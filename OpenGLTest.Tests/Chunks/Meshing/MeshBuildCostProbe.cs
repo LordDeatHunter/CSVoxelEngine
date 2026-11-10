@@ -39,14 +39,14 @@ public sealed class MeshBuildCostProbe
     private const int TimedBuilds = 300;
     private const int Seed = 26;
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
     public void GreedyMeshBuildCost()
     {
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var lamp = Block("lamp");
-        byte[] solids = [Block("stone"), Block("dirt"), Block("oak_leaves"), Block("glass")];
+        ushort[] solids = [Block("stone"), Block("dirt"), Block("oak_leaves"), Block("glass")];
 
         // Fill in a fixed order: the dictionary's enumeration order changes per process
         var chunks = manager.Chunks.Values
@@ -59,7 +59,7 @@ public sealed class MeshBuildCostProbe
             for (var z = 0; z < Chunk.Size; z++)
             {
                 var r = rng.NextDouble();
-                var id = r < 0.55 ? (byte)0
+                var id = r < 0.55 ? BlockType.Air
                     : r < 0.565 ? lamp
                     : solids[rng.Next(solids.Length)];
                 chunk.SetBlockRaw(x, y, z, id, 0);
@@ -67,7 +67,7 @@ public sealed class MeshBuildCostProbe
 
         Measure("A (default-color lamps)", manager, center);
 
-        byte blueLamp;
+        ushort blueLamp;
         try
         {
             blueLamp = Block("blue_lamp");

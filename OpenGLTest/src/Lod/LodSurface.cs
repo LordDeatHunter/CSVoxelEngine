@@ -18,8 +18,8 @@ namespace VoxelEngine.Lod;
 /// window and the height bias, so the nesting and burial invariants hold by construction.
 /// </summary>
 /// <remarks>
-/// Bucketed by chunk column exactly like the caps: a <c>Chunk.Size * Chunk.Size</c> int array
-/// indexed like a heightmap, <see cref="None"/> where the column has no override. Written on the
+/// Bucketed by chunk column exactly like the caps: a <c>Chunk.Size * Chunk.Size</c> long array
+/// (<see cref="Pack"/>) indexed like a heightmap, <see cref="None"/> where the column has no override. Written on the
 /// main thread, read on the LodGen workers; the bucket publishes through the ConcurrentDictionary
 /// and each element through <c>Volatile.Write</c>, the caps' publish order. Process-global but
 /// per WORLD: <see cref="WorldSeed.Apply"/> resets it between worlds, and a save carries it
@@ -27,24 +27,31 @@ namespace VoxelEngine.Lod;
 /// </remarks>
 public static class LodSurface
 {
-    private static readonly ConcurrentDictionary<(int CX, int CZ), int[]> Overrides = new();
+    private static readonly ConcurrentDictionary<(int CX, int CZ), long[]> Overrides = new();
 
     private static int _editVersion;
 
     /// <summary>
-    /// "No override". <see cref="Pack"/> could only produce it for a top of -8388608 with block 0,
-    /// which no world height reaches.
+    /// "No override". No <see cref="Pack"/> produces it: a packed top is an int shifted left by
+    /// 16, so the value's top 16 bits are always the sign extension of bit 47, never the lone sign
+    /// bit of <see cref="long.MinValue"/>.
     /// </summary>
-    internal const int None = int.MinValue;
+    internal const long None = long.MinValue;
 
-    /// <summary>Top in the high 24 bits (sign kept), block id in the low 8.</summary>
-    internal static int Pack(int top, byte block) => (top << 8) | block;
+    private const int BlockShift = 16;
+    private const long BlockMask = 0xFFFF;
+
+    /// <summary>
+    /// The top (any int, sign kept) in bits 16-47 and the block id in the low 16 bits, so every
+    /// int top and every id fit, edits far above the generated terrain included.
+    /// </summary>
+    internal static long Pack(int top, ushort block) => ((long)top << BlockShift) | block;
 
     /// <summary>Inverse of <see cref="Pack"/>: an arithmetic shift keeps a negative top.</summary>
-    internal static void Unpack(int value, out int top, out byte block)
+    internal static void Unpack(long value, out int top, out ushort block)
     {
-        top = value >> 8;
-        block = (byte)value;
+        top = (int)(value >> BlockShift);
+        block = (ushort)(value & BlockMask);
     }
 
     /// <summary>Bumped by every <see cref="Set"/> that changes a column, so a save can tell whether anything changed.</summary>
@@ -54,12 +61,12 @@ public static class LodSurface
     internal static bool IsEmpty => Overrides.IsEmpty;
 
     /// <summary>The override bucket of chunk column (cx, cz), or null when it holds none.</summary>
-    internal static int[]? BucketOf(int cx, int cz) =>
+    internal static long[]? BucketOf(int cx, int cz) =>
         Overrides.TryGetValue((cx, cz), out var bucket) ? bucket : null;
 
-    private static int[] NewBucket()
+    private static long[] NewBucket()
     {
-        var bucket = new int[Chunk.Size * Chunk.Size];
+        var bucket = new long[Chunk.Size * Chunk.Size];
         Array.Fill(bucket, None);
         return bucket;
     }
@@ -68,14 +75,14 @@ public static class LodSurface
         ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
 
     /// <summary>The override of world column (x, z), if it has one.</summary>
-    internal static bool TryGet(int x, int z, out int top, out byte block)
+    internal static bool TryGet(int x, int z, out int top, out ushort block)
     {
         var bucket = BucketOf(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
         var value = bucket != null ? Volatile.Read(ref bucket[LocalIndex(x, z)]) : None;
         if (value == None)
         {
             top = 0;
-            block = 0;
+            block = BlockType.Air;
             return false;
         }
 
@@ -89,7 +96,7 @@ public static class LodSurface
     /// already held exactly this override, so a repeated record never bumps
     /// <see cref="EditVersion"/> (which drives lod-edits.bin autosaves) or rebuilds a region.
     /// </summary>
-    internal static bool Set(int x, int z, int top, byte block)
+    internal static bool Set(int x, int z, int top, ushort block)
     {
         var packed = Pack(top, block);
         var bucket = Overrides.GetOrAdd((x >> Chunk.SizeShift, z >> Chunk.SizeShift), static _ => NewBucket());
@@ -117,7 +124,7 @@ public static class LodSurface
     /// leaves, tree wood, pebbles, flowers, snow layers and fluids never count, so trees stay
     /// with the canopy path and a player-built ice or glass structure never raises the LOD.
     /// </summary>
-    internal static bool IsSurfaceSolid(byte id) => BlockType.IsSolid(id) && BlockType.Occludes(id);
+    internal static bool IsSurfaceSolid(ushort id) => BlockType.IsSolid(id) && BlockType.Occludes(id);
 
     /// <summary>Forgets every override, which belongs to the previous world; only <see cref="WorldSeed.Apply"/> calls it.</summary>
     internal static void Reset() => Overrides.Clear();
@@ -126,12 +133,12 @@ public static class LodSurface
     /// A copy of every override bucket that overrides at least one column, for the per-world LOD
     /// edit save (<c>LodEditState</c>). Main thread (the only writer), so the copies are consistent.
     /// </summary>
-    internal static List<(int CX, int CZ, int[] Values)> Export()
+    internal static List<(int CX, int CZ, long[] Values)> Export()
     {
-        var result = new List<(int CX, int CZ, int[] Values)>();
+        var result = new List<(int CX, int CZ, long[] Values)>();
         foreach (var (key, bucket) in Overrides)
         {
-            var copy = new int[bucket.Length];
+            var copy = new long[bucket.Length];
             var any = false;
             for (var i = 0; i < copy.Length; i++)
             {
@@ -151,11 +158,11 @@ public static class LodSurface
     /// replaced by the older saved surface. Call before <c>LodManager.Start</c> so the first region
     /// builds see it. Leaves <see cref="EditVersion"/> alone: the imported state is what the file holds.
     /// </summary>
-    internal static void Import(IEnumerable<(int CX, int CZ, int[] Values)> overrides)
+    internal static void Import(IEnumerable<(int CX, int CZ, long[] Values)> overrides)
     {
         foreach (var (cx, cz, values) in overrides)
         {
-            int[]? bucket = null;
+            long[]? bucket = null;
             var n = Math.Min(values.Length, Chunk.Size * Chunk.Size);
             for (var i = 0; i < n; i++)
             {
@@ -240,13 +247,13 @@ public static class LodSurface
             for (var yy = y - 1; yy >= y - depth; yy--)
             {
                 if (!chunks.TryGetCell(x, yy, z, out var below, out _))
-                    return Set(x, z, yy, 0);
+                    return Set(x, z, yy, BlockType.Air);
 
                 if (IsSurfaceSolid(below))
                     return Set(x, z, yy, below);
             }
 
-            return Set(x, z, y - depth - 1, 0);
+            return Set(x, z, y - depth - 1, BlockType.Air);
         }
 
         return !IsSurfaceSolid(id) && LodColumnCaps.LowerColumnBelow(chunks.WorldSource, x, y, z);

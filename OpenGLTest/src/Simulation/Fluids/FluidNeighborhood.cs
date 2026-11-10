@@ -18,7 +18,7 @@ internal sealed class FluidNeighborhood(FluidCells cells)
     /// 2x2 pool), <see cref="FluidState.Falling"/> when fed from above, else the thinnest
     /// flowing level its neighbors can support.
     /// </summary>
-    internal int ComputeState(int x, int y, int z, byte fluid)
+    internal int ComputeState(int x, int y, int z, ushort fluid)
     {
         var maxAmount = 0;
         var sources = 0;
@@ -56,7 +56,7 @@ internal sealed class FluidNeighborhood(FluidCells cells)
 
     /// <summary>Whether any of the six face neighbors of a cell holds the given fluid.
     /// Unloaded neighbors read as absent, never as contact.</summary>
-    internal bool TouchesFluid(int x, int y, int z, byte fluidId)
+    internal bool TouchesFluid(int x, int y, int z, ushort fluidId)
     {
         foreach (var (dx, dy, dz) in Horizontals)
         {
@@ -73,7 +73,7 @@ internal sealed class FluidNeighborhood(FluidCells cells)
     /// neighboring fluid hardens on its touch (water reaching lava crusts to the lava's
     /// cobblestone), or 0 when no neighbor does. Unloaded neighbors harden nothing.
     /// </summary>
-    internal byte HardenedByNeighbor(int x, int y, int z, byte fluid)
+    internal ushort HardenedByNeighbor(int x, int y, int z, ushort fluid)
     {
         foreach (var (dx, dy, dz) in Horizontals)
         {
@@ -100,7 +100,7 @@ internal sealed class FluidNeighborhood(FluidCells cells)
     }
 
     /// <summary>Horizontally adjacent source cells of the same fluid.</summary>
-    internal int SourceNeighborCount(int x, int y, int z, byte fluid)
+    internal int SourceNeighborCount(int x, int y, int z, ushort fluid)
     {
         var count = 0;
         foreach (var (dx, dy, dz) in Horizontals)

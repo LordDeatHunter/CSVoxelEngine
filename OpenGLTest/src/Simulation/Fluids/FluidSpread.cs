@@ -34,7 +34,7 @@ internal sealed class FluidSpread
     /// a cell that already holds fluid recomputes itself on its own tick, which is how the cell
     /// under fresh water turns into a falling column.
     /// </summary>
-    internal void Spread(int x, int y, int z, byte fluid, byte state, DropManager drops)
+    internal void Spread(int x, int y, int z, ushort fluid, byte state, DropManager drops)
     {
         if (CanFlowInto(x, y - 1, z))
         {
@@ -52,7 +52,7 @@ internal sealed class FluidSpread
     }
 
     /// <summary>Flows into the neighboring cells the slope search picked out.</summary>
-    private void SpreadSides(int x, int y, int z, byte fluid, byte state, DropManager drops)
+    private void SpreadSides(int x, int y, int z, ushort fluid, byte state, DropManager drops)
     {
         // Level 7 has nothing left to give
         if (FluidState.Amount(state) - 1 <= 0) return;
@@ -83,7 +83,7 @@ internal sealed class FluidSpread
     /// <see cref="SimulationConfig.FluidSlopeSearchDistance"/> blocks. On flat ground no
     /// direction finds a hole, they all tie, and the water spreads evenly.
     /// </summary>
-    private List<(int X, int Y, int Z)> ChooseSpreadDirections(int x, int y, int z, byte fluid)
+    private List<(int X, int Y, int Z)> ChooseSpreadDirections(int x, int y, int z, ushort fluid)
     {
         var best = NoSlope;
         var chosen = _spreadDirections;
@@ -131,7 +131,7 @@ internal sealed class FluidSpread
     /// <see cref="SimulationConfig.FluidSlopeSearchDistance"/>. Never turns back on
     /// itself (<paramref name="exclude"/>), so the search fans out.
     /// </summary>
-    private int SlopeDistance(int x, int y, int z, int depth, (int X, int Y, int Z) exclude, byte fluid)
+    private int SlopeDistance(int x, int y, int z, int depth, (int X, int Y, int Z) exclude, ushort fluid)
     {
         var best = NoSlope;
 
@@ -165,7 +165,7 @@ internal sealed class FluidSpread
     /// Fills a cell with fluid at the level its surroundings support, popping whatever fragile
     /// block the flow washed away (a pebble drops its flint) and rescheduling the neighborhood.
     /// </summary>
-    private void Flow(int x, int y, int z, byte fluid, DropManager drops)
+    private void Flow(int x, int y, int z, ushort fluid, DropManager drops)
     {
         var state = _neighborhood.ComputeState(x, y, z, fluid);
 
@@ -175,7 +175,7 @@ internal sealed class FluidSpread
 
         // A flow that would land touching the fluid that hardens it arrives hardened:
         // lava reaching water comes out as cobblestone, not as a one-tick lava cell
-        byte writeId = fluid;
+        var writeId = fluid;
         byte writeState = (byte)state;
         var hardensTo = BlockType.HardensToById[fluid];
         if (hardensTo != 0 && _neighborhood.TouchesFluid(x, y, z, BlockType.HardensTouchingById[fluid]))
@@ -222,7 +222,7 @@ internal sealed class FluidSpread
 
     /// <summary>Whether a cell would let fluid drain into it: replaceable, or already the same
     /// fluid. What the slope search calls a "hole".</summary>
-    private bool IsWaterHole(int x, int y, int z, byte fluid)
+    private bool IsWaterHole(int x, int y, int z, ushort fluid)
     {
         return _cells.TryGetCell(x, y, z, out var id, out _)
                && (BlockType.IsReplaceable(id) || id == fluid);
@@ -230,7 +230,7 @@ internal sealed class FluidSpread
 
     /// <summary>Whether the slope search may travel through a cell: replaceable, or the same
     /// fluid but not a source (a source is a destination, not a corridor).</summary>
-    private bool CanPassThrough(int x, int y, int z, byte fluid)
+    private bool CanPassThrough(int x, int y, int z, ushort fluid)
     {
         if (!_cells.TryGetCell(x, y, z, out var id, out var state)) return false;
         return BlockType.IsReplaceable(id) || (id == fluid && !FluidState.IsSource(state));

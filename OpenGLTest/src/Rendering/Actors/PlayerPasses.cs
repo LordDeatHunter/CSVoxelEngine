@@ -30,7 +30,7 @@ internal sealed class PlayerPasses : IDisposable
     private Dictionary<string, Mesh> _playerMeshes = new();
 
     // Armor shells, built on first use per (part, piece): the part's cuboids grown a little and tinted by the piece
-    private readonly Dictionary<(string Part, byte Piece), Mesh> _armorMeshes = new();
+    private readonly Dictionary<(string Part, ushort Piece), Mesh> _armorMeshes = new();
 
     /// <summary>How far an armor shell stands off the body, in blocks (a mob's shells too, <see cref="MobPasses"/>).</summary>
     internal const float ArmorInflate = 0.03f;
@@ -226,7 +226,7 @@ internal sealed class PlayerPasses : IDisposable
     /// sprite's matrix are <see cref="HeldItemPose"/>'s, shared with the slice trail and the item
     /// debugger.
     /// </summary>
-    internal void RenderHeldItem(Camera camera, PlayerModel player, byte selectedId, bool hasHeld,
+    internal void RenderHeldItem(Camera camera, PlayerModel player, ushort selectedId, bool hasHeld,
         float timeSeconds, float headingDegrees)
     {
         if (camera == null || player == null || selectedId == 0 || !hasHeld) return;

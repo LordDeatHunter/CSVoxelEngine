@@ -50,10 +50,10 @@ public sealed class HellFloraTests : IDisposable
 
     private static int LayerTop(int layer) => WorldGenerationConfig.HellTopY - layer * Period;
 
-    private static bool IsPlant(byte block) =>
+    private static bool IsPlant(ushort block) =>
         block != BlockType.Air && AllBiomes.Any(b => HellBiomes.Palette(b).GroundPlant == block);
 
-    private static bool IsFlora(byte block) => block == HellFlora.VineBlock || IsPlant(block);
+    private static bool IsFlora(ushort block) => block == HellFlora.VineBlock || IsPlant(block);
 
     /// <summary>A chunk column wholly in <paramref name="biome"/> (at its corners) in <paramref name="layer"/>.</summary>
     private static (int Cx, int Cz) ColumnIn(HellBiome biome, int layer, int skip = 0)
@@ -85,9 +85,9 @@ public sealed class HellFloraTests : IDisposable
             Z0 = cz * Chunk.Size;
             Y0 = Cy0 * Chunk.Size;
             Height = (cy1 - Cy0 + 1) * Chunk.Size;
-            Blocks = new byte[Chunk.Size * Height * Chunk.Size];
+            Blocks = new ushort[Chunk.Size * Height * Chunk.Size];
 
-            var chunk = new byte[Volume];
+            var chunk = new ushort[Volume];
             for (var cy = Cy0; cy <= cy1; cy++)
             {
                 Array.Clear(chunk);
@@ -104,11 +104,11 @@ public sealed class HellFloraTests : IDisposable
         public int Z0 { get; }
         public int Cy0 { get; }
         public int Height { get; }
-        public byte[] Blocks { get; }
+        public ushort[] Blocks { get; }
 
         public int Index(int x, int y, int z) => (x * Height + y) * Chunk.Size + z;
 
-        public byte At(int x, int y, int z) => Blocks[Index(x, y, z)];
+        public ushort At(int x, int y, int z) => Blocks[Index(x, y, z)];
     }
 
     [Fact]
@@ -175,8 +175,8 @@ public sealed class HellFloraTests : IDisposable
     [Fact]
     public void TheStampEqualsThePointQueryWithTheFloraInPlace()
     {
-        var blocks = new byte[Volume];
-        var floraSeen = new HashSet<byte>();
+        var blocks = new ushort[Volume];
+        var floraSeen = new HashSet<ushort>();
         foreach (var biome in AllBiomes)
         {
             var (cx, cz) = ColumnIn(biome, 0, skip: 1);
@@ -222,10 +222,10 @@ public sealed class HellFloraTests : IDisposable
         }
         Assert.Equal(first, Flora());
 
-        List<(int Index, byte Block)> Flora()
+        List<(int Index, ushort Block)> Flora()
         {
             var column = new PocketColumn(cx, cz, 0);
-            var list = new List<(int, byte)>();
+            var list = new List<(int, ushort)>();
             for (var i = 0; i < column.Blocks.Length; i++)
                 if (IsFlora(column.Blocks[i])) list.Add((i, column.Blocks[i]));
             return list;
@@ -287,7 +287,7 @@ public sealed class HellFloraTests : IDisposable
             .First(t => t.Tree.MinY >> Chunk.SizeShift != t.Tree.MaxY >> Chunk.SizeShift);
         var expected = tree.Cells.ToDictionary(c => (c.X, c.Y, c.Z), c => (c.Block, c.State));
 
-        var stamped = new Dictionary<(int, int, int), (byte, byte)>();
+        var stamped = new Dictionary<(int, int, int), (ushort, byte)>();
         var x0 = tree.X >> Chunk.SizeShift << Chunk.SizeShift;
         var z0 = tree.Z >> Chunk.SizeShift << Chunk.SizeShift;
         for (var cy = tree.MinY >> Chunk.SizeShift; cy <= tree.MaxY >> Chunk.SizeShift; cy++)
@@ -347,7 +347,7 @@ public sealed class HellFloraTests : IDisposable
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var origin = center.Position * Chunk.Size;
-        byte At(int x, int y, int z) => manager.GetBlockGlobal((int)origin.X + x, (int)origin.Y + y, (int)origin.Z + z);
+        ushort At(int x, int y, int z) => manager.GetBlockGlobal((int)origin.X + x, (int)origin.Y + y, (int)origin.Z + z);
 
         // A ceiling cell inside the blast, its vine hanging down through the blast's edge and on below
         // the box the support scan covers; a second vine under a ceiling the blast never reaches

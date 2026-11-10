@@ -44,7 +44,7 @@ public sealed class KilnManagerTests
             Assert.True(kilns.TryAddFuel(anchor, Coal));
     }
 
-    private static void SetCell(ChunkManager manager, Vector3 cell, byte id, byte state)
+    private static void SetCell(ChunkManager manager, Vector3 cell, ushort id, byte state)
     {
         var chunk = manager.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z);
         Assert.NotNull(chunk);
@@ -52,7 +52,7 @@ public sealed class KilnManagerTests
         chunk!.SetBlockRaw(lx, ly, lz, id, state);
     }
 
-    private static (byte Id, byte State) Cell(ChunkManager manager, Vector3 cell)
+    private static (ushort Id, byte State) Cell(ChunkManager manager, Vector3 cell)
     {
         Assert.True(manager.TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out var state));
         return (id, state);

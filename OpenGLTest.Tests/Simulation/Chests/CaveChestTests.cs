@@ -23,7 +23,7 @@ public sealed class CaveChestTests
 {
     public CaveChestTests() => TestContent.EnsureLoaded();
 
-    private static byte Chest => ContentRegistry.RequireBlock("ruin_chest_underground").Id;
+    private static ushort Chest => ContentRegistry.RequireBlock("ruin_chest_underground").Id;
     private static ChestProfile Profile => BlockType.ById[Chest]!.Chest!;
 
     private static string Describe(ChestState c) => string.Join(",", Enumerable.Range(0, c.SlotCount)
@@ -37,7 +37,7 @@ public sealed class CaveChestTests
         return map;
     }
 
-    // Every cell the whole footprint writes (block | state << 8), stamped through the chunks it spans from origin (0, 0, 0)
+    // Every cell the whole footprint writes (a packed StructureCell), stamped through the chunks it spans from origin (0, 0, 0)
     private static Dictionary<(int, int, int), int> StampAll(StructureTemplate template, int turns, CaveBiomeMap? map)
     {
         var written = new Dictionary<(int, int, int), int>();
@@ -45,7 +45,7 @@ public sealed class CaveChestTests
         foreach (var cy in new[] { 0, Chunk.Size })
         foreach (var cz in new[] { 0, Chunk.Size })
         {
-            var blocks = new byte[Chunk.BlockCount];
+            var blocks = new ushort[Chunk.BlockCount];
             byte[]? state = null;
             StructureStamper.Stamp(blocks, ref state, cx, cy, cz, template, turns, 0, 0, 0, int.MinValue, int.MaxValue,
                 chestBiomes: map);
@@ -56,14 +56,14 @@ public sealed class CaveChestTests
                 var i = Chunk.Idx(lx, ly, lz);
                 var s = state?[i] ?? 0;
                 if (blocks[i] == 0 && s == 0) continue;
-                written[(cx + lx, cy + ly, cz + lz)] = blocks[i] | (s << 8);
+                written[(cx + lx, cy + ly, cz + lz)] = StructureCell.Pack(blocks[i], s);
             }
         }
         return written;
     }
 
     private static IEnumerable<StructureTemplate> ChestRooms =>
-        StructureRegistry.Of(StructureKind.Underground).Where(t => StampAll(t, 0, null).Values.Any(c => (c & 0xFF) == Chest));
+        StructureRegistry.Of(StructureKind.Underground).Where(t => StampAll(t, 0, null).Values.Any(c => StructureCell.BlockOf(c) == Chest));
 
     [Fact]
     public void EveryCaveBiomeHasItsOwnLoadedChestTable()
@@ -96,15 +96,15 @@ public sealed class CaveChestTests
             foreach (var (cell, before) in plain)
             {
                 var after = flavoured[cell];
-                Assert.Equal(before & 0xFF, after & 0xFF);
-                if ((before & 0xFF) != Chest)
+                Assert.Equal(StructureCell.BlockOf(before), StructureCell.BlockOf(after));
+                if (StructureCell.BlockOf(before) != Chest)
                 {
                     Assert.Equal(before, after);
                     continue;
                 }
                 chests++;
-                var stateBefore = (byte)(before >> 8);
-                var stateAfter = (byte)(after >> 8);
+                var stateBefore = StructureCell.StateOf(before);
+                var stateAfter = StructureCell.StateOf(after);
                 Assert.Equal(0, ChestProfile.TierOf(stateBefore));
                 Assert.Equal((int)CaveBiome.Fungal, ChestProfile.TierOf(stateAfter));
                 Assert.Equal(stateBefore & 3, stateAfter & 3);

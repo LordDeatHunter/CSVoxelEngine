@@ -116,7 +116,7 @@ internal static class EntityLoader
     /// every one of its models has, posed by the same <c>display</c> shape and parser as an item file.
     /// Nothing held is item 0 with an identity transform.
     /// </summary>
-    private static (byte ItemId, string? Part, Matrix4x4 Transform) ParseHeld(EntityDefinition.HeldDefinition? held,
+    private static (ushort ItemId, string? Part, Matrix4x4 Transform) ParseHeld(EntityDefinition.HeldDefinition? held,
         string path, IReadOnlyList<BbmodelData> models)
     {
         if (held == null) return (0, null, Matrix4x4.Identity);

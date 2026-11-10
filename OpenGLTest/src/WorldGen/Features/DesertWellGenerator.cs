@@ -14,8 +14,8 @@ namespace VoxelEngine.WorldGen.Features;
 public static class DesertWellGenerator
 {
     /// <summary>Blocks this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte SandstoneBlock;
-    public static readonly byte WaterBlock;
+    public static readonly ushort SandstoneBlock;
+    public static readonly ushort WaterBlock;
 
     /// <summary>The footprint's half width: the 5x5 well reaches this many columns from its center.</summary>
     internal const int FootprintRadius = 2;
@@ -49,7 +49,7 @@ public static class DesertWellGenerator
     /// cell only, clipped at the chunk's border. Runs on a generation worker thread after the
     /// trees.
     /// </summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0)
     {
         var shift = WorldFeatureConfig.WellCellShift;
         var minCellX = (worldX0 - FootprintRadius) >> shift;
@@ -84,7 +84,7 @@ public static class DesertWellGenerator
     /// center the water source), into air and the surface cell only, clipped to the chunk whose origin
     /// is (<paramref name="worldX0"/>, <paramref name="worldY0"/>, <paramref name="worldZ0"/>). The test seam for the shape.
     /// </summary>
-    internal static void StampWell(byte[] blocks, int worldX0, int worldY0, int worldZ0, int x, int z, int ground)
+    internal static void StampWell(ushort[] blocks, int worldX0, int worldY0, int worldZ0, int x, int z, int ground)
     {
         for (var dx = -FootprintRadius; dx <= FootprintRadius; dx++)
         for (var dz = -FootprintRadius; dz <= FootprintRadius; dz++)

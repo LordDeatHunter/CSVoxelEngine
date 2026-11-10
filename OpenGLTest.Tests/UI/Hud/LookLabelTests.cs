@@ -15,13 +15,13 @@ public sealed class LookLabelTests
 {
     public LookLabelTests() => TestContent.EnsureLoaded();
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
     public void ABlockIsUnknownUntilItsItemIsObtained()
     {
         var stone = Block("stone");
-        var known = new System.Collections.Generic.HashSet<byte>();
+        var known = new System.Collections.Generic.HashSet<ushort>();
 
         var unknown = LookLabel.For(stone, creative: false, known.Contains, held: null);
         Assert.Equal("Unknown", unknown.Text);

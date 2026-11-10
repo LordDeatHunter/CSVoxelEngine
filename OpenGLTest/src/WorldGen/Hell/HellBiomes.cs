@@ -23,7 +23,7 @@ public static class HellBiomes
     {
         Reseed();
 
-        byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+        ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
         var hellrock = Block("hellrock");
         var scorched = Block("scorched_hellrock");
         var basalt = Block("basalt");

@@ -328,6 +328,50 @@ public sealed class NetworkProtocolTests
         for (var turns = 0; turns < 4; turns++)
             Assert.Equal(turns, NetEntity.TurnsFromYaw(NetEntity.YawFromTurns(turns)));
     }
+
+    [Fact]
+    public void UInt16RoundTripsAndConsumesExactlyTwoBytes()
+    {
+        // Values on both sides of the byte boundary: a reader that took one byte, or three, would misread the sentinel
+        ushort[] values = [0, 0x00FF, 0x0100, ushort.MaxValue];
+        const int sentinel = 0x5EED_1234;
+        using var writer = new PacketWriter(NetMessage.KeepAlive);
+        foreach (var value in values)
+            writer.Write(value).Write(sentinel);
+        var payload = writer.ToArray();
+        Assert.Equal(1 + values.Length * (sizeof(ushort) + sizeof(int)), payload.Length);
+
+        using var reader = new PacketReader(payload);
+        Assert.Equal(NetMessage.KeepAlive, reader.Message);
+        foreach (var value in values)
+        {
+            Assert.Equal(value, reader.ReadUInt16());
+            Assert.Equal(sentinel, reader.ReadInt());
+        }
+        Assert.Throws<EndOfStreamException>(() => reader.ReadByte());
+    }
+
+    [Fact]
+    public void ABlockOrItemIdRoundTripsAtItsExtremes()
+    {
+        // An id takes exactly the width of the id type on the wire, so the field after it reads back intact
+        ushort[] ids = [BlockType.Air, ushort.MaxValue];
+        const int sentinel = 0x5EED_1234;
+        using var writer = new PacketWriter(NetMessage.KeepAlive);
+        foreach (var id in ids)
+            writer.WriteId(id).Write(sentinel);
+        var payload = writer.ToArray();
+        Assert.Equal(1 + ids.Length * (sizeof(ushort) + sizeof(int)), payload.Length);
+
+        using var reader = new PacketReader(payload);
+        Assert.Equal(NetMessage.KeepAlive, reader.Message);
+        foreach (var id in ids)
+        {
+            Assert.Equal(id, reader.ReadId());
+            Assert.Equal(sentinel, reader.ReadInt());
+        }
+        Assert.Throws<EndOfStreamException>(() => reader.ReadByte());
+    }
 }
 
 /// <summary>

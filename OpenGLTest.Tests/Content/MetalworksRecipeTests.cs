@@ -15,9 +15,9 @@ public sealed class MetalworksRecipeTests
 {
     public MetalworksRecipeTests() => TestContent.EnsureLoaded();
 
-    private static byte Item(string name) => ContentRegistry.RequireItem(name).Id;
+    private static ushort Item(string name) => ContentRegistry.RequireItem(name).Id;
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
     public void EveryPureCopperFormMeltsIntoOneMaterialAndBranchDoesNot()

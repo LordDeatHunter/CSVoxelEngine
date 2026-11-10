@@ -20,7 +20,7 @@ public sealed class TinTests
         var ore = TinGenerator.OreBlock;
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         var oreCells = 0;
         for (var x0 = 0; x0 < 128; x0 += Chunk.Size)
         for (var z0 = 0; z0 < 128; z0 += Chunk.Size)

@@ -14,7 +14,7 @@ public sealed class DropPickupTests
 {
     public DropPickupTests() => TestContent.EnsureLoaded();
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
 
     // One loaded, empty chunk at the origin (cells 0..15 on every axis)
     private static ChunkManager OriginChunk()

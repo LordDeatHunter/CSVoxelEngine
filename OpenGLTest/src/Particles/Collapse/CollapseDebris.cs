@@ -26,7 +26,7 @@ public sealed class CollapseDebris
     /// <param name="lifetime">Seconds until it bursts.</param>
     /// <param name="tumbleAxis">The axis it tumbles about in the air (normalized here).</param>
     /// <param name="tumbleRate">How fast it tumbles in the air, in radians per second.</param>
-    public CollapseDebris(byte blockId, Vector3 position, Vector3 velocity, float size, float lifetime,
+    public CollapseDebris(ushort blockId, Vector3 position, Vector3 velocity, float size, float lifetime,
         Vector3 tumbleAxis, float tumbleRate)
     {
         BlockId = blockId;
@@ -39,7 +39,7 @@ public sealed class CollapseDebris
     }
 
     /// <summary>The block the cube is drawn as.</summary>
-    public byte BlockId { get; }
+    public ushort BlockId { get; }
 
     /// <summary>The cube's center, in world blocks.</summary>
     public Vector3 Position { get; private set; }

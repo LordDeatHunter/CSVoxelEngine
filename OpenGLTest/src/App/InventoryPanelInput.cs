@@ -113,7 +113,7 @@ internal sealed class InventoryPanelInput
 
     /// <summary>What a listed row names: its item id, the tool or gear instance it stands for (else 0), and the
     /// recipe it opens (a recipe row or hit, else null).</summary>
-    internal readonly record struct RowEntry(byte Id, int ToolInstance, CraftingRecipe? Recipe);
+    internal readonly record struct RowEntry(ushort Id, int ToolInstance, CraftingRecipe? Recipe);
 
     /// <summary>
     /// The listed row under a window-pixel point and what it names, read from the list the panel shows this frame
@@ -372,7 +372,7 @@ internal sealed class InventoryPanelInput
             return;
         }
 
-        inventoryView.SelectedId = hit.ToolInstance > 0 ? (byte)0 : hit.Id;
+        inventoryView.SelectedId = hit.ToolInstance > 0 ? (ushort)0 : hit.Id;
         inventoryView.SelectedToolInstance = hit.ToolInstance;
         // The hotbar equip and the preview read the pick through the current tab, so a tool
         // picked from the Blocks tab's search has to land on the Tools tab to be equippable.
@@ -393,7 +393,7 @@ internal sealed class InventoryPanelInput
 
     /// <summary>Grants a catalog id to the player and picks it; the catalog's +1/+10/+100 buttons and the row body go
     /// through here. The grant never lands on the hotbar by itself: a click on a slot (or a drop) puts it there.</summary>
-    internal void GrantFromCreative(byte id, int amount)
+    internal void GrantFromCreative(ushort id, int amount)
     {
         var inventory = ActiveWorld!.Inventory;
         if (!inventory.Add(id, amount, autoEquip: false)) return;
@@ -401,14 +401,14 @@ internal sealed class InventoryPanelInput
         session.SendInventoryIntent(InventoryIntent.CreativeGrant(id, amount));
         var instance = RowEquip.FirstInstanceOf(inventory, id);
         inventoryView.SelectedToolInstance = instance;
-        inventoryView.SelectedId = instance != 0 ? (byte)0 : id;
+        inventoryView.SelectedId = instance != 0 ? (ushort)0 : id;
     }
 
     /// <summary>
     /// Acts on one creative catalog row click: a button grants its amount or clears the id's
     /// counts, the row body grants one.
     /// </summary>
-    private void ApplyCatalogButton(byte id, int row, float offset, int rowCount,
+    private void ApplyCatalogButton(ushort id, int row, float offset, int rowCount,
         Vector2 position)
     {
         var button = InventoryPanelLayout.CatalogButtonAt(renderManager.Ui.ToCanvas(position),
@@ -718,7 +718,7 @@ internal sealed class InventoryPanelInput
                     // The fed members are read before the craft, which spends the reservation
                     var recipe = craft.Recipe;
                     var batch = craft.Batch;
-                    var members = new byte[recipe?.Ingredients.Length ?? 0];
+                    var members = new ushort[recipe?.Ingredients.Length ?? 0];
                     for (var i = 0; i < members.Length; i++)
                         members[i] = craft.FedAt(i).MemberId;
                     if (craft.Craft(inventory) && recipe != null)

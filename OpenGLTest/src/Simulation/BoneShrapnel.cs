@@ -27,7 +27,7 @@ internal sealed class BoneShrapnel
     private readonly ChunkManager _chunks;
     private readonly BlockDebrisSystem _debris;
     private readonly bool _serverMode;
-    private readonly byte _boneId;
+    private readonly ushort _boneId;
     private readonly List<Fragment> _live = [];
 
     internal BoneShrapnel(World world, ChunkManager chunks, BlockDebrisSystem debris, bool serverMode)

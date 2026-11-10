@@ -18,10 +18,10 @@ public static class CoalGenerator
     private static FastNoiseLite VeinNoise;
 
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte OreBlock;
+    public static readonly ushort OreBlock;
 
-    private static readonly byte RockBlock;
-    private static readonly byte SandstoneBlock;
+    private static readonly ushort RockBlock;
+    private static readonly ushort SandstoneBlock;
 
     /// <summary>How the vein threshold shifts per cave biome (CB-2): richer in fungal and desert echo caves,
     /// burned out in the magma-touched deep.</summary>
@@ -51,7 +51,7 @@ public static class CoalGenerator
     /// Whether the host cell (x, y, z), of cave biome <paramref name="caveBiome"/>, is coal ore: the
     /// interpolated <see cref="OreNoiseLattice"/> field exceeds the threshold shifted by that biome's
     /// richness there. Threshold test only; the caller decides what counts as a replaceable host. Equals
-    /// what <see cref="Stamp(byte[], int, int, int, CaveBiomeMap)"/> writes given a map holding that biome there.
+    /// what <see cref="Stamp(ushort[], int, int, int, CaveBiomeMap)"/> writes given a map holding that biome there.
     /// </summary>
     public static bool HasOre(int x, int y, int z, CaveBiome caveBiome)
     {
@@ -59,8 +59,8 @@ public static class CoalGenerator
             WorldGenerationConfig.CoalThreshold + Richness.ShiftOf(caveBiome));
     }
 
-    /// <summary>Stamps the chunk as if every cell were plain (<see cref="Stamp(byte[], int, int, int, CaveBiomeMap)"/>).</summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0) =>
+    /// <summary>Stamps the chunk as if every cell were plain (<see cref="Stamp(ushort[], int, int, int, CaveBiomeMap)"/>).</summary>
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0) =>
         Stamp(blocks, worldX0, worldY0, worldZ0, null);
 
     /// <summary>
@@ -69,7 +69,7 @@ public static class CoalGenerator
     /// lava, air and every other feature's output pass through untouched. <paramref name="caves"/> is the
     /// chunk's cave biome map, null when every cell is plain.
     /// </summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0, CaveBiomeMap? caves)
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0, CaveBiomeMap? caves)
     {
         OreNoiseLattice.Stamp(blocks, VeinNoise, WorldGenerationConfig.CoalThreshold,
             worldX0, worldY0, worldZ0, new VeinRule(caves?.Cells));
@@ -78,10 +78,10 @@ public static class CoalGenerator
     /// <summary>Coal replaces stone and sandstone, its threshold shifted by each cell's cave biome (null: all plain).</summary>
     private readonly struct VeinRule(byte[]? biomes) : IOreLatticeRule
     {
-        public bool IsHost(byte block, int localX, int localY, int localZ) =>
+        public bool IsHost(ushort block, int localX, int localY, int localZ) =>
             block == RockBlock || block == SandstoneBlock;
 
-        public byte Replacement(int worldX, int worldY, int worldZ) => OreBlock;
+        public ushort Replacement(int worldX, int worldY, int worldZ) => OreBlock;
 
         public float ThresholdShift(int localX, int localY, int localZ) =>
             biomes is null ? 0f : Richness.ShiftOf((CaveBiome)biomes[Chunk.Idx(localX, localY, localZ)]);

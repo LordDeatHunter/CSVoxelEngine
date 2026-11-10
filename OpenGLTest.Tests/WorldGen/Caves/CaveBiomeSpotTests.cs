@@ -127,7 +127,7 @@ public sealed class CaveBiomeSpotTests
     }
 
     /// <summary>The non-occluding cells in the 7x3x7 box over floor cell (x, y, z), inside the chunk.</summary>
-    private static int OpenCellsOver(byte[] blocks, int x, int y, int z)
+    private static int OpenCellsOver(ushort[] blocks, int x, int y, int z)
     {
         var open = 0;
         for (var dx = -RoomHalf; dx <= RoomHalf; dx++)

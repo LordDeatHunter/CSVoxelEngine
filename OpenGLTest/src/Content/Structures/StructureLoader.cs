@@ -39,7 +39,7 @@ internal static class StructureLoader
         var groundLayer = d.GroundLayer ?? 0;
         if ((uint)groundLayer >= layers.Length) throw new InvalidOperationException(Fail("has a groundLayer outside its layers."));
 
-        var palette = new Dictionary<char, (byte Block, byte State, bool Facing)>();
+        var palette = new Dictionary<char, (ushort Block, byte State, bool Facing)>();
         foreach (var (key, value) in d.Palette)
         {
             if (key.Length != 1 || key[0] == ' ' || key[0] == '.')
@@ -68,11 +68,11 @@ internal static class StructureLoader
                 {
                     var index = (y * size + z) * size + x;
                     var ch = rows[z][x];
-                    if (ch == ' ') cells[index] = -1;
-                    else if (ch == '.') cells[index] = BlockType.Air;
+                    if (ch == ' ') cells[index] = StructureCell.None;
+                    else if (ch == '.') cells[index] = StructureCell.Pack(BlockType.Air, 0);
                     else if (palette.TryGetValue(ch, out var entry))
                     {
-                        cells[index] = entry.Block | (entry.State << 8);
+                        cells[index] = StructureCell.Pack(entry.Block, entry.State);
                         facing[index] = entry.Facing;
                         if (BlockType.ById[entry.Block]!.Waystone) waystones++;
                     }
@@ -85,7 +85,7 @@ internal static class StructureLoader
         // half its lower half right below
         for (var index = 0; index < cells.Length; index++)
         {
-            if (BlockAt(cells, index) <= 0 || BlockType.ById[(byte)cells[index]] is not { } type) continue;
+            if (BlockAt(cells, index) <= 0 || BlockType.ById[StructureCell.BlockOf(cells[index])] is not { } type) continue;
             var y = index / (size * size);
             if (type.UpperHalfId != 0 && (y + 1 >= layers.Length || BlockAt(cells, index + size * size) != type.UpperHalfId))
                 throw new InvalidOperationException(Fail($"has '{type.Name}' in layer {y} without its upper half right above it."));
@@ -141,9 +141,9 @@ internal static class StructureLoader
     }
 
     // The block a template cell writes, or -1 for a cell that writes nothing
-    private static int BlockAt(int[] cells, int index) => cells[index] < 0 ? -1 : cells[index] & 0xFF;
+    private static int BlockAt(int[] cells, int index) => cells[index] < 0 ? -1 : StructureCell.BlockOf(cells[index]);
 
-    private static (byte Block, byte State, bool Facing) ParseEntry(string key, JsonElement value, Func<string, string> fail)
+    private static (ushort Block, byte State, bool Facing) ParseEntry(string key, JsonElement value, Func<string, string> fail)
     {
         string blockName;
         string? facingName = null;

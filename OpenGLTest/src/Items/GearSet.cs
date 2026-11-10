@@ -8,4 +8,4 @@ namespace VoxelEngine.Items;
 /// <param name="Bonuses">The bonuses, ascending by piece count.</param>
 /// <param name="Members">Item ids of the pieces that name this set.</param>
 public sealed record GearSet(string Name, string DisplayName, IReadOnlyList<GearSetBonus> Bonuses,
-    IReadOnlyList<byte> Members);
+    IReadOnlyList<ushort> Members);

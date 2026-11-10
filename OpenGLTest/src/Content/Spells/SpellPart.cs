@@ -5,7 +5,7 @@ namespace VoxelEngine.Content.Spells;
 /// <summary>
 /// One compiled spell part from <c>assets/data/spell/&lt;kind&gt;/&lt;name&gt;.json</c>, immutable. Parts are
 /// keyed by <see cref="Key"/> (<c>&lt;kind&gt;/&lt;name&gt;</c>), so parts of different kinds may share a file
-/// name; they take no byte ids.
+/// name; they take no block or item ids.
 /// </summary>
 public sealed class SpellPart
 {

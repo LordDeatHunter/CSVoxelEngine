@@ -41,7 +41,7 @@ public class FallingBlockManager
     /// <paramref name="blockId"/> so it renders as the block that toppled. Returns the cube
     /// so <see cref="TryTopple"/> can flag chain collapses.
     /// </summary>
-    public FallingBlock Spawn(Vector3 blockPosition, byte blockId)
+    public FallingBlock Spawn(Vector3 blockPosition, ushort blockId)
     {
         var block = new FallingBlock(blockPosition + new Vector3(0.5f), blockId);
         _falling.Add(block);
@@ -54,7 +54,7 @@ public class FallingBlockManager
     /// mirror never moves or lands here; it is drawn, and it still blocks a placement into its cell
     /// (<see cref="OverlapsAny"/>).
     /// </summary>
-    internal void ReplaceMirrors(IReadOnlyList<(Vector3 Center, byte BlockId)> cubes)
+    internal void ReplaceMirrors(IReadOnlyList<(Vector3 Center, ushort BlockId)> cubes)
     {
         _falling.Clear();
         for (var i = 0; i < cubes.Count; i++)

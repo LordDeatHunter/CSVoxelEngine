@@ -47,9 +47,8 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   `entities.json`.
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
-- **Budgets**: 249 of the 255 content ids are used (138 blocks, 110 items, air), 6 left; the battle tower
-  (plans/BATTLE_TOWER.md) is done (its roof dome's `tower_forcefield` came later and took 1), the cave biomes' three
-  exclusive ores (`CB-2`) took 3, their mobs and chest tables (`CB-4`) none (entities take no id). Status effects: 3 of the 8 slots (`burning`, `frostburn`, `spore`). Seed offsets
+- **Budgets**: content ids are `ushort` (up to 65,535 shared by blocks and items), so they are no longer a
+  budget; entities take no id. Status effects: 3 of the 8 slots (`burning`, `frostburn`, `spore`). Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes), 175 to 178 (sky landmasses), 179 to 181
   (cave biomes), 182 (cave shape scale) and 183 to 185 (cave ores); the whole table is in
@@ -65,7 +64,10 @@ A structure is a hand-authored template under `assets/data/structures/<name>.jso
 `hell`, `sky`), `weight`, optional `biomes` (surface only), `groundLayer` (the layer standing on the anchor floor level;
 the layers under it are dug in), a `palette` (a key to a block name, or `{"block", "facing"}`) and `layers`, bottom first, each
 an array of rows north to south of palette keys west to east (a space writes nothing, `.` writes air). A footprint is square, at
-most `StructureRegistry.MaxSize` (17) wide and `MaxHeight` (24) tall. A template precomputes its four clockwise quarter turns,
+most `StructureRegistry.MaxSize` (17) wide and `MaxHeight` (24) tall. A compiled cell is an `int` packed by
+`Content/Structures/StructureCell` (the block id in bits 0-15, the state byte in 16-23, never negative; `StructureCell.None`,
+-1, writes nothing), the one encoding the templates, `StructureStamper`, `TowerShell`, `TowerGenerator`, `TowerRuin` and
+`TowerCollapse` share; a stateless cell is the bare block id. A template precomputes its four clockwise quarter turns,
 mapping (x, z) to (size - 1 - z, x) and turning a `facing` cell low two state bits through `TurnedFacing` (the engine
 north/south/west/east order is not cyclic). Ruin loot chests are ordinary palette entries (`ruin_chest_<kind>`), so there are
 no marker keys and no id cost. `StructureStamper.Stamp` writes a template part inside one chunk, clipped at the border and to a

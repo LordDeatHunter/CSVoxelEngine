@@ -12,11 +12,11 @@ public sealed class CastRecipe
 {
     public CastRecipe(
         string name,
-        byte moldId,
+        ushort moldId,
         byte materialId,
         int amountMl,
         float coolSeconds,
-        byte resultId,
+        ushort resultId,
         int resultCount)
     {
         Name = name;
@@ -32,7 +32,7 @@ public sealed class CastRecipe
     public string Name { get; }
 
     /// <summary>Fired mold block the metal is poured into.</summary>
-    public byte MoldId { get; }
+    public ushort MoldId { get; }
 
     /// <summary>Molten material poured in (<see cref="MoltenMaterial.Id"/>).</summary>
     public byte MaterialId { get; }
@@ -44,7 +44,7 @@ public sealed class CastRecipe
     public float CoolSeconds { get; }
 
     /// <summary>Block or item the cooled cast yields.</summary>
-    public byte ResultId { get; }
+    public ushort ResultId { get; }
 
     /// <summary>How many of the result one cast makes.</summary>
     public int ResultCount { get; }

@@ -45,7 +45,7 @@ public sealed class ImportedMapSource : IWorldSource
     public const string ChunksDirectoryName = "chunks";
 
     // The blocks of a supplied chunk without a file; RestoreFrom only copies from it
-    private static readonly ChunkSnapshot Empty = new(new byte[Chunk.BlockCount], state: null, playerPlaced: null);
+    private static readonly ChunkSnapshot Empty = new(new ushort[Chunk.BlockCount], state: null, playerPlaced: null);
 
     private readonly IWorldSource _fallback;
     private readonly Dictionary<(int X, int Z), ColumnData> _columns = new();

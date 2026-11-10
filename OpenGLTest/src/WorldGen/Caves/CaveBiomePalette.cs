@@ -12,4 +12,4 @@ namespace VoxelEngine.WorldGen.Caves;
 /// <param name="Accent">The block one cave face cell (any role but interior) in
 /// <paramref name="AccentRate"/> wears instead.</param>
 /// <param name="AccentRate">One face cell in this many is <paramref name="Accent"/>; 0 for none.</param>
-public readonly record struct CaveBiomePalette(byte Stone, byte Floor, byte Ceiling, byte Accent, int AccentRate);
+public readonly record struct CaveBiomePalette(ushort Stone, ushort Floor, ushort Ceiling, ushort Accent, int AccentRate);

@@ -45,7 +45,7 @@ public class Chunk : IDisposable
     // meshing only reads it, so background mesh threads need no synchronization.
 
     // Flat block storage; index = (x << 8) | (y << 4) | z
-    private readonly byte[] _blocks = new byte[BlockCount];
+    private readonly ushort[] _blocks = new ushort[BlockCount];
 
     // Per-block state byte, parallel to _blocks and lazily allocated: null means "all zero",
     // which is what every non-fluid cell and every generated sea cell reads as (see
@@ -63,7 +63,7 @@ public class Chunk : IDisposable
     /// <summary>The block ids in <see cref="Idx"/> order, read and written in place by the worldgen fill
     /// (<see cref="ChunkTerrainFill"/>) and read by the mesh build (<see cref="ChunkMeshBuilder"/>); an edit
     /// never writes through it but goes through <see cref="SetBlockRaw"/>.</summary>
-    internal byte[] Blocks => _blocks;
+    internal ushort[] Blocks => _blocks;
 
     /// <summary>One plain read or write of the volatile state array (null = all zero), for the worldgen
     /// fill's round trip around the tree stamps and the mesh build's once-per-chunk read.</summary>
@@ -238,7 +238,7 @@ public class Chunk : IDisposable
     /// point. "Hot" is keyed off the block's <c>light.emission</c>, never its name, so any
     /// glowing fluid qualifies; the cell above must be neither fluid, solid nor occluding.
     /// </summary>
-    internal static bool IsHotFluidVent(byte id, byte above) =>
+    internal static bool IsHotFluidVent(ushort id, ushort above) =>
         BlockType.IsFluid(id) && BlockType.Emission[id] > 0
         && !BlockType.IsFluid(above) && !BlockType.IsSolid(above) && !BlockType.Occludes(above);
 
@@ -271,7 +271,7 @@ public class Chunk : IDisposable
     /// Reads a block using chunk-local coordinates. Coordinates must be in [0, Size).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public byte GetLocalBlock(int x, int y, int z) => _blocks[Idx(x, y, z)];
+    public ushort GetLocalBlock(int x, int y, int z) => _blocks[Idx(x, y, z)];
 
     /// <summary>
     /// Reads a cell's state byte using chunk-local coordinates; 0 when no state array exists
@@ -322,7 +322,7 @@ public class Chunk : IDisposable
     /// other block edit. Allocates the state array on the first non-zero state. It is raw and does
     /// not honor <see cref="BlockType.IsUnbreakable"/>; semantic callers guard themselves.
     /// </summary>
-    public byte SetBlockRaw(int x, int y, int z, byte id, byte state)
+    public ushort SetBlockRaw(int x, int y, int z, ushort id, byte state)
     {
         var i = Idx(x, y, z);
         var previous = _blocks[i];
@@ -360,7 +360,7 @@ public class Chunk : IDisposable
     /// coordinates, so it can broadcast the change to clients. Null on a client and in singleplayer;
     /// worldgen never fires it, because it writes the block array directly.
     /// </summary>
-    public static Action<int, int, int, byte, byte>? CellWritten { get; set; }
+    public static Action<int, int, int, ushort, byte>? CellWritten { get; set; }
 
     /// <summary>Flags the chunk as holding unsaved edits (see <see cref="ModifiedSinceSave"/>).
     /// The test keeps the hot fluid-tick path from rewriting a field it already set.</summary>
@@ -381,7 +381,7 @@ public class Chunk : IDisposable
     internal ChunkSnapshot TakeSnapshot(ushort[]? playerPlaced)
     {
         // The snapshot's constructor copies both arrays itself
-        var snapshot = new ChunkSnapshot(_blocks, _state, playerPlaced);
+        var snapshot = new ChunkSnapshot(_blocks, _state, playerPlaced: playerPlaced);
         ModifiedSinceSave = false;
         return snapshot;
     }
@@ -453,7 +453,7 @@ public class Chunk : IDisposable
     /// <paramref name="state"/> rides along into the state byte (a freshly grounded rock pile
     /// starts at 1); 0 clears it, which is what every ordinary placement wants.
     /// </summary>
-    public bool PlaceBlockAt(Vector3 worldPos, byte blockId, ChunkManager chunkManager, byte state = 0)
+    public bool PlaceBlockAt(Vector3 worldPos, ushort blockId, ChunkManager chunkManager, byte state = 0)
     {
         var localX = (int)(worldPos.X - Position.X * Size);
         var localY = (int)(worldPos.Y - Position.Y * Size);
@@ -504,7 +504,7 @@ public class Chunk : IDisposable
     /// every touched chunk afterwards — explosions clear hundreds of blocks, where per-block
     /// remeshing would hitch. Main thread only, like the other block edits.
     /// </summary>
-    public byte ClearBlockAt(Vector3 worldPos)
+    public ushort ClearBlockAt(Vector3 worldPos)
     {
         var localX = (int)(worldPos.X - Position.X * Size);
         var localY = (int)(worldPos.Y - Position.Y * Size);
@@ -531,7 +531,7 @@ public class Chunk : IDisposable
     /// above, the far-LOD and canopy hooks, <c>UnmarkPlayerPlaced</c>; see the edit-path
     /// checklist). Main thread only.
     /// </summary>
-    public byte CollapseWriteAt(Vector3 worldPos, byte id, byte state)
+    public ushort CollapseWriteAt(Vector3 worldPos, ushort id, byte state)
     {
         var localX = (int)(worldPos.X - Position.X * Size);
         var localY = (int)(worldPos.Y - Position.Y * Size);

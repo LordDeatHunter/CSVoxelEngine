@@ -14,7 +14,7 @@ namespace VoxelEngine.Juice;
 /// </summary>
 public static class ToolShatter
 {
-    private static readonly ConcurrentDictionary<byte, Vector3> Colors = new();
+    private static readonly ConcurrentDictionary<ushort, Vector3> Colors = new();
 
     /// <summary>Mean sRGB color of <paramref name="item"/>'s sprite; <paramref name="fallback"/>
     /// when the texture is missing or has not one opaque texel.</summary>

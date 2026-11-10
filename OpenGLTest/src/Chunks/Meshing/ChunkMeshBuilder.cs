@@ -58,12 +58,12 @@ internal static class ChunkMeshBuilder
             return null;
         }
 
-        var padded = ArrayPool<byte>.Shared.Rent(PaddedCount);
+        var padded = ArrayPool<ushort>.Shared.Rent(PaddedCount);
         var paddedState = ArrayPool<byte>.Shared.Rent(PaddedCount);
         // Rented arrays arrive dirty: the light snapshot is fully overwritten by the fill,
         // but the outputs must start at zero. Oversized rents are fine — everything below
         // only touches the first LightCount entries.
-        var lightBlocks = ArrayPool<byte>.Shared.Rent(LightCount);
+        var lightBlocks = ArrayPool<ushort>.Shared.Rent(LightCount);
         var sunLight = ArrayPool<byte>.Shared.Rent(LightCount);
         var blockLight = ArrayPool<byte>.Shared.Rent(LightCount);
         var queue = ArrayPool<int>.Shared.Rent(LightCount);
@@ -96,9 +96,9 @@ internal static class ChunkMeshBuilder
         }
         finally
         {
-            ArrayPool<byte>.Shared.Return(padded);
+            ArrayPool<ushort>.Shared.Return(padded);
             ArrayPool<byte>.Shared.Return(paddedState);
-            ArrayPool<byte>.Shared.Return(lightBlocks);
+            ArrayPool<ushort>.Shared.Return(lightBlocks);
             ArrayPool<byte>.Shared.Return(sunLight);
             ArrayPool<byte>.Shared.Return(blockLight);
             ArrayPool<int>.Shared.Return(queue);
@@ -208,7 +208,7 @@ internal static class ChunkMeshBuilder
     /// <see cref="TryResolveNeighbors"/>, so the 6 face neighbors are always present; a null
     /// edge or corner slot reads as air, which only affects fluid corner heights.
     /// </summary>
-    private static void FillPaddedSnapshot(byte[] padded, byte[] paddedState, Chunk?[] neighbors, byte[]?[] neighborStates)
+    private static void FillPaddedSnapshot(ushort[] padded, byte[] paddedState, Chunk?[] neighbors, byte[]?[] neighborStates)
     {
         for (var px = 0; px < Padded; px++)
         {
@@ -228,7 +228,7 @@ internal static class ChunkMeshBuilder
                     var ni = neighborRow + cz;
                     var neighbor = neighbors[ni];
                     var blockIndex = Idx(lx, ly, (pz - 1) & SizeMask);
-                    padded[rowBase + pz] = neighbor?.Blocks[blockIndex] ?? 0;
+                    padded[rowBase + pz] = neighbor?.Blocks[blockIndex] ?? BlockType.Air;
                     paddedState[rowBase + pz] = neighborStates[ni]?[blockIndex] ?? 0;
                 }
             }
@@ -243,7 +243,7 @@ internal static class ChunkMeshBuilder
     /// (tree wood, pebbles, branch piles) build their geometry from tiles, everything else
     /// replays its baked model's quads.
     /// </summary>
-    private static ChunkMeshData GenerateMeshDataFromSnapshot(Chunk chunk, byte[] padded, byte[] paddedState,
+    private static ChunkMeshData GenerateMeshDataFromSnapshot(Chunk chunk, ushort[] padded, byte[] paddedState,
         byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy, WoodDamage chopDamage)
     {
         // Rented, not allocated: ChunkManager returns them once the mesh is on the GPU

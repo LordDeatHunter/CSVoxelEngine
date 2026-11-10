@@ -36,7 +36,7 @@ internal static class InventorySaveCodec
     {
         var unnamed = new List<string>();
 
-        List<PlayerSaveData.StackData> ExportStore(Dictionary<byte, int> store)
+        List<PlayerSaveData.StackData> ExportStore(Dictionary<ushort, int> store)
         {
             var list = new List<PlayerSaveData.StackData>();
             foreach (var (id, count) in store)
@@ -220,7 +220,7 @@ internal static class InventorySaveCodec
     }
 
     private static void ImportStore(Inventory inventory, List<PlayerSaveData.StackData>? entries,
-        InventoryCategory category, Dictionary<byte, int> store, List<string> dropped)
+        InventoryCategory category, Dictionary<ushort, int> store, List<string> dropped)
     {
         if (entries == null) return;
         var capacity = Inventory.CapacityOf(category);

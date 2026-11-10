@@ -56,7 +56,7 @@ internal static class SkyTrees
     /// the first write). Runs after <see cref="SkyIslandGenerator.Stamp"/>; a tree cell is open sky before the
     /// flora, so it only ever writes over air or a plant or vine, and leaves anything solid alone.
     /// </summary>
-    internal static void Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    internal static void Stamp(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         if (!WriteBand().Reaches(worldY0)) return;
         // A chunk no island reaches holds no tree root

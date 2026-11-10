@@ -69,7 +69,7 @@ public static class SkyIslandGenerator
 
     /// <summary>The island block at the cell, with its biome's sparkle, plant and vine, or air: on air this
     /// is what <see cref="Stamp"/> writes. Trees are separate (<see cref="SkyTrees"/>).</summary>
-    public static byte BlockAt(int x, int y, int z)
+    public static ushort BlockAt(int x, int y, int z)
     {
         if (!TryGetColumn(x, z, out var island, out var bottom, out var top)) return BlockType.Air;
         return SkyFlora.BlockAt(SkyBiomes.Palette(SkyBiomes.OfColumn(island, x, z)), x, y, z, bottom, top);
@@ -77,7 +77,7 @@ public static class SkyIslandGenerator
 
     /// <summary>Writes the islands into the air cells of the chunk whose minimum corner is
     /// (worldX0, worldY0, worldZ0).</summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0)
     {
         var yMin = Math.Max(0, WorldGenerationConfig.SkyIslandBottomY - worldY0);
         var yMax = Math.Min(Chunk.Size - 1, WorldGenerationConfig.SkyIslandTopY - worldY0);

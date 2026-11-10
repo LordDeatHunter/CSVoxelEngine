@@ -21,7 +21,7 @@ internal static class FluidFlow
     /// neighbor is replaceable and the fluid would drop off into it. False (no term) past a
     /// solid, a different block, a replaceable cell with no drop, or an unavailable cell.
     /// </summary>
-    private static bool PairTerm<T>(in T cells, int x, int y, int z, byte id, float ownHeight,
+    private static bool PairTerm<T>(in T cells, int x, int y, int z, ushort id, float ownHeight,
         int dx, int dz, out float term) where T : struct, IFluidCellReader
     {
         term = 0f;
@@ -103,7 +103,7 @@ internal static class FluidFlow
     }
 
     // One edge of a corner block, from (x, z) toward (x+dx, z+dz), as a vector along (dx, dz)
-    private static Vector3 EdgeTerm<T>(in T cells, int x, int y, int z, byte id, int dx, int dz)
+    private static Vector3 EdgeTerm<T>(in T cells, int x, int y, int z, ushort id, int dx, int dz)
         where T : struct, IFluidCellReader
     {
         if (cells.TryGetCell(x, y, z, out var firstId, out var firstState) && firstId == id)

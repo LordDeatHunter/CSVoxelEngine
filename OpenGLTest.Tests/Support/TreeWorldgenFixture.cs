@@ -52,7 +52,7 @@ internal static class TreeWorldgenFixture
     /// blocks out, so a test comparing against it wants <see cref="TreeGenerator.ReachChunkRadius"/>
     /// rather than the default one-chunk ring.
     /// </summary>
-    public static Dictionary<(int X, int Y, int Z), (byte Block, byte State)> Generate(
+    public static Dictionary<(int X, int Y, int Z), (ushort Block, byte State)> Generate(
         int cx, int cz, bool reverse, int radius = 1)
     {
         var minHeight = int.MaxValue;
@@ -74,7 +74,7 @@ internal static class TreeWorldgenFixture
             positions.Add(new Vector3(cx + dx, cy, cz + dz));
         if (reverse) positions.Reverse();
 
-        var cells = new Dictionary<(int X, int Y, int Z), (byte Block, byte State)>();
+        var cells = new Dictionary<(int X, int Y, int Z), (ushort Block, byte State)>();
         foreach (var position in positions)
         {
             var chunk = new Chunk(null!, position, generateBlockData: false);
@@ -91,8 +91,8 @@ internal static class TreeWorldgenFixture
         return cells;
     }
 
-    public static HashSet<byte> WoodIds() => TreeSpeciesRegistry.All.Select(s => s.WoodId).ToHashSet();
+    public static HashSet<ushort> WoodIds() => TreeSpeciesRegistry.All.Select(s => s.WoodId).ToHashSet();
 
-    public static HashSet<byte> LeafIds() =>
+    public static HashSet<ushort> LeafIds() =>
         TreeSpeciesRegistry.All.Where(s => s.HasLeaves).Select(s => s.LeavesId).ToHashSet();
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
 using VoxelEngine.Lod;
 using VoxelEngine.Particles;
@@ -106,8 +107,8 @@ public class LeafDecayManager
     private readonly HashSet<long> _editedColumns = [];
 
     // The species owning each leaf block and each wood block, by id
-    private readonly TreeSpecies?[] _speciesByLeaf = new TreeSpecies?[256];
-    private readonly TreeSpecies?[] _speciesByWood = new TreeSpecies?[256];
+    private readonly TreeSpecies?[] _speciesByLeaf = new TreeSpecies?[BlockTables.IdCount];
+    private readonly TreeSpecies?[] _speciesByWood = new TreeSpecies?[BlockTables.IdCount];
 
     // Set by Update before the ticks run
     private ChunkManager _chunks = null!;
@@ -284,7 +285,7 @@ public class LeafDecayManager
     }
 
     // A leaf of a leafy species, or the wood block of any species
-    private bool IsDecayCandidate(byte id) =>
+    private bool IsDecayCandidate(ushort id) =>
         _speciesByLeaf[id] != null || (BlockType.IsTreeWood(id) && _speciesByWood[id] != null);
 
     private static int ScatterOrder(long a, long b) =>
@@ -308,7 +309,7 @@ public class LeafDecayManager
     /// Re-derives a leaf's hydration from the live tips around it, rewrites it when it changed,
     /// and decays the leaf when nothing holds it any more.
     /// </summary>
-    private void TickLeaf(TreeSpecies species, int x, int y, int z, byte id, byte state, long key)
+    private void TickLeaf(TreeSpecies species, int x, int y, int z, ushort id, byte state, long key)
     {
         if (LeafState.IsPersistent(state)) return;
 
@@ -342,7 +343,7 @@ public class LeafDecayManager
     /// rule, shared with <see cref="TopplingTree.Collect"/>). Roots and detached (player-placed)
     /// cells are exempt; shells are not. Any read that hits an unloaded chunk freezes the cell.
     /// </summary>
-    private void TickWood(int x, int y, int z, byte id, byte state, long key)
+    private void TickWood(int x, int y, int z, ushort id, byte state, long key)
     {
         if (!WoodState.HasParentCell(state) || WoodState.IsDetached(state)) return;
 
@@ -363,7 +364,7 @@ public class LeafDecayManager
     /// box, which covers the removed tip's leaves, a parent that turned into a tip and the
     /// children it orphaned.
     /// </summary>
-    private void Remove(int x, int y, int z, byte id, byte state)
+    private void Remove(int x, int y, int z, ushort id, byte state)
     {
         _cells.Write(x, y, z, 0, 0, remesh: true);
         _removalsThisTick++;

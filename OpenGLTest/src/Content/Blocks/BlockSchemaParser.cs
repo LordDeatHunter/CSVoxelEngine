@@ -248,7 +248,7 @@ internal static class BlockSchemaParser
 
     /// <summary>A required block or item name of a block's object, resolved to its shared id; a missing or unknown
     /// name throws naming the file and the field.</summary>
-    private static byte ResolveItemName(string? name, string field, string path)
+    private static ushort ResolveItemName(string? name, string field, string path)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new InvalidOperationException($"Block '{path}' needs {field}, which names the item it works.");

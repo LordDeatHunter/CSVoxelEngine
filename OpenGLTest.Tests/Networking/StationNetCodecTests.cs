@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Player;
@@ -23,8 +24,8 @@ public sealed class StationNetCodecTests
 {
     public StationNetCodecTests() => TestContent.EnsureLoaded();
 
-    private static byte Mudball => ContentRegistry.RequireItem("mudball").Id;
-    private static byte MalachiteChunk => ContentRegistry.RequireItem("malachite_ore").Id;
+    private static ushort Mudball => ContentRegistry.RequireItem("mudball").Id;
+    private static ushort MalachiteChunk => ContentRegistry.RequireItem("malachite_ore").Id;
     private static Item Coal => ContentRegistry.RequireItem("coal");
     private static BlockType Kiln => ContentRegistry.RequireBlock("mud_brick_kiln");
     private static byte Copper => ContentRegistry.MoltenMaterialByName("copper")!.Id;
@@ -134,10 +135,40 @@ public sealed class StationNetCodecTests
             writer.Write(molten);
             writer.Write(pending);
         }
-        writer.Write((byte)0);
+        writer.WriteId(BlockType.Air);
         using var reader = new PacketReader(writer.ToArray());
         _ = reader.Message;
         Assert.Throws<InvalidDataException>(() => StationNetCodec.ReadCrucible(reader));
+    }
+
+    [Fact]
+    public void ACruciblesLastInputCarriesTheHighestIdBesideTheHighestMaterial()
+    {
+        var contents = new CrucibleComponent(byte.MaxValue, 120, 30, ushort.MaxValue);
+        using var writer = new PacketWriter(NetMessage.StationState);
+        StationNetCodec.WriteCrucible(writer, contents);
+        writer.Write(int.MinValue);
+        using var reader = new PacketReader(writer.ToArray());
+        _ = reader.Message;
+
+        var read = StationNetCodec.ReadCrucible(reader);
+
+        Assert.Equal(contents, read);
+        Assert.Equal(ushort.MaxValue, read.PendingInputId);
+        Assert.Equal(byte.MaxValue, read.Metals.Single().MaterialId);
+        Assert.Equal(int.MinValue, reader.ReadInt());
+    }
+
+    [Fact]
+    public void AKilnWhoseCrucibleNamesAnIdPastTheLoadedContentIsRefused()
+    {
+        Assert.True(BlockTables.IdCount <= ushort.MaxValue, "the loaded content fills every id the id type holds");
+        var server = Stations.Empty();
+        server.Kilns.Ensure(new Vector3(8, 2, 3), 2, Kiln.Id);
+        Assert.True(server.Kilns.TryPlaceCrucible(new Vector3(8, 2, 3), ContentRegistry.RequireItem("crucible").Id,
+            new CrucibleComponent(Copper, 200, 100, (ushort)BlockTables.IdCount)));
+
+        Assert.Throws<InvalidDataException>(() => RoundTrip(server, Stations.Empty()));
     }
 
     [Fact]

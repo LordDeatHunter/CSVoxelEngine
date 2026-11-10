@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Simulation.Chests;
@@ -33,8 +34,8 @@ public static class ChestAccess
     /// </summary>
     public static int Apply(Inventory inventory, ChestState chest, in ChestMove move) => move.Kind switch
     {
-        ChestMoveKind.DepositStack when move.Id is > 0 and <= byte.MaxValue =>
-            ChestTransfer.Deposit(inventory, chest, (byte)move.Id, move.Count <= 0 ? int.MaxValue : move.Count),
+        ChestMoveKind.DepositStack when BlockTables.IsAssignedId(move.Id) =>
+            ChestTransfer.Deposit(inventory, chest, (ushort)move.Id, move.Count <= 0 ? int.MaxValue : move.Count),
         ChestMoveKind.DepositInstance => ChestTransfer.DepositInstance(inventory, chest, move.Id) ? 1 : 0,
         ChestMoveKind.Withdraw => ChestTransfer.Withdraw(inventory, chest, move.Slot, move.Count),
         _ => 0,

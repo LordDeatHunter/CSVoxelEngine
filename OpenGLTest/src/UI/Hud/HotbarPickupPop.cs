@@ -14,7 +14,7 @@ namespace VoxelEngine.UI.Hud;
 /// </summary>
 public sealed class HotbarPickupPop
 {
-    private readonly byte[] _ids = new byte[Inventory.SlotCount];
+    private readonly ushort[] _ids = new ushort[Inventory.SlotCount];
     private readonly int[] _counts = new int[Inventory.SlotCount];
     private readonly bool[] _seen = new bool[Inventory.SlotCount];
     private readonly float[] _elapsed = new float[Inventory.SlotCount];
@@ -42,7 +42,7 @@ public sealed class HotbarPickupPop
     /// its pop when it still shows the same (non-empty) item with a higher count than last time.
     /// The first observation of a slot only records it. Returns whether a pop started.
     /// </summary>
-    public bool Observe(int slot, byte id, int count)
+    public bool Observe(int slot, ushort id, int count)
     {
         var pop = _seen[slot] && id != 0 && id == _ids[slot] && count > _counts[slot];
         _seen[slot] = true;

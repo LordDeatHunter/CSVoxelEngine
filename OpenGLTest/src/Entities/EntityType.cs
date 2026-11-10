@@ -11,7 +11,7 @@ namespace VoxelEngine.Entities;
 /// <summary>
 /// One entity kind loaded from <c>assets/data/entities/&lt;name&gt;.json</c>: its display name,
 /// health pool, death loot and the Blockbench model it draws from. Unlike blocks and items these
-/// are not byte ids — the handful of live entity kinds are addressed by name through
+/// are not numeric ids — the handful of live entity kinds are addressed by name through
 /// <see cref="EntityRegistry"/>, so an entity never eats a chunk-storage id.
 /// </summary>
 public sealed class EntityType
@@ -63,7 +63,7 @@ public sealed class EntityType
     }
 
     /// <summary>The item every spawn holds (the entity file's <c>held</c>), 0 for none.</summary>
-    public byte HeldItemId { get; init; }
+    public ushort HeldItemId { get; init; }
 
     /// <summary>The rig group whose hand holds <see cref="HeldItemId"/>; null when it is 0.</summary>
     public string? HeldPart { get; init; }

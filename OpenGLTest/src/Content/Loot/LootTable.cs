@@ -7,7 +7,7 @@ namespace VoxelEngine.Content.Loot;
 
 /// <summary>
 /// A compiled loot table: pools of weighted entries whose item names are already resolved to
-/// byte ids. An entry is an item (with a count range, and for gear a rarity range), a weighted nothing, or a nested
+/// ids. An entry is an item (with a count range, and for gear a rarity range), a weighted nothing, or a nested
 /// table rolled in its place; a pool may be limited to a world-Y band. Rolling is allocation-free apart from the
 /// caller's list. The plain overloads use <see cref="Random.Shared"/>; the ones taking a <see cref="Random"/> are
 /// deterministic for a seeded one, which is how a ruin chest rolls the same contents whenever it is first opened or
@@ -41,12 +41,12 @@ public sealed class LootTable
     }
 
     /// <summary>Rolls every pool and appends the produced ids to <paramref name="into"/>.</summary>
-    public void Roll(LootContext context, List<byte> into) => Roll(context, into, Random.Shared);
+    public void Roll(LootContext context, List<ushort> into) => Roll(context, into, Random.Shared);
 
-    /// <summary>Like <see cref="Roll(LootContext, List{byte})"/> with an explicit source of randomness.</summary>
-    public void Roll(LootContext context, List<byte> into, Random random)
+    /// <summary>Like <see cref="Roll(LootContext, List{ushort})"/> with an explicit source of randomness.</summary>
+    public void Roll(LootContext context, List<ushort> into, Random random)
     {
-        var sink = new ByteSink(into);
+        var sink = new IdSink(into);
         RollCore(context, random, ref sink, 0);
     }
 
@@ -102,7 +102,7 @@ public sealed class LootTable
 
     internal sealed class Entry
     {
-        public byte Item;
+        public ushort Item;
         public int Weight = 1;
         public IntRange Count = new(1, 1);
         public bool IsEmpty;
@@ -169,7 +169,7 @@ public sealed class LootTable
         void Add(Entry entry, int count, Random random);
     }
 
-    private readonly struct ByteSink(List<byte> into) : ISink
+    private readonly struct IdSink(List<ushort> into) : ISink
     {
         public void Add(Entry entry, int count, Random random)
         {

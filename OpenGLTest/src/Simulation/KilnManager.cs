@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Content.Stations;
 using VoxelEngine.Interaction;
@@ -59,7 +60,7 @@ public sealed class KilnManager
     {
         /// <summary>Block id of the anchor this kiln was registered with. Remembered so the
         /// integrity sweep can revert the structure even when the anchor cell itself is gone.</summary>
-        public byte AnchorId;
+        public ushort AnchorId;
 
         /// <summary>How this kiln behaves, derived from <see cref="AnchorId"/>'s block whenever
         /// the kiln is registered, restored or mirrored (<see cref="ProfileOf"/>); never saved or
@@ -73,7 +74,7 @@ public sealed class KilnManager
         public int Fuel;
 
         /// <summary>Item id of the stored fuel; 0 when the hearth is empty.</summary>
-        public byte FuelItemId;
+        public ushort FuelItemId;
 
         /// <summary>Seconds one stored unit burns for.</summary>
         public float FuelSeconds;
@@ -88,7 +89,7 @@ public sealed class KilnManager
         public bool HasCrucible;
 
         /// <summary>Item id of that crucible; 0 when the slot is empty.</summary>
-        public byte CrucibleItemId;
+        public ushort CrucibleItemId;
 
         /// <summary>What the crucible holds. Moves back onto the item's stack when it is taken
         /// out, and is lost when the structure is broken.</summary>
@@ -119,7 +120,7 @@ public sealed class KilnManager
     /// Registers a kiln structure (or refreshes the facing and anchor id of one already known),
     /// so a converted kiln is tracked from the frame it went up.
     /// </summary>
-    public void Ensure(Vector3 anchor, int facing, byte anchorId)
+    public void Ensure(Vector3 anchor, int facing, ushort anchorId)
     {
         var key = KeyOf(anchor);
         if (!_kilns.TryGetValue(key, out var state))
@@ -134,7 +135,7 @@ public sealed class KilnManager
 
     /// <summary>The kiln profile of the block <paramref name="anchorId"/>, or
     /// <see cref="KilnProfile.Default"/> when that block is not (or no longer) a kiln.</summary>
-    public static KilnProfile ProfileOf(byte anchorId) => BlockType.ById[anchorId]?.Kiln ?? KilnProfile.Default;
+    public static KilnProfile ProfileOf(ushort anchorId) => BlockType.ById[anchorId]?.Kiln ?? KilnProfile.Default;
 
     /// <summary>Live state of the kiln anchored at this cell, or null when none is tracked.</summary>
     public KilnState? StateAt(int x, int y, int z) => _kilns.GetValueOrDefault((x, y, z));
@@ -234,7 +235,7 @@ public sealed class KilnManager
     /// item's stack carries no timer of its own, so taking a vessel out mid-chunk and putting it
     /// straight back re-melts that partial chunk.
     /// </summary>
-    public bool TryPlaceCrucible(Vector3 anchor, byte itemId, CrucibleComponent contents)
+    public bool TryPlaceCrucible(Vector3 anchor, ushort itemId, CrucibleComponent contents)
     {
         if (!_kilns.TryGetValue(KeyOf(anchor), out var state)) return false;
         if (state.HasCrucible) return false;
@@ -247,7 +248,7 @@ public sealed class KilnManager
     }
 
     /// <summary>Lifts the crucible back out, contents and all, and empties the slot.</summary>
-    public bool TryTakeCrucible(Vector3 anchor, out byte itemId, out CrucibleComponent contents)
+    public bool TryTakeCrucible(Vector3 anchor, out ushort itemId, out CrucibleComponent contents)
     {
         itemId = 0;
         contents = default;
@@ -267,7 +268,7 @@ public sealed class KilnManager
     /// vessel whose metals the charge may not join (<see cref="CanAccept"/>) or with no room.
     /// Needs no fire — loading is cold work, and so is nothing else: alloying waits for the fire.
     /// </summary>
-    public bool TryInsertMelt(Vector3 anchor, byte inputId)
+    public bool TryInsertMelt(Vector3 anchor, ushort inputId)
     {
         var recipe = ContentRegistry.MeltRecipeForInput(inputId);
         if (recipe == null) return false;
@@ -433,7 +434,7 @@ public sealed class KilnManager
     /// separately by the caller.
     /// </summary>
     private static void RevertStructure(ChunkManager chunks, LodManager? lod, (int X, int Y, int Z) key,
-        byte anchorId, Vector3 anchor)
+        ushort anchorId, Vector3 anchor)
     {
         if (BlockType.ById[anchorId] is not { } anchorType) return;
 
@@ -590,15 +591,15 @@ public sealed class KilnManager
         {
             if (leftKilns-- == 0) break;
             StationNetCodec.WriteCell(writer, x, y, z);
-            writer.Write(state.AnchorId);
+            writer.WriteId(state.AnchorId);
             writer.Write((byte)state.Facing);
             writer.Write((byte)state.Fuel);
-            writer.Write(state.FuelItemId);
+            writer.WriteId(state.FuelItemId);
             writer.Write(state.FuelSeconds);
             writer.Write(state.Lit);
             writer.Write(state.BurnLeft);
             writer.Write(state.HasCrucible);
-            writer.Write(state.CrucibleItemId);
+            writer.WriteId(state.CrucibleItemId);
             StationNetCodec.WriteCrucible(writer, state.Contents);
             writer.Write(state.MeltLeft);
         }
@@ -618,17 +619,18 @@ public sealed class KilnManager
             var key = StationNetCodec.ReadCell(reader);
             var state = new KilnState
             {
-                AnchorId = reader.ReadByte(),
+                AnchorId = BlockTables.RequireAssigned(reader.ReadId()),
                 Facing = reader.ReadByte(),
                 Fuel = reader.ReadByte(),
-                FuelItemId = reader.ReadByte(),
+                FuelItemId = BlockTables.RequireAssigned(reader.ReadId()),
                 FuelSeconds = StationNetCodec.ReadFinite(reader),
                 Lit = reader.ReadBool(),
                 BurnLeft = StationNetCodec.ReadFinite(reader),
                 HasCrucible = reader.ReadBool(),
-                CrucibleItemId = reader.ReadByte(),
+                CrucibleItemId = BlockTables.RequireAssigned(reader.ReadId()),
             };
             state.Contents = StationNetCodec.ReadCrucible(reader);
+            BlockTables.RequireAssigned(state.Contents.PendingInputId);
             state.MeltLeft = StationNetCodec.ReadFinite(reader);
             state.Profile = ProfileOf(state.AnchorId);
             if (state.Facing > 3 || state.Fuel > state.Profile.FuelCap)

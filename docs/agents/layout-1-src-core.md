@@ -101,6 +101,7 @@ OpenGLTest/
       ChunkMesher.cs         # the binary greedy pass, the biome-tinted cube face and model-tint helpers, and the box-face/quad primitives the emitters share
         FaceLight.cs           # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
         FluidEmitter.cs        # a fluid cell's surface and side quads: order-independent corner heights, corner light, per-corner flow codes
+        GreedyKey.cs           # the greedy pass's packed face key (id 0-15, AO 16-23, submerged 24, water surface 25-31): Pack, WithSurface and the decoders
         MeshScratch.cs         # per-thread scratch buffers of the binary greedy mesh pass
         PaneEmitter.cs         # a pane cell from the padded snapshot: post + arms, no face between
                                #   connected panes, caps culled against a same-shaped pane above/below
@@ -188,7 +189,7 @@ OpenGLTest/
                                #   *EchoShift, *MagmaDeepShift beside each ore's threshold) and the exclusive cave ores
                                #   (CaveOresEnabled, CaveAmethyst*, CaveJade*, CaveCinnabar*)
     Content/                   # the data-driven content pipeline (ContentRegistry) — see "Content" below
-      ContentRegistry.cs       # the static facade: owns the content tables, assigns byte ids, runs Load / BakeModels /
+      ContentRegistry.cs       # the static facade: owns the content tables, assigns ids, runs Load / BakeModels /
                                #   Reset in order and serves the public lookups (RequireBlock, recipes, tags, ...)
       ContentFiles.cs          # the one JsonSerializerOptions, JSON file listing and reading, name -> id resolution
       EntityLoader.cs          # data/entities -> EntityRegistry (hp, loot table, the parsed .bbmodel, the held item)
@@ -205,6 +206,8 @@ OpenGLTest/
                                #   pickAs), queued per file and resolved once all load
         BlockLoader.cs         # data/blocks -> BlockType and the per-id tables: LoadBlocks, BuildType and RegisterTables
         BlockSchemaParser.cs   # a block JSON's shape fields: material, flame, facing/support, pane, open, hitboxes, tree wood
+        BlockTables.cs         # sizes every BlockType per-id table to the loaded id count (Allocate, air's defaults) and
+                               #   bounds peer ids (IsAssignedId on the server, RequireAssigned on the client)
       Definitions/             # the JSON DTOs
         BlockDefinition.cs, ItemDefinition.cs,
           LootTableDefinition.cs, ModelDefinition.cs  # JSON DTOs
@@ -275,6 +278,7 @@ OpenGLTest/
         StatusEffectLoader.cs  # data/effects/*.json -> effects (id = file-name order, at most MaxKinds); Compile is pure
         StatusEffectRegistry.cs # every effect by name and id, KnownMask, published once by ContentRegistry.Load
       Structures/              # structure templates (see "Structure templates and ruins")
+        StructureCell.cs       # the packed template/tower cell: block id bits 0-15, state 16-23, None (-1) writes nothing
         StructureLoader.cs     # data/structures/*.json -> templates; a two-cell block stands whole, a satellite holds
                                #   exactly one waystone, a ruin none
         StructureRegistry.cs   # templates by kind and role: Of (ruins), SatellitesOf (waystones), TryPick(..., satellite)

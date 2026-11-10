@@ -34,14 +34,14 @@ public readonly struct CrucibleComponent : IEquatable<CrucibleComponent>
 
     /// <summary>A vessel holding one metal, or nothing when both amounts are 0 (then
     /// <paramref name="materialId"/> may be 0).</summary>
-    public CrucibleComponent(byte materialId, int moltenMl, int pendingMl, byte pendingInputId = 0)
+    public CrucibleComponent(byte materialId, int moltenMl, int pendingMl, ushort pendingInputId = 0)
         : this([new CrucibleMetal(materialId, moltenMl, pendingMl)], pendingInputId)
     {
     }
 
     /// <summary>A vessel holding these metals: entries of one material are summed and empty ones
     /// dropped. A negative amount, or an amount of material 0, throws.</summary>
-    public CrucibleComponent(IEnumerable<CrucibleMetal> metals, byte pendingInputId = 0)
+    public CrucibleComponent(IEnumerable<CrucibleMetal> metals, ushort pendingInputId = 0)
     {
         PendingInputId = pendingInputId;
         var merged = new SortedDictionary<byte, CrucibleMetal>();
@@ -60,7 +60,7 @@ public readonly struct CrucibleComponent : IEquatable<CrucibleComponent>
     }
 
     /// <summary>The last melt input charged in, for the drawn lump; 0 when none was recorded.</summary>
-    public byte PendingInputId { get; init; }
+    public ushort PendingInputId { get; init; }
 
     /// <summary>Every metal held, sorted by material id, none empty.</summary>
     public IReadOnlyList<CrucibleMetal> Metals => _metals ?? [];

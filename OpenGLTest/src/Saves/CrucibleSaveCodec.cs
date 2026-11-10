@@ -58,7 +58,7 @@ public static class CrucibleSaveCodec
             room -= molten + pending;
             metals.Add(new CrucibleMetal(material, molten, pending));
         }
-        var pendingInput = SaveNames.TryResolve(data.PendingInput, out var input) ? input : (byte)0;
+        var pendingInput = SaveNames.TryResolve(data.PendingInput, out var input) ? input : (ushort)0;
         return new CrucibleComponent(metals, pendingInput);
     }
 }

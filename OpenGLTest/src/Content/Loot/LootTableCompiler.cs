@@ -79,7 +79,7 @@ internal static class LootTableCompiler
                 if (weight <= 0)
                     throw new InvalidOperationException($"Loot table '{path}' has an entry with weight {weight}; expected 1 or more.");
 
-                byte item = 0;
+                ushort item = 0;
                 if (!isEmpty && !isNested && !ContentFiles.TryResolve(entryDefinition.Item!, out item))
                     throw new InvalidOperationException(
                         $"Loot table '{path}' names '{entryDefinition.Item}', which is not a registered block or item.");

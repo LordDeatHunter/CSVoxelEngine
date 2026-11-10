@@ -215,8 +215,11 @@ public static class NetFraming
     /// different tier.
     /// 32: the anvil forge. Each anvil in <see cref="NetMessage.StationState"/> ends with its stacked metal's id and count,
     /// and a <see cref="NetIntentKind.Forge"/> world intent (the anvil's cell and the recipe's result id) forges from that
-    /// stack; an older peer would misread the station frames and refuse the intent as malformed.</summary>
-    public const int ProtocolVersion = 32;
+    /// stack; an older peer would misread the station frames and refuse the intent as malformed.
+    /// 33: block and item ids are two bytes (<see cref="PacketWriter.WriteId"/>) everywhere an id travels: the chunk
+    /// payload (one little-endian ushort per cell), cell changes and corrections, entity item ids, worn armor, inventory
+    /// and world intents and the station frames; an older peer would misread every frame carrying an id.</summary>
+    public const int ProtocolVersion = 33;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;
@@ -269,12 +272,17 @@ public sealed class PacketWriter : IDisposable
     }
 
     public PacketWriter Write(byte value) { _writer.Write(value); return this; }
+    public PacketWriter Write(ushort value) { _writer.Write(value); return this; }
     public PacketWriter Write(bool value) { _writer.Write(value); return this; }
     public PacketWriter Write(int value) { _writer.Write(value); return this; }
     public PacketWriter Write(float value) { _writer.Write(value); return this; }
     public PacketWriter Write(double value) { _writer.Write(value); return this; }
     public PacketWriter Write(string value) { _writer.Write(value); return this; }
     public PacketWriter Write(Vector3 value) { _writer.Write(value.X); _writer.Write(value.Y); _writer.Write(value.Z); return this; }
+
+    /// <summary>Writes a block or item id. The one place that fixes an id's wire width: every id that travels goes
+    /// through here and comes back through <see cref="PacketReader.ReadId"/>.</summary>
+    public PacketWriter WriteId(ushort id) { _writer.Write(id); return this; }
 
     /// <summary>Writes a length-prefixed byte array (the chunk/column payloads).</summary>
     public PacketWriter WriteBytes(byte[] value)
@@ -308,12 +316,16 @@ public sealed class PacketReader : IDisposable
     public NetMessage Message => (NetMessage)_reader.ReadByte();
 
     public byte ReadByte() => _reader.ReadByte();
+    public ushort ReadUInt16() => _reader.ReadUInt16();
     public bool ReadBool() => _reader.ReadBoolean();
     public int ReadInt() => _reader.ReadInt32();
     public float ReadFloat() => _reader.ReadSingle();
     public double ReadDouble() => _reader.ReadDouble();
     public string ReadString() => _reader.ReadString();
     public Vector3 ReadVector3() => new(_reader.ReadSingle(), _reader.ReadSingle(), _reader.ReadSingle());
+
+    /// <summary>Reads a block or item id written by <see cref="PacketWriter.WriteId"/>, at the same width.</summary>
+    public ushort ReadId() => _reader.ReadUInt16();
 
     /// <summary>Reads a length-prefixed byte array written by <see cref="PacketWriter.WriteBytes"/>.</summary>
     public byte[] ReadBytes() => _reader.ReadBytes(_reader.ReadInt32());

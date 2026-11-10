@@ -80,7 +80,7 @@ internal sealed class SpellBlockImpact
 
     // The firestarter's targets minus its roll and durability: a fueled kiln from any of its cells,
     // else a full, unlit branch pile
-    private void Light(byte id, byte state, int x, int y, int z)
+    private void Light(ushort id, byte state, int x, int y, int z)
     {
         if (_use.CanIgniteKiln(x, y, z))
         {
@@ -94,7 +94,7 @@ internal sealed class SpellBlockImpact
     }
 
     // A tree block grows its tree; anything else gets the element's sapling on the hit face, if it names one
-    private void Grow(SpellPart element, byte id, Vector3 cell, Vector3 normal)
+    private void Grow(SpellPart element, ushort id, Vector3 cell, Vector3 normal)
     {
         if (TreeSpeciesRegistry.ForBlock(id) != null)
             _use.GrowTree(cell);

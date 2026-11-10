@@ -146,7 +146,7 @@ public sealed class TreeGrowerTests
     {
         var wood = ContentRegistry.RequireBlock("oak_log").Id;
         var leaves = ContentRegistry.RequireBlock("oak_leaves").Id;
-        byte? Resolve(string n) => n switch
+        ushort? Resolve(string n) => n switch
         {
             "block/wood" => wood,
             "block/leaf" => leaves,

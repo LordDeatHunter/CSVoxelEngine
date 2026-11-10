@@ -500,12 +500,12 @@ public class ChunkManager
     /// <summary>
     /// Reads a block at world coordinates. Unloaded chunks read as air.
     /// </summary>
-    public byte GetBlockGlobal(int x, int y, int z)
+    public ushort GetBlockGlobal(int x, int y, int z)
     {
         return Chunks.TryGetValue(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift,
             out var chunk)
             ? chunk.GetLocalBlock(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask)
-            : (byte)0;
+            : BlockType.Air;
     }
 
     /// <summary>
@@ -524,7 +524,7 @@ public class ChunkManager
     /// loaded. The fluid simulation must use this rather than <see cref="GetBlockGlobal"/>:
     /// "unloaded" reads as air there, which would make water pour into unloaded space.
     /// </summary>
-    public bool TryGetCell(int x, int y, int z, out byte id, out byte state)
+    public bool TryGetCell(int x, int y, int z, out ushort id, out byte state)
     {
         var chunk = ChunkAt(x, y, z);
         if (chunk == null)

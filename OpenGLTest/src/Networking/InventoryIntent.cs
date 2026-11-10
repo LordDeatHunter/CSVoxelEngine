@@ -35,7 +35,7 @@ public readonly record struct InventoryIntent(
     int Id = 0,
     int Count = 0,
     string? Recipe = null,
-    byte[]? Members = null,
+    ushort[]? Members = null,
     string[]? Parts = null)
 {
     public static InventoryIntent Select(int slot) => new(NetInventoryAction.SelectSlot, Slot: slot);
@@ -43,21 +43,21 @@ public readonly record struct InventoryIntent(
     public static InventoryIntent Drop(bool wholeStack) =>
         new(wholeStack ? NetInventoryAction.DropAllSelected : NetInventoryAction.DropSelected);
 
-    public static InventoryIntent EquipStackable(int slot, byte id) =>
+    public static InventoryIntent EquipStackable(int slot, ushort id) =>
         new(NetInventoryAction.Equip, Slot: slot, IsTool: false, Id: id);
 
     public static InventoryIntent EquipTool(int slot, int instanceId) =>
         new(NetInventoryAction.Equip, Slot: slot, IsTool: true, Id: instanceId);
 
-    public static InventoryIntent Craft(string recipe, int batch, byte[] members) =>
+    public static InventoryIntent Craft(string recipe, int batch, ushort[] members) =>
         new(NetInventoryAction.Craft, Count: batch, Recipe: recipe, Members: members);
 
-    public static InventoryIntent CreativeGrant(byte id, int count) =>
+    public static InventoryIntent CreativeGrant(ushort id, int count) =>
         new(NetInventoryAction.CreativeGrant, Id: id, Count: count);
 
-    public static InventoryIntent CreativeClear(byte id) => new(NetInventoryAction.CreativeClear, Id: id);
+    public static InventoryIntent CreativeClear(ushort id) => new(NetInventoryAction.CreativeClear, Id: id);
 
-    public static InventoryIntent PickBlock(byte id) => new(NetInventoryAction.PickBlock, Id: id);
+    public static InventoryIntent PickBlock(ushort id) => new(NetInventoryAction.PickBlock, Id: id);
 
     public static InventoryIntent SelectStaffSlot(int slot) => new(NetInventoryAction.SelectStaffSlot, Slot: slot);
 

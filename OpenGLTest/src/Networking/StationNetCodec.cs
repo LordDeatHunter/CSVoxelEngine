@@ -75,12 +75,12 @@ public static class StationNetCodec
             writer.Write(metal.MoltenMl);
             writer.Write(metal.PendingMl);
         }
-        writer.Write(contents.PendingInputId);
+        writer.WriteId(contents.PendingInputId);
     }
 
     /// <summary>Reads what <see cref="WriteCrucible"/> wrote, refusing more than
     /// <see cref="CrucibleComponent.MaxMetals"/> metals, a material id 0, a repeated material and a
-    /// negative amount.</summary>
+    /// negative amount. The last input's id is read as it came; the caller checks it against its content.</summary>
     internal static CrucibleComponent ReadCrucible(PacketReader reader)
     {
         var count = reader.ReadByte();
@@ -95,7 +95,7 @@ public static class StationNetCodec
                 throw new InvalidDataException("crucible metal out of range");
             metals.Add(metal);
         }
-        return new CrucibleComponent(metals, reader.ReadByte());
+        return new CrucibleComponent(metals, reader.ReadId());
     }
 
     /// <summary>Reads a float that must be finite.</summary>

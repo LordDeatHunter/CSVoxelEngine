@@ -33,7 +33,7 @@ public sealed class MovementRulesTests
     // A single block to step up onto
     private static readonly (int X, int Y, int Z) Step = (4, 1, 12);
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
 
     /// <summary>The stone floor at y = 0 with the wall and the step on it.</summary>
     private static ChunkManager Course()

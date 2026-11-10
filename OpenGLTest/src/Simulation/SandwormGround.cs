@@ -12,8 +12,8 @@ namespace VoxelEngine.Simulation;
 /// </summary>
 public static class SandwormGround
 {
-    private static byte _sandId;
-    private static byte _sandstoneId;
+    private static ushort _sandId;
+    private static ushort _sandstoneId;
 
     /// <summary>The y of the top face of the column's surface (the ground cell's y plus one) and whether that cell
     /// is dry sand or sandstone right now (a dug or built-over column reads as not sand).</summary>
@@ -58,7 +58,7 @@ public static class SandwormGround
     }
 
     /// <summary>The sand block id, for the chips a surfacing worm throws.</summary>
-    public static byte SandId
+    public static ushort SandId
     {
         get
         {
@@ -68,7 +68,7 @@ public static class SandwormGround
     }
 
     /// <summary>Whether the block id is sand or sandstone.</summary>
-    public static bool IsSand(byte id)
+    public static bool IsSand(ushort id)
     {
         if (_sandId == 0)
         {

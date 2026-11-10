@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Config;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Stations;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
@@ -37,7 +38,7 @@ public sealed class BloomeryManager
     {
         /// <summary>Block id of the anchor this bloomery was registered with; remembered so the sweep can revert
         /// the structure even when the anchor cell itself is gone.</summary>
-        public byte AnchorId;
+        public ushort AnchorId;
 
         /// <summary>How this bloomery behaves, derived from <see cref="AnchorId"/> (<see cref="ProfileOf"/>); never
         /// saved or sent.</summary>
@@ -53,7 +54,7 @@ public sealed class BloomeryManager
         public int Fuel;
 
         /// <summary>Item id of the stored fuel; 0 when there is none.</summary>
-        public byte FuelItemId;
+        public ushort FuelItemId;
 
         /// <summary>Seconds one stored unit burns for.</summary>
         public float FuelSeconds;
@@ -94,7 +95,7 @@ public sealed class BloomeryManager
     public IReadOnlyList<Vector3> LitCells => _litCells;
 
     /// <summary>Registers a bloomery structure (or refreshes the facing and anchor id of one already known).</summary>
-    public void Ensure(Vector3 anchor, int facing, byte anchorId)
+    public void Ensure(Vector3 anchor, int facing, ushort anchorId)
     {
         var key = KeyOf(anchor);
         if (!_bloomeries.TryGetValue(key, out var state))
@@ -109,7 +110,7 @@ public sealed class BloomeryManager
 
     /// <summary>The bloomery profile of the block <paramref name="anchorId"/>, or <see cref="BloomeryProfile.Default"/>
     /// when that block is not (or no longer) a bloomery.</summary>
-    public static BloomeryProfile ProfileOf(byte anchorId) =>
+    public static BloomeryProfile ProfileOf(ushort anchorId) =>
         BlockType.ById[anchorId]?.Bloomery ?? BloomeryProfile.Default;
 
     /// <summary>Live state of the bloomery anchored at this cell, or null when none is tracked.</summary>
@@ -126,7 +127,7 @@ public sealed class BloomeryManager
     /// Loads one unit of <paramref name="item"/> as ore. Refuses anything but the profile's ore, a full shaft, and
     /// any load while the last run's output is still inside (collect it first).
     /// </summary>
-    public bool TryAddOre(Vector3 anchor, byte item)
+    public bool TryAddOre(Vector3 anchor, ushort item)
     {
         if (!_bloomeries.TryGetValue(KeyOf(anchor), out var state)) return false;
         if (item == 0 || item != state.Profile.OreId) return false;
@@ -173,7 +174,7 @@ public sealed class BloomeryManager
     /// Hands over what a finished run left (blooms, then slag) and empties the shaft of it. The ids are the
     /// profile's; the caller puts them in the player's inventory or on the ground. False when nothing is waiting.
     /// </summary>
-    public bool TryCollect(Vector3 anchor, List<byte> output)
+    public bool TryCollect(Vector3 anchor, List<ushort> output)
     {
         if (!_bloomeries.TryGetValue(KeyOf(anchor), out var state) || state.Blooms + state.Slag == 0) return false;
         for (var i = 0; i < state.Blooms; i++)
@@ -323,7 +324,7 @@ public sealed class BloomeryManager
     }
 
     private static void RevertStructure(ChunkManager chunks, LodManager? lod, (int X, int Y, int Z) key,
-        byte anchorId, Vector3 anchor)
+        ushort anchorId, Vector3 anchor)
     {
         if (BlockType.ById[anchorId] is not { } anchorType) return;
 
@@ -468,11 +469,11 @@ public sealed class BloomeryManager
         {
             if (left-- == 0) break;
             StationNetCodec.WriteCell(writer, x, y, z);
-            writer.Write(state.AnchorId);
+            writer.WriteId(state.AnchorId);
             writer.Write((byte)state.Facing);
             writer.Write((byte)state.Ore);
             writer.Write((byte)state.Fuel);
-            writer.Write(state.FuelItemId);
+            writer.WriteId(state.FuelItemId);
             writer.Write(state.FuelSeconds);
             writer.Write(state.Lit);
             writer.Write(state.BurnLeft);
@@ -495,11 +496,11 @@ public sealed class BloomeryManager
             var key = StationNetCodec.ReadCell(reader);
             var state = new BloomeryState
             {
-                AnchorId = reader.ReadByte(),
+                AnchorId = BlockTables.RequireAssigned(reader.ReadId()),
                 Facing = reader.ReadByte(),
                 Ore = reader.ReadByte(),
                 Fuel = reader.ReadByte(),
-                FuelItemId = reader.ReadByte(),
+                FuelItemId = BlockTables.RequireAssigned(reader.ReadId()),
                 FuelSeconds = StationNetCodec.ReadFinite(reader),
                 Lit = reader.ReadBool(),
                 BurnLeft = StationNetCodec.ReadFinite(reader),

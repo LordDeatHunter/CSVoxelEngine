@@ -20,7 +20,7 @@ public static class RowEquip
     /// <paramref name="toolInstance"/>, else 0). Returns the intent to mirror, or null when nothing changed: an id
     /// the player does not own, or gear that fits no slot.
     /// </summary>
-    public static InventoryIntent? Apply(Inventory inventory, byte id, int toolInstance)
+    public static InventoryIntent? Apply(Inventory inventory, ushort id, int toolInstance)
     {
         var instance = toolInstance != 0 ? toolInstance : FirstInstanceOf(inventory, id);
         if (instance != 0)
@@ -44,7 +44,7 @@ public static class RowEquip
     /// owned stackable now shows there. Never a toggle, so a drop onto the slot already showing it changes nothing, and
     /// gear, which is worn rather than held, never goes on the hotbar. Returns the intent to mirror, or null.
     /// </summary>
-    public static InventoryIntent? DropOnHotbar(Inventory inventory, byte id, int toolInstance, int slot)
+    public static InventoryIntent? DropOnHotbar(Inventory inventory, ushort id, int toolInstance, int slot)
     {
         var held = inventory.SlotAt(slot);
         var instance = toolInstance != 0 ? toolInstance : FirstInstanceOf(inventory, id);
@@ -67,7 +67,7 @@ public static class RowEquip
     /// Wears the row's piece of gear in equipment slot <paramref name="slot"/> (a drop), when it fits there and is not
     /// already on in it. Returns the intent to mirror, or null.
     /// </summary>
-    public static InventoryIntent? DropOnEquipment(Inventory inventory, byte id, int toolInstance, int slot)
+    public static InventoryIntent? DropOnEquipment(Inventory inventory, ushort id, int toolInstance, int slot)
     {
         var instance = toolInstance != 0 ? toolInstance : FirstInstanceOf(inventory, id);
         if (instance == 0 || inventory.Equipment.InstanceAt(slot) == instance) return null;
@@ -78,7 +78,7 @@ public static class RowEquip
     /// The hotbar slot showing the row's item, or -1: its own instance's slot for a tool row, else the first slot
     /// showing the id (a stackable, or any instance of a tool kind).
     /// </summary>
-    public static int HotbarSlotOf(Inventory inventory, byte id, int toolInstance)
+    public static int HotbarSlotOf(Inventory inventory, ushort id, int toolInstance)
     {
         if (toolInstance != 0) return inventory.SlotOfTool(toolInstance);
         for (var i = 0; i < Inventory.SlotCount; i++)
@@ -88,7 +88,7 @@ public static class RowEquip
     }
 
     /// <summary>Whether the row's piece is worn: its own instance, or for a row naming only a kind, any worn piece of it.</summary>
-    public static bool IsWorn(Inventory inventory, byte id, int toolInstance)
+    public static bool IsWorn(Inventory inventory, ushort id, int toolInstance)
     {
         if (toolInstance != 0) return inventory.Equipment.IsEquipped(toolInstance);
         for (var slot = 0; slot < GearConfig.EquipmentSlotCount; slot++)
@@ -98,7 +98,7 @@ public static class RowEquip
     }
 
     /// <summary>The first live instance of a tool or gear kind, or 0 for a stackable id or a kind the player does not own.</summary>
-    internal static int FirstInstanceOf(Inventory inventory, byte id)
+    internal static int FirstInstanceOf(Inventory inventory, ushort id)
     {
         var category = Inventory.CategoryOf(id);
         if (category is not (InventoryCategory.Tools or InventoryCategory.Gear)) return 0;

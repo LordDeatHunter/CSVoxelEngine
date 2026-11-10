@@ -29,7 +29,7 @@ public sealed class AlloyFurnaceTests : IDisposable
     private static BlockType Furnace => ContentRegistry.RequireBlock("alloy_furnace");
 
     /// <summary>Alloy bricks in the cells and on the ground as drops.</summary>
-    private int BricksInWorld(Vector3 anchor, int size, byte bricks)
+    private int BricksInWorld(Vector3 anchor, int size, ushort bricks)
     {
         var cells = 0;
         foreach (var (dx, dy, dz) in Multiblock.Offsets(size))
@@ -82,7 +82,7 @@ public sealed class AlloyFurnaceTests : IDisposable
         foreach (var (dx, dy, dz) in Multiblock.Offsets(size))
         {
             var cell = anchor + new Vector3(dx, dy, dz);
-            var expected = cell == mined || Multiblock.IsInterior(dx, dy, dz, size) ? (byte)0 : bricks;
+            var expected = cell == mined || Multiblock.IsInterior(dx, dy, dz, size) ? BlockType.Air : bricks;
             Assert.Equal(expected, _world.IdAt((int)cell.X, (int)cell.Y, (int)cell.Z));
             Assert.Equal(0, _world.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z));
         }

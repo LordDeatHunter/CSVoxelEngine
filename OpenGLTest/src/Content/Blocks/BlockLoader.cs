@@ -17,7 +17,7 @@ namespace VoxelEngine.Content.Blocks;
 internal static class BlockLoader
 {
     /// <summary>The <c>light.color</c> a block's JSON declared, or null when it declared none.</summary>
-    internal static float[]? DeclaredLightColor(byte id) =>
+    internal static float[]? DeclaredLightColor(ushort id) =>
         ContentRegistry.BlockDefinitions.TryGetValue(id, out var definition) ? definition.Light?.Color : null;
 
     /// <summary>
@@ -43,7 +43,7 @@ internal static class BlockLoader
 
     internal static void LoadBlocks(List<(string Name, string Path)> files)
     {
-        var types = new Dictionary<byte, BlockType>();
+        var types = new Dictionary<ushort, BlockType>();
         var links = new BlockLinkResolver();
 
         foreach (var (name, path) in files)
@@ -73,11 +73,12 @@ internal static class BlockLoader
         links.Resolve(types);
         BlockType.Types = types;
 
-        // The vectorized set of covering ids, built once every block's tables are written
-        var coverIds = new List<byte>();
-        for (var id = 0; id < BlockType.CoversSkyById.Length; id++)
-            if (BlockType.CoversSkyById[id]) coverIds.Add((byte)id);
-        BlockType.SkyCoverIds = SearchValues.Create(coverIds.ToArray());
+        // The vectorized set of covering ids, built once every block's tables are written: every
+        // covering id as a char, since the search runs over the id span reinterpreted as chars
+        var coverChars = new List<char>();
+        for (var id = 1; id < BlockTables.IdCount; id++)
+            if (BlockType.CoversSkyById[id]) coverChars.Add((char)id);
+        BlockType.SkyCoverChars = SearchValues.Create(coverChars.ToArray());
     }
 
     /// <summary>
@@ -86,7 +87,7 @@ internal static class BlockLoader
     /// <paramref name="stackSolidAt"/> is the stack count at which the block turns solid, which
     /// the per-id tables carry but the type does not.
     /// </summary>
-    private static BlockType BuildType(BlockDefinition definition, string name, byte id, string path,
+    private static BlockType BuildType(BlockDefinition definition, string name, ushort id, string path,
         out int stackSolidAt)
     {
         var renderer = BlockFieldRules.ParseRenderer(definition, path);

@@ -31,9 +31,9 @@ public static class FlowerGenerator
     private static readonly Func<int, int, bool> OpennessGate = IsOpenMeadow;
 
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte FlowerBlock;
+    public static readonly ushort FlowerBlock;
 
-    private static readonly byte GrassBlock;
+    private static readonly ushort GrassBlock;
 
     static FlowerGenerator()
     {
@@ -82,7 +82,7 @@ public static class FlowerGenerator
     /// only over grass inside this chunk (a carve below leaves the cell empty instead of
     /// floating). Runs on a generation worker thread, after the pebbles.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

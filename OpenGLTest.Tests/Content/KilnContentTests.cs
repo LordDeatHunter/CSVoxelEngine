@@ -25,9 +25,9 @@ public sealed class KilnContentTests
 
     public KilnContentTests() => TestContent.EnsureLoaded();
 
-    private static List<byte> RollOnce(LootTable table)
+    private static List<ushort> RollOnce(LootTable table)
     {
-        var into = new List<byte>();
+        var into = new List<ushort>();
         table.Roll(new LootContext(0, 0, 0), into);
         return into;
     }

@@ -59,7 +59,7 @@ public sealed class WaystoneContentTests
             Assert.Equal(waystone.Hardness, upper.Hardness);
             Assert.False(Mining.CanMine(upper.Id, axe), upper.Name);
             Assert.Equal(waystone.Id, TallBlock.LowerOf(upper.Id));
-            var rolled = new List<byte>();
+            var rolled = new List<ushort>();
             DropManager.RollLoot(upper.Id, new LootContext(1, 64, -1), rolled);
             Assert.Empty(rolled);
         }
@@ -68,7 +68,7 @@ public sealed class WaystoneContentTests
     [Fact]
     public void ABrokenWaystoneDropsOnlyThingsAPlayerCanCarry()
     {
-        var rolled = new List<byte>();
+        var rolled = new List<ushort>();
         foreach (var waystone in Waystones())
             for (var seed = 0; seed < 32; seed++)
             {

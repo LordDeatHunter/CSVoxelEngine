@@ -57,7 +57,7 @@ public static class WormCarver
     /// Carves every worm from the cells within reach through this chunk. Only <paramref name="blocks"/>
     /// is written; neighboring chunks carve their own share of the same worms.
     /// </summary>
-    public static void Carve(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Carve(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         var chunkMin = new Vector3(worldX0, worldY0, worldZ0);
         var chunkMax = chunkMin + new Vector3(Chunk.Size);
@@ -79,7 +79,7 @@ public static class WormCarver
     }
 
     // Clears the blocks inside one node's (slightly flattened) sphere that lie in this chunk
-    private static void CarveNode(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0, CaveNode node)
+    private static void CarveNode(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0, CaveNode node)
     {
         var r = node.Radius;
         var ry = r * WorldGenerationConfig.WormVerticalSquash;

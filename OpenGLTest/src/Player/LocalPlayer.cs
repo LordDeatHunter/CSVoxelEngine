@@ -62,7 +62,7 @@ internal sealed class LocalPlayer
     internal Vector3 RespawnEye => _respawnEye;
 
     /// <summary>The item in hand this frame, as the body model last read it.</summary>
-    internal byte HeldId => _heldId;
+    internal ushort HeldId => _heldId;
 
     /// <summary>Whether the hand holds anything this frame (a stack or a tool instance).</summary>
     internal bool HasHeld => _hasHeld;
@@ -92,7 +92,7 @@ internal sealed class LocalPlayer
 
     private Vector3 _prevCamPos;
     private bool _hasPrevCamPos;
-    private byte _heldId;
+    private ushort _heldId;
     private bool _hasHeld;
 
     // The local player as a PlayerContext: this world's own inventory, aimed by its camera.

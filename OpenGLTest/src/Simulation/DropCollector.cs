@@ -10,4 +10,4 @@ namespace VoxelEngine.Simulation;
 /// (<see cref="DropManager.PickupRange"/>, wider while the magnet ability is worn). See
 /// <see cref="DropManager.Update(float, System.Collections.Generic.IReadOnlyList{DropCollector}, ChunkManager)"/>.
 /// </summary>
-public readonly record struct DropCollector(Vector3 Eye, Func<byte, bool>? CanCollect, float Range = DropManager.PickupRange);
+public readonly record struct DropCollector(Vector3 Eye, Func<ushort, bool>? CanCollect, float Range = DropManager.PickupRange);

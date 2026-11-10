@@ -304,7 +304,7 @@ public class World
     /// Credits <paramref name="count"/> of an item to this world's inventory (the creative grants
     /// and the /give command), toasting a first find like a pickup does.
     /// </summary>
-    public void CreditItem(byte id, int count)
+    public void CreditItem(ushort id, int count)
     {
         var known = Inventory.Knows(id);
         if (Inventory.Add(id, count) && !known)
@@ -772,7 +772,7 @@ public class World
     /// answer to it from an older message (<see cref="ClientPrediction"/>). Null in singleplayer
     /// and on the server.
     /// </summary>
-    public Action<int, int, int, byte, byte>? BlockEdited { get; set; }
+    public Action<int, int, int, ushort, byte>? BlockEdited { get; set; }
 
     /// <summary>
     /// Raised on a multiplayer client for every action the server has to replay: a mining start or

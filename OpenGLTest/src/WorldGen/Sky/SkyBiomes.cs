@@ -21,7 +21,7 @@ public static class SkyBiomes
     {
         Reseed();
 
-        byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+        ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
         Palettes = new SkyIslandPalette[Enum.GetValues<SkyBiome>().Length];
         Palettes[(int)SkyBiome.Meadow] = new SkyIslandPalette(
             Top: TerrainGenerator.SurfaceBlock, Soil: TerrainGenerator.SoilBlock, Core: TerrainGenerator.RockBlock,

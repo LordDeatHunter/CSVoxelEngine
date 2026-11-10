@@ -17,10 +17,10 @@ public sealed class CharmLootTests
 
     private static readonly string[] Charms = ["feather_charm", "gill_charm", "frost_charm", "fire_charm", "magnet_charm"];
 
-    private static IEnumerable<byte> CharmIds => Charms.Select(name => ContentRegistry.RequireItem(name).Id);
+    private static IEnumerable<ushort> CharmIds => Charms.Select(name => ContentRegistry.RequireItem(name).Id);
 
     /// <summary>Every item id a chest block's or an entity's loot table can roll, nested tables included.</summary>
-    private static HashSet<byte> ReachableLoot()
+    private static HashSet<ushort> ReachableLoot()
     {
         var tables = new List<LootTable>();
         foreach (var block in BlockType.ById)
@@ -32,7 +32,7 @@ public sealed class CharmLootTests
         foreach (var entity in EntityRegistry.ByName.Values)
             if (entity.LootTable != null) tables.Add(entity.LootTable);
 
-        var reachable = new HashSet<byte>();
+        var reachable = new HashSet<ushort>();
         var seen = new HashSet<LootTable>();
         var pending = new Stack<LootTable>(tables);
         while (pending.Count > 0)

@@ -24,7 +24,7 @@ public sealed class ForgeView
     public (int X, int Y, int Z) Cell { get; private set; }
 
     /// <summary>The metal stacked on that anvil, 0 for none.</summary>
-    public byte MetalId { get; private set; }
+    public ushort MetalId { get; private set; }
 
     /// <summary>How many of <see cref="MetalId"/> are stacked.</summary>
     public int MetalCount { get; private set; }
@@ -50,7 +50,7 @@ public sealed class ForgeView
     }
 
     /// <summary>Shows the anvil's current stack; the cards are rebuilt only when it changed.</summary>
-    public void Show(byte metalId, int count)
+    public void Show(ushort metalId, int count)
     {
         if (_shown && metalId == MetalId && count == MetalCount) return;
         _shown = true;

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
@@ -135,7 +136,7 @@ public sealed class ChestServerTests : IDisposable
         return cell;
     }
 
-    private static byte Flint => ContentRegistry.RequireItem("flint").Id;
+    private static ushort Flint => ContentRegistry.RequireItem("flint").Id;
 
     [Fact]
     public void TwoPlayersShareOneChestAndEachSeesEveryMove()
@@ -194,6 +195,29 @@ public sealed class ChestServerTests : IDisposable
 
         Assert.Null(_inboxes[a].Contents);
         Assert.Null(PlayerOf(a).OpenChest);
+    }
+
+    [Fact]
+    public void ADepositNamingAnIdPastTheLoadedContentIsRefusedWithoutThrowing()
+    {
+        // The first id this build's content does not assign: a client with other content could name it
+        var outside = new ChestMove(ChestMoveKind.DepositStack, Id: BlockTables.IdCount, Count: 1);
+        var inventory = Inventory.Empty();
+        inventory.Add(Flint, 1);
+        Assert.Equal(0, ChestAccess.Apply(inventory, new ChestState(1), outside));
+
+        var a = Connect("Alice");
+        var cell = PlaceChest(a);
+        PlayerOf(a).Inventory.Add(Flint, 2);
+        Open(a, cell);
+        Move(a, outside);
+        // The session survives the refused move: a valid deposit sent after it still lands, and only it
+        Move(a, ChestMove.DepositStack(Flint, 0));
+        TickUntil(() => _inboxes[a].Contents?.CountOf(Flint) == 2, "the deposit after the refused one never arrived");
+
+        var chest = _world.Chests.Peek(cell.Item1, cell.Item2, cell.Item3)!;
+        Assert.Equal(2, Enumerable.Range(0, chest.SlotCount).Sum(i => chest[i].Count));
+        Assert.Equal(0, PlayerOf(a).Inventory.CountFor(Flint));
     }
 
     [Fact]

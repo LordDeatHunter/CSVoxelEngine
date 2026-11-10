@@ -6,7 +6,7 @@ The spell part schema, what a cast does, and the status effect schema and rules.
 
 The folder is the part's kind (`element`, `shape`, `modifier`, `trigger`; `SpellPartKind`, folder name
 `SpellPart.FolderOf`), never a field. Parts are keyed `<kind>/<name>` (`SpellPart.Key`), so an element
-and a modifier may share a file name, and they take no byte ids. A missing `spell/` folder or kind folder
+and a modifier may share a file name, and they take no content ids. A missing `spell/` folder or kind folder
 is no parts (no trigger ships); an unknown kind folder or a `.json` lying directly in `spell/` is an error
 naming it, and every part error names its file. `SpellPartLoader` (`Content/Spells/`) runs in
 `ContentRegistry.Load` right after the status effects (which follow the tree species) and publishes `SpellPartRegistry` (`TryGet`,

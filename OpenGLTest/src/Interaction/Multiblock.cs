@@ -99,7 +99,7 @@ public static class Multiblock
     }
 
     /// <summary>Whether a block id belongs to a multiblock structure, anchor or part.</summary>
-    public static bool IsMultiblockCell(byte id) =>
+    public static bool IsMultiblockCell(ushort id) =>
         BlockType.ById[id]?.Renderer is BlockRenderer.Multiblock or BlockRenderer.MultiblockPart;
 
     /// <summary>

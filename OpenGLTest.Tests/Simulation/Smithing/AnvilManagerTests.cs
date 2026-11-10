@@ -151,9 +151,9 @@ public sealed class AnvilManagerTests
     }
 
     // The metal the anvil's own work makes is what its forge recipes take (the iron chain)
-    private static byte Metal => Profile.ResultId;
+    private static ushort Metal => Profile.ResultId;
 
-    private static ForgeRecipe[] RecipesOf(byte metal) =>
+    private static ForgeRecipe[] RecipesOf(ushort metal) =>
         ContentRegistry.ForgeRecipes.Where(r => r.MetalId == metal).ToArray();
 
     private static AnvilManager Stacked(int count)

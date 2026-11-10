@@ -24,10 +24,10 @@ public sealed class WoodLootTests
     private static IEnumerable<BlockType> TreeWoods =>
         BlockType.Types.Values.Where(t => BlockType.IsTreeWood(t.Id));
 
-    private static HashSet<byte> Support(System.Action<List<byte>> roll)
+    private static HashSet<ushort> Support(System.Action<List<ushort>> roll)
     {
-        var support = new HashSet<byte>();
-        var into = new List<byte>();
+        var support = new HashSet<ushort>();
+        var into = new List<ushort>();
         for (var i = 0; i < Rolls; i++)
         {
             into.Clear();

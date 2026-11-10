@@ -25,7 +25,7 @@ submerged face in quarter blocks (`Vertex.EncodeWaterSurface`, 0 on every dry fa
 gets it from `WaterSurfaceCodes.SubmergedSurfaceCode`, which walks the fluid column in the padded snapshot and
 resolves a column that leaves the snapshot from the build's resolved `ColumnTerrain.WaterLevel`
 (`MeshScratch.Columns`, worldgen or streamed, see "Chunk meshing"); it rides the greedy key
-as a 7-bit code in bits 25-31 (bits 16-23 are unused), so a merge never crosses two water surfaces. On a **fluid** quad
+as a 7-bit code in bits 25-31 (`GreedyKey`), so a merge never crosses two water surfaces. On a **fluid** quad
 (alpha 254) the same ushort means something else: the per-corner flow code
 (`Vertex.EncodeWaterFlow` of `FluidFlow.Corner`, signed 7-bit X and Z plus a falling bit, 0 =
 still), one per vertex so neighboring cells agree at shared corners. That is safe only because
@@ -110,13 +110,18 @@ emitters still read seed-hashed worldgen per cell, see the multiplayer "Known ga
 streamed column makes the build return `null`, which the caller treats like a vanished neighbor
 (see the threading rules).
 `ChunkMeshBuilder.GenerateMeshDataFromSnapshot` runs two passes over the padded 18³
-block snapshot. The binary greedy pass (`EmitGreedyFaces`, scratch in the `[ThreadStatic]`
+block snapshot. The id snapshots (the padded `ushort[]` and the light flood's id copy, both rented
+from `ArrayPool<ushort>`) are `ushort` like chunk storage; the state, sun and block-light
+snapshots stay `byte`. The binary greedy pass (`EmitGreedyFaces`, scratch in the `[ThreadStatic]`
 `MeshScratch`) takes every block flagged `BlockType.IsGreedy`: a `Model`-renderer block whose
 baked model is exactly the six untransformed cube faces (`ModelBakeSteps.BakesGreedy`; all four
 built-in parents qualify, so stone, dirt, grass, logs, TNT, lamps, leaves and glass all do). It
 builds per-axis bit columns of greedy and occluding cells, finds visible faces with one
 shift-and-mask per column (the halo bits cull border faces exactly like the neighbor read),
-keys each face by block id, the four corner AO values, the submerged flag and the four corner
+keys each face by one int (`GreedyKey`: block id in bits 0-15, the four 2-bit corner AO values
+in 16-23, the submerged flag in 24, a submerged face's 7-bit water surface code in 25-31; bit 31
+may make it negative, which is safe because the plane table hashes it as `(uint)key` and an
+empty slot is entry 0) and by the four corner
 **smooth light** sums (Minecraft smooth lighting, `ChunkLighting.SmoothCornerLight`): each corner's sun
 and lamp light is summed over the front cell plus the same side/side/corner cells AO reads (a
 side that blocks light, or a corner behind two blocked sides, is replaced by the front cell, so

@@ -19,7 +19,7 @@ public sealed class HotbarNameFade
     private int _slot;
 
     /// <summary>The item the selected slot showed when last observed; 0 for an empty slot.</summary>
-    public byte ShownId { get; private set; }
+    public ushort ShownId { get; private set; }
 
     /// <summary>Seconds since the selection last changed, parked at the end of the fade.</summary>
     public float Elapsed { get; private set; } = Total;
@@ -51,7 +51,7 @@ public sealed class HotbarNameFade
     /// otherwise the timer advances by <paramref name="deltaTime"/>. The very first observation
     /// only records the selection, so a world does not open with a name over the hotbar.
     /// </summary>
-    public bool Observe(int slot, byte id, float deltaTime)
+    public bool Observe(int slot, ushort id, float deltaTime)
     {
         var changed = _tracked && (slot != _slot || id != ShownId);
         _tracked = true;
@@ -62,7 +62,7 @@ public sealed class HotbarNameFade
     }
 
     // Only resolved on a change, so the tool-instance lookup never runs per frame.
-    private static string NameOf(Inventory inventory, byte id)
+    private static string NameOf(Inventory inventory, ushort id)
     {
         var instance = inventory.SelectedToolInstance;
         if (instance != 0 && inventory.GetToolStack(instance) is { } stack)

@@ -102,7 +102,7 @@ public readonly record struct WorldIntent(
     float Charge = 0f,
     NetAttackKind Attack = NetAttackKind.Punch,
     int Slot = 0,
-    byte Recipe = 0)
+    ushort Recipe = 0)
 {
     /// <summary>The cell the intent names, as a floored world position.</summary>
     public Vector3 Cell => new(X, Y, Z);
@@ -159,6 +159,6 @@ public readonly record struct WorldIntent(
     public static WorldIntent Waystone(Vector3 eye, Vector3 direction, (int X, int Y, int Z) destination) =>
         new(NetIntentKind.Waystone, eye, direction, destination.X, destination.Y, destination.Z, HasCell: true);
 
-    public static WorldIntent Forge(Vector3 eye, Vector3 direction, Vector3 cell, byte resultId) =>
+    public static WorldIntent Forge(Vector3 eye, Vector3 direction, Vector3 cell, ushort resultId) =>
         new(NetIntentKind.Forge, eye, direction, (int)cell.X, (int)cell.Y, (int)cell.Z, HasCell: true, Recipe: resultId);
 }

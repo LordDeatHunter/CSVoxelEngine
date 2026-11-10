@@ -18,9 +18,9 @@ public static class HematiteGenerator
     private static FastNoiseLite VeinNoise;
 
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte OreBlock;
+    public static readonly ushort OreBlock;
 
-    private static readonly byte RockBlock;
+    private static readonly ushort RockBlock;
 
     /// <summary>How the vein threshold shifts per cave biome (CB-2): richer in the magma-touched deep.</summary>
     internal static readonly CaveRichness Richness = new((CaveBiome.MagmaDeep, WorldGenerationConfig.HematiteMagmaDeepShift));
@@ -46,7 +46,7 @@ public static class HematiteGenerator
     /// or below the <see cref="WorldGenerationConfig.HematiteMaxY"/> ceiling, the interpolated
     /// <see cref="OreNoiseLattice"/> field exceeds the threshold shifted by that biome's richness there.
     /// Threshold and ceiling test only; the caller decides what counts as a replaceable host. Equals what
-    /// <see cref="Stamp(byte[], int, int, int, CaveBiomeMap)"/> writes given a map holding that biome there, the ceiling included.
+    /// <see cref="Stamp(ushort[], int, int, int, CaveBiomeMap)"/> writes given a map holding that biome there, the ceiling included.
     /// </summary>
     public static bool HasOre(int x, int y, int z, CaveBiome caveBiome)
     {
@@ -55,8 +55,8 @@ public static class HematiteGenerator
                 WorldGenerationConfig.HematiteThreshold + Richness.ShiftOf(caveBiome));
     }
 
-    /// <summary>Stamps the chunk as if every cell were plain (<see cref="Stamp(byte[], int, int, int, CaveBiomeMap)"/>).</summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0) =>
+    /// <summary>Stamps the chunk as if every cell were plain (<see cref="Stamp(ushort[], int, int, int, CaveBiomeMap)"/>).</summary>
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0) =>
         Stamp(blocks, worldX0, worldY0, worldZ0, null);
 
     /// <summary>
@@ -65,7 +65,7 @@ public static class HematiteGenerator
     /// water, lava, air and every other feature's output pass through untouched. <paramref name="caves"/>
     /// is the chunk's cave biome map, null when every cell is plain.
     /// </summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0, CaveBiomeMap? caves)
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0, CaveBiomeMap? caves)
     {
         OreNoiseLattice.Stamp(blocks, VeinNoise, WorldGenerationConfig.HematiteThreshold,
             worldX0, worldY0, worldZ0, new VeinRule(WorldGenerationConfig.HematiteMaxY - worldY0, caves?.Cells));
@@ -80,9 +80,9 @@ public static class HematiteGenerator
     /// </summary>
     private readonly struct VeinRule(int maxLocalY, byte[]? biomes) : IOreLatticeRule
     {
-        public bool IsHost(byte block, int localX, int localY, int localZ) => localY <= maxLocalY && block == RockBlock;
+        public bool IsHost(ushort block, int localX, int localY, int localZ) => localY <= maxLocalY && block == RockBlock;
 
-        public byte Replacement(int worldX, int worldY, int worldZ) => OreBlock;
+        public ushort Replacement(int worldX, int worldY, int worldZ) => OreBlock;
 
         public float ThresholdShift(int localX, int localY, int localZ) =>
             biomes is null ? 0f : Richness.ShiftOf((CaveBiome)biomes[Chunk.Idx(localX, localY, localZ)]);

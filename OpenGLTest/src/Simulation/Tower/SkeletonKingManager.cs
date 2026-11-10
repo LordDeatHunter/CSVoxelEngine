@@ -29,7 +29,7 @@ public sealed class SkeletonKingManager : RealmMobManager<SkeletonKing>
     private readonly EntityType? _type;
     // The volley bones and the slam shards in flight, each carrying its own damage
     private readonly MobMissiles _bones = new();
-    private readonly byte _boneItemId;
+    private readonly ushort _boneItemId;
     // The skeletons the kings summoned and still track (pruned once they are dying or dead)
     private readonly List<Skeleton> _minions = [];
     // The manager the summons go through this frame; none (no summons) when the update is given none

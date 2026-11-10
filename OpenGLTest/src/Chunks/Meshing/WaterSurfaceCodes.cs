@@ -33,7 +33,7 @@ internal static class WaterSurfaceCodes
     /// tower) caps at the snapshot top. <see cref="DecodeSurfaceCode"/> turns the code back into
     /// a world Y.
     /// </summary>
-    internal static int SubmergedSurfaceCode(byte[] padded, byte[] paddedState, int fluidPIdx,
+    internal static int SubmergedSurfaceCode(ushort[] padded, byte[] paddedState, int fluidPIdx,
         int chunkBaseY, ColumnTerrain[] columns)
     {
         // ChunkMeshBuilder.FillPaddedSnapshot's layout: px * PaddedSq + py * Padded + pz (z innermost)
@@ -78,7 +78,7 @@ internal static class WaterSurfaceCodes
 
     /// <summary>The baked <see cref="Vertex.WaterSurface"/> of a face looking into the fluid
     /// cell at <paramref name="fluidPIdx"/>; the per-voxel twin of the greedy key's code.</summary>
-    internal static ushort BakedWaterSurface(byte[] padded, byte[] paddedState, int fluidPIdx,
+    internal static ushort BakedWaterSurface(ushort[] padded, byte[] paddedState, int fluidPIdx,
         int chunkBaseY, ColumnTerrain[] columns) =>
         Vertex.EncodeWaterSurface(DecodeSurfaceCode(chunkBaseY,
             SubmergedSurfaceCode(padded, paddedState, fluidPIdx, chunkBaseY, columns)));

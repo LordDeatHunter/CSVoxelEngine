@@ -14,7 +14,7 @@ public sealed class HealItemTests
 {
     public HealItemTests() => TestContent.EnsureLoaded();
 
-    private static byte Bandage => ContentRegistry.RequireItem("bandage").Id;
+    private static ushort Bandage => ContentRegistry.RequireItem("bandage").Id;
 
     [Fact]
     public void AHurtPlayerIsHealedAndOneBandageIsSpent()

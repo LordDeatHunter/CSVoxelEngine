@@ -73,11 +73,11 @@ public class UIRenderer : IDisposable
 
     // Flat sprite textures for the list rows; the hotbar and the preview draw the same ids
     // as extruded 3D meshes through DrawItemIcon instead
-    private readonly Dictionary<byte, uint> _itemIcons = new();
+    private readonly Dictionary<ushort, uint> _itemIcons = new();
     // One unit square per sheet frame, UV'd to that frame's array slice (see UvRect.Tile):
     // the icon texture of a spritesheet item holds one slice per frame, so picking a frame
     // is picking a mesh, and every frame mipmaps without bleeding into its neighbors.
-    private readonly Dictionary<byte, Mesh[]> _itemFrames = new();
+    private readonly Dictionary<ushort, Mesh[]> _itemFrames = new();
     private readonly int _locAlphaCutoff;
     private readonly int _locSrgbTex;
     // Whether the shared block atlas is SRGB8_ALPHA8 (the game) or linear (the ItemDebugger);
@@ -431,7 +431,7 @@ public class UIRenderer : IDisposable
     /// Width and height of the box the icon fits in, in pixels — not the cube's edge length,
     /// which is derived from the viewing angle.
     /// </param>
-    public void DrawBlockIcon(Vector2 center, float size, byte blockId)
+    public void DrawBlockIcon(Vector2 center, float size, ushort blockId)
     {
         var mesh = _blockCubes.Get(blockId);
         if (mesh == null) return;
@@ -752,7 +752,7 @@ public class UIRenderer : IDisposable
         return fitted;
     }
 
-    internal void DrawIdIcon(Vector2 center, float size, byte id, float headingDegrees, float timeSeconds)
+    internal void DrawIdIcon(Vector2 center, float size, ushort id, float headingDegrees, float timeSeconds)
     {
         if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
             DrawItemSprite(center, new Vector2(size), id, icon, headingDegrees, timeSeconds);
@@ -765,7 +765,7 @@ public class UIRenderer : IDisposable
     /// texture for a plain one. Falls back to the whole texture when the frame meshes are
     /// missing, so an icon never vanishes over a cache mismatch.
     /// </summary>
-    internal void DrawItemSprite(Vector2 center, Vector2 size, byte id, uint texture,
+    internal void DrawItemSprite(Vector2 center, Vector2 size, ushort id, uint texture,
         float headingDegrees, float timeSeconds)
     {
         if (_itemFrames.TryGetValue(id, out var frames)
@@ -784,7 +784,7 @@ public class UIRenderer : IDisposable
     /// inventory rows show; the item debugger uses it for its grid so icons read as sprites.
     /// Air, blocks and unknown ids draw nothing.
     /// </summary>
-    public void DrawItemSprite(Vector2 center, float pixels, byte itemId, float headingDegrees,
+    public void DrawItemSprite(Vector2 center, float pixels, ushort itemId, float headingDegrees,
         float timeSeconds)
     {
         if (!ItemRegistry.IsItem(itemId) || !_itemIcons.TryGetValue(itemId, out var texture)) return;
@@ -795,7 +795,7 @@ public class UIRenderer : IDisposable
     /// A pure item as its extruded world-drop sprite, yawed like the block icons. Only the
     /// preview uses this; rows and hotbar draw the flat sprite.
     /// </summary>
-    public void DrawItemIcon(Vector2 center, float size, byte itemId, float yaw)
+    public void DrawItemIcon(Vector2 center, float size, ushort itemId, float yaw)
     {
         if (!_itemMeshes.TryGet(itemId, out var mesh, out var texture)) return;
 
@@ -819,7 +819,7 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>A block cube yawed by <paramref name="yaw"/> instead of the fixed icon angle.</summary>
-    public void DrawBlockIconSpinning(Vector2 center, float size, byte blockId, float yaw)
+    public void DrawBlockIconSpinning(Vector2 center, float size, ushort blockId, float yaw)
     {
         var mesh = _blockCubes.Get(blockId);
         if (mesh == null) return;

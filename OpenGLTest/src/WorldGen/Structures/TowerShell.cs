@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Content.Structures;
 
 namespace VoxelEngine.WorldGen.Structures;
 
@@ -83,14 +84,15 @@ internal static class TowerShell
     internal static bool IsSlabStep(int t) => t >= 0 && t % 2 == 0;
 
     /// <summary>The shell cell at world height <paramref name="y"/> of a column in <paramref name="ring"/> and strip
-    /// <paramref name="step"/>: -1 (write nothing) or <c>block | state &lt;&lt; 8</c>, air included.</summary>
+    /// <paramref name="step"/>: <see cref="StructureCell.None"/> (write nothing) or a stateless <see cref="StructureCell"/>,
+    /// which is the bare block id, air included.</summary>
     internal static int CellAt(TowerSite s, TowerRing ring, int step, int y)
     {
-        if (ring == TowerRing.Outside || y < s.BottomY || y > s.TopY) return -1;
+        if (ring == TowerRing.Outside || y < s.BottomY || y > s.TopY) return StructureCell.None;
         if (ring == TowerRing.Apron)
         {
             if (y <= s.GroundY) return TowerPalette.StoopBlock;
-            return y <= s.GroundY + Headroom ? BlockType.Air : -1;
+            return y <= s.GroundY + Headroom ? BlockType.Air : StructureCell.None;
         }
         if (y <= s.GroundY) return s.Palette.Brick;
         return ring switch

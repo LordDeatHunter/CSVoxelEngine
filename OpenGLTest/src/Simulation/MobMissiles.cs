@@ -30,7 +30,7 @@ internal sealed class MobMissiles
     /// <summary>Launches a missile of item <paramref name="itemId"/> carrying <paramref name="damage"/>, falling under
     /// <paramref name="gravityScale"/> of the throw gravity and spent after <paramref name="lifeSeconds"/> (a bone
     /// shard's are shorter than an arrow's).</summary>
-    public ThrownProjectile Launch(byte itemId, Vector3 origin, Vector3 velocity, int damage, float gravityScale = 1f,
+    public ThrownProjectile Launch(ushort itemId, Vector3 origin, Vector3 velocity, int damage, float gravityScale = 1f,
         float lifeSeconds = PlayerConfig.ThrowLifetimeSeconds)
     {
         var missile = new ThrownProjectile(itemId, origin, velocity, 0f, 1f, gravityScale, lifeSeconds);

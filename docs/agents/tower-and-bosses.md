@@ -46,7 +46,7 @@ share `MobConfig.SkeletonHeight` as their body box.
   blow (`Skeleton.ScaleDamage`, never below 1) and is drawn as a tinted shell over its rig part (`RiggedMob.ArmorPieceOn`,
   `MobPasses.DrawArmorShell` on `PlayerRig.BuildArmorMesh`, the player's own shells: leather in the leather piece's
   sprite color, copper in the copper ingot's; a helmet leaves its front open so the skull shows; the arms stay bare). The
-  pieces are a look, not items (no copper armor exists, and the id budget is short): they never drop. The outfit is saved
+  pieces are a look, not items (no copper armor exists): they never drop. The outfit is saved
   (`MobData.Outfit`) and rides the wire with the role in the tier byte (`Skeleton.PackLook`, protocol 31), so a mirror
   draws the same skeleton. A scenario's `spawn` names the kind (`skeleton` or `skeleton_warrior`) and rolls the outfit.
 - **Arrows** are `ThrownProjectile`s of the `arrow` item (`throwAligned`, so they fly point first like the spear, which
@@ -95,8 +95,7 @@ reference and the measured costs ("Costs (BT-9)": the sky-cover mesh build, the 
 per-frame step, with their ceilings). This section is the **floor locks** (`BT-4`), the **chests** (`BT-5`), the **roof
 altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collapse** (`BT-8`) and the **dark interiors**
 (`BT-10`). The tower's last protocol was 27 (the altar byte and the king; the collapse needs no wire change); 28
-(the cave biome byte, CB-3) and 29 (the cave mobs, CB-4, the current one) came after it. The tower's
-content ids left 244 of the 255 used, before the cave ores took 3 more (see "Budgets" under "Layers").
+(the cave biome byte, CB-3) and 29 (the cave mobs, CB-4) came after it.
 - **Dark interiors (BT-10)**: the floors get no sun. The three palette bricks carry `coversSky`, so a mesh build over a
   tower chunk starts every sun seed above the slab over it ("Sky cover (BT-10)" under "Chunk meshing"); a floor is lit only
   by its template lanterns and the torches a player brings, identically in singleplayer, on a server and on a client. The
@@ -307,7 +306,8 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
   `TowerRules.CollapseDue` (Defeated and not done) every frame after the door/pile sweep, so a live defeat and one restored
   from a save take the same path; a new collapse waits `MobConfig.TowerCollapseDelaySeconds` (the death and loot play
   first), a restored one resumes at once. Only a record built from a world site (`TowerRecord.Site`) collapses. **The rule**
-  (`WorldGen/Structures/TowerRuin.RuinAt`, GL-free and pure in cell, seed and site, salt `0x5E80`, no cache): each wall column
+  (`WorldGen/Structures/TowerRuin.RuinAt`, GL-free and pure in cell, seed and site, salt `0x5E80`, no cache; it returns a
+  packed `StructureCell` or `StructureCell.None` to keep the cell, like `TowerGenerator.CellAt`): each wall column
   keeps a hashed stump (`TowerRuinStumpMinBlocks..MaxBlocks` over the ground slab), every unbreakable cell at or below its
   stump (the palette bricks, ground slab and foundation included) becomes `stone_bricks` or `cobblestone`
   (`TowerRuinCobbleShare`), doors, piles and the altar become air, everything above the stump becomes air except floor 0's

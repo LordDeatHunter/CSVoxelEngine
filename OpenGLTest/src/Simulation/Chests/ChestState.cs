@@ -52,7 +52,7 @@ public sealed class ChestState
     }
 
     /// <summary>Total units of a stackable id held across the chest.</summary>
-    public int CountOf(byte id)
+    public int CountOf(ushort id)
     {
         var total = 0;
         foreach (var slot in _slots)

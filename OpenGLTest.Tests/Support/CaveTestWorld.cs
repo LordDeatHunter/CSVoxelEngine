@@ -36,7 +36,7 @@ internal static class CaveTestWorld
             {
                 var worldY = cy * Chunk.Size + y;
                 var open = worldY > floor && worldY <= floor + 3;
-                chunk.SetBlockRaw(x, y, z, open ? (byte)0 : stone, 0);
+                chunk.SetBlockRaw(x, y, z, open ? BlockType.Air : stone, 0);
             }
             chunk.PublishLight(light);
             chunks.Chunks[pos] = chunk;

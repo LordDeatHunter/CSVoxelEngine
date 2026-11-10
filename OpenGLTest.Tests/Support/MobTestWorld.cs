@@ -7,7 +7,7 @@ internal static class MobTestWorld
 {
     /// <summary>One loaded chunk at the origin whose bottom layer (y = 0) is <paramref name="topId"/>,
     /// so a body stands with its feet at y = 1.</summary>
-    public static ChunkManager Floor(byte topId)
+    public static ChunkManager Floor(ushort topId)
     {
         var chunks = new ChunkManager(null!);
         var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);

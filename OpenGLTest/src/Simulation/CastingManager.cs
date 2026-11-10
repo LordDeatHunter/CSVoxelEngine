@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Items;
 using VoxelEngine.Networking;
@@ -77,7 +78,7 @@ public sealed class CastingManager
 
     private readonly Dictionary<(int X, int Y, int Z), CastState> _casts = new();
     private readonly List<(int X, int Y, int Z)> _stale = new();
-    private readonly List<byte> _collected = new();
+    private readonly List<ushort> _collected = new();
 
     /// <summary>Whether any mold cell holds a pour, for render early-out.</summary>
     public bool HasAny => _casts.Count > 0;
@@ -95,7 +96,7 @@ public sealed class CastingManager
     /// <paramref name="source"/> binds the pour to a player other than the one <see cref="Update"/>
     /// is handed (a server's connected player, see <see cref="CastState.PourSource"/>).
     /// </summary>
-    public bool TryStartPour(Vector3 cell, byte moldId, ItemStack crucible, PlayerContext? source = null)
+    public bool TryStartPour(Vector3 cell, ushort moldId, ItemStack crucible, PlayerContext? source = null)
     {
         if (crucible.Item is not CrucibleItem) return false;
         var contents = crucible.Get<CrucibleComponent>();
@@ -120,7 +121,7 @@ public sealed class CastingManager
     /// <summary>The cast recipe an empty mold <paramref name="moldId"/> takes from a crucible holding
     /// <paramref name="contents"/>: the molten metal with the most ml among those it casts (the lowest
     /// material id on a tie), or null when it casts none of them.</summary>
-    public static CastRecipe? PourRecipe(byte moldId, CrucibleComponent contents)
+    public static CastRecipe? PourRecipe(ushort moldId, CrucibleComponent contents)
     {
         CastRecipe? best = null;
         var bestMl = 0;
@@ -253,7 +254,7 @@ public sealed class CastingManager
     /// filling, pouring or cooling. The list is reused between calls, so a caller must consume it
     /// before the next one.
     /// </summary>
-    public IReadOnlyList<byte> Collect(Vector3 cell)
+    public IReadOnlyList<ushort> Collect(Vector3 cell)
     {
         _collected.Clear();
         var key = VoxelCoords.BlockCellOf(cell);
@@ -279,7 +280,7 @@ public sealed class CastingManager
     }
 
     /// <summary>Every mold cell holding a pour, for the molten/cooling render pass.</summary>
-    public IEnumerable<(Vector3 Cell, byte MaterialId, float Fill01, float Cool01, bool Done, byte ResultId)>
+    public IEnumerable<(Vector3 Cell, byte MaterialId, float Fill01, float Cool01, bool Done, ushort ResultId)>
         CastingView()
     {
         foreach (var (key, state) in _casts)
@@ -353,7 +354,7 @@ public sealed class CastingManager
         {
             if (leftCasts-- == 0) break;
             StationNetCodec.WriteCell(writer, x, y, z);
-            writer.Write(state.Recipe.MoldId);
+            writer.WriteId(state.Recipe.MoldId);
             writer.Write(state.Recipe.MaterialId);
             writer.Write(state.FilledMl);
             writer.Write(state.Pouring);
@@ -375,7 +376,7 @@ public sealed class CastingManager
         for (var i = 0; i < count; i++)
         {
             var key = StationNetCodec.ReadCell(reader);
-            var moldId = reader.ReadByte();
+            var moldId = BlockTables.RequireAssigned(reader.ReadId());
             var materialId = reader.ReadByte();
             var filled = reader.ReadInt();
             var pouring = reader.ReadBool();

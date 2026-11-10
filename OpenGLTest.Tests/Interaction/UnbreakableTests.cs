@@ -26,11 +26,11 @@ public sealed class UnbreakableTests
 {
     public UnbreakableTests() => TestContent.EnsureLoaded();
 
-    private static byte Id(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Id(string name) => ContentRegistry.RequireBlock(name).Id;
 
-    private static byte Brick => BlockType.Types.Values.First(t => t.Unbreakable).Id;
+    private static ushort Brick => BlockType.Types.Values.First(t => t.Unbreakable).Id;
 
-    private static byte Control => Id("stone_bricks");
+    private static ushort Control => Id("stone_bricks");
 
     private const StatusEffectBlockAction AllActions =
         StatusEffectBlockAction.Ignite | StatusEffectBlockAction.Freeze | StatusEffectBlockAction.Thaw;

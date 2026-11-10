@@ -14,7 +14,7 @@ namespace VoxelEngine.Simulation.Chests;
 public static class ChestTransfer
 {
     /// <summary>Whether an id moves as a single instance (a tool or gear piece) rather than by count.</summary>
-    public static bool IsInstance(byte id) =>
+    public static bool IsInstance(ushort id) =>
         Inventory.CategoryOf(id) is InventoryCategory.Tools or InventoryCategory.Gear;
 
     /// <summary>
@@ -22,7 +22,7 @@ public static class ChestTransfer
     /// existing stacks first and then the empty slots. Returns how many went (0 for an id that is not a stackable the
     /// player holds, or a full chest).
     /// </summary>
-    public static int Deposit(Inventory inventory, ChestState chest, byte id, int count)
+    public static int Deposit(Inventory inventory, ChestState chest, ushort id, int count)
     {
         if (count <= 0 || IsInstance(id) || Inventory.CategoryOf(id) == null) return 0;
         var want = Math.Min(count, inventory.CountFor(id));
@@ -74,7 +74,7 @@ public static class ChestTransfer
     /// Puts up to <paramref name="count"/> units of a stackable into the chest (merging, then empty slots) and returns
     /// how many fit. Also what the loot materializer fills a ruin chest with.
     /// </summary>
-    public static int Place(ChestState chest, byte id, int count)
+    public static int Place(ChestState chest, ushort id, int count)
     {
         var left = count;
         for (var i = 0; i < chest.SlotCount && left > 0; i++)

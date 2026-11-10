@@ -16,7 +16,7 @@ public static class Placement
     /// <summary>The cell a placement aimed at <paramref name="hit"/> fills: the neighbor across
     /// the hit face, or the hit cell itself when it holds a stack a placement may take over.
     /// <paramref name="hit"/> is the integral cell the raycast reported.</summary>
-    public static Vector3 TargetCell(Vector3 hit, Vector3 normal, byte targetId, byte targetState) =>
+    public static Vector3 TargetCell(Vector3 hit, Vector3 normal, ushort targetId, byte targetState) =>
         BlockType.IsReplaceableByPlacement(targetId, targetState) ? hit : hit + normal;
 
     /// <summary>Whether a placement may write into a cell that already holds a block: air, a
@@ -24,7 +24,7 @@ public static class Placement
     /// caller keeps its item. An unbreakable cell is never written over (the load rules already
     /// refuse a fluid or replaceable unbreakable block; the check keeps the rule in this one place
     /// for placement and falling-block landing alike).</summary>
-    public static bool CanOccupy(byte existingId, byte existingState) =>
+    public static bool CanOccupy(ushort existingId, byte existingState) =>
         existingId == 0
         || (!BlockType.IsUnbreakable(existingId)
             && (BlockType.IsFluid(existingId) || BlockType.IsReplaceableByPlacement(existingId, existingState)));
@@ -40,8 +40,8 @@ public static class Placement
     /// snow drift) stands on the floor whatever face was hit, since that face is no wall. Every
     /// other block places as itself with <paramref name="state"/>. Returns false when refused.
     /// </summary>
-    public static bool TryMount(byte blockId, byte state, Vector3 normal, bool fillsHitCell,
-        out byte placedId, out byte placedState)
+    public static bool TryMount(ushort blockId, byte state, Vector3 normal, bool fillsHitCell,
+        out ushort placedId, out byte placedState)
     {
         placedId = blockId;
         placedState = state;
@@ -57,13 +57,13 @@ public static class Placement
     }
 
     /// <summary>
-    /// <see cref="TryMount(byte, byte, Vector3, bool, out byte, out byte)"/> for a placement made
+    /// <see cref="TryMount(ushort, byte, Vector3, bool, out ushort, out byte)"/> for a placement made
     /// looking along <paramref name="viewDirection"/>: a placed block that takes its facing from the
     /// look (<see cref="BlockType.FacingFromLook"/>, stairs) faces <see cref="LookFacing"/> of it,
     /// whatever face was hit. Everything else mounts exactly as the overload without a look.
     /// </summary>
-    public static bool TryMount(byte blockId, byte state, Vector3 normal, bool fillsHitCell, Vector3 viewDirection,
-        out byte placedId, out byte placedState)
+    public static bool TryMount(ushort blockId, byte state, Vector3 normal, bool fillsHitCell, Vector3 viewDirection,
+        out ushort placedId, out byte placedState)
     {
         if (!TryMount(blockId, state, normal, fillsHitCell, out placedId, out placedState)) return false;
         if (BlockType.ById[placedId] is { FacingFromLook: true })

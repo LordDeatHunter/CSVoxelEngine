@@ -72,16 +72,16 @@ public static class InventoryIntentCodec
                 writer.Write(intent.Count);
                 writer.Write((byte)members.Length);
                 foreach (var member in members)
-                    writer.Write(member);
+                    writer.WriteId(member);
                 break;
             }
             case NetInventoryAction.CreativeGrant:
-                writer.Write((byte)intent.Id);
+                writer.WriteId((ushort)intent.Id);
                 writer.Write(intent.Count);
                 break;
             case NetInventoryAction.CreativeClear:
             case NetInventoryAction.PickBlock:
-                writer.Write((byte)intent.Id);
+                writer.WriteId((ushort)intent.Id);
                 break;
             default:
                 throw new ArgumentException($"Unknown inventory action {intent.Action}.", nameof(intent));
@@ -115,20 +115,20 @@ public static class InventoryIntentCodec
                 var count = reader.ReadByte();
                 if (count > MaxCraftMembers)
                     throw new InvalidDataException($"craft intent with {count} members");
-                var members = new byte[count];
+                var members = new ushort[count];
                 for (var i = 0; i < count; i++)
-                    members[i] = reader.ReadByte();
+                    members[i] = reader.ReadId();
                 return InventoryIntent.Craft(recipe, batch, members);
             }
             case NetInventoryAction.CreativeGrant:
             {
-                var id = reader.ReadByte();
+                var id = reader.ReadId();
                 return InventoryIntent.CreativeGrant(id, reader.ReadInt());
             }
             case NetInventoryAction.CreativeClear:
-                return InventoryIntent.CreativeClear(reader.ReadByte());
+                return InventoryIntent.CreativeClear(reader.ReadId());
             case NetInventoryAction.PickBlock:
-                return InventoryIntent.PickBlock(reader.ReadByte());
+                return InventoryIntent.PickBlock(reader.ReadId());
             case NetInventoryAction.SelectStaffSlot:
                 return InventoryIntent.SelectStaffSlot(reader.ReadInt());
             case NetInventoryAction.ClearStaffSlot:

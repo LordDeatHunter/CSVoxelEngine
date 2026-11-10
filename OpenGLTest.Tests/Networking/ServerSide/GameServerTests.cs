@@ -178,6 +178,8 @@ public sealed class GameServerTests : IDisposable
                             ListedFlags[name] = (NetPlayerFlags)reader.ReadByte();
                             reader.ReadByte();
                             reader.ReadByte();
+                            for (var slot = 0; slot < GearConfig.ArmorSlotCount; slot++)
+                                reader.ReadId();
                         }
                         break;
                     }
@@ -196,8 +198,7 @@ public sealed class GameServerTests : IDisposable
             var count = reader.ReadInt();
             var cells = new List<NetCellChange>(count);
             for (var i = 0; i < count; i++)
-                cells.Add(new NetCellChange(reader.ReadInt(), reader.ReadInt(), reader.ReadInt(),
-                    reader.ReadByte(), reader.ReadByte()));
+                cells.Add(NetCellChangeCodec.Read(reader));
             return cells;
         }
 
@@ -332,8 +333,8 @@ public sealed class GameServerTests : IDisposable
         return player;
     }
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
-    private static byte Dirt => ContentRegistry.RequireBlock("dirt").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Dirt => ContentRegistry.RequireBlock("dirt").Id;
 
     /// <summary>
     /// A cleared pocket around the spawn eye: a dirt floor one row under the feet and air for four
@@ -381,11 +382,11 @@ public sealed class GameServerTests : IDisposable
         for (var x = fx - 3; x <= fx + 3; x++)
         for (var y = fy - 1; y <= fy + 4; y++)
         for (var z = fz - 3; z <= fz + 3; z++)
-            SetCell(new Vector3(x, y, z), y == fy - 1 ? Dirt : (byte)0);
+            SetCell(new Vector3(x, y, z), y == fy - 1 ? Dirt : BlockType.Air);
         return new Arena(eye, fx, fy, fz);
     }
 
-    private void SetCell(Vector3 cell, byte id, byte state = 0)
+    private void SetCell(Vector3 cell, ushort id, byte state = 0)
     {
         var chunk = _world.GetChunkManager().ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z);
         Assert.NotNull(chunk);
@@ -393,7 +394,7 @@ public sealed class GameServerTests : IDisposable
         chunk!.SetBlockRaw(lx, ly, lz, id, state);
     }
 
-    private (byte Id, byte State) CellAt(Vector3 cell)
+    private (ushort Id, byte State) CellAt(Vector3 cell)
     {
         Assert.True(_world.GetChunkManager().TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out var state));
         return (id, state);
@@ -401,7 +402,7 @@ public sealed class GameServerTests : IDisposable
 
     /// <summary>Grants <paramref name="id"/> through a creative request and puts it in hand (a grant never lands on
     /// the hotbar by itself), then drops back to survival.</summary>
-    private void GrantAsSurvival(NetworkClient client, byte id, int count)
+    private void GrantAsSurvival(NetworkClient client, ushort id, int count)
     {
         _server.AllowCreative = true;
         SendModes(client, NetPlayerFlags.Creative);
@@ -415,7 +416,7 @@ public sealed class GameServerTests : IDisposable
     }
 
     /// <summary>Seconds of server time the bare hand needs to mine <paramref name="block"/>.</summary>
-    private static double BareHandSeconds(byte block) =>
+    private static double BareHandSeconds(ushort block) =>
         BreakProgress.RequiredSeconds(Mining.HardnessOf(block, 0), Mining.BlockDamage(null), Mining.HitGapSeconds(null));
 
     [Fact]
@@ -630,7 +631,7 @@ public sealed class GameServerTests : IDisposable
         Assert.Equal(crafted.CountFor(recipe.ResultId), mirror.CountFor(recipe.ResultId));
 
         // A craft fed with a member the ingredient does not accept is refused and spends nothing
-        var wrong = (byte[])members.Clone();
+        var wrong = (ushort[])members.Clone();
         wrong[0] = 1;
         while (recipe.Ingredients[0].Accepts(wrong[0]))
             wrong[0]++;
@@ -646,12 +647,12 @@ public sealed class GameServerTests : IDisposable
     /// accepted member, the result not itself an ingredient, and one craft fitting an inventory that
     /// holds exactly the granted ingredients.
     /// </summary>
-    private static (CraftingRecipe Recipe, byte[] Members, List<(byte Id, int Count)> Grants) FirstGrantableRecipe()
+    private static (CraftingRecipe Recipe, ushort[] Members, List<(ushort Id, int Count)> Grants) FirstGrantableRecipe()
     {
         foreach (var recipe in ContentRegistry.CraftingRecipes)
         {
-            var members = new byte[recipe.Ingredients.Length];
-            var totals = new Dictionary<byte, int>();
+            var members = new ushort[recipe.Ingredients.Length];
+            var totals = new Dictionary<ushort, int>();
             for (var i = 0; i < members.Length; i++)
             {
                 var ingredient = recipe.Ingredients[i];
@@ -662,7 +663,7 @@ public sealed class GameServerTests : IDisposable
                 continue;
 
             var dryRun = Inventory.Empty();
-            var grants = new List<(byte, int)>();
+            var grants = new List<(ushort, int)>();
             var granted = true;
             foreach (var (id, count) in totals)
             {
@@ -1325,7 +1326,7 @@ public sealed class GameServerTests : IDisposable
             SetCell(new Vector3(x, y, z), TowerPalette.DoorBlock);
         SetCell(new Vector3(pile.Item1, pile.Item2, pile.Item3), TowerPalette.PileBlock);
 
-        bool Broadcasts(int from, (int X, int Y, int Z) cell, byte id) =>
+        bool Broadcasts(int from, (int X, int Y, int Z) cell, ushort id) =>
             inbox.Broadcast.Skip(from).Any(c => c.X == cell.X && c.Y == cell.Y && c.Z == cell.Z && c.Id == id);
 
         // The closed door reaches the client (pumping the server only, so the pile never wakes)
@@ -1445,7 +1446,7 @@ public sealed class GameServerTests : IDisposable
 
         var inbox = InboxOf(client);
         WaitForEntities(inbox, entities => entities.Exists(e => e.Kind == NetEntityKind.Skeleton && e.Ammo == 3));
-        // Sent as a skeleton (never under the switch's goblin default), its tier, role and outfit in the item byte
+        // Sent as a skeleton (never under the switch's goblin default), its tier, role and outfit in the item id
         var carried = Assert.Single(inbox.Entities!, e => e.Kind == NetEntityKind.Skeleton);
         Assert.Equal(Skeleton.PackLook(skeleton.Tier, skeleton.Role, skeleton.Outfit), carried.ItemId);
         Assert.Equal(skeleton.Health, carried.Health);
@@ -1493,7 +1494,7 @@ public sealed class GameServerTests : IDisposable
 
         var inbox = InboxOf(client);
         WaitForEntities(inbox, entities => entities.Exists(e => e.Kind == NetEntityKind.Sporeling && e.Ammo == 2));
-        // Sent as a sporeling (never under the switch's goblin default), its tier in the item byte
+        // Sent as a sporeling (never under the switch's goblin default), its tier in the item id
         var carried = Assert.Single(inbox.Entities!, e => e.Kind == NetEntityKind.Sporeling);
         Assert.Equal(sporeling.Tier, carried.ItemId);
         Assert.Equal(sporeling.Health, carried.Health);

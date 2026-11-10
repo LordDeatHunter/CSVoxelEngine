@@ -37,7 +37,7 @@ public class FallingBlock
     public Vector3 Position { get; private set; }
 
     /// <summary>The block that toppled, so the cube renders as itself.</summary>
-    public byte BlockId { get; }
+    public ushort BlockId { get; }
 
     /// <summary>Set when the cube toppled as part of a multi-cube column collapse (see
     /// <see cref="FallingBlockManager.TryTopple"/>): chain cubes stack on sand instead of
@@ -78,7 +78,7 @@ public class FallingBlock
     /// (<see cref="WaterSplash.Track"/>).</summary>
     internal WaterSplashTracker Splash { get; } = new();
 
-    public FallingBlock(Vector3 position, byte blockId)
+    public FallingBlock(Vector3 position, ushort blockId)
     {
         Position = position;
         BlockId = blockId;

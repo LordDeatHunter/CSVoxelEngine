@@ -71,7 +71,7 @@ public sealed class GroundHeave
     }
 
     // The ground of column (x, z) at or a few cells under level: a full cube under no full cube (a wall's face is no ground)
-    private static bool TryFindGround(ChunkManager chunks, int x, int z, int level, out int y, out byte id)
+    private static bool TryFindGround(ChunkManager chunks, int x, int z, int level, out int y, out ushort id)
     {
         id = 0;
         for (y = level; y >= level - JuiceConfig.SlamHeaveSearchDepth; y--)

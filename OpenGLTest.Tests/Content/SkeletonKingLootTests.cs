@@ -22,7 +22,7 @@ public sealed class SkeletonKingLootTests
         var random = new Random(7);
         for (var i = 0; i < 200; i++)
         {
-            var into = new List<byte>();
+            var into = new List<ushort>();
             table.Roll(new LootContext(0, 0, 0), into, random);
             Assert.Equal(1, into.Count(uniqueIds.Contains));
         }

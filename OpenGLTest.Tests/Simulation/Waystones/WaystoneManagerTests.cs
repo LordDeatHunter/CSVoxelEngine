@@ -20,7 +20,7 @@ public sealed class WaystoneManagerTests
 {
     public WaystoneManagerTests() => TestContent.EnsureLoaded();
 
-    private static byte Waystone => ContentRegistry.RequireBlock("waystone_surface").Id;
+    private static ushort Waystone => ContentRegistry.RequireBlock("waystone_surface").Id;
 
     private static (ChunkManager Manager, WaystoneManager Waystones) World()
     {

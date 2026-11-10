@@ -35,7 +35,7 @@ public static class RuinPlacement
         new(int.MinValue, neighborhoodMaxHeight + StructureRegistry.MaxHeight);
 
     /// <summary>Stamps every surface ruin whose footprint reaches the chunk: dry, level ground of a land biome.</summary>
-    public static void StampSurface(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    public static void StampSurface(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         if (StructureRegistry.Of(StructureKind.Surface).Count == 0) return;
         foreach (var (cellX, cellZ) in CellsReaching(worldX0, worldZ0, Reach))
@@ -92,7 +92,7 @@ public static class RuinPlacement
     /// own cell's cave biome from <paramref name="caves"/> as its tier (<see cref="StructureStamper.Stamp"/>), so a room in a
     /// crystal cave rolls the crystal table; a null map (no cave biomes in the chunk) leaves every chest plain, tier 0, which
     /// is what <see cref="CaveBiomes.At"/> answers there too.</summary>
-    public static void StampUnderground(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
+    public static void StampUnderground(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
         CaveBiomeMap? caves = null)
     {
         if (StructureRegistry.Of(StructureKind.Underground).Count == 0) return;
@@ -132,7 +132,7 @@ public static class RuinPlacement
 
     /// <summary>Stamps every hell ruin whose footprint reaches the chunk, in each hell layer the chunk spans. Its cells stay
     /// inside their own layer.</summary>
-    public static void StampHell(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    public static void StampHell(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         if (StructureRegistry.Of(StructureKind.Hell).Count == 0) return;
         if (!TryHellLayers(worldY0, out var first, out var last)) return;
@@ -157,7 +157,7 @@ public static class RuinPlacement
 
     /// <summary>Stamps a hell template whose bottom layer is at <paramref name="originY"/>, its cells kept inside
     /// <paramref name="layer"/>.</summary>
-    internal static void StampInLayer(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
+    internal static void StampInLayer(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
         StructureTemplate template, int turns, int x, int originY, int z, int layer)
     {
         var layerTop = WorldGenerationConfig.HellTopY - layer * WorldGenerationConfig.HellLayerPeriodBlocks;
@@ -227,7 +227,7 @@ public static class RuinPlacement
     internal static StampBand SkyBand() => SkyIslandGenerator.WriteBand();
 
     /// <summary>Stamps every sky ruin whose footprint reaches the chunk: at most one per island, on its top.</summary>
-    public static void StampSky(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    public static void StampSky(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         if (StructureRegistry.Of(StructureKind.Sky).Count == 0) return;
         Span<SkyIsland> islands = stackalloc SkyIsland[SkyIslands.MaxIslandsPerBox];
@@ -358,7 +358,7 @@ public static class RuinPlacement
 
     /// <summary>Stamps a template centered on column (x, z) with its bottom layer at <paramref name="originY"/>; a tiered chest
     /// takes its cell's cave biome from <paramref name="chestBiomes"/> when one is given.</summary>
-    internal static void StampAt(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
+    internal static void StampAt(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
         StructureTemplate template, int turns, int x, int originY, int z, int minY, int maxY, CaveBiomeMap? chestBiomes = null) =>
         StructureStamper.Stamp(blocks, ref state, worldX0, worldY0, worldZ0, template, turns,
             StructureStamper.OriginOf(x, template), originY, StructureStamper.OriginOf(z, template), minY, maxY,

@@ -65,7 +65,7 @@ public sealed class DoorTests : IDisposable
         Assert.False(TallBlock.TryGetPartner(ContentRegistry.RequireBlock("stone").Id, cell, out _, out _));
     }
 
-    private (int X, int Y, int Z) PlaceDoor(byte door, int x, int z, int facing)
+    private (int X, int Y, int Z) PlaceDoor(ushort door, int x, int z, int facing)
     {
         _world!.Player.Context.ViewDirection = Chunk.CubeFaces[facing].normal;
         Assert.True(_world.Place(door, new Vector3(x, _world.Top, z), Vector3.UnitY));

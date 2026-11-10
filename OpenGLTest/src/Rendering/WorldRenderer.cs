@@ -352,6 +352,6 @@ internal sealed class WorldRenderer
     /// Hitboxes for the outline, break overlay and mining pop: the cell's drawn shape resolved
     /// from the live world exactly as the raycast aims at it (see <see cref="BlockShape"/>).
     /// </summary>
-    private BlockHitbox[] HitboxesAt(Vector3 blockPos, byte blockId) =>
+    private BlockHitbox[] HitboxesAt(Vector3 blockPos, ushort blockId) =>
         BlockShape.BoxesAt(blockId, _chunkManager, (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
 }

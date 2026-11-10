@@ -142,7 +142,7 @@ internal sealed class ChestInput
     internal void Withdraw(World world, int slot, bool all) => Send(world, ChestMove.Withdraw(slot, all ? 0 : 1));
 
     /// <summary>Moves a stackable (one unit, or all with shift) from the inventory into the open chest.</summary>
-    internal void DepositStack(byte id)
+    internal void DepositStack(ushort id)
     {
         if (ActiveWorld is not { } world || !world.ChestPanel.IsOpen) return;
         Send(world, ChestMove.DepositStack(id, ShiftHeld ? 0 : 1));

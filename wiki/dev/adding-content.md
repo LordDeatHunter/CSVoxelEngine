@@ -17,7 +17,7 @@ Everything about a block, item, recipe, entity or tree species comes from `OpenG
 }
 ```
 
-3. Check the id budget: blocks and items share 255 ids.
+3. Never hardcode its numeric id: ids are handed out by file name at startup (blocks and items share up to 65,535), so name it with `ContentRegistry.RequireBlock("<name>")` in code.
 4. Give it a recipe or a way to drop (a `loot` table by the same name, or it drops itself).
 
 ## A new item

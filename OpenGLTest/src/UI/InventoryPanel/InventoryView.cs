@@ -52,7 +52,7 @@ public sealed class InventoryView
     public InventoryFocus Focus { get; set; }
 
     /// <summary>Picked stackable id for the blocks/misc tabs, or 0 for none.</summary>
-    public byte SelectedId { get; set; }
+    public ushort SelectedId { get; set; }
 
     /// <summary>Picked tool instance for the tools tab, or 0 for none.</summary>
     public int SelectedToolInstance { get; set; }

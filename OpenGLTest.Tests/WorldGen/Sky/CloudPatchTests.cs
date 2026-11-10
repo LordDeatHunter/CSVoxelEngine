@@ -78,7 +78,7 @@ public sealed class CloudPatchTests
     {
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var (cx, cz) = CloudyChunkColumn();
-        var blocks = new byte[Volume];
+        var blocks = new ushort[Volume];
 
         for (var cy = SlabChunkY - 1; cy <= SlabChunkY + 1; cy++)
         {

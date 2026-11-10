@@ -76,7 +76,7 @@ internal static class OreNoiseLattice
     /// exceeds <paramref name="threshold"/> with <paramref name="rule"/>'s replacement. Lattice cells
     /// holding no host are never sampled, and lattice points are sampled lazily, once each.
     /// </summary>
-    public static void Stamp<TRule>(byte[] blocks, FastNoiseLite noise, float threshold,
+    public static void Stamp<TRule>(ushort[] blocks, FastNoiseLite noise, float threshold,
         int worldX0, int worldY0, int worldZ0, TRule rule) where TRule : struct, IOreLatticeRule
     {
         Span<bool> hostCells = stackalloc bool[CellCount];
@@ -106,7 +106,7 @@ internal static class OreNoiseLattice
     /// (by <see cref="CellOf"/>) every lattice cell holding a cell <paramref name="rule"/> hosts, and may mark more,
     /// since every cell is tested against the rule again. One scan can then serve several deposits.
     /// </summary>
-    public static void StampHostCells<TRule>(byte[] blocks, FastNoiseLite noise, float threshold,
+    public static void StampHostCells<TRule>(ushort[] blocks, FastNoiseLite noise, float threshold,
         int worldX0, int worldY0, int worldZ0, TRule rule, ReadOnlySpan<bool> hostCells)
         where TRule : struct, IOreLatticeRule
     {
@@ -125,7 +125,7 @@ internal static class OreNoiseLattice
     }
 
     /// <summary>Stamps the host cells of one lattice cell (cx, cy, cz) of a chunk.</summary>
-    private static void StampCell<TRule>(byte[] blocks, FastNoiseLite noise, float threshold,
+    private static void StampCell<TRule>(ushort[] blocks, FastNoiseLite noise, float threshold,
         int worldX0, int worldY0, int worldZ0, TRule rule, Span<float> samples, int cx, int cy, int cz)
         where TRule : struct, IOreLatticeRule
     {

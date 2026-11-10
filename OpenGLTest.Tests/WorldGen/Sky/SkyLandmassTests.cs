@@ -157,7 +157,7 @@ public sealed class SkyLandmassTests
         var written = 0;
         for (var half = -1; half <= 0; half++)
         {
-            var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+            var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
             var chunkX0 = x0 + half * Chunk.Size;
             SkyIslandGenerator.Stamp(blocks, chunkX0, y0, z0);
             for (var x = 0; x < Chunk.Size; x++)

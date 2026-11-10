@@ -57,7 +57,7 @@ public sealed class SkyIslandTests
 
     /// <summary>What the sky holds at a cell far above every column's ground: a sky tree's cell, island (with
     /// its flora), cloud sea, cloud patch or air, from the tree shapes and the three point queries.</summary>
-    private static byte ExpectedSky(int x, int y, int z)
+    private static ushort ExpectedSky(int x, int y, int z)
     {
         var tree = SkyTreeCell(x, y, z);
         var island = SkyIslandGenerator.BlockAt(x, y, z);
@@ -69,7 +69,7 @@ public sealed class SkyIslandTests
     }
 
     /// <summary>The block of the sky tree rooted in the cell's tree cell at (x, y, z), or air.</summary>
-    private static byte SkyTreeCell(int x, int y, int z)
+    private static ushort SkyTreeCell(int x, int y, int z)
     {
         var tree = SkyTrees.TreeOf(SkyTrees.CellOf(x), SkyTrees.CellOf(z));
         if (tree == null || y < tree.MinY || y > tree.MaxY) return BlockType.Air;
@@ -413,7 +413,7 @@ public sealed class SkyIslandTests
         var written = 0;
         for (var half = -1; half <= 0; half++)
         {
-            var blocks = new byte[Volume];
+            var blocks = new ushort[Volume];
             var chunkX0 = x0 + half * Chunk.Size;
             SkyIslandGenerator.Stamp(blocks, chunkX0, y0, z0);
             for (var x = 0; x < Chunk.Size; x++)
@@ -451,7 +451,7 @@ public sealed class SkyIslandTests
         var z0 = ((int)MathF.Floor(island.CenterZ) >> Chunk.SizeShift) * Chunk.Size;
         var y0 = (island.BaseY >> Chunk.SizeShift) * Chunk.Size;
         var marker = ContentRegistry.RequireBlock("glass").Id;
-        var blocks = new byte[Volume];
+        var blocks = new ushort[Volume];
         Array.Fill(blocks, marker);
         SkyIslandGenerator.Stamp(blocks, x0, y0, z0);
         CloudSeaGenerator.Stamp(blocks, x0, SkyIslandConfig.CloudSeaBottomY, z0);

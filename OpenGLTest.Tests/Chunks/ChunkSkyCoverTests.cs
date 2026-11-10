@@ -21,8 +21,8 @@ public sealed class ChunkSkyCoverTests
         WorldSeed.Apply(WorldSeed.Default);
     }
 
-    private static byte Brick => ContentRegistry.RequireBlock("tower_bricks").Id;
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Brick => ContentRegistry.RequireBlock("tower_bricks").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
 
     [Fact]
     public void WritingACoveringBlockRaisesTheFlagAndItStaysRaised()

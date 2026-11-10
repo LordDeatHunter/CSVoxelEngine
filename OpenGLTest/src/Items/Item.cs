@@ -35,8 +35,8 @@ public enum ItemAnimationMode
 /// </summary>
 public abstract class Item
 {
-    /// <summary>Byte id assigned at load; shares the block id space (air = 0).</summary>
-    public byte Id { get; }
+    /// <summary>Id assigned at load; shares the block id space (air = 0).</summary>
+    public ushort Id { get; }
 
     /// <summary>Display name for inventory rows and preview headings.</summary>
     public string Name { get; }
@@ -57,16 +57,16 @@ public abstract class Item
 
     /// <summary>Item id this one becomes after a successful use (a bucket becomes a water
     /// bucket); 0 when the item declares no use or never morphs.</summary>
-    public byte UseResultId { get; internal init; }
+    public ushort UseResultId { get; internal init; }
 
     /// <summary>Fluid block id the use picks up or places; 0 when the item declares no use.</summary>
-    public byte UseFluidId { get; internal init; }
+    public ushort UseFluidId { get; internal init; }
 
     /// <summary>
     /// Stackable block id an ignite/place_stack use works on (firepit block for
     /// <see cref="ItemUseAction.IgniteCampfire"/>); 0 for every other action.
     /// </summary>
-    public byte UseBlockId { get; internal init; }
+    public ushort UseBlockId { get; internal init; }
 
     /// <summary>Per-use success chance 0..1 for ignite uses; 1 for everything else.</summary>
     public float UseChance { get; internal init; } = 1f;
@@ -133,7 +133,7 @@ public abstract class Item
     public bool ThrowAligned { get; internal init; }
 
     /// <summary>The block whose cube a thrown copy is drawn as instead of this item's sprite, or 0 for the sprite.</summary>
-    public byte ThrowBlockId { get; internal init; }
+    public ushort ThrowBlockId { get; internal init; }
 
     /// <summary>Seconds between uses of this item; 0 means the global click rate applies.</summary>
     public float UseDelaySeconds { get; internal init; }
@@ -238,7 +238,7 @@ public abstract class Item
     }
 
     /// <summary>Minimal member for synthetic items (see <see cref="BlockItem"/>).</summary>
-    protected Item(byte id, string name)
+    protected Item(ushort id, string name)
     {
         Id = id;
         Name = name;

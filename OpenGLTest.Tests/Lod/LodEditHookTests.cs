@@ -42,14 +42,14 @@ public sealed class LodEditHookTests
             manager.QueueChunk(new Vector3(cx, cy, cz));
     }
 
-    private static void Set(ChunkManager manager, int x, int y, int z, byte id, byte state = 0)
+    private static void Set(ChunkManager manager, int x, int y, int z, ushort id, byte state = 0)
     {
         var chunk = manager.ChunkAt(x, y, z);
         Assert.NotNull(chunk);
         chunk.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, id, state);
     }
 
-    private static byte BlockAt(ChunkManager manager, int x, int y, int z)
+    private static ushort BlockAt(ChunkManager manager, int x, int y, int z)
     {
         Assert.True(manager.TryGetCell(x, y, z, out var id, out _), $"({x}, {y}, {z}) is not loaded");
         return id;
@@ -208,7 +208,7 @@ public sealed class LodEditHookTests
     /// A lava source beside a water source on a stone floor in an empty chunk high above chunk
     /// column (cx, cz)'s terrain, ticked until the lava crusts over.
     /// </summary>
-    private static (int X, int Y, int Z, byte Cobble, ChunkManager Chunks) HardenLavaAbove(
+    private static (int X, int Y, int Z, ushort Cobble, ChunkManager Chunks) HardenLavaAbove(
         int cx, int cz, bool attachLod)
     {
         var cy = (ColumnCache.GetHeights(cx, cz).Max() >> Chunk.SizeShift) + 3;
@@ -222,7 +222,7 @@ public sealed class LodEditHookTests
     /// (cx, <paramref name="cy"/>, cz), ticked until the lava crusts over. The crust cell is at
     /// local (8, 1, 8); callers assert how it sits against the generated terrain and water.
     /// </summary>
-    private static (int X, int Y, int Z, byte Cobble, ChunkManager Chunks) HardenLavaAt(
+    private static (int X, int Y, int Z, ushort Cobble, ChunkManager Chunks) HardenLavaAt(
         int cx, int cz, int cy, bool attachLod)
     {
         var pos = new Vector3(cx, cy, cz);

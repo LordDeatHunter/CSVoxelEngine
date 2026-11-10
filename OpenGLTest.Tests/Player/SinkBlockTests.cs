@@ -22,9 +22,9 @@ public sealed class SinkBlockTests
     private const float Dt = 1f / 60f;
 
     // The shipped sink block: the solid cloud of the sky's cloud slab
-    private static byte Cloud => ContentRegistry.RequireBlock("cloud_block").Id;
+    private static ushort Cloud => ContentRegistry.RequireBlock("cloud_block").Id;
 
-    private static ChunkManager Floor(byte topId) => MobTestWorld.Floor(topId);
+    private static ChunkManager Floor(ushort topId) => MobTestWorld.Floor(topId);
 
     private static Camera DroppedFrom(float feet)
     {
@@ -91,7 +91,7 @@ public sealed class SinkBlockTests
     }
 
     // Drops a body from 12 blocks with the fall tracker fed exactly as LocalPlayer feeds it
-    private static int FallDamageOnto(byte topId)
+    private static int FallDamageOnto(ushort topId)
     {
         var manager = Floor(topId);
         var camera = DroppedFrom(12f);

@@ -5,7 +5,7 @@ The data-driven content pipeline, the block, item, loot and model schemas, multi
 ## Content: blocks, items, models and loot are data
 
 Nothing about a block is hardcoded any more. `ContentRegistry` reads `assets/data` and
-`assets/models` at startup, hands out byte ids and publishes read-only tables that the rest of
+`assets/models` at startup, hands out ids and publishes read-only tables that the rest of
 the engine indexes by id. **Adding a block means adding JSON, not editing C#.**
 
 **Placeholder art.** Any asset an agent adds as a stand-in — a texture, sprite, model or skin — is
@@ -16,16 +16,18 @@ entry once real art is in. If a `tools/` generator wrote the file, remove or rep
 in the same change, or a re-run puts the placeholder back. Sound is not tracked there: a feature
 that needs audio waits in `plans/TODO.md` (`M-26`).
 
-Ids are `byte` and chunk storage is a `byte[]`: id 0 is air (it has no definition file, and a
-block may not be named `air`), then blocks sorted by file name, then items sorted by file name.
-Blocks and items therefore share 255 ids and the registry throws if they overflow. Code that has
+Ids are `ushort` and chunk storage is a dense `ushort[]` (the per-block state byte stays a
+`byte`): id 0 is air (it has no definition file, and a block may not be named `air`), then blocks
+sorted by file name, then items sorted by file name. Blocks and items share one id space of up to
+65,535 ids; the registry throws if they overflow, and `BlockTables.Allocate` sizes every per-id
+table on `BlockType` to exactly the loaded id count. Code that has
 to name a specific block or item asks for it by file name — `ContentRegistry.RequireBlock("stone")`,
 `ContentRegistry.RequireItem("bucket")` — which throws naming the missing content at startup
 instead of silently mis-indexing. Hot paths must not do that per voxel: worldgen and the LOD
 mesher resolve their palette once in the owning feature's static constructor
 (`TerrainGenerator.SurfaceBlock/SoilBlock/RockBlock/SeaBlock`, `TreeGenerator.LeavesBlock` — the
 far LOD's fallback canopy leaf —, `PebbleGenerator.PebbleBlock`), a tree species resolves its
-blocks once at load (`TreeSpecies.WoodId`/`LeavesId`), and everything else reads those bytes. Best of all is not naming
+blocks once at load (`TreeSpecies.WoodId`/`LeavesId`), and everything else reads those ids. Best of all is not naming
 a block: when the question is "what does this block do", add a data flag and read it (see the
 convention below). Every content error names the file it came from.
 

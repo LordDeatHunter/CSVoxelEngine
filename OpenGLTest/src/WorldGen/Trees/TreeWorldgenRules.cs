@@ -46,7 +46,7 @@ public sealed class TreeWorldgenRules
     /// The block worldgen lays as this species' fallen (hollow) log on the floor of the biomes it
     /// is the tree of, a facing model block whose state byte holds the log's axis; 0 means none.
     /// </summary>
-    public byte FallenLogId { get; init; }
+    public ushort FallenLogId { get; init; }
 
     /// <summary>Whether the species grows in <paramref name="biome"/>.</summary>
     public bool GrowsIn(Biome biome)

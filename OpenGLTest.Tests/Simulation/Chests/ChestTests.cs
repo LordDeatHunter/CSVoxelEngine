@@ -24,15 +24,15 @@ public sealed class ChestTests
 {
     public ChestTests() => TestContent.EnsureLoaded();
 
-    private static byte Flint => ContentRegistry.RequireItem("flint").Id;
-    private static byte Coal => ContentRegistry.RequireItem("coal").Id;
-    private static byte Wooden => ContentRegistry.RequireBlock("wooden_chest").Id;
-    private static byte RuinSurface => ContentRegistry.RequireBlock("ruin_chest_surface").Id;
-    private static ChestProfile Profile(byte id) => BlockType.ById[id]!.Chest!;
+    private static ushort Flint => ContentRegistry.RequireItem("flint").Id;
+    private static ushort Coal => ContentRegistry.RequireItem("coal").Id;
+    private static ushort Wooden => ContentRegistry.RequireBlock("wooden_chest").Id;
+    private static ushort RuinSurface => ContentRegistry.RequireBlock("ruin_chest_surface").Id;
+    private static ChestProfile Profile(ushort id) => BlockType.ById[id]!.Chest!;
 
     private static GearItem Cap => ItemRegistry.All.OfType<GearItem>().First(g => g.SourceName == "bronze_cap");
 
-    private static (ChunkManager Manager, ChestManager Chests, DropManager Drops) World(byte chestBlock = 0)
+    private static (ChunkManager Manager, ChestManager Chests, DropManager Drops) World(ushort chestBlock = BlockType.Air)
     {
         var (manager, center) = MeshTestWorld.WalledArea(Vector3.Zero);
         if (chestBlock != 0) center.SetBlockRaw(4, 4, 4, chestBlock, 0);

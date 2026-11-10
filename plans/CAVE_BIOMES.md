@@ -108,8 +108,7 @@ Nothing.
     map. Tiles are palette swaps of `malachite_ore.png`'s six green shades (`tools/generate-cave-ore-textures.py`, in
     `USER_TODO.md`). The echoes have no exclusive ore. `CaveOreTests`, `MiningTests.TheCaveOresGateByTheirDepth`,
     `LayerBandTests.EveryExclusiveCaveOreGrowsInsideItsBiomesReach`.
-  - Content ids: 3 blocks, 0 items (each block shares its id with its `BlockItem`): 247 of 255 used, 8 left, recounted from the
-    assets.
+  - Content ids: 3 blocks, 0 items (each block shares its id with its `BlockItem`).
   - `StampGateSample`'s deep stack now reaches up to one chunk past the sub band's highest reach (it stopped one chunk past the
     barrier), so the gated-versus-ungated comparison meets real sub-biome cells; the `CaveOres` row has `MustWrite` set, since
     the sample writes it.
@@ -189,7 +188,7 @@ Nothing.
     (`RuinPlacement.StampUnderground(..., caves)`), so `ChestLoot` and `ChestManager` are unchanged, opening and breaking
     unopened agree, and a client or an imported world source never reads worldgen. Resolving the biome at open time was rejected
     (`NotifyBlockRemoved` has no column access, clients must not touch worldgen).
-  - Content ids: 0 new (247 of 255 used); entities use none.
+  - Content ids: 0 new; entities use none.
   - Measured (default seed, generated and lit chunks around the `cave-biomes.json` spots, 200 spawn turns each): at the shared
     block-light limit of 8 the fungal spot still lands a fungal floor on 33 turns (0.17 a turn; 131 turns land on some mob biome
     with the real mask), the crystal and magma spots 164 and 169 turns; raising the limit to 15 only lifts fungal to 63. So

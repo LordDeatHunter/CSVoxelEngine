@@ -48,8 +48,8 @@ public sealed class MultiblockTests
 
     /// <summary>What a revert leaves in a cell of the volume that was not the mined one: the
     /// source block on the shell, nothing in the interior.</summary>
-    private static byte RevertedId(BlockType anchorType, int dx, int dy, int dz) =>
-        Multiblock.IsInterior(dx, dy, dz, anchorType.MultiblockSize) ? (byte)0 : anchorType.MultiblockSourceId;
+    private static ushort RevertedId(BlockType anchorType, int dx, int dy, int dz) =>
+        Multiblock.IsInterior(dx, dy, dz, anchorType.MultiblockSize) ? BlockType.Air : anchorType.MultiblockSourceId;
 
     private static (ChunkManager Manager, HashSet<Vector3> Touched) Converted(BlockType anchorType,
         Vector3 anchor, int facing)
@@ -60,7 +60,7 @@ public sealed class MultiblockTests
         return (manager, touched);
     }
 
-    private static (byte Id, byte State) Cell(ChunkManager manager, Vector3 cell)
+    private static (ushort Id, byte State) Cell(ChunkManager manager, Vector3 cell)
     {
         Assert.True(manager.TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out var state),
             $"cell {cell} should be loaded");
@@ -186,7 +186,7 @@ public sealed class MultiblockTests
             var (id, state) = Cell(manager, cell);
             // The mined cell and the interior are the only holes; the shell is plain bricks again,
             // state cleared
-            Assert.Equal(cell == mined ? (byte)0 : RevertedId(anchorType, dx, dy, dz), id);
+            Assert.Equal(cell == mined ? BlockType.Air : RevertedId(anchorType, dx, dy, dz), id);
             Assert.Equal(0, state);
         }
 
@@ -221,7 +221,7 @@ public sealed class MultiblockTests
         {
             var cell = anchor + new Vector3(dx, dy, dz);
             var (id, state) = Cell(manager, cell);
-            Assert.Equal(cell == blasted ? (byte)0 : RevertedId(anchorType, dx, dy, dz), id);
+            Assert.Equal(cell == blasted ? BlockType.Air : RevertedId(anchorType, dx, dy, dz), id);
             Assert.Equal(0, state);
         }
     }
@@ -248,7 +248,7 @@ public sealed class MultiblockTests
         {
             var cell = anchor + new Vector3(dx, dy, dz);
             var (id, state) = Cell(manager, cell);
-            Assert.Equal(cell == anchor ? (byte)0 : RevertedId(anchorType, dx, dy, dz), id);
+            Assert.Equal(cell == anchor ? BlockType.Air : RevertedId(anchorType, dx, dy, dz), id);
             Assert.Equal(0, state);
         }
     }

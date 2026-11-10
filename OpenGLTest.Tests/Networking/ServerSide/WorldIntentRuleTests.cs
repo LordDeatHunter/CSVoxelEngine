@@ -23,7 +23,7 @@ public sealed class WorldIntentRuleTests
 
     private static readonly Vector3 Eye = new(0.5f, 65.62f, 0.5f);
 
-    private static byte BlockOf(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort BlockOf(string name) => ContentRegistry.RequireBlock(name).Id;
 
     private static WorldIntent RoundTrip(int seq, WorldIntent intent, out int readSeq)
     {
@@ -81,6 +81,16 @@ public sealed class WorldIntentRuleTests
         Assert.False(back.EditsCells);
         Assert.True(back.PredictsInventory);
         Assert.True(back.IsRateLimited);
+    }
+
+    [Fact]
+    public void AForgePickCarriesTheHighestResultId()
+    {
+        var back = RoundTrip(3, WorldIntent.Forge(Eye, Vector3.UnitX, new Vector3(4f, 70f, -9f), ushort.MaxValue),
+            out var readSeq);
+        Assert.Equal(3, readSeq);
+        Assert.Equal(ushort.MaxValue, back.Recipe);
+        Assert.Equal(new Vector3(4f, 70f, -9f), back.Cell);
     }
 
     [Fact]

@@ -214,7 +214,7 @@ public static class TowerPlacement
 
     /// <summary>Stamps every tower whose footprint reaches the chunk whose minimum corner is (<paramref name="worldX0"/>,
     /// <paramref name="worldY0"/>, <paramref name="worldZ0"/>).</summary>
-    public static void Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         var maxX = worldX0 + Chunk.Size - 1;
         var maxZ = worldZ0 + Chunk.Size - 1;

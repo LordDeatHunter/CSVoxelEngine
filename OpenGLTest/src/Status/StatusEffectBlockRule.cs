@@ -24,8 +24,8 @@ public static class StatusEffectBlockRule
     /// unbreakable block is never converted (the load rules already refuse it every status flag;
     /// the check keeps the writer and the spell impacts safe in this one place).
     /// </summary>
-    public static bool TryConvert(byte id, byte state, StatusEffectBlockAction actions, bool belowFeet,
-        out byte newId, out byte newState)
+    public static bool TryConvert(ushort id, byte state, StatusEffectBlockAction actions, bool belowFeet,
+        out ushort newId, out byte newState)
     {
         newId = 0;
         newState = 0;

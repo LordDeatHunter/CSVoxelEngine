@@ -51,7 +51,7 @@ internal sealed class DropPickup
     // Inventory is assigned in its own initializer and never replaced, so the method group is the
     // same closed delegate every frame; passing `Inventory.CanAccept` inline at the DropManager call
     // allocated a fresh one per frame (PERF_TODO C7).
-    private readonly Func<byte, bool> _canAcceptDrop;
+    private readonly Func<ushort, bool> _canAcceptDrop;
 
     // Scratch for the server's per-player pickup, rebuilt each frame from ServerPlayers
     private readonly List<DropCollector> _dropCollectors = [];
@@ -61,7 +61,7 @@ internal sealed class DropPickup
     private bool _pickupBlocked;
 
     // The hotbar slot a collected item's icon flies to: the first slot showing it, else the selected one
-    private int FlySlot(byte id)
+    private int FlySlot(ushort id)
     {
         for (var slot = 0; slot < Inventory.SlotCount; slot++)
             if (Inventory.IdAt(slot) == id) return slot;

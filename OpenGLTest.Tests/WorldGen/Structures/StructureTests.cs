@@ -60,10 +60,10 @@ public sealed class StructureTests
         var lower = ContentRegistry.RequireBlock("waystone_surface").Id;
         for (var turns = 0; turns < 4; turns++)
         {
-            var cells = Enumerable.Range(0, 4).Where(i => (template.CellAt(turns, i % 2, 0, i / 2) & 0xFF) == lower).ToArray();
+            var cells = Enumerable.Range(0, 4).Where(i => StructureCell.BlockOf(template.CellAt(turns, i % 2, 0, i / 2)) == lower).ToArray();
             Assert.Single(cells);
             var (x, z) = (cells[0] % 2, cells[0] / 2);
-            Assert.Equal(BlockType.ById[lower]!.UpperHalfId, template.CellAt(turns, x, 1, z) & 0xFF);
+            Assert.Equal(BlockType.ById[lower]!.UpperHalfId, StructureCell.BlockOf(template.CellAt(turns, x, 1, z)));
         }
     }
 
@@ -74,20 +74,22 @@ public sealed class StructureTests
         var stair = ContentRegistry.RequireBlock("oak_planks_stairs").Id;
 
         // North-west corner, facing north: one turn puts it in the north-east corner facing east
-        Assert.Equal(stair | (0 << 8), template.CellAt(0, 0, 0, 0));
-        Assert.Equal(stair | (StructureTemplate.TurnedFacing[0] << 8), template.CellAt(1, 2, 0, 0));
+        Assert.Equal(StructureCell.Pack(stair, 0), template.CellAt(0, 0, 0, 0));
+        Assert.Equal(StructureCell.Pack(stair, StructureTemplate.TurnedFacing[0]), template.CellAt(1, 2, 0, 0));
         // The facing walks north, east, south, west across the turns
         var seen = new[] { 0, 1, 2, 3 }.Select(turns => FacingOf(template, turns, stair)).ToArray();
         Assert.Equal(4, seen.Distinct().Count());
         Assert.Equal(0, seen[0]);
     }
 
-    private static int FacingOf(StructureTemplate template, int turns, byte stair)
+    private static int FacingOf(StructureTemplate template, int turns, ushort stair)
     {
         for (var z = 0; z < template.Size; z++)
         for (var x = 0; x < template.Size; x++)
-            if ((template.CellAt(turns, x, 0, z) & 0xFF) == stair)
-                return (template.CellAt(turns, x, 0, z) >> 8) & 3;
+        {
+            var cell = template.CellAt(turns, x, 0, z);
+            if (cell >= 0 && StructureCell.BlockOf(cell) == stair) return StructureCell.StateOf(cell) & 3;
+        }
         throw new InvalidOperationException("the stair vanished");
     }
 
@@ -98,21 +100,30 @@ public sealed class StructureTests
         {
             var counts = Enumerable.Range(0, 4).Select(turns => Histogram(template, turns)).ToArray();
             for (var turns = 1; turns < 4; turns++)
-                Assert.True(counts[0].SequenceEqual(counts[turns]), $"{template.Name} changes its cells when turned {turns} times");
+                Assert.True(counts[0].None == counts[turns].None && counts[0].Blocks.SequenceEqual(counts[turns].Blocks),
+                    $"{template.Name} changes its cells when turned {turns} times");
         }
     }
 
-    private static int[] Histogram(StructureTemplate template, int turns)
+    // How many cells write nothing, and how many write each block (air included)
+    private static (int None, SortedDictionary<ushort, int> Blocks) Histogram(StructureTemplate template, int turns)
     {
-        var counts = new int[257];
+        var none = 0;
+        var blocks = new SortedDictionary<ushort, int>();
         for (var y = 0; y < template.Height; y++)
         for (var z = 0; z < template.Size; z++)
         for (var x = 0; x < template.Size; x++)
         {
             var cell = template.CellAt(turns, x, y, z);
-            counts[cell < 0 ? 256 : cell & 0xFF]++;
+            if (cell < 0)
+            {
+                none++;
+                continue;
+            }
+            var block = StructureCell.BlockOf(cell);
+            blocks[block] = blocks.GetValueOrDefault(block) + 1;
         }
-        return counts;
+        return (none, blocks);
     }
 
     [Theory]
@@ -213,7 +224,7 @@ public sealed class StructureTests
             var chest = ContentRegistry.RequireBlock($"ruin_chest_{kind.ToString().ToLowerInvariant()}").Id;
             Assert.NotEmpty(StructureRegistry.Of(kind));
             foreach (var template in StructureRegistry.Of(kind))
-                Assert.True(Histogram(template, 0)[chest] > 0, $"{template.Name} holds no {kind} loot chest");
+                Assert.True(Histogram(template, 0).Blocks.GetValueOrDefault(chest) > 0, $"{template.Name} holds no {kind} loot chest");
         }
     }
 
@@ -227,7 +238,7 @@ public sealed class StructureTests
             var written = new Dictionary<(int, int, int), int>();
             foreach (var (cx, cz) in new[] { (-16, -16), (-16, 0), (0, -16), (0, 0) })
             {
-                var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+                var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
                 byte[]? state = null;
                 StructureStamper.Stamp(blocks, ref state, cx, 0, cz, template, turns, originX, originY, originZ, int.MinValue, int.MaxValue);
                 for (var lx = 0; lx < Chunk.Size; lx++)
@@ -236,7 +247,7 @@ public sealed class StructureTests
                 {
                     var i = Chunk.Idx(lx, ly, lz);
                     if (blocks[i] == 0 && StateOf(state, i) == 0) continue;
-                    written[(cx + lx, ly, cz + lz)] = blocks[i] | (StateOf(state, i) << 8);
+                    written[(cx + lx, ly, cz + lz)] = StructureCell.Pack(blocks[i], StateOf(state, i));
                 }
             }
 
@@ -252,13 +263,13 @@ public sealed class StructureTests
         }
     }
 
-    private static int StateOf(byte[]? state, int i) => state?[i] ?? 0;
+    private static byte StateOf(byte[]? state, int i) => state?[i] ?? 0;
 
     [Fact]
     public void TheWindowKeepsACellOutOfALayerItDoesNotOwn()
     {
         var template = Compile([["ss", "ss"], ["ss", "ss"]]);
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         byte[]? state = null;
         StructureStamper.Stamp(blocks, ref state, 0, 0, 0, template, 0, 0, 4, 0, minY: 5, maxY: 5);
         Assert.Equal(0, blocks[Chunk.Idx(0, 4, 0)]);

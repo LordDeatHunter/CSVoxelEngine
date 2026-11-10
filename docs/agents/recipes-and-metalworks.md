@@ -43,8 +43,7 @@ Metal reaches an item by being cast (iron, never molten, by being forged on the 
 200 ml each, one `mold_ring` for all three metals) and `copper_dagger` (`mold_dagger`, 200 ml). The ring doubles as the
 generic metal part for everything else made of copper, tin or bronze: the bronze armor (cap 5, tunic 8, pants 7, boots 4,
 gloves 4 rings), `bronze_chest` (8 rings and 4 planks), `clock` (4 copper rings and a mud brick), `lantern`, `thumper`,
-`crystal_staff`, `alloy_bricks` (a copper and a tin ring) and the `focus_ring` / `reserve_charm` (2 rings and a vine),
-because blocks and items share 255 ids and a mold per armor piece (raw + fired) does not fit the remaining budget.
+`crystal_staff`, `alloy_bricks` (a copper and a tin ring) and the `focus_ring` / `reserve_charm` (2 rings and a vine).
 
 **Tin** (`tin_ore`, `TinGenerator`) is the second, weaker metal: commoner than malachite, in the
 `TinMinY..TinMaxY` band, mined with any pickaxe; it crushes in the quern into `crushed_tin`, melts as `tin`

@@ -24,7 +24,7 @@ public sealed class TowerCollapseTests
 
     public TowerCollapseTests() => TestContent.EnsureLoaded();
 
-    private static byte Id(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Id(string name) => ContentRegistry.RequireBlock(name).Id;
 
     private sealed class Rig
     {
@@ -57,7 +57,7 @@ public sealed class TowerCollapseTests
     }
 
     // Every box cell of stone becomes cobblestone
-    private static int StoneToCobble(int x, int y, int z, out byte expected)
+    private static int StoneToCobble(int x, int y, int z, out ushort expected)
     {
         expected = Id("stone");
         return Id("cobblestone");
@@ -79,7 +79,7 @@ public sealed class TowerCollapseTests
         Assert.True(collapse.Done);
     }
 
-    private static int CountBox(Rig rig, byte block, int minX = MinX)
+    private static int CountBox(Rig rig, ushort block, int minX = MinX)
     {
         var count = 0;
         for (var y = BottomY; y <= TopY; y++)
@@ -227,7 +227,7 @@ public sealed class TowerCollapseTests
         var stone = Id("stone");
         var cobble = Id("cobblestone");
         var body = (X: 3, Y: TopY + 1, Z: 3);
-        var collapse = Collapse(topY: TopY + 1, rule: (int x, int y, int z, out byte expected) =>
+        var collapse = Collapse(topY: TopY + 1, rule: (int x, int y, int z, out ushort expected) =>
         {
             if (y <= TopY)
             {

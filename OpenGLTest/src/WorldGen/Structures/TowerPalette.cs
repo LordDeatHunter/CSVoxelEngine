@@ -10,7 +10,7 @@ namespace VoxelEngine.WorldGen.Structures;
 /// </summary>
 /// <param name="Brick">The unbreakable tower brick every wall, slab and the foundation is made of.</param>
 /// <param name="Step">The breakable slab every even stair half-step is made of.</param>
-public sealed record TowerPalette(byte Brick, byte Step)
+public sealed record TowerPalette(ushort Brick, ushort Step)
 {
     private static readonly TowerPalette Plain;
     private static readonly TowerPalette Sandstone;
@@ -34,44 +34,44 @@ public sealed record TowerPalette(byte Brick, byte Step)
     }
 
     /// <summary>The plain tower brick, which a dressing template names and the stamp swaps for the site's own brick.</summary>
-    internal static byte DefaultBrick { get; }
+    internal static ushort DefaultBrick { get; }
 
     /// <summary>The block under the entrance apron's walkway.</summary>
-    internal static byte StoopBlock { get; }
+    internal static ushort StoopBlock { get; }
 
     /// <summary>
     /// The unbreakable gate worldgen stamps across each floor's stairwell, the same in every palette; the tower's lock
     /// clears it once the floor below is cleared.
     /// </summary>
-    internal static byte DoorBlock { get; }
+    internal static ushort DoorBlock { get; }
 
     /// <summary>
     /// The unbreakable bone heap a floor template places, the same in every palette; its skeletons rise from it, and the
     /// tower's lock clears it once it is spent.
     /// </summary>
-    internal static byte PileBlock { get; }
+    internal static ushort PileBlock { get; }
 
     /// <summary>
     /// The worldgen-only loot chest a floor template (and the roof's) places, the same in every palette; the stamp writes
     /// the floor's tier into its state, which picks the loot table it rolls.
     /// </summary>
-    internal static byte ChestBlock { get; }
+    internal static ushort ChestBlock { get; }
 
     /// <summary>
     /// The unbreakable roof altar the stamp writes at <see cref="TowerSite.AltarCell"/>, the same in every palette. Like the
     /// piles and the doors, the altar means something only inside its tower, so the tower recognizes it by this palette id
     /// rather than by a block flag.
     /// </summary>
-    internal static byte AltarBlock { get; }
+    internal static ushort AltarBlock { get; }
 
     /// <summary>
     /// The unbreakable, see-through forcefield the stamp writes on the roof dome's shell (<see cref="TowerDome"/>), the same
     /// in every palette; only the tower's collapse clears it.
     /// </summary>
-    internal static byte ForcefieldBlock { get; }
+    internal static ushort ForcefieldBlock { get; }
 
     /// <summary>The lantern hung in each floor's stairwell doorway, the same in every palette.</summary>
-    internal static byte LanternBlock { get; }
+    internal static ushort LanternBlock { get; }
 
     /// <summary>Every palette, once each.</summary>
     internal static IReadOnlyList<TowerPalette> All { get; }

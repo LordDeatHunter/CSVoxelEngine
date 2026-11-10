@@ -32,7 +32,7 @@ public sealed class SmithingStations
     /// for the stack (<see cref="AnvilManager.TryForge"/>) or its result does not fit the inventory, so no metal is
     /// ever lost. The caller judges the hammer in hand and the reach.
     /// </summary>
-    public bool Forge(Vector3 cell, byte resultId, Inventory inventory)
+    public bool Forge(Vector3 cell, ushort resultId, Inventory inventory)
     {
         if (ContentRegistry.ForgeRecipeForResult(resultId) is not { } wanted
             || Inventory.CategoryOf(wanted.ResultId) is not { } category

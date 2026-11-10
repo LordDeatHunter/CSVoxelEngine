@@ -53,7 +53,7 @@ public sealed class MoldTests
         return (xs.Max() - xs.Min()) * (zs.Max() - zs.Min());
     }
 
-    private static byte BranchPile => ContentRegistry.RequireBlock("branch_pile").Id;
+    private static ushort BranchPile => ContentRegistry.RequireBlock("branch_pile").Id;
 
     private static ChunkManager LitPile(out CampfireManager fires, out DropManager drops)
     {

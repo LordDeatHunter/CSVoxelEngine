@@ -235,7 +235,7 @@ internal sealed class BlockInteractions
             // An empty hand collects the run's output
             case null:
             {
-                var output = new List<byte>();
+                var output = new List<ushort>();
                 if (!bloomeries.TryCollect(anchor, output)) return true;
                 foreach (var id in output)
                     if (!inventory.Add(id))

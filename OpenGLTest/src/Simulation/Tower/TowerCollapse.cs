@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Structures;
 using VoxelEngine.Saves;
 using VoxelEngine.WorldGen.Structures;
 
@@ -17,9 +18,10 @@ namespace VoxelEngine.Simulation.Tower;
 /// </summary>
 public sealed class TowerCollapse
 {
-    /// <summary>The ruin of the cell at (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>): -1 to keep it, else
-    /// <c>block | state &lt;&lt; 8</c>, with <paramref name="expected"/> the block the cell must still hold to be rewritten.</summary>
-    public delegate int CellRule(int x, int y, int z, out byte expected);
+    /// <summary>The ruin of the cell at (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>):
+    /// <see cref="StructureCell.None"/> to keep it, else a packed <see cref="StructureCell"/>, with <paramref name="expected"/>
+    /// the block the cell must still hold to be rewritten.</summary>
+    public delegate int CellRule(int x, int y, int z, out ushort expected);
 
     private readonly int _minX, _maxX, _bottomY, _topY, _minZ, _maxZ;
     private readonly int _width;
@@ -50,10 +52,10 @@ public sealed class TowerCollapse
     /// <summary>The collapse of <paramref name="site"/> into its <see cref="TowerRuin"/>.</summary>
     public static TowerCollapse ForSite(TowerSite site, float delaySeconds) =>
         new(site.MinX, site.MaxX, site.BottomY, site.TopY, site.MinZ, site.MaxZ,
-            (int x, int y, int z, out byte expected) =>
+            (int x, int y, int z, out ushort expected) =>
             {
                 var ruin = TowerRuin.RuinAt(site, x, y, z, out var original);
-                expected = (byte)Math.Max(original, 0);
+                expected = original < 0 ? BlockType.Air : StructureCell.BlockOf(original);
                 return ruin;
             }, delaySeconds);
 
@@ -113,10 +115,10 @@ public sealed class TowerCollapse
     {
         var target = _rule(x, y, z, out var expected);
         if (target < 0) return TowerWriteResult.Written;
-        var block = (byte)target;
+        var block = StructureCell.BlockOf(target);
         if (BlockType.IsSolid(block) && !BlockType.IsSolid(expected) && occupied?.Invoke(x, y, z) == true)
             return TowerWriteResult.Written;
-        return writer.TryReplace(x, y, z, expected, block, (byte)(target >> 8));
+        return writer.TryReplace(x, y, z, expected, block, StructureCell.StateOf(target));
     }
 
     private void AdvanceMain()

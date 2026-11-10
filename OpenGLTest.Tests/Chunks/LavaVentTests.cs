@@ -14,7 +14,7 @@ public sealed class LavaVentTests
 {
     public LavaVentTests() => TestContent.EnsureLoaded();
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
     public void ExposedLavaIsAVent()

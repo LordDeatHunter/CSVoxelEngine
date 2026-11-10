@@ -55,10 +55,11 @@ public enum NetEntityKind : byte
 /// <see cref="Velocity"/> (its drift, which the client dead-reckons along). Every entry ends with
 /// <see cref="Effects"/>, a mob's active status effects as a bitmask of each effect's
 /// <c>StatusEffect.Bit</c> (0 for every other kind); the client drops the bits no loaded effect owns.
-/// GL-free and content-free.
+/// <see cref="ItemId"/> is a block or item id wide enough for any id; the mob data it carries for a mob kind
+/// always fits in a byte. GL-free and content-free.
 /// </summary>
 public readonly record struct NetEntity(NetEntityKind Kind, int Id, Vector3 Position, float Yaw,
-    int Health, int Ammo, byte ItemId, Vector3 Velocity, byte Effects = 0)
+    int Health, int Ammo, ushort ItemId, Vector3 Velocity, byte Effects = 0)
 {
     /// <summary>Whether <paramref name="kind"/> is a mob (a slime, a goblin, a hell, sky, cave or tower mob), the only kinds
     /// the client's mob reconcile spawns; drops, primed TNT and falling blocks are mirrored apart.</summary>
@@ -96,4 +97,4 @@ public readonly record struct NetEntity(NetEntityKind Kind, int Id, Vector3 Posi
 }
 
 /// <summary>One server cell change: world coordinates and the new block id and state.</summary>
-public readonly record struct NetCellChange(int X, int Y, int Z, byte Id, byte State);
+public readonly record struct NetCellChange(int X, int Y, int Z, ushort Id, byte State);

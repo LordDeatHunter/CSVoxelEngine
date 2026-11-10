@@ -51,7 +51,7 @@ public sealed class WaystoneManager(Random? rng = null)
     /// block (the lower half), the cell below for the upper half of one. False for any other block. Reads no chunk, so
     /// whether the waystone still stands whole is <see cref="IsWaystoneAt"/>'s question.
     /// </summary>
-    public static bool TryGetWaystoneCell(byte id, int x, int y, int z, out (int X, int Y, int Z) cell)
+    public static bool TryGetWaystoneCell(ushort id, int x, int y, int z, out (int X, int Y, int Z) cell)
     {
         if (BlockType.ById[id] is { Waystone: true })
         {

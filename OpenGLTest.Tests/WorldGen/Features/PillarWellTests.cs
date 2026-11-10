@@ -15,7 +15,7 @@ public sealed class PillarWellTests
     public void APillarsStackHonorsItsHeightAndGaps()
     {
         var brick = RuinedPillarGenerator.BrickBlock;
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         // Ground at y=40 (ly=8 in a chunk based at y=32): height 4, the second and third levels missing
         RuinedPillarGenerator.StampPillar(blocks, 32, 3, 4, 40, 4, gaps: 0b011);
 
@@ -25,7 +25,7 @@ public sealed class PillarWellTests
         Assert.Equal(brick, blocks[Chunk.Idx(3, 12, 4)]);
 
         // The bottom cell always stands, whatever the gaps
-        var solid = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var solid = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         RuinedPillarGenerator.StampPillar(solid, 32, 3, 4, 40, 2, gaps: 0b1111);
         Assert.Equal(brick, solid[Chunk.Idx(3, 9, 4)]);
         Assert.Equal(BlockType.Air, solid[Chunk.Idx(3, 10, 4)]);
@@ -36,7 +36,7 @@ public sealed class PillarWellTests
     {
         var sandstone = DesertWellGenerator.SandstoneBlock;
         var water = DesertWellGenerator.WaterBlock;
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         DesertWellGenerator.StampWell(blocks, 0, 32, 0, 8, 8, 40);
 
         // The 5x5 wall one above the ground, the inner ring a floor at the ground's level
@@ -51,9 +51,9 @@ public sealed class PillarWellTests
     public void AWellOnAChunkBorderIsClippedPerChunkNeverCopiedIntoNeighbors()
     {
         // Center at x = 16 (the first column of chunk 1): its footprint reaches chunk 0 and chunk 1 only
-        var left = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
-        var right = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
-        var farRight = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var left = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
+        var right = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
+        var farRight = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         DesertWellGenerator.StampWell(left, 0, 32, 0, 16, 8, 40);
         DesertWellGenerator.StampWell(right, 16, 32, 0, 16, 8, 40);
         DesertWellGenerator.StampWell(farRight, 32, 32, 0, 16, 8, 40);

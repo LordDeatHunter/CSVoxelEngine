@@ -41,7 +41,7 @@ public sealed class HellMobManagerTests
             for (var z = 0; z < Chunk.Size; z++)
             {
                 var worldY = cy * Chunk.Size + y;
-                chunk.SetBlockRaw(x, y, z, worldY > floor && worldY <= floor + 3 ? (byte)0 : stone, 0);
+                chunk.SetBlockRaw(x, y, z, worldY > floor && worldY <= floor + 3 ? BlockType.Air : stone, 0);
             }
             chunk.PublishLight(light);
             chunks.Chunks[pos] = chunk;

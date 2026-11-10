@@ -54,7 +54,7 @@ public sealed class TowerManagerTests
         public void Update(IReadOnlyList<IMobTarget> targets, float dt = Dt, int pending = 0) =>
             Towers.Update(dt, Chunks, Skeletons, targets, f => f == Floor0.Ref ? pending : 0, null);
 
-        public byte At((int X, int Y, int Z) c) => Chunks.GetBlockGlobal(c.X, c.Y, c.Z);
+        public ushort At((int X, int Y, int Z) c) => Chunks.GetBlockGlobal(c.X, c.Y, c.Z);
     }
 
     [Fact]

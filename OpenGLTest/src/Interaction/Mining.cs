@@ -32,7 +32,7 @@ public static class Mining
 
     /// <summary>Whether the held item may damage this block under its requiresTool gate. Never
     /// for a fluid or an unbreakable block, which nothing mines.</summary>
-    public static bool CanMine(byte blockId, Item? held)
+    public static bool CanMine(ushort blockId, Item? held)
     {
         var block = BlockType.ById[blockId];
         return block is { Fluid: false, Unbreakable: false } && !Refused(block, held);
@@ -48,7 +48,7 @@ public static class Mining
 
     /// <summary>Damage one hit deals, or 0 when the block's gate refuses the held item. An
     /// unbreakable block takes no damage from anything.</summary>
-    public static float HitDamage(byte blockId, Item? held)
+    public static float HitDamage(ushort blockId, Item? held)
     {
         var block = BlockType.ById[blockId];
         if (block == null || block.Fluid || block.Unbreakable) return 0f;
@@ -61,7 +61,7 @@ public static class Mining
     /// <see cref="BlockType.TipHardness"/> of it at the thinnest up to all of it at a full cube
     /// (so placed, detached wood is as hard as a trunk). 0 for an unknown id.
     /// </summary>
-    public static float HardnessOf(byte blockId, byte state)
+    public static float HardnessOf(ushort blockId, byte state)
     {
         var type = BlockType.ById[blockId];
         if (type == null) return 0f;

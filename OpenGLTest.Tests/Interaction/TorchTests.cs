@@ -24,8 +24,8 @@ public sealed class TorchTests : IDisposable
 {
     private const int FloorY = 4;
 
-    private readonly byte _torch;
-    private readonly byte _stone;
+    private readonly ushort _torch;
+    private readonly ushort _stone;
     private SupportTestWorld? _world;
 
     public TorchTests()
@@ -192,8 +192,8 @@ public sealed class TorchTests : IDisposable
         {
             if (type.WallBlockId == 0) continue;
             pairs++;
-            var floorLoot = new List<byte>();
-            var wallLoot = new List<byte>();
+            var floorLoot = new List<ushort>();
+            var wallLoot = new List<ushort>();
             DropManager.RollLoot(type.Id, new LootContext(0, 0, 0), floorLoot);
             DropManager.RollLoot(type.WallBlockId, new LootContext(0, 0, 0), wallLoot);
             Assert.Equal(floorLoot, wallLoot);
@@ -278,8 +278,8 @@ public sealed class TorchTests : IDisposable
         var wallTorch = BlockType.ById[_torch]!.WallBlockId;
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var origin = center.Position * Chunk.Size;
-        void Set(int x, int y, int z, byte id, byte state = 0) => center.SetBlockRaw(x, y, z, id, state);
-        byte At(int x, int y, int z) => manager.GetBlockGlobal((int)origin.X + x, (int)origin.Y + y, (int)origin.Z + z);
+        void Set(int x, int y, int z, ushort id, byte state = 0) => center.SetBlockRaw(x, y, z, id, state);
+        ushort At(int x, int y, int z) => manager.GetBlockGlobal((int)origin.X + x, (int)origin.Y + y, (int)origin.Z + z);
 
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

@@ -78,7 +78,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       IgniteItem.cs            # strikes a spark at the aimed block: a dry TNT block primes, a fully built firepit lights
       IItemUseWorld.cs         # what an Item override may query and change during Item.OnUse
       Item.cs, ItemFactory.cs  # the abstract item; the per-use.action factory building the singletons
-      ItemRegistry.cs          # every item by shared byte id: pure items (vine, branch, flint, ...) plus
+      ItemRegistry.cs          # every item by shared id: pure items (vine, branch, flint, ...) plus
                                #   one BlockItem per placeable block
       ShrapnelProfile.cs       # GL-free one hit's bone-shrapnel payload and the rule that resolves it from the
                                #   held weapon and the worn bone_shrapnel ability
@@ -181,7 +181,9 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       LodNetCodec.cs           # a far-LOD region's mesh on the wire
       NetAttacks.cs            # what each NetAttackKind stands for: the attack pattern it needs in hand, the
                                #   sword swing it names, the NetPlayerAction it is rebroadcast as
-      NetEntity.cs             # NetEntityKind/NetEntity (ItemId: a goblin's torches or a skeleton's tower tier) and NetCellChange
+      NetCellChangeCodec.cs    # one BlockChanges/BlockCorrection cell on the wire (the server writes, the client reads)
+      NetEntity.cs             # NetEntityKind/NetEntity (ItemId: a drop's, TNT's or falling block's id, or a goblin's
+                               #   torches or a skeleton's tower tier) and NetCellChange
       NetEntityCodec.cs        # one EntityList entry on the wire (the server writes, the client reads)
       NetPlayerAction.cs       # the swing a player just made, as the server rebroadcasts it in each
                                #   player list entry (with a counter that moves on every new one)

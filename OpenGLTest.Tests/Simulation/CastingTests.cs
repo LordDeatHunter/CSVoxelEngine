@@ -42,7 +42,7 @@ public sealed class CastingTests
     private const float Reach = 10f;
 
     /// <summary>One chunk holding a single mold block at the origin, so Update sees a live cell.</summary>
-    private static ChunkManager MoldWorld(byte moldId)
+    private static ChunkManager MoldWorld(ushort moldId)
     {
         var manager = new ChunkManager(null!);
         var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
@@ -52,11 +52,11 @@ public sealed class CastingTests
         return manager;
     }
 
-    private static void SetCell(ChunkManager manager, byte id) =>
+    private static void SetCell(ChunkManager manager, ushort id) =>
         manager.Chunks[Vector3.Zero]!.SetBlockRaw(0, 0, 0, id, 0);
 
     private static (CastingManager Casting, ChunkManager Chunks, DropManager Drops, Inventory Inventory,
-        ItemStack Stack, CastRecipe Recipe, byte MoldId) Setup(int moltenMl = -1)
+        ItemStack Stack, CastRecipe Recipe, ushort MoldId) Setup(int moltenMl = -1)
     {
         var moldId = ContentRegistry.RequireBlock("fired_mold_pickaxe").Id;
         var recipe = ContentRegistry.CastRecipeFor(moldId, Copper)!;

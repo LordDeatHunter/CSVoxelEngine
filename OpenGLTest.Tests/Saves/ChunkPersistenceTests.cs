@@ -35,7 +35,7 @@ public sealed class ChunkPersistenceTests : IDisposable
             Directory.Delete(_world, recursive: true);
     }
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     private static void ShutdownOrFail(ChunkSaveStore store) =>
         Assert.True(store.Shutdown(ShutdownTimeout), "the writer never finished");
@@ -188,13 +188,13 @@ public sealed class ChunkPersistenceTests : IDisposable
     public void UnadoptedRestoredPlacementsSurviveAFlushBeforeAdoption()
     {
         var placedIndex = (ushort)Chunk.Idx(2, 3, 4);
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         blocks[placedIndex] = Block("dirt");
 
         var store = new ChunkSaveStore(_world);
         try
         {
-            store.Enqueue(Key, new ChunkSnapshot(blocks, null, [placedIndex]));
+            store.Enqueue(Key, new ChunkSnapshot(blocks, null, playerPlaced: [placedIndex]));
 
             var manager = new ChunkManager(null!, saveStore: store);
             manager.QueueChunk(Pos);

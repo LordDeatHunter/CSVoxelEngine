@@ -23,7 +23,7 @@ public sealed class SandwormManager : IMobPopulation
     private readonly EntityType? _type;
     private readonly MobCaps _caps;
     private readonly List<Sandworm> _worms = [];
-    private readonly List<byte> _loot = [];
+    private readonly List<ushort> _loot = [];
     private readonly Dictionary<Sandworm, (Vector3 Point, float Age)> _lastTargets = [];
 
     /// <summary>Joins <paramref name="caps"/> (the world's), or caps itself alone when none is given (tests).

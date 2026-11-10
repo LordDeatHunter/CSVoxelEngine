@@ -5,7 +5,7 @@ namespace VoxelEngine.Content.Recipes;
 /// <summary>One compiled crafting recipe: what it makes and what one craft consumes.</summary>
 public sealed class CraftingRecipe
 {
-    public CraftingRecipe(string name, byte resultId, int resultCount, Ingredient[] ingredients)
+    public CraftingRecipe(string name, ushort resultId, int resultCount, Ingredient[] ingredients)
     {
         Name = name;
         ResultId = resultId;
@@ -17,7 +17,7 @@ public sealed class CraftingRecipe
     public string Name { get; }
 
     /// <summary>What one craft adds.</summary>
-    public byte ResultId { get; }
+    public ushort ResultId { get; }
 
     /// <summary>How many of the result one craft adds.</summary>
     public int ResultCount { get; }
@@ -31,15 +31,15 @@ public sealed class CraftingRecipe
     /// Tags resolve through <see cref="ContentRegistry"/> like loot entries do — no per-id
     /// branches at the call sites.
     /// </summary>
-    public readonly record struct Ingredient(byte Id, int Count, string? Tag = null, byte[]? MemberIds = null)
+    public readonly record struct Ingredient(ushort Id, int Count, string? Tag = null, ushort[]? MemberIds = null)
     {
         /// <summary>Whether this ingredient accepts any member of <see cref="Tag"/>.</summary>
         public bool IsTag => Tag != null;
 
         /// <summary>Every id this ingredient accepts: the tag members, or just <see cref="Id"/>.</summary>
-        public byte[] AcceptedIds => MemberIds ?? [Id];
+        public ushort[] AcceptedIds => MemberIds ?? [Id];
 
         /// <summary>Whether this id satisfies the ingredient (single id or tag member).</summary>
-        public bool Accepts(byte id) => !IsTag ? id == Id : MemberIds != null && Array.IndexOf(MemberIds, id) >= 0;
+        public bool Accepts(ushort id) => !IsTag ? id == Id : MemberIds != null && Array.IndexOf(MemberIds, id) >= 0;
     }
 }

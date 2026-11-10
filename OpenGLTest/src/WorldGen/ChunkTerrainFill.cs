@@ -493,9 +493,9 @@ internal static class ChunkTerrainFill
         WorldgenStageTimer? timer, long genStart)
     {
         // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping.
-        // Counting AIR and subtracting beats counting non-air: BlockType.Air is
-        // `public const byte Air = 0`, so this binds to the vectorized
-        // MemoryExtensions.Count<byte> with no cast, where a "!= Air" predicate would
+        // Counting AIR and subtracting beats counting non-air: BlockType.Air is a
+        // constant of the block id type, so this binds to the vectorized
+        // MemoryExtensions.Count over the id span with no cast, where a "!= Air" predicate would
         // have to run one comparison per cell.
         chunk.SolidCount = BlockCount - chunk.Blocks.AsSpan().Count(BlockType.Air);
         timer?.Mark(Stage.SolidCount);
@@ -680,7 +680,7 @@ internal static class ChunkTerrainFill
     /// <see cref="FillWater"/> is built on outside it. (It was a plain height test before lakes
     /// and rivers, when any below-waterline column held water; that is no longer true.)
     /// </summary>
-    private static bool TouchesSeaWater(Chunk chunk, int x, int y, int z, int worldX0, int lowerBoundY, int worldZ0, byte water)
+    private static bool TouchesSeaWater(Chunk chunk, int x, int y, int z, int worldX0, int lowerBoundY, int worldZ0, ushort water)
     {
         for (var dx = -1; dx <= 1; dx++)
         for (var dy = -1; dy <= 1; dy++)

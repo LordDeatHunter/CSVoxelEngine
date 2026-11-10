@@ -19,7 +19,7 @@ namespace VoxelEngine.Simulation;
 public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmMob
 {
     private readonly List<TMob> _mobs = [];
-    private readonly List<byte> _loot = [];
+    private readonly List<ushort> _loot = [];
     private float _spawnTimer;
     private int _spawnCursor;
 

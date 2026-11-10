@@ -225,7 +225,7 @@ public sealed class SkyBiomeTests : IDisposable
                 .First(t => t.Tree.MinY >> Chunk.SizeShift != t.Tree.MaxY >> Chunk.SizeShift);
             var expected = tree.Cells.ToDictionary(c => (c.X, c.Y, c.Z), c => (c.Block, c.State));
 
-            var stamped = new Dictionary<(int, int, int), (byte, byte)>();
+            var stamped = new Dictionary<(int, int, int), (ushort, byte)>();
             var x0 = tree.X >> Chunk.SizeShift << Chunk.SizeShift;
             var z0 = tree.Z >> Chunk.SizeShift << Chunk.SizeShift;
             for (var cy = tree.MinY >> Chunk.SizeShift; cy <= tree.MaxY >> Chunk.SizeShift; cy++)

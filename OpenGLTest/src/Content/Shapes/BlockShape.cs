@@ -19,7 +19,7 @@ public static class BlockShape
 
     /// <summary>Cell-local boxes of block <paramref name="id"/> at world cell (x, y, z), reading
     /// whatever state and neighbors its shape depends on through <paramref name="chunks"/>.</summary>
-    public static BlockHitbox[] BoxesAt(byte id, ChunkManager chunks, int x, int y, int z)
+    public static BlockHitbox[] BoxesAt(ushort id, ChunkManager chunks, int x, int y, int z)
     {
         var type = BlockType.ById[id];
         if (type == null) return FullCube;

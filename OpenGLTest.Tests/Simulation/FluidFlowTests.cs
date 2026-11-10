@@ -85,10 +85,10 @@ public class FluidFlowTests
     }
 
     /// <summary>A world of explicit cells; anything unset is air, and y 0 is a stone floor.</summary>
-    private readonly struct DictCells(Dictionary<(int, int, int), (byte Id, byte State)> cells, byte floor)
+    private readonly struct DictCells(Dictionary<(int, int, int), (ushort Id, byte State)> cells, ushort floor)
         : IFluidCellReader
     {
-        public bool TryGetCell(int x, int y, int z, out byte id, out byte state)
+        public bool TryGetCell(int x, int y, int z, out ushort id, out byte state)
         {
             if (y <= 0)
             {
@@ -97,7 +97,7 @@ public class FluidFlowTests
                 return true;
             }
 
-            (id, state) = cells.TryGetValue((x, y, z), out var c) ? c : ((byte)0, (byte)0);
+            (id, state) = cells.TryGetValue((x, y, z), out var c) ? c : (BlockType.Air, (byte)0);
             return true;
         }
     }
@@ -112,7 +112,7 @@ public class FluidFlowTests
         for (var seed = 0; seed < 40; seed++)
         {
             var rng = new Random(seed);
-            var map = new Dictionary<(int, int, int), (byte, byte)>();
+            var map = new Dictionary<(int, int, int), (ushort, byte)>();
             for (var x = 0; x < 4; x++)
             for (var z = 0; z < 4; z++)
             {

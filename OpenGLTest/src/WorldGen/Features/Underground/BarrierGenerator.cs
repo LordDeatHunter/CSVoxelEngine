@@ -22,7 +22,7 @@ public static class BarrierGenerator
     private static FastNoiseLite PatchNoise;
 
     /// <summary>The barrier block; resolved once in the static constructor.</summary>
-    public static readonly byte BarrierBlock;
+    public static readonly ushort BarrierBlock;
 
     static BarrierGenerator()
     {
@@ -67,14 +67,14 @@ public static class BarrierGenerator
 
     /// <summary>Whether a ramp cell holding this block may become barrier: solid, occluding ground
     /// (stone, ore, gravel), never air, a fluid or a partial block.</summary>
-    public static bool IsHost(byte block) => BlockType.IsSolid(block) && BlockType.Occludes(block);
+    public static bool IsHost(ushort block) => BlockType.IsSolid(block) && BlockType.Occludes(block);
 
     /// <summary>The patch noise mapped to 0..1.</summary>
     private static float PatchValue(int x, int y, int z) => 0.5f * (PatchNoise.GetNoise(x, y, z) + 1f);
 
     /// <summary>Writes the barrier into the chunk whose minimum corner is (worldX0, worldY0, worldZ0):
     /// every core cell, and every host cell of a ramp that <see cref="IsBarrier"/> names.</summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0)
     {
         var yMin = Math.Max(0, WorldGenerationConfig.BarrierBottomY - worldY0);
         var yMax = Math.Min(Chunk.Size - 1, WorldGenerationConfig.BarrierTopY - worldY0);

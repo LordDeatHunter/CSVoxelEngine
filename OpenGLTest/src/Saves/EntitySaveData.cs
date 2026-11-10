@@ -13,7 +13,7 @@ namespace VoxelEngine.Saves;
 /// older or hand-edited file degrades field by field instead of failing the load; vectors travel
 /// as <c>float[3]</c>.
 /// <para>
-/// Content is referenced by name, never by byte id: a mob by its <see cref="EntityType.Name"/>,
+/// Content is referenced by name, never by numeric id: a mob by its <see cref="EntityType.Name"/>,
 /// a drop by its <see cref="SaveNames"/> name (<c>block/...</c> or <c>item/...</c>). Whoever
 /// restores the data drops an entry whose name no longer resolves.
 /// </para>

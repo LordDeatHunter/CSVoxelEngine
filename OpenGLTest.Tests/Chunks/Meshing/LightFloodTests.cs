@@ -29,7 +29,7 @@ public sealed class LightFloodTests
 
     public LightFloodTests() => TestContent.EnsureLoaded();
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Theory]
     [InlineData("SurfaceChunk")]
@@ -46,7 +46,7 @@ public sealed class LightFloodTests
         var neighbors = BuildScene(scene);
         var center = neighbors[Center]!;
 
-        var light = new byte[LightCount];
+        var light = new ushort[LightCount];
         ChunkLighting.FillLightSnapshot(light, neighbors);
 
         var skyCover = ChunkLighting.AnySkyCover(neighbors);
@@ -118,7 +118,7 @@ public sealed class LightFloodTests
 
     // ---- the engine flood ----
 
-    private static (byte[] Sun, byte[] Block, bool AnyTinted) Flood(Chunk center, byte[] light, bool skyCover)
+    private static (byte[] Sun, byte[] Block, bool AnyTinted) Flood(Chunk center, ushort[] light, bool skyCover)
     {
         var sun = new byte[LightCount];
         var block = new byte[LightCount];
@@ -141,7 +141,7 @@ public sealed class LightFloodTests
 
     // ---- the naive reference ----
 
-    private static (byte[] Sun, byte[] Block, bool AnyTinted) ReferenceFlood(Chunk center, byte[] light, bool skyCover)
+    private static (byte[] Sun, byte[] Block, bool AnyTinted) ReferenceFlood(Chunk center, ushort[] light, bool skyCover)
     {
         var worldX0 = (int)center.Position.X * Size - Chunk.LightBorder;
         var worldZ0 = (int)center.Position.Z * Size - Chunk.LightBorder;
@@ -206,7 +206,7 @@ public sealed class LightFloodTests
 
     /// <summary>A plain max flood: a light-passing face neighbor dimmer than one less than the
     /// current cell takes that level and floods on. Coordinates decoded by division.</summary>
-    private static void Bfs(byte[] light, byte[] levels, IEnumerable<int> seeds)
+    private static void Bfs(ushort[] light, byte[] levels, IEnumerable<int> seeds)
     {
         var queue = new Queue<int>(seeds);
         while (queue.Count > 0)
@@ -411,7 +411,7 @@ public sealed class LightFloodTests
     }
 
     /// <summary>Writes a world cell into whichever of the 27 chunks holds it.</summary>
-    private static void SetWorld(Chunk?[] neighbors, int wx, int wy, int wz, byte id)
+    private static void SetWorld(Chunk?[] neighbors, int wx, int wy, int wz, ushort id)
     {
         var center = neighbors[Center]!;
         var cx = FloorDiv(wx, Size); var cy = FloorDiv(wy, Size); var cz = FloorDiv(wz, Size);
@@ -436,7 +436,7 @@ public sealed class LightFloodTests
         return neighbors;
     }
 
-    private static void Fill(Chunk chunk, int x0, int x1, int y0, int y1, int z0, int z1, byte id)
+    private static void Fill(Chunk chunk, int x0, int x1, int y0, int y1, int z0, int z1, ushort id)
     {
         for (var x = x0; x <= x1; x++)
         for (var y = y0; y <= y1; y++)

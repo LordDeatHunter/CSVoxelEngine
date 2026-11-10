@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Content.Structures;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Structures;
 using Xunit;
@@ -48,11 +49,11 @@ public sealed class TowerRuinTests
         }
 
         // The block the cell holds after the collapse, or null where the tower writes nothing
-        public byte? After(int x, int y, int z)
+        public ushort? After(int x, int y, int z)
         {
             var i = Index(x, y, z);
-            if (Result[i] >= 0) return (byte)Result[i];
-            return Original[i] >= 0 ? (byte)Original[i] : null;
+            if (Result[i] >= 0) return StructureCell.BlockOf(Result[i]);
+            return Original[i] >= 0 ? StructureCell.BlockOf(Original[i]) : null;
         }
     }
 
@@ -99,10 +100,10 @@ public sealed class TowerRuinTests
         foreach (var (x, y, z) in ruin.Cells())
         {
             var i = ruin.Index(x, y, z);
-            if (ruin.Original[i] < 0 || !BlockType.IsUnbreakable((byte)ruin.Original[i])) continue;
+            if (ruin.Original[i] < 0 || !BlockType.IsUnbreakable(StructureCell.BlockOf(ruin.Original[i]))) continue;
             unbreakable++;
             Assert.True(ruin.Result[i] >= 0, $"unbreakable cell ({x}, {y}, {z}) kept");
-            Assert.False(BlockType.IsUnbreakable((byte)ruin.Result[i]));
+            Assert.False(BlockType.IsUnbreakable(StructureCell.BlockOf(ruin.Result[i])));
         }
         Assert.True(unbreakable > 0);
     }
@@ -161,8 +162,8 @@ public sealed class TowerRuinTests
         {
             var i = ruin.Index(x, y, z);
             if (ruin.Result[i] < 0) continue;
-            var block = (byte)ruin.Result[i];
-            if (BlockType.IsSolid(block) && ruin.Original[i] >= 0 && !BlockType.IsSolid((byte)ruin.Original[i]))
+            var block = StructureCell.BlockOf(ruin.Result[i]);
+            if (BlockType.IsSolid(block) && ruin.Original[i] >= 0 && !BlockType.IsSolid(StructureCell.BlockOf(ruin.Original[i])))
             {
                 Assert.Equal(site.GroundY + 1, y);
                 piles++;

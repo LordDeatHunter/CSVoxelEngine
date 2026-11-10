@@ -21,7 +21,7 @@ public sealed class WaystonePlacementTests
 {
     private delegate bool CellFinder(int cellX, int cellZ, out PlacedStructure ruin, out PlacedStructure waystone);
 
-    private delegate void ChunkStamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0);
+    private delegate void ChunkStamp(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0);
 
     private static readonly StructureKind[] Kinds =
         [StructureKind.Surface, StructureKind.Underground, StructureKind.Hell, StructureKind.Sky];
@@ -32,7 +32,7 @@ public sealed class WaystonePlacementTests
         WorldSeed.Apply(WorldSeed.Default);
     }
 
-    private static byte WaystoneOf(StructureKind kind) =>
+    private static ushort WaystoneOf(StructureKind kind) =>
         ContentRegistry.RequireBlock($"waystone_{kind.ToString().ToLowerInvariant()}").Id;
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class WaystonePlacementTests
                 for (var x = 0; x < template.Size; x++)
                 {
                     var cell = template.CellAt(0, x, y, z);
-                    if (cell > 0 && BlockType.ById[cell & 0xFF]!.Waystone) waystones.Add(cell & 0xFF);
+                    if (cell > 0 && BlockType.ById[StructureCell.BlockOf(cell)]!.Waystone) waystones.Add(StructureCell.BlockOf(cell));
                 }
                 Assert.Equal(new List<int> { WaystoneOf(kind) }, waystones);
             }
@@ -201,7 +201,7 @@ public sealed class WaystonePlacementTests
             if (!WaystonePlacement.TryFindUnderground(cx, cz, out _, out var chamber)) continue;
             checkedChambers++;
             var template = chamber.Template;
-            var chunks = new Dictionary<(int, int, int), byte[]>();
+            var chunks = new Dictionary<(int, int, int), ushort[]>();
             for (var y = 0; y < template.Height; y++)
             for (var z = 0; z < template.Size; z++)
             for (var x = 0; x < template.Size; x++)
@@ -217,7 +217,7 @@ public sealed class WaystonePlacementTests
                     chunks[key] = blocks = chunk.Blocks;
                 }
                 var got = blocks[Chunk.Idx(wx & Chunk.SizeMask, wy & Chunk.SizeMask, wz & Chunk.SizeMask)];
-                Assert.True(got == (cell & 0xFF),
+                Assert.True(got == StructureCell.BlockOf(cell),
                     $"{template.Name} cell {wx},{wy},{wz} holds {BlockType.ById[got]?.Name ?? "air"} after generation");
             }
         }
@@ -232,7 +232,7 @@ public sealed class WaystonePlacementTests
         for (var x = 0; x < template.Size; x++)
         {
             var cell = template.CellAt(placed.Turns, x, y, z);
-            if (cell > 0 && BlockType.ById[cell & 0xFF]!.Waystone) return (placed.MinX + x, placed.OriginY + y, placed.MinZ + z);
+            if (cell > 0 && BlockType.ById[StructureCell.BlockOf(cell)]!.Waystone) return (placed.MinX + x, placed.OriginY + y, placed.MinZ + z);
         }
         throw new InvalidOperationException($"{template.Name} holds no waystone");
     }
@@ -269,7 +269,7 @@ public sealed class WaystonePlacementTests
         for (var cy = waystone.OriginY >> Chunk.SizeShift; cy <= maxY >> Chunk.SizeShift; cy++)
         for (var cz = waystone.MinZ >> Chunk.SizeShift; cz <= waystone.MaxZ >> Chunk.SizeShift; cz++)
         {
-            var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+            var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
             byte[]? state = null;
             stamp(blocks, ref state, cx * Chunk.Size, cy * Chunk.Size, cz * Chunk.Size);
             for (var lx = 0; lx < Chunk.Size; lx++)
@@ -277,7 +277,7 @@ public sealed class WaystonePlacementTests
             for (var lz = 0; lz < Chunk.Size; lz++)
             {
                 var i = Chunk.Idx(lx, ly, lz);
-                if (blocks[i] != 0) written[(cx * Chunk.Size + lx, cy * Chunk.Size + ly, cz * Chunk.Size + lz)] = blocks[i] | ((state?[i] ?? 0) << 8);
+                if (blocks[i] != 0) written[(cx * Chunk.Size + lx, cy * Chunk.Size + ly, cz * Chunk.Size + lz)] = StructureCell.Pack(blocks[i], state?[i] ?? 0);
             }
         }
 
@@ -294,10 +294,10 @@ public sealed class WaystonePlacementTests
                 Assert.True(written.TryGetValue(at, out var got), $"{template.Name} cell {x},{y},{z} missing");
                 Assert.Equal(cell, got);
             }
-            if (written.TryGetValue(at, out var block) && BlockType.ById[block & 0xFF]!.Waystone)
+            if (written.TryGetValue(at, out var block) && BlockType.ById[StructureCell.BlockOf(block)]!.Waystone)
             {
                 waystones++;
-                Assert.Equal(WaystoneOf(kind), block & 0xFF);
+                Assert.Equal(WaystoneOf(kind), StructureCell.BlockOf(block));
             }
         }
         Assert.Equal(1, waystones);

@@ -23,14 +23,14 @@ public static class CaveOres
 
     // Indexed by CaveBiome; only the three sub-band biomes carry an ore
     private static readonly FastNoiseLite?[] Noises = new FastNoiseLite?[BiomeCount];
-    private static readonly byte[] Ores = new byte[BiomeCount];
+    private static readonly ushort[] Ores = new ushort[BiomeCount];
     private static readonly float[] Thresholds = new float[BiomeCount];
     private static readonly int[] MaxYs = new int[BiomeCount];
 
     private static readonly CaveBiome[] OreBiomes = [CaveBiome.Crystal, CaveBiome.Fungal, CaveBiome.MagmaDeep];
 
     /// <summary>The block every exclusive ore replaces: plain stone and nothing else.</summary>
-    private static readonly byte RockBlock;
+    private static readonly ushort RockBlock;
 
     static CaveOres()
     {
@@ -59,7 +59,7 @@ public static class CaveOres
     }
 
     /// <summary>The ore exclusive to <paramref name="biome"/>, or 0 when it has none (plain and the echoes).</summary>
-    public static byte OreOf(CaveBiome biome) => Ores[(int)biome];
+    public static ushort OreOf(CaveBiome biome) => Ores[(int)biome];
 
     /// <summary>The highest world y the ore of <paramref name="biome"/> grows at (only meaningful when it has one).</summary>
     internal static int MaxYOf(CaveBiome biome) => MaxYs[(int)biome];
@@ -94,7 +94,7 @@ public static class CaveOres
     /// an ore whose biome the map lacks, or whose highest y lies under the chunk, is skipped unread. One scan of
     /// the chunk marks every ore's host lattice cells at once, and each ore then samples only its own.
     /// </summary>
-    public static void Stamp(byte[] blocks, CaveBiomeMap caves, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, CaveBiomeMap caves, int worldX0, int worldY0, int worldZ0)
     {
         var minLocalY = WorldGenerationConfig.BarrierTopY + 1 - worldY0;
         Span<int> maxLocalY = stackalloc int[BiomeCount];
@@ -140,14 +140,14 @@ public static class CaveOres
     /// An exclusive ore replaces plain stone of its own biome only, between the local y just above the barrier
     /// and its highest local y (the same band <see cref="HasOre"/> tests).
     /// </summary>
-    private readonly struct BiomeVeinRule(byte[] biomes, byte biome, byte ore, int minLocalY, int maxLocalY)
+    private readonly struct BiomeVeinRule(byte[] biomes, byte biome, ushort ore, int minLocalY, int maxLocalY)
         : IOreLatticeRule
     {
-        public bool IsHost(byte block, int localX, int localY, int localZ) =>
+        public bool IsHost(ushort block, int localX, int localY, int localZ) =>
             localY >= minLocalY && localY <= maxLocalY && block == RockBlock
             && biomes[Chunk.Idx(localX, localY, localZ)] == biome;
 
-        public byte Replacement(int worldX, int worldY, int worldZ) => ore;
+        public ushort Replacement(int worldX, int worldY, int worldZ) => ore;
 
         public float ThresholdShift(int localX, int localY, int localZ) => 0f;
 

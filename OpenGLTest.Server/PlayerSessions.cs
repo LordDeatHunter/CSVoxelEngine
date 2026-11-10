@@ -278,7 +278,7 @@ internal sealed class PlayerSessions
     {
         using var writer = new PacketWriter(NetMessage.PlayerList);
         writer.Write(_state.Players.Count);
-        Span<byte> worn = stackalloc byte[VoxelEngine.Config.GearConfig.ArmorSlotCount];
+        Span<ushort> worn = stackalloc ushort[VoxelEngine.Config.GearConfig.ArmorSlotCount];
         foreach (var (id, player) in _state.Players)
         {
             writer.Write(id);
@@ -290,7 +290,7 @@ internal sealed class PlayerSessions
             writer.Write((byte)player.LastAction);
             writer.Write(player.ActionSeq);
             VoxelEngine.Player.ArmorLook.From(player.Inventory.Equipment).CopyTo(worn);
-            foreach (var piece in worn) writer.Write(piece);
+            foreach (var piece in worn) writer.WriteId(piece);
         }
         _state.Broadcast(writer.ToArray());
     }

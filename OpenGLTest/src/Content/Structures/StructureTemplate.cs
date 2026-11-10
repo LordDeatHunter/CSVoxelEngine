@@ -20,7 +20,8 @@ public enum StructureKind
 
 /// <summary>
 /// One compiled structure template: a square footprint, a height and the four quarter turns of its cells, built once at load.
-/// A cell is -1 (write nothing) or <c>block | state &lt;&lt; 8</c>; the index is <c>(y * size + z) * size + x</c>.
+/// A cell is <see cref="StructureCell.None"/> (write nothing) or a <see cref="StructureCell"/> packing a block and its state;
+/// the index is <c>(y * size + z) * size + x</c>.
 /// </summary>
 public sealed class StructureTemplate
 {
@@ -79,7 +80,8 @@ public sealed class StructureTemplate
     /// <summary>The surface biomes it may stand in, or null for every one.</summary>
     public Biome[]? Biomes { get; }
 
-    /// <summary>The cell at (x, y, z) after <paramref name="turns"/> clockwise quarter turns: -1 or block | state &lt;&lt; 8.</summary>
+    /// <summary>The cell at (x, y, z) after <paramref name="turns"/> clockwise quarter turns: <see cref="StructureCell.None"/>
+    /// or a packed <see cref="StructureCell"/>.</summary>
     public int CellAt(int turns, int x, int y, int z) => _turns[turns & 3][(y * Size + z) * Size + x];
 
     // A clockwise quarter turn seen from above: (x, z) goes to (size - 1 - z, x), and a facing cell's facing turns with it
@@ -94,8 +96,8 @@ public sealed class StructureTemplate
             var cell = cells[from];
             if (cell >= 0 && facing[from])
             {
-                var state = (cell >> 8) & 0xFF;
-                cell = (cell & 0xFF) | (((state & ~3) | TurnedFacing[state & 3]) << 8);
+                var state = StructureCell.StateOf(cell);
+                cell = StructureCell.Pack(StructureCell.BlockOf(cell), (byte)((state & ~3) | TurnedFacing[state & 3]));
             }
             result[(y * size + x) * size + (size - 1 - z)] = cell;
         }

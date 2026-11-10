@@ -48,7 +48,7 @@ public sealed class LootDepthTests
         var table = ContentRegistry.LootTableFor("ruin_surface")!;
         for (var seed = 0; seed < 25; seed++)
         {
-            var ids = new List<byte>();
+            var ids = new List<ushort>();
             table.Roll(new LootContext(0, 0, 0), ids, new Random(seed));
             var fromStacks = Stacks(table, seed).SelectMany(s => Enumerable.Repeat(s.Item, s.Count)).ToList();
             Assert.Equal(ids, fromStacks);
@@ -65,7 +65,7 @@ public sealed class LootDepthTests
 
         var stacks = Stacks(outer, 1);
         Assert.Equal(2, stacks.Count);
-        Assert.All(stacks, s => Assert.Equal((byte)ContentRegistry.RequireItem("flint").Id, s.Item));
+        Assert.All(stacks, s => Assert.Equal((ushort)ContentRegistry.RequireItem("flint").Id, s.Item));
         Assert.Equal(6, stacks.Sum(s => s.Count));
     }
 

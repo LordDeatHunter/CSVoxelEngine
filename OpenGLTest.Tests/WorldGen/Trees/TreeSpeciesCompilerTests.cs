@@ -18,9 +18,9 @@ public sealed class TreeSpeciesCompilerTests
 {
     private const string FakePath = "data/trees/x.json";
 
-    private readonly byte _woodId;
-    private readonly byte _leafId;
-    private readonly byte _waterId;
+    private readonly ushort _woodId;
+    private readonly ushort _leafId;
+    private readonly ushort _waterId;
 
     public TreeSpeciesCompilerTests()
     {
@@ -30,7 +30,7 @@ public sealed class TreeSpeciesCompilerTests
         _waterId = ContentRegistry.RequireBlock("water").Id;
     }
 
-    private byte? Resolve(string n) => n switch
+    private ushort? Resolve(string n) => n switch
     {
         "block/wood" => _woodId,
         "block/leaf" => _leafId,

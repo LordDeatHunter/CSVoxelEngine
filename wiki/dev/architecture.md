@@ -43,7 +43,7 @@
 
 ## Startup order
 
-1. `ContentRegistry.Load("assets")` parses items, loot, blocks, models and assigns byte ids (no GL).
+1. `ContentRegistry.Load("assets")` parses items, loot, blocks, models and assigns `ushort` ids (no GL).
 2. `TextureAtlas.Build` loads the block tiles into a `TEXTURE_2D_ARRAY`.
 3. `ContentRegistry.BakeModels()` bakes block models into atlas-ready quads.
 4. Shaders, caches, UI, and finally the `World`.

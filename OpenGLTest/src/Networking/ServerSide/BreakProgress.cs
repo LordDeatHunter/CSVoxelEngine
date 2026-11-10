@@ -45,8 +45,8 @@ public sealed class BreakProgress
     private int _x;
     private int _y;
     private int _z;
-    private byte _blockId;
-    private byte _heldId;
+    private ushort _blockId;
+    private ushort _heldId;
     private int _heldInstance;
     private bool _allowed;
     private double _startedAt;
@@ -61,7 +61,7 @@ public sealed class BreakProgress
     /// with <paramref name="held"/> in hand (identified by <paramref name="heldId"/> and, for a tool,
     /// its <paramref name="heldInstance"/>), at server time <paramref name="now"/>.
     /// </summary>
-    public void Start(int x, int y, int z, byte blockId, byte state, Item? held, byte heldId, int heldInstance,
+    public void Start(int x, int y, int z, ushort blockId, byte state, Item? held, ushort heldId, int heldInstance,
         double now, float speedFactor = 1f)
     {
         _active = true;
@@ -81,7 +81,7 @@ public sealed class BreakProgress
     /// <paramref name="now"/>. <paramref name="slackSeconds"/> forgives the start arriving later
     /// than the completion relative to when the client sent them (network jitter).
     /// </summary>
-    public BreakVerdict Complete(int x, int y, int z, byte blockId, byte heldId, int heldInstance, bool creative,
+    public BreakVerdict Complete(int x, int y, int z, ushort blockId, ushort heldId, int heldInstance, bool creative,
         double now, double slackSeconds)
     {
         var verdict = Judge(x, y, z, blockId, heldId, heldInstance, creative, now, slackSeconds);
@@ -92,7 +92,7 @@ public sealed class BreakProgress
     /// <summary>Abandons any break in progress.</summary>
     public void Reset() => _active = false;
 
-    private BreakVerdict Judge(int x, int y, int z, byte blockId, byte heldId, int heldInstance, bool creative,
+    private BreakVerdict Judge(int x, int y, int z, ushort blockId, ushort heldId, int heldInstance, bool creative,
         double now, double slackSeconds)
     {
         if (BlockType.IsUnbreakable(blockId)) return BreakVerdict.Unbreakable;

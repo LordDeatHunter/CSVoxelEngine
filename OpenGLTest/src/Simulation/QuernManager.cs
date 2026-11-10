@@ -34,7 +34,7 @@ public sealed class QuernManager
     public sealed class QuernState
     {
         /// <summary>Waiting crushable id, or 0 when the quern is empty.</summary>
-        public byte InputId;
+        public ushort InputId;
 
         /// <summary>Top angle in radians; advances while spinning, back at rest modulo 2pi.</summary>
         public float Angle;
@@ -74,7 +74,7 @@ public sealed class QuernManager
     /// Puts one crushable unit into an empty quern. Refuses anything with no crush recipe
     /// and anything while the quern already holds a unit.
     /// </summary>
-    public bool TryInsert(int x, int y, int z, byte inputId)
+    public bool TryInsert(int x, int y, int z, ushort inputId)
     {
         if (ContentRegistry.CrushRecipeForInput(inputId) == null) return false;
         var key = (x, y, z);
@@ -117,7 +117,7 @@ public sealed class QuernManager
     }
 
     /// <summary>Every quern cell with state, for the spinning-top render pass.</summary>
-    public IEnumerable<(Vector3 Cell, float Angle, byte InputId)> QuernView()
+    public IEnumerable<(Vector3 Cell, float Angle, ushort InputId)> QuernView()
     {
         foreach (var (key, state) in _querns)
             yield return (new Vector3(key.X, key.Y, key.Z), state.Angle, state.InputId);
@@ -240,7 +240,7 @@ public sealed class QuernManager
         {
             if (leftQuerns-- == 0) break;
             StationNetCodec.WriteCell(writer, x, y, z);
-            writer.Write(state.InputId);
+            writer.WriteId(state.InputId);
             writer.Write(state.Angle);
             writer.Write(state.Spinning);
         }
@@ -259,7 +259,7 @@ public sealed class QuernManager
         for (var i = 0; i < count; i++)
         {
             var key = StationNetCodec.ReadCell(reader);
-            var inputId = reader.ReadByte();
+            var inputId = BlockTables.RequireAssigned(reader.ReadId());
             var angle = StationNetCodec.ReadFinite(reader);
             var spinning = reader.ReadBool();
             _stale.Remove(key);

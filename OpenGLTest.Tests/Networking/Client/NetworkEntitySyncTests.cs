@@ -240,7 +240,7 @@ public sealed class NetworkEntitySyncTests : IDisposable
         Assert.Equal(type.DisplayName, bar.Value.Name);
         Assert.Equal(wounded / (float)king.MaxHealth, bar.Value.Share, 3);
 
-        // The same id updates in place: the phase follows the item byte, and an attack count of 1 plays the volley
+        // The same id updates in place: the phase follows the item id, and an attack count of 1 plays the volley
         _world.ClientMirror.ApplyNetworkEntities([
             new NetEntity(NetEntityKind.SkeletonKing, 9, pos, 0f, wounded, 1, 3, Vector3.Zero),
         ]);

@@ -11,10 +11,10 @@ internal interface IOreLatticeRule
     /// Whether the chunk-local cell (localX, localY, localZ) holding <paramref name="block"/> may be
     /// replaced by the deposit.
     /// </summary>
-    bool IsHost(byte block, int localX, int localY, int localZ);
+    bool IsHost(ushort block, int localX, int localY, int localZ);
 
     /// <summary>The block a host cell at world (worldX, worldY, worldZ) inside the deposit becomes.</summary>
-    byte Replacement(int worldX, int worldY, int worldZ);
+    ushort Replacement(int worldX, int worldY, int worldZ);
 
     /// <summary>
     /// What the chunk-local cell (localX, localY, localZ) adds to the stamp's threshold (the cave biome

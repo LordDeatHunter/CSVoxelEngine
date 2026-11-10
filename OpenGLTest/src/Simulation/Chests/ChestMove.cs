@@ -19,7 +19,7 @@ public enum ChestMoveKind : byte
 /// </summary>
 public readonly record struct ChestMove(ChestMoveKind Kind, int Slot = 0, int Id = 0, int Count = 1)
 {
-    public static ChestMove DepositStack(byte id, int count) => new(ChestMoveKind.DepositStack, Id: id, Count: count);
+    public static ChestMove DepositStack(ushort id, int count) => new(ChestMoveKind.DepositStack, Id: id, Count: count);
 
     public static ChestMove DepositInstance(int instanceId) => new(ChestMoveKind.DepositInstance, Id: instanceId);
 

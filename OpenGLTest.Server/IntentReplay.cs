@@ -177,7 +177,7 @@ internal sealed class IntentReplay
         _state.World.RaycastFor(player.Context, includeFluids: false, out var hit, out normal) && hit == intent.Cell;
 
     // A loaded cell holding a block that can be mined: not air, not a fluid
-    private bool TryMineable(in WorldIntent intent, out byte id, out byte state) =>
+    private bool TryMineable(in WorldIntent intent, out ushort id, out byte state) =>
         _state.World.GetChunkManager().TryGetCell(intent.X, intent.Y, intent.Z, out id, out state)
         && id != 0 && !BlockType.IsFluid(id);
 
@@ -337,13 +337,7 @@ internal sealed class IntentReplay
         writer.Write(seq);
         writer.Write(_correctionScratch.Count);
         foreach (var cell in _correctionScratch)
-        {
-            writer.Write(cell.X);
-            writer.Write(cell.Y);
-            writer.Write(cell.Z);
-            writer.Write(cell.Id);
-            writer.Write(cell.State);
-        }
+            NetCellChangeCodec.Write(writer, cell);
         client.Send(writer.ToArray());
     }
 }

@@ -71,6 +71,6 @@ public sealed class SkyCoverFlagTests
             Assert.Equal(type.CoversSky, BlockType.CoversSkyById[type.Id]);
             Assert.Equal(type.CoversSky, BlockType.ContainsSkyCover([type.Id]));
         }
-        Assert.False(BlockType.ContainsSkyCover(new byte[4096]));
+        Assert.False(BlockType.ContainsSkyCover(new ushort[Chunk.BlockCount]));
     }
 }

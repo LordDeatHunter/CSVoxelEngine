@@ -1,5 +1,6 @@
 using System;
 using VoxelEngine.Content;
+using VoxelEngine.Content.Structures;
 
 namespace VoxelEngine.WorldGen.Structures;
 
@@ -23,9 +24,9 @@ public static class TowerRuin
 {
     private const int RuinSalt = 0x5E80;
 
-    private static readonly byte StoneBricks;
-    private static readonly byte Cobblestone;
-    private static readonly byte Gravel;
+    private static readonly ushort StoneBricks;
+    private static readonly ushort Cobblestone;
+    private static readonly ushort Gravel;
 
     static TowerRuin()
     {
@@ -54,9 +55,10 @@ public static class TowerRuin
 
     /// <summary>
     /// The ruin of the cell at world (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>) of
-    /// <paramref name="s"/>: -1 when the cell keeps what the tower wrote there (a cell the tower never writes included), else
-    /// <c>block | state &lt;&lt; 8</c> (the state is always 0). <paramref name="original"/> is the tower's own cell
-    /// (<see cref="TowerGenerator.CellAt(TowerSite, int, int, int)"/>), -1 where it writes nothing.
+    /// <paramref name="s"/>: <see cref="StructureCell.None"/> when the cell keeps what the tower wrote there (a cell the tower
+    /// never writes included), else a packed <see cref="StructureCell"/> whose state is always 0. <paramref name="original"/> is
+    /// the tower's own cell (<see cref="TowerGenerator.CellAt(TowerSite, int, int, int)"/>), <see cref="StructureCell.None"/>
+    /// where it writes nothing.
     /// </summary>
     public static int RuinAt(TowerSite s, int x, int y, int z, out int original)
     {
@@ -64,29 +66,29 @@ public static class TowerRuin
         var dz = z - s.CenterZ;
         var step = TowerShell.StepOf(s, dx, dz);
         var ring = TowerShell.RingOf(s, dx, dz, step);
-        original = ring == TowerRing.Outside ? -1 : TowerGenerator.CellIn(s, ring, step, x, y, z);
-        if (original < 0) return -1;
+        original = ring == TowerRing.Outside ? StructureCell.None : TowerGenerator.CellIn(s, ring, step, x, y, z);
+        if (original < 0) return StructureCell.None;
 
-        var block = (byte)original;
+        var block = StructureCell.BlockOf(original);
         var top = StumpTop(s, ring, x, z);
         if (y > top) return AboveStump(s, ring, block, x, y, z);
-        if (!BlockType.IsUnbreakable(block)) return -1;
+        if (!BlockType.IsUnbreakable(block)) return StructureCell.None;
         if (block == TowerPalette.DoorBlock || block == TowerPalette.PileBlock || block == TowerPalette.AltarBlock)
             return BlockType.Air;
         return Rubble(x, y, z);
     }
 
     // A cell over its column's stump: air, but for the ground floor's breakable dressing and its rubble piles
-    private static int AboveStump(TowerSite s, TowerRing ring, byte block, int x, int y, int z)
+    private static int AboveStump(TowerSite s, TowerRing ring, ushort block, int x, int y, int z)
     {
         if (ring == TowerRing.Room && y == s.GroundY + 1)
         {
-            if (block != BlockType.Air) return BlockType.IsUnbreakable(block) ? BlockType.Air : -1;
+            if (block != BlockType.Air) return BlockType.IsUnbreakable(block) ? BlockType.Air : StructureCell.None;
             var h = ColumnHash(x, z);
-            if (SplitMix64.Unit(h, 1) >= WorldGenerationConfig.TowerRuinRubbleChance) return -1;
+            if (SplitMix64.Unit(h, 1) >= WorldGenerationConfig.TowerRuinRubbleChance) return StructureCell.None;
             return SplitMix64.Unit(h, 2) < WorldGenerationConfig.TowerRuinGravelShare ? Gravel : Cobblestone;
         }
-        return block == BlockType.Air ? -1 : BlockType.Air;
+        return block == BlockType.Air ? StructureCell.None : BlockType.Air;
     }
 
     // A crumbled brick: cobblestone or stone bricks, hashed per cell

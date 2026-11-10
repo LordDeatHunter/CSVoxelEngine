@@ -366,7 +366,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
     }
 
     // A plain give: the item lands in the inventory and is put to use, so a shot shows it
-    private void Give(byte id, VisualStep step)
+    private void Give(ushort id, VisualStep step)
     {
         world.Inventory.Add(id, step.Count);
         if (Inventory.CategoryOf(id) == InventoryCategory.Gear)
@@ -390,7 +390,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
 
     // A give with a rarity: each piece is rolled at it (seeded by the step, so a run is repeatable) and left unworn,
     // so the Gear list shows every piece; only gear rolls one
-    private void GiveRolled(byte id, Rarity rarity, VisualStep step)
+    private void GiveRolled(ushort id, Rarity rarity, VisualStep step)
     {
         if (ItemRegistry.TryGet(id) is not GearItem gear)
             throw new InvalidOperationException($"Step {_step + 1} gives {step.Block} a rarity, but only gear rolls one.");

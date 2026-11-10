@@ -13,15 +13,15 @@ namespace VoxelEngine.Content.Blocks;
 /// </summary>
 internal sealed class BlockLinkResolver
 {
-    private readonly List<(byte Id, string? To, string? Touching, string Path)> _harden = [];
-    private readonly List<(byte Id, string? FreezesTo, string? MeltsTo, string Path)> _status = [];
-    private readonly List<(byte Id, string? Part, string? Source, string Path)> _multiblock = [];
-    private readonly List<(byte Id, string Wall, string Path)> _wall = [];
-    private readonly List<(byte Id, string Upper, string Path)> _upper = [];
-    private readonly List<(byte Id, string Target, string Path)> _pick = [];
+    private readonly List<(ushort Id, string? To, string? Touching, string Path)> _harden = [];
+    private readonly List<(ushort Id, string? FreezesTo, string? MeltsTo, string Path)> _status = [];
+    private readonly List<(ushort Id, string? Part, string? Source, string Path)> _multiblock = [];
+    private readonly List<(ushort Id, string Wall, string Path)> _wall = [];
+    private readonly List<(ushort Id, string Upper, string Path)> _upper = [];
+    private readonly List<(ushort Id, string Target, string Path)> _pick = [];
 
     /// <summary>Queues the references one block's definition declares (contact hardening, freezesTo / meltsTo, multiblock, wall block, upper half, pickAs).</summary>
-    internal void Queue(byte id, BlockDefinition definition, string path)
+    internal void Queue(ushort id, BlockDefinition definition, string path)
     {
         var flow = definition.Flow;
         if ((flow?.HardensTo == null) != (flow?.HardensTouching == null))
@@ -41,7 +41,7 @@ internal sealed class BlockLinkResolver
     }
 
     /// <summary>Resolves every queued reference against the loaded <paramref name="types"/>, writing the target ids onto them and the per-id tables.</summary>
-    internal void Resolve(Dictionary<byte, BlockType> types)
+    internal void Resolve(Dictionary<ushort, BlockType> types)
     {
         // Contact targets resolve here, not inline: lava's flow.hardensTouching (water) may not
         // have its fluid flag yet when lava is read.
@@ -101,7 +101,7 @@ internal sealed class BlockLinkResolver
     /// it must name a fluid other than its owner (<c>flow.hardensTouching</c>, <c>meltsTo</c>),
     /// otherwise a solid block (<c>flow.hardensTo</c>, <c>freezesTo</c>). Null names no link (0).
     /// </summary>
-    private static byte ResolveFluidLink(string? name, string field, string path, bool requireFluid, byte ownerId)
+    private static ushort ResolveFluidLink(string? name, string field, string path, bool requireFluid, ushort ownerId)
     {
         if (name == null) return 0;
 
@@ -122,7 +122,7 @@ internal sealed class BlockLinkResolver
     /// Resolves a multiblock anchor's <c>multiblock.part</c>: the block that fills the seven
     /// non-anchor cells, which must itself use the part renderer (nothing else draws nothing).
     /// </summary>
-    private static byte ResolveMultiblockPart(string? name, string path)
+    private static ushort ResolveMultiblockPart(string? name, string path)
     {
         if (name == null)
             throw new InvalidOperationException($"Block '{path}' names no multiblock.part.");
@@ -139,7 +139,7 @@ internal sealed class BlockLinkResolver
     /// Resolves a multiblock anchor's <c>multiblock.source</c>: the plain block the structure is
     /// built from and reverts to, which must not itself be part of a multiblock nor unbreakable.
     /// </summary>
-    private static byte ResolveMultiblockSource(string? name, string path, byte ownerId)
+    private static ushort ResolveMultiblockSource(string? name, string path, ushort ownerId)
     {
         if (name == null)
             throw new InvalidOperationException($"Block '{path}' names no multiblock.source.");
@@ -161,7 +161,7 @@ internal sealed class BlockLinkResolver
     /// owner itself must stand on the floor (support below, no facing of its own), since a placement
     /// on top keeps it. A wall block belongs to one owner, which is what it is picked and named as.
     /// </summary>
-    private static byte ResolveWallBlock(string name, string path, byte ownerId)
+    private static ushort ResolveWallBlock(string name, string path, ushort ownerId)
     {
         if (!ContentFiles.TryResolve(name, out var id) || id == BlockType.Air || ItemRegistry.IsItem(id))
             throw new InvalidOperationException(
@@ -188,7 +188,7 @@ internal sealed class BlockLinkResolver
     /// as its plain counterpart) and is not already picked as another block through a
     /// <c>wallBlock</c> or <c>upperHalf</c>.
     /// </summary>
-    private static byte ResolvePickAs(string name, string path, byte ownerId)
+    private static ushort ResolvePickAs(string name, string path, ushort ownerId)
     {
         if (!ContentFiles.TryResolve(name, out var id) || id == BlockType.Air || ItemRegistry.IsItem(id))
             throw new InvalidOperationException(
@@ -216,7 +216,7 @@ internal sealed class BlockLinkResolver
     /// the upper half may never be held; each half belongs to one pair; and neither may topple, pop
     /// or flow away from the other.
     /// </summary>
-    private static byte ResolveUpperHalf(string name, string path, byte ownerId)
+    private static ushort ResolveUpperHalf(string name, string path, ushort ownerId)
     {
         if (!ContentFiles.TryResolve(name, out var id) || id == BlockType.Air || ItemRegistry.IsItem(id))
             throw new InvalidOperationException(

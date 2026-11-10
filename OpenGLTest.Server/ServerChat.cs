@@ -113,7 +113,7 @@ internal sealed class ServerChat
 
     // An item or block by plain name (blocks first, like a loot entry) or by its block//item/
     // pinned name
-    private static bool TryResolveContent(string name, out byte id)
+    private static bool TryResolveContent(string name, out ushort id)
     {
         var trimmed = name.Trim();
         if (trimmed.StartsWith("block/", StringComparison.OrdinalIgnoreCase))

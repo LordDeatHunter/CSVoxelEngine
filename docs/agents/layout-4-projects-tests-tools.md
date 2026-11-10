@@ -56,14 +56,17 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                       #   namespaces mirror the test folders (VoxelEngine.Tests.<folder>)
   VoxelEngine.Tests.csproj            # the test project (references the game, the server and the item debugger)
   GlobalUsings.cs                     # VoxelEngine.Core, VoxelEngine.Chunks, VoxelEngine.Content and VoxelEngine.Tests.Support
-  Support/                     # cross-area fixtures: TestContent (the headless content load),
+  Support/                     # cross-area fixtures: TestContent (the headless content load, and
+                               #   SwapIn/RestoreReal for the registry-swap tests), SyntheticContentRoot (a
+                               #   temp asset root with N extra stone copies, so ids pass 255),
                                #   MeshTestWorld, MobTestWorld, FlatWorldSource, StampedTree,
                                #   WideTreeSpecies, TreeWorldgenFixture, IcebergTestWorld (a hand-built sea with a
                                #   pack-ice strip), StubTarget, BoxSolids, SkyZoneFinder (sky zones under the seed),
                                #   SyntheticGear (gear items with made-up abilities and modifiers), TowerSiteFixture
                                #   (synthetic tower sites of any radius, floor count and turn), CaveTestWorld
                                #   (a carved, evenly lit cave for the cave spawn searches)
-                               #   and the three [CollectionDefinition]s
+                               #   and the four [CollectionDefinition]s (ContentRegistrySwapCollection
+                               #   runs the tests that swap the registry)
   Audio/                       # the sfx library and the ambience bed
   Chunks/                      # chunk storage, keys and map, the chunk manager and its mesh scheduling, the
                                #   column cache, fluid surfaces, lava vents, EntityLight; the replay probes
@@ -73,7 +76,9 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Streaming/                 # the generation workers, the scan frontier, the streaming foci
   Content/                     # the registry and its baked tables: blocks, models, shapes (panes,
                                #   tree wood, multiblocks), loot, recipes, kiln and molds, spell parts and
-                               #   recipes, status effects and the status block flags, the tower lock blocks (flat)
+                               #   recipes, status effects and the status block flags, the tower lock blocks (flat);
+                               #   Blocks/ holds the per-id tables and WideIdRegistryTests (a registry past
+                               #   the byte range, meshed, saved and streamed)
   Core/                        # the Core utilities and the src-root types (World lifecycle, WorldSeed, WorldLoadGate)
   Effects/                     # mirrors src/Effects: one folder per sub-domain of shader twins
     Climate/                   # the biome tint field and its chunk, LOD, pop and texture consumers

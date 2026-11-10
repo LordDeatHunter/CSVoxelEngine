@@ -19,8 +19,8 @@ public sealed class StationSaveTests
 {
     public StationSaveTests() => TestContent.EnsureLoaded();
 
-    private static byte Mudball => ContentRegistry.RequireItem("mudball").Id;
-    private static byte MalachiteChunk => ContentRegistry.RequireItem("malachite_ore").Id;
+    private static ushort Mudball => ContentRegistry.RequireItem("mudball").Id;
+    private static ushort MalachiteChunk => ContentRegistry.RequireItem("malachite_ore").Id;
     private static Item Coal => ContentRegistry.RequireItem("coal");
     private static BlockType Kiln => ContentRegistry.RequireBlock("mud_brick_kiln");
     private static byte Copper => ContentRegistry.MoltenMaterialByName("copper")!.Id;

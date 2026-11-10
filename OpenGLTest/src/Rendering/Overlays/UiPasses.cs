@@ -286,7 +286,7 @@ internal sealed class UiPasses
 
     // The compass item id, resolved once: null when no item named "compass" is registered,
     // in which case the HUD compass never shows rather than throwing every frame.
-    private byte? _compassId;
+    private ushort? _compassId;
     private bool _compassResolved;
 
     private bool HasCompassEquipped(Inventory inventory)
@@ -307,7 +307,7 @@ internal sealed class UiPasses
     }
 
     // The clock item id, resolved once like the compass's
-    private byte? _clockId;
+    private ushort? _clockId;
     private bool _clockResolved;
 
     private bool HasClockEquipped(Inventory inventory)

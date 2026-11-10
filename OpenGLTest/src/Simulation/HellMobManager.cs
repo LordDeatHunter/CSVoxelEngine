@@ -29,7 +29,7 @@ public sealed class HellMobManager : RealmMobManager<HellMob>
     private readonly EntityType? _casterType;
     // Each bolt carries its caster's damage, scaled by the caster's layer
     private readonly MobMissiles _bolts = new();
-    private readonly byte _boltItemId;
+    private readonly ushort _boltItemId;
 
     /// <summary>
     /// Validates both kinds' content first, so a model missing a part, clip or event fails at startup

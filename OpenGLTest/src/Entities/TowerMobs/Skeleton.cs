@@ -183,7 +183,7 @@ public sealed class Skeleton : RealmMob
         amount <= 0 ? amount : Math.Max(1, (int)MathF.Round(amount * (1f - Outfit.DamageReduction)));
 
     /// <inheritdoc />
-    public override byte ArmorPieceOn(string part) => Outfit.TintItemOn(part);
+    public override ushort ArmorPieceOn(string part) => Outfit.TintItemOn(part);
 
     /// <inheritdoc />
     protected override void TickCooldowns(float scaledDelta)

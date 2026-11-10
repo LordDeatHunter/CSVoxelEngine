@@ -58,7 +58,7 @@ public sealed class PondPlantTests
         }
         Assert.NotEmpty(members);
 
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         ReedGenerator.Stamp(blocks, column, chunkX << Chunk.SizeShift, 0, chunkZ << Chunk.SizeShift);
 
         var memberSet = new HashSet<int>(members);
@@ -90,7 +90,7 @@ public sealed class PondPlantTests
         }
         Assert.NotEmpty(members);
 
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         LilyPadGenerator.Stamp(blocks, column, 0, 0, 0);
 
         var memberSet = new HashSet<int>(members);

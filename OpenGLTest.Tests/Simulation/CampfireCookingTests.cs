@@ -9,9 +9,9 @@ public sealed class CampfireCookingTests
 {
     public CampfireCookingTests() => TestContent.EnsureLoaded();
 
-    private static byte Mudball => ContentRegistry.RequireItem("mudball").Id;
-    private static byte MudBrick => ContentRegistry.RequireItem("mud_brick").Id;
-    private static byte BranchPile => ContentRegistry.RequireBlock("branch_pile").Id;
+    private static ushort Mudball => ContentRegistry.RequireItem("mudball").Id;
+    private static ushort MudBrick => ContentRegistry.RequireItem("mud_brick").Id;
+    private static ushort BranchPile => ContentRegistry.RequireBlock("branch_pile").Id;
 
     private static ChunkManager LitPile(out CampfireManager fires, out DropManager drops, byte state = 4)
     {

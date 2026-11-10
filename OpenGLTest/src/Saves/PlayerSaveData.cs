@@ -9,7 +9,7 @@ namespace VoxelEngine.Saves;
 ///
 /// <para>
 /// Content is referenced by name only, through <see cref="SaveNames"/> (<c>block/&lt;name&gt;</c>,
-/// <c>item/&lt;name&gt;</c>, molten materials by file name), never by a byte id, since ids are
+/// <c>item/&lt;name&gt;</c>, molten materials by file name), never by a numeric id, since ids are
 /// renumbered whenever the content set changes. Vectors travel as <c>float[3]</c> (x, y, z).
 /// Every field is optional, so an older or hand-edited file degrades field by field: a missing
 /// value keeps whatever a fresh world would have, and a name this run does not know is dropped

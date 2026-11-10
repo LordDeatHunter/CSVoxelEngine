@@ -23,11 +23,11 @@ namespace VoxelEngine.UI.Hud;
 public static class ItemTooltip
 {
     /// <summary>The lines for an id, with the stack when one is hovered (its durability left).</summary>
-    public static List<string> Lines(byte id, ItemStack? stack) => Lines(id, stack, null, out _);
+    public static List<string> Lines(ushort id, ItemStack? stack) => Lines(id, stack, null, out _);
 
     /// <summary>The tooltip for an id hovered at <paramref name="anchor"/> (window pixels): its lines and colors, and
     /// the rarity (<see cref="Rarities.Of"/>) that dresses the box.</summary>
-    public static HoverTooltip Hover(Vector2 anchor, byte id, ItemStack? stack, Equipment? worn) =>
+    public static HoverTooltip Hover(Vector2 anchor, ushort id, ItemStack? stack, Equipment? worn) =>
         new(anchor, Lines(id, stack, worn, out var colors), colors, Rarities.Of(id, stack));
 
     /// <summary>
@@ -35,7 +35,7 @@ public static class ItemTooltip
     /// to its color (the title takes its rarity's, a set's active bonus is green and an inactive one dim); a line not in
     /// it is drawn in the default. <paramref name="worn"/> is the wearer's equipment, which set progress counts.
     /// </summary>
-    public static List<string> Lines(byte id, ItemStack? stack, Equipment? worn, out Dictionary<int, Rgba> colors)
+    public static List<string> Lines(ushort id, ItemStack? stack, Equipment? worn, out Dictionary<int, Rgba> colors)
     {
         colors = new Dictionary<int, Rgba>();
         var lines = new List<string> { stack?.ResolvedName ?? Inventory.DisplayName(id) };

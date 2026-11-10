@@ -83,10 +83,10 @@ public static class HellGenerator
     private static FastNoiseLite CavernNoise;
 
     /// <summary>The hellrock block; resolved once in the static constructor.</summary>
-    public static readonly byte HellrockBlock;
+    public static readonly ushort HellrockBlock;
 
     /// <summary>The lava block the pools are made of.</summary>
-    public static readonly byte LavaBlock;
+    public static readonly ushort LavaBlock;
 
     static HellGenerator()
     {
@@ -202,7 +202,7 @@ public static class HellGenerator
 
     /// <summary>The block hell generates at world cell (x, y, z), y at or below
     /// <see cref="WorldGenerationConfig.HellTopY"/>: exactly what <see cref="Stamp"/> writes there.</summary>
-    public static byte BlockAt(int x, int y, int z)
+    public static ushort BlockAt(int x, int y, int z)
     {
         if (!InHell(y)) throw new ArgumentOutOfRangeException(nameof(y), y, "above hell");
         if (!NeedsClassify(y)) return HellrockBlock;
@@ -218,7 +218,7 @@ public static class HellGenerator
     /// the skin reach above and below, from lattice points sampled lazily, once each, and only for rows
     /// that can open; every cell is then classified exactly as <see cref="BlockAt"/> classifies it.
     /// </summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0)
     {
         var anyClassified = false;
         for (var y = 0; y < Chunk.Size && InHell(worldY0 + y); y++)
@@ -296,7 +296,7 @@ public static class HellGenerator
     /// biome's ceiling light right over open cavern); else, above the lava level, beside open cavern
     /// wall; anything else hellrock.
     /// </summary>
-    private static byte Classify<TField>(ref TField field, int x, int y, int z)
+    private static ushort Classify<TField>(ref TField field, int x, int y, int z)
         where TField : IHellField, allows ref struct
     {
         if (field.IsOpen(x, y, z)) return OpenCell(ref field, x, y, z);
@@ -327,7 +327,7 @@ public static class HellGenerator
     /// <summary>What open cell (x, y, z) holds: above its layer's lava level air or the flora
     /// <see cref="HellFlora.AirCell"/> puts there; under it lava where the column's pool holds lava,
     /// else the biome's soil, its top row the biome's surface.</summary>
-    private static byte OpenCell<TField>(ref TField field, int x, int y, int z)
+    private static ushort OpenCell<TField>(ref TField field, int x, int y, int z)
         where TField : IHellField, allows ref struct
     {
         if (!field.InPool(y)) return HellFlora.AirCell(ref field, x, y, z);
@@ -343,7 +343,7 @@ public static class HellGenerator
         HellBiomes.Palette(field.Biome(x, LayerIndex(y), z));
 
     /// <summary>A floor's top cell: the biome's surface, now and then its floor light.</summary>
-    internal static byte Surface(HellBiomePalette palette, int x, int y, int z) =>
+    internal static ushort Surface(HellBiomePalette palette, int x, int y, int z) =>
         palette.FloorLight != BlockType.Air && HellBiomes.Picks(x, y, z, palette.FloorLightRate)
             ? palette.FloorLight
             : palette.Surface;
@@ -397,7 +397,7 @@ public static class HellGenerator
         }
     }
 
-    private static void FillRow(byte[] blocks, int y, byte block)
+    private static void FillRow(ushort[] blocks, int y, ushort block)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

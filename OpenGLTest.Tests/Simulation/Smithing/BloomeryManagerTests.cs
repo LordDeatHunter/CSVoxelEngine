@@ -25,7 +25,7 @@ public sealed class BloomeryManagerTests
     private static BlockType Bloomery => ContentRegistry.RequireBlock("bloomery");
     private static Item Coal => ContentRegistry.RequireItem("coal");
 
-    private static byte OreId => Bloomery.Bloomery!.OreId;
+    private static ushort OreId => Bloomery.Bloomery!.OreId;
 
     private static float Mid => (BloomeryConfig.BandMin + BloomeryConfig.BandMax) * 0.5f;
 
@@ -190,7 +190,7 @@ public sealed class BloomeryManagerTests
 
         Assert.False(bloomeries.TryAddOre(Anchor, OreId));
 
-        var output = new List<byte>();
+        var output = new List<ushort>();
         Assert.True(bloomeries.TryCollect(Anchor, output));
         Assert.Equal([Bloomery.Bloomery!.BloomId], output);
         Assert.False(bloomeries.TryCollect(Anchor, output));

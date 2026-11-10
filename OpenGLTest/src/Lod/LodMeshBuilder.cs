@@ -32,7 +32,7 @@ internal sealed class LodMeshBuilder
     private readonly bool[] _supplied;
     private bool _anySupplied;
     private readonly int[][]? _capmaps;
-    private readonly int[][]? _overrideMaps;
+    private readonly long[][]? _overrideMaps;
     private bool _hasRegionOverrides;
     private readonly int _baseFineX;
     private readonly int _baseFineZ;
@@ -52,12 +52,12 @@ internal sealed class LodMeshBuilder
     private readonly bool[] _soilStripped;
     private readonly Biome[] _biomeGrid;
     private readonly byte[] _seaFloor;
-    private readonly byte[] _canopyLeaf;
+    private readonly ushort[] _canopyLeaf;
     private readonly int[] _fine;
     private readonly int[] _xMin;
     private readonly int[] _fineGen;
-    private readonly byte[] _fineBlock;
-    private readonly byte[] _topBlockGrid;
+    private readonly ushort[] _fineBlock;
+    private readonly ushort[] _topBlockGrid;
     private readonly int _regionChunkX;
     private readonly int _regionChunkZ;
     private readonly int _latticeSpan;
@@ -113,7 +113,7 @@ internal sealed class LodMeshBuilder
         // whole array is skipped while the table is empty. Same shape and lifetime as heightmaps.
         _capmaps = hasCaps ? new int[_chunkSpan * _chunkSpan][] : null;
         // The LodSurface override buckets, resolved the same way and with the same shape.
-        _overrideMaps = hasOverrides ? new int[_chunkSpan * _chunkSpan][] : null;
+        _overrideMaps = hasOverrides ? new long[_chunkSpan * _chunkSpan][] : null;
         // Whether any chunk column this region samples carries an edit. Only then does the build
         // pay for the generated-only grid and the tile rule; an unedited region keeps the old path.
         var hasEdits = false;
@@ -164,7 +164,7 @@ internal sealed class LodMeshBuilder
         _soilStripped = ArrayPool<bool>.Shared.Rent(gridSize);
         _biomeGrid = ArrayPool<Biome>.Shared.Rent(gridSize);
         _seaFloor = ArrayPool<byte>.Shared.Rent(gridSize);
-        _canopyLeaf = ArrayPool<byte>.Shared.Rent(gridSize);
+        _canopyLeaf = ArrayPool<ushort>.Shared.Rent(gridSize);
         // Item C1: the fine heights every cell window reads (index fx * fineSpan + fz), and one row
         // of the separable min's horizontal half, rebuilt per cell row and reused by every column.
         // Level 2 is the largest at 81796 ints, well inside ArrayPool<int>.Shared's largest bucket.
@@ -179,8 +179,8 @@ internal sealed class LodMeshBuilder
         // The override block of each fine column while that override is its drawn height (0
         // otherwise), and the block each cell's drawn surface wears by the tile rule below (0 =
         // the generated tile chain). Only read while the region has overrides.
-        _fineBlock = ArrayPool<byte>.Shared.Rent(_fineSpan * _fineSpan);
-        _topBlockGrid = ArrayPool<byte>.Shared.Rent(gridSize);
+        _fineBlock = ArrayPool<ushort>.Shared.Rent(_fineSpan * _fineSpan);
+        _topBlockGrid = ArrayPool<ushort>.Shared.Rent(gridSize);
         // The biome tint lattice (BiomeTint) at this region's chunk-column corners, both palettes
         // from one climate evaluation per point. Indexed from the region's OWN first chunk column,
         // never from baseChunkX, which is the prefetch origin one chunk before it: the chunk mesher
@@ -221,13 +221,13 @@ internal sealed class LodMeshBuilder
     // The seam path's per-sample read of the EDITED height: the override replaces the generated
     // height, then the cap lowers it, exactly the order the separable fill applies. block is
     // the override's block while that override is the column's drawn height, else 0.
-    private int FineHeight(int fineX, int fineZ, out byte block)
+    private int FineHeight(int fineX, int fineZ, out ushort block)
     {
         var cx = (fineX >> Chunk.SizeShift) - _baseChunkX;
         var cz = (fineZ >> Chunk.SizeShift) - _baseChunkZ;
         var local = ((fineX & Chunk.SizeMask) << Chunk.SizeShift) | (fineZ & Chunk.SizeMask);
         var height = _heightmaps[cx * _chunkSpan + cz][local];
-        block = 0;
+        block = BlockType.Air;
 
         var overrides = _overrideMaps?[cx * _chunkSpan + cz];
         var packed = overrides != null ? overrides[local] : LodSurface.None;
@@ -237,7 +237,7 @@ internal sealed class LodMeshBuilder
         if (caps != null && caps[local] < height)
         {
             height = caps[local];
-            block = 0;
+            block = BlockType.Air;
         }
 
         return height;
@@ -298,14 +298,14 @@ internal sealed class LodMeshBuilder
                     // Override first (replace), then the cap (min), as FineHeight does.
                     var h = heights[src + lz];
                     _fineGen[dst + lz] = h;
-                    byte b = 0;
+                    var b = BlockType.Air;
                     var o = overrides != null ? overrides[src + lz] : LodSurface.None;
                     if (o != LodSurface.None) LodSurface.Unpack(o, out h, out b);
                     var c = caps != null ? caps[src + lz] : LodColumnCaps.NoCap;
                     if (c < h)
                     {
                         h = c;
-                        b = 0;   // a cap below the override: the override is not what shows
+                        b = BlockType.Air;   // a cap below the override: the override is not what shows
                     }
                     _fine[dst + lz] = h;
                     _fineBlock[dst + lz] = b;
@@ -353,7 +353,7 @@ internal sealed class LodMeshBuilder
     {
         int minHeight;
         var maxOwn = int.MinValue;
-        byte topBlock;
+        ushort topBlock;
         if (_separableMin)
             topBlock = SampleSeparable(i, j, out minHeight, ref maxOwn);
         else
@@ -386,7 +386,7 @@ internal sealed class LodMeshBuilder
         // negative terrain and pave lowlands with phantom leaf pillars.
         var top = ground;
         var canopyMax = 0;
-        byte canopyId = 0;
+        var canopyId = BlockType.Air;
 
         if (suppliedColumn == null)
             ClassifyGenerated(i, j, centerX, centerZ, maxOwn, ref canopyMax, ref canopyId);
@@ -399,7 +399,7 @@ internal sealed class LodMeshBuilder
         _canopyLeaf[(i + 1) * _heightGrid + (j + 1)] = canopyId;
     }
 
-    private byte SampleSeparable(int i, int j, out int minHeight, ref int maxOwn)
+    private ushort SampleSeparable(int i, int j, out int minHeight, ref int maxOwn)
     {
         // Vertical half of the min
         var wz = (j + 1) * _cellSize;
@@ -422,7 +422,7 @@ internal sealed class LodMeshBuilder
         // Tile rule: an override's block shows only where that override actually is
         // the drawn (eroded-min) surface, so a lone block never repaints a coarse cell.
         // First match in dx-outer, dz-inner order, the seam path's order too.
-        byte topBlock = 0;
+        var topBlock = BlockType.Air;
         if (_hasRegionOverrides)
         {
             for (var dx = 0; dx < _cellSize && topBlock == 0; dx++)
@@ -439,7 +439,7 @@ internal sealed class LodMeshBuilder
         return topBlock;
     }
 
-    private byte SampleSeam(int i, int j, out int minHeight, ref int maxOwn)
+    private ushort SampleSeam(int i, int j, out int minHeight, ref int maxOwn)
     {
         // Test seam (item C1): the original fused O(window^2) scan, kept so
         // LodHeightSamplingTests can compare full output against it.
@@ -456,7 +456,7 @@ internal sealed class LodMeshBuilder
         }
 
         // The same tile rule, restricted to the cell's own footprint.
-        byte topBlock = 0;
+        var topBlock = BlockType.Air;
         if (_hasRegionOverrides)
         {
             for (var dx = 0; dx < _cellSize && topBlock == 0; dx++)
@@ -473,7 +473,7 @@ internal sealed class LodMeshBuilder
         return topBlock;
     }
 
-    private void ClassifyGenerated(int i, int j, int centerX, int centerZ, int maxOwn, ref int canopyMax, ref byte canopyId)
+    private void ClassifyGenerated(int i, int j, int centerX, int centerZ, int maxOwn, ref int canopyMax, ref ushort canopyId)
     {
         var cellBiome = TerrainGenerator.BiomeAt(centerX, centerZ);
         _biomeGrid[(i + 1) * _heightGrid + (j + 1)] = cellBiome;
@@ -655,12 +655,12 @@ internal sealed class LodMeshBuilder
         ArrayPool<bool>.Shared.Return(_soilStripped);
         ArrayPool<Biome>.Shared.Return(_biomeGrid);
         ArrayPool<byte>.Shared.Return(_seaFloor);
-        ArrayPool<byte>.Shared.Return(_canopyLeaf);
+        ArrayPool<ushort>.Shared.Return(_canopyLeaf);
         ArrayPool<int>.Shared.Return(_fine);
         ArrayPool<int>.Shared.Return(_xMin);
         if (!ReferenceEquals(_fineGen, _fine)) ArrayPool<int>.Shared.Return(_fineGen);
-        ArrayPool<byte>.Shared.Return(_fineBlock);
-        ArrayPool<byte>.Shared.Return(_topBlockGrid);
+        ArrayPool<ushort>.Shared.Return(_fineBlock);
+        ArrayPool<ushort>.Shared.Return(_topBlockGrid);
         ArrayPool<Vector3>.Shared.Return(_grassTint);
         ArrayPool<Vector3>.Shared.Return(_foliageTint);
     }

@@ -41,7 +41,7 @@ public sealed class FluidTests
     // The whole chunk floored: with no hole in slope-search range every direction
     // ties and water spreads evenly, and unloaded neighbors read as walls.
     // A smaller floor has open edges the search correctly prefers (Minecraft getSpread).
-    private static ChunkManager FullFloorBasin(out byte water)
+    private static ChunkManager FullFloorBasin(out ushort water)
     {
         TestContent.EnsureLoaded();
         var manager = new ChunkManager(null!);
@@ -176,7 +176,7 @@ public sealed class FluidTests
     private static ChunkSnapshot EnclosedPouredSource()
     {
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         const int x = Chunk.SizeMask;
         blocks[Chunk.Idx(x, PouredY, PouredZ)] = ContentRegistry.RequireBlock("water").Id;
         blocks[Chunk.Idx(x, PouredY - 1, PouredZ)] = stone;
@@ -191,7 +191,7 @@ public sealed class FluidTests
     /// two in the given order and waking either after each load or once after both, then ticks.
     /// Returns what stands in the cell across the border from the source, and its state.
     /// </summary>
-    private static (byte Id, byte State) PouredWaterAcrossBorder(bool restoredFirst, bool wakeAfterEachLoad)
+    private static (ushort Id, byte State) PouredWaterAcrossBorder(bool restoredFirst, bool wakeAfterEachLoad)
     {
         var world = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         var store = new ChunkSaveStore(world);
@@ -238,7 +238,7 @@ public sealed class FluidTests
         }
     }
 
-    private static void AssertFlowingWater((byte Id, byte State) cell)
+    private static void AssertFlowingWater((ushort Id, byte State) cell)
     {
         Assert.Equal(ContentRegistry.RequireBlock("water").Id, cell.Id);
         Assert.False(FluidState.IsSource(cell.State));
@@ -303,7 +303,7 @@ public sealed class FluidTests
     /// and opens the cell across the border into air, walled in on every other side so nothing but
     /// that source can fill it. Wakes, ticks, and returns what the opened cell holds.
     /// </summary>
-    private static (byte Id, byte State) SourceAcrossBorder(int cx, int cz, int z, int worldY)
+    private static (ushort Id, byte State) SourceAcrossBorder(int cx, int cz, int z, int worldY)
     {
         var manager = new ChunkManager(null!);
         var cy = worldY >> Chunk.SizeShift;

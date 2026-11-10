@@ -310,7 +310,7 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
     /// <paramref name="y"/>, <paramref name="z"/>), or null for any other block or a cell outside every tracked tower.
     /// Reads mirrors too. A door is named by the floor whose band holds it (a door sits on its own floor's stair).
     /// </summary>
-    public string? Detail(byte blockId, int x, int y, int z)
+    public string? Detail(ushort blockId, int x, int y, int z)
     {
         if (blockId != TowerPalette.PileBlock && blockId != TowerPalette.DoorBlock && blockId != TowerPalette.AltarBlock)
             return null;

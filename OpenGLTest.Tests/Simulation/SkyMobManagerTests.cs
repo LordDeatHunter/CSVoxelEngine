@@ -44,7 +44,7 @@ public sealed class SkyMobManagerTests
             for (var x = 0; x < Chunk.Size; x++)
             for (var y = 0; y < Chunk.Size; y++)
             for (var z = 0; z < Chunk.Size; z++)
-                chunk.SetBlockRaw(x, y, z, cy * Chunk.Size + y <= floor ? stone : (byte)0, 0);
+                chunk.SetBlockRaw(x, y, z, cy * Chunk.Size + y <= floor ? stone : BlockType.Air, 0);
             chunks.Chunks[pos] = chunk;
         }
         return chunks;

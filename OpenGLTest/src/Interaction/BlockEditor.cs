@@ -47,7 +47,7 @@ internal sealed class BlockEditor
 
     private bool IsPlaying => _world.IsPlaying;
     private Camera Camera => _world.Camera;
-    private Action<int, int, int, byte, byte>? BlockEdited => _world.BlockEdited;
+    private Action<int, int, int, ushort, byte>? BlockEdited => _world.BlockEdited;
 
     internal BlockEditor(World world, ChunkManager chunkManager, BlockDebrisSystem debris, DropManager dropManager,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
@@ -95,7 +95,7 @@ internal sealed class BlockEditor
     /// <summary>
     /// Block id at a world position; 0 (air) for unloaded chunks.
     /// </summary>
-    internal byte BlockIdAt(Vector3 blockPos)
+    internal ushort BlockIdAt(Vector3 blockPos)
     {
         // blockPos components are floored floats, so the int casts are exact
         return _chunkManager.GetBlockGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
@@ -255,7 +255,7 @@ internal sealed class BlockEditor
     /// The tree tips away from <paramref name="feller"/>, the eye of whoever cut it, and anything
     /// the felled cells held up (a torch on the trunk) pops for <paramref name="player"/>.
     /// </summary>
-    private void FellWood(Vector3 blockPos, byte brokenId, byte brokenState, Chunk chunk, bool creative,
+    private void FellWood(Vector3 blockPos, ushort brokenId, byte brokenState, Chunk chunk, bool creative,
         Vector3 feller, PlayerContext player)
     {
         var x = (int)blockPos.X;
@@ -379,7 +379,7 @@ internal sealed class BlockEditor
     /// the clicked face, since a revert leaves the interior empty. Returns whether a volume was
     /// converted.
     /// </summary>
-    internal bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, byte sourceId, byte anchorId,
+    internal bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, ushort sourceId, ushort anchorId,
         Vector3 viewDirection)
     {
         if (BlockType.ById[anchorId] is not { } anchorType) return false;
@@ -440,7 +440,7 @@ internal sealed class BlockEditor
     /// <paramref name="dropsLoot"/> (not for a creative break, and never on a client, whose break
     /// is a prediction). An orphaned cell (its anchor already blasted away) just pops on its own.
     /// </summary>
-    private void RevertMultiblock(Vector3 blockPos, byte brokenId, Chunk chunk, bool dropsLoot)
+    private void RevertMultiblock(Vector3 blockPos, ushort brokenId, Chunk chunk, bool dropsLoot)
     {
         if (!Multiblock.TryResolveAnchor(_chunkManager, (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z,
                 out var anchor, out _, out var anchorType) || anchorType == null)
@@ -482,7 +482,7 @@ internal sealed class BlockEditor
     /// schedules, the far LOD, the blocks it held up, a falls block above it, the client's
     /// prediction report) without dropping anything of its own.
     /// </summary>
-    private void RemoveTallBlock(Vector3 blockPos, byte brokenId, Vector3 partnerCell, byte partnerId, Chunk chunk,
+    private void RemoveTallBlock(Vector3 blockPos, ushort brokenId, Vector3 partnerCell, ushort partnerId, Chunk chunk,
         bool dropsLoot, PlayerContext player)
     {
         if (!chunk.RemoveBlockAt(blockPos, _chunkManager)) return;

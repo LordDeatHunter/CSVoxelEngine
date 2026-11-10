@@ -17,13 +17,13 @@ public static class ItemFactory
 {
     /// <summary>Parsed <c>assets/data/items/&lt;name&gt;.json</c>: everything a subclass needs.</summary>
     public sealed record ItemSpec(
-        byte Id,
+        ushort Id,
         string Name,
         string TexturePath,
         ItemUseAction Action,
-        byte ResultId,
-        byte FluidId,
-        byte BlockId,
+        ushort ResultId,
+        ushort FluidId,
+        ushort BlockId,
         float Chance,
         int Durability,
         float UseDelay,
@@ -51,7 +51,7 @@ public static class ItemFactory
         string? EntityName = null,
         Rgba? TrailColor = null,
         bool ThrowAligned = false,
-        byte ThrowBlockId = 0,
+        ushort ThrowBlockId = 0,
         UsePose UsePose = UsePose.Raise,
         int StaffSlots = 0,
         int StaffTier = 0,

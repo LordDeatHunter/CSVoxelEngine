@@ -156,10 +156,10 @@ internal sealed class WorldItemUse : IItemUseWorld
     bool IItemUseWorld.RaycastSolid(float maxDistance, out Vector3 hit, out Vector3 normal) =>
         ActiveContext.Raycast(maxDistance, _chunkManager, out hit, out normal);
 
-    bool IItemUseWorld.TryGetCell(int x, int y, int z, out byte id, out byte state) =>
+    bool IItemUseWorld.TryGetCell(int x, int y, int z, out ushort id, out byte state) =>
         _chunkManager.TryGetCell(x, y, z, out id, out state);
 
-    byte IItemUseWorld.GetBlockAt(Vector3 pos) => Edits.BlockIdAt(pos);
+    ushort IItemUseWorld.GetBlockAt(Vector3 pos) => Edits.BlockIdAt(pos);
 
     bool IItemUseWorld.ScoopFluidCell(Vector3 pos)
     {
@@ -172,7 +172,7 @@ internal sealed class WorldItemUse : IItemUseWorld
         return true;
     }
 
-    bool IItemUseWorld.PourFluidCell(Vector3 pos, byte fluidId)
+    bool IItemUseWorld.PourFluidCell(Vector3 pos, ushort fluidId)
     {
         var changed = _fluidManager.SetCellImmediate(pos, fluidId, FluidState.Source, _chunkManager);
         // Scheduled for uniformity with every other edit path; a flow itself never overwrites a
@@ -183,7 +183,7 @@ internal sealed class WorldItemUse : IItemUseWorld
         return true;
     }
 
-    bool IItemUseWorld.PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state,
+    bool IItemUseWorld.PlaceBlockAtFace(Vector3 hit, Vector3 normal, ushort blockId, byte state,
         out Vector3 placedCell) =>
         Placer.PlaceBlockAtFace(hit, normal, blockId, state, ActiveContext.ViewDirection, out placedCell);
 
@@ -195,7 +195,7 @@ internal sealed class WorldItemUse : IItemUseWorld
             (int)pos.X, (int)pos.Y, (int)pos.Z);
     }
 
-    int IItemUseWorld.PileCountFor(byte blockId, int x, int y, int z, byte state)
+    int IItemUseWorld.PileCountFor(ushort blockId, int x, int y, int z, byte state)
     {
         var pile = BlockType.ById[blockId];
         if (pile == null)
@@ -216,13 +216,13 @@ internal sealed class WorldItemUse : IItemUseWorld
         return changed;
     }
 
-    int IItemUseWorld.PileSecondaryFor(byte blockId, int x, int y, int z, byte state)
+    int IItemUseWorld.PileSecondaryFor(ushort blockId, int x, int y, int z, byte state)
     {
         var pile = BlockType.ById[blockId];
         return pile?.Renderer != BlockRenderer.Pebbles ? 0 : PebbleGenerator.ObsidianCountWithState(x, z, state, pile.StackMax);
     }
 
-    bool IItemUseWorld.SetPileComposition(Vector3 pos, byte blockId, int total, int secondary)
+    bool IItemUseWorld.SetPileComposition(Vector3 pos, ushort blockId, int total, int secondary)
     {
         var chunk = _chunkManager.ChunkAt((int)pos.X, (int)pos.Y, (int)pos.Z);
         if (chunk == null)
@@ -238,7 +238,7 @@ internal sealed class WorldItemUse : IItemUseWorld
     void IItemUseWorld.UnmarkPlayerPlaced(int x, int y, int z) =>
         _chunkManager.UnmarkPlayerPlaced(x, y, z);
 
-    void IItemUseWorld.SpawnLoot(byte blockId, Vector3 pos) =>
+    void IItemUseWorld.SpawnLoot(ushort blockId, Vector3 pos) =>
         _dropManager.SpawnLoot(blockId, pos);
 
     bool IItemUseWorld.IsCampfireLit(int x, int y, int z) => _campfires.IsLit(x, y, z);
@@ -253,10 +253,10 @@ internal sealed class WorldItemUse : IItemUseWorld
         Interactions.TryTrackKilnAt(x, y, z, out var anchor) && _kilns.Ignite(anchor)
         || Interactions.TryTrackBloomeryAt(x, y, z, out var bloomery) && _world.Smithing.Bloomeries.Ignite(bloomery);
 
-    bool IItemUseWorld.TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, byte sourceId, byte anchorId) =>
+    bool IItemUseWorld.TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, ushort sourceId, ushort anchorId) =>
         Edits.TryConvertMultiblock(hitCell, hitNormal, sourceId, anchorId, ActiveContext.ViewDirection);
 
-    bool IItemUseWorld.IsPrimedTntBlock(byte id) =>
+    bool IItemUseWorld.IsPrimedTntBlock(ushort id) =>
         BlockType.ById[id]?.OnBreak == BlockBreakAction.PrimeTnt;
 
     bool IItemUseWorld.IsCellSubmerged(int x, int y, int z) =>
@@ -272,7 +272,7 @@ internal sealed class WorldItemUse : IItemUseWorld
         return true;
     }
 
-    void IItemUseWorld.SpawnPrimedTnt(Vector3 cell, byte blockId)
+    void IItemUseWorld.SpawnPrimedTnt(Vector3 cell, ushort blockId)
     {
         // A client simulates no TNT: the removed cell was forwarded, and anything the server
         // makes of it arrives in its broadcast. A local fuse would blow a crater only this
@@ -389,7 +389,7 @@ internal sealed class WorldItemUse : IItemUseWorld
 
     // A tool that ran out of durability shatters: chips of its sprite's color burst off the hand
     // and its hotbar slot flashes (cosmetic: a server draws nothing)
-    private void ToolBroke(byte itemId, int slot)
+    private void ToolBroke(ushort itemId, int slot)
     {
         if (_serverMode) return;
         if (slot >= 0) _hotbarPops.Flash(slot);

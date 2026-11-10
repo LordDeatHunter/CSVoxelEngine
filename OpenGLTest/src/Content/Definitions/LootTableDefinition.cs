@@ -7,7 +7,7 @@ namespace VoxelEngine.Content.Definitions;
 /// <summary>
 /// JSON shape of <c>assets/data/loot/&lt;name&gt;.json</c>: a simplified Minecraft loot table.
 /// Compiled into a <see cref="LootTable"/> by <see cref="ContentRegistry"/>, which resolves
-/// every entry's item name to a byte id up front so a roll never touches a string.
+/// every entry's item name to an id up front so a roll never touches a string.
 /// </summary>
 public sealed class LootTableDefinition
 {

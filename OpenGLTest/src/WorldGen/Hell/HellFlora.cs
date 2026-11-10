@@ -26,13 +26,13 @@ internal static class HellFlora
     private const ulong PlantSalt = 0x504C4E54UL;
 
     /// <summary>The hanging vine block.</summary>
-    internal static readonly byte VineBlock;
+    internal static readonly ushort VineBlock;
 
     static HellFlora() => VineBlock = ContentRegistry.RequireBlock("hell_vine").Id;
 
     /// <summary>What air cell (x, y, z) (open cavern above its layer's lava level) holds: a vine, a
     /// ground plant, or air.</summary>
-    internal static byte AirCell<TField>(ref TField field, int x, int y, int z)
+    internal static ushort AirCell<TField>(ref TField field, int x, int y, int z)
         where TField : IHellField, allows ref struct
     {
         // The first closed cell over the air cell within a vine's reach, if any. Every cell between

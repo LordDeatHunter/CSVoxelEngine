@@ -17,15 +17,15 @@ public sealed class ChunkNetCodecTests
     [Fact]
     public void BlocksAndStateRoundTripExactly()
     {
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         var state = new byte[Chunk.BlockCount];
         for (var i = 0; i < blocks.Length; i++)
         {
-            blocks[i] = (byte)(i % 7);
+            blocks[i] = (ushort)(i % 7);
             state[i] = (byte)(i % 5);
         }
 
-        var decoded = ChunkNetCodec.Decode(ChunkNetCodec.Encode(new ChunkSnapshot(blocks, state, null)));
+        var decoded = ChunkNetCodec.Decode(ChunkNetCodec.Encode(new ChunkSnapshot(blocks, state, playerPlaced: null)));
 
         Assert.Equal(blocks, decoded.Blocks);
         Assert.Equal(state, decoded.State);
@@ -35,13 +35,39 @@ public sealed class ChunkNetCodecTests
     [Fact]
     public void AStatelessChunkRoundTripsWithNullState()
     {
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         blocks[123] = 5;
 
-        var decoded = ChunkNetCodec.Decode(ChunkNetCodec.Encode(new ChunkSnapshot(blocks, null, null)));
+        var decoded = ChunkNetCodec.Decode(ChunkNetCodec.Encode(new ChunkSnapshot(blocks, null, playerPlaced: null)));
 
         Assert.Equal(blocks, decoded.Blocks);
         Assert.Null(decoded.State);
+    }
+
+    /// <summary>Ids spread over the whole id range, from air to the largest id, survive the wire
+    /// exactly, with and without a state array beside them.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IdsAcrossTheWholeRangeRoundTrip(bool withState)
+    {
+        var blocks = new ushort[Chunk.BlockCount];
+        for (var i = 0; i < blocks.Length; i++)
+            blocks[i] = (ushort)((long)i * ushort.MaxValue / (blocks.Length - 1));
+        Assert.Equal(BlockType.Air, blocks[0]);
+        Assert.Equal(ushort.MaxValue, blocks[^1]);
+
+        byte[]? state = null;
+        if (withState)
+        {
+            state = new byte[Chunk.BlockCount];
+            new Random(41).NextBytes(state);
+        }
+
+        var decoded = ChunkNetCodec.Decode(ChunkNetCodec.Encode(new ChunkSnapshot(blocks, state, playerPlaced: null)));
+
+        Assert.Equal(blocks, decoded.Blocks);
+        Assert.Equal(state, decoded.State);
     }
 
     [Fact]

@@ -25,25 +25,25 @@ public sealed class ArmorLook : IEquatable<ArmorLook>
         ["ForearmL", "ForearmR"],
     ];
 
-    private static readonly ConcurrentDictionary<byte, (byte R, byte G, byte B)> Colors = new();
+    private static readonly ConcurrentDictionary<ushort, (byte R, byte G, byte B)> Colors = new();
 
-    private readonly byte[] _pieces;
+    private readonly ushort[] _pieces;
 
-    private ArmorLook(byte[] pieces) => _pieces = pieces;
+    private ArmorLook(ushort[] pieces) => _pieces = pieces;
 
     /// <summary>Wearing nothing visible.</summary>
-    public static readonly ArmorLook None = new(new byte[GearConfig.ArmorSlotCount]);
+    public static readonly ArmorLook None = new(new ushort[GearConfig.ArmorSlotCount]);
 
     /// <summary>Whether no piece shows.</summary>
     public bool IsNone => Array.TrueForAll(_pieces, p => p == 0);
 
     /// <summary>The item id drawn in armor slot <paramref name="slot"/> or 0 for none.</summary>
-    public byte PieceAt(int slot) => (uint)slot < _pieces.Length ? _pieces[slot] : (byte)0;
+    public ushort PieceAt(int slot) => (uint)slot < _pieces.Length ? _pieces[slot] : (ushort)0;
 
     /// <summary>The look of what <paramref name="equipment"/> wears: its visible armor pieces.</summary>
     public static ArmorLook From(Equipment equipment)
     {
-        var pieces = new byte[GearConfig.ArmorSlotCount];
+        var pieces = new ushort[GearConfig.ArmorSlotCount];
         for (var slot = 0; slot < pieces.Length; slot++)
             if (equipment.StackAt(slot) is { } stack && ItemRegistry.TryGet(stack.DefinitionId) is GearItem { Info.Visible: true })
                 pieces[slot] = stack.DefinitionId;
@@ -52,28 +52,28 @@ public sealed class ArmorLook : IEquatable<ArmorLook>
 
     /// <summary>The look of the given piece ids (one per armor slot); an id that is not visible armor of its slot is dropped,
     /// so a peer can never make a body wear something it cannot.</summary>
-    public static ArmorLook FromWire(ReadOnlySpan<byte> ids)
+    public static ArmorLook FromWire(ReadOnlySpan<ushort> ids)
     {
-        var pieces = new byte[GearConfig.ArmorSlotCount];
+        var pieces = new ushort[GearConfig.ArmorSlotCount];
         for (var slot = 0; slot < pieces.Length && slot < ids.Length; slot++)
             if (ItemRegistry.TryGet(ids[slot]) is GearItem { Info.Visible: true } gear && (int)gear.Info.Slot == slot)
                 pieces[slot] = ids[slot];
         return Of(pieces);
     }
 
-    private static ArmorLook Of(byte[] pieces) => Array.TrueForAll(pieces, p => p == 0) ? None : new ArmorLook(pieces);
+    private static ArmorLook Of(ushort[] pieces) => Array.TrueForAll(pieces, p => p == 0) ? None : new ArmorLook(pieces);
 
     /// <summary>Copies the piece ids, one per armor slot, for the wire.</summary>
-    public void CopyTo(Span<byte> destination) => _pieces.AsSpan().CopyTo(destination);
+    public void CopyTo(Span<ushort> destination) => _pieces.AsSpan().CopyTo(destination);
 
     /// <summary>The body parts armor slot <paramref name="slot"/> covers.</summary>
     public static string[] PartsOf(int slot) => Covered[slot];
 
     /// <summary>The color item <paramref name="itemId"/> is drawn in: the mean of its opaque sprite pixels, darkened by half, since entity light brightens a vertex color, so
     /// armor reads as material rather than as a glow. Gray when the sprite cannot be read.</summary>
-    public static (byte R, byte G, byte B) ColorOf(byte itemId) => Colors.GetOrAdd(itemId, Average);
+    public static (byte R, byte G, byte B) ColorOf(ushort itemId) => Colors.GetOrAdd(itemId, Average);
 
-    private static (byte, byte, byte) Average(byte itemId)
+    private static (byte, byte, byte) Average(ushort itemId)
     {
         try
         {

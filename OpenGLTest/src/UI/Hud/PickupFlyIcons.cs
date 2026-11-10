@@ -16,7 +16,7 @@ public sealed class PickupFlyIcons
     /// <summary>One icon in flight.</summary>
     public struct Icon
     {
-        public byte Id;
+        public ushort Id;
         public Vector3 WorldPosition;
         public int Slot;
         public float Elapsed;
@@ -34,7 +34,7 @@ public sealed class PickupFlyIcons
     public static float Progress(Icon icon) => MathUtils.Clamp01(icon.Elapsed / HudConfig.PickupFlySeconds);
 
     /// <summary>Starts an icon of <paramref name="id"/> flying from <paramref name="worldPosition"/> to hotbar <paramref name="slot"/>.</summary>
-    public void Spawn(byte id, Vector3 worldPosition, int slot)
+    public void Spawn(ushort id, Vector3 worldPosition, int slot)
     {
         var index = Count;
         if (Count == Capacity)

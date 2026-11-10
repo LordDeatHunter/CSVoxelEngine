@@ -216,7 +216,7 @@ internal sealed class InventoryPanelRenderer
     /// A row being dragged (<see cref="RowDrag"/>): its item rides the pointer over everything drawn so far, the
     /// rows, the cards and the hotbar it is aimed at.
     /// </summary>
-    internal void DrawDraggedRow(byte id, Vector2 pointer, float headingDegrees, float timeSeconds)
+    internal void DrawDraggedRow(ushort id, Vector2 pointer, float headingDegrees, float timeSeconds)
     {
         _ui.ClearDepthForOverlay();
         _ui.DrawIdIcon(pointer, RowIcon * 1.4f, id, headingDegrees, timeSeconds);
@@ -273,10 +273,10 @@ internal sealed class InventoryPanelRenderer
     }
 
     // The rarity a row shows: a tool or gear row's own rolled stack, else its item's.
-    private static Rarity RowRarity(Inventory inventory, byte id, int toolInstance) =>
+    private static Rarity RowRarity(Inventory inventory, ushort id, int toolInstance) =>
         Rarities.Of(id, toolInstance != 0 ? inventory.GetToolStack(toolInstance) : null);
 
-    private void DrawEntryRow(int row, float offset, byte id, string name, string count, bool selected,
+    private void DrawEntryRow(int row, float offset, ushort id, string name, string count, bool selected,
         bool dim, float headingDegrees, float timeSeconds, Rarity rarity, Rgba? accent = null, float? durability = null,
         float countInset = 0f, int hotbarSlot = -1)
     {
@@ -338,7 +338,7 @@ internal sealed class InventoryPanelRenderer
             hotbarSlot: mark.HotbarSlot);
     }
 
-    private void DrawCatalogRow(int row, float offset, int rowCount, Inventory inventory, byte id, string name, int count,
+    private void DrawCatalogRow(int row, float offset, int rowCount, Inventory inventory, ushort id, string name, int count,
         bool selected, float headingDegrees, float timeSeconds)
     {
         var mark = EquippedMark.Of(inventory, id, 0);
@@ -394,7 +394,7 @@ internal sealed class InventoryPanelRenderer
             return;
         }
 
-        byte id = 0;
+        ushort id = 0;
         string name = "";
         string stock = "";
         if (view.Tab == InventoryCategory.Tools)

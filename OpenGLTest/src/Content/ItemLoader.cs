@@ -18,7 +18,7 @@ internal static class ItemLoader
 {
     internal static void LoadItems(List<(string Name, string Path)> files)
     {
-        var types = new Dictionary<byte, Item>();
+        var types = new Dictionary<ushort, Item>();
         foreach (var (name, path) in files)
         {
             var definition = ContentFiles.ReadJson<ItemDefinition>(path);
@@ -187,7 +187,7 @@ internal static class ItemLoader
                 Shrapnel: shrapnel));
         }
 
-        ItemRegistry.Publish(types, new Dictionary<string, byte>(ContentRegistry.ItemIds, StringComparer.Ordinal));
+        ItemRegistry.Publish(types, new Dictionary<string, ushort>(ContentRegistry.ItemIds, StringComparer.Ordinal));
     }
 
     /// <summary>
@@ -501,7 +501,7 @@ internal static class ItemLoader
 
     // Items are parsed before blocks, so only the id maps exist here; what those ids turn out
     // to be is checked in ValidateItemUses once the runtime tables are filled.
-    private static byte ResolveUseTarget(string? name, string field, string path)
+    private static ushort ResolveUseTarget(string? name, string field, string path)
     {
         if (name == null) return 0;
 

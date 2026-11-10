@@ -57,7 +57,7 @@ public static class WorldIntentCodec
                 break;
             case NetIntentKind.Forge:
                 WriteCell(writer, intent);
-                writer.Write(intent.Recipe);
+                writer.WriteId(intent.Recipe);
                 break;
             default:
                 throw new ArgumentException($"Unknown world intent {intent.Kind}.", nameof(intent));
@@ -135,7 +135,7 @@ public static class WorldIntentCodec
             case NetIntentKind.Forge:
             {
                 var (x, y, z) = ReadCell(reader);
-                return new WorldIntent(kind, eye, direction, x, y, z, HasCell: true, Recipe: reader.ReadByte());
+                return new WorldIntent(kind, eye, direction, x, y, z, HasCell: true, Recipe: reader.ReadId());
             }
             default:
                 throw new InvalidDataException($"unknown world intent {(byte)kind}");

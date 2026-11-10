@@ -13,7 +13,7 @@ public sealed class ArmorLookTests
 {
     public ArmorLookTests() => TestContent.EnsureLoaded();
 
-    private static byte Id(string item) => ContentRegistry.RequireItem(item).Id;
+    private static ushort Id(string item) => ContentRegistry.RequireItem(item).Id;
 
     [Fact]
     public void AWornVisiblePieceShowsInItsSlotAndAnAccessoryNever()
@@ -34,7 +34,7 @@ public sealed class ArmorLookTests
     [Fact]
     public void ThePiecesSurviveTheWireAndAPeerCannotPutAPieceInTheWrongSlot()
     {
-        var wire = new byte[GearConfig.ArmorSlotCount];
+        var wire = new ushort[GearConfig.ArmorSlotCount];
         wire[(int)GearSlot.Feet] = Id("bronze_boots");
         wire[(int)GearSlot.Head] = Id("bronze_boots");
         wire[(int)GearSlot.Chest] = Id("flint");
@@ -44,7 +44,7 @@ public sealed class ArmorLookTests
         Assert.Equal(Id("bronze_boots"), look.PieceAt((int)GearSlot.Feet));
         Assert.Equal(0, look.PieceAt((int)GearSlot.Head));
         Assert.Equal(0, look.PieceAt((int)GearSlot.Chest));
-        var back = new byte[GearConfig.ArmorSlotCount];
+        var back = new ushort[GearConfig.ArmorSlotCount];
         look.CopyTo(back);
         Assert.True(ArmorLook.FromWire(back).Equals(look));
     }
@@ -53,7 +53,7 @@ public sealed class ArmorLookTests
     public void NothingWornIsTheSharedEmptyLook()
     {
         Assert.Same(ArmorLook.None, ArmorLook.From(Inventory.Empty().Equipment));
-        Assert.Same(ArmorLook.None, ArmorLook.FromWire(new byte[GearConfig.ArmorSlotCount]));
+        Assert.Same(ArmorLook.None, ArmorLook.FromWire(new ushort[GearConfig.ArmorSlotCount]));
     }
 
     [Fact]

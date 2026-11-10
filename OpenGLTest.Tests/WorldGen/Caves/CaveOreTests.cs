@@ -28,7 +28,7 @@ public sealed class CaveOreTests
 
     public CaveOreTests() => TestContent.EnsureLoaded();
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
 
     /// <summary>The chunk floors around an ore's highest y: one chunk below, the one holding it, one above.</summary>
     private static IEnumerable<(int X0, int Y0, int Z0)> StraddlingChunks(CaveBiome biome)
@@ -48,9 +48,9 @@ public sealed class CaveOreTests
         return map;
     }
 
-    private static byte[] StampedStone(CaveBiomeMap map, int x0, int y0, int z0)
+    private static ushort[] StampedStone(CaveBiomeMap map, int x0, int y0, int z0)
     {
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         Array.Fill(blocks, Stone);
         CaveOres.Stamp(blocks, map, x0, y0, z0);
         return blocks;
@@ -121,20 +121,20 @@ public sealed class CaveOreTests
     [Fact]
     public void InRealChunksEveryStoneCellBecomesTheOreItsBiomeSays()
     {
-        byte[]? before = null;
-        byte[]? after = null;
+        ushort[]? before = null;
+        ushort[]? after = null;
         Chunk? current = null;
         var timer = new WorldgenStageTimer
         {
             AfterMark = s =>
             {
-                if (s == Stage.Tin) before = (byte[])current!.Blocks.Clone();
-                else if (s == Stage.CaveOres) after = (byte[])current!.Blocks.Clone();
+                if (s == Stage.Tin) before = (ushort[])current!.Blocks.Clone();
+                else if (s == Stage.CaveOres) after = (ushort[])current!.Blocks.Clone();
             },
         };
 
         var stone = Stone;
-        var exclusive = new HashSet<byte>(OreBiomes.Select(CaveOres.OreOf));
+        var exclusive = new HashSet<ushort>(OreBiomes.Select(CaveOres.OreOf));
         var oreCells = 0;
         var lowest = (WorldGenerationConfig.BarrierTopY >> Chunk.SizeShift) + 1;
         var highest = CaveBiomes.SubBandTopY >> Chunk.SizeShift;
@@ -195,7 +195,7 @@ public sealed class CaveOreTests
             Assert.True(type.FaceTiles.All(tile => tile != stoneTile), $"{type.Name} wears stone's tile");
             Assert.True(tiles.Add(type.FaceTiles[0]), $"{type.Name} shares a tile with another cave ore");
 
-            var rolled = new List<byte>();
+            var rolled = new List<ushort>();
             DropManager.RollLoot(type.Id, new LootContext(0, -240, 0), rolled);
             Assert.Equal(new[] { type.Id }, rolled);
         }
@@ -205,7 +205,7 @@ public sealed class CaveOreTests
     public void TheSameSeedGrowsTheSameOres()
     {
         var stamps = OreBiomes.SelectMany(b => StraddlingChunks(b).Take(2).Select(c => (Biome: b, c.X0, c.Y0, c.Z0))).ToArray();
-        byte[][] Stamp() => stamps.Select(s => StampedStone(MapOf(_ => s.Biome), s.X0, s.Y0, s.Z0)).ToArray();
+        ushort[][] Stamp() => stamps.Select(s => StampedStone(MapOf(_ => s.Biome), s.X0, s.Y0, s.Z0)).ToArray();
 
         var first = Stamp();
         try

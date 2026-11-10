@@ -85,7 +85,7 @@ internal sealed class ChunkCellCache
     /// matches <see cref="ChunkManager.TryGetCell"/>: false means the chunk is not loaded, and
     /// an unloaded cell must never read as air.
     /// </summary>
-    internal bool TryGetCell(int x, int y, int z, out byte id, out byte state)
+    internal bool TryGetCell(int x, int y, int z, out ushort id, out byte state)
     {
         if (!TryGetChunk(x, y, z, out var chunk))
         {
@@ -110,7 +110,7 @@ internal sealed class ChunkCellCache
     /// which is right for fluids, leaves and tree wood, all of which pass light and cast no ambient
     /// occlusion. A leaf decay hydration rewrite passes false: the mesher never reads <c>LeafState</c>.
     /// </summary>
-    internal bool Write(int x, int y, int z, byte id, byte state, bool remesh)
+    internal bool Write(int x, int y, int z, ushort id, byte state, bool remesh)
     {
         if (!TryGetChunk(x, y, z, out var chunk)) return false;
 

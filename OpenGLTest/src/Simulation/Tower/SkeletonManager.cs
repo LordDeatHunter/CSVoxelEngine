@@ -33,7 +33,7 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
     private readonly List<TowerFloorRef> _released = [];
     // Each arrow carries its archer's damage, scaled by the archer's tier
     private readonly MobMissiles _arrows = new();
-    private readonly byte _arrowItemId;
+    private readonly ushort _arrowItemId;
 
     /// <summary>
     /// Validates both kinds' content first, so a model missing a part, clip or event fails at startup naming its

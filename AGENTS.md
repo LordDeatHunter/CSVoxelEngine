@@ -79,7 +79,7 @@ Cross-references inside the docs such as `see "Chunk drawing" below` name a sect
 - **Worldgen is a pure, deterministic, thread-safe function of position and seed.** No cross-chunk writes; a `GenerationalCache`
   holds only values that are a pure function of the key (never player edits).
 - **Content is data.** Blocks, items, loot, models, entities, trees, recipes, spell parts and effects are JSON; add a data flag
-  instead of a per-id branch. Ids are bytes with a 255 cap shared by blocks and items: check the budget before adding.
+  instead of a per-id branch. Ids are ushort (up to 65,535) shared by blocks and items; the per-block state byte stays a byte.
 - **The per-block state byte's meaning is owned by the block id**; every write that is not that meaning zeroes it.
 - **Every block-edit path** calls the full hook set (fluid, leaf decay, gravity, LOD, canopy, saves, networking): use the
   `edit-path-checklist` skill when adding or reviewing one.

@@ -22,18 +22,18 @@ namespace VoxelEngine.WorldGen.Sky;
 /// <param name="Tree">The tree species the biome's tree cells root, or null.</param>
 /// <param name="TreeChance">The chance one tree cell roots <paramref name="Tree"/>.</param>
 public sealed record SkyIslandPalette(
-    byte Top,
-    byte Soil,
-    byte Core,
+    ushort Top,
+    ushort Soil,
+    ushort Core,
     int SoilDepth,
-    byte Sparkle,
+    ushort Sparkle,
     int SparkleRate,
-    byte[] Plants,
+    ushort[] Plants,
     int PlantRate,
     int VineRate,
     TreeSpecies? Tree,
     float TreeChance)
 {
     /// <summary>The block at world y of a column whose top cell is <paramref name="top"/>, before any sparkle.</summary>
-    public byte BlockAt(int y, int top) => y == top ? Top : y >= top - SoilDepth ? Soil : Core;
+    public ushort BlockAt(int y, int top) => y == top ? Top : y >= top - SoilDepth ? Soil : Core;
 }

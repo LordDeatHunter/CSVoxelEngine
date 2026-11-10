@@ -234,7 +234,7 @@ spawning**: a ring spawn rolls one to `GoblinPackMaxSize` goblins, the rest land
 underground), equips one while it is dark (drawn at the off hand's `ArmL` anchor through
 `BodyEffect`, its flame point joining `World.FireCells` for light and embers), and drops the carried
 torches on death with the flint; the count is saved (`MobData.Torches`) and sent (the mob
-`NetEntity.ItemId` byte) (`GoblinTorches`, `GoblinTorchTests`). **A notice pip**: a "!" billboard
+`NetEntity.ItemId` field) (`GoblinTorches`, `GoblinTorchTests`). **A notice pip**: a "!" billboard
 pops over a goblin's head the moment it first spots a player (`GoblinNoticePipTests`).
 
 **Goblin camps** (`Simulation/Camps/GoblinCamps.cs`, owned by `MobDirector`, ticked after the goblins on authoritative

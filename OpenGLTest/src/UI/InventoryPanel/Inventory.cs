@@ -45,14 +45,14 @@ public class Inventory
     /// enough that the whole seed still leaves the pool room to add to as blocks are added.</summary>
     public const int StartingStock = 20;
 
-    private readonly Dictionary<byte, int> _blocks = new();
+    private readonly Dictionary<ushort, int> _blocks = new();
     // The ids this player has obtained (the look-at label's "Unknown" rule); filled by Add and
     // saved as names like every other pool
-    private readonly HashSet<byte> _known = [];
+    private readonly HashSet<ushort> _known = [];
     // The spell part keys (<kind>/<name>) this player knows; saved by key in player.json and synced in
     // the inventory snapshot
     private readonly HashSet<string> _knownParts = new(StringComparer.Ordinal);
-    private readonly Dictionary<byte, int> _misc = new();
+    private readonly Dictionary<ushort, int> _misc = new();
 
     // One entry per tool; InstanceId is handed out increasing and never reused, so a
     // hotbar slot can name its instance and dead references are detectable
@@ -71,9 +71,9 @@ public class Inventory
     // The same instances, handed to the static helpers that work on this inventory
     // (InventoryCrafting, InventorySaveCodec); state lives only here
     internal List<ItemStack> Tools => _tools;
-    internal Dictionary<byte, int> Blocks => _blocks;
-    internal Dictionary<byte, int> Misc => _misc;
-    internal HashSet<byte> Known => _known;
+    internal Dictionary<ushort, int> Blocks => _blocks;
+    internal Dictionary<ushort, int> Misc => _misc;
+    internal HashSet<ushort> Known => _known;
     internal HotbarSlot[] Hotbar => _hotbar;
     internal int NextToolInstance { get => _nextToolInstance; set => _nextToolInstance = value; }
 
@@ -81,7 +81,7 @@ public class Inventory
     public int SelectedIndex { get; private set; }
 
     /// <summary>Block or item id in the selected hotbar slot, or 0 when it is empty.</summary>
-    public byte SelectedBlockId => IdAt(SelectedIndex);
+    public ushort SelectedBlockId => IdAt(SelectedIndex);
 
     public int SelectedCount => CountAt(SelectedIndex);
 
@@ -102,7 +102,7 @@ public class Inventory
 
     /// <summary>Pool an id stores into, or null when it is not collectable (air, fluids,
     /// blocks without an item form, unknown ids).</summary>
-    public static InventoryCategory? CategoryOf(byte id)
+    public static InventoryCategory? CategoryOf(ushort id)
     {
         if (id == 0) return null;
         if (BlockType.ById[id] is { } block)
@@ -129,7 +129,7 @@ public class Inventory
     };
 
     /// <summary>Whether a pickup of this id would fit (one unit, or one instance for tools).</summary>
-    public bool CanAccept(byte id)
+    public bool CanAccept(ushort id)
     {
         var category = CategoryOf(id);
         return category.HasValue && UsedOf(category.Value) < CapacityOf(category.Value);
@@ -145,7 +145,7 @@ public class Inventory
     /// clicked in the panel passes <paramref name="autoEquip"/> false, since only a slot click or a
     /// drop puts it on the hotbar.
     /// </summary>
-    public bool Add(byte id, int amount = 1, bool autoEquip = true)
+    public bool Add(ushort id, int amount = 1, bool autoEquip = true)
     {
         var category = CategoryOf(id);
         if (!category.HasValue || amount <= 0) return false;
@@ -184,7 +184,7 @@ public class Inventory
     /// Removes up to <paramref name="count"/> units of a stackable (block or misc) id from its pool and returns how many
     /// went, clearing the hotbar slots that showed it when the last unit goes. 0 for an id with no stackable pool.
     /// </summary>
-    public int Remove(byte id, int count)
+    public int Remove(ushort id, int count)
     {
         var store = StoreOf(id);
         if (store == null || count <= 0) return 0;
@@ -220,7 +220,7 @@ public class Inventory
     /// gear instance carrying its rarity and modifiers and the name they earned. False for a non-gear id or a full
     /// gear pool, in which case nothing is added.
     /// </summary>
-    public bool AddRolledGear(byte id, in RolledGear rolled)
+    public bool AddRolledGear(ushort id, in RolledGear rolled)
     {
         if (ItemRegistry.TryGet(id) is not GearItem gear || !Add(id)) return false;
         var stack = _tools[^1];
@@ -233,7 +233,7 @@ public class Inventory
     /// Morphs a tool instance into another item (a bucket scooped full, a water bucket
     /// poured out). Hotbar slots name the instance, so every slot holding it flips together.
     /// </summary>
-    public bool MorphTool(int instanceId, byte toId)
+    public bool MorphTool(int instanceId, ushort toId)
     {
         var stack = _tools.FirstOrDefault(t => t.InstanceId == instanceId);
         if (stack == null) return false;
@@ -272,7 +272,7 @@ public class Inventory
     /// Removes every unit or instance of an id and empties the hotbar slots that showed it.
     /// The creative catalog's clear button uses this; false when nothing was held.
     /// </summary>
-    public bool RemoveAll(byte id)
+    public bool RemoveAll(ushort id)
     {
         if (CategoryOf(id) is InventoryCategory.Tools or InventoryCategory.Gear)
         {
@@ -329,7 +329,7 @@ public class Inventory
     /// Points a hotbar slot at a stackable id. Clicking the id the slot already shows
     /// clears it (toggle off); anything else overwrites.
     /// </summary>
-    public void EquipStackable(int hotbarIndex, byte id)
+    public void EquipStackable(int hotbarIndex, ushort id)
     {
         var i = Wrap(hotbarIndex);
         _hotbar[i] = _hotbar[i] is { IsTool: false } slot && slot.Id == id && id != 0
@@ -358,7 +358,7 @@ public class Inventory
     public void ClearSlot(int hotbarIndex) => _hotbar[Wrap(hotbarIndex)] = HotbarSlot.Empty;
 
     /// <summary>Id shown in a hotbar slot, or 0 when it is empty or its tool is gone.</summary>
-    public byte IdAt(int index)
+    public ushort IdAt(int index)
     {
         var slot = _hotbar[Wrap(index)];
         if (slot.IsTool)
@@ -399,7 +399,7 @@ public class Inventory
     /// Whether any hotbar slot shows this id — equipped, whether selected or not. Used by
     /// the HUD compass, which is visible while its item sits anywhere on the hotbar.
     /// </summary>
-    public bool ContainsInHotbar(byte id)
+    public bool ContainsInHotbar(ushort id)
     {
         if (id == 0) return false;
         for (var i = 0; i < SlotCount; i++)
@@ -413,7 +413,7 @@ public class Inventory
     /// player needs to own none of it: a block it holds none of is granted one first, so the slot can place it (creative
     /// placing spends nothing).
     /// </summary>
-    public bool PickBlock(byte id, bool creative = false)
+    public bool PickBlock(ushort id, bool creative = false)
     {
         if (id == 0) return false;
         for (var i = 0; i < SlotCount; i++)
@@ -437,7 +437,7 @@ public class Inventory
     }
 
     /// <summary>Pool total for a stackable id, or the live-instance count for a tool id.</summary>
-    public int CountFor(byte id)
+    public int CountFor(ushort id)
     {
         var category = CategoryOf(id);
         return category switch
@@ -467,7 +467,7 @@ public class Inventory
     /// picked member alone must cover its ingredient's share.
     /// </summary>
     public bool CanCraftBatch(CraftingRecipe recipe, int batch,
-        Func<int, CraftingRecipe.Ingredient, byte>? pickMember) => InventoryCrafting.CanCraftBatch(this, recipe, batch, pickMember);
+        Func<int, CraftingRecipe.Ingredient, ushort>? pickMember) => InventoryCrafting.CanCraftBatch(this, recipe, batch, pickMember);
 
     /// <summary>Consumes one craft's ingredients and adds its result. Returns false when
     /// the recipe is not currently craftable, consuming nothing.</summary>
@@ -480,10 +480,10 @@ public class Inventory
     /// the batch is not currently craftable, consuming nothing.
     /// </summary>
     public bool TryCraft(CraftingRecipe recipe, int batch,
-        Func<int, CraftingRecipe.Ingredient, byte>? pickMember) => InventoryCrafting.TryCraft(this, recipe, batch, pickMember);
+        Func<int, CraftingRecipe.Ingredient, ushort>? pickMember) => InventoryCrafting.TryCraft(this, recipe, batch, pickMember);
 
     /// <summary>Display name for a list row or preview heading.</summary>
-    public static string DisplayName(byte id)
+    public static string DisplayName(ushort id)
     {
         if (BlockType.ById[id] != null) return BlockType.ById[id]!.DisplayName;
         if (ItemRegistry.TryGet(id) is { } item) return item.Name;
@@ -521,7 +521,7 @@ public class Inventory
             .ToArray();
 
     /// <summary>Item id a tool instance currently is, or 0 when it is gone.</summary>
-    public byte ToolItemId(int instanceId) =>
+    public ushort ToolItemId(int instanceId) =>
         _tools.FirstOrDefault(t => t.InstanceId == instanceId)?.DefinitionId ?? 0;
 
     /// <summary>Live tool stack for an instance id, or null when it is gone. Used by the item
@@ -583,10 +583,10 @@ public class Inventory
 
     /// <summary>
     /// Whether this player has ever obtained the id — the look-at label's "Unknown" rule (see
-    /// <see cref="LookLabel"/>). Every credited id is marked in <see cref="Add(byte, int)"/>, and a
+    /// <see cref="LookLabel"/>). Every credited id is marked in <see cref="Add(ushort, int, bool)"/>, and a
     /// restored save's obtained names are marked on import.
     /// </summary>
-    public bool Knows(byte id) => _known.Contains(id);
+    public bool Knows(ushort id) => _known.Contains(id);
 
     /// <summary>
     /// Moves whenever the spell parts this inventory knows really change (never for an equal set), so
@@ -648,14 +648,14 @@ public class Inventory
     /// </summary>
     public void Import(PlayerSaveData.InventoryData data) => InventorySaveCodec.Import(this, data);
 
-    internal Dictionary<byte, int>? StoreOf(byte id) => CategoryOf(id) switch
+    internal Dictionary<ushort, int>? StoreOf(ushort id) => CategoryOf(id) switch
     {
         InventoryCategory.Blocks => _blocks,
         InventoryCategory.Misc => _misc,
         _ => null,
     };
 
-    internal void ClearSlotsShowing(byte id)
+    internal void ClearSlotsShowing(ushort id)
     {
         for (var i = 0; i < _hotbar.Length; i++)
             if (_hotbar[i] is { IsTool: false } slot && slot.Id == id)
@@ -674,7 +674,7 @@ public class Inventory
         return -1;
     }
 
-    private void EquipNewStackable(byte id)
+    private void EquipNewStackable(ushort id)
     {
         var slot = FirstEmptySlot();
         if (slot >= 0)
@@ -737,8 +737,8 @@ public class Inventory
     }
 
     /// <summary>One stackable list row: icon, name and the pool count for that id.</summary>
-    public readonly record struct StackRow(byte Id, string Name, int Count);
+    public readonly record struct StackRow(ushort Id, string Name, int Count);
 
     /// <summary>One tool list row: icon, name and the instance it equips.</summary>
-    public readonly record struct ToolRow(int InstanceId, byte ItemId, string Name);
+    public readonly record struct ToolRow(int InstanceId, ushort ItemId, string Name);
 }

@@ -31,7 +31,7 @@ public static class FootstepDust
     /// (<paramref name="surfaceId"/>) is loose ground.
     /// </summary>
     public static bool Kicks(bool sprinting, bool grounded, bool flying, bool sneaking, bool inWater,
-        float horizontalSpeed, byte surfaceId) =>
+        float horizontalSpeed, ushort surfaceId) =>
         BodyKicks(sprinting, grounded, flying, sneaking, inWater, horizontalSpeed)
         && BlockType.KicksFootstepDust(surfaceId);
 

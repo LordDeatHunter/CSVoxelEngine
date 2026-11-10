@@ -20,12 +20,36 @@ internal static class TestContent
         lock (Gate)
         {
             if (_loaded) return;
-            var root = FindAssetsRoot();
-            ContentRegistry.Load(root);
-            TextureAtlas.RegisterTilesWithoutUpload(Path.Combine(root, "textures", "blocks"));
-            ContentRegistry.BakeModels();
+            LoadFrom(FindAssetsRoot());
             _loaded = true;
         }
+    }
+
+    /// <summary>
+    /// Loads the content under another asset root in place of the real one. Only a test in the
+    /// <see cref="ContentRegistrySwapCollection"/> may call it, and it must call
+    /// <see cref="RestoreReal"/> in a <c>finally</c>.
+    /// </summary>
+    internal static void SwapIn(string root)
+    {
+        lock (Gate) LoadFrom(root);
+    }
+
+    /// <summary>Reloads the real content after a <see cref="SwapIn"/>.</summary>
+    internal static void RestoreReal()
+    {
+        lock (Gate)
+        {
+            LoadFrom(FindAssetsRoot());
+            _loaded = true;
+        }
+    }
+
+    private static void LoadFrom(string root)
+    {
+        ContentRegistry.Load(root);
+        TextureAtlas.RegisterTilesWithoutUpload(Path.Combine(root, "textures", "blocks"));
+        ContentRegistry.BakeModels();
     }
 
     /// <summary>

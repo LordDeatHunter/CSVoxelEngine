@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using VoxelEngine.App;
 using VoxelEngine.Audio;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Platform;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering;
@@ -284,7 +285,7 @@ internal sealed class ClientSession
             {
                 var count = reader.ReadInt();
                 remoteScratch.Clear();
-                Span<byte> worn = stackalloc byte[VoxelEngine.Config.GearConfig.ArmorSlotCount];
+                Span<ushort> worn = stackalloc ushort[VoxelEngine.Config.GearConfig.ArmorSlotCount];
                 for (var i = 0; i < count; i++)
                 {
                     var id = reader.ReadInt();
@@ -295,7 +296,7 @@ internal sealed class ClientSession
                     var flags = (NetPlayerFlags)reader.ReadByte();
                     var action = (NetPlayerAction)reader.ReadByte();
                     var actionSeq = reader.ReadByte();
-                    for (var slot = 0; slot < worn.Length; slot++) worn[slot] = reader.ReadByte();
+                    for (var slot = 0; slot < worn.Length; slot++) worn[slot] = BlockTables.RequireAssigned(reader.ReadId());
                     remoteScratch.Add(new RemotePlayerSnapshot(id, name, eye, yaw, pitch, flags, action, actionSeq,
                         VoxelEngine.Player.ArmorLook.FromWire(worn)));
                 }
@@ -439,7 +440,8 @@ internal sealed class ClientSession
         }
     }
 
-    /// <summary>Reads a count-prefixed batch of cell changes into <c>netCellsScratch</c>.</summary>
+    /// <summary>Reads a count-prefixed batch of cell changes into <c>netCellsScratch</c>; an id outside this build's
+    /// content is bad data (<see cref="BlockTables.RequireAssigned"/>).</summary>
     private void ReadCellChanges(PacketReader reader)
     {
         var count = reader.ReadInt();
@@ -448,12 +450,9 @@ internal sealed class ClientSession
         netCellsScratch.Clear();
         for (var i = 0; i < count; i++)
         {
-            var x = reader.ReadInt();
-            var y = reader.ReadInt();
-            var z = reader.ReadInt();
-            var blockId = reader.ReadByte();
-            var state = reader.ReadByte();
-            netCellsScratch.Add(new NetCellChange(x, y, z, blockId, state));
+            var change = NetCellChangeCodec.Read(reader);
+            BlockTables.RequireAssigned(change.Id);
+            netCellsScratch.Add(change);
         }
     }
 
@@ -592,7 +591,7 @@ internal sealed class ClientSession
     }
 
     /// <summary>A cell the world just changed as part of a predicted action (World.BlockEdited).</summary>
-    private void StagePredictedCell(int x, int y, int z, byte blockId, byte state) =>
+    private void StagePredictedCell(int x, int y, int z, ushort blockId, byte state) =>
         prediction.Stage(x, y, z);
 
     /// <summary>

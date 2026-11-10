@@ -61,7 +61,7 @@ internal static class HellTrees
     /// flora, so nothing else is ever overwritten. A tree stays inside its cell's columns and its
     /// layer's pocket, so only the chunk's own cells and layers are read.
     /// </summary>
-    internal static void Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    internal static void Stamp(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         var yTop = Math.Min(worldY0 + Chunk.Size - 1, WorldGenerationConfig.HellTopY);
         if (yTop < worldY0) return;

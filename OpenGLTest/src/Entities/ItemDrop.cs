@@ -60,7 +60,7 @@ public class ItemDrop
     private const float PickupDelaySeconds = 0.4f;
 
     /// <summary>Block or item id this drop collects as (see <see cref="ItemRegistry.IsItem"/>).</summary>
-    public byte BlockId { get; }
+    public ushort BlockId { get; }
     public Vector3 Position { get; private set; }
 
     private Vector3 _velocity;
@@ -83,7 +83,7 @@ public class ItemDrop
     // Collision stays at the shared Size: the item boost is visual only
     private float VisualSize => Size * (ItemRegistry.IsItem(BlockId) ? ItemSizeMultiplier : 1f);
 
-    public ItemDrop(byte blockId, Vector3 position, Vector3? toss = null)
+    public ItemDrop(ushort blockId, Vector3 position, Vector3? toss = null)
     {
         BlockId = blockId;
         Position = position;
@@ -107,7 +107,7 @@ public class ItemDrop
     /// pickup grace period, so a drop saved before it could be collected still waits out the
     /// rest of it.
     /// </summary>
-    internal ItemDrop(byte blockId, Vector3 position, Vector3 velocity, float age)
+    internal ItemDrop(ushort blockId, Vector3 position, Vector3 velocity, float age)
     {
         BlockId = blockId;
         Position = position;

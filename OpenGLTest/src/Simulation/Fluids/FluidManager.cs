@@ -174,7 +174,7 @@ public class FluidManager
     /// cell's chunk is not loaded or the cell holds an unbreakable block, which a bucket never
     /// scoops or pours over.
     /// </summary>
-    public bool SetCellImmediate(Vector3 cell, byte id, byte state, ChunkManager chunks)
+    public bool SetCellImmediate(Vector3 cell, ushort id, byte state, ChunkManager chunks)
     {
         var x = (int)cell.X;
         var y = (int)cell.Y;

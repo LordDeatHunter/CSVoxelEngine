@@ -40,7 +40,7 @@ internal sealed class RightClickAction
     }
 
     private float _useChargeSeconds;
-    private byte _useItemId;
+    private ushort _useItemId;
 
     // The slot the last local cast went out on, which a client's Cast intent names
     private int _castSlot;

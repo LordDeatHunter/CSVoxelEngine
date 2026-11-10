@@ -7,7 +7,7 @@ namespace VoxelEngine.Saves;
 /// querns, kilns and cast molds with their in-progress state. Every field is optional, so an older or
 /// hand-edited file degrades field by field instead of failing the load; a cell travels as
 /// <c>int[3]</c>. Content is referenced by <see cref="SaveNames"/> name (blocks and items) or molten
-/// material file name, never by byte id; whoever restores the data drops an entry whose name no
+/// material file name, never by numeric id; whoever restores the data drops an entry whose name no
 /// longer resolves.
 /// </summary>
 public sealed class StationSaveData

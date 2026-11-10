@@ -51,9 +51,6 @@ public sealed class TowerPlacementTests
         return sites;
     }
 
-    private static int BlockOf(int cell) => cell & 0xFF;
-    private static byte StateOf(int cell) => (byte)(cell >> 8);
-
     [Fact]
     public void ATowerStandsWithinAFewCellsOfTheOrigin()
     {
@@ -145,7 +142,7 @@ public sealed class TowerPlacementTests
         for (var cy = s.MinChunkY; cy <= s.MaxChunkY; cy++)
         for (var cz = s.MinChunkZ; cz <= s.MaxChunkZ; cz++)
         {
-            var blocks = new byte[volume];
+            var blocks = new ushort[volume];
             byte[]? state = null;
             int x0 = cx * Chunk.Size, y0 = cy * Chunk.Size, z0 = cz * Chunk.Size;
             TowerPlacement.Stamp(blocks, ref state, x0, y0, z0);
@@ -167,8 +164,8 @@ public sealed class TowerPlacementTests
                     continue;
                 }
                 chunkWrote++;
-                Assert.Equal(BlockOf(cell), stamped);
-                Assert.Equal(StateOf(cell), stampedState);
+                Assert.Equal(StructureCell.BlockOf(cell), stamped);
+                Assert.Equal(StructureCell.StateOf(cell), stampedState);
                 if (stamped != TowerPalette.ChestBlock) continue;
                 // A chest carries the tier of the floor it stands on, or the roof's treasure tier
                 chests++;
@@ -184,7 +181,7 @@ public sealed class TowerPlacementTests
         Assert.NotNull(seam);
 
         // A seam chunk over junk: unwritten cells keep it, written cells get their exact state, zero included
-        const byte junkId = 1;
+        const ushort junkId = 1;
         const byte junkState = 0x5A;
         var (sx0, sy0, sz0) = seam.Value;
         var junk = Enumerable.Repeat(junkId, volume).ToArray();
@@ -206,8 +203,8 @@ public sealed class TowerPlacementTests
                 continue;
             }
             written++;
-            Assert.Equal(BlockOf(cell), junk[i]);
-            Assert.Equal(StateOf(cell), junkStates![i]);
+            Assert.Equal(StructureCell.BlockOf(cell), junk[i]);
+            Assert.Equal(StructureCell.StateOf(cell), junkStates![i]);
         }
         Assert.True(written > 0 && kept > 0, "the seam chunk should be partly covered");
     }
@@ -250,9 +247,9 @@ public sealed class TowerPlacementTests
                 var cell = TowerGenerator.CellAt(s, x, y, z);
                 if (cell < 0) continue;
                 checkedCells++;
-                if (BlockOf(cell) != 0 && y > columnTop + Chunk.Size) aboveTerrain++;
-                Assert.True(BlockOf(cell) == BlockAt(x, y, z) && StateOf(cell) == StateAt(x, y, z),
-                    $"cell ({x}, {y}, {z}): the point query says {BlockOf(cell)}/{StateOf(cell)}, the fill holds {BlockAt(x, y, z)}/{StateAt(x, y, z)}");
+                if (StructureCell.BlockOf(cell) != 0 && y > columnTop + Chunk.Size) aboveTerrain++;
+                Assert.True(StructureCell.BlockOf(cell) == BlockAt(x, y, z) && StructureCell.StateOf(cell) == StateAt(x, y, z),
+                    $"cell ({x}, {y}, {z}): the point query says {StructureCell.BlockOf(cell)}/{StructureCell.StateOf(cell)}, the fill holds {BlockAt(x, y, z)}/{StateAt(x, y, z)}");
             }
         }
         Assert.True(checkedCells > 0, "the tower wrote no cell");
@@ -347,11 +344,11 @@ public sealed class TowerPlacementTests
             {
                 var cell = TowerGenerator.CellAt(s, x, y, z);
                 if (cell <= 0) continue;
-                var id = (byte)BlockOf(cell);
-                if (!BlockSupport.TryGetSupportCell(id, StateOf(cell), new Vector3(x, y, z), out var holder)) continue;
+                var id = StructureCell.BlockOf(cell);
+                if (!BlockSupport.TryGetSupportCell(id, StructureCell.StateOf(cell), new Vector3(x, y, z), out var holder)) continue;
                 checkedBlocks++;
                 var held = TowerGenerator.CellAt(s, (int)holder.X, (int)holder.Y, (int)holder.Z);
-                Assert.True(held >= 0 && BlockType.IsSolid((byte)BlockOf(held)),
+                Assert.True(held >= 0 && BlockType.IsSolid(StructureCell.BlockOf(held)),
                     $"{BlockType.ById[id].Name} at ({x}, {y}, {z}) has no solid holder");
             }
         }
@@ -365,10 +362,10 @@ public sealed class TowerPlacementTests
         {
             var (x, y, z) = s.AltarCell;
             var altar = TowerGenerator.CellAt(s, x, y, z);
-            Assert.Equal(TowerPalette.AltarBlock, (byte)BlockOf(altar));
+            Assert.Equal(TowerPalette.AltarBlock, StructureCell.BlockOf(altar));
             Assert.True(BlockType.IsUnbreakable(TowerPalette.AltarBlock));
             var roof = TowerGenerator.CellAt(s, x, y - 1, z);
-            Assert.True(roof >= 0 && BlockType.IsUnbreakable((byte)BlockOf(roof)));
+            Assert.True(roof >= 0 && BlockType.IsUnbreakable(StructureCell.BlockOf(roof)));
         }
     }
 
@@ -383,7 +380,7 @@ public sealed class TowerPlacementTests
             Assert.Equal(piles.Count, piles.Distinct().Count());
             foreach (var (x, y, z) in piles)
             {
-                Assert.Equal(TowerPalette.PileBlock, (byte)BlockOf(TowerGenerator.CellAt(s, x, y, z)));
+                Assert.Equal(TowerPalette.PileBlock, StructureCell.BlockOf(TowerGenerator.CellAt(s, x, y, z)));
                 Assert.Equal(s.FloorY(k) + 1, y);
             }
         }
@@ -403,8 +400,8 @@ public sealed class TowerPlacementTests
                 foreach (var (x, y, z) in chests)
                 {
                     var cell = TowerGenerator.CellAt(s, x, y, z);
-                    Assert.Equal(TowerPalette.ChestBlock, (byte)BlockOf(cell));
-                    Assert.Equal(s.Tier(k), ChestProfile.TierOf(StateOf(cell)));
+                    Assert.Equal(TowerPalette.ChestBlock, StructureCell.BlockOf(cell));
+                    Assert.Equal(s.Tier(k), ChestProfile.TierOf(StructureCell.StateOf(cell)));
                     Assert.Equal(s.FloorY(k) + 1, y);
                     Assert.DoesNotContain((x, y, z), piles);
                 }
@@ -415,8 +412,8 @@ public sealed class TowerPlacementTests
             foreach (var (x, y, z) in treasure)
             {
                 var cell = TowerGenerator.CellAt(s, x, y, z);
-                Assert.Equal(TowerPalette.ChestBlock, (byte)BlockOf(cell));
-                Assert.Equal(TowerSite.TreasureTier, ChestProfile.TierOf(StateOf(cell)));
+                Assert.Equal(TowerPalette.ChestBlock, StructureCell.BlockOf(cell));
+                Assert.Equal(TowerSite.TreasureTier, ChestProfile.TierOf(StructureCell.StateOf(cell)));
                 Assert.Equal(s.RoofY + 1, y);
                 Assert.NotEqual(s.AltarCell, (x, y, z));
             }
@@ -444,7 +441,7 @@ public sealed class TowerPlacementTests
             var ruin = TowerRuin.RuinAt(s, x, y, s.CenterZ, out _);
             if (ruin < 0) continue;
             ruinWrites++;
-            Assert.False(BlockType.CoversSkyById[BlockOf(ruin)], $"the ruin writes a covering block at ({x}, {y})");
+            Assert.False(BlockType.CoversSkyById[StructureCell.BlockOf(ruin)], $"the ruin writes a covering block at ({x}, {y})");
         }
         Assert.True(ruinWrites > 0, "the slice crossed no ruin cell");
         Assert.Equal(TowerPalette.DefaultBrick, TowerPalette.For(Biome.Forest).Brick);
@@ -475,7 +472,7 @@ public sealed class TowerPlacementTests
         for (var y = s.BottomY; y <= s.TopY; y++)
         {
             var cell = TowerGenerator.CellAt(s, x, y, s.CenterZ);
-            if (cell < 0 || BlockOf(cell) != field) continue;
+            if (cell < 0 || StructureCell.BlockOf(cell) != field) continue;
             fieldCells++;
             Assert.True(y > s.RoofY, $"a forcefield cell at ({x}, {y}) under the roof");
         }

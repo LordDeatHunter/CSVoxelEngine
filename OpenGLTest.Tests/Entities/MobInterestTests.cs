@@ -27,7 +27,7 @@ public sealed class MobInterestTests
         public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift, string? attacker = null) { }
     }
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
 
     // A stone floor with a wall across x = 8 from y = 1 to the chunk top.
     private static ChunkManager Walled()

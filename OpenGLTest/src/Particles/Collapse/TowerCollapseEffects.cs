@@ -56,7 +56,7 @@ internal sealed class TowerCollapseEffects
     /// does, so another player's edit never shakes anyone. A see-through one (the roof dome's forcefield) has no rubble to
     /// throw and just winks out. The caller still checks that a defeated tower stands there.
     /// </summary>
-    internal static bool ShowsCollapse(byte before, byte after) =>
+    internal static bool ShowsCollapse(ushort before, ushort after) =>
         before != after && BlockType.IsUnbreakable(before) && !BlockType.ById[before].Translucent;
 
     /// <summary>
@@ -66,7 +66,7 @@ internal sealed class TowerCollapseEffects
     /// chips while the chip cap allows, and, when it fell away to air near the wall with the cell outside it open, may throw
     /// a block off the tower.
     /// </summary>
-    internal void OnCellChanged(int x, int y, int z, byte before, byte after)
+    internal void OnCellChanged(int x, int y, int z, ushort before, ushort after)
     {
         if (!ShowsCollapse(before, after)) return;
         if (_towers.RecordAt(x, z) is not { BossDefeated: true } tower) return;
@@ -151,7 +151,7 @@ internal sealed class TowerCollapseEffects
     }
 
     // Throws a block of blockId off the tower from the cell centered at center, away from the tower's middle along outward
-    private void Launch(Vector3 center, byte blockId, Vector2 outward)
+    private void Launch(Vector3 center, ushort blockId, Vector2 outward)
     {
         var side = new Vector2(-outward.Y, outward.X) * ((_random.NextSingle() * 2f - 1f) * JuiceConfig.TowerDebrisSideSpeed);
         var horizontal = outward * Between(JuiceConfig.TowerDebrisOutwardSpeedMin, JuiceConfig.TowerDebrisOutwardSpeedMax) + side;

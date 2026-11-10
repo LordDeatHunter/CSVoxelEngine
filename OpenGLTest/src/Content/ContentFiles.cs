@@ -16,7 +16,7 @@ internal static class ContentFiles
         AllowTrailingCommas = true
     };
 
-    internal static bool TryResolve(string name, out byte id)
+    internal static bool TryResolve(string name, out ushort id)
     {
         if (name.StartsWith("block/", StringComparison.Ordinal))
             return ContentRegistry.BlockIds.TryGetValue(name["block/".Length..], out id);

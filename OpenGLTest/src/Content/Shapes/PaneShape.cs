@@ -11,7 +11,7 @@ namespace VoxelEngine.Content.Shapes;
 /// The one shape rule of a <see cref="BlockRenderer.Pane"/> block (the glass pane, the fence, the
 /// wall), derived from its four horizontal neighbors at mesh time and never stored: a full-height
 /// center post, plus an arm reaching the cell edge toward every neighbor it connects to
-/// (<see cref="ConnectsTo(PaneProfile, byte, byte)"/>: a pane of the same shape, or a solid full
+/// (<see cref="ConnectsTo(PaneProfile, ushort, byte)"/>: a pane of the same shape, or a solid full
 /// cube). A lone pane is just the post, as in Minecraft. How wide the post and arms are and which
 /// height bands an arm fills is the block's <see cref="PaneProfile"/> (its <c>pane</c> JSON; the
 /// glass pane's 2 px post and arms are <see cref="PaneProfile.Default"/>). Directions are the
@@ -35,7 +35,7 @@ public static class PaneShape
 
     /// <summary>The shape of a pane block id: its <see cref="BlockType.PaneProfileById"/> entry,
     /// or the default for anything else.</summary>
-    public static PaneProfile ProfileOf(byte id) => BlockType.PaneProfileById[id] ?? PaneProfile.Default;
+    public static PaneProfile ProfileOf(ushort id) => BlockType.PaneProfileById[id] ?? PaneProfile.Default;
 
     /// <summary>
     /// Whether a pane of shape <paramref name="profile"/> reaches toward a neighbor holding
@@ -44,20 +44,20 @@ public static class PaneShape
     /// or full-thickness tree wood. Air, fluids, sub-cell blocks (a torch, a flower, thin wood) and
     /// panes of another shape (a fence beside a glass pane) get no arm.
     /// </summary>
-    public static bool ConnectsTo(PaneProfile profile, byte id, byte state) =>
+    public static bool ConnectsTo(PaneProfile profile, ushort id, byte state) =>
         BlockType.IsPane(id)
             ? ReferenceEquals(ProfileOf(id), profile)
             : BlockType.IsSolid(id)
               && (BlockType.Occludes(id) || BlockType.IsGreedy(id)
                   || (BlockType.IsTreeWood(id) && WoodState.IsFullCube(state)));
 
-    /// <summary><see cref="ConnectsTo(PaneProfile, byte, byte)"/> for the default shape.</summary>
-    public static bool ConnectsTo(byte id, byte state) => ConnectsTo(PaneProfile.Default, id, state);
+    /// <summary><see cref="ConnectsTo(PaneProfile, ushort, byte)"/> for the default shape.</summary>
+    public static bool ConnectsTo(ushort id, byte state) => ConnectsTo(PaneProfile.Default, id, state);
 
     /// <summary>The arm mask of a pane of shape <paramref name="profile"/> whose horizontal
     /// neighbors, in direction order, hold <paramref name="ids"/> with <paramref name="states"/>
     /// (at least four of each).</summary>
-    public static int ConnectionMask(PaneProfile profile, ReadOnlySpan<byte> ids, ReadOnlySpan<byte> states)
+    public static int ConnectionMask(PaneProfile profile, ReadOnlySpan<ushort> ids, ReadOnlySpan<byte> states)
     {
         var mask = 0;
         for (var dir = 0; dir < Directions; dir++)
@@ -66,9 +66,9 @@ public static class PaneShape
         return mask;
     }
 
-    /// <summary><see cref="ConnectionMask(PaneProfile, ReadOnlySpan{byte}, ReadOnlySpan{byte})"/>
+    /// <summary><see cref="ConnectionMask(PaneProfile, ReadOnlySpan{ushort}, ReadOnlySpan{byte})"/>
     /// for the default shape.</summary>
-    public static int ConnectionMask(ReadOnlySpan<byte> ids, ReadOnlySpan<byte> states) =>
+    public static int ConnectionMask(ReadOnlySpan<ushort> ids, ReadOnlySpan<byte> states) =>
         ConnectionMask(PaneProfile.Default, ids, states);
 
     /// <summary>The arm mask of the pane at world cell (x, y, z), its shape read from the cell

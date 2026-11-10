@@ -28,7 +28,7 @@ public class BlockDebrisSystem
     /// null means worldgen); a column that source does not have yet (a client's streamed column
     /// that has not arrived) leaves them untinted.
     /// </summary>
-    public void Burst(Vector3 cell, byte blockId, int count, Random? random = null, IColumnSource? columns = null)
+    public void Burst(Vector3 cell, ushort blockId, int count, Random? random = null, IColumnSource? columns = null)
     {
         if (count <= 0) return;
         if (blockId == BlockType.Air || BlockType.ById[blockId] == null) return;
@@ -62,7 +62,7 @@ public class BlockDebrisSystem
     /// unknown ids spawn nothing. <paramref name="drift"/> is added to every chip's launch (a
     /// footfall kicks its grit up and back).
     /// </summary>
-    public void Puff(Vector3 origin, Vector3 cell, byte blockId, int count, float speed, float size,
+    public void Puff(Vector3 origin, Vector3 cell, ushort blockId, int count, float speed, float size,
         Random? random = null, IColumnSource? columns = null, Vector3 drift = default)
     {
         if (blockId == BlockType.Air || BlockType.ById[blockId] == null) return;
@@ -76,7 +76,7 @@ public class BlockDebrisSystem
     /// outside the cell's sides at its floor, never inside the solid block, and fly off outward like a
     /// <see cref="Puff"/>, so the landing reads as a skirt of dust. Air and unknown ids spawn nothing.
     /// </summary>
-    public void Skirt(Vector3 cell, byte blockId, int count, float speed, float size, Random? random = null,
+    public void Skirt(Vector3 cell, ushort blockId, int count, float speed, float size, Random? random = null,
         IColumnSource? columns = null)
     {
         if (blockId == BlockType.Air || BlockType.ById[blockId] == null) return;
@@ -124,7 +124,7 @@ public class BlockDebrisSystem
     // heading, flying at 60-100 % of speed sideways and lift..2 lift of it upward, plus a shared
     // drift, launched exactly (no mining pop). A square block's rim is further out toward its corners,
     // so a Skirt pushes each start out to the cell's square edge along its heading.
-    private void Spray(Vector3 origin, byte blockId, DebrisLook look, Vector3 tint, int count, float speed,
+    private void Spray(Vector3 origin, ushort blockId, DebrisLook look, Vector3 tint, int count, float speed,
         float size, float radius, float lift, Random rng, Vector3 drift = default, float innerRadius = 0f)
     {
         if (count <= 0 || speed <= 0f) return;
@@ -151,7 +151,7 @@ public class BlockDebrisSystem
     /// <paramref name="columns"/> (null means worldgen), and anything else, or a column that source
     /// does not have yet (a client's streamed column that has not arrived), is untinted white.
     /// </summary>
-    internal static Vector3 TintAt(Vector3 cell, byte blockId, IColumnSource? columns) =>
+    internal static Vector3 TintAt(Vector3 cell, ushort blockId, IColumnSource? columns) =>
         BlockType.ById[blockId]?.BiomeTint is { } bt
         && BiomeTint.TryCellTint(columns ?? WorldgenColumnSource.Instance, bt.Palette,
             (int)MathF.Floor(cell.X), (int)MathF.Floor(cell.Z), out var cellTint)

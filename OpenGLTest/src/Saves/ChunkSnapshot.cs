@@ -21,7 +21,7 @@ public sealed class ChunkSnapshot
     /// <param name="state">The state bytes in the same order, or null when every cell is 0.</param>
     /// <param name="playerPlaced">Chunk-local <see cref="Chunk.Idx"/> indices of the
     /// player-placed cells, or null (an empty array is stored as null) when there are none.</param>
-    public ChunkSnapshot(byte[] blocks, byte[]? state, ushort[]? playerPlaced)
+    public ChunkSnapshot(ushort[] blocks, byte[]? state, ushort[]? playerPlaced)
     {
         ArgumentNullException.ThrowIfNull(blocks);
         if (blocks.Length != Chunk.BlockCount)
@@ -31,14 +31,14 @@ public sealed class ChunkSnapshot
             throw new ArgumentException(
                 $"A chunk snapshot needs {Chunk.BlockCount} state bytes, got {state.Length}.", nameof(state));
 
-        Blocks = (byte[])blocks.Clone();
+        Blocks = (ushort[])blocks.Clone();
         State = (byte[]?)state?.Clone();
         PlayerPlaced = playerPlaced is { Length: > 0 } ? (ushort[])playerPlaced.Clone() : null;
     }
 
     /// <summary>The block ids, <see cref="Chunk.BlockCount"/> of them in <see cref="Chunk.Idx"/>
     /// order. Read-only by contract.</summary>
-    public byte[] Blocks { get; }
+    public ushort[] Blocks { get; }
 
     /// <summary>The state bytes in the same order, or null when every cell's state is 0.
     /// Read-only by contract.</summary>

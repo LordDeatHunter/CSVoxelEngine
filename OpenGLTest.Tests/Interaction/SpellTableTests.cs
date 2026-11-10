@@ -36,7 +36,7 @@ public sealed class SpellTableTests : IDisposable
         }
     }
 
-    private static byte Table() => BlockType.Types.Values.First(t => t.SpellBuilder).Id;
+    private static ushort Table() => BlockType.Types.Values.First(t => t.SpellBuilder).Id;
 
     // A table two cells north of the player on the plateau; returns its cell
     private Vector3 StandTable(out int x, out int y, out int z)

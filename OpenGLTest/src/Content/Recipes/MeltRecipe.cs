@@ -9,7 +9,7 @@ namespace VoxelEngine.Content.Recipes;
 /// </summary>
 public sealed class MeltRecipe
 {
-    public MeltRecipe(string name, byte inputId, byte materialId, int amountMl)
+    public MeltRecipe(string name, ushort inputId, byte materialId, int amountMl)
     {
         Name = name;
         InputId = inputId;
@@ -21,7 +21,7 @@ public sealed class MeltRecipe
     public string Name { get; }
 
     /// <summary>Block or item id that goes into the crucible, one unit at a time.</summary>
-    public byte InputId { get; }
+    public ushort InputId { get; }
 
     /// <summary>Molten material it melts into (<see cref="MoltenMaterial.Id"/>).</summary>
     public byte MaterialId { get; }

@@ -48,7 +48,7 @@ public sealed class SandwormManagerTests
         return new FlatWorldSource(cxMin, cxMax, -5, 5, Top, Sand, biome, desert ? 0.8f : 0.1f, desert ? 0.1f : 0.8f);
     }
 
-    private static byte Sand => ContentRegistry.RequireBlock("sand").Id;
+    private static ushort Sand => ContentRegistry.RequireBlock("sand").Id;
 
     // A flat sand plateau whose top cell is Top, over 5x5 chunk columns around the origin
     private static ChunkManager Build(IWorldSource source)
@@ -63,7 +63,7 @@ public sealed class SandwormManagerTests
             for (var x = 0; x < Chunk.Size; x++)
             for (var y = 0; y < Chunk.Size; y++)
             for (var z = 0; z < Chunk.Size; z++)
-                chunk.SetBlockRaw(x, y, z, cy * Chunk.Size + y <= Top ? Sand : (byte)0, 0);
+                chunk.SetBlockRaw(x, y, z, cy * Chunk.Size + y <= Top ? Sand : BlockType.Air, 0);
             chunks.Chunks[pos] = chunk;
         }
         return chunks;

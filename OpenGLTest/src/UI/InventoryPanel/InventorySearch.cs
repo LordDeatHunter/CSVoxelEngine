@@ -22,7 +22,7 @@ public enum SearchHitKind
 /// </summary>
 public readonly record struct SearchHit(
     SearchHitKind Kind,
-    byte Id,
+    ushort Id,
     string Name,
     InventoryCategory Category,
     int ToolInstance,
@@ -57,7 +57,7 @@ public static class InventorySearch
         var hits = new List<SearchHit>();
         if (scope != SearchScope.Recipes)
         {
-            var owned = new HashSet<byte>();
+            var owned = new HashSet<ushort>();
             AddInventoryHits(q, inventory, hits, owned);
             if (creative)
                 AddCatalogHits(q, inventory, hits, owned);
@@ -79,7 +79,7 @@ public static class InventorySearch
     }
 
     private static void AddInventoryHits(string query, Inventory inventory, List<SearchHit> hits,
-        HashSet<byte> owned)
+        HashSet<ushort> owned)
     {
         AddStacks(query, inventory, InventoryCategory.Blocks, hits, owned);
         AddStacks(query, inventory, InventoryCategory.Misc, hits, owned);
@@ -87,7 +87,7 @@ public static class InventorySearch
 
         // One row per tool kind, pointing at its first live instance: tools are instances, but
         // a search should offer "Bucket", not one row per duplicate.
-        var seen = new HashSet<byte>();
+        var seen = new HashSet<ushort>();
         foreach (var tool in inventory.ToolEntries())
         {
             if (!seen.Add(tool.ItemId)) continue;
@@ -98,10 +98,10 @@ public static class InventorySearch
         }
     }
 
-    private static void AddGearHits(string query, Inventory inventory, List<SearchHit> hits, HashSet<byte> owned)
+    private static void AddGearHits(string query, Inventory inventory, List<SearchHit> hits, HashSet<ushort> owned)
     {
         // Like tools: one row per gear kind, pointing at its first live instance
-        var seen = new HashSet<byte>();
+        var seen = new HashSet<ushort>();
         foreach (var gear in inventory.GearEntries())
         {
             if (!seen.Add(gear.ItemId)) continue;
@@ -113,7 +113,7 @@ public static class InventorySearch
     }
 
     private static void AddStacks(string query, Inventory inventory, InventoryCategory category,
-        List<SearchHit> hits, HashSet<byte> owned)
+        List<SearchHit> hits, HashSet<ushort> owned)
     {
         foreach (var row in inventory.StackEntries(category))
         {
@@ -124,7 +124,7 @@ public static class InventorySearch
     }
 
     private static void AddCatalogHits(string query, Inventory inventory, List<SearchHit> hits,
-        HashSet<byte> owned)
+        HashSet<ushort> owned)
     {
         foreach (var item in ItemRegistry.All)
         {

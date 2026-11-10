@@ -24,7 +24,7 @@ public static class Rarities
     /// <summary>The rarity an item shows: a stack's own (its roll, else its item's, see
     /// <see cref="GearStatsCalculator.RarityOf"/>), else with no stack the item's base rarity; Common for a block or
     /// an unknown id.</summary>
-    public static Rarity Of(byte id, ItemStack? stack) =>
+    public static Rarity Of(ushort id, ItemStack? stack) =>
         stack != null ? GearStatsCalculator.RarityOf(stack) : ItemRegistry.TryGet(id)?.Rarity ?? Rarity.Common;
 
     /// <summary>The color a rarity's name and slot border are drawn in.</summary>

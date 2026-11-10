@@ -19,7 +19,7 @@ public sealed class SmoothLightTests
 {
     public SmoothLightTests() => TestContent.EnsureLoaded();
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     private static IEnumerable<Vertex[]> Quads(List<Vertex> vertices, List<ushort> indices)
     {
@@ -181,10 +181,10 @@ public sealed class SmoothLightTests
 
     private static Vector3 Decode(Vertex v) => LightTint.Decode(v.BlockTint, BlockLightPalette.Linear);
 
-    private static Vector3 Color(byte id) => BlockLightPalette.Linear[BlockType.LightSlot[id]];
+    private static Vector3 Color(ushort id) => BlockLightPalette.Linear[BlockType.LightSlot[id]];
 
     /// <summary>The colored proof lamp, with the preconditions the tests below lean on.</summary>
-    private static (byte Lamp, byte Blue) Lamps()
+    private static (ushort Lamp, ushort Blue) Lamps()
     {
         var lamp = Block("lamp");
         var blue = Block("blue_lamp");
@@ -276,7 +276,7 @@ public sealed class SmoothLightTests
         // A default and a colored lamp equidistant from column x = 8, then the same with the two
         // swapped: world B is world A mirrored about that column, but the scan that seeds the
         // flood meets the two lamps in the opposite order
-        ChunkMeshData Build(byte left, byte right)
+        ChunkMeshData Build(ushort left, ushort right)
         {
             var (manager, center) = FloorWorld();
             center.SetBlockRaw(5, 3, 8, left, 0);
@@ -321,7 +321,7 @@ public sealed class SmoothLightTests
 
         // A snow layer and a pool beside the lamp under test; a warm lamp across the pool mixes
         // a second color into the far cells, so the emitters resolve real two-slot corners
-        (ChunkManager, Chunk) Build(byte near)
+        (ChunkManager, Chunk) Build(ushort near)
         {
             var (manager, center) = FloorWorld();
             for (var x = 7; x <= 10; x++)

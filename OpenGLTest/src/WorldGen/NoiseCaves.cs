@@ -72,7 +72,7 @@ public static class NoiseCaves
     /// block array (Chunk.Idx layout) and (worldX0, worldY0, worldZ0) its lowest corner.
     /// <paramref name="caves"/> is the chunk's cave biome map, null when every cell is plain.
     /// </summary>
-    public static void Carve(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0,
+    public static void Carve(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0,
         CaveBiomeMap? caves = null)
     {
         var samples = ArrayPool<float>.Shared.Rent(Channels * GridCount);
@@ -117,7 +117,7 @@ public static class NoiseCaves
         }
     }
 
-    private static void CarveBlocks(byte[] blocks, ColumnData column, int worldY0, float[] samples,
+    private static void CarveBlocks(ushort[] blocks, ColumnData column, int worldY0, float[] samples,
         CaveBiomeMap? caves)
     {
         for (var x = 0; x < Chunk.Size; x++)

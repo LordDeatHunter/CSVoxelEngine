@@ -11,7 +11,7 @@ namespace VoxelEngine.UI.InventoryPanel;
 public readonly record struct EquippedMark(int HotbarSlot, bool Worn)
 {
     /// <summary>The mark of the row naming item <paramref name="id"/> and, for a tool or gear row, its instance (else 0).</summary>
-    public static EquippedMark Of(Inventory inventory, byte id, int toolInstance) =>
+    public static EquippedMark Of(Inventory inventory, ushort id, int toolInstance) =>
         new(RowEquip.HotbarSlotOf(inventory, id, toolInstance), RowEquip.IsWorn(inventory, id, toolInstance));
 
     /// <summary>Whether the row's item is on the hotbar or worn.</summary>

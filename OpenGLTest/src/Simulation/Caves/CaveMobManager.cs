@@ -34,7 +34,7 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
     private readonly EntityType? _magmabornType;
     // Each shard carries its shardling's damage, scaled by the shardling's tier
     private readonly MobMissiles _shards = new();
-    private readonly byte _shardItemId;
+    private readonly ushort _shardItemId;
 
     // The ring search around a target: dark, unlit cave floors whose cave biome holds a cave mob kind
     private static readonly CaveSpawnSearch RingSearch = new(

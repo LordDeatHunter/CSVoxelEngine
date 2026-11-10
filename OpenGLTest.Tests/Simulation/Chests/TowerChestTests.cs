@@ -24,7 +24,7 @@ public sealed class TowerChestTests
 {
     public TowerChestTests() => TestContent.EnsureLoaded();
 
-    private static byte Tower => ContentRegistry.RequireBlock("tower_chest").Id;
+    private static ushort Tower => ContentRegistry.RequireBlock("tower_chest").Id;
     private static ChestProfile Profile => BlockType.ById[Tower]!.Chest!;
 
     /// <summary>Every tier a tower stamps: its floors, then the roof's treasure.</summary>

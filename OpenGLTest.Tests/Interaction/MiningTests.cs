@@ -12,7 +12,7 @@ public sealed class MiningTests
 
     private static Item ItemOf(string name) => ContentRegistry.RequireItem(name);
 
-    private static byte BlockOf(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort BlockOf(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
     public void ToolPaceAndPowerComeFromTheItemWithBaselineFallback()

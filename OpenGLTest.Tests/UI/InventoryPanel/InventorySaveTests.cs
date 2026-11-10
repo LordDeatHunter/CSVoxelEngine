@@ -18,8 +18,8 @@ public sealed class InventorySaveTests
 {
     public InventorySaveTests() => TestContent.EnsureLoaded();
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
-    private static byte Dirt => ContentRegistry.RequireBlock("dirt").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Dirt => ContentRegistry.RequireBlock("dirt").Id;
 
     private static Item ToolItem(System.Func<Item, bool> predicate) =>
         ItemRegistry.All.First(i => Inventory.CategoryOf(i.Id) == InventoryCategory.Tools && predicate(i));
@@ -27,7 +27,7 @@ public sealed class InventorySaveTests
     private static Item MiscItem() =>
         ItemRegistry.All.First(i => Inventory.CategoryOf(i.Id) == InventoryCategory.Misc);
 
-    private static int InstanceOf(Inventory inventory, byte itemId) =>
+    private static int InstanceOf(Inventory inventory, ushort itemId) =>
         inventory.ToolEntries().Last(t => t.ItemId == itemId).InstanceId;
 
     private static string[] SortedKnownParts(Inventory inventory) =>

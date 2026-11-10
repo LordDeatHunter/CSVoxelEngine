@@ -50,15 +50,15 @@ internal sealed class MobPasses : IDisposable
     // The Chunk.CubeFaces index of the -Z face, the side a rig faces
     private const int FrontFace = 0;
     // Armor shells over realm mob parts (a tower skeleton's outfit), built on first use per (kind, part, tint item)
-    private readonly Dictionary<(EntityType Type, int Part, byte Piece), Mesh> _armorShells = [];
+    private readonly Dictionary<(EntityType Type, int Part, ushort Piece), Mesh> _armorShells = [];
     // The flint item: the stone a goblin holds while it still has ammo.
-    private byte _flintId;
-    private byte _torchId;
+    private ushort _flintId;
+    private ushort _torchId;
 
     // Live views of the slime mesh and the goblin rig, for the shadow and mirror passes.
     internal Mesh? SlimeMesh => _slimeMesh;
     internal RigMeshes? GoblinRig => _goblin;
-    internal byte FlintId => _flintId;
+    internal ushort FlintId => _flintId;
 
     private TextureUnits Units => _owner.Units;
 
@@ -328,7 +328,7 @@ internal sealed class MobPasses : IDisposable
 
     // The armor shell over one already drawn part, with its uniforms still set: the part's cuboids grown a little and
     // tinted by the piece's item color over the white texture (the player's own shells, PlayerPasses.DrawPart)
-    private void DrawArmorShell(EntityType type, RigMeshes rig, int part, byte piece)
+    private void DrawArmorShell(EntityType type, RigMeshes rig, int part, ushort piece)
     {
         if (!_armorShells.TryGetValue((type, part, piece), out var shell))
         {

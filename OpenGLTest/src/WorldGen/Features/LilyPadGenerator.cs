@@ -15,7 +15,7 @@ namespace VoxelEngine.WorldGen.Features;
 public static class LilyPadGenerator
 {
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte PadBlock;
+    public static readonly ushort PadBlock;
 
     static LilyPadGenerator() => PadBlock = ContentRegistry.RequireBlock("lily_pad").Id;
 
@@ -31,7 +31,7 @@ public static class LilyPadGenerator
     /// into air only. Runs on a generation worker thread after the water. Every test is pure, so
     /// the order is free: the pad hash waits for a column the cheap level and cell window admit.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

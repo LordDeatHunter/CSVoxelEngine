@@ -38,8 +38,8 @@ public sealed class ItemStack
     /// <summary>The singleton this stack is an instance of; never null past construction.</summary>
     public Item Item { get; private set; }
 
-    /// <summary>Definition id, mirroring <see cref="Item.Id"/> for byte-oriented callers.</summary>
-    public byte DefinitionId => Item.Id;
+    /// <summary>Definition id, mirroring <see cref="Item.Id"/> for callers that hold an id.</summary>
+    public ushort DefinitionId => Item.Id;
 
     /// <summary>Units in this stack. Tool instances stay at 1; pool counts live in
     /// <see cref="Inventory"/>, which hands out one stack view per tool.</summary>
@@ -51,7 +51,7 @@ public sealed class ItemStack
 
     private readonly Dictionary<Type, object> _components = new();
 
-    public ItemStack(int instanceId, byte definitionId)
+    public ItemStack(int instanceId, ushort definitionId)
         : this(instanceId, ItemRegistry.TryGet(definitionId)
             ?? throw new InvalidOperationException(
                 $"No item with id {definitionId} is registered; content must load first."))

@@ -13,7 +13,7 @@ namespace VoxelEngine.WorldGen.Features;
 public static class RuinedPillarGenerator
 {
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte BrickBlock;
+    public static readonly ushort BrickBlock;
 
     static RuinedPillarGenerator() => BrickBlock = ContentRegistry.RequireBlock("stone_bricks").Id;
 
@@ -45,7 +45,7 @@ public static class RuinedPillarGenerator
     /// one, into air only, a level skipped where the gap bit is set, clipped at the chunk's border.
     /// Runs on a generation worker thread after the trees.
     /// </summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0)
     {
         var shift = WorldFeatureConfig.PillarCellShift;
         var minCellX = worldX0 >> shift;
@@ -79,7 +79,7 @@ public static class RuinedPillarGenerator
     /// corresponding <paramref name="gaps"/> bit is set (the bottom cell always stands), into air
     /// only. The test seam for the shape.
     /// </summary>
-    internal static void StampPillar(byte[] blocks, int worldY0, int x, int z, int ground, int height,
+    internal static void StampPillar(ushort[] blocks, int worldY0, int x, int z, int ground, int height,
         uint gaps)
     {
         var lx = x & Chunk.SizeMask;

@@ -29,7 +29,7 @@ public sealed class SlimeManager : IMobPopulation
     private readonly EntityType _type;
     private readonly MobCaps _caps;
     private readonly List<Slime> _slimes = [];
-    private readonly List<byte> _loot = [];
+    private readonly List<ushort> _loot = [];
     // Reused by MergeTouching so a frame with merges allocates nothing once warm
     private readonly HashSet<Slime> _mergeUsed = [];
     private readonly List<(Slime A, Slime B, Vector3 Center, int Size)> _merges = [];

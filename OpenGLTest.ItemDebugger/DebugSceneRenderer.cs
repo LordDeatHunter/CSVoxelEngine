@@ -62,7 +62,7 @@ public sealed class DebugSceneRenderer : IDisposable
     private readonly int[] _locPointColor;
     // Resolved in the ctor body after ContentRegistry.Load: a field initializer would run first,
     // against an empty registry.
-    private readonly byte _flintId;
+    private readonly ushort _flintId;
     // Entity rigs, built the first time the ENTITIES tab shows each one.
     private readonly Dictionary<(string Type, int Variant), EntityPreview> _entityPreviews = new();
 

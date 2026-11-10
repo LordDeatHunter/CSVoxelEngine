@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Structures;
 using VoxelEngine.Lod;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
@@ -50,7 +51,7 @@ public sealed class TowerCollapseCostProbe(ITestOutputHelper output)
             for (var z = 0; z < Chunk.Size; z++)
             {
                 var cell = TowerGenerator.CellAt(site, cx * Chunk.Size + x, cy * Chunk.Size + y, cz * Chunk.Size + z);
-                if (cell > 0) chunk.SetBlockRaw(x, y, z, (byte)cell, (byte)(cell >> 8));
+                if (cell > 0) chunk.SetBlockRaw(x, y, z, StructureCell.BlockOf(cell), StructureCell.StateOf(cell));
             }
             chunk.IsBlockDataReady = true;
             chunks.Chunks[position] = chunk;

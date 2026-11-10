@@ -69,8 +69,8 @@ public sealed class CaveBiomeTests
 
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var others = new[] { TinGenerator.OreBlock, UndergroundPoolGenerator.WaterBlock, GlowMushroomGenerator.MushroomBlock };
-        var input = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
-        var output = new byte[input.Length];
+        var input = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
+        var output = new ushort[input.Length];
         var changed = 0;
         foreach (var (bcx, bcz, bcy, mustChange) in blocks)
         {
@@ -169,7 +169,7 @@ public sealed class CaveBiomeTests
     }
 
     /// <summary>All stone, about a quarter opened to air and a few other blocks, by a hash of the world cell.</summary>
-    private static void FillSynthetic(byte[] blocks, byte stone, byte[] others, int x0, int y0, int z0)
+    private static void FillSynthetic(ushort[] blocks, ushort stone, ushort[] others, int x0, int y0, int z0)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var y = 0; y < Chunk.Size; y++)
@@ -296,7 +296,7 @@ public sealed class CaveBiomeTests
     [Fact]
     public void PaletteBlocksAreSafeHosts()
     {
-        var paletteBlocks = new HashSet<byte>();
+        var paletteBlocks = new HashSet<ushort>();
         foreach (var cave in Enum.GetValues<CaveBiome>())
         {
             if (cave == CaveBiome.Plain) continue;
@@ -341,15 +341,15 @@ public sealed class CaveBiomeTests
         };
 
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        byte[]? before = null;
-        byte[]? after = null;
+        ushort[]? before = null;
+        ushort[]? after = null;
         Chunk? current = null;
         var timer = new WorldgenStageTimer
         {
             AfterMark = s =>
             {
-                if (s == Stage.UndergroundPools) before = (byte[])current!.Blocks.Clone();
-                else if (s == Stage.CaveBiomes) after = (byte[])current!.Blocks.Clone();
+                if (s == Stage.UndergroundPools) before = (ushort[])current!.Blocks.Clone();
+                else if (s == Stage.CaveBiomes) after = (ushort[])current!.Blocks.Clone();
             },
         };
 

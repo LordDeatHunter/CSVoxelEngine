@@ -242,7 +242,7 @@ A grown tree shows in the far LOD at once: after poisoning each written column, 
 scans the loaded column for its highest leaf and records it through `TreeGenerator.SetCanopyAdded`
 (`TreeCanopy.CanopyAdded`: packed top and leaf block per fine column, read before the disturbed
 marker and the generated canopy on every ring, cleared by any later `PoisonCanopy`, saved in
-`lod-edits.bin` format version 2 with the leaf as a block name, reset by `WorldSeed.Apply`; never
+`lod-edits.bin` (format version 3) with the leaf as a block name, reset by `WorldSeed.Apply`; never
 in a `GenerationalCache`). `CanopyAddedTests`, `AGrownCrownGoesBackToTheFarLod`.
 
 Known gap, open: the wide-trunk residue of `M-14` — a wide core cut while its shells stand leaves

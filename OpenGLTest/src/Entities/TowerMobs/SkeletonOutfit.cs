@@ -32,7 +32,7 @@ public readonly record struct SkeletonOutfit
     ];
 
     // The items whose sprite colors tint the shells: the leather piece of each slot, then the copper ingot
-    private static byte[]? _tintItems;
+    private static ushort[]? _tintItems;
 
     private SkeletonOutfit(int code) => Code = code;
 
@@ -96,7 +96,7 @@ public readonly record struct SkeletonOutfit
 
     /// <summary>The item whose sprite color tints the shell over rig part <paramref name="part"/>, or 0 when no piece
     /// covers it.</summary>
-    public byte TintItemOn(string part)
+    public ushort TintItemOn(string part)
     {
         var slot = SlotOf(part);
         var tints = _tintItems ??=

@@ -49,7 +49,7 @@ internal sealed class StationPasses : IDisposable
     /// an item's own sprite texture, or the world atlas - a no-op while that is already bound,
     /// so a run of block results never rebinds. Null when the id has no mesh.
     /// </summary>
-    private Mesh? BindStationMesh(byte id, ref bool atlasBound)
+    private Mesh? BindStationMesh(ushort id, ref bool atlasBound)
     {
         if (ItemRegistry.IsItem(id))
         {
@@ -374,7 +374,7 @@ internal sealed class StationPasses : IDisposable
 
     // A metal stack on an anvil: one face-up piece per unit, each resting on the one below and turned a little against
     // it, so the pile grows with every piece laid on
-    private void DrawAnvilStack(Vector3 cell, byte metalId, int count, Matrix4x4 viewProj, ref bool atlasBound)
+    private void DrawAnvilStack(Vector3 cell, ushort metalId, int count, Matrix4x4 viewProj, ref bool atlasBound)
     {
         if (BindStationMesh(metalId, ref atlasBound) is not { } mesh) return;
 
@@ -393,7 +393,7 @@ internal sealed class StationPasses : IDisposable
     }
 
     // One row of up to `count` flat pieces of item `id`, centered on `center` and spread along `along`
-    private void DrawRow(byte id, int count, Vector3 center, Vector3 along, float yaw, EntityLightSample light,
+    private void DrawRow(ushort id, int count, Vector3 center, Vector3 along, float yaw, EntityLightSample light,
         Matrix4x4 viewProj, ref bool atlasBound)
     {
         if (count <= 0 || id == 0 || BindStationMesh(id, ref atlasBound) is not { } mesh) return;

@@ -35,7 +35,7 @@ public static class MultiblockPlacement
     /// <paramref name="anchor"/> and the facing of the structure's front (an engine face index
     /// 0..3), or false when no candidate is built entirely from <paramref name="sourceId"/>.
     /// </summary>
-    public static bool TryFindVolume(Func<int, int, int, byte> blockAt, byte sourceId, int size,
+    public static bool TryFindVolume(Func<int, int, int, ushort> blockAt, ushort sourceId, int size,
         Vector3 clickedCell, Vector3 hitNormal, Vector3 viewForward, out Vector3 anchor, out int facing)
     {
         anchor = Vector3.Zero;
@@ -81,7 +81,7 @@ public static class MultiblockPlacement
     /// <summary>Whether the candidate volume whose front face starts at the clicked cell moved
     /// by <paramref name="rightOrigin"/> + <paramref name="upOrigin"/> is all source block (or air
     /// inside it); its minimum corner on every axis (whatever the facing) is the anchor.</summary>
-    private static bool TryCandidate(Func<int, int, int, byte> blockAt, byte sourceId, int size,
+    private static bool TryCandidate(Func<int, int, int, ushort> blockAt, ushort sourceId, int size,
         int clickX, int clickY, int clickZ, Vector3 rightOrigin, Vector3 upOrigin,
         Vector3 right, Vector3 up, Vector3 depth, out Vector3 anchor)
     {

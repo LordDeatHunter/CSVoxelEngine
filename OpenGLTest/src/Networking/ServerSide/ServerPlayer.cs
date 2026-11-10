@@ -489,7 +489,7 @@ public sealed class ServerPlayer : IMobTarget
     public bool InventoryChanged { get; set; }
 
     /// <summary>Whether a pickup of an id would fit this player's inventory (a cached method group).</summary>
-    public Func<byte, bool> CanAcceptDrop { get; }
+    public Func<ushort, bool> CanAcceptDrop { get; }
 
     /// <summary>Unit look direction from <see cref="Yaw"/> and <see cref="Pitch"/>.</summary>
     public Vector3 Forward => Vector3Utils.FromYawPitch(Yaw, Pitch);

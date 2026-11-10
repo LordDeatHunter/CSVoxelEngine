@@ -26,13 +26,13 @@ public class DropManager
     internal const float CollectHeightOffset = 0.35f;
 
     private readonly List<ItemDrop> _drops = [];
-    private readonly List<byte> _collected = [];
+    private readonly List<ushort> _collected = [];
     // Parallel to _collected after a multi-collector Update: the index of the collector each went to
     private readonly List<int> _collectedBy = [];
     // Parallel to _collected: where each collected drop was when it was taken
     private readonly List<Vector3> _collectedAt = [];
     // Reused by SpawnLoot so a break does not allocate; main thread only, like the rest
-    private readonly List<byte> _loot = [];
+    private readonly List<ushort> _loot = [];
 
     public IReadOnlyList<ItemDrop> Drops => _drops;
 
@@ -52,7 +52,7 @@ public class DropManager
     /// <summary>
     /// Block ids collected during the most recent <c>Update</c>. Valid until the next one.
     /// </summary>
-    public ReadOnlySpan<byte> Collected => CollectionsMarshal.AsSpan(_collected);
+    public ReadOnlySpan<ushort> Collected => CollectionsMarshal.AsSpan(_collected);
 
     /// <summary>
     /// After the multi-collector <see cref="Update(float, IReadOnlyList{DropCollector}, ChunkManager)"/>:
@@ -68,7 +68,7 @@ public class DropManager
     /// Drops a block or item at the center of the cell it occupied. Air and unknown ids drop
     /// nothing.
     /// </summary>
-    public void Spawn(byte blockId, Vector3 blockPosition)
+    public void Spawn(ushort blockId, Vector3 blockPosition)
     {
         if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return;
 
@@ -79,7 +79,7 @@ public class DropManager
     /// Drops a block or item at an exact world position (no cell-center snap), for throws.
     /// Air and unknown ids drop nothing.
     /// </summary>
-    public void SpawnAt(byte blockId, Vector3 position, Vector3? toss = null)
+    public void SpawnAt(ushort blockId, Vector3 position, Vector3? toss = null)
     {
         if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return;
 
@@ -91,7 +91,7 @@ public class DropManager
     /// False (and nothing added) for an id that is neither a block nor an item, the same guard
     /// as <see cref="SpawnAt"/>.
     /// </summary>
-    public bool SpawnRestored(byte blockId, Vector3 position, Vector3 velocity, float age)
+    public bool SpawnRestored(ushort blockId, Vector3 position, Vector3 velocity, float age)
     {
         if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return false;
 
@@ -106,7 +106,7 @@ public class DropManager
     /// depends on how the block came down. Unknown ids (air, items) roll nothing. Tree wood
     /// rolls the band its thickness (read from <see cref="LootContext.State"/>) falls in.
     /// </summary>
-    public static void RollLoot(byte blockId, LootContext context, List<byte> into)
+    public static void RollLoot(ushort blockId, LootContext context, List<ushort> into)
     {
         var type = BlockType.ById[blockId];
         if (type == null) return;
@@ -136,7 +136,7 @@ public class DropManager
     /// <paramref name="secondary"/> carries the obsidian share of a player-built pebble pile,
     /// <paramref name="state"/> the destroyed cell's state byte (tree wood's thickness band).
     /// </summary>
-    public void SpawnLoot(byte blockId, Vector3 blockPosition, int count = 0, int secondary = 0, byte state = 0)
+    public void SpawnLoot(ushort blockId, Vector3 blockPosition, int count = 0, int secondary = 0, byte state = 0)
     {
         _loot.Clear();
         RollLoot(blockId,
@@ -152,7 +152,7 @@ public class DropManager
     /// player-built pile, else 0 meaning "derive from the world". Callers must read the state
     /// before the block is cleared, and pass 0 straight through for ordinary blocks.
     /// </summary>
-    public static int PileCount(byte blockId, byte state)
+    public static int PileCount(ushort blockId, byte state)
     {
         var max = BlockType.ById[blockId]?.StackMax ?? 0;
         if (BlockType.ById[blockId]?.Renderer == BlockRenderer.Pebbles)
@@ -164,7 +164,7 @@ public class DropManager
     /// Obsidian share for a destroyed pebble pile: the packed count for a player pile, else 0
     /// meaning "derive it from the world hash". Other blocks always read 0.
     /// </summary>
-    public static int PileSecondary(byte blockId, byte state)
+    public static int PileSecondary(ushort blockId, byte state)
     {
         if (BlockType.ById[blockId]?.Renderer != BlockRenderer.Pebbles)
             return 0;
@@ -173,7 +173,7 @@ public class DropManager
     }
 
     /// <summary>
-    /// Whether the last <see cref="Update(float, Vector3, ChunkManager, Func{byte, bool})"/> saw a
+    /// Whether the last <see cref="Update(float, Vector3, ChunkManager, Func{ushort, bool}, float)"/> saw a
     /// drop within pickup range that the pool refused (a full inventory). The HUD's "Inventory
     /// full" warning fires on this turning true and stays silent while it stays true; a drop the
     /// pool has room for again clears it.
@@ -197,7 +197,7 @@ public class DropManager
     /// <paramref name="range"/> (<see cref="PickupRange"/> by default).
     /// </summary>
     public void Update(float deltaTime, Vector3 playerPosition, ChunkManager chunks,
-        Func<byte, bool>? canCollect = null, float range = PickupRange)
+        Func<ushort, bool>? canCollect = null, float range = PickupRange)
     {
         _collected.Clear();
         _collectedBy.Clear();

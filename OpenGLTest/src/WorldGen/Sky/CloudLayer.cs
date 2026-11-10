@@ -59,7 +59,7 @@ internal sealed class CloudLayer(
 
     /// <summary>Writes <paramref name="block"/> into the air cells of the layer in the chunk whose minimum
     /// corner is (worldX0, worldY0, worldZ0).</summary>
-    internal void Stamp(byte[] blocks, byte block, int worldX0, int worldY0, int worldZ0)
+    internal void Stamp(ushort[] blocks, ushort block, int worldX0, int worldY0, int worldZ0)
     {
         var yMin = Math.Max(0, BottomY - worldY0);
         var yMax = Math.Min(Chunk.Size - 1, TopY - worldY0);

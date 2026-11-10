@@ -18,12 +18,13 @@ namespace VoxelEngine.WorldGen.Structures;
 /// </summary>
 public static class TowerGenerator
 {
-    /// <summary>The tower cell at world (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>): -1 when no tower
-    /// writes it, else <c>block | state &lt;&lt; 8</c>, air included.</summary>
-    public static int CellAt(int x, int y, int z) => TowerPlacement.TryFindAt(x, z, out var site) ? CellAt(site, x, y, z) : -1;
+    /// <summary>The tower cell at world (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>):
+    /// <see cref="StructureCell.None"/> when no tower writes it, else a packed <see cref="StructureCell"/>, air included.</summary>
+    public static int CellAt(int x, int y, int z) =>
+        TowerPlacement.TryFindAt(x, z, out var site) ? CellAt(site, x, y, z) : StructureCell.None;
 
     /// <summary>The cell <paramref name="site"/> writes at world (<paramref name="x"/>, <paramref name="y"/>,
-    /// <paramref name="z"/>): -1 or <c>block | state &lt;&lt; 8</c>.</summary>
+    /// <paramref name="z"/>): <see cref="StructureCell.None"/> or a packed <see cref="StructureCell"/>.</summary>
     public static int CellAt(TowerSite site, int x, int y, int z)
     {
         var dx = x - site.CenterX;
@@ -34,7 +35,7 @@ public static class TowerGenerator
 
     /// <summary>The cell <paramref name="s"/> writes at world (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>)
     /// for a caller that already knows the column's <paramref name="ring"/> and stair <paramref name="step"/> (the ruin rule),
-    /// so the angle is computed once per cell: -1 or <c>block | state &lt;&lt; 8</c>.</summary>
+    /// so the angle is computed once per cell: <see cref="StructureCell.None"/> or a packed <see cref="StructureCell"/>.</summary>
     internal static int CellIn(TowerSite s, TowerRing ring, int step, int x, int y, int z) => Merge(s, ring, step, x, y, z);
 
     // The shell cell, unless a floor's or the roof's dressing template writes there; air on the dome's shell is the
@@ -73,13 +74,14 @@ public static class TowerGenerator
     {
         var lx = x - StructureStamper.OriginOf(s.CenterX, template);
         var lz = z - StructureStamper.OriginOf(s.CenterZ, template);
-        if ((uint)lx >= template.Size || (uint)lz >= template.Size || (uint)ly >= template.Height) return -1;
+        if ((uint)lx >= template.Size || (uint)lz >= template.Size || (uint)ly >= template.Height) return StructureCell.None;
         var cell = template.CellAt(turns, lx, ly, lz);
         if (cell < 0) return cell;
-        var block = cell & 0xFF;
-        if (block == TowerPalette.DefaultBrick) return (cell & ~0xFF) | s.Palette.Brick;
+        var block = StructureCell.BlockOf(cell);
+        if (block == TowerPalette.DefaultBrick) return StructureCell.WithBlock(cell, s.Palette.Brick);
         // The template's state for a chest is its facing alone (bits 0-1), so the tier bits OR on cleanly
-        if (block == TowerPalette.ChestBlock) return cell | (ChestProfile.TierState(tier) << 8);
+        if (block == TowerPalette.ChestBlock)
+            return StructureCell.Pack(block, (byte)(StructureCell.StateOf(cell) | ChestProfile.TierState(tier)));
         return cell;
     }
 
@@ -113,7 +115,7 @@ public static class TowerGenerator
 
     // The cells where both the turned template (its layer 0 at world y0) and the merged cell are the block
     private static IReadOnlyList<(int X, int Y, int Z)> TemplateBlockCells(TowerSite s, StructureTemplate template, int turns,
-        int y0, byte block)
+        int y0, ushort block)
     {
         var x0 = StructureStamper.OriginOf(s.CenterX, template);
         var z0 = StructureStamper.OriginOf(s.CenterZ, template);
@@ -123,10 +125,10 @@ public static class TowerGenerator
         for (var lx = 0; lx < template.Size; lx++)
         {
             var cell = template.CellAt(turns, lx, ly, lz);
-            if (cell < 0 || (cell & 0xFF) != block) continue;
+            if (cell < 0 || StructureCell.BlockOf(cell) != block) continue;
             int x = x0 + lx, y = y0 + ly, z = z0 + lz;
             var merged = CellAt(s, x, y, z);
-            if (merged >= 0 && (merged & 0xFF) == block) cells.Add((x, y, z));
+            if (merged >= 0 && StructureCell.BlockOf(merged) == block) cells.Add((x, y, z));
         }
         return cells;
     }
@@ -134,7 +136,7 @@ public static class TowerGenerator
     /// <summary>Writes <paramref name="site"/>'s cells inside the chunk whose minimum corner is (<paramref name="worldX0"/>,
     /// <paramref name="worldY0"/>, <paramref name="worldZ0"/>). Every written cell's state byte is assigned, never OR'd, so a
     /// stale tree, leaf or snow state never survives under a tower block.</summary>
-    internal static void StampSite(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0, TowerSite site)
+    internal static void StampSite(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0, TowerSite site)
     {
         var xLo = Math.Max(site.MinX, worldX0);
         var xHi = Math.Min(site.MaxX, worldX0 + Chunk.Size - 1);
@@ -157,8 +159,8 @@ public static class TowerGenerator
                 var cell = Merge(site, ring, step, x, y, z);
                 if (cell < 0) continue;
                 var index = Chunk.Idx(x - worldX0, y - worldY0, z - worldZ0);
-                blocks[index] = (byte)(cell & 0xFF);
-                var cellState = (byte)(cell >> 8);
+                blocks[index] = StructureCell.BlockOf(cell);
+                var cellState = StructureCell.StateOf(cell);
                 if (cellState != 0 || state != null)
                     (state ??= new byte[Chunk.Size * Chunk.Size * Chunk.Size])[index] = cellState;
             }

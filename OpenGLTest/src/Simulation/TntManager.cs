@@ -37,7 +37,7 @@ public class TntManager
     private readonly List<PrimedTnt> _primed = [];
     // Spawned while iterating _primed (chained TNT), each with the shove of the blast that lit it;
     // drained after the tick
-    private readonly List<(Vector3 Position, byte BlockId, Vector3 Impulse)> _pendingSpawns = [];
+    private readonly List<(Vector3 Position, ushort BlockId, Vector3 Impulse)> _pendingSpawns = [];
     // Centers of the blasts of the last Update, for the world's camera shake
     private readonly List<Vector3> _blasts = [];
 
@@ -53,7 +53,7 @@ public class TntManager
     /// <paramref name="fuseSeconds"/> (<see cref="PlayerFuseSeconds"/> when lit by hand,
     /// <see cref="ChainFuseSeconds"/> when lit by a blast).
     /// </summary>
-    public void Spawn(Vector3 blockPosition, byte blockId, float fuseSeconds)
+    public void Spawn(Vector3 blockPosition, ushort blockId, float fuseSeconds)
     {
         _primed.Add(new PrimedTnt(blockPosition + new Vector3(0.5f), blockId, fuseSeconds));
     }

@@ -88,6 +88,14 @@ pure function of the seed: only **deltas** and the seed are written.
   (`Chunk.RestoreFrom(snapshot, column)`, with the source's column) and is `IsRestored` too;
   like any restore it is not `ModifiedSinceSave` until edited, so the save only ever holds the
   edited imported chunks, and a saved chunk wins over the map (see "World sources").
+- **Chunk file format (`ChunkSaveCodec`, v3).** A header with a ushort palette count and the
+  palette's block names, then a Deflate body with one palette index per cell: a byte when the
+  palette holds at most 255 names, else a little-endian ushort, then the state bytes and the
+  player-placed cells. A file of any other version (a v2 file from a build whose ids were bytes)
+  is refused as `InvalidDataException`, never misread: `ChunkSaveStore` warns once, regenerates
+  the chunk and sets the old file aside as `.bad` before the first write over it. An imported
+  map's chunk files share the format, so a map written by an older build loads as air
+  (`ImportedMapSource` warns per chunk) and must be re-imported.
 - **`world.json`'s `source` and the `import/` folder.** `source` (`WorldInfo.SourceName`, kept
   raw) names the world source a dedicated server builds the world from; `WorldStore` writes it
   back on every rewrite (rename, touch) only when it is set, so a world the game creates never
@@ -106,7 +114,11 @@ pure function of the seed: only **deltas** and the seed are written.
   `min(override ?? generated, cap)`, fed in before the erosion window and bias so the nesting and
   burial invariants hold by construction. `LodEditState` exports all four to `lod-edits.bin`
   (only when their combined version moved) and imports them **before** `LodManager.Start`, so
-  the first region build already sees them.
+  the first region build already sees them. The file is v3: overrides and grown crowns are
+  `LodSurface.Pack` longs (the top in bits 16-47, a palette index in the low 16 bits) behind a
+  ushort-counted palette of block names. A file of any other version (v1/v2, written before ids
+  widened) is ignored with one warning by `LodEditState.TryParse`, so an old world's far LOD
+  loses only its old edits and the world itself loads as usual.
 - **`WorldSeed.Apply(seed)`** is how a world gets its seed (`WorldGenerationConfig.Seed` reads
   `WorldSeed.Value`; `WorldSeed.Default` is what tests and scripted runs use). It is legal only
   while no World is live (`WorldSeed.BeginWorld` in the World constructor, `EndWorld` at the very

@@ -23,7 +23,7 @@ public sealed class HellTests
 
     public HellTests() => TestContent.EnsureLoaded();
 
-    private static byte Id(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Id(string name) => ContentRegistry.RequireBlock(name).Id;
 
     /// <summary>The top row of hell layer <paramref name="layer"/>.</summary>
     private static int LayerTop(int layer) => WorldGenerationConfig.HellTopY - layer * Period;
@@ -123,8 +123,8 @@ public sealed class HellTests
     public void TheStampEqualsThePointQueryAcrossChunkSeamsAndLeavesTheCellsAboveHell()
     {
         var stone = Id("stone");
-        var blocks = new byte[Volume];
-        var seen = new HashSet<byte>();
+        var blocks = new ushort[Volume];
+        var seen = new HashSet<ushort>();
         var sawAbove = false;
 
         // The chunk straddling hell's top, a pocket chunk and a deep layer's chunk, over 3x3 columns

@@ -15,7 +15,7 @@ public readonly record struct LookLabelState(
     bool Known,
     bool Mineable,
     Vector3 Cell,
-    byte BlockId,
+    ushort BlockId,
     byte BlockState,
     EntityLightSample Light,
     string? Detail = null);

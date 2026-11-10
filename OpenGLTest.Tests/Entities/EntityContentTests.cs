@@ -30,7 +30,7 @@ public sealed class EntityContentTests
     {
         var type = EntityRegistry.Require("slime");
         var slimeball = ContentRegistry.Require("item/slimeball");
-        var into = new List<byte>();
+        var into = new List<ushort>();
 
         for (var i = 0; i < 32; i++)
             type.LootTable!.Roll(new LootContext(0, 0, 0, 0), into);

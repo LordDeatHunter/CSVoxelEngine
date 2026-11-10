@@ -59,7 +59,7 @@ internal sealed class ThrowAction
     private readonly List<ThrownProjectile> _thrown = [];
 
     private float _throwChargeSeconds;
-    private byte _throwItemId;
+    private ushort _throwItemId;
     private float _throwBaseDamage;
 
     internal bool IsThrowCharging { get; private set; }
@@ -239,7 +239,7 @@ internal sealed class ThrowAction
     /// no longer holds that item. The release half of a throw, apart from the local player's
     /// charge and arm pose.
     /// </summary>
-    private bool TryLaunchThrow(Inventory inventory, byte id, float baseDamage, float charge01,
+    private bool TryLaunchThrow(Inventory inventory, ushort id, float baseDamage, float charge01,
         Vector3 eye, Vector3 forward, bool creative)
     {
         if (id == 0 || inventory.SelectedBlockId != id || inventory.SelectedCount <= 0)

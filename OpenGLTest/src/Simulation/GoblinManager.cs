@@ -34,11 +34,11 @@ public sealed class GoblinManager : IMobPopulation
     private readonly List<Goblin> _stoneOwners = [];
     // The mobs a frame's stones can hit, rebuilt per stone pass
     private readonly List<Mob> _stoneMobs = [];
-    private readonly List<byte> _loot = [];
-    private readonly byte _flintId;
-    private readonly byte _torchId;
+    private readonly List<ushort> _loot = [];
+    private readonly ushort _flintId;
+    private readonly ushort _torchId;
     // One delegate for every goblin's collector: it only ever takes flint
-    private readonly Func<byte, bool> _canScavenge;
+    private readonly Func<ushort, bool> _canScavenge;
     // The goblins a frame's collectors were built for, in the same order (AwardScavenged's index)
     private readonly List<Goblin> _collectorGoblins = [];
     // The camera overload's one-element target list, reused so it allocates nothing per frame.
@@ -157,7 +157,7 @@ public sealed class GoblinManager : IMobPopulation
 
     /// <summary>Credits a drop scavenged by the collector at <paramref name="index"/> of this
     /// frame's <see cref="AppendCollectors"/> order: flint becomes ammo, clamped at the cap.</summary>
-    public void AwardScavenged(int index, byte id)
+    public void AwardScavenged(int index, ushort id)
     {
         if (index < 0 || index >= _collectorGoblins.Count || id != _flintId) return;
         _collectorGoblins[index].AddAmmo(1);

@@ -69,7 +69,7 @@ public sealed class IronWorksWorldTests : IDisposable
     public void AHammerHitThatFinishesABloomDropsTheIronAndTheSlagOnTheAnvil()
     {
         _world = new SupportTestWorld();
-        var anvilBlock = Enumerable.Range(1, 255).Select(i => BlockType.ById[i]).First(b => b?.Anvil != null)!;
+        var anvilBlock = BlockType.Types.Values.First(b => b.Anvil != null);
         var cell = new Vector3(2, _world.Top + 1, 2);
         _world.Load(3, _world.Top + 2, 3);
         _world.Set((int)cell.X, (int)cell.Y, (int)cell.Z, anvilBlock.Id);
@@ -92,7 +92,7 @@ public sealed class IronWorksWorldTests : IDisposable
     public void RightClicksStackTheMetalTakeOneBackOrAllWhileSneakingAndAHammerOpensTheRecipes()
     {
         _world = new SupportTestWorld();
-        var anvilBlock = Enumerable.Range(1, 255).Select(i => BlockType.ById[i]).First(b => b?.Anvil != null)!;
+        var anvilBlock = BlockType.Types.Values.First(b => b.Anvil != null);
         var (x, y, z) = (8, _world.Top + 1, 6);
         _world.Load(x, y, z);
         _world.Set(x, y, z, anvilBlock.Id);
@@ -108,7 +108,7 @@ public sealed class IronWorksWorldTests : IDisposable
         var eye = player.Context.Eye;
         player.Aim(eye, Vector3.Normalize(cell + new Vector3(0.5f, 0.9f, 0.5f) - eye));
         bool Click() => _world.World.Interactions.TryAnvilInteract(World.InteractionReach, player.Context);
-        bool Hold(byte id) => inventory.PickBlock(id) && inventory.HeldItem?.Id == id;
+        bool Hold(ushort id) => inventory.PickBlock(id) && inventory.HeldItem?.Id == id;
 
         // Each click with the metal in hand lays one more on the stack
         Assert.True(Hold(metal));

@@ -48,7 +48,7 @@ namespace VoxelEngine.Simulation.Tower;
 public sealed class TowerBlockWriter(ChunkManager chunks, FluidManager fluids, LeafDecayManager leafDecay,
     FallingBlockManager falling, LodManager lod, Action<int, int, int> notifyLodEdit,
     Action<int, int, int>? popUnsupported, Action<int, int, int, ChestProfile, byte>? spillChest = null,
-    Action<int, int, int, byte, byte>? replaced = null)
+    Action<int, int, int, ushort, ushort>? replaced = null)
 {
     private int _writesThisFrame;
 
@@ -59,7 +59,7 @@ public sealed class TowerBlockWriter(ChunkManager chunks, FluidManager fluids, L
     /// Clears the cell (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>) to air when it still holds
     /// <paramref name="expected"/>: <see cref="TryReplace"/> with air.
     /// </summary>
-    public TowerWriteResult TryClear(int x, int y, int z, byte expected) => TryReplace(x, y, z, expected, BlockType.Air, 0);
+    public TowerWriteResult TryClear(int x, int y, int z, ushort expected) => TryReplace(x, y, z, expected, BlockType.Air, 0);
 
     /// <summary>
     /// Replaces the cell (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>) with <paramref name="block"/> and
@@ -68,7 +68,7 @@ public sealed class TowerBlockWriter(ChunkManager chunks, FluidManager fluids, L
     /// <see cref="TowerWriteResult.Unloaded"/> for a cell in an unloaded chunk and <see cref="TowerWriteResult.Gone"/> for a
     /// loaded cell holding anything else, writing nothing in each case.
     /// </summary>
-    public TowerWriteResult TryReplace(int x, int y, int z, byte expected, byte block, byte state)
+    public TowerWriteResult TryReplace(int x, int y, int z, ushort expected, ushort block, byte state)
     {
         if (_writesThisFrame >= MobConfig.TowerMaxBlockWritesPerFrame)
             return TowerWriteResult.Capped;

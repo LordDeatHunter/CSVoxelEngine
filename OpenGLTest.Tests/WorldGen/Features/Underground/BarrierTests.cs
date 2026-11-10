@@ -21,13 +21,13 @@ public sealed class BarrierTests
 
     public BarrierTests() => TestContent.EnsureLoaded();
 
-    private static byte Id(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Id(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
     public void NoBarrierOutsideTheBand()
     {
         var stone = Id("stone");
-        var blocks = new byte[Volume];
+        var blocks = new ushort[Volume];
 
         // The chunks straddling each edge of the band and the ones just outside it
         int[] floors =
@@ -66,8 +66,8 @@ public sealed class BarrierTests
         var coreFloor = (WorldGenerationConfig.BarrierFullTopY >> Chunk.SizeShift) * Chunk.Size - Chunk.Size;
         Assert.True(BarrierGenerator.InCore(coreFloor) && BarrierGenerator.InCore(coreFloor + Chunk.Size - 1),
             "the test chunk must lie in the core");
-        byte[] fills = [BlockType.Air, Id("water"), Id("lava"), Id("stone")];
-        var blocks = new byte[Volume];
+        ushort[] fills = [BlockType.Air, Id("water"), Id("lava"), Id("stone")];
+        var blocks = new ushort[Volume];
         for (var i = 0; i < Volume; i++)
             blocks[i] = fills[i % fills.Length];
         BarrierGenerator.Stamp(blocks, 48, coreFloor, -16);
@@ -135,7 +135,7 @@ public sealed class BarrierTests
     {
         var stone = Id("stone");
         var barrier = BarrierGenerator.BarrierBlock;
-        var blocks = new byte[Volume];
+        var blocks = new ushort[Volume];
         var sawBarrier = false;
         var sawStone = false;
 

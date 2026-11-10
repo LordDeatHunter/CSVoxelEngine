@@ -30,7 +30,7 @@ namespace VoxelEngine.WorldGen.Caves;
 /// expressions and call the same <see cref="Classify"/>, so they agree bit for bit across every chunk
 /// seam. <see cref="Fill"/> classifies a chunk once into a <see cref="CaveBiomeMap"/> (CB-2) that every
 /// cave consumer reads (the noise cave shape, the ore richness, the exclusive ores) and that
-/// <see cref="Stamp(byte[], CaveBiomeMap, int, int, int)"/> dresses the caves from. A pure function of
+/// <see cref="Stamp(ushort[], CaveBiomeMap, int, int, int)"/> dresses the caves from. A pure function of
 /// position, the column's stored biome and height, and the seed; thread-safe: the noises are read-only
 /// after their reseed, and all scratch lives on the stack or in the caller's map.
 /// </summary>
@@ -65,7 +65,7 @@ public static class CaveBiomes
     private static readonly CaveBiomePalette[] Palettes;
 
     /// <summary>The block the pass hosts on: plain stone and nothing else.</summary>
-    private static readonly byte RockBlock;
+    private static readonly ushort RockBlock;
 
     static CaveBiomes()
     {
@@ -75,7 +75,7 @@ public static class CaveBiomes
 
         Reseed();
 
-        byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+        ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
         var stone = Block("stone");
         var frostStone = Block("frost_stone");
         var sandstone = Block("sandstone");
@@ -257,7 +257,7 @@ public static class CaveBiomes
     /// cells only (a neighbor outside the chunk counts as closed): a floor with a non-occluding cell
     /// above, else a ceiling with one below, else a wall with one beside, else interior.
     /// </summary>
-    internal static CaveCellRole RoleAt(byte[] blocks, int lx, int ly, int lz)
+    internal static CaveCellRole RoleAt(ushort[] blocks, int lx, int ly, int lz)
     {
         if (ly < Chunk.SizeMask && !BlockType.Occludes(blocks[Chunk.Idx(lx, ly + 1, lz)])) return CaveCellRole.Floor;
         if (ly > 0 && !BlockType.Occludes(blocks[Chunk.Idx(lx, ly - 1, lz)])) return CaveCellRole.Ceiling;
@@ -273,7 +273,7 @@ public static class CaveBiomes
     /// (wx, wy, wz) wears: the accent on one cave face cell in the palette's accent rate (by a hash of
     /// the cell and the seed), else the floor, ceiling or base stone.
     /// </summary>
-    internal static byte BlockFor(CaveBiome biome, CaveCellRole role, int wx, int wy, int wz)
+    internal static ushort BlockFor(CaveBiome biome, CaveCellRole role, int wx, int wy, int wz)
     {
         var p = Palettes[(int)biome];
         if (role != CaveCellRole.Interior && p.AccentRate > 0
@@ -307,9 +307,9 @@ public static class CaveBiomes
     /// <summary>
     /// The self-contained palette pass: classifies the chunk at world origin (worldX0, worldY0, worldZ0)
     /// into a fresh map with <see cref="Fill"/> and stamps from it. Generation fills one shared map per
-    /// chunk instead and calls <see cref="Stamp(byte[], CaveBiomeMap, int, int, int)"/>.
+    /// chunk instead and calls <see cref="Stamp(ushort[], CaveBiomeMap, int, int, int)"/>.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         var map = new CaveBiomeMap();
         if (Fill(map, column, worldX0, worldY0, worldZ0)) Stamp(blocks, map, worldX0, worldY0, worldZ0);
@@ -322,7 +322,7 @@ public static class CaveBiomes
     /// support are left alone, and every palette block occludes like the stone it replaces, so the roles
     /// can be read in place.
     /// </summary>
-    public static void Stamp(byte[] blocks, CaveBiomeMap caves, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, CaveBiomeMap caves, int worldX0, int worldY0, int worldZ0)
     {
         var cells = caves.Cells;
         for (var x = 0; x < Chunk.Size; x++)

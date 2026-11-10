@@ -2,7 +2,8 @@ namespace VoxelEngine.Networking;
 
 /// <summary>
 /// The wire form of one <see cref="NetMessage.EntityList"/> entry: <c>(byte kind, int id, Vector3 position,
-/// float yaw, int health, int ammo, byte itemId, Vector3 velocity, byte effects)</c>, every kind in the same
+/// float yaw, int health, int ammo, id itemId, Vector3 velocity, byte effects)</c> (the id at the width
+/// <see cref="PacketWriter.WriteId"/> fixes), every kind in the same
 /// shape (<see cref="NetEntity"/> documents what each kind puts in the fields). The server writes the list
 /// through <see cref="Write"/> and the client reads it back through <see cref="Read"/>, so the two can never
 /// drift apart. A short frame throws <see cref="System.IO.EndOfStreamException"/>, which the client answers by
@@ -18,7 +19,7 @@ public static class NetEntityCodec
         writer.Write(entity.Yaw);
         writer.Write(entity.Health);
         writer.Write(entity.Ammo);
-        writer.Write(entity.ItemId);
+        writer.WriteId(entity.ItemId);
         writer.Write(entity.Velocity);
         writer.Write(entity.Effects);
     }
@@ -32,7 +33,7 @@ public static class NetEntityCodec
         var yaw = reader.ReadFloat();
         var health = reader.ReadInt();
         var ammo = reader.ReadInt();
-        var itemId = reader.ReadByte();
+        var itemId = reader.ReadId();
         var velocity = reader.ReadVector3();
         var effects = reader.ReadByte();
         return new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity, effects);

@@ -30,11 +30,11 @@ internal static class GearSetLoader
         GearSetRegistry.Publish(sets);
     }
 
-    private static List<byte> MembersOf(string setName) =>
+    private static List<ushort> MembersOf(string setName) =>
         ItemRegistry.All.OfType<GearItem>().Where(g => g.Info.SetName == setName && GearSlots.CountsForSets(g.Info.Slot)).Select(g => g.Id).ToList();
 
     /// <summary>Compiles one set, throwing an error that names <paramref name="path"/> on any bad field.</summary>
-    internal static GearSet Compile(string name, GearSetDefinition definition, string path, IReadOnlyList<byte> members)
+    internal static GearSet Compile(string name, GearSetDefinition definition, string path, IReadOnlyList<ushort> members)
     {
         if (definition.Bonuses is not { Length: > 0 } bonuses)
             throw new InvalidOperationException($"Gear set '{path}' has no bonuses.");

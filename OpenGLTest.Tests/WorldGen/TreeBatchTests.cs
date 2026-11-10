@@ -340,7 +340,7 @@ public sealed class TreeBatchTests
 
             var world = TreeWorldgenFixture.Generate(cx, cz, reverse: false,
                 radius: TreeGenerator.ReachChunkRadius);
-            var highest = new Dictionary<(int X, int Z), (int Y, byte Leaf)>();
+            var highest = new Dictionary<(int X, int Z), (int Y, ushort Leaf)>();
             foreach (var ((x, y, z), (block, _)) in world)
             {
                 if (x >> Chunk.SizeShift != cx || z >> Chunk.SizeShift != cz || !leafIds.Contains(block)) continue;

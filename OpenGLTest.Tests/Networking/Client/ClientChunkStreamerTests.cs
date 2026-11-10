@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Saves;
@@ -14,7 +16,8 @@ namespace VoxelEngine.Tests.Networking.Client;
 /// The client's streamed-chunk path: an applied snapshot becomes readable blocks, the streamer
 /// asks for the chunks around the camera and the 3x3 columns around each without duplicating a
 /// request, re-asks an unanswered column like a chunk, and a streamed column (heights, water levels
-/// and climate) is served as the client's column source.
+/// and climate) is served as the client's column source. A chunk naming an id outside the client's content is
+/// refused before anything is stored.
 /// </summary>
 public sealed class ClientChunkStreamerTests
 {
@@ -25,12 +28,32 @@ public sealed class ClientChunkStreamerTests
     {
         var manager = new ChunkManager(null!);
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         blocks[Chunk.Idx(0, 0, 0)] = stone;
 
-        manager.ApplyStreamedChunk(Vector3.Zero, new ChunkSnapshot(blocks, null, null));
+        manager.ApplyStreamedChunk(Vector3.Zero, new ChunkSnapshot(blocks, null, playerPlaced: null));
 
         Assert.Equal(stone, manager.GetBlockGlobal(0, 0, 0));
+    }
+
+    [Fact]
+    public void AChunkNamingAnIdPastTheLoadedContentIsRefusedAndAnAllAssignedOneApplies()
+    {
+        var manager = new ChunkManager(null!);
+        var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (_, _) => { });
+        var highestBlock = BlockType.Types.Keys.Max();
+        var blocks = new ushort[Chunk.BlockCount];
+        blocks[Chunk.Idx(1, 2, 3)] = highestBlock;
+
+        streamer.ApplyChunk(0, 0, 0, ChunkNetCodec.Encode(new ChunkSnapshot(blocks, null, playerPlaced: null)));
+        Assert.Equal(highestBlock, manager.GetBlockGlobal(1, 2, 3));
+
+        // One cell past the loaded content poisons the whole payload: nothing of it is stored
+        Assert.True(BlockTables.IdCount <= ushort.MaxValue, "the loaded content fills every id the id type holds");
+        blocks[Chunk.Idx(4, 5, 6)] = (ushort)BlockTables.IdCount;
+        var bad = ChunkNetCodec.Encode(new ChunkSnapshot(blocks, null, playerPlaced: null));
+        Assert.Throws<InvalidDataException>(() => streamer.ApplyChunk(0, 1, 0, bad));
+        Assert.False(manager.Chunks.ContainsKey(new Vector3(0, 1, 0)));
     }
 
     [Fact]
@@ -241,7 +264,7 @@ public sealed class ClientChunkStreamerTests
         // The wake queue is only drained by FluidManager.WakeLoadedChunks, which a client never
         // runs; a streamed chunk left in it would stay referenced for the whole session.
         var manager = new ChunkManager(null!);
-        manager.ApplyStreamedChunk(Vector3.Zero, new ChunkSnapshot(new byte[Chunk.BlockCount], null, null));
+        manager.ApplyStreamedChunk(Vector3.Zero, new ChunkSnapshot(new ushort[Chunk.BlockCount], null, playerPlaced: null));
 
         Assert.False(manager.TryDequeueLoaded(out _));
     }

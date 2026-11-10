@@ -54,7 +54,7 @@ public sealed class TreeGrowthTests
             (rootX + reach.Horizontal, RootY + reach.Up, RootZ + reach.Horizontal));
     }
 
-    private static Dictionary<(int X, int Y, int Z), (byte Id, byte State)> SnapshotReach(
+    private static Dictionary<(int X, int Y, int Z), (ushort Id, byte State)> SnapshotReach(
         StampedTree tree, int rootX)
     {
         var (min, max) = ReachBox(tree.Species, rootX);
@@ -76,8 +76,8 @@ public sealed class TreeGrowthTests
         Enumerable.Range(0, graph.Count).Select(i => (graph[i].X, graph[i].Y, graph[i].Z)).ToHashSet();
 
     private static List<(int X, int Y, int Z)> Diff(
-        Dictionary<(int X, int Y, int Z), (byte Id, byte State)> before,
-        Dictionary<(int X, int Y, int Z), (byte Id, byte State)> after) =>
+        Dictionary<(int X, int Y, int Z), (ushort Id, byte State)> before,
+        Dictionary<(int X, int Y, int Z), (ushort Id, byte State)> after) =>
         after.Where(kv => !before.TryGetValue(kv.Key, out var b) || b != kv.Value).Select(kv => kv.Key).ToList();
 
     /// <summary>Clears a stamped tree's limb cell, leaving its subtree's wood standing orphaned.</summary>
@@ -127,7 +127,7 @@ public sealed class TreeGrowthTests
             Grow(new TreeGrowthWriter(), tree, rootX, 0);
 
             foreach (var cell in mined)
-                Assert.Equal(((byte)0, (byte)0), tree.Read(cell));
+                Assert.Equal((BlockType.Air, (byte)0), tree.Read(cell));
         }
     }
 
@@ -185,7 +185,7 @@ public sealed class TreeGrowthTests
             var rootX = RootXOf(test++);
             var tree = StampLoaded(species, rootX);
             var other = LeafySpecies.FirstOrDefault(s => s.LeavesId != species.LeavesId);
-            var kinds = new List<(byte Id, byte State)>
+            var kinds = new List<(ushort Id, byte State)>
             {
                 (TerrainGenerator.RockBlock, 0),
                 (species.LeavesId, LeafState.Encode(1, true)),
@@ -194,7 +194,7 @@ public sealed class TreeGrowthTests
                 kinds.Add((other.LeavesId, LeafState.Encode(1, false)));
 
             var (min, max) = ReachBox(species, rootX);
-            var sprinkle = new Dictionary<(int X, int Y, int Z), (byte Id, byte State)>();
+            var sprinkle = new Dictionary<(int X, int Y, int Z), (ushort Id, byte State)>();
             foreach (var (cell, value) in StampedTree.Snapshot(tree.Chunks, min, max))
             {
                 if (value.Id != 0 || Math.Abs(cell.X + cell.Y + cell.Z) % 5 != 0)
@@ -590,7 +590,7 @@ public sealed class TreeGrowthTests
                 for (var call = 0; call < 2; call++)
                     Assert.Equal(TreeGrowthStatus.Grew, Grow(writer, tree, rootX, 40).Status);
 
-                Assert.Equal(((byte)0, (byte)0), tree.Read(outer));
+                Assert.Equal((BlockType.Air, (byte)0), tree.Read(outer));
             }
 
             // A mid-ring shell whose outward shell still stands, naming the hole as its parent
@@ -606,7 +606,7 @@ public sealed class TreeGrowthTests
                 for (var call = 0; call < 2; call++)
                     Assert.Equal(TreeGrowthStatus.Grew, Grow(writer, tree, rootX, 40).Status);
 
-                Assert.Equal(((byte)0, (byte)0), tree.Read(mid));
+                Assert.Equal((BlockType.Air, (byte)0), tree.Read(mid));
                 Assert.Equal((species.WoodId, outwardState), tree.Read(outward));
             }
         }
@@ -616,7 +616,7 @@ public sealed class TreeGrowthTests
 
     /// <summary>A loaded, empty area around a column with a one-cell floor of
     /// <paramref name="floorId"/> under the root level, wide enough for the whole reach.</summary>
-    private static ChunkManager FloorWorld(TreeSpecies species, int rootX, byte floorId)
+    private static ChunkManager FloorWorld(TreeSpecies species, int rootX, ushort floorId)
     {
         var chunks = new ChunkManager(null!);
         var reach = TreeRasterizer.ReachOf(species);
@@ -626,14 +626,14 @@ public sealed class TreeGrowthTests
         return chunks;
     }
 
-    private static Dictionary<(int X, int Y, int Z), (byte Id, byte State)> SnapshotReach(
+    private static Dictionary<(int X, int Y, int Z), (ushort Id, byte State)> SnapshotReach(
         ChunkManager chunks, TreeSpecies species, int rootX)
     {
         var (min, max) = ReachBox(species, rootX);
         return StampedTree.Snapshot(chunks, min, max);
     }
 
-    private static (byte Id, byte State) ReadCell(ChunkManager chunks, int x, int y, int z)
+    private static (ushort Id, byte State) ReadCell(ChunkManager chunks, int x, int y, int z)
     {
         Assert.True(chunks.TryGetCell(x, y, z, out var id, out var state));
         return (id, state);
@@ -699,7 +699,7 @@ public sealed class TreeGrowthTests
         var test = 140;
         foreach (var species in StampedTree.WorldgenSpecies)
         {
-            var blockers = new List<(byte Id, byte State)>();
+            var blockers = new List<(ushort Id, byte State)>();
             if (species.HasLeaves)
                 blockers.Add((species.LeavesId, LeafState.Encode(1, true)));
             var other = StampedTree.WorldgenSpecies.FirstOrDefault(s => s.WoodId != species.WoodId);
@@ -725,9 +725,8 @@ public sealed class TreeGrowthTests
     [Fact]
     public void ASaplingTakesOverGroundCover()
     {
-        var cover = Enumerable.Range(1, 255)
-            .Where(id => BlockType.ById[id] != null)
-            .SelectMany(id => Enumerable.Range(0, 256).Select(state => (Id: (byte)id, State: (byte)state)))
+        var cover = BlockType.Types.Keys.Order()
+            .SelectMany(id => Enumerable.Range(0, 256).Select(state => (Id: id, State: (byte)state)))
             .First(c => BlockType.IsReplaceableByPlacement(c.Id, c.State)
                 && !TreeGenerator.IsLeaf(c.Id) && !BlockType.IsTreeWood(c.Id));
 

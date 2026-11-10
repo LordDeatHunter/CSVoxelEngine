@@ -36,7 +36,7 @@ public static class WaystonePlacement
     internal static StampBand SurfaceBand(int neighborhoodMaxHeight) => RuinPlacement.SurfaceBand(neighborhoodMaxHeight);
 
     /// <summary>Stamps every surface ruin's waystone whose footprint reaches the chunk.</summary>
-    public static void StampSurface(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    public static void StampSurface(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         if (StructureRegistry.SatellitesOf(StructureKind.Surface).Count == 0) return;
         foreach (var (cellX, cellZ) in RuinPlacement.CellsReaching(worldX0, worldZ0, CellReach))
@@ -85,7 +85,7 @@ public static class WaystonePlacement
         + (int)Math.Ceiling(WorldFeatureConfig.WaystoneTowerExtraDistance) + 2;
 
     // Stamps every tower's waystone whose footprint reaches the chunk
-    private static void StampTowers(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    private static void StampTowers(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         var maxX = worldX0 + Chunk.Size - 1;
         var maxZ = worldZ0 + Chunk.Size - 1;
@@ -149,7 +149,7 @@ public static class WaystonePlacement
     internal static StampBand UndergroundBand(int neighborhoodMaxHeight) => RuinPlacement.UndergroundBand(neighborhoodMaxHeight);
 
     /// <summary>Stamps every underground room's waystone chamber whose footprint reaches the chunk.</summary>
-    public static void StampUnderground(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    public static void StampUnderground(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         if (StructureRegistry.SatellitesOf(StructureKind.Underground).Count == 0) return;
         foreach (var (cellX, cellZ) in RuinPlacement.CellsReaching(worldX0, worldZ0, CellReach))
@@ -190,7 +190,7 @@ public static class WaystonePlacement
 
     /// <summary>Stamps every hell ruin's waystone whose footprint reaches the chunk, in each hell layer the chunk spans; its
     /// cells stay inside the layer.</summary>
-    public static void StampHell(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    public static void StampHell(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         if (StructureRegistry.SatellitesOf(StructureKind.Hell).Count == 0) return;
         if (!RuinPlacement.TryHellLayers(worldY0, out var first, out var last)) return;
@@ -240,7 +240,7 @@ public static class WaystonePlacement
 
     /// <summary>Stamps every sky ruin's waystone whose footprint reaches the chunk. A waystone stays inside its island's disc,
     /// so the islands the ruins collect are all it needs.</summary>
-    public static void StampSky(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    public static void StampSky(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         if (StructureRegistry.SatellitesOf(StructureKind.Sky).Count == 0) return;
         Span<SkyIsland> islands = stackalloc SkyIsland[SkyIslands.MaxIslandsPerBox];
@@ -347,7 +347,7 @@ public static class WaystonePlacement
         return false;
     }
 
-    private static void Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0, in PlacedStructure w) =>
+    private static void Stamp(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0, in PlacedStructure w) =>
         RuinPlacement.StampAt(blocks, ref state, worldX0, worldY0, worldZ0, w.Template, w.Turns, w.X, w.OriginY, w.Z,
             int.MinValue, int.MaxValue);
 }

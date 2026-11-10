@@ -47,7 +47,7 @@ public sealed class SpellEffectsTests : IDisposable
 
     private SupportTestWorld World() => _world ??= new SupportTestWorld();
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     private static SpellPart[] Parts(params string[] keys) =>
         keys.Select(k => SpellPartRegistry.TryGetByKey(k) ?? throw new InvalidOperationException(k)).ToArray();

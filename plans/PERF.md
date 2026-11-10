@@ -8,7 +8,7 @@ Frame time (F#), worldgen, meshing and streaming (G#). Ids F4, F5 and F13 (and t
 comments still cite) exist only in git history or under Ruled out. Every number names its machine and
 date; a win not yet measured is labeled *estimated*. Landed items are summarized under Reference;
 `git log -p -- plans/PERF.md` has the full write-ups (history was trimmed on 2026-10-28, 2026-10-31
-and 2026-11-05). Last updated 2026-11-09.
+and 2026-11-05). Last updated 2026-11-10.
 
 ## In progress
 
@@ -117,6 +117,20 @@ justify one.
     worker), `WorldLoadGate`. Time a large save's loading phase before proposing region files (a save-format change).
   - **Win**: unknown until measured. **Verify**: a loading-phase timer on a heavily edited world. **Invariant**: the
     store's write and lookup ordering (`ChunkSaveStore`'s class doc).
+  - **Note**: the chunk save is v3 since 2026-11-10 (ids widened to `ushort`): a chunk whose palette passes 255 names
+    stores 2-byte indices per cell until palette chunk storage lands, so any restore IO number taken before then
+    predates the format.
+
+- [ ] **`G10` A/B the per-id tables now that they are not `static readonly`** (measure first).
+  - **Files**: `BlockType.cs` (the per-id tables, sized at load by `Content/Blocks/BlockTables.Allocate`), and their
+    hot readers: `ChunkMesher`/`ChunkMeshBuilder`, `ChunkLighting`, `ChunkTerrainFill` and the feature stamps,
+    `Simulation/Fluids`. Widening ids to `ushort` dropped `readonly` from the tables, so the JIT can no longer fold
+    them as constants, and chunk ids doubled to 2 bytes a cell (about 70 MB to 140 MB at radius 16; the light flood's
+    id snapshot ~97 KB to ~195 KB per mesh build) until palette chunk storage lands.
+  - **Win**: unknown; measure in the perf capture after palette storage, hoisting a table into a local in any hot
+    loop that still reads it per cell (`ChunkLighting.SpreadLight` already does). **Verify**: perf-fly fps pairs,
+    `MeshBuildCostProbe` and `WorldgenCostProbe` pairs against the pre-widening commit. **Invariant**: tables are
+    never reallocated while workers run.
 
 ## Reference
 

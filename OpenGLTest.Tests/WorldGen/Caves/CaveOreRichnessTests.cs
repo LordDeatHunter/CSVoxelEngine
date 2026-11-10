@@ -18,10 +18,10 @@ public sealed class CaveOreRichnessTests
 {
     private sealed record Ore(
         string Name,
-        Action<byte[], int, int, int, CaveBiomeMap?> Stamp,
+        Action<ushort[], int, int, int, CaveBiomeMap?> Stamp,
         Func<int, int, int, CaveBiome, bool> HasOre,
         CaveRichness Richness,
-        byte Block,
+        ushort Block,
         int[] ChunkYs,
         bool Sandstone);
 
@@ -53,7 +53,7 @@ public sealed class CaveOreRichnessTests
     }
 
     /// <summary>Stone, with about a third of the cells sandstone when the ore hosts on it too.</summary>
-    private static void FillHosts(byte[] blocks, Ore ore, int x0, int y0, int z0)
+    private static void FillHosts(ushort[] blocks, Ore ore, int x0, int y0, int z0)
     {
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var sandstone = ContentRegistry.RequireBlock("sandstone").Id;
@@ -76,9 +76,9 @@ public sealed class CaveOreRichnessTests
         return map;
     }
 
-    private static byte[] Stamped(Ore ore, CaveBiomeMap? map, int x0, int y0, int z0)
+    private static ushort[] Stamped(Ore ore, CaveBiomeMap? map, int x0, int y0, int z0)
     {
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         FillHosts(blocks, ore, x0, y0, z0);
         ore.Stamp(blocks, x0, y0, z0, map);
         return blocks;
@@ -134,7 +134,7 @@ public sealed class CaveOreRichnessTests
     /// <summary>Asserts every cell of the stamp equals the point query with that cell's map biome; returns the ore count.</summary>
     private static int AssertMatchesPointQuery(Ore ore, CaveBiomeMap map, int x0, int y0, int z0)
     {
-        var input = new byte[Chunk.BlockCount];
+        var input = new ushort[Chunk.BlockCount];
         FillHosts(input, ore, x0, y0, z0);
         var output = Stamped(ore, map, x0, y0, z0);
         var oreCells = 0;

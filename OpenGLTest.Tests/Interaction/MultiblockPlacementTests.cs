@@ -17,16 +17,16 @@ public sealed class MultiblockPlacementTests
 {
     public MultiblockPlacementTests() => TestContent.EnsureLoaded();
 
-    private static byte Bricks => ContentRegistry.RequireBlock("mud_bricks").Id;
+    private static ushort Bricks => ContentRegistry.RequireBlock("mud_bricks").Id;
 
     /// <summary>The kiln's edge length, the 2x2x2 these order rules were written for.</summary>
     private static int Two => ContentRegistry.RequireBlock("mud_brick_kiln").MultiblockSize;
 
     /// <summary>A block of source cells <paramref name="edge"/> wide at the origin; at 3 every
     /// 2x2x2 volume around its center fits.</summary>
-    private static Dictionary<(int, int, int), byte> Cube(int edge = 3)
+    private static Dictionary<(int, int, int), ushort> Cube(int edge = 3)
     {
-        var cells = new Dictionary<(int, int, int), byte>();
+        var cells = new Dictionary<(int, int, int), ushort>();
         for (var x = 0; x < edge; x++)
         for (var y = 0; y < edge; y++)
         for (var z = 0; z < edge; z++)
@@ -34,8 +34,8 @@ public sealed class MultiblockPlacementTests
         return cells;
     }
 
-    private static Func<int, int, int, byte> Reader(Dictionary<(int, int, int), byte> cells) =>
-        (x, y, z) => cells.TryGetValue((x, y, z), out var id) ? id : (byte)0;
+    private static Func<int, int, int, ushort> Reader(Dictionary<(int, int, int), ushort> cells) =>
+        (x, y, z) => cells.TryGetValue((x, y, z), out var id) ? id : BlockType.Air;
 
     [Fact]
     public void RightDownWinsWhenSeveralVolumesFit()
@@ -160,7 +160,7 @@ public sealed class MultiblockPlacementTests
     {
         // A 5 wide, 5 tall, 3 deep slab: from its center front cell nine 3x3x3 volumes fit, and
         // the preference generalizes right-down: farthest right first, then farthest down
-        var cells = new Dictionary<(int, int, int), byte>();
+        var cells = new Dictionary<(int, int, int), ushort>();
         for (var x = 0; x < 5; x++)
         for (var y = 0; y < 5; y++)
         for (var z = 0; z < 3; z++)

@@ -125,7 +125,7 @@ public sealed class WorldLifecycleTests : IDisposable
     /// <summary>Grants a few stone, equips it on hotbar slot 0 and selects it: a new survival
     /// world starts empty, so a throw or a consume is a no-op until something is granted and
     /// equipped. Add may already have auto-equipped slot 0, hence the guard against toggling.</summary>
-    private static byte EquipRock(World world)
+    private static ushort EquipRock(World world)
     {
         var id = TerrainGenerator.RockBlock;
         world.Inventory.Add(id, 10);

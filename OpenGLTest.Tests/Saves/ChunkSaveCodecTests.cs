@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Numerics;
 using VoxelEngine.Saves;
@@ -19,17 +20,17 @@ namespace VoxelEngine.Tests.Saves;
 public class ChunkSaveCodecTests
 {
     // Content-free id <-> name mapping: id 7 is "b7", and back
-    private static string? NameOf(byte id) => "b" + id;
-    private static byte? IdOf(string name) => byte.Parse(name[1..]);
+    private static string? NameOf(ushort id) => "b" + id;
+    private static ushort? IdOf(string name) => ushort.Parse(name[1..]);
 
-    private static byte[] Encode(ChunkSnapshot snapshot, Func<byte, string?> nameOf)
+    private static byte[] Encode(ChunkSnapshot snapshot, Func<ushort, string?> nameOf)
     {
         using var stream = new MemoryStream();
         ChunkSaveCodec.Write(stream, snapshot, nameOf);
         return stream.ToArray();
     }
 
-    private static ChunkSnapshot Decode(byte[] bytes, Func<string, byte?> idOf)
+    private static ChunkSnapshot Decode(byte[] bytes, Func<string, ushort?> idOf)
     {
         using var stream = new MemoryStream(bytes);
         return ChunkSaveCodec.Read(stream, idOf);
@@ -38,10 +39,10 @@ public class ChunkSaveCodecTests
     private static ChunkSnapshot RandomSnapshot(int seed, bool withState, bool withPlaced)
     {
         var random = new Random(seed);
-        var blocks = new byte[Chunk.BlockCount];
-        random.NextBytes(blocks);
+        var blocks = new ushort[Chunk.BlockCount];
+        for (var i = 0; i < blocks.Length; i++) blocks[i] = (ushort)random.Next(0, ushort.MaxValue + 1);
         // Plenty of air too, so the palette's air slot is exercised
-        for (var i = 0; i < blocks.Length; i += 3) blocks[i] = 0;
+        for (var i = 0; i < blocks.Length; i += 3) blocks[i] = BlockType.Air;
 
         byte[]? state = null;
         if (withState)
@@ -53,7 +54,21 @@ public class ChunkSaveCodecTests
         ushort[]? placed = withPlaced
             ? Enumerable.Range(0, 50).Select(_ => (ushort)random.Next(Chunk.BlockCount)).ToArray()
             : null;
-        return new ChunkSnapshot(blocks, state, placed);
+        return new ChunkSnapshot(blocks, state, playerPlaced: placed);
+    }
+
+    // Air everywhere except cells 1..ids.Length, which hold the given ids in order
+    private static ChunkSnapshot SnapshotHolding(ushort[] ids)
+    {
+        var blocks = new ushort[Chunk.BlockCount];
+        ids.CopyTo(blocks, 1);
+        return new ChunkSnapshot(blocks, state: null, playerPlaced: null);
+    }
+
+    private static void AssertRoundTripsCellExactly(ChunkSnapshot snapshot)
+    {
+        var back = Decode(Encode(snapshot, NameOf), IdOf);
+        Assert.Equal(snapshot.Blocks, back.Blocks);
     }
 
     [Fact]
@@ -110,6 +125,113 @@ public class ChunkSaveCodecTests
         var future = (byte[])valid.Clone();
         future[4] = unchecked((byte)(ChunkSaveCodec.Version + 1));
         Assert.Throws<InvalidDataException>(() => Decode(future, IdOf));
+    }
+
+    /// <summary>An older file is refused, not misread: its body has another layout, and the save
+    /// store turns the refusal into a regenerated chunk.</summary>
+    [Fact]
+    public void AnOlderVersionIsRefusedAsInvalidData()
+    {
+        var older = Encode(RandomSnapshot(33, withState: true, withPlaced: true), NameOf);
+        older[4] = ChunkSaveCodec.Version - 1;
+
+        Assert.Throws<InvalidDataException>(() => Decode(older, IdOf));
+    }
+
+    /// <summary>A cell naming a palette entry the header never listed is refused.</summary>
+    [Fact]
+    public void AnIndexPastThePaletteIsRefused()
+    {
+        // Control: the forged file is otherwise well-formed, so naming the one entry decodes
+        Assert.Equal(1, Decode(ForgeOneNameChunk(cell: 7, index: 1), IdOf).Blocks[7]);
+        Assert.Throws<InvalidDataException>(() => Decode(ForgeOneNameChunk(cell: 7, index: 2), IdOf));
+    }
+
+    // A chunk file written by hand: a header listing one name ("b1") and no state or placed
+    // cells, then a byte-index body that is air except for one cell naming palette entry index
+    private static byte[] ForgeOneNameChunk(int cell, byte index)
+    {
+        var indices = new byte[Chunk.BlockCount];
+        indices[cell] = index;
+        using var forged = new MemoryStream();
+        using (var header = new BinaryWriter(forged, System.Text.Encoding.UTF8, leaveOpen: true))
+        {
+            header.Write("CVXC"u8);
+            header.Write(ChunkSaveCodec.Version);
+            header.Write((byte)0);
+            header.Write((ushort)1);
+            header.Write(NameOf(1)!);
+        }
+        using (var deflate = new DeflateStream(forged, CompressionLevel.Fastest, leaveOpen: true))
+            deflate.Write(indices);
+        return forged.ToArray();
+    }
+
+    /// <summary>
+    /// As many distinct non-air ids as a chunk can hold or an id can name, spread over the whole
+    /// id range up to its largest value, round-trip cell for cell: the palette count and the
+    /// indices are wide enough for any chunk.
+    /// </summary>
+    [Fact]
+    public void APaletteOfEveryDistinctIdRoundTrips()
+    {
+        var count = Math.Min(Chunk.BlockCount - 1, (int)ushort.MaxValue);
+        var ids = new ushort[count];
+        for (var i = 1; i <= count; i++)
+            ids[i - 1] = (ushort)((long)i * ushort.MaxValue / count);
+        Assert.Equal(count, ids.Distinct().Count());
+        Assert.Contains(ushort.MaxValue, ids);
+
+        AssertRoundTripsCellExactly(SnapshotHolding(ids));
+    }
+
+    /// <summary>Exactly as many distinct non-air ids as a one-byte index can name, taken from the
+    /// top of the id range, round-trip cell for cell.</summary>
+    [Fact]
+    public void APaletteAtTheByteIndexBoundaryRoundTrips()
+    {
+        AssertRoundTripsCellExactly(SnapshotHolding(TopIds(byte.MaxValue)));
+    }
+
+    /// <summary>One distinct non-air id more than a one-byte index can name round-trips cell for
+    /// cell, and its body switches to wide indices: it inflates to roughly one extra byte per cell
+    /// over the byte-index boundary case.</summary>
+    [Fact]
+    public void APaletteJustPastTheByteIndexWidthRoundTrips()
+    {
+        var wide = SnapshotHolding(TopIds(byte.MaxValue + 1));
+        AssertRoundTripsCellExactly(wide);
+
+        var narrowBody = InflatedBodyLength(Encode(SnapshotHolding(TopIds(byte.MaxValue)), NameOf));
+        var wideBody = InflatedBodyLength(Encode(wide, NameOf));
+        Assert.True(wideBody >= narrowBody + Chunk.BlockCount / 2,
+            $"a {byte.MaxValue + 1}-name palette's body inflates to {wideBody} bytes, the {byte.MaxValue}-name one to {narrowBody}");
+    }
+
+    // count distinct ids taken from the top of the id range
+    private static ushort[] TopIds(int count)
+    {
+        var ids = new ushort[count];
+        for (var k = 0; k < ids.Length; k++)
+            ids[k] = (ushort)(ushort.MaxValue - k);
+        return ids;
+    }
+
+    // The length of an encoded chunk's Deflate body once inflated: the header (magic, version,
+    // flags, palette count and names) is skipped first
+    private static long InflatedBodyLength(byte[] file)
+    {
+        using var input = new MemoryStream(file);
+        using (var header = new BinaryReader(input, System.Text.Encoding.UTF8, leaveOpen: true))
+        {
+            header.ReadBytes(4 + 1 + 1);
+            var names = header.ReadUInt16();
+            for (var k = 0; k < names; k++) header.ReadString();
+        }
+        using var deflate = new DeflateStream(input, CompressionMode.Decompress);
+        using var body = new MemoryStream();
+        deflate.CopyTo(body);
+        return body.Length;
     }
 
     [Fact]
@@ -276,16 +398,16 @@ public class ChunkSaveCodecTests
         Assert.Contains((ushort)Chunk.Idx(lx, ly, lz), FrontierOf(pos, overCavity));
     }
 
-    private static byte[] BlocksWithSource(byte water, int x, int y, int z)
+    private static ushort[] BlocksWithSource(ushort water, int x, int y, int z)
     {
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         blocks[Chunk.Idx(x, y, z)] = water;
         return blocks;
     }
 
     /// <summary>Stones the five faces the frontier scan tests (never +Y), except
     /// <paramref name="leaveOpen"/>, which stays air.</summary>
-    private static void EncloseFiveFaces(byte[] blocks, byte stone, int x, int y, int z,
+    private static void EncloseFiveFaces(ushort[] blocks, ushort stone, int x, int y, int z,
         (int X, int Y, int Z)? leaveOpen)
     {
         (int X, int Y, int Z)[] faces = [(-1, 0, 0), (1, 0, 0), (0, 0, -1), (0, 0, 1), (0, -1, 0)];
@@ -296,10 +418,10 @@ public class ChunkSaveCodecTests
         }
     }
 
-    private static ushort[] FrontierOf(Vector3 pos, byte[] blocks)
+    private static ushort[] FrontierOf(Vector3 pos, ushort[] blocks)
     {
         var chunk = new Chunk(null!, pos, generateBlockData: false);
-        chunk.RestoreFrom(new ChunkSnapshot(blocks, null, null));
+        chunk.RestoreFrom(new ChunkSnapshot(blocks, null, playerPlaced: null));
         return chunk.FluidFrontier ?? [];
     }
 

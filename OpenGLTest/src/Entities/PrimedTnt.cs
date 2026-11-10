@@ -30,7 +30,7 @@ public class PrimedTnt
 
     /// <summary>The block that primed, so the cube renders as whatever declared
     /// <c>onBreak: prime_tnt</c> instead of one hardcoded type.</summary>
-    public byte BlockId { get; }
+    public ushort BlockId { get; }
 
     private Vector3 _velocity;
     private float _age;
@@ -63,7 +63,7 @@ public class PrimedTnt
         }
     }
 
-    public PrimedTnt(Vector3 position, byte blockId, float fuseSeconds)
+    public PrimedTnt(Vector3 position, ushort blockId, float fuseSeconds)
     {
         Position = position;
         BlockId = blockId;
@@ -82,7 +82,7 @@ public class PrimedTnt
 
     // A mirror: no ejection pop, and the age a cube that has burnt this long would have, so the
     // strobe picks up where the server's is
-    private PrimedTnt(Vector3 position, byte blockId, float fuseDuration, float fuseRemaining)
+    private PrimedTnt(Vector3 position, ushort blockId, float fuseDuration, float fuseRemaining)
     {
         Position = position;
         BlockId = blockId;
@@ -97,7 +97,7 @@ public class PrimedTnt
     /// blast. <see cref="MirrorSetState"/> applies each snapshot and <see cref="AdvanceFuse"/> keeps
     /// the strobe running between them.
     /// </summary>
-    internal static PrimedTnt Mirror(Vector3 position, byte blockId, float fuseDuration, float fuseRemaining) =>
+    internal static PrimedTnt Mirror(Vector3 position, ushort blockId, float fuseDuration, float fuseRemaining) =>
         new(position, blockId, fuseDuration, fuseRemaining);
 
     /// <summary>Takes a server snapshot's position and fuse; the strobe clock keeps running.</summary>

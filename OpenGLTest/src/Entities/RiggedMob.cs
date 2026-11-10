@@ -115,7 +115,7 @@ public abstract class RiggedMob : Mob
 
     /// <summary>The item whose sprite color tints the armor shell drawn over rig part <paramref name="part"/>, or 0 for
     /// a bare part: none by default; a tower skeleton wears its outfit (<see cref="TowerMobs.SkeletonOutfit"/>).</summary>
-    public virtual byte ArmorPieceOn(string part) => 0;
+    public virtual ushort ArmorPieceOn(string part) => 0;
 
     /// <inheritdoc />
     protected override void SetVelocity(Vector3 velocity) => _velocity = velocity;

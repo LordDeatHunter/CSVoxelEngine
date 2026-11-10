@@ -18,7 +18,7 @@ public static class BlockSupport
     /// The cell holding up a support-fragile <paramref name="blockId"/> with state byte
     /// <paramref name="state"/> at <paramref name="cell"/>; false for a block that needs no support.
     /// </summary>
-    public static bool TryGetSupportCell(byte blockId, byte state, Vector3 cell, out Vector3 support)
+    public static bool TryGetSupportCell(ushort blockId, byte state, Vector3 cell, out Vector3 support)
     {
         if (BlockType.ById[blockId] is not { NeedsSupport: true } type)
         {
@@ -40,13 +40,13 @@ public static class BlockSupport
 
     /// <summary>Whether the block at <paramref name="cell"/> is held up by the cell
     /// <paramref name="holder"/>, i.e. loses its support when that cell is emptied.</summary>
-    public static bool IsHeldUpBy(byte blockId, byte state, Vector3 cell, Vector3 holder) =>
+    public static bool IsHeldUpBy(ushort blockId, byte state, Vector3 cell, Vector3 holder) =>
         TryGetSupportCell(blockId, state, cell, out var support) && support == holder;
 
     /// <summary>Whether the block <paramref name="holderId"/> (with state <paramref name="holderState"/>) may hold up a
     /// newly placed support-fragile <paramref name="blockId"/>: any solid block, or only a full block face for a
     /// <see cref="BlockType.SupportFullFace"/> block (a torch).</summary>
-    public static bool CanHold(byte blockId, byte holderId, byte holderState) =>
+    public static bool CanHold(ushort blockId, ushort holderId, byte holderState) =>
         BlockType.ById[blockId] is { SupportFullFace: true }
             ? BlockType.HoldsFullFace(holderId, holderState)
             : BlockType.IsSolid(holderId);

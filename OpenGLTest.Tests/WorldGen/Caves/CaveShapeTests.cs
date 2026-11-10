@@ -27,10 +27,10 @@ public sealed class CaveShapeTests
 
     public CaveShapeTests() => TestContent.EnsureLoaded();
 
-    private static byte[] Carved(int cx, int cy, int cz, CaveBiomeMap? map)
+    private static ushort[] Carved(int cx, int cy, int cz, CaveBiomeMap? map)
     {
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         Array.Fill(blocks, stone);
         NoiseCaves.Carve(blocks, ColumnCache.Get(cx, cz), cx * Chunk.Size, cy * Chunk.Size, cz * Chunk.Size, map);
         return blocks;
@@ -184,12 +184,12 @@ public sealed class CaveShapeTests
         foreach (var (cx, cy, cz) in new[] { (0, -2, 0), (2, -14, -3), (-4, -16, 5), (6, -4, 1) })
         {
             var column = ColumnCache.Get(cx, cz);
-            var first = new byte[Chunk.BlockCount];
+            var first = new ushort[Chunk.BlockCount];
             Array.Fill(first, stone);
             WormCarver.Carve(first, column, cx * Chunk.Size, cy * Chunk.Size, cz * Chunk.Size);
 
             WormCarver.ResetCellCache();
-            var second = new byte[Chunk.BlockCount];
+            var second = new ushort[Chunk.BlockCount];
             Array.Fill(second, stone);
             WormCarver.Carve(second, column, cx * Chunk.Size, cy * Chunk.Size, cz * Chunk.Size);
             Assert.True(first.AsSpan().SequenceEqual(second), $"the worms carved chunk ({cx}, {cy}, {cz}) differently");

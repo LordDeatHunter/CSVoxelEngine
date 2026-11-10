@@ -31,16 +31,16 @@ internal static class TreeSpeciesCompiler
     /// reference, or null when the name is not a block; the caller owns the prefix rules.
     /// </summary>
     internal static TreeSpecies Compile(
-        string name, TreeSpeciesDefinition dto, string path, Func<string, byte?> resolveBlock)
+        string name, TreeSpeciesDefinition dto, string path, Func<string, ushort?> resolveBlock)
     {
         // Block references.
         if (string.IsNullOrWhiteSpace(dto.Wood))
             throw Fail(path, "is missing 'wood'.");
-        byte woodId = resolveBlock(dto.Wood) ?? throw Fail(path, $"wood '{dto.Wood}' is not a block.");
+        ushort woodId = resolveBlock(dto.Wood) ?? throw Fail(path, $"wood '{dto.Wood}' is not a block.");
         if (BlockType.IsFluid(woodId))
             throw Fail(path, $"wood '{dto.Wood}' is a fluid.");
 
-        byte leavesId = 0;
+        ushort leavesId = 0;
         if (dto.Leaves != null)
         {
             leavesId = resolveBlock(dto.Leaves) ?? throw Fail(path, $"leaves '{dto.Leaves}' is not a block.");
@@ -183,7 +183,7 @@ internal static class TreeSpeciesCompiler
     }
 
     private static TreeWorldgenRules Worldgen(string path, TreeSpeciesDefinition.WorldgenDefinition w,
-        Func<string, byte?> resolveBlock)
+        Func<string, ushort?> resolveBlock)
     {
         if (w.Biomes == null || w.Biomes.Length == 0)
             throw Fail(path, $"worldgen.biomes must name at least one biome (known: {BiomeNames}).");
@@ -217,7 +217,7 @@ internal static class TreeSpeciesCompiler
         float openness = w.Openness ?? 1f;
         if (!float.IsFinite(openness) || openness < 0f || openness > 1f)
             throw Fail(path, $"worldgen.openness must be 0..1, got {openness}.");
-        byte fallenLogId = 0;
+        ushort fallenLogId = 0;
         if (w.FallenLog != null)
         {
             var resolved = resolveBlock(w.FallenLog);

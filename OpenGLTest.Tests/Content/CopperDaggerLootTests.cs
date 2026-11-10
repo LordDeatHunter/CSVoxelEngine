@@ -23,7 +23,7 @@ public sealed class CopperDaggerLootTests
         var daggers = 0;
         for (var i = 0; i < Kills; i++)
         {
-            var into = new List<byte>();
+            var into = new List<ushort>();
             table.Roll(new LootContext(0, 0, 0), into, random);
             var count = into.Count(id => id == dagger);
             Assert.True(count <= 1, "a kill dropped more than one dagger");

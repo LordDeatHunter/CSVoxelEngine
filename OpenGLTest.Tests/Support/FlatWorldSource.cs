@@ -22,7 +22,7 @@ internal sealed class FlatWorldSource : IWorldSource
     private readonly int _cxMax;
     private readonly int _czMin;
     private readonly int _czMax;
-    private readonly byte _block;
+    private readonly ushort _block;
     private readonly Biome _biome;
     private readonly float _warmth;
     private readonly float _wetness;
@@ -49,7 +49,7 @@ internal sealed class FlatWorldSource : IWorldSource
     /// <param name="dirtDepth">The <see cref="ColumnData.DirtDepth"/> of every supplied column; 0
     /// marks bare rock. It only describes the column (the far LOD reads it); the fill is
     /// <paramref name="block"/> all the same.</param>
-    public FlatWorldSource(int cxMin, int cxMax, int czMin, int czMax, int top, byte block, Biome biome,
+    public FlatWorldSource(int cxMin, int cxMax, int czMin, int czMax, int top, ushort block, Biome biome,
         float warmth, float wetness, int waterLevel = TerrainGenerator.NoWater,
         IReadOnlySet<(int X, int Y, int Z)>? carved = null, IWorldSource? fallback = null,
         int dirtDepth = WorldGenerationConfig.NominalDirtDepth)
@@ -93,7 +93,7 @@ internal sealed class FlatWorldSource : IWorldSource
             return;
         }
 
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         var lowerY = chunk.LowerBoundY;
         for (var x = 0; x < Chunk.Size; x++)
         for (var y = 0; y < Chunk.Size; y++)

@@ -393,7 +393,7 @@ public sealed class LeafDecayTests
         var cx = cell.X >> Chunk.SizeShift;
         var cz = cell.Z >> Chunk.SizeShift;
 
-        void AssertFreezesThenGoes(string what, byte id, byte state)
+        void AssertFreezesThenGoes(string what, ushort id, byte state)
         {
             var manager = new LeafDecayManager();
             var drops = new DropManager();
@@ -450,7 +450,7 @@ public sealed class LeafDecayTests
             foreach (var cell in tree.Leaves.Keys)
                 Assert.True(IsAir(tree.Chunks, cell), $"{species.Name}: the leaf at {cell} outlived every tip");
 
-            var possible = new List<byte>();
+            var possible = new List<ushort>();
             for (var i = 0; i < 400; i++)
                 DropManager.RollLoot(species.LeavesId, new LootContext(0, 0, 0), possible);
             var possibleIds = possible.ToHashSet();

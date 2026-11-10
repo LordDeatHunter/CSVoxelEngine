@@ -123,7 +123,7 @@ public static class SnowGenerator
     /// the ground or the ice. Runs on a generation worker thread; writes only this chunk's own
     /// cells. Runs before <see cref="StampCanopy"/>, which must see the snowed ground.
     /// </summary>
-    public static void StampGround(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void StampGround(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         // The caller gates this on SnowAndIceEnabled, so the body has no toggle of its own.
         var seaBlock = TerrainGenerator.SeaBlock;
@@ -191,7 +191,7 @@ public static class SnowGenerator
     /// Runs after <see cref="StampGround"/>; writes only this chunk's own cells. Never gated by a
     /// band: its leaves can come from trees rooted in neighbor columns.
     /// </summary>
-    public static void StampCanopy(byte[] blocks, ColumnData column, int worldX0, int worldZ0)
+    public static void StampCanopy(ushort[] blocks, ColumnData column, int worldX0, int worldZ0)
     {
         var snowBlock = TerrainGenerator.SnowBlock;
 

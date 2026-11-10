@@ -23,8 +23,8 @@ public sealed class TowerCollapseEffectsTests
     private const int Radius = 6;
     private const float Frame = 1f / 60f;
 
-    private static byte Bricks => ContentRegistry.RequireBlock("tower_bricks").Id;
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Bricks => ContentRegistry.RequireBlock("tower_bricks").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
 
     // A stone floor at y 0, the camera beside one tracked tower in the given altar state, and the caps filled
     private static (TowerCollapseEffects Effects, BlockDebrisSystem Chips, ChunkManager Chunks) Setup(TowerAltarState altar)
@@ -111,9 +111,9 @@ public sealed class TowerCollapseEffectsTests
     }
 
     // Every loaded cell's block and state, in a fixed order
-    private static List<(byte Id, byte State)> Snapshot(ChunkManager chunks)
+    private static List<(ushort Id, byte State)> Snapshot(ChunkManager chunks)
     {
-        var cells = new List<(byte, byte)>();
+        var cells = new List<(ushort, byte)>();
         foreach (var chunk in chunks.Chunks.Values)
         {
             var origin = chunk.Position * Chunk.Size;

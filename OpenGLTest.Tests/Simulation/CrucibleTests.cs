@@ -343,7 +343,7 @@ public sealed class CrucibleTests
         Assert.Equal(crushed.InputId, otherKilns.StateAt(2, 2, 2)!.Contents.PendingInputId);
 
         // A component written the way every older caller writes it is unchanged by the new field
-        Assert.Equal<byte>(0, default(CrucibleComponent).PendingInputId);
+        Assert.Equal(BlockType.Air, default(CrucibleComponent).PendingInputId);
         Assert.Equal(new CrucibleComponent(Copper, 1, 2), new CrucibleComponent(Copper, 1, 2, 0));
     }
 

@@ -78,7 +78,7 @@ internal sealed class LeftClickAction
     internal Vector3 BreakingBlockPosition => _breakingBlockPosition;
 
     /// <summary>The id of the block being mined.</summary>
-    internal byte BreakingBlockId => _breakingBlockId;
+    internal ushort BreakingBlockId => _breakingBlockId;
 
     /// <summary>Whether the cell being mined shows its progress as an eaten-away face (a natural full-cube trunk
     /// with a side bite), so the crack overlay stays off for it.</summary>
@@ -114,8 +114,8 @@ internal sealed class LeftClickAction
     private int _selectedBoxIndex;
     private bool _isBreaking;
     private Vector3 _breakingBlockPosition;
-    private byte _breakingBlockId;
-    private byte _breakingHeldId;
+    private ushort _breakingBlockId;
+    private ushort _breakingHeldId;
     private float _breakDamage;
     private float _breakHardness;
     private float _breakPower;
@@ -193,7 +193,7 @@ internal sealed class LeftClickAction
     }
 
     // The status line of the bloomery or anvil under the crosshair (see SmithingReadout), null for anything else
-    private string? IronWorksDetail(byte blockId, Vector3 anchor, int x, int y, int z)
+    private string? IronWorksDetail(ushort blockId, Vector3 anchor, int x, int y, int z)
     {
         var type = BlockType.ById[blockId];
         if (type?.Bloomery != null && _world.Smithing.Bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z) is { } bloomery)
@@ -844,6 +844,6 @@ internal sealed class LeftClickAction
 
     // One hit, one sound: an unknown or air id falls back to the default group, which is what
     // a block with no authored sfx plays too. A null manager (headless/tests) is silent.
-    private void PlayHitSfx(byte blockId) =>
+    private void PlayHitSfx(ushort blockId) =>
         _sfx?.Play(BlockType.ById[blockId]?.Sfx ?? SfxLibrary.DefaultGroup);
 }

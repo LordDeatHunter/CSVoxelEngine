@@ -18,7 +18,7 @@ public static class LavaGenerator
     private static FastNoiseLite PatchNoise;
 
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte LavaBlock;
+    public static readonly ushort LavaBlock;
 
     static LavaGenerator()
     {
@@ -49,7 +49,7 @@ public static class LavaGenerator
     /// layer is skipped (its floor lives in the chunk below, which this chunk cannot see),
     /// so ponded lava never floats.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         if (worldY0 > WorldGenerationConfig.LavaMaxY) return;
 

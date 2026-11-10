@@ -35,7 +35,7 @@ public sealed class ServerPlayerTests : IDisposable
         }
     }
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
 
     [Fact]
     public void ANewcomerGetsTheHintScrollAndAReturningPlayerDoesNot()

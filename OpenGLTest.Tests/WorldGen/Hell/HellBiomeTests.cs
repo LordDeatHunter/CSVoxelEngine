@@ -27,11 +27,11 @@ public sealed class HellBiomeTests
 
     private static int LayerTop(int layer) => WorldGenerationConfig.HellTopY - layer * Period;
 
-    private static IEnumerable<byte> Blocks(HellBiomePalette p) =>
+    private static IEnumerable<ushort> Blocks(HellBiomePalette p) =>
         [p.Surface, p.Soil, p.Wall, p.Ceiling, p.PoolBed, p.CeilingLight, p.FloorLight];
 
     /// <summary>Air, or the flora (HellFlora) that stands in an air cell.</summary>
-    private static bool IsCavernAir(byte block) =>
+    private static bool IsCavernAir(ushort block) =>
         block == BlockType.Air || block == HellFlora.VineBlock
         || AllBiomes.Any(b => HellBiomes.Palette(b).GroundPlant == block);
 
@@ -163,8 +163,8 @@ public sealed class HellBiomeTests
         var hellrock = HellGenerator.HellrockBlock;
         var lavaId = HellGenerator.LavaBlock;
         var surfacesSeen = new HashSet<HellBiome>();
-        var lightsSeen = new HashSet<byte>();
-        var blocks = new byte[Volume];
+        var lightsSeen = new HashSet<ushort>();
+        var blocks = new ushort[Volume];
         var checkedPoint = new HashSet<HellBiome>();
 
         foreach (var (layer, cx, cz) in ChunkColumnsPerBiome())
@@ -221,7 +221,7 @@ public sealed class HellBiomeTests
 
     /// <summary>The floor under an air cell is its biome's surface or floor light (or lava), and a
     /// solid cell over it that is no floor itself is its biome's ceiling or ceiling light.</summary>
-    private static void CheckAirNeighbors(byte[] blocks, int x, int y, int z, int wx, int wy, int wz,
+    private static void CheckAirNeighbors(ushort[] blocks, int x, int y, int z, int wx, int wy, int wz,
         HashSet<HellBiome> surfacesSeen)
     {
         if (y > 0)
@@ -249,7 +249,7 @@ public sealed class HellBiomeTests
     }
 
     /// <summary>A lava cell's sides and bottom, inside the chunk, are lava or solid, so it never flows.</summary>
-    private static void CheckLavaContained(byte[] blocks, int x, int y, int z)
+    private static void CheckLavaContained(ushort[] blocks, int x, int y, int z)
     {
         Span<(int, int, int)> sides = [(x - 1, y, z), (x + 1, y, z), (x, y, z - 1), (x, y, z + 1), (x, y - 1, z)];
         foreach (var (nx, ny, nz) in sides)

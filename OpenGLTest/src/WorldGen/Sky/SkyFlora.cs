@@ -23,13 +23,13 @@ internal static class SkyFlora
     private const ulong VineLengthSalt = 0x534B564CUL;
 
     /// <summary>The vine hanging under the islands.</summary>
-    internal static readonly byte VineBlock;
+    internal static readonly ushort VineBlock;
 
     static SkyFlora() => VineBlock = ContentRegistry.RequireBlock("sky_vine").Id;
 
     /// <summary>The block of island column (x, z), whose island cells run <paramref name="bottom"/>..<paramref name="top"/>,
     /// at world y: the island, its plant, its vine, or air.</summary>
-    internal static byte BlockAt(SkyIslandPalette palette, int x, int y, int z, int bottom, int top)
+    internal static ushort BlockAt(SkyIslandPalette palette, int x, int y, int z, int bottom, int top)
     {
         if (y >= bottom && y <= top)
             return y == top && IsSparkle(palette, x, z) ? palette.Sparkle : palette.BlockAt(y, top);
@@ -42,7 +42,7 @@ internal static class SkyFlora
         palette.Sparkle != BlockType.Air && SkyBiomes.Hash(x, z, SparkleSalt) % (ulong)palette.SparkleRate == 0;
 
     /// <summary>The plant over the top cell of column (x, z), or air: never over a sparkle.</summary>
-    internal static byte PlantAt(SkyIslandPalette palette, int x, int z)
+    internal static ushort PlantAt(SkyIslandPalette palette, int x, int z)
     {
         if (palette.Plants.Length == 0 || IsSparkle(palette, x, z)) return BlockType.Air;
         if (SkyBiomes.Hash(x, z, PlantSalt) % (ulong)palette.PlantRate != 0) return BlockType.Air;

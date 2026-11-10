@@ -19,7 +19,7 @@ public static class TreeStepDiff
     public readonly record struct Step(int[] Set, int[] Del);
 
     /// <summary>The cells keyed by position, the later of two cells at one position winning.</summary>
-    public static Dictionary<(int X, int Y, int Z), Cell> ToMap(IReadOnlyList<TreeCell> cells, byte leavesId)
+    public static Dictionary<(int X, int Y, int Z), Cell> ToMap(IReadOnlyList<TreeCell> cells, ushort leavesId)
     {
         var map = new Dictionary<(int X, int Y, int Z), Cell>(cells.Count);
         foreach (var c in cells)

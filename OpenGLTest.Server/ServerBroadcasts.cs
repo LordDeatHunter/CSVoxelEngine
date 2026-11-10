@@ -21,11 +21,9 @@ internal sealed class ServerBroadcasts
 
     // Long-lived, coalesced cell changes the server's own simulation produced (explosions, fluid
     // flow, decay, felling), drained and broadcast in batches.
-    private readonly ConcurrentQueue<CellChange> _cellJournal = new();
-    private readonly Dictionary<(int X, int Y, int Z), (byte Id, byte State)> _cellCoalesce = new();
+    private readonly ConcurrentQueue<NetCellChange> _cellJournal = new();
+    private readonly Dictionary<(int X, int Y, int Z), (ushort Id, byte State)> _cellCoalesce = new();
     private const int MaxCellChangesPerBroadcast = 8192;
-
-    private readonly record struct CellChange(int X, int Y, int Z, byte Id, byte State);
 
     // Whether the last station broadcast carried anything, so the one after the last station went
     // away still goes out and clears the clients' mirrors
@@ -171,8 +169,8 @@ internal sealed class ServerBroadcasts
             _entityIds.Remove(key);
     }
 
-    internal void OnCellWritten(int x, int y, int z, byte id, byte state) =>
-        _cellJournal.Enqueue(new CellChange(x, y, z, id, state));
+    internal void OnCellWritten(int x, int y, int z, ushort id, byte state) =>
+        _cellJournal.Enqueue(new NetCellChange(x, y, z, id, state));
 
     /// <summary>
     /// Broadcasts every campfire, quern, kiln and cast mold the server runs, which the clients draw
@@ -210,13 +208,7 @@ internal sealed class ServerBroadcasts
         using var writer = new PacketWriter(NetMessage.BlockChanges);
         writer.Write(_cellCoalesce.Count);
         foreach (var (cell, value) in _cellCoalesce)
-        {
-            writer.Write(cell.X);
-            writer.Write(cell.Y);
-            writer.Write(cell.Z);
-            writer.Write(value.Id);
-            writer.Write(value.State);
-        }
+            NetCellChangeCodec.Write(writer, new NetCellChange(cell.X, cell.Y, cell.Z, value.Id, value.State));
 
         _state.Broadcast(writer.ToArray());
         _cellCoalesce.Clear();

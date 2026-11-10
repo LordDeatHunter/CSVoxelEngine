@@ -26,7 +26,7 @@ namespace VoxelEngine.Content;
 
 /// <summary>
 /// Loads every block, item, loot table, tag and model from <c>assets/data</c> and
-/// <c>assets/models</c>, hands out byte ids and fills the static tables on
+/// <c>assets/models</c>, hands out ids and fills the static tables on
 /// <see cref="BlockType"/> and <see cref="ItemRegistry"/>.
 ///
 /// Two phases, both on the main thread at startup and both before the <see cref="World"/> (and
@@ -46,20 +46,20 @@ namespace VoxelEngine.Content;
 /// </summary>
 public static class ContentRegistry
 {
-    internal static readonly Dictionary<string, byte> BlockIds = new(StringComparer.Ordinal);
-    internal static readonly Dictionary<string, byte> ItemIds = new(StringComparer.Ordinal);
+    internal static readonly Dictionary<string, ushort> BlockIds = new(StringComparer.Ordinal);
+    internal static readonly Dictionary<string, ushort> ItemIds = new(StringComparer.Ordinal);
     internal static readonly Dictionary<string, LootTable> LootTables = new(StringComparer.Ordinal);
-    internal static readonly Dictionary<string, HashSet<byte>> Tags = new(StringComparer.Ordinal);
-    internal static readonly Dictionary<byte, BlockModel> BlockModels = new();
+    internal static readonly Dictionary<string, HashSet<ushort>> Tags = new(StringComparer.Ordinal);
+    internal static readonly Dictionary<ushort, BlockModel> BlockModels = new();
 
     // The open model of every openable block (its "open" object), flattened at load and baked
     // beside the closed model in BakeModels
-    internal static readonly Dictionary<byte, BlockModel> OpenModels = new();
+    internal static readonly Dictionary<ushort, BlockModel> OpenModels = new();
 
     // Items that declare a "model": flattened at load like a block's, baked in BakeModels so a
     // station can draw the item as real geometry (the crucible standing in a kiln's hearth).
-    internal static readonly Dictionary<byte, BlockModel> ItemModels = new();
-    internal static readonly Dictionary<byte, BlockDefinition> BlockDefinitions = new();
+    internal static readonly Dictionary<ushort, BlockModel> ItemModels = new();
+    internal static readonly Dictionary<ushort, BlockDefinition> BlockDefinitions = new();
     internal static readonly List<CraftingRecipe> Recipes = [];
     internal static readonly List<CookRecipe> CookRecipes = [];
     internal static readonly List<CrushRecipe> CrushRecipes = [];
@@ -71,12 +71,12 @@ public static class ContentRegistry
 
     // Blocks declaring a "biomeTint", validated at load (so a bad face names its file before any
     // GL) and resolved to atlas tiles in BakeModels, the first point the tiles exist.
-    internal static readonly List<(byte Id, BiomeTintPalette Palette, BlockDefinition.BiomeTintFaceDefinition?[] Faces, string Path)>
+    internal static readonly List<(ushort Id, BiomeTintPalette Palette, BlockDefinition.BiomeTintFaceDefinition?[] Faces, string Path)>
         BiomeTintPending = [];
 
     // Blocks declaring a "modelTint": a sub-cell model block whose own quads are climate-tinted,
     // validated and resolved in BakeModels beside the cube-face biomeTint list.
-    internal static readonly List<(byte Id, string? Palette, string Path)> ModelTintPending = [];
+    internal static readonly List<(ushort Id, string? Palette, string Path)> ModelTintPending = [];
 
     internal static string AssetsRoot = "assets";
     internal static ModelLoader? ModelFiles;
@@ -101,22 +101,24 @@ public static class ContentRegistry
         var blockFiles = ContentFiles.JsonFilesIn(Path.Combine(assetsRoot, "data", "blocks"));
         var itemFiles = ContentFiles.JsonFilesIn(Path.Combine(assetsRoot, "data", "items"));
 
-        // Chunk storage is a byte and 0 is air, so blocks and items share 255 slots
+        // 0 is air, so blocks and items share the remaining ids; the per-id tables are sized to
+        // exactly this many before any loader writes one
         var total = 1 + blockFiles.Count + itemFiles.Count;
-        if (total > 256)
+        if (total - 1 > ushort.MaxValue)
             throw new InvalidOperationException(
-                $"{blockFiles.Count} blocks + {itemFiles.Count} items exceed the 255 ids a byte block id can hold.");
+                $"{blockFiles.Count} blocks + {itemFiles.Count} items exceed the {ushort.MaxValue} ids a block or item id can hold.");
+        BlockTables.Allocate(total);
 
-        byte nextId = 1;
+        var nextId = 1;
         foreach (var (name, path) in blockFiles)
         {
             if (name == "air")
                 throw new InvalidOperationException($"'{path}' may not be named 'air': id 0 is reserved for empty cells.");
-            BlockIds[name] = nextId++;
+            BlockIds[name] = (ushort)nextId++;
         }
 
         foreach (var (name, _) in itemFiles)
-            ItemIds[name] = nextId++;
+            ItemIds[name] = (ushort)nextId++;
 
         ItemLoader.LoadItems(itemFiles);
         LootTableCompiler.LoadLootTables(Path.Combine(assetsRoot, "data", "loot"));
@@ -330,10 +332,10 @@ public static class ContentRegistry
     }
 
     /// <summary>
-    /// Byte id of a block or item by name. A bare name resolves against blocks first, then
+    /// Id of a block or item by name. A bare name resolves against blocks first, then
     /// items; a <c>block/</c> or <c>item/</c> prefix pins it to one of the two.
     /// </summary>
-    public static byte Require(string name)
+    public static ushort Require(string name)
     {
         if (ContentFiles.TryResolve(name, out var id)) return id;
         throw new InvalidOperationException($"No block or item named '{name}' is registered.");
@@ -357,7 +359,7 @@ public static class ContentRegistry
     /// removed block degrades to air instead of failing the load. Read-only after
     /// <see cref="Load"/>, so worker threads may call it.
     /// </summary>
-    public static bool TryResolveBlock(string name, out byte id) => BlockIds.TryGetValue(name, out id);
+    public static bool TryResolveBlock(string name, out ushort id) => BlockIds.TryGetValue(name, out id);
 
     /// <summary>
     /// The id of the pure item registered under <paramref name="name"/> (its JSON file name), or
@@ -367,7 +369,7 @@ public static class ContentRegistry
     /// is dropped instead of failing the load. Read-only after <see cref="Load"/>, so any thread
     /// may call it.
     /// </summary>
-    public static bool TryResolveItem(string name, out byte id) => ItemIds.TryGetValue(name, out id);
+    public static bool TryResolveItem(string name, out ushort id) => ItemIds.TryGetValue(name, out id);
 
     /// <summary>The item registered under that JSON file name; items only, like
     /// <see cref="RequireBlock"/>.</summary>
@@ -381,7 +383,7 @@ public static class ContentRegistry
     public static IReadOnlyList<CraftingRecipe> CraftingRecipes => Recipes;
 
     /// <summary>First recipe making this id, or null when nothing crafts it.</summary>
-    public static CraftingRecipe? RecipeForResult(byte id)
+    public static CraftingRecipe? RecipeForResult(ushort id)
     {
         foreach (var recipe in Recipes)
             if (recipe.ResultId == id) return recipe;
@@ -397,7 +399,7 @@ public static class ContentRegistry
     }
 
     /// <summary>First cook recipe taking this id, or null when it is not cookable.</summary>
-    public static CookRecipe? CookRecipeForInput(byte id)
+    public static CookRecipe? CookRecipeForInput(ushort id)
     {
         foreach (var recipe in CookRecipes)
             if (recipe.InputId == id) return recipe;
@@ -405,7 +407,7 @@ public static class ContentRegistry
     }
 
     /// <summary>First crush recipe taking this id, or null when it is not crushable.</summary>
-    public static CrushRecipe? CrushRecipeForInput(byte id)
+    public static CrushRecipe? CrushRecipeForInput(ushort id)
     {
         foreach (var recipe in CrushRecipes)
             if (recipe.InputId == id) return recipe;
@@ -428,7 +430,7 @@ public static class ContentRegistry
         id >= 1 && id <= MoltenMaterialsList.Count ? MoltenMaterialsList[id - 1] : null;
 
     /// <summary>The melt recipe taking this id, or null when it does not melt.</summary>
-    public static MeltRecipe? MeltRecipeForInput(byte id)
+    public static MeltRecipe? MeltRecipeForInput(ushort id)
     {
         foreach (var recipe in MeltRecipes)
             if (recipe.InputId == id) return recipe;
@@ -439,7 +441,7 @@ public static class ContentRegistry
     public static IReadOnlyList<CastRecipe> CastRecipesList => CastRecipes;
 
     /// <summary>The cast recipe for this mold and molten material, or null when the pair casts nothing.</summary>
-    public static CastRecipe? CastRecipeFor(byte moldId, byte materialId)
+    public static CastRecipe? CastRecipeFor(ushort moldId, byte materialId)
     {
         foreach (var recipe in CastRecipes)
             if (recipe.MoldId == moldId && recipe.MaterialId == materialId) return recipe;
@@ -454,7 +456,7 @@ public static class ContentRegistry
     public static IReadOnlyList<ForgeRecipe> ForgeRecipes => ForgeRecipesList;
 
     /// <summary>The forge recipe making this id, or null when no anvil forges it.</summary>
-    public static ForgeRecipe? ForgeRecipeForResult(byte id)
+    public static ForgeRecipe? ForgeRecipeForResult(ushort id)
     {
         foreach (var recipe in ForgeRecipesList)
             if (recipe.ResultId == id) return recipe;
@@ -462,7 +464,7 @@ public static class ContentRegistry
     }
 
     /// <summary>Whether this id is a forge metal: some forge recipe takes it, so it stacks on an anvil.</summary>
-    public static bool IsForgeMetal(byte id)
+    public static bool IsForgeMetal(ushort id)
     {
         if (id == BlockType.Air) return false;
         foreach (var recipe in ForgeRecipesList)
@@ -471,7 +473,7 @@ public static class ContentRegistry
     }
 
     /// <summary>Whether any cast recipe pours into this block, i.e. whether it is a usable mold.</summary>
-    public static bool IsCastMold(byte id)
+    public static bool IsCastMold(ushort id)
     {
         if (id == BlockType.Air) return false;
         foreach (var recipe in CastRecipes)
@@ -507,59 +509,12 @@ public static class ContentRegistry
         SpellPartRegistry.Reset();
         StatusEffectRegistry.Reset();
 
-        Array.Clear(BlockType.ById);
-        Array.Clear(BlockType.Emission);
-        Array.Clear(BlockType.LightSlot);
         BlockLightPalette.Reset();
-        Array.Clear(BlockType.PassesLightById);
-        Array.Clear(BlockType.TreeWoodById);
-        Array.Clear(BlockType.FullCubeById);
-        Array.Clear(BlockType.PixelRimById);
-        Array.Clear(BlockType.PaneById);
-        Array.Clear(BlockType.PaneProfileById);
-        Array.Clear(BlockType.SolidById);
-        Array.Clear(BlockType.CollidesByHitboxById);
-        Array.Clear(BlockType.MovementSpeedById);
-        Array.Clear(BlockType.FrictionById);
-        Array.Fill(BlockType.FrictionById, BlockType.DefaultFriction);
-        Array.Clear(BlockType.PebbleWeightById);
-        Array.Clear(BlockType.FootstepDustById);
         TileMaterials.Reset();
-        Array.Clear(BlockType.OccludesById);
-        Array.Clear(BlockType.CastsAoById);
-        Array.Clear(BlockType.FluidById);
-        Array.Clear(BlockType.FluidTickDivisorById);
-        Array.Clear(BlockType.FluidRangeById);
-        Array.Clear(BlockType.FluidInfiniteById);
-        Array.Clear(BlockType.HardensToById);
-        Array.Clear(BlockType.HardensTouchingById);
-        Array.Clear(BlockType.FlammableById);
-        Array.Clear(BlockType.UnbreakableById);
-        Array.Clear(BlockType.CoversSkyById);
-        BlockType.SkyCoverIds = System.Buffers.SearchValues.Create(ReadOnlySpan<byte>.Empty);
-        Array.Clear(BlockType.FreezesToById);
-        Array.Clear(BlockType.MeltsToById);
-        Array.Clear(BlockType.ReplaceableById);
-        Array.Clear(BlockType.ReplaceableByPlacementById);
-        Array.Clear(BlockType.FallsById);
-        Array.Clear(BlockType.StackSolidStateById);
-        Array.Clear(BlockType.BounceById);
-        Array.Clear(BlockType.SoftLandingById);
-        Array.Clear(BlockType.SinkById);
-        Array.Clear(BlockType.BlocksSightById);
-        Array.Clear(BlockType.ContactDamageById);
-        Array.Clear(BlockType.GreedyById);
         ModelFiles = null;
-
-        // Air owns no definition but still has to let light through and stop nothing
-        BlockType.PassesLightById[BlockType.Air] = true;
-        BlockType.ReplaceableById[BlockType.Air] = true;
-        BlockType.FluidTickDivisorById[BlockType.Air] = 1;
-        BlockType.FluidRangeById[BlockType.Air] = 7;
-        BlockType.FluidInfiniteById[BlockType.Air] = true;
     }
 
     /// <summary>Whether a block id belongs to a loaded tag.</summary>
-    public static bool IsInTag(string tag, byte id) =>
+    public static bool IsInTag(string tag, ushort id) =>
         Tags.TryGetValue(tag, out var members) && members.Contains(id);
 }

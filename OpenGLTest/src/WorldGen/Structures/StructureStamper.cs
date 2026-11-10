@@ -26,7 +26,7 @@ public static class StructureStamper
     /// 2-7 (<see cref="ChestProfile.TierState"/>), so the loot it rolls follows the cave it stands in; without one every
     /// chest keeps the template's state. Returns whether anything was written.
     /// </summary>
-    public static bool Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
+    public static bool Stamp(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
         StructureTemplate template, int turns, int originX, int originY, int originZ, int minY, int maxY, bool keepChests = true,
         CaveBiomeMap? chestBiomes = null)
     {
@@ -48,7 +48,7 @@ public static class StructureStamper
             if (cell < 0) continue;
 
             var index = Chunk.Idx(originX + x - worldX0, originY + y - worldY0, originZ + z - worldZ0);
-            var id = (byte)(cell & 0xFF);
+            var id = StructureCell.BlockOf(cell);
             if (!keepChests && id != BlockType.Air && BlockType.ById[id].Chest != null)
             {
                 blocks[index] = 0;
@@ -59,7 +59,7 @@ public static class StructureStamper
             blocks[index] = id;
 
             // Assign, never OR: the block id decides what the state byte means
-            var cellState = (byte)(cell >> 8);
+            var cellState = StructureCell.StateOf(cell);
             if (chestBiomes != null && id != BlockType.Air && BlockType.ById[id].Chest is { TierTables: not null })
                 cellState |= ChestProfile.TierState(chestBiomes.Cells[index]);
             if (cellState != 0 || state != null)

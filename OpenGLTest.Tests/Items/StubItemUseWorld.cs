@@ -13,13 +13,13 @@ namespace VoxelEngine.Tests.Items;
 /// </summary>
 internal sealed class StubItemUseWorld : IItemUseWorld
 {
-    public Dictionary<(int, int, int), (byte Id, byte State)> Cells { get; } = new();
+    public Dictionary<(int, int, int), (ushort Id, byte State)> Cells { get; } = new();
 
     public bool RaycastHits { get; set; }
     public Vector3 RaycastHit { get; set; }
     public Vector3 RaycastNormal { get; set; }
 
-    public List<(Vector3 Cell, Vector3 Normal, byte SourceId, byte AnchorId)> ConvertCalls { get; } = new();
+    public List<(Vector3 Cell, Vector3 Normal, ushort SourceId, ushort AnchorId)> ConvertCalls { get; } = new();
     public bool ConvertResult { get; set; }
 
     public List<(int, int, int)> IgnitedKilns { get; } = new();
@@ -61,7 +61,7 @@ internal sealed class StubItemUseWorld : IItemUseWorld
         return RaycastHits;
     }
 
-    public bool TryGetCell(int x, int y, int z, out byte id, out byte state)
+    public bool TryGetCell(int x, int y, int z, out ushort id, out byte state)
     {
         if (Cells.TryGetValue((x, y, z), out var cell))
         {
@@ -73,14 +73,14 @@ internal sealed class StubItemUseWorld : IItemUseWorld
         return false;
     }
 
-    public byte GetBlockAt(Vector3 pos) =>
-        Cells.TryGetValue(((int)pos.X, (int)pos.Y, (int)pos.Z), out var cell) ? cell.Id : (byte)0;
+    public ushort GetBlockAt(Vector3 pos) =>
+        Cells.TryGetValue(((int)pos.X, (int)pos.Y, (int)pos.Z), out var cell) ? cell.Id : BlockType.Air;
 
     public bool ScoopFluidCell(Vector3 pos) => false;
 
-    public bool PourFluidCell(Vector3 pos, byte fluidId) => false;
+    public bool PourFluidCell(Vector3 pos, ushort fluidId) => false;
 
-    public bool PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state, out Vector3 placedCell)
+    public bool PlaceBlockAtFace(Vector3 hit, Vector3 normal, ushort blockId, byte state, out Vector3 placedCell)
     {
         placedCell = hit;
         return false;
@@ -88,17 +88,17 @@ internal sealed class StubItemUseWorld : IItemUseWorld
 
     public void AfterPlaced(Vector3 pos) { }
 
-    public int PileCountFor(byte blockId, int x, int y, int z, byte state) => 0;
+    public int PileCountFor(ushort blockId, int x, int y, int z, byte state) => 0;
 
-    public int PileSecondaryFor(byte blockId, int x, int y, int z, byte state) => 0;
+    public int PileSecondaryFor(ushort blockId, int x, int y, int z, byte state) => 0;
 
     public bool SetPileCount(Vector3 pos, byte count) => false;
 
-    public bool SetPileComposition(Vector3 pos, byte blockId, int total, int secondary) => false;
+    public bool SetPileComposition(Vector3 pos, ushort blockId, int total, int secondary) => false;
 
     public void UnmarkPlayerPlaced(int x, int y, int z) { }
 
-    public void SpawnLoot(byte blockId, Vector3 pos) { }
+    public void SpawnLoot(ushort blockId, Vector3 pos) { }
 
     public bool IsCampfireLit(int x, int y, int z) => false;
 
@@ -113,19 +113,19 @@ internal sealed class StubItemUseWorld : IItemUseWorld
         return true;
     }
 
-    public bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, byte sourceId, byte anchorId)
+    public bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, ushort sourceId, ushort anchorId)
     {
         ConvertCalls.Add((hitCell, hitNormal, sourceId, anchorId));
         return ConvertResult;
     }
 
-    public bool IsPrimedTntBlock(byte id) => false;
+    public bool IsPrimedTntBlock(ushort id) => false;
 
     public bool IsCellSubmerged(int x, int y, int z) => false;
 
     public bool RemoveCellForPrime(Vector3 cell) => false;
 
-    public void SpawnPrimedTnt(Vector3 cell, byte blockId) { }
+    public void SpawnPrimedTnt(Vector3 cell, ushort blockId) { }
 
     public void ScheduleFluidAround(Vector3 cell) { }
 

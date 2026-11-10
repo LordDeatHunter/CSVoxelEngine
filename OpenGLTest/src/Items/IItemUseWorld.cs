@@ -28,44 +28,44 @@ public interface IItemUseWorld
     bool RaycastSolid(float maxDistance, out Vector3 hit, out Vector3 normal);
 
     /// <summary>Cell contents with its fluid/state byte.</summary>
-    bool TryGetCell(int x, int y, int z, out byte id, out byte state);
+    bool TryGetCell(int x, int y, int z, out ushort id, out byte state);
 
     /// <summary>Block id at a world position; 0 (air) for unloaded chunks.</summary>
-    byte GetBlockAt(Vector3 pos);
+    ushort GetBlockAt(Vector3 pos);
 
     /// <summary>Removes a fluid cell immediately (scoop): the only fluid write that remeshes on
     /// the spot instead of on the next tick.</summary>
     bool ScoopFluidCell(Vector3 pos);
 
     /// <summary>Places a fluid source immediately (pour).</summary>
-    bool PourFluidCell(Vector3 pos, byte fluidId);
+    bool PourFluidCell(Vector3 pos, ushort fluidId);
 
     /// <summary>Grounds one block against a raycast hit face; state rides into the state byte
     /// (a fresh rock pile starts at 1) and <paramref name="placedCell"/> reports the cell that was
     /// filled, which is the hit cell itself when it held a stack the placement took over.</summary>
-    bool PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state, out Vector3 placedCell);
+    bool PlaceBlockAtFace(Vector3 hit, Vector3 normal, ushort blockId, byte state, out Vector3 placedCell);
 
     /// <summary>Runs after a block went down (sand topples when placed into thin air).</summary>
     void AfterPlaced(Vector3 pos);
 
     /// <summary>Units in a player-built pile cell (branch piles read state directly, pebbles mix
     /// in the worldgen hash).</summary>
-    int PileCountFor(byte blockId, int x, int y, int z, byte state);
+    int PileCountFor(ushort blockId, int x, int y, int z, byte state);
 
     /// <summary>Obsidian share of a pebble pile cell; 0 for every other pile.</summary>
-    int PileSecondaryFor(byte blockId, int x, int y, int z, byte state);
+    int PileSecondaryFor(ushort blockId, int x, int y, int z, byte state);
 
     /// <summary>Writes a pile cell's unit count.</summary>
     bool SetPileCount(Vector3 pos, byte count);
 
     /// <summary>Writes a pebble pile cell's total and obsidian share; other piles ignore the share.</summary>
-    bool SetPileComposition(Vector3 pos, byte blockId, int total, int secondary);
+    bool SetPileComposition(Vector3 pos, ushort blockId, int total, int secondary);
 
     /// <summary>Drops nothing check for a pour that displaces a fragile block.</summary>
     void UnmarkPlayerPlaced(int x, int y, int z);
 
     /// <summary>Loot pop for a block displaced by a pour (creative pours drop nothing).</summary>
-    void SpawnLoot(byte blockId, Vector3 pos);
+    void SpawnLoot(ushort blockId, Vector3 pos);
 
     /// <summary>Lit campfire entity at this cell.</summary>
     bool IsCampfireLit(int x, int y, int z);
@@ -88,10 +88,10 @@ public interface IItemUseWorld
     /// <see cref="MultiblockPlacement.TryFindVolume"/>), so item code passes only the hit.
     /// False when no candidate volume is whole.
     /// </summary>
-    bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, byte sourceId, byte anchorId);
+    bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, ushort sourceId, ushort anchorId);
 
     /// <summary>Whether this block id primes into TNT instead of dropping.</summary>
-    bool IsPrimedTntBlock(byte id);
+    bool IsPrimedTntBlock(ushort id);
 
     /// <summary>Whether a TNT cell touches fluid and must refuse to prime.</summary>
     bool IsCellSubmerged(int x, int y, int z);
@@ -100,7 +100,7 @@ public interface IItemUseWorld
     bool RemoveCellForPrime(Vector3 cell);
 
     /// <summary>Spawns the live primed cube.</summary>
-    void SpawnPrimedTnt(Vector3 cell, byte blockId);
+    void SpawnPrimedTnt(Vector3 cell, ushort blockId);
 
     /// <summary>Neighbors of an edit recompute their fluid levels.</summary>
     void ScheduleFluidAround(Vector3 cell);

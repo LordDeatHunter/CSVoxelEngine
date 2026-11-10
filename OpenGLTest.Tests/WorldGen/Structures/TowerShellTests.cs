@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Content.Structures;
 using VoxelEngine.WorldGen.Structures;
 using Xunit;
 
@@ -47,8 +48,6 @@ public sealed class TowerShellTests
         }
     }
 
-    private static int BlockOf(int cell) => cell & 0xFF;
-
     [Theory]
     [MemberData(nameof(Shapes))]
     public void TheStairClimbsHalfABlockAtATimeFromTheGroundToTheRoof(int radius, int floors, int turns)
@@ -61,7 +60,7 @@ public sealed class TowerShellTests
             var block = TowerShell.IsSlabStep(t) ? s.Palette.Step : s.Palette.Brick;
             var strip = t % StepsPerTurn;
             var walkable = corridor.Any(c => c.Step == strip
-                                             && BlockOf(TowerShell.CellAt(s, c.Ring, c.Step, stepY)) == block
+                                             && StructureCell.BlockOf(TowerShell.CellAt(s, c.Ring, c.Step, stepY)) == block
                                              && Enumerable.Range(stepY + 1, Headroom)
                                                  .All(y => TowerShell.CellAt(s, c.Ring, c.Step, y) == HeadroomOf(s, t)));
             Assert.True(walkable, $"half-step {t} has no corridor column with its step and headroom (r {radius}, {floors} floors, turn {turns})");
@@ -86,7 +85,7 @@ public sealed class TowerShellTests
             var open = columns.Any(c => c.Ring == TowerRing.InnerWall && c.Step == strip
                                         && Enumerable.Range(floorY + 1, Headroom)
                                             .All(y => TowerShell.CellAt(s, c.Ring, c.Step, y) is var cell and >= 0
-                                                      && !BlockType.IsSolid((byte)BlockOf(cell))));
+                                                      && !BlockType.IsSolid(StructureCell.BlockOf(cell))));
             Assert.True(open, $"floor {k} has no doorway in its inner wall (r {radius}, {floors} floors, turn {turns})");
         }
     }
@@ -188,7 +187,7 @@ public sealed class TowerShellTests
             for (var y = box.Y0; y < box.Y0 + box.Sy; y++)
             {
                 var cell = TowerShell.CellAt(s, ring, step, y);
-                solid[box.Index(x, y, z)] = cell > 0 && BlockType.IsUnbreakable((byte)BlockOf(cell));
+                solid[box.Index(x, y, z)] = cell > 0 && BlockType.IsUnbreakable(StructureCell.BlockOf(cell));
             }
         }
         for (var k = 0; k < floors; k++)
@@ -237,7 +236,7 @@ public sealed class TowerShellTests
         for (var y = box.Y0; y < box.Y0 + box.Sy; y++)
         {
             var cell = TowerGenerator.CellAt(s, x, y, z);
-            var block = (byte)BlockOf(cell);
+            var block = StructureCell.BlockOf(cell);
             solid[box.Index(x, y, z)] = cell > 0 && BlockType.IsUnbreakable(block) && block != TowerPalette.PileBlock;
         }
 
@@ -329,7 +328,7 @@ public sealed class TowerShellTests
                 for (var y = s.GroundY + 1; y <= s.RoofY; y++)
                 {
                     var cell = TowerShell.CellAt(s, ring, step, y);
-                    Assert.True(cell == BlockType.Air || cell == s.Palette.Step || BlockType.IsUnbreakable((byte)BlockOf(cell)),
+                    Assert.True(cell == BlockType.Air || cell == s.Palette.Step || BlockType.IsUnbreakable(StructureCell.BlockOf(cell)),
                         $"corridor cell at {y} is {cell}");
                 }
             }
@@ -337,7 +336,7 @@ public sealed class TowerShellTests
     }
 
     private static void AssertUnbreakable(int cell, string where) =>
-        Assert.True(cell > 0 && BlockType.IsUnbreakable((byte)BlockOf(cell)), $"{where} is {cell}, not an unbreakable brick");
+        Assert.True(cell > 0 && BlockType.IsUnbreakable(StructureCell.BlockOf(cell)), $"{where} is {cell}, not an unbreakable brick");
 
     [Theory]
     [MemberData(nameof(Shapes))]

@@ -19,8 +19,8 @@ internal sealed class StampedTree
     public required TreeSpecies Species { get; init; }
     public required TreeGraph Graph { get; init; }
     public required ChunkManager Chunks { get; init; }
-    public required Dictionary<(int X, int Y, int Z), (byte Id, byte State)> Wood { get; init; }
-    public required Dictionary<(int X, int Y, int Z), (byte Id, byte State)> Leaves { get; init; }
+    public required Dictionary<(int X, int Y, int Z), (ushort Id, byte State)> Wood { get; init; }
+    public required Dictionary<(int X, int Y, int Z), (ushort Id, byte State)> Leaves { get; init; }
 
     /// <summary>Every worldgen species, in ordinal name order.</summary>
     internal static IEnumerable<TreeSpecies> WorldgenSpecies =>
@@ -32,17 +32,17 @@ internal sealed class StampedTree
         return new Vector3(n.X, n.Y, n.Z);
     }
 
-    public (byte Id, byte State) Read((int X, int Y, int Z) cell)
+    public (ushort Id, byte State) Read((int X, int Y, int Z) cell)
     {
         Assert.True(Chunks.TryGetCell(cell.X, cell.Y, cell.Z, out var id, out var state));
         return (id, state);
     }
 
     /// <summary>Writes a cell, creating its chunk (block data ready, all air) on first use.</summary>
-    public void Write((int X, int Y, int Z) cell, byte id, byte state) => WriteCell(Chunks, cell, id, state);
+    public void Write((int X, int Y, int Z) cell, ushort id, byte state) => WriteCell(Chunks, cell, id, state);
 
     /// <summary>Writes a cell, creating its chunk (block data ready, all air) on first use.</summary>
-    internal static void WriteCell(ChunkManager chunks, (int X, int Y, int Z) cell, byte id, byte state)
+    internal static void WriteCell(ChunkManager chunks, (int X, int Y, int Z) cell, ushort id, byte state)
     {
         var pos = new Vector3(cell.X >> Chunk.SizeShift, cell.Y >> Chunk.SizeShift, cell.Z >> Chunk.SizeShift);
         if (!chunks.Chunks.TryGetValue(pos, out var chunk))
@@ -106,7 +106,7 @@ internal sealed class StampedTree
 
     /// <summary>Writes <paramref name="id"/> and <paramref name="state"/> into every cell of the
     /// inclusive box, creating chunks as needed.</summary>
-    internal static void Fill(ChunkManager chunks, (int X, int Y, int Z) min, (int X, int Y, int Z) max, byte id, byte state = 0)
+    internal static void Fill(ChunkManager chunks, (int X, int Y, int Z) min, (int X, int Y, int Z) max, ushort id, byte state = 0)
     {
         for (var x = min.X; x <= max.X; x++)
         for (var y = min.Y; y <= max.Y; y++)
@@ -116,10 +116,10 @@ internal sealed class StampedTree
 
     /// <summary>Every loaded cell of the inclusive box with its id and state; cells in unloaded
     /// chunks are left out.</summary>
-    internal static Dictionary<(int X, int Y, int Z), (byte Id, byte State)> Snapshot(
+    internal static Dictionary<(int X, int Y, int Z), (ushort Id, byte State)> Snapshot(
         ChunkManager chunks, (int X, int Y, int Z) min, (int X, int Y, int Z) max)
     {
-        var result = new Dictionary<(int X, int Y, int Z), (byte Id, byte State)>();
+        var result = new Dictionary<(int X, int Y, int Z), (ushort Id, byte State)>();
         for (var x = min.X; x <= max.X; x++)
         for (var y = min.Y; y <= max.Y; y++)
         for (var z = min.Z; z <= max.Z; z++)
@@ -145,8 +145,8 @@ internal sealed class StampedTree
         var cells = TreeRasterizer.Rasterize(graph, species, space, out _);
 
         var chunks = new ChunkManager(null!);
-        var wood = new Dictionary<(int, int, int), (byte, byte)>();
-        var leaves = new Dictionary<(int, int, int), (byte, byte)>();
+        var wood = new Dictionary<(int, int, int), (ushort, byte)>();
+        var leaves = new Dictionary<(int, int, int), (ushort, byte)>();
         for (var i = 0; i < cells.Count; i++)
         {
             var c = cells[i];

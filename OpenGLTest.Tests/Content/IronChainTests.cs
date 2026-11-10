@@ -19,7 +19,7 @@ public sealed class IronChainTests
     private static BlockType Bloomery => ContentRegistry.RequireBlock("bloomery");
 
     private static BlockType AnvilBlock =>
-        Enumerable.Range(1, 255).Select(i => BlockType.ById[i]).First(b => b?.Anvil != null)!;
+        BlockType.Types.Values.First(b => b.Anvil != null);
 
     [Fact]
     public void WhatTheBloomeryMakesIsWhatTheAnvilTakesAndTheOreComesFromTheQuern()
@@ -27,7 +27,7 @@ public sealed class IronChainTests
         var bloomery = Bloomery.Bloomery!;
         Assert.Equal(bloomery.BloomId, AnvilBlock.Anvil!.InputId);
         Assert.NotEqual(bloomery.BloomId, bloomery.OreId);
-        Assert.True(Enumerable.Range(1, 255).Any(i => ContentRegistry.CrushRecipeForInput((byte)i)?.ResultId == bloomery.OreId),
+        Assert.True(Enumerable.Range(1, BlockType.ById.Length - 1).Any(i => ContentRegistry.CrushRecipeForInput((ushort)i)?.ResultId == bloomery.OreId),
             "the ore the bloomery smelts has to be something the quern makes");
     }
 
@@ -54,10 +54,10 @@ public sealed class IronChainTests
     {
         var anvil = AnvilBlock;
         var wrought = anvil.Anvil!.ResultId;
-        var stationMade = new HashSet<byte> { wrought, anvil.Anvil.InputId, anvil.Anvil.SlagId, Bloomery.Bloomery!.SlagId };
+        var stationMade = new HashSet<ushort> { wrought, anvil.Anvil.InputId, anvil.Anvil.SlagId, Bloomery.Bloomery!.SlagId };
 
         // Raw: every item with no crafting or forge recipe, except what the iron works themselves make
-        var obtainable = new HashSet<byte>(ItemRegistry.All
+        var obtainable = new HashSet<ushort>(ItemRegistry.All
             .Select(i => i.Id)
             .Where(id => ContentRegistry.RecipeForResult(id) == null && ContentRegistry.ForgeRecipeForResult(id) == null
                          && !stationMade.Contains(id)));

@@ -8,13 +8,13 @@ namespace VoxelEngine.UI.InventoryPanel;
 /// released over (<see cref="RowEquip.DropOnHotbar"/>, <see cref="RowEquip.DropOnEquipment"/>). Until it lifts, the
 /// release is an ordinary click. GL-free.
 /// </summary>
-public sealed class RowDrag(byte id, int toolInstance, Vector2 pressCanvas)
+public sealed class RowDrag(ushort id, int toolInstance, Vector2 pressCanvas)
 {
     /// <summary>Canvas units the pointer must travel from the press before the row lifts.</summary>
     public const float LiftDistance = 6f;
 
     /// <summary>The dragged row's item id.</summary>
-    public byte Id { get; } = id;
+    public ushort Id { get; } = id;
 
     /// <summary>The tool or gear instance the row names, else 0.</summary>
     public int ToolInstance { get; } = toolInstance;

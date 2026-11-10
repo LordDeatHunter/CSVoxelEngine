@@ -37,7 +37,7 @@ public static class CloudSeaGenerator
 
     /// <summary>Writes the cloud sea into the air cells of the chunk whose minimum corner is
     /// (worldX0, worldY0, worldZ0).</summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0) =>
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0) =>
         _layer.Stamp(blocks, CloudPatchGenerator.CloudBlock, worldX0, worldY0, worldZ0);
 
     /// <summary>Every world y <see cref="Stamp"/> can write: the band itself.</summary>

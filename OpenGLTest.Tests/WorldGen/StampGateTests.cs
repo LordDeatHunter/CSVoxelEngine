@@ -39,7 +39,7 @@ public sealed class StampGateTests
     public StampGateTests() => TestContent.EnsureLoaded();
 
     /// <summary>One feature stamp called directly, in the shape every gated stamp fits.</summary>
-    private delegate void StampCall(byte[] blocks, ref byte[]? state, ColumnData column, int x0, int y0, int z0);
+    private delegate void StampCall(ushort[] blocks, ref byte[]? state, ColumnData column, int x0, int y0, int z0);
 
     /// <summary>
     /// A gated stamp: the stage it runs in, its band over (own column, neighborhood max height), the
@@ -51,77 +51,77 @@ public sealed class StampGateTests
     private static readonly Feature[] Features =
     [
         new("FallenLogs", Stage.FallenLogs, (_, nb) => FallenLogGenerator.WriteBand(nb),
-            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => FallenLogGenerator.Stamp(b, ref s, x, y, z), true),
+            (ushort[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => FallenLogGenerator.Stamp(b, ref s, x, y, z), true),
         new("Boulders", Stage.Boulders, (_, nb) => BoulderGenerator.WriteBand(nb),
-            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => BoulderGenerator.Stamp(b, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => BoulderGenerator.Stamp(b, x, y, z), true),
         new("Cairns", Stage.Cairns, (c, _) => CairnGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => CairnGenerator.Stamp(b, x, y, z), false),
+            (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => CairnGenerator.Stamp(b, x, y, z), false),
         new("RuinedPillars", Stage.RuinedPillars, (c, _) => RuinedPillarGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => RuinedPillarGenerator.Stamp(b, x, y, z), false),
+            (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => RuinedPillarGenerator.Stamp(b, x, y, z), false),
         new("DesertWells", Stage.DesertWells, (_, nb) => DesertWellGenerator.WriteBand(nb),
-            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => DesertWellGenerator.Stamp(b, x, y, z), false),
+            (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => DesertWellGenerator.Stamp(b, x, y, z), false),
         new("RuinsSurface", Stage.RuinsSurface, (_, nb) => RuinPlacement.SurfaceBand(nb),
-            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => RuinPlacement.StampSurface(b, ref s, x, y, z), false),
+            (ushort[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => RuinPlacement.StampSurface(b, ref s, x, y, z), false),
         new("RuinsUnderground", Stage.RuinsUnderground, (_, nb) => RuinPlacement.UndergroundBand(nb),
-            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => RuinPlacement.StampUnderground(b, ref s, x, y, z), false),
+            (ushort[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => RuinPlacement.StampUnderground(b, ref s, x, y, z), false),
         new("WaystonesSurface", Stage.WaystonesSurface, (_, nb) => WaystonePlacement.SurfaceBand(nb),
-            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => WaystonePlacement.StampSurface(b, ref s, x, y, z), false),
+            (ushort[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => WaystonePlacement.StampSurface(b, ref s, x, y, z), false),
         new("WaystonesUnderground", Stage.WaystonesUnderground, (_, nb) => WaystonePlacement.UndergroundBand(nb),
-            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => WaystonePlacement.StampUnderground(b, ref s, x, y, z), false),
+            (ushort[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => WaystonePlacement.StampUnderground(b, ref s, x, y, z), false),
         new("Geodes", Stage.Geodes, (_, _) => GeodeGenerator.WriteBand(),
-            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => GeodeGenerator.Stamp(b, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => GeodeGenerator.Stamp(b, x, y, z), true),
         new("Meteors", Stage.Meteors, (c, _) => MeteorGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => MeteorGenerator.Stamp(b, c, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => MeteorGenerator.Stamp(b, c, x, y, z), true),
         new("Reeds", Stage.Reeds, (c, _) => ReedGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => ReedGenerator.Stamp(b, c, x, y, z), false),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => ReedGenerator.Stamp(b, c, x, y, z), false),
         new("LilyPads", Stage.LilyPads, (c, _) => LilyPadGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => LilyPadGenerator.Stamp(b, c, x, y, z), false),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => LilyPadGenerator.Stamp(b, c, x, y, z), false),
         new("GlowMushrooms", Stage.GlowMushrooms, (c, _) => GlowMushroomGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => GlowMushroomGenerator.Stamp(b, c, x, y, z), false),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => GlowMushroomGenerator.Stamp(b, c, x, y, z), false),
         new("CaveFormations", Stage.CaveFormations, (c, _) => CaveFormationGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => CaveFormationGenerator.Stamp(b, c, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => CaveFormationGenerator.Stamp(b, c, x, y, z), true),
         new("UndergroundPools", Stage.UndergroundPools, (c, _) => UndergroundPoolGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => UndergroundPoolGenerator.Stamp(b, c, x, y, z), false),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => UndergroundPoolGenerator.Stamp(b, c, x, y, z), false),
         new("CaveBiomes", Stage.CaveBiomes, (c, _) => CaveBiomes.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => CaveBiomes.Stamp(b, c, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => CaveBiomes.Stamp(b, c, x, y, z), true),
         new("CaveOres", Stage.CaveOres, (_, _) => CaveOres.WriteBand(),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) =>
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) =>
             {
                 var map = new CaveBiomeMap();
                 if (CaveBiomes.Fill(map, c, x, y, z)) CaveOres.Stamp(b, map, x, y, z);
             }, true),
         new("IceSpikes", Stage.IceSpikes, (c, _) => IceSpikeGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => IceSpikeGenerator.Stamp(b, x, y, z), false),
+            (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => IceSpikeGenerator.Stamp(b, x, y, z), false),
         new("SnowGround", Stage.Snow, (c, _) => SnowGenerator.GroundWriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => SnowGenerator.StampGround(b, c, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => SnowGenerator.StampGround(b, c, x, y, z), true),
         new("Pebbles", Stage.Pebbles, (c, _) => PebbleGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => PebbleGenerator.Stamp(b, c, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => PebbleGenerator.Stamp(b, c, x, y, z), true),
         new("Cotton", Stage.Cotton, (c, _) => CottonGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => CottonGenerator.Stamp(b, c, x, y, z), false),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => CottonGenerator.Stamp(b, c, x, y, z), false),
         new("Flowers", Stage.Flowers, (c, _) => FlowerGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => FlowerGenerator.Stamp(b, c, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => FlowerGenerator.Stamp(b, c, x, y, z), true),
         new("Foliage", Stage.Foliage, (c, _) => FoliageGenerator.WriteBand(c),
-            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => FoliageGenerator.Stamp(b, c, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => FoliageGenerator.Stamp(b, c, x, y, z), true),
         new("Towers", Stage.Towers, (_, nb) => TowerPlacement.Band(nb),
-            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => TowerPlacement.Stamp(b, ref s, x, y, z), true),
+            (ushort[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => TowerPlacement.Stamp(b, ref s, x, y, z), true),
         new("Clouds", Stage.Clouds, (_, _) => CloudPatchGenerator.WriteBand(),
-            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => CloudPatchGenerator.Stamp(b, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => CloudPatchGenerator.Stamp(b, x, y, z), true),
         new("CloudSea", Stage.CloudSea, (_, _) => CloudSeaGenerator.WriteBand(),
-            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => CloudSeaGenerator.Stamp(b, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => CloudSeaGenerator.Stamp(b, x, y, z), true),
         new("SkyIslands", Stage.SkyIslands, (_, _) => SkyIslandGenerator.WriteBand(),
-            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => SkyIslandGenerator.Stamp(b, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => SkyIslandGenerator.Stamp(b, x, y, z), true),
         new("RuinsSky", Stage.RuinsSky, (_, _) => RuinPlacement.SkyBand(),
-            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => RuinPlacement.StampSky(b, ref s, x, y, z), false),
+            (ushort[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => RuinPlacement.StampSky(b, ref s, x, y, z), false),
         new("WaystonesSky", Stage.WaystonesSky, (_, _) => WaystonePlacement.SkyBand(),
-            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => WaystonePlacement.StampSky(b, ref s, x, y, z), false),
+            (ushort[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => WaystonePlacement.StampSky(b, ref s, x, y, z), false),
         new("Barrier", Stage.Barrier, (_, _) => BarrierGenerator.WriteBand(),
-            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => BarrierGenerator.Stamp(b, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => BarrierGenerator.Stamp(b, x, y, z), true),
         new("RuinsHell", Stage.RuinsHell, (_, _) => HellGenerator.WriteBand(),
-            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => RuinPlacement.StampHell(b, ref s, x, y, z), false),
+            (ushort[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => RuinPlacement.StampHell(b, ref s, x, y, z), false),
         new("WaystonesHell", Stage.WaystonesHell, (_, _) => HellGenerator.WriteBand(),
-            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => WaystonePlacement.StampHell(b, ref s, x, y, z), false),
+            (ushort[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => WaystonePlacement.StampHell(b, ref s, x, y, z), false),
         new("Hell", Stage.Hell, (_, _) => HellGenerator.WriteBand(),
-            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => HellGenerator.Stamp(b, x, y, z), true),
+            (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => HellGenerator.Stamp(b, x, y, z), true),
     ];
 
     private static Chunk Generate(Vector3 pos, WorldgenStageTimer? timer, bool stampGates)
@@ -203,11 +203,11 @@ public sealed class StampGateTests
     public void EveryStampWritesOnlyInsideItsWriteBand()
     {
         var wrote = new bool[Features.Length];
-        var snapshots = new Dictionary<Stage, (byte[] Blocks, byte[]? State)>();
+        var snapshots = new Dictionary<Stage, (ushort[] Blocks, byte[]? State)>();
         Chunk? current = null;
         var timer = new WorldgenStageTimer
         {
-            AfterMark = s => snapshots[s] = ((byte[])current!.Blocks.Clone(), Clone(current.StateArray)),
+            AfterMark = s => snapshots[s] = ((ushort[])current!.Blocks.Clone(), Clone(current.StateArray)),
         };
 
         foreach (var pos in DefaultSeedSample.Value)
@@ -229,7 +229,7 @@ public sealed class StampGateTests
             {
                 var feature = Features[f];
                 var (inBlocks, inState) = snapshots[feature.Stage - 1];
-                var blocks = (byte[])inBlocks.Clone();
+                var blocks = (ushort[])inBlocks.Clone();
                 var state = Clone(inState);
                 feature.Stamp(blocks, ref state, column, x0, y0, z0);
 

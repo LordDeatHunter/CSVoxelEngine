@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using System.Text;
 using VoxelEngine.Chunks;
 using VoxelEngine.Saves;
@@ -13,8 +14,15 @@ namespace VoxelEngine.Networking;
 /// client restores streamed chunks from this instead of generating them; player-placed bookkeeping
 /// is not sent, since a client never fells, decays or saves. It also carries one chunk column's
 /// terrain (<see cref="ColumnTerrain"/>: heights, water levels and corner climate), which is all a
-/// client needs from the terrain beyond the blocks. GL-free and content-free.
+/// client needs from the terrain beyond the blocks. GL-free and content-free: the ids are not
+/// checked against the loaded content here, the client checks them before it applies a chunk.
 /// </summary>
+/// <remarks>
+/// The block ids travel dense, in <see cref="Chunk.Idx"/> order, at their in-memory width:
+/// one little-endian ushort per cell. The bytes are the array's own
+/// (<see cref="MemoryMarshal.AsBytes{T}(Span{T})"/>), which assumes a little-endian host, as
+/// <see cref="LodNetCodec"/> does; every supported target is.
+/// </remarks>
 public static class ChunkNetCodec
 {
     /// <summary>Encodes a snapshot's blocks and state (its player-placed cells are dropped).</summary>
@@ -23,7 +31,7 @@ public static class ChunkNetCodec
         using var output = new MemoryStream();
         using (var deflate = new DeflateStream(output, CompressionLevel.Fastest, leaveOpen: true))
         {
-            deflate.Write(snapshot.Blocks);
+            deflate.Write(MemoryMarshal.AsBytes(snapshot.Blocks.AsSpan()));
             var state = snapshot.State;
             if (state is { Length: Chunk.BlockCount })
             {
@@ -45,8 +53,8 @@ public static class ChunkNetCodec
         using var input = new MemoryStream(payload, writable: false);
         using var deflate = new DeflateStream(input, CompressionMode.Decompress);
 
-        var blocks = new byte[Chunk.BlockCount];
-        ReadFully(deflate, blocks);
+        var blocks = new ushort[Chunk.BlockCount];
+        ReadFully(deflate, MemoryMarshal.AsBytes(blocks.AsSpan()));
 
         var hasState = deflate.ReadByte();
         byte[]? state = null;

@@ -15,8 +15,8 @@ BT-9 verified and documented it: the `towerdefeat` op, the dark, torch-lit and r
 wiki's battle tower page. BT-10 made the floors dark: the tower bricks cover the sky in the light flood, and surface
 ring spawns keep out of a tower's footprint (see "Dark interiors (BT-10)").
 Tracks the battle tower: a rare, huge (radius ~20+) cylindrical landmark of 4-8 floors with skeleton piles, chests, floor locks, a roof
-altar that summons the Skeleton King, unique boss loot and a collapse into a ruin. **Content ids are tight: 11 left, see Reference.**
-Last updated 2026-11-09.
+altar that summons the Skeleton King, unique boss loot and a collapse into a ruin.
+Last updated 2026-11-10.
 
 ## In progress
 
@@ -28,11 +28,9 @@ Nothing.
 
 ## Reference
 
-- **Content id budget (budget constraint, after BT-3, which used 2: the `arrow` and `bone` items, BT-7's bone pair,
-  which used 2: `bone_breaker_blade`, `bone_charm`, BT-4, which used 2: `skeleton_pile`, `tower_door`, BT-5, which
-  used 1: `tower_chest`, BT-6, which used 1: `tower_altar`, and BT-8, which used 0: the rubble reuses `stone_bricks`, `cobblestone` and
-  `gravel`): 244 of 255 used (134 blocks, 109 items, air), 11 free.** No later phase plans a content id; the rest is
-  left for `CAVE_BIOMES.md`.
+- **Content the tower added**: BT-3 the `arrow` and `bone` items, BT-7 `bone_breaker_blade` and `bone_charm`, BT-4
+  `skeleton_pile` and `tower_door`, BT-5 `tower_chest`, BT-6 `tower_altar`; BT-8's rubble reuses `stone_bricks`,
+  `cobblestone` and `gravel`. Content ids are `ushort` now, so they are no longer a budget.
 - **How `unbreakable` is enforced** (BT-1): load rules (`BlockFieldRules.ValidateUnbreakable` refuses fluid, falls,
   needsSupport, replaceableByPlacement, flammable, meltsTo, the tree-wood and multiblock renderers, upperHalf and
   prime_tnt, and `BlockLinkResolver` refuses an unbreakable multiblock source) keep the block away from every raw-write

@@ -1,6 +1,6 @@
 # Content schemas
 
-Ids are `byte`s: id 0 is air, then blocks sorted by file name, then items sorted by file name. Blocks and items share 255 ids and the registry throws on overflow. Every content error names the file it came from. Files tolerate comments and trailing commas.
+Ids are `ushort`s: id 0 is air, then blocks sorted by file name, then items sorted by file name. Blocks and items share up to 65,535 ids and the registry throws on overflow. The per-block state stays a byte. Every content error names the file it came from. Files tolerate comments and trailing commas.
 
 ## Block (`assets/data/blocks/<name>.json`)
 
