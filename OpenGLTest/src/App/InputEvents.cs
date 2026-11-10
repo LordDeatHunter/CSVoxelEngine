@@ -13,6 +13,8 @@ namespace VoxelEngine.App;
 /// <summary>The window's mouse and keyboard events, routed to whatever owns them on the current screen: the main menu, the pause and settings menus, the [E] panel, the spell builder, the waystone screen, the chat, or the right-click repeat timer. Program registers them once in OnLoad; Silk.NET raises them on the main thread.</summary>
 internal sealed class InputEvents
 {
+    // Whether the latest right press began with the [E] panel already up (see OnMouseUp)
+    private bool _rightPressedOnPanel;
     private readonly InputManager inputManager;
     private readonly RenderManager renderManager;
     private readonly MainMenuController menu;
@@ -100,8 +102,9 @@ internal sealed class InputEvents
         {
             case MouseButton.Right:
                 gameplay.ResetPlaceTimer();
-                // A right-click on an [E] panel row equips it; the world's use and place stand aside while it is open
-                if (inventoryView.IsOpen && !chatView.IsOpen && !waystoneInput.IsOpen && !builderInput.IsOpen
+                // A right-click on an [E] panel row equips it; the world's use and place stand aside while it is open.
+                // A press that began in the world (a chest it just opened) never equips on its release.
+                if (inventoryView.IsOpen && _rightPressedOnPanel && !chatView.IsOpen && !waystoneInput.IsOpen && !builderInput.IsOpen
                     && inputManager.Mouse != null)
                     panelInput.HandleInventoryRightClick(inputManager.Mouse.Position);
                 break;
@@ -147,6 +150,7 @@ internal sealed class InputEvents
                 return;
         }
         if (button == MouseButton.Left) fieldPointer.Press();
+        if (button == MouseButton.Right) _rightPressedOnPanel = inventoryView.IsOpen;
         switch (Screen)
         {
             case AppScreen.Playing when inventoryView.IsOpen && !pauseMenuView.IsOpen
