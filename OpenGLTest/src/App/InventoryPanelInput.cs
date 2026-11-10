@@ -95,6 +95,12 @@ internal sealed class InventoryPanelInput
             return ItemTooltip.Hover(position, entry.Id, stack, inventory.Equipment);
         }
 
+        // The Gear tab's equipment card: a worn piece's row names it, like a listed row does
+        if (inventoryView.Tab == InventoryCategory.Gear
+            && EquipmentCardLayout.SlotAt(renderManager.Ui.ToCanvas(position), renderManager.Ui.ScreenSize) is { } wornSlot
+            && inventory.Equipment.StackAt(wornSlot) is { } worn)
+            return ItemTooltip.Hover(position, worn.DefinitionId, worn, inventory.Equipment);
+
         if (renderManager.Ui.Hud.HotbarSlotAt(position) is not { } slot || slot < 0 || inventory.IdAt(slot) == 0)
             return null;
         var tool = inventory.ToolInstanceAt(slot);

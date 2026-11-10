@@ -140,7 +140,7 @@ mining and attack pace and `Combat.*Damage` read the mining, attack-speed and da
 `UnequipGear` intent (protocol 19), judged by `Equipment.TryEquip`; the worn ids save as `InventoryData.Equipped`. The
 [E] panel's Gear tab lists the pieces over `EquipmentCardLayout`/`EquipmentCardRenderer`: pick a row, then
 click a lit slot to wear it, drag the row onto a slot, or right-click the row (or a gear search hit) to wear it or take it
-off in one click (`RowEquip`; a second left click only picks again). Every list of the panel (a tab's rows, the search
+off in one click (`RowEquip`; a second left click only picks again). Hovering a worn piece's row shows its tooltip (`InventoryPanelInput.HoveredTooltip`, the `EquipmentCardLayout.SlotAt` hit). Every list of the panel (a tab's rows, the search
 results and the creative catalog) marks an equipped row the same way (`EquippedMark`): a green accent bar, "worn" in
 place of the count for a worn piece, and the hotbar key on a chip over the icon for an item on the hotbar. A left click
 never puts a row on the hotbar: a pick goes there by a click on a slot, a drag onto it (`RowDragInput`, `RowDrag`: a press
