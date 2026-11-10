@@ -14,7 +14,7 @@ public static class MobConfig
     // them; a forced spawn (a slime splitting, a scenario, a save restore, a client's mirror) may
     // pass it, but nothing ever spawns past the hard cap, which also sizes the healthbar buffers
     // (MobsMaxAlive).
-    public const int MobNaturalCap = 15;
+    public const int MobNaturalCap = 30;
     public const int MobNaturalCapMaxPlayers = 3;
     public const int MobHardCapFactor = 15;
     public const int MobHardCap = MobNaturalCap * MobHardCapFactor;

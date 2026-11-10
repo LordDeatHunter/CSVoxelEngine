@@ -14,7 +14,7 @@ public static class WildlifeConfig
     // biome and hour (WildlifeSpawnRules), and its group placed within GroupSpawnRadiusBlocks of the first.
     // An animal no target keeps in play (MobTargets.OutOfPlay at DespawnRadiusBlocks) fades out; unlike a
     // hostile mob it never despawns for standing idle.
-    public const int WildlifeCap = 30;
+    public const int WildlifeCap = 60;
     public const float SpawnIntervalSeconds = 1.5f;
     public const float SpawnMinRadiusBlocks = 36f;
     public const float SpawnMaxRadiusBlocks = 64f;
