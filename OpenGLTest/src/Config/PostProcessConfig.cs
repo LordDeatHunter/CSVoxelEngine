@@ -157,4 +157,31 @@ public static class PostProcessConfig
     public const float GodraysBlurDecay = 0.95f;
     /// <summary>Radial blur samples per full-resolution pixel.</summary>
     public const int GodraysBlurSamples = 24;
+
+    // Sun dazzle (SunDazzle, SunDazzleRenderer, dazzle-fragment.glsl): the blinding bloom of looking
+    // straight at the sun, added over the whole frame (the foreground included) after the godrays.
+    // Radii and reaches are shares of the screen height.
+    /// <summary>Master switch for the dazzle pass; off, it costs nothing and the frame is exactly what it was.</summary>
+    public const bool SunDazzleEnabled = true;
+    /// <summary>Linear HDR light the dazzle adds right at the sun at its peak, times the sun color.</summary>
+    public const float SunDazzleStrength = 1.5f;
+    /// <summary>Angle between the view and the sun within which the dazzle is at full strength.</summary>
+    public const float SunDazzleFullDegrees = 4f;
+    /// <summary>Angle between the view and the sun beyond which there is no dazzle.</summary>
+    public const float SunDazzleFacingDegrees = 34f;
+    /// <summary>Radius of the bright core around the sun (a Gaussian).</summary>
+    public const float SunDazzleCoreRadius = 0.09f;
+    /// <summary>Share of the peak that is the soft veil reaching out across the view, rather than the core.</summary>
+    public const float SunDazzleVeilShare = 0.3f;
+    /// <summary>Distance from the sun over which the veil falls to 1/e.</summary>
+    public const float SunDazzleVeilReach = 0.3f;
+    /// <summary>Brightness of the fan of rays round the core, as a share of the peak.</summary>
+    public const float SunDazzleRayShare = 0.3f;
+    /// <summary>Distance from the sun over which the rays fall to 1/e.</summary>
+    public const float SunDazzleRayReach = 0.3f;
+    /// <summary>Depth taps across the sun's disc that measure how much of it is in open sky.</summary>
+    public const int SunDazzleTaps = 32;
+    /// <summary>Rate (per second) at which the dazzle follows the share of the disc in open sky, so
+    /// a leaf or a block edge crossing the sun fades it instead of stepping it.</summary>
+    public const float SunDazzleEaseRate = 12f;
 }

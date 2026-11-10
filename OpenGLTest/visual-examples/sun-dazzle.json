@@ -1,0 +1,32 @@
+// Sun dazzle check (SunDazzle, SunDazzleRenderer, dazzle-fragment.glsl): the blinding bloom of
+// looking straight at the sun. Run from OpenGLTest/, once per time, copying visual/sun-dazzle/
+// aside between runs:
+//   $env:VOXEL_SCRIPT='visual-examples/sun-dazzle.json'; $env:VOXEL_TIME='<t>'
+//   bin/Release/net9.0/VoxelEngine.exe
+// Times: 395 (a low sun at yaw ~160, pitch ~11, as in godrays.json: the shots land ~15-25 s in).
+// High over the wood west of the origin, flying so the poses hold: straight at the sun (the core
+// swallows the disc, rays fan out, the whole view lifts), then turned off it in steps (the dazzle
+// falls away and is gone well before the sun leaves the screen), then from the forest floor, where
+// the trunks and crowns hide the disc (no dazzle through solid wood, a little through the gaps).
+{
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-40.5, 40.5, -20.5], "yaw": 160, "pitch": 11 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "at_sun", "hideHud": true },
+    { "op": "teleport", "pos": [-40.5, 40.5, -20.5], "yaw": 148, "pitch": 9 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "near_sun", "hideHud": true },
+    { "op": "teleport", "pos": [-40.5, 40.5, -20.5], "yaw": 136, "pitch": 6 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "off_sun", "hideHud": true },
+    { "op": "teleport", "pos": [-40.5, 40.5, -20.5], "yaw": 120, "pitch": 4 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "sun_at_edge", "hideHud": true },
+    // On the forest floor, toward the sun through the trunks and crowns.
+    { "op": "teleport", "pos": [-40.5, 14.5, -20.5], "yaw": 160, "pitch": 11 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "behind_trees", "hideHud": true }
+  ]
+}

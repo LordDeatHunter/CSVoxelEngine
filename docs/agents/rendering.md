@@ -283,6 +283,28 @@ shadow passes do not run. Cost on the dev GPU at 1080p: about 0.35 ms GPU (under
 and 0.02-0.05 ms CPU while active, nothing otherwise. `GodraysTests`;
 `visual-examples/godrays.json` (`VOXEL_TIME` 395, 425, 147, with `VOXEL_DEBUG=1` for the cost).
 
+**Sun dazzle.** The blinding bloom of looking straight at the sun. Where the sun glare above is a faint
+glow in the dome that the terrain hides, the dazzle is light in the eye, added over the whole frame, the
+foreground included: `ScreenPasses.RenderSunDazzle` (`SunDazzleRenderer`), right after the godrays and
+inside their `godPass` profiler row, switched off by `SunDazzleEnabled`. Two draws of one triangle. The
+first (`dazzle-visibility-fragment.glsl`) is a single fragment into the renderer's own 1x1 `R16F`
+target: it taps the HDR scene's own depth at `SunDazzleTaps` points over the sun's disc
+(`SunDazzle.DiscRadius` of `GameSettings.SunSize`) and counts the ones at the far plane (no terrain,
+tree, cloud, mob or held item; a tap off screen counts as hidden), blended in with
+`SunDazzle.EaseShare` of the time since the pass last drew as its alpha, so the target holds the eased
+share of the disc in open sky with no readback and takes a stale measurement whole. The second
+(`dazzle-fragment.glsl`) adds `SunDazzle.Glow` times that share, additively in linear light through the
+color-only HDR framebuffer: a Gaussian core (`SunDazzleCoreRadius`), a soft veil
+(`SunDazzleVeilShare`, `SunDazzleVeilReach`) and a fan of rays that starts outside the core
+(`SunDazzleRayShare`, `SunDazzleRayReach`), all in shares of the screen height round the sun's place on
+screen. The frame's strength is `SunDazzle.Intensity` (set by `FrameLighting.SetLighting`) times the
+linear sun disc color, so a setting sun dazzles dimmer and redder: full within `SunDazzleFullDegrees`
+of the sun, zero `SunDazzleFacingDegrees` from it, scaled by the disc's own visibility (gone below the
+horizon, in hell and in lava) and zero under water. Cost on the dev GPU at 1080p: the `godPass` row
+read about 0.41 ms GPU and 0.01 ms CPU with the godrays and the dazzle both drawing (the godrays alone
+about 0.35), nothing otherwise. `SunDazzleTests`;
+`visual-examples/sun-dazzle.json` (`VOXEL_TIME` 395, 418).
+
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`SkyConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,

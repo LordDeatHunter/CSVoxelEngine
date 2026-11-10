@@ -320,6 +320,9 @@ internal sealed class WorldRenderer
         FrameProfiler.Begin(ProfileSection.GodraysPass);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.GodraysPass);
         renderManager.Screen.RenderGodrays(Camera);
+        // The sun dazzle shares the godrays' row: one more full-screen draw toward the sun, over
+        // the shafts and everything else
+        renderManager.Screen.RenderSunDazzle(Camera);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.GodraysPass);
         FrameProfiler.End(ProfileSection.GodraysPass);
 

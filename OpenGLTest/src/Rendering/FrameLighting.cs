@@ -36,6 +36,9 @@ internal sealed class FrameLighting
     // This frame's godray strength (Godrays.Intensity), set by SetLighting; 0 skips the pass
     private float _godrayStrength;
 
+    // This frame's sun dazzle strength (SunDazzle.Intensity), set by SetLighting; 0 skips the pass
+    private float _dazzleStrength;
+
     // Per-frame lighting state, pushed once per frame via SetLighting and uploaded to the
     // world shader once per frame by RenderManager.ApplyFrameUniforms
     // _sunDir is the world's key light (Moonlight): the sun by day, the moon (the sun negated) once
@@ -196,6 +199,7 @@ internal sealed class FrameLighting
     internal float MoonVisibility => _moonVisibility;
     internal float MoonPhaseFraction => _moonPhase;
     internal float GodrayStrength => _godrayStrength;
+    internal float DazzleStrength => _dazzleStrength;
     internal Matrix4x4 InvViewProj => _invViewProj;
     internal Matrix4x4 SceneViewProj => _sceneViewProj;
     internal float UnderwaterT => _underwaterT;
@@ -427,6 +431,12 @@ internal sealed class FrameLighting
         _godrayStrength = camera == null || !PostProcessConfig.GodraysEnabled
             ? 0f
             : Godrays.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), elevation, _glareCloud, wet) * open;
+        // The dazzle: the blinding bloom of looking straight at the sun, over the whole frame. It
+        // goes with the disc (below the horizon, in hell, in lava) and, like the glare, under water;
+        // what hides the disc on screen (terrain, clouds) the pass measures itself (SunDazzleRenderer)
+        _dazzleStrength = camera == null || !PostProcessConfig.SunDazzleEnabled
+            ? 0f
+            : SunDazzle.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), _sunVisibility, wet);
         // The aurora shows only from cold lands: the climate at the eye's column, read from the stored
         // corner climate (never worldgen noise, so a client reads what its server streamed), eased so
         // walking across a border fades it; an unknown column eases it out

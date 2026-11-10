@@ -11,7 +11,7 @@ namespace VoxelEngine.Rendering.ScreenSpace;
 
 /// <summary>
 /// The full-screen passes over the HDR scene: the tonemap resolve into the default framebuffer,
-/// the screen-space contact AO, the underwater sun shafts and the godrays. Owns their four
+/// the screen-space contact AO, the underwater sun shafts, the godrays and the sun dazzle. Owns their five
 /// renderers (built in its constructor, which <see cref="RenderManager"/> runs from LoadResources,
 /// and freed by <see cref="Dispose"/> at the same point of RenderManager's teardown); the targets,
 /// the texture units and the frame's light are read live through the owner. Render thread only.
@@ -26,6 +26,11 @@ internal sealed class ScreenPasses : IDisposable
 
     // Godrays: the same march over dry air (RenderGodrays). Built by the constructor.
     private GodraysRenderer? _godrays;
+
+    // The sun dazzle: the bloom of looking straight at the sun (RenderSunDazzle), and the lighting
+    // clock at its last draw, which its eased visibility steps from. Built by the constructor.
+    private SunDazzleRenderer? _dazzle;
+    private double _dazzleDrawnAt = double.NegativeInfinity;
 
     // The frame's resolve pass: tonemaps the HDR scene target into the default framebuffer at
     // the end of WorldRenderer.Render, before the UI (RenderPostProcess). Built by the constructor.
@@ -44,6 +49,7 @@ internal sealed class ScreenPasses : IDisposable
         _contactAo = new ContactAoRenderer(gl);
         _rays = new UnderwaterRaysRenderer(gl);
         _godrays = new GodraysRenderer(gl, RenderManager.CloudShadowUnit);
+        _dazzle = new SunDazzleRenderer(gl);
     }
 
     /// <summary>
@@ -157,10 +163,8 @@ internal sealed class ScreenPasses : IDisposable
         if (camera == null || _godrays == null || !PostProcessConfig.GodraysEnabled) return;
         if (Lighting.GodrayStrength <= 0.0005f || Lighting.ShadowStrengthDry <= 0f) return;
         if (Targets.RaysFbo == 0 || Targets.HdrColorOnlyFbo == 0) return;
-        // The sun's place on screen, which the composite blurs toward; none behind the eye
-        var sunClip = Vector4.Transform(new Vector4(Lighting.CameraPos + Lighting.SkySunDir * 1000f, 1f), Lighting.SceneViewProj);
-        if (sunClip.W <= 1e-4f) return;
-        var sunUv = new Vector2(sunClip.X / sunClip.W, sunClip.Y / sunClip.W) * 0.5f + new Vector2(0.5f);
+        // The sun's place on screen, which the composite blurs toward
+        if (!TrySunUv(out var sunUv)) return;
         Units.BindUnit(1, TextureTarget.Texture2D, _owner.NearShadow.DepthTex);
         Units.BindUnit(4, TextureTarget.Texture2D, Targets.HdrDepthTex);
         Units.ActiveUnit(0);
@@ -176,12 +180,57 @@ internal sealed class ScreenPasses : IDisposable
         Targets.BindSceneTarget();
     }
 
-    /// <summary>Frees the four renderers, in the order RenderManager.Dispose always freed them.</summary>
+    /// <summary>
+    /// The sun dazzle: the blinding bloom of looking straight at the sun
+    /// (<see cref="SunDazzleRenderer"/>), added over the finished world right after the godrays, so
+    /// it lies over the foreground too. The renderer measures how much of the sun's disc is in open
+    /// sky from the HDR scene's own depth texture, so like the godrays it needs no scene copy and
+    /// draws through the color-only HDR framebuffer. Skipped when the frame's strength
+    /// (<see cref="SunDazzle.Intensity"/>, set by <see cref="FrameLighting.SetLighting"/>) is
+    /// negligible, with the sun behind the eye, and when
+    /// <see cref="PostProcessConfig.SunDazzleEnabled"/> is off.
+    /// </summary>
+    internal void RenderSunDazzle(Camera? camera)
+    {
+        if (camera == null || _dazzle == null || !PostProcessConfig.SunDazzleEnabled) return;
+        if (Lighting.DazzleStrength <= 0.0005f || Targets.HdrColorOnlyFbo == 0) return;
+        if (!TrySunUv(out var sunUv)) return;
+        // The eased visibility steps by the time since the pass last drew, so after a pause it
+        // takes this frame's measurement whole
+        var ease = SunDazzle.EaseShare((float)(Lighting.TimeD - _dazzleDrawnAt));
+        _dazzleDrawnAt = Lighting.TimeD;
+        Units.BindUnit(4, TextureTarget.Texture2D, Targets.HdrDepthTex);
+        Units.ActiveUnit(0);
+        _dazzle.Render(Targets.HdrColorOnlyFbo, Targets.ViewportSize, sunUv,
+            SunDazzle.DiscRadius(GameSettings.SunSize, camera.CurrentFov), Lighting.SunDiscColor * Lighting.DazzleStrength, ease);
+        // The renderer bound unit 5 behind the cache's back, and unit 4 must not keep the scene
+        // depth (the next frame renders into it)
+        Units.InvalidateTextureUnits();
+        Units.BindUnit(4, TextureTarget.Texture2D, 0);
+        Units.ActiveUnit(0);
+        Targets.BindSceneTarget();
+    }
+
+    /// <summary>
+    /// The sun's place on screen (0..1, possibly off screen) under the matrix the scene was drawn
+    /// with; false with the sun behind the eye, where it has none.
+    /// </summary>
+    private bool TrySunUv(out Vector2 sunUv)
+    {
+        var sunClip = Vector4.Transform(new Vector4(Lighting.CameraPos + Lighting.SkySunDir * 1000f, 1f), Lighting.SceneViewProj);
+        sunUv = default;
+        if (sunClip.W <= 1e-4f) return false;
+        sunUv = new Vector2(sunClip.X / sunClip.W, sunClip.Y / sunClip.W) * 0.5f + new Vector2(0.5f);
+        return true;
+    }
+
+    /// <summary>Frees the five renderers, in the order RenderManager.Dispose always freed them.</summary>
     public void Dispose()
     {
         _post?.Dispose();
         _contactAo?.Dispose();
         _rays?.Dispose();
         _godrays?.Dispose();
+        _dazzle?.Dispose();
     }
 }

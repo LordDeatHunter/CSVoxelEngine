@@ -360,7 +360,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   geometry change (LightingConfig.FarShadowReuse*); visual-examples/far-shadow.json
                                #   (VOXEL_TIME=400, shots near 430) is the far-shadow pop check
       FrameLighting.cs         # the frame's light, sky, fog and eye state, computed once a frame by SetLighting (the
-                               #   sun/moon key light, eye adaptation, biome grade, glare, godrays strength, point lights,
+                               #   sun/moon key light, eye adaptation, biome grade, glare, godrays and dazzle strength, point lights,
                                #   WindDirection) and read live by every pass; FireLightOffset
       GpuPassTimer.cs          # the per-pass TIME_ELAPSED query ring and its once-a-frame GpuTimingGate latch
                                #   (BeginGpuFrame, BeginGpuPass/EndGpuPass, EndGpuFrame, LogQueryCounts)
@@ -527,7 +527,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         UIRenderer.cs          # the UI's GL resources (ui program, count font, text batch, item icons) and shared
                                #   primitives (rects, text, icons, input field); builds the page renderers as internal properties
         UITextCache.cs         # memoized per-frame HUD strings (FPS, compass, coordinates, counts)
-      ScreenSpace/             # full-screen and screen-space passes: post (tonemap, FXAA), contact AO, godrays, underwater rays
+      ScreenSpace/             # full-screen and screen-space passes: post (tonemap, FXAA), contact AO, godrays, sun dazzle, underwater rays
         ContactAoRenderer.cs   # the screen-space contact AO pass (SH-28, contact-ao-fragment.glsl, twin ContactAo)
         GodraysRenderer.cs     # the godrays: a half-res shadow-map march over dry air, then a radial composite toward the sun
         HalfResTarget.cs       # the GL-free sizing arithmetic behind the half-resolution underwater-rays render target
@@ -535,9 +535,10 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         PostProcessRenderer.cs # the frame's final full-screen pass: one oversized triangle
                                #   (the shape SkyRenderer draws) shaded by post-fragment.glsl
         ScreenPasses.cs        # the full-screen passes: RenderPostProcess (tonemap, FXAA, the post
-                               #   effects), RenderUnderwaterRays, RenderGodrays and
+                               #   effects), RenderUnderwaterRays, RenderGodrays, RenderSunDazzle and
                                #   RenderContactAo: the multiplicative screen-space contact AO
                                #   (ContactAoRenderer) drawn through the color-only HDR FBO while
                                #   sampling the HDR depth texture, placed mid entity pass
+        SunDazzleRenderer.cs   # the sun dazzle: a 1x1 eased depth-tap visibility of the sun's disc, then an additive glow over the frame
         UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
 ```
