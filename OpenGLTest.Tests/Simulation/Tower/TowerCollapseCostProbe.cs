@@ -57,7 +57,7 @@ public sealed class TowerCollapseCostProbe(ITestOutputHelper output)
             chunks.Chunks[position] = chunk;
             stamped.Add(chunk);
         }
-        var before = stamped.Select(c => c.Blocks.ToArray()).ToArray();
+        var before = stamped.Select(c => c.Storage.ToDense()).ToArray();
 
         var writer = new TowerBlockWriter(chunks, new FluidManager(), new LeafDecayManager(), new FallingBlockManager(),
             new LodManager(null!), (_, _, _) => { }, null);
@@ -79,7 +79,7 @@ public sealed class TowerCollapseCostProbe(ITestOutputHelper output)
         var changed = 0;
         for (var i = 0; i < stamped.Count; i++)
         {
-            var after = stamped[i].Blocks;
+            var after = stamped[i].Storage.ToDense();
             for (var j = 0; j < after.Length; j++)
                 if (after[j] != before[i][j]) changed++;
         }

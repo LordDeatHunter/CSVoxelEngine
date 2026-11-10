@@ -60,10 +60,14 @@ OpenGLTest/
                                #   PlayerBodyProbe.InLava
       CellKey.cs               # packs a world block cell into one long (fluid and leaf-decay schedules, tree growth sets),
                                #   forwarding to ChunkKey's one 21-bit bit math
-      Chunk.cs                 # 16^3 block storage of one chunk: ids, the per-block state byte, the published light
-                               #   snapshot, the raw writers and edit API, save/network snapshots, and its GPU slices
-                               #   (UpdateMesh, MarkMeshedHeadless); GenerateBlockData, RestoreFrom and GenerateMeshData
-                               #   forward to WorldGen/ChunkTerrainFill, ChunkRestore and Meshing/ChunkMeshBuilder
+      Chunk.cs                 # one 16^3 chunk: the volatile reference to its id storage (ChunkBlocks), the per-block
+                               #   state byte, the published light snapshot, the raw writers and edit API, save/network
+                               #   snapshots, and its GPU slices (UpdateMesh, MarkMeshedHeadless); GenerateBlockData,
+                               #   RestoreFrom and GenerateMeshData forward to WorldGen/ChunkTerrainFill, ChunkRestore
+                               #   and Meshing/ChunkMeshBuilder
+      ChunkBlocks.cs           # a chunk's palette-compressed ids: Uniform (one id), Indexed (256-id palette + one index
+                               #   byte per cell) or Direct (ushort per cell); one-way upgrades, FromDense compaction,
+                               #   the single-writer lock-free rules, the thread-static DenseScratch
       ChunkCellCache.cs        # a simulation's per-frame cell access: the 16-slot chunk cache, TryGetCell, the raw Write
                                #   that queues the touched chunks, the MarkDirty batch; one instance per owner
       ChunkFluidQueries.cs     # the fluid surface, column-top and flow queries over the loaded cells (behind ChunkManager.GetFluid*)
@@ -75,8 +79,8 @@ OpenGLTest/
       ChunkMap.cs              # the loaded-chunk table (ChunkManager.Chunks): a ConcurrentDictionary keyed on a packed ChunkKey long
       ChunkRenderLists.cs      # Renderable / TranslucentRenderable swap-remove bookkeeping and MeshVersion (behind ChunkManager's forwarders)
       ChunkRestore.cs          # rebuilds a chunk from a ChunkSnapshot (a save, a world source's map, a streamed chunk):
-                               #   copies blocks and state, recounts, surface floor, fluid frontier, publishes (behind
-                               #   Chunk.RestoreFrom)
+                               #   shares a Uniform storage, clones a compact one or recompacts an edited one, copies
+                               #   state, recounts, surface floor, fluid frontier, publishes (behind Chunk.RestoreFrom)
       ColumnCache.cs           # the process-global column-data cache, its accessors and the column fill
       ColumnTerrain.cs         # one chunk column's terrain: heights, water levels, corner climate (warmth, wetness)
       EntityLight.cs           # GL-free world light query for entity draws (drops, pops, debris, the player, ...)

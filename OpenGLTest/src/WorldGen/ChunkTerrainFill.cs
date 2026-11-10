@@ -13,7 +13,7 @@ using Stage = VoxelEngine.WorldGen.WorldgenStageTimer.Stage;
 
 namespace VoxelEngine.WorldGen;
 
-/// <summary>The worldgen fill of a fresh <see cref="Chunk"/>: column fill, carvers, water, mud, lava and every feature stamp, written straight into the chunk's arrays (never through the edit API, so a generated chunk is neither marked modified nor journaled). A pure function of world position; runs on the generation workers.</summary>
+/// <summary>The worldgen fill of a fresh <see cref="Chunk"/>: column fill, carvers, water, mud, lava and every feature stamp, written into the generating thread's dense work array (<see cref="ChunkBlocks.DenseScratch"/>) and handed to the chunk at the end, never through the edit API, so a generated chunk is neither marked modified nor journaled. A pure function of world position; runs on the generation workers.</summary>
 internal static class ChunkTerrainFill
 {
     /// <summary>Each generation worker's cave biome map, reused chunk after chunk (CaveBiomes.Fill writes every cell).</summary>
@@ -33,6 +33,9 @@ internal static class ChunkTerrainFill
         // Worldgen timing for the X/VOXEL_DEBUG console line (WorldgenStats, the `wgen` token)
         var genStart = System.Diagnostics.Stopwatch.GetTimestamp();
         timer?.Begin(genStart);
+        // The stamps write a dense id array that used to arrive zeroed with the chunk; the scratch is reused
+        var blocks = ChunkBlocks.DenseScratch;
+        Array.Clear(blocks);
         var column = ColumnCache.Get((int)chunk.Position.X, (int)chunk.Position.Z);
         var lowerBoundY = chunk.LowerBoundY;
         chunk.SurfaceMinY = column.MinHeight;
@@ -44,12 +47,12 @@ internal static class ChunkTerrainFill
         if (stampGates && WorldGenerationConfig.HellEnabled && HellGenerator.Covers(lowerBoundY))
         {
             timer?.Mark(Stage.Columns);
-            HellGenerator.Stamp(chunk.Blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
+            HellGenerator.Stamp(blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
             timer?.Mark(Stage.Hell);
-            StampHellTrees(chunk, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
+            StampHellTrees(chunk, blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
             timer?.Mark(Stage.HellTrees);
-            StampHellRuins(chunk, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size, stampGates, timer);
-            Finish(chunk, column, lowerBoundY, hasWater: false, timer, genStart);
+            StampHellRuins(chunk, blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size, stampGates, timer);
+            Finish(chunk, blocks, column, lowerBoundY, hasWater: false, timer, genStart);
             return;
         }
 
@@ -91,9 +94,9 @@ internal static class ChunkTerrainFill
 
             if (stampGates)
             {
-                StampSky(chunk, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size,
+                StampSky(chunk, blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size,
                     stampGates, timer);
-                Finish(chunk, column, lowerBoundY, hasWater: false, timer, genStart);
+                Finish(chunk, blocks, column, lowerBoundY, hasWater: false, timer, genStart);
                 return;
             }
         }
@@ -106,7 +109,7 @@ internal static class ChunkTerrainFill
                 // An oasis column is filled as forest so its ring wears grass (the stored biome
                 // stays the desert's; see OasisGenerator)
                 var fillBiome = column.Oasis[i] ? Biome.Forest : column.Biomes[i];
-                ColumnCache.GenerateColumn(chunk.Blocks, (int)chunk.Position.X, (int)chunk.Position.Z, x, z, column.Heights[i], column.Bed[i], column.DirtDepth[i],
+                ColumnCache.GenerateColumn(blocks, (int)chunk.Position.X, (int)chunk.Position.Z, x, z, column.Heights[i], column.Bed[i], column.DirtDepth[i],
                     lowerBoundY, fillBiome);
             }
         }
@@ -137,32 +140,32 @@ internal static class ChunkTerrainFill
         var carvable = column.MaxHeight >= lowerBoundY;
 
         if (carvable && WorldGenerationConfig.NoiseCavesEnabled)
-            NoiseCaves.Carve(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0, caves);
+            NoiseCaves.Carve(blocks, column, worldX0, lowerBoundY, worldZ0, caves);
         timer?.Mark(Stage.NoiseCaves);
 
         if (carvable && WorldGenerationConfig.WormCavesEnabled)
-            WormCarver.Carve(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            WormCarver.Carve(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.WormCaves);
 
         // After the carvers, so veins rim cave walls instead of being eaten by them. Each ore's richness follows
         // the cave biome map (a per-cell threshold shift; null keeps the plain field).
         if (WorldGenerationConfig.MalachiteEnabled)
-            MalachiteGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0, caves);
+            MalachiteGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0, caves);
         timer?.Mark(Stage.Malachite);
 
         // Same pass, same reason; coal's two host rocks let it also fill desert sandstone.
         if (WorldGenerationConfig.CoalEnabled)
-            CoalGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0, caves);
+            CoalGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0, caves);
         timer?.Mark(Stage.Coal);
 
         // Same pass again, deep stone only: a chunk whose floor is above the ceiling holds no host,
         // so skipping the call is bit-identical and saves its host scan on every shallower chunk.
         if (WorldGenerationConfig.HematiteEnabled && lowerBoundY <= WorldGenerationConfig.HematiteMaxY)
-            HematiteGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0, caves);
+            HematiteGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0, caves);
         timer?.Mark(Stage.Hematite);
 
         if (WorldGenerationConfig.TinEnabled && lowerBoundY <= WorldGenerationConfig.TinMaxY)
-            TinGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0, caves);
+            TinGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0, caves);
         timer?.Mark(Stage.Tin);
 
         // The cave biome exclusive ores host plain stone of their own biome, so they sit before the palette pass
@@ -170,7 +173,7 @@ internal static class ChunkTerrainFill
         // magma-touched deep's scorched hellrock.
         if (WorldGenerationConfig.CaveOresEnabled && caves is not null
             && Admits(stampGates, CaveOres.WriteBand(), lowerBoundY))
-            CaveOres.Stamp(chunk.Blocks, caves, worldX0, lowerBoundY, worldZ0);
+            CaveOres.Stamp(blocks, caves, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.CaveOres);
 
         // After the carvers (so caves under the sea floor flood) and before the trees and
@@ -178,15 +181,15 @@ internal static class ChunkTerrainFill
         var hasWater = false;
         if (WorldGenerationConfig.WaterEnabled)
         {
-            hasWater = FillWater(chunk, column, lowerBoundY);
+            hasWater = FillWater(blocks, column, lowerBoundY);
             timer?.Mark(Stage.Water);
-            StampMud(chunk, column, worldX0, lowerBoundY, worldZ0);
+            StampMud(blocks, column, worldX0, lowerBoundY, worldZ0);
         }
         timer?.Mark(Stage.Mud);
 
         // After the sea: flooded cells are water, not air, so only dry cave floors pond lava
         if (WorldGenerationConfig.LavaEnabled)
-            LavaGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            LavaGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Lava);
 
         // Every species (cacti included) stamps here, wood and leaves with their state bytes.
@@ -196,7 +199,7 @@ internal static class ChunkTerrainFill
         if (WorldGenerationConfig.TreesEnabled)
         {
             var state = chunk.StateArray;
-            TreeGenerator.Stamp(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            TreeGenerator.Stamp(blocks, ref state, worldX0, lowerBoundY, worldZ0);
             chunk.StateArray = state;
         }
         WorldgenStats.AddTreeTicks(System.Diagnostics.Stopwatch.GetTimestamp() - treeStart);
@@ -209,30 +212,30 @@ internal static class ChunkTerrainFill
             && Admits(stampGates, FallenLogGenerator.WriteBand(neighborhoodMaxHeight), lowerBoundY))
         {
             var state = chunk.StateArray;
-            FallenLogGenerator.Stamp(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            FallenLogGenerator.Stamp(blocks, ref state, worldX0, lowerBoundY, worldZ0);
             chunk.StateArray = state;
         }
         timer?.Mark(Stage.FallenLogs);
 
         if (WorldFeatureConfig.BouldersEnabled
             && Admits(stampGates, BoulderGenerator.WriteBand(neighborhoodMaxHeight), lowerBoundY))
-            BoulderGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+            BoulderGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Boulders);
 
         // A landmark on a summit, after everything else so its stack owns the peak
         if (WorldFeatureConfig.CairnsEnabled && Admits(stampGates, CairnGenerator.WriteBand(column), lowerBoundY))
-            CairnGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+            CairnGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Cairns);
 
         // Ruins on the dry land, clipped at chunk borders
         if (WorldFeatureConfig.RuinedPillarsEnabled
             && Admits(stampGates, RuinedPillarGenerator.WriteBand(column), lowerBoundY))
-            RuinedPillarGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+            RuinedPillarGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.RuinedPillars);
 
         if (WorldFeatureConfig.DesertWellsEnabled
             && Admits(stampGates, DesertWellGenerator.WriteBand(neighborhoodMaxHeight), lowerBoundY))
-            DesertWellGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+            DesertWellGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.DesertWells);
 
         // Template ruins: after the wells so a ruin owns its footprint, before the deep features and the snow
@@ -240,7 +243,7 @@ internal static class ChunkTerrainFill
             && Admits(stampGates, RuinPlacement.SurfaceBand(neighborhoodMaxHeight), lowerBoundY))
         {
             var state = chunk.StateArray;
-            RuinPlacement.StampSurface(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            RuinPlacement.StampSurface(blocks, ref state, worldX0, lowerBoundY, worldZ0);
             chunk.StateArray = state;
         }
         timer?.Mark(Stage.RuinsSurface);
@@ -249,57 +252,57 @@ internal static class ChunkTerrainFill
         if (WaystonesEnabled && Admits(stampGates, WaystonePlacement.SurfaceBand(neighborhoodMaxHeight), lowerBoundY))
         {
             var state = chunk.StateArray;
-            WaystonePlacement.StampSurface(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            WaystonePlacement.StampSurface(blocks, ref state, worldX0, lowerBoundY, worldZ0);
             chunk.StateArray = state;
         }
         timer?.Mark(Stage.WaystonesSurface);
 
         // Deep rock features, after the carvers so a geode's heart is not carved again
         if (WorldFeatureConfig.GeodesEnabled && Admits(stampGates, GeodeGenerator.WriteBand(), lowerBoundY))
-            GeodeGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+            GeodeGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Geodes);
 
         if (WorldFeatureConfig.MeteorsEnabled && Admits(stampGates, MeteorGenerator.WriteBand(column), lowerBoundY))
-            MeteorGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            MeteorGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Meteors);
 
         // Pond plants, after the water: reeds may replace the shallow cell they stand in, and a
         // lily pad floats on the cell above a lake's top water cell
         if (WorldFeatureConfig.ReedsEnabled && Admits(stampGates, ReedGenerator.WriteBand(column), lowerBoundY))
-            ReedGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            ReedGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Reeds);
 
         if (WorldFeatureConfig.LilyPadsEnabled && Admits(stampGates, LilyPadGenerator.WriteBand(column), lowerBoundY))
-            LilyPadGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            LilyPadGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.LilyPads);
 
         // Cave life, after the carvers and the water: only carved, dry air takes any
         if (WorldFeatureConfig.GlowMushroomsEnabled
             && Admits(stampGates, GlowMushroomGenerator.WriteBand(column), lowerBoundY))
-            GlowMushroomGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            GlowMushroomGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.GlowMushrooms);
 
         if (WorldFeatureConfig.CaveFormationsEnabled
             && Admits(stampGates, CaveFormationGenerator.WriteBand(column), lowerBoundY))
-            CaveFormationGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            CaveFormationGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.CaveFormations);
 
         // Loose rock buried inside stone, after the carvers so a pocket never fills a cave
         if (WorldFeatureConfig.GravelPocketsEnabled)
-            GravelPocketGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            GravelPocketGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.GravelPockets);
 
         // Underground water, after the lava so a pool never sits in a lava cell
         if (WorldFeatureConfig.UndergroundPoolsEnabled
             && Admits(stampGates, UndergroundPoolGenerator.WriteBand(column), lowerBoundY))
-            UndergroundPoolGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            UndergroundPoolGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.UndergroundPools);
 
         // The cave biomes' palette, after every carver, ore and underground stamp, so it rewrites only the plain
         // stone they left (ore counts, pockets, pools and cave life unchanged), and before the underground ruins,
         // which own their rooms. The cells were classified up front (Stage.CaveBiomeMap); this only dresses them
         if (caves is not null)
-            CaveBiomes.Stamp(chunk.Blocks, caves, worldX0, lowerBoundY, worldZ0);
+            CaveBiomes.Stamp(blocks, caves, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.CaveBiomes);
 
         // Sealed underground rooms and their waystone chambers, after the deep features and the cave life, so no
@@ -309,7 +312,7 @@ internal static class ChunkTerrainFill
             && Admits(stampGates, RuinPlacement.UndergroundBand(neighborhoodMaxHeight), lowerBoundY))
         {
             var state = chunk.StateArray;
-            RuinPlacement.StampUnderground(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0, caves);
+            RuinPlacement.StampUnderground(blocks, ref state, worldX0, lowerBoundY, worldZ0, caves);
             chunk.StateArray = state;
         }
         timer?.Mark(Stage.RuinsUnderground);
@@ -317,7 +320,7 @@ internal static class ChunkTerrainFill
         if (WaystonesEnabled && Admits(stampGates, WaystonePlacement.UndergroundBand(neighborhoodMaxHeight), lowerBoundY))
         {
             var state = chunk.StateArray;
-            WaystonePlacement.StampUnderground(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            WaystonePlacement.StampUnderground(blocks, ref state, worldX0, lowerBoundY, worldZ0);
             chunk.StateArray = state;
         }
         timer?.Mark(Stage.WaystonesUnderground);
@@ -325,7 +328,7 @@ internal static class ChunkTerrainFill
         // Frozen-only ice spikes go down before the snow, so a spike keeps its base cell
         if (WorldGenerationConfig.SnowAndIceEnabled
             && Admits(stampGates, IceSpikeGenerator.WriteBand(column), lowerBoundY))
-            IceSpikeGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+            IceSpikeGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.IceSpikes);
 
         // Last of the cold features: freezes cold surface water to ice, then lays snow on the dry
@@ -334,8 +337,8 @@ internal static class ChunkTerrainFill
         if (WorldGenerationConfig.SnowAndIceEnabled)
         {
             if (Admits(stampGates, SnowGenerator.GroundWriteBand(column), lowerBoundY))
-                SnowGenerator.StampGround(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
-            SnowGenerator.StampCanopy(chunk.Blocks, column, worldX0, worldZ0);
+                SnowGenerator.StampGround(blocks, column, worldX0, lowerBoundY, worldZ0);
+            SnowGenerator.StampCanopy(blocks, column, worldX0, worldZ0);
         }
 
         timer?.Mark(Stage.Snow);
@@ -344,21 +347,21 @@ internal static class ChunkTerrainFill
         // from tuning), so a stamp whose band misses this chunk cannot change a cell here and
         // skipping it is bit-identical. The marks stay unconditional so the stage layout holds.
         if (WorldFeatureConfig.PebblesEnabled && Admits(stampGates, PebbleGenerator.WriteBand(column), lowerBoundY))
-            PebbleGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            PebbleGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Pebbles);
 
         // Before the flowers and foliage, so their per-column scatter fills in around a clump
         // instead of eating into it
         if (WorldFeatureConfig.CottonEnabled && Admits(stampGates, CottonGenerator.WriteBand(column), lowerBoundY))
-            CottonGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            CottonGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Cotton);
 
         if (WorldFeatureConfig.FlowersEnabled && Admits(stampGates, FlowerGenerator.WriteBand(column), lowerBoundY))
-            FlowerGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            FlowerGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Flowers);
 
         if (WorldFeatureConfig.FoliageEnabled && Admits(stampGates, FoliageGenerator.WriteBand(column), lowerBoundY))
-            FoliageGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            FoliageGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Foliage);
 
         // The battle towers: after the heightmap-reading scatter (snow, pebbles, cotton, flowers,
@@ -369,35 +372,32 @@ internal static class ChunkTerrainFill
             && Admits(stampGates, TowerPlacement.Band(neighborhoodMaxHeight), lowerBoundY))
         {
             var state = chunk.StateArray;
-            TowerPlacement.Stamp(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            TowerPlacement.Stamp(blocks, ref state, worldX0, lowerBoundY, worldZ0);
             chunk.StateArray = state;
-            // Only a tower-stamped chunk pays the vectorized scan; no later stamp writes a covering block, and
-            // every other chunk keeps the flag false, so its light flood runs the plain heightmap rule
-            chunk.MayHaveSkyCover = BlockType.ContainsSkyCover(chunk.Blocks);
         }
         timer?.Mark(Stage.Towers);
 
         // The sky layers, into air only: a chunk straddling the cloud slab under a tall tree's reach
-        StampSky(chunk, worldX0, lowerBoundY, worldZ0, stampGates, timer);
+        StampSky(chunk, blocks, worldX0, lowerBoundY, worldZ0, stampGates, timer);
 
         // Last of every stamp, so nothing writes over it: the barrier band between the overworld
         // and hell. Its core takes every cell, carved air and fluids included, so it is gapless.
         if (WorldGenerationConfig.BarrierEnabled && Admits(stampGates, BarrierGenerator.WriteBand(), lowerBoundY))
-            BarrierGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+            BarrierGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Barrier);
 
         // Hell under the barrier band: it overwrites every cell at or below HellTopY, so only the
         // chunk straddling hell's top gets here with any (wholly hell chunks took the path above)
         var inHell = WorldGenerationConfig.HellEnabled && Admits(stampGates, HellGenerator.WriteBand(), lowerBoundY);
         if (inHell)
-            HellGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+            HellGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Hell);
         if (inHell)
-            StampHellTrees(chunk, worldX0, lowerBoundY, worldZ0);
+            StampHellTrees(chunk, blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.HellTrees);
-        StampHellRuins(chunk, worldX0, lowerBoundY, worldZ0, stampGates, timer);
+        StampHellRuins(chunk, blocks, worldX0, lowerBoundY, worldZ0, stampGates, timer);
 
-        Finish(chunk, column, lowerBoundY, hasWater, timer, genStart);
+        Finish(chunk, blocks, column, lowerBoundY, hasWater, timer, genStart);
     }
 
     /// <summary>Whether the chunk whose floor is <paramref name="worldY0"/> meets any sky layer's band.</summary>
@@ -409,10 +409,9 @@ internal static class ChunkTerrainFill
     /// <summary>The sky layers' stamps, each gated by its band: the solid cloud patches, the cloud sea, the
     /// sky islands and their trees. Their bands are disjoint and each writes only air (a tree also over the
     /// islands' plants and vines).</summary>
-    private static void StampSky(Chunk chunk, int worldX0, int worldY0, int worldZ0, bool stampGates,
+    private static void StampSky(Chunk chunk, ushort[] blocks, int worldX0, int worldY0, int worldZ0, bool stampGates,
         WorldgenStageTimer? timer)
     {
-        var blocks = chunk.Blocks;
         if (WorldGenerationConfig.CloudPatchesEnabled && Admits(stampGates, CloudPatchGenerator.WriteBand(), worldY0))
             CloudPatchGenerator.Stamp(blocks, worldX0, worldY0, worldZ0);
         timer?.Mark(Stage.Clouds);
@@ -457,23 +456,23 @@ internal static class ChunkTerrainFill
 
     /// <summary>The hell trees crossing the chunk (<see cref="HellTrees.Stamp"/>), after the hell stamp,
     /// through a local like the overworld trees: a ref to the volatile state field is refused.</summary>
-    private static void StampHellTrees(Chunk chunk, int worldX0, int worldY0, int worldZ0)
+    private static void StampHellTrees(Chunk chunk, ushort[] blocks, int worldX0, int worldY0, int worldZ0)
     {
         var state = chunk.StateArray;
-        HellTrees.Stamp(chunk.Blocks, ref state, worldX0, worldY0, worldZ0);
+        HellTrees.Stamp(blocks, ref state, worldX0, worldY0, worldZ0);
         chunk.StateArray = state;
     }
 
     /// <summary>The hell ruins crossing the chunk (<see cref="RuinPlacement.StampHell"/>) and their waystones
     /// (<see cref="WaystonePlacement.StampHell"/>), after the hell stamp and its trees, through a local like the trees: a ref to
     /// the volatile state field is refused.</summary>
-    private static void StampHellRuins(Chunk chunk, int worldX0, int worldY0, int worldZ0, bool stampGates,
+    private static void StampHellRuins(Chunk chunk, ushort[] blocks, int worldX0, int worldY0, int worldZ0, bool stampGates,
         WorldgenStageTimer? timer)
     {
         if (WorldFeatureConfig.RuinsEnabled && Admits(stampGates, HellGenerator.WriteBand(), worldY0))
         {
             var state = chunk.StateArray;
-            RuinPlacement.StampHell(chunk.Blocks, ref state, worldX0, worldY0, worldZ0);
+            RuinPlacement.StampHell(blocks, ref state, worldX0, worldY0, worldZ0);
             chunk.StateArray = state;
         }
         timer?.Mark(Stage.RuinsHell);
@@ -481,30 +480,31 @@ internal static class ChunkTerrainFill
         if (WaystonesEnabled && Admits(stampGates, HellGenerator.WriteBand(), worldY0))
         {
             var state = chunk.StateArray;
-            WaystonePlacement.StampHell(chunk.Blocks, ref state, worldX0, worldY0, worldZ0);
+            WaystonePlacement.StampHell(blocks, ref state, worldX0, worldY0, worldZ0);
             chunk.StateArray = state;
         }
         timer?.Mark(Stage.WaystonesHell);
     }
 
-    /// <summary>The tail every filled chunk shares: the solid recount, the fluid frontier and the
-    /// ready flag.</summary>
-    private static void Finish(Chunk chunk, ColumnData column, int lowerBoundY, bool hasWater,
+    /// <summary>The tail every filled chunk shares: the palette build (<see cref="ChunkBlocks.FromDense"/>) that
+    /// hands the chunk its storage, the solid count, the sky-cover flag, the fluid frontier and the ready flag.</summary>
+    private static void Finish(Chunk chunk, ushort[] blocks, ColumnData column, int lowerBoundY, bool hasWater,
         WorldgenStageTimer? timer, long genStart)
     {
-        // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping.
-        // Counting AIR and subtracting beats counting non-air: BlockType.Air is a
-        // constant of the block id type, so this binds to the vectorized
-        // MemoryExtensions.Count over the id span with no cast, where a "!= Air" predicate would
-        // have to run one comparison per cell.
-        chunk.SolidCount = BlockCount - chunk.Blocks.AsSpan().Count(BlockType.Air);
+        // Carving removed an unknown number of blocks; a recount off the compact storage is cheaper than
+        // bookkeeping. The sky-cover flag comes from its palette (exactly the ids present), so only a
+        // chunk that really holds a coversSky block runs the light flood's cover rule.
+        var storage = ChunkBlocks.FromDense(blocks);
+        chunk.Storage = storage;
+        chunk.SolidCount = storage.CountNonAir();
+        chunk.MayHaveSkyCover = BlockType.ContainsSkyCover(storage.IdSpan);
         timer?.Mark(Stage.SolidCount);
 
         // Only a chunk that actually got flooded can have a frontier to report, plus any
         // chunk low enough to hold lava pockets or hell's lava (the scan itself is fluid-generic)
         if (hasWater || (WorldGenerationConfig.LavaEnabled && lowerBoundY <= WorldGenerationConfig.LavaMaxY)
                      || (WorldGenerationConfig.HellEnabled && HellGenerator.WriteBand().Reaches(lowerBoundY)))
-            ScanFluidFrontier(chunk, column, lowerBoundY);
+            ScanFluidFrontier(chunk, blocks, column, lowerBoundY);
         timer?.Mark(Stage.FluidFrontier);
 
         chunk.IsBlockDataReady = true;
@@ -567,7 +567,7 @@ internal static class ChunkTerrainFill
     /// both chunks are loaded, so this only ever reads this chunk's own blocks and stays as
     /// thread-safe as the rest of worldgen.
     /// </summary>
-    internal static void ScanFluidFrontier(Chunk chunk, ColumnData column, int lowerBoundY)
+    internal static void ScanFluidFrontier(Chunk chunk, ushort[] blocks, ColumnData column, int lowerBoundY)
     {
         List<ushort>? frontier = null;
 
@@ -576,7 +576,7 @@ internal static class ChunkTerrainFill
         for (var z = 0; z < Size; z++)
         {
             var i = Idx(x, y, z);
-            if (!BlockType.IsFluid(chunk.Blocks[i])) continue;
+            if (!BlockType.IsFluid(blocks[i])) continue;
 
             var fluidY = lowerBoundY + y;
             var column2D = (x << SizeShift) | z;
@@ -584,11 +584,11 @@ internal static class ChunkTerrainFill
             var fluidWaterLevel = column.WaterLevel[column2D];
 
             var exposed = !FluidState.IsSource(chunk.GetLocalState(x, y, z))
-                          || (x > 0 && IsWakeTarget(chunk, column, lowerBoundY, x - 1, y, z, fluidY, fluidHeight, fluidWaterLevel))
-                          || (x < SizeMask && IsWakeTarget(chunk, column, lowerBoundY, x + 1, y, z, fluidY, fluidHeight, fluidWaterLevel))
-                          || (z > 0 && IsWakeTarget(chunk, column, lowerBoundY, x, y, z - 1, fluidY, fluidHeight, fluidWaterLevel))
-                          || (z < SizeMask && IsWakeTarget(chunk, column, lowerBoundY, x, y, z + 1, fluidY, fluidHeight, fluidWaterLevel))
-                          || (y > 0 && IsWakeTarget(chunk, column, lowerBoundY, x, y - 1, z, fluidY, fluidHeight, fluidWaterLevel));
+                          || (x > 0 && IsWakeTarget(blocks, column, lowerBoundY, x - 1, y, z, fluidY, fluidHeight, fluidWaterLevel))
+                          || (x < SizeMask && IsWakeTarget(blocks, column, lowerBoundY, x + 1, y, z, fluidY, fluidHeight, fluidWaterLevel))
+                          || (z > 0 && IsWakeTarget(blocks, column, lowerBoundY, x, y, z - 1, fluidY, fluidHeight, fluidWaterLevel))
+                          || (z < SizeMask && IsWakeTarget(blocks, column, lowerBoundY, x, y, z + 1, fluidY, fluidHeight, fluidWaterLevel))
+                          || (y > 0 && IsWakeTarget(blocks, column, lowerBoundY, x, y - 1, z, fluidY, fluidHeight, fluidWaterLevel));
             if (!exposed) continue;
 
             frontier ??= [];
@@ -600,9 +600,9 @@ internal static class ChunkTerrainFill
 
     /// <summary>Whether a chunk-local neighbor is somewhere the fluid beside it may wake into
     /// (<see cref="FluidWakeRules.IsWakeTarget"/> with this chunk's column data).</summary>
-    private static bool IsWakeTarget(Chunk chunk, ColumnData column, int lowerBoundY, int x, int y, int z,
+    private static bool IsWakeTarget(ushort[] blocks, ColumnData column, int lowerBoundY, int x, int y, int z,
         int fluidY, int fluidColumnHeight, int fluidColumnWaterLevel) =>
-        FluidWakeRules.IsWakeTarget(chunk.Blocks[Idx(x, y, z)], lowerBoundY + y,
+        FluidWakeRules.IsWakeTarget(blocks[Idx(x, y, z)], lowerBoundY + y,
             column.Heights[(x << SizeShift) | z], fluidY, fluidColumnHeight, fluidColumnWaterLevel);
 
     /// <summary>
@@ -620,7 +620,7 @@ internal static class ChunkTerrainFill
     /// state. Returns whether any cell was flooded, which is what decides if this chunk can have a
     /// fluid frontier to report.
     /// </summary>
-    private static bool FillWater(Chunk chunk, ColumnData column, int lowerBoundY)
+    private static bool FillWater(ushort[] blocks, ColumnData column, int lowerBoundY)
     {
         var filled = false;
 
@@ -637,8 +637,8 @@ internal static class ChunkTerrainFill
             for (var y = 0; y <= top; y++)
             {
                 var i = Idx(x, y, z);
-                if (chunk.Blocks[i] != BlockType.Air) continue;
-                chunk.Blocks[i] = TerrainGenerator.SeaBlock;
+                if (blocks[i] != BlockType.Air) continue;
+                blocks[i] = TerrainGenerator.SeaBlock;
                 filled = true;
             }
         }
@@ -654,7 +654,7 @@ internal static class ChunkTerrainFill
     /// across a border is left to the fluid tick, the same split <see cref="ScanFluidFrontier"/>
     /// uses: worldgen stays a pure per-chunk function with no cross-chunk block reads.
     /// </summary>
-    private static void StampMud(Chunk chunk, ColumnData column, int worldX0, int lowerBoundY, int worldZ0)
+    private static void StampMud(ushort[] blocks, ColumnData column, int worldX0, int lowerBoundY, int worldZ0)
     {
         // A chunk starting above every level this column can hold water at can neither hold any
         // nor touch any within one cell
@@ -668,9 +668,9 @@ internal static class ChunkTerrainFill
         for (var y = 0; y < Size; y++)
         for (var z = 0; z < Size; z++)
         {
-            if (chunk.Blocks[Idx(x, y, z)] != dirt) continue;
-            if (TouchesSeaWater(chunk, x, y, z, worldX0, lowerBoundY, worldZ0, water))
-                chunk.Blocks[Idx(x, y, z)] = mud;
+            if (blocks[Idx(x, y, z)] != dirt) continue;
+            if (TouchesSeaWater(blocks, x, y, z, worldX0, lowerBoundY, worldZ0, water))
+                blocks[Idx(x, y, z)] = mud;
         }
     }
 
@@ -680,7 +680,7 @@ internal static class ChunkTerrainFill
     /// <see cref="FillWater"/> is built on outside it. (It was a plain height test before lakes
     /// and rivers, when any below-waterline column held water; that is no longer true.)
     /// </summary>
-    private static bool TouchesSeaWater(Chunk chunk, int x, int y, int z, int worldX0, int lowerBoundY, int worldZ0, ushort water)
+    private static bool TouchesSeaWater(ushort[] blocks, int x, int y, int z, int worldX0, int lowerBoundY, int worldZ0, ushort water)
     {
         for (var dx = -1; dx <= 1; dx++)
         for (var dy = -1; dy <= 1; dy++)
@@ -693,7 +693,7 @@ internal static class ChunkTerrainFill
             var nz = z + dz;
             if (nx >= 0 && ny >= 0 && nz >= 0 && nx < Size && ny < Size && nz < Size)
             {
-                if (chunk.Blocks[Idx(nx, ny, nz)] == water) return true;
+                if (blocks[Idx(nx, ny, nz)] == water) return true;
                 continue;
             }
 

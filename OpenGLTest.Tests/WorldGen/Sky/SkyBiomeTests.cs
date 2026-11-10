@@ -238,7 +238,7 @@ public sealed class SkyBiomeTests : IDisposable
                 {
                     if (c.Y >> Chunk.SizeShift != cy) continue;
                     var index = Chunk.Idx(c.X - x0, c.Y - cy * Chunk.Size, c.Z - z0);
-                    stamped[(c.X, c.Y, c.Z)] = (chunk.Blocks[index], state[index]);
+                    stamped[(c.X, c.Y, c.Z)] = (chunk.Storage.Get(index), state[index]);
                 }
             }
 

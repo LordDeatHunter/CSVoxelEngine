@@ -54,11 +54,13 @@ public static class TreeGenerator
             ? OasisSpecies
             : SpeciesByBiome[(int)TerrainGenerator.BiomeAt(x, z)];
 
-    internal static readonly bool[] LeafById = new bool[BlockTables.IdCount];
+    // Leaves of every species, by id. Sized once at first touch (see the static constructor), so
+    // a read must go through IsLeaf unless the id is known to be loaded content.
+    internal static readonly bool[] LeafById;
 
     // Wood and leaves of every species with a canopy: what disturbs the far-LOD canopy. A
     // leafless species (cactus) has no canopy, so its wood is left out, as before.
-    private static readonly bool[] CanopyBlockById = new bool[BlockTables.IdCount];
+    private static readonly bool[] CanopyBlockById;
 
     // The highest worldgen density: a column whose placement hash is at or above it can never
     // root anything, so it is rejected before any noise is read.
@@ -81,10 +83,15 @@ public static class TreeGenerator
     // the proxy sweep looks for trunks whose crown can overhang it.
     internal static readonly int ProxyReach;
 
-    // Explicit so the tables are built the first time anything touches this class (after
-    // ContentRegistry.Load), not at whatever point beforefieldinit would allow
+    // Explicit so the tables are built the first time anything touches this class, not at
+    // whatever point beforefieldinit would allow; RequireLoaded enforces that this is after
+    // ContentRegistry.Load, so the per-id tables are sized for the loaded content
     static TreeGenerator()
     {
+        BlockTables.RequireLoaded(nameof(TreeGenerator));
+        LeafById = new bool[BlockTables.IdCount];
+        CanopyBlockById = new bool[BlockTables.IdCount];
+
         Species = TreeSpeciesRegistry.All.OrderBy(s => s.Name, StringComparer.Ordinal).ToArray();
 
         var biomes = Enum.GetValues<Biome>();
@@ -234,12 +241,22 @@ public static class TreeGenerator
         ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
             .Heights[((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
 
-    /// <summary>Whether a block id is the leaves of any tree species.</summary>
-    public static bool IsLeaf(ushort blockId) => LeafById[blockId];
+    /// <summary>Whether a block id is the leaves of any tree species (false for an id past the
+    /// table, which a later, wider content load can produce).</summary>
+    public static bool IsLeaf(ushort blockId)
+    {
+        var table = LeafById;
+        return (uint)blockId < (uint)table.Length && table[blockId];
+    }
 
     /// <summary>Wood or leaves of a species with a canopy: the blocks whose removal disturbs the
-    /// far-LOD canopy. A leafless species' wood (cactus) is excluded because it has no canopy.</summary>
-    public static bool IsTreeBlock(ushort blockId) => CanopyBlockById[blockId];
+    /// far-LOD canopy. A leafless species' wood (cactus) is excluded because it has no canopy.
+    /// False for an id past the table, as <see cref="IsLeaf"/>.</summary>
+    public static bool IsTreeBlock(ushort blockId)
+    {
+        var table = CanopyBlockById;
+        return (uint)blockId < (uint)table.Length && table[blockId];
+    }
 
     /// <summary>Highest canopy cell over the ground column (x, z), or 0 under open sky (<see cref="TreeCanopy.CanopyTop"/>).</summary>
     public static int CanopyTop(int x, int z) => TreeCanopy.CanopyTop(x, z);

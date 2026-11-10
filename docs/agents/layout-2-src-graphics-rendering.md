@@ -173,8 +173,9 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   (see "Multiple players and chat"); the client and the server side below
       ChatMessageCodec.cs      # one ChatMessage frame (kind, sender, text, optional link), its one writer and reader;
                                #   a link that does not fit its text is a malformed frame
-      ChunkNetCodec.cs         # chunk blocks/state and column terrain (heights, water levels, corner climate),
-                               #   Deflate-compressed
+      ChunkNetCodec.cs         # the chunk payload (mode byte, then one id | id palette + index bytes | ushort per
+                               #   cell, then the state; malformed -> InvalidDataException) and column terrain
+                               #   (heights, water levels, corner climate), Deflate-compressed
       InventoryIntent.cs       # one client inventory intent (select, drop, equip, craft, creative grant/clear, pick)
       InventoryIntentCodec.cs  # its bounds-checked wire form
       InventoryNetCodec.cs     # the server-owned inventory on the wire (the save JSON shape)

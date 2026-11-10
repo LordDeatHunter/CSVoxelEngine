@@ -33,10 +33,15 @@ public static class FallenLogGenerator
 
     // The hollow log of each biome's worldgen tree species, indexed by (int)Biome; 0 = none
     private static readonly ushort[] LogByBiome;
-    private static readonly bool[] FallenLogById = new bool[BlockTables.IdCount];
+    private static readonly bool[] FallenLogById;
 
+    // Explicit so the table is sized the first time anything touches this class; RequireLoaded
+    // enforces that this is after ContentRegistry.Load
     static FallenLogGenerator()
     {
+        BlockTables.RequireLoaded(nameof(FallenLogGenerator));
+        FallenLogById = new bool[BlockTables.IdCount];
+
         var species = TreeGenerator.SpeciesByBiome;
         LogByBiome = new ushort[species.Length];
         for (var b = 0; b < species.Length; b++)
@@ -53,8 +58,13 @@ public static class FallenLogGenerator
     /// </summary>
     public static ushort HollowLogFor(Biome biome) => LogByBiome[(int)biome];
 
-    /// <summary>Whether a block is one this generator stamps as some biome's fallen log.</summary>
-    public static bool IsFallenLog(ushort id) => FallenLogById[id];
+    /// <summary>Whether a block is one this generator stamps as some biome's fallen log (false
+    /// for an id past the table, which a later, wider content load can produce).</summary>
+    public static bool IsFallenLog(ushort id)
+    {
+        var table = FallenLogById;
+        return (uint)id < (uint)table.Length && table[id];
+    }
 
     /// <summary>
     /// The log a cell holds: its start column (jittered inside the cell), its length and its axis

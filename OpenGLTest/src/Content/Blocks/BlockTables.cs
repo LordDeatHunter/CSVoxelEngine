@@ -39,6 +39,21 @@ internal static class BlockTables
         ids.IndexOfAnyExceptInRange((ushort)0, (ushort)(IdCount - 1)) < 0;
 
     /// <summary>
+    /// The guard for a static class that sizes a per-id table of its own once per process (from
+    /// its static constructor): throws <see cref="InvalidOperationException"/> when
+    /// <paramref name="consumer"/> is first touched before <see cref="ContentRegistry.Load"/>, which
+    /// would freeze a table sized for no content. It enforces the first-touch order only: such a
+    /// table is not resized by a later, wider load, so the class's lookups must be length-tolerant
+    /// (an id past the table reads as false) and no worldgen runs under a swapped registry.
+    /// </summary>
+    internal static void RequireLoaded(string consumer)
+    {
+        if (ContentRegistry.BlockIds.Count == 0)
+            throw new InvalidOperationException(
+                $"{consumer} was touched before ContentRegistry.Load; its per-id tables would be sized for no content");
+    }
+
+    /// <summary>
     /// Replaces every per-id table on <see cref="BlockType"/> with a fresh one of
     /// <paramref name="idCount"/> entries, empties <see cref="BlockType.Types"/> and the sky-cover
     /// set, and seeds air's defaults. Every static array on <see cref="BlockType"/> is in this

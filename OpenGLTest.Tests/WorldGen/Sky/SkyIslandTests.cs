@@ -381,7 +381,7 @@ public sealed class SkyIslandTests
                 var wx = (cx + dcx) * Chunk.Size + x;
                 var wy = cy * Chunk.Size + y;
                 var wz = (cz + dcz) * Chunk.Size + z;
-                var block = chunk.Blocks[Chunk.Idx(x, y, z)];
+                var block = chunk.GetLocalBlock(x, y, z);
                 // A ruin on the island owns its footprint cells; the point query knows nothing of it
                 if (!RuinPlacement.SkyRuinOwns(wx, wy, wz)) Assert.Equal(ExpectedSky(wx, wy, wz), block);
                 if (block == BlockType.Air) continue;

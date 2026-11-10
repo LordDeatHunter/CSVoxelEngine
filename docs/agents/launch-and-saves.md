@@ -57,8 +57,10 @@ A world opened from the main menu owns a `ChunkSaveStore` over its save folder (
 pure function of the seed: only **deltas** and the seed are written.
 
 - **Chunk persistence ordering** (`ChunkSaveStore`'s class doc is the reference). Writes are
-  asynchronous: the main thread only copies arrays (`Chunk.TakeSnapshot`) and one background
-  thread (`ChunkSaveWriter`) builds the palette, deflates and writes. `Enqueue` publishes the
+  asynchronous: the main thread only clones the chunk's palette storage and state
+  (`Chunk.TakeSnapshot`, `ChunkBlocks.Clone`: a pending snapshot holds one id for a Uniform chunk and
+  about 4.5 KB for an Indexed one, rather than a dense 8 KB array) and one background
+  thread (`ChunkSaveWriter`) builds the name palette, deflates and writes. `Enqueue` publishes the
   snapshot in the pending map **before** the job is queued, and `ChunkManager` enqueues
   **before** it forgets the unloading chunk, so a chunk that streams straight back in is
   restored from memory. The writer writes `.bin.tmp`, moves it over the final file (retried
@@ -91,7 +93,11 @@ pure function of the seed: only **deltas** and the seed are written.
 - **Chunk file format (`ChunkSaveCodec`, v3).** A header with a ushort palette count and the
   palette's block names, then a Deflate body with one palette index per cell: a byte when the
   palette holds at most 255 names, else a little-endian ushort, then the state bytes and the
-  player-placed cells. A file of any other version (a v2 file from a build whose ids were bytes)
+  player-placed cells. The file does not follow the in-memory `ChunkBlocks` palette: `Write` decodes
+  the snapshot's storage into a dense array and re-derives the name palette in first-seen cell
+  order, so stale in-memory entries never reach the file and the bytes depend only on the cells;
+  `ReadCore` decodes into `ChunkBlocks.DenseScratch` and compacts it with `FromDense`, so a loaded
+  chunk holds the smallest storage for its ids. A file of any other version (a v2 file from a build whose ids were bytes)
   is refused as `InvalidDataException`, never misread: `ChunkSaveStore` warns once, regenerates
   the chunk and sets the old file aside as `.bad` before the first write over it. An imported
   map's chunk files share the format, so a map written by an older build loads as air

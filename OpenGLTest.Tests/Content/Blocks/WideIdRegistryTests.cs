@@ -16,7 +16,8 @@ namespace VoxelEngine.Tests.Content.Blocks;
 /// extra blocks (<see cref="SyntheticContentRoot"/>) is swapped into the process-global registry,
 /// so ids above 255 exist. Each test restores the real content in a <c>finally</c> and asserts the
 /// restore was exact. Only the registry, meshing and the codecs run under the swap, never
-/// worldgen, so no static worldgen cache is built from the synthetic ids.
+/// worldgen, so no static worldgen cache is built from the synthetic ids. The tree and fallen-log
+/// per-id tables are sized at their first touch and read false for ids past them.
 /// </summary>
 [Collection("Content registry swap")]
 public sealed class WideIdRegistryTests
@@ -91,18 +92,18 @@ public sealed class WideIdRegistryTests
             for (var i = 0; i < all.Length; i++)
                 chunk.SetBlockRaw(i % Chunk.Size, 10 + i / (Chunk.Size * Chunk.Size), i / Chunk.Size % Chunk.Size, all[i], 0);
             var snapshot = chunk.TakeSnapshot(null);
-            Assert.True(snapshot.Blocks.Distinct().Count() > byte.MaxValue + 1);
+            Assert.True(snapshot.Storage.ToDense().Distinct().Count() > byte.MaxValue + 1);
 
             using var file = new MemoryStream();
             ChunkSaveCodec.Write(file, snapshot, static id => BlockType.ById[id]?.Name);
             file.Position = 0;
             var saved = ChunkSaveCodec.Read(file,
                 static name => ContentRegistry.TryResolveBlock(name, out var id) ? id : null);
-            Assert.Equal(snapshot.Blocks, saved.Blocks);
+            Assert.Equal(snapshot.Storage.ToDense(), saved.Storage.ToDense());
             Assert.Equal(snapshot.State, saved.State);
 
             var streamed = ChunkNetCodec.Decode(ChunkNetCodec.Encode(snapshot));
-            Assert.Equal(snapshot.Blocks, streamed.Blocks);
+            Assert.Equal(snapshot.Storage.ToDense(), streamed.Storage.ToDense());
             Assert.Equal(snapshot.State, streamed.State);
         });
     }

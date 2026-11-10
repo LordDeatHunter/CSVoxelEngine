@@ -348,8 +348,8 @@ public sealed class CaveBiomeTests
         {
             AfterMark = s =>
             {
-                if (s == Stage.UndergroundPools) before = (ushort[])current!.Blocks.Clone();
-                else if (s == Stage.CaveBiomes) after = (ushort[])current!.Blocks.Clone();
+                if (s == Stage.UndergroundPools) before = (ushort[])ChunkBlocks.DenseScratch.Clone();
+                else if (s == Stage.CaveBiomes) after = (ushort[])ChunkBlocks.DenseScratch.Clone();
             },
         };
 

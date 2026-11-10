@@ -117,17 +117,20 @@ justify one.
     worker), `WorldLoadGate`. Time a large save's loading phase before proposing region files (a save-format change).
   - **Win**: unknown until measured. **Verify**: a loading-phase timer on a heavily edited world. **Invariant**: the
     store's write and lookup ordering (`ChunkSaveStore`'s class doc).
-  - **Note**: the chunk save is v3 since 2026-11-10 (ids widened to `ushort`): a chunk whose palette passes 255 names
-    stores 2-byte indices per cell until palette chunk storage lands, so any restore IO number taken before then
-    predates the format.
+  - **Note**: the chunk save is v3 since 2026-11-10 (ids widened to `ushort`; a chunk whose palette passes 255 names
+    stores 2-byte indices per cell), so any restore IO number taken before then predates the format. Palette chunk
+    storage (also 2026-11-10) kept the v3 bytes identical; a restore now ends in `ChunkBlocks.FromDense` (or a clone
+    of an already compact snapshot), a few us a chunk on the worker.
 
 - [ ] **`G10` A/B the per-id tables now that they are not `static readonly`** (measure first).
   - **Files**: `BlockType.cs` (the per-id tables, sized at load by `Content/Blocks/BlockTables.Allocate`), and their
     hot readers: `ChunkMesher`/`ChunkMeshBuilder`, `ChunkLighting`, `ChunkTerrainFill` and the feature stamps,
     `Simulation/Fluids`. Widening ids to `ushort` dropped `readonly` from the tables, so the JIT can no longer fold
-    them as constants, and chunk ids doubled to 2 bytes a cell (about 70 MB to 140 MB at radius 16; the light flood's
-    id snapshot ~97 KB to ~195 KB per mesh build) until palette chunk storage lands.
-  - **Win**: unknown; measure in the perf capture after palette storage, hoisting a table into a local in any hot
+    them as constants. The memory side is settled: palette chunk storage (`Chunks/ChunkBlocks`) holds the 17,077-chunk
+    rest ring's ids in ~49.6 MB against 136.6 MB dense (RTX 3070 machine, 2026-11-10; see "Palette chunk storage"
+    under Landed results); the light flood's dense id snapshot is still ~195 KB per mesh build.
+  - **Win**: unknown; the palette-storage capture compared against d29c0735 (already widened), so the table A/B
+    itself is still unmeasured. Hoist a table into a local in any hot
     loop that still reads it per cell (`ChunkLighting.SpreadLight` already does). **Verify**: perf-fly fps pairs,
     `MeshBuildCostProbe` and `WorldgenCostProbe` pairs against the pre-widening commit. **Invariant**: tables are
     never reallocated while workers run.
@@ -321,6 +324,17 @@ and steps the far key light by under half a texel between renders).
   6250 -> 4275 us (-32%), blue lamps 7299 -> 4772 us. An `EdgeFlags` table in `SpreadLight` gained under 1%.
 - **G6 chunk-level stamp gates** (`StampBand`, `StampGateTests`): warm fill -14% to -64% per chunk class
   (above-surface 0.477 -> 0.171 ms); a new feature stamp must add its band and its `StampGateTests` row.
+- **Palette chunk storage** (`Chunks/ChunkBlocks`; RTX 3070, 16 cpus, Release, 2026-11-10, interleaved against a
+  d29c0735 worktree). Memory: the `VOXEL_SPAWN=0,30,0 VOXEL_TIME=60` rest ring (17,077 chunks) held ~6,050 Uniform /
+  ~11,020 Indexed / 0 Direct chunks, ids ~49.6 MB vs 136.6 MB dense (-64%; ~4,250 Indexed chunks already edited
+  by the fluid settle); perf-fly ended at 7,659 / 9,418 / 0, 42.4 MB vs 136.6 MB. Frame time within noise: rest
+  pairs 4.68/4.57, 4.35/4.21, 4.29/4.18 ms (after/before; every CPU row moved together by ~1%), perf-fly means
+  4.30/3.99, 4.02/4.08, 3.93/3.98 ms with the same worst-frame spread, a 25 s pour of `flow-water.json` 6.21/5.84,
+  5.85/6.24 ms (`fluidTick` 0.08 ms both). Probes, after/before: `MeshBuildCostProbe` within ~1% in every case,
+  `WorldgenCostProbe` warm all-classes mean 0.342-0.348 vs 0.336-0.343 ms (`FromDense` costs ~5-8 us a chunk,
+  charged to the `SolidCount` stage), `TowerCollapseCostProbe` step mean 0.194 vs 0.190 ms over six pairs once the
+  Indexed `Get`/`CopyRun` read the 256-slot palette without a bounds check (before that it leaned ~0.03 ms worse).
+  **Trap:** the tower probe's step mean is bimodal run to run (~0.14 or ~0.20 ms); judge it over five or more pairs.
 
 ### Not chasing (recorded so it is not re-proposed)
 

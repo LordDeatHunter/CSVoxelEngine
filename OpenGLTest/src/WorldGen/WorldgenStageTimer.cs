@@ -123,7 +123,7 @@ internal sealed class WorldgenStageTimer
         RuinsHell,
         /// <summary>WaystonePlacement.StampHell.</summary>
         WaystonesHell,
-        /// <summary>The SolidCount recount.</summary>
+        /// <summary>The palette build (ChunkBlocks.FromDense) and the solid count.</summary>
         SolidCount,
         /// <summary>ScanFluidFrontier.</summary>
         FluidFrontier,

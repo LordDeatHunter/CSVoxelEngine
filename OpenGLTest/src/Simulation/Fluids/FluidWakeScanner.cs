@@ -84,7 +84,7 @@ internal sealed class FluidWakeScanner
     /// at or below its column's terrain top counts), so it does not wake into open air above a
     /// ravine, beach or hillside, while a fluid above both its column's terrain top and water
     /// level (only ever poured, brought back by a restored chunk) wakes against any replaceable
-    /// neighbor. Blocks are read straight off both chunks (they are loaded, so their arrays are
+    /// neighbor. Blocks are read straight off both chunks (they are loaded, so their cells are
     /// there) rather than through <c>GetBlockGlobal</c>, which would call an unloaded chunk air.
     /// </summary>
     private void WakeBorders(Chunk chunk, ChunkManager chunks)

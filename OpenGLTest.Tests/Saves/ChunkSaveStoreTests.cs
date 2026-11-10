@@ -46,7 +46,7 @@ public sealed class ChunkSaveStoreTests : IDisposable
 
     private static void AssertSameData(ChunkSnapshot expected, ChunkSnapshot actual)
     {
-        Assert.Equal(expected.Blocks, actual.Blocks);
+        Assert.Equal(expected.Storage.ToDense(), actual.Storage.ToDense());
         Assert.Equal(expected.State, actual.State);
         Assert.Equal(expected.PlayerPlaced, actual.PlayerPlaced);
     }
@@ -129,7 +129,7 @@ public sealed class ChunkSaveStoreTests : IDisposable
         {
             Assert.True(reopened.TryLoad(key, out var fromDisk));
             AssertSameData(newer, fromDisk);
-            Assert.NotEqual(older.Blocks, fromDisk.Blocks);
+            Assert.NotEqual(older.Storage.ToDense(), fromDisk.Storage.ToDense());
         }
         finally
         {

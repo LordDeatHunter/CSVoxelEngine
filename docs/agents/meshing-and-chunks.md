@@ -111,8 +111,19 @@ streamed column makes the build return `null`, which the caller treats like a va
 (see the threading rules).
 `ChunkMeshBuilder.GenerateMeshDataFromSnapshot` runs two passes over the padded 18³
 block snapshot. The id snapshots (the padded `ushort[]` and the light flood's id copy, both rented
-from `ArrayPool<ushort>`) are `ushort` like chunk storage; the state, sun and block-light
-snapshots stay `byte`. The binary greedy pass (`EmitGreedyFaces`, scratch in the `[ThreadStatic]`
+from `ArrayPool<ushort>`) are dense `ushort`, decoded from the palette storage (`ChunkBlocks`, see the
+threading rules) of each chunk in the neighborhood, captured once per build in `MeshScratch.NeighborBlocks`
+(`TryResolveNeighbors` fills it beside `Neighbors`/`NeighborStates`): `FillPaddedSnapshot` copies each row's
+16 middle cells with one `ChunkBlocks.CopyRun` (a fill for a Uniform storage, a gather for an Indexed one, a
+span copy for a Direct one) and reads the two halo cells with `Get`, and `ChunkLighting.FillLightSnapshot`
+copies its runs with `CopyRun` the same way. The per-voxel pass reads ids from the padded snapshot, never
+the live chunk, so one build sees one consistent set of cells. The state, sun and block-light snapshots
+stay `byte`. The enclosed early return (`IsFullyEnclosed`: a full chunk whose cells all occlude and whose
+six face neighbors seal the shared planes builds nothing, not even a light volume) answers from the palette
+first: a Uniform or Indexed storage whose every `IdSpan` id occludes passes in O(1) or a palette's length,
+and a face neighbor whose palette all occludes seals its face; otherwise (a stale air entry left by edits,
+a real non-occluder, any Direct storage) it falls back to the exact scan of the chunk's cells and of the
+neighbor's facing 16x16 plane, so a solid chunk built by edits keeps the skip. The binary greedy pass (`EmitGreedyFaces`, scratch in the `[ThreadStatic]`
 `MeshScratch`) takes every block flagged `BlockType.IsGreedy`: a `Model`-renderer block whose
 baked model is exactly the six untransformed cube faces (`ModelBakeSteps.BakesGreedy`; all four
 built-in parents qualify, so stone, dirt, grass, logs, TNT, lamps, leaves and glass all do). It
@@ -169,9 +180,9 @@ gradients split merges.
 **Sky cover (BT-10).** The sun seeds of a light volume normally start at the column's terrain height, which a battle
 tower stands above (its heightmap must not be raised: the far LOD, water and spawns read it). A block flagged
 `coversSky` (the three tower bricks) closes that gap. `Chunk.MayHaveSkyCover` is a sticky flag that a chunk may hold
-one: `ChunkTerrainFill.GenerateBlockData` sets it right after the tower stamp (a vectorized
-`BlockType.ContainsSkyCover` over the chunk, so only tower chunks pay the scan), `ChunkRestore` sets it from the blocks
-on every restore (a save, an imported map, a client's streamed chunk) and `Chunk.SetBlockRaw` raises it when it writes a
+one: the worldgen fill's `Finish` sets it for every generated chunk from the palette (`BlockType.ContainsSkyCover`
+over `ChunkBlocks.IdSpan`, a few ids instead of 4096 cells; a stale entry could only raise it), `ChunkRestore` sets it
+the same way on every restore (a save, an imported map, a client's streamed chunk) and `Chunk.SetBlockRaw` raises it when it writes a
 covering id; an edit never clears it. `ChunkMeshBuilder` passes `ChunkLighting.AnySkyCover` (any of the 27 resolved
 neighbors flagged) to `ComputeLight`, and only then does `RaiseSeedsUnderSkyCover` scan each volume column top-down and
 start its seeds one above the highest covering cell at or above the heightmap start. Every seed still enters at 15, so

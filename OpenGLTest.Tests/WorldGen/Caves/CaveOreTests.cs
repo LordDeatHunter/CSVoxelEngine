@@ -128,8 +128,8 @@ public sealed class CaveOreTests
         {
             AfterMark = s =>
             {
-                if (s == Stage.Tin) before = (ushort[])current!.Blocks.Clone();
-                else if (s == Stage.CaveOres) after = (ushort[])current!.Blocks.Clone();
+                if (s == Stage.Tin) before = (ushort[])ChunkBlocks.DenseScratch.Clone();
+                else if (s == Stage.CaveOres) after = (ushort[])ChunkBlocks.DenseScratch.Clone();
             },
         };
 

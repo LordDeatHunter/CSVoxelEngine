@@ -215,7 +215,7 @@ public sealed class ChunkPersistenceTests : IDisposable
         try
         {
             Assert.True(reopened.TryLoad(Key, out var snapshot));
-            Assert.Equal(Block("stone"), snapshot.Blocks[Chunk.Idx(9, 9, 9)]);
+            Assert.Equal(Block("stone"), snapshot.Storage.Get(Chunk.Idx(9, 9, 9)));
             Assert.NotNull(snapshot.PlayerPlaced);
             Assert.Contains(placedIndex, snapshot.PlayerPlaced!);
         }

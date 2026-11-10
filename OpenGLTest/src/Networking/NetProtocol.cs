@@ -218,8 +218,11 @@ public static class NetFraming
     /// stack; an older peer would misread the station frames and refuse the intent as malformed.
     /// 33: block and item ids are two bytes (<see cref="PacketWriter.WriteId"/>) everywhere an id travels: the chunk
     /// payload (one little-endian ushort per cell), cell changes and corrections, entity item ids, worn armor, inventory
-    /// and world intents and the station frames; an older peer would misread every frame carrying an id.</summary>
-    public const int ProtocolVersion = 33;
+    /// and world intents and the station frames; an older peer would misread every frame carrying an id.
+    /// 34: the chunk payload is the palette form (a mode byte, then one id, or a palette of up to 256 ids with one index
+    /// byte per cell, or one little-endian ushort per cell past 256 distinct ids), then the state as before; an older peer
+    /// would misread every ChunkData frame.</summary>
+    public const int ProtocolVersion = 34;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

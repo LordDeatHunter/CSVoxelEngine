@@ -121,7 +121,7 @@ public sealed class CloudPatchTests
                 var wx = (cx + dcx) * Chunk.Size + x;
                 var wy = cy * Chunk.Size + y;
                 var wz = (cz + dcz) * Chunk.Size + z;
-                var block = chunk.Blocks[Chunk.Idx(x, y, z)];
+                var block = chunk.GetLocalBlock(x, y, z);
                 // The sky up here is empty but for the cloud
                 Assert.Equal(CloudPatchGenerator.IsCloud(wx, wy, wz) ? CloudPatchGenerator.CloudBlock : BlockType.Air, block);
                 if (block != BlockType.Air) clouds++;

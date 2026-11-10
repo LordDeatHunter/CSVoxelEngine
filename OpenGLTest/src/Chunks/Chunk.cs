@@ -44,10 +44,15 @@ public class Chunk : IDisposable
     // Tile layout lives on TextureAtlas (set once when the atlas is stitched at startup);
     // meshing only reads it, so background mesh threads need no synchronization.
 
-    // Flat block storage; index = (x << 8) | (y << 4) | z
-    private readonly ushort[] _blocks = new ushort[BlockCount];
+    // The block ids, palette-compressed (ChunkBlocks); index = (x << 8) | (y << 4) | z. One writer
+    // (the generation worker before IsBlockDataReady, the main thread after); mesh and light
+    // workers read the reference ONCE per use, lock-free. An in-mode write mutates the object in
+    // place, the palette entry stored before the index; a mode upgrade publishes a new object with
+    // one volatile swap, and a reader still holding the old one misses only that write, the same
+    // tolerated race as before (the edit's own remesh wins after).
+    private volatile ChunkBlocks _blocks = ChunkBlocks.Air;
 
-    // Per-block state byte, parallel to _blocks and lazily allocated: null means "all zero",
+    // Per-block state byte in Idx order, lazily allocated: null means "all zero",
     // which is what every non-fluid cell and every generated sea cell reads as (see
     // FluidState). Written on the main thread only; mesh threads copy the field to a local and
     // treat null as zeros, the same tolerated race as _blocks (an edit's own remesh wins after).
@@ -60,10 +65,10 @@ public class Chunk : IDisposable
     // or an all-air/fully-enclosed chunk whose build skipped the light flood).
     private volatile byte[]? _light;
 
-    /// <summary>The block ids in <see cref="Idx"/> order, read and written in place by the worldgen fill
-    /// (<see cref="ChunkTerrainFill"/>) and read by the mesh build (<see cref="ChunkMeshBuilder"/>); an edit
-    /// never writes through it but goes through <see cref="SetBlockRaw"/>.</summary>
-    internal ushort[] Blocks => _blocks;
+    /// <summary>The block ids (<see cref="ChunkBlocks"/>, <see cref="Idx"/> order), read once per use by the
+    /// mesh and light builds. Set only by the worldgen fill's finish (<see cref="ChunkTerrainFill"/>) and by
+    /// <see cref="ChunkRestore"/>, before <see cref="IsBlockDataReady"/>; an edit goes through <see cref="SetBlockRaw"/>.</summary>
+    internal ChunkBlocks Storage { get => _blocks; set => _blocks = value; }
 
     /// <summary>One plain read or write of the volatile state array (null = all zero), for the worldgen
     /// fill's round trip around the tree stamps and the mesh build's once-per-chunk read.</summary>
@@ -271,7 +276,7 @@ public class Chunk : IDisposable
     /// Reads a block using chunk-local coordinates. Coordinates must be in [0, Size).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ushort GetLocalBlock(int x, int y, int z) => _blocks[Idx(x, y, z)];
+    public ushort GetLocalBlock(int x, int y, int z) => _blocks.Get(Idx(x, y, z));
 
     /// <summary>
     /// Reads a cell's state byte using chunk-local coordinates; 0 when no state array exists
@@ -325,13 +330,12 @@ public class Chunk : IDisposable
     public ushort SetBlockRaw(int x, int y, int z, ushort id, byte state)
     {
         var i = Idx(x, y, z);
-        var previous = _blocks[i];
+        var previous = WriteId(i, id);
 
         // _solidCount tracks non-air cells, so only an air <-> non-air transition moves it
         if (previous == 0 && id != 0) _solidCount++;
         else if (previous != 0 && id == 0) _solidCount--;
 
-        _blocks[i] = id;
         if (BlockType.CoversSkyById[id]) _mayHaveSkyCover = true;
 
         if (state != 0)
@@ -358,7 +362,7 @@ public class Chunk : IDisposable
     /// <summary>
     /// A server sets this to observe every raw cell write (an edit or a simulation step) in world
     /// coordinates, so it can broadcast the change to clients. Null on a client and in singleplayer;
-    /// worldgen never fires it, because it writes the block array directly.
+    /// worldgen never fires it, because it fills a dense work array and hands the chunk its storage.
     /// </summary>
     public static Action<int, int, int, ushort, byte>? CellWritten { get; set; }
 
@@ -370,18 +374,27 @@ public class Chunk : IDisposable
         if (!ModifiedSinceSave) ModifiedSinceSave = true;
     }
 
+    /// <summary>Writes one id, returns the one it replaced and publishes an upgraded storage (see <c>_blocks</c>).</summary>
+    private ushort WriteId(int i, ushort id)
+    {
+        var blocks = _blocks;
+        var next = blocks.Set(i, id, out var previous);
+        if (!ReferenceEquals(next, blocks)) _blocks = next;
+        return previous;
+    }
+
     /// <summary>
     /// Copies this chunk's blocks and state into a <see cref="ChunkSnapshot"/> for the save
-    /// writer and clears <see cref="ModifiedSinceSave"/>. Copies only — no palette, no Deflate:
-    /// the encoding happens on the writer thread. Main thread only, since that is the only
+    /// writer and clears <see cref="ModifiedSinceSave"/>. Copies only (a storage clone, no name
+    /// palette, no Deflate): the encoding happens on the writer thread. Main thread only, since that is the only
     /// thread that edits blocks, so the copy is consistent.
     /// </summary>
     /// <param name="playerPlaced">The chunk's player-placed cells as local <see cref="Idx"/>
     /// indices (the chunk manager owns that set), or null.</param>
     internal ChunkSnapshot TakeSnapshot(ushort[]? playerPlaced)
     {
-        // The snapshot's constructor copies both arrays itself
-        var snapshot = new ChunkSnapshot(_blocks, _state, playerPlaced: playerPlaced);
+        var snapshot = new ChunkSnapshot(_blocks.Clone(), (byte[]?)_state?.Clone(),
+            playerPlaced is { Length: > 0 } ? (ushort[])playerPlaced.Clone() : null);
         ModifiedSinceSave = false;
         return snapshot;
     }
@@ -391,52 +404,26 @@ public class Chunk : IDisposable
     /// <see cref="TakeSnapshot"/>'s save-dirty side effect: a server hands chunks to clients
     /// without pretending it just saved them. Main thread, like every read of the arrays.
     /// </summary>
-    public ChunkSnapshot CaptureForNetwork() => new(_blocks, _state, playerPlaced: null);
+    public ChunkSnapshot CaptureForNetwork() => new(_blocks.Clone(), (byte[]?)_state?.Clone(), playerPlaced: null);
 
-    /// <summary>
-    /// Fills this chunk from a save instead of generating it: the blocks, the state bytes and
-    /// the player-placed cells (handed to the chunk manager through
-    /// <see cref="RestoredPlayerPlaced"/>) come from <paramref name="snapshot"/>, and everything
-    /// <see cref="GenerateBlockData"/> derives on the way — the non-air count, the surface
-    /// floor and the fluid frontier — is recomputed from them. Runs on a generation worker on a
-    /// chunk built with <c>generateBlockData: false</c>, before any other thread can see it;
-    /// <see cref="IsBlockDataReady"/> goes true last, which is what publishes the rest.
-    /// </summary>
+    /// <inheritdoc cref="ChunkRestore.RestoreFrom(Chunk, ChunkSnapshot)"/>
     internal void RestoreFrom(ChunkSnapshot snapshot) => ChunkRestore.RestoreFrom(this, snapshot);
 
-    /// <summary>
-    /// <see cref="RestoreFrom(ChunkSnapshot)"/> with the block source chosen: a streamed
-    /// multiplayer chunk (<paramref name="streamedColumns"/> true) carries no worldgen column, so
-    /// its surface floor is derived from its own cells and no fluid frontier is scanned (the server
-    /// owns fluids). A save restore without a world source at hand uses the column cache as
-    /// before, for the fluid frontier (<see cref="RestoreFrom(ChunkSnapshot, ColumnData)"/>).
-    /// </summary>
+    /// <inheritdoc cref="ChunkRestore.RestoreFrom(Chunk, ChunkSnapshot, bool)"/>
     internal void RestoreFrom(ChunkSnapshot snapshot, bool streamedColumns) => ChunkRestore.RestoreFrom(this, snapshot, streamedColumns);
 
-    /// <summary>
-    /// <see cref="RestoreFrom(ChunkSnapshot)"/> against a known column: the surface floor comes
-    /// from <paramref name="column"/> and the fluid frontier is scanned against its heights and
-    /// water levels. This is the save store's restore (with the world source's column) and the
-    /// way a world source that supplies chunks fills one (<see cref="IWorldSource.Fill"/>).
-    /// </summary>
+    /// <inheritdoc cref="ChunkRestore.RestoreFrom(Chunk, ChunkSnapshot, ColumnData)"/>
     internal void RestoreFrom(ChunkSnapshot snapshot, ColumnData column) => ChunkRestore.RestoreFrom(this, snapshot, column);
 
     /// <summary>Clears a block. Returns false if the cell is outside this chunk, already air or
     /// holds an unbreakable block (<see cref="BlockType.IsUnbreakable"/>).</summary>
     public bool RemoveBlockAt(Vector3 worldPos, ChunkManager chunkManager)
     {
-        var localX = (int)(worldPos.X - Position.X * Size);
-        var localY = (int)(worldPos.Y - Position.Y * Size);
-        var localZ = (int)(worldPos.Z - Position.Z * Size);
-
-        if (!InBounds(localX, localY, localZ)) return false;
+        if (!TryLocal(worldPos, out var localX, out var localY, out var localZ)) return false;
         var i = Idx(localX, localY, localZ);
-        var existing = _blocks[i];
+        var existing = _blocks.Get(i);
         if (existing == 0 || BlockType.IsUnbreakable(existing)) return false;
-        _blocks[i] = 0;
-        _solidCount--;
-        ClearState(i);
-        MarkModified();
+        ClearCell(i);
 
         chunkManager.UnmarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
         // Chop damage belongs to the wood that was here (a no-op unless the cell was chopped)
@@ -455,15 +442,11 @@ public class Chunk : IDisposable
     /// </summary>
     public bool PlaceBlockAt(Vector3 worldPos, ushort blockId, ChunkManager chunkManager, byte state = 0)
     {
-        var localX = (int)(worldPos.X - Position.X * Size);
-        var localY = (int)(worldPos.Y - Position.Y * Size);
-        var localZ = (int)(worldPos.Z - Position.Z * Size);
-
-        if (!InBounds(localX, localY, localZ)) return false;
+        if (!TryLocal(worldPos, out var localX, out var localY, out var localZ)) return false;
         // Water is displaced by a placement instead of blocking it, and a stack a placement may
         // take over (layered snow) is overwritten too; anything else occupies the cell and the
         // placement fails, so the caller keeps its item
-        var existing = _blocks[Idx(localX, localY, localZ)];
+        var existing = _blocks.Get(Idx(localX, localY, localZ));
         if (!Placement.CanOccupy(existing, GetLocalState(localX, localY, localZ))) return false;
 
         // One write does id, count and state together: SetBlockRaw moves _solidCount only
@@ -483,14 +466,10 @@ public class Chunk : IDisposable
     /// </summary>
     public bool SetStateAt(Vector3 worldPos, byte state, ChunkManager chunkManager)
     {
-        var localX = (int)(worldPos.X - Position.X * Size);
-        var localY = (int)(worldPos.Y - Position.Y * Size);
-        var localZ = (int)(worldPos.Z - Position.Z * Size);
-
-        if (!InBounds(localX, localY, localZ)) return false;
-        var i = Idx(localX, localY, localZ);
-        if (_blocks[i] == 0) return false;
-        SetBlockRaw(localX, localY, localZ, _blocks[i], state);
+        if (!TryLocal(worldPos, out var localX, out var localY, out var localZ)) return false;
+        var id = _blocks.Get(Idx(localX, localY, localZ));
+        if (id == 0) return false;
+        SetBlockRaw(localX, localY, localZ, id, state);
 
         chunkManager.MarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
         chunkManager.ImmediateRemeshWithBorders(Position, worldPos);
@@ -506,18 +485,11 @@ public class Chunk : IDisposable
     /// </summary>
     public ushort ClearBlockAt(Vector3 worldPos)
     {
-        var localX = (int)(worldPos.X - Position.X * Size);
-        var localY = (int)(worldPos.Y - Position.Y * Size);
-        var localZ = (int)(worldPos.Z - Position.Z * Size);
-
-        if (!InBounds(localX, localY, localZ)) return 0;
+        if (!TryLocal(worldPos, out var localX, out var localY, out var localZ)) return 0;
         var i = Idx(localX, localY, localZ);
-        var removed = _blocks[i];
+        var removed = _blocks.Get(i);
         if (removed == 0 || BlockType.IsUnbreakable(removed)) return 0;
-        _blocks[i] = 0;
-        _solidCount--;
-        ClearState(i);
-        MarkModified();
+        ClearCell(i);
         CellWritten?.Invoke((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z, 0, 0);
         return removed;
     }
@@ -531,14 +503,16 @@ public class Chunk : IDisposable
     /// above, the far-LOD and canopy hooks, <c>UnmarkPlayerPlaced</c>; see the edit-path
     /// checklist). Main thread only.
     /// </summary>
-    public ushort CollapseWriteAt(Vector3 worldPos, ushort id, byte state)
-    {
-        var localX = (int)(worldPos.X - Position.X * Size);
-        var localY = (int)(worldPos.Y - Position.Y * Size);
-        var localZ = (int)(worldPos.Z - Position.Z * Size);
+    public ushort CollapseWriteAt(Vector3 worldPos, ushort id, byte state) =>
+        TryLocal(worldPos, out var x, out var y, out var z) ? SetBlockRaw(x, y, z, id, state) : (ushort)0;
 
-        if (!InBounds(localX, localY, localZ)) return 0;
-        return SetBlockRaw(localX, localY, localZ, id, state);
+    // RemoveBlockAt's and ClearBlockAt's write once their guards passed (a breakable non-air cell).
+    private void ClearCell(int i)
+    {
+        WriteId(i, 0);
+        _solidCount--;
+        ClearState(i);
+        MarkModified();
     }
 
     /// <summary>Zeroes one cell's state byte. Every write that is not a fluid write goes
@@ -576,8 +550,14 @@ public class Chunk : IDisposable
             LightingConfig.LightPropagationRadius, skip: Position);
     }
 
-    private static bool InBounds(int x, int y, int z)
-        => x >= 0 && y >= 0 && z >= 0 && x < Size && y < Size && z < Size;
+    // The chunk-local cell of a world position; false when it lies outside this chunk.
+    private bool TryLocal(Vector3 worldPos, out int x, out int y, out int z)
+    {
+        x = (int)(worldPos.X - Position.X * Size);
+        y = (int)(worldPos.Y - Position.Y * Size);
+        z = (int)(worldPos.Z - Position.Z * Size);
+        return x >= 0 && y >= 0 && z >= 0 && x < Size && y < Size && z < Size;
+    }
 
     /// <summary>
     /// Builds this chunk's mesh, or returns null when a face neighbor, or one of the nine chunk

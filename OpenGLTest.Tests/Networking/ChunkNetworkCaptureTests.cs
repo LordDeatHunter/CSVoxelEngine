@@ -22,7 +22,7 @@ public sealed class ChunkNetworkCaptureTests
 
         var snapshot = chunk.CaptureForNetwork();
 
-        Assert.Equal(stone, snapshot.Blocks[Chunk.Idx(1, 1, 1)]);
+        Assert.Equal(stone, snapshot.Storage.Get(Chunk.Idx(1, 1, 1)));
         // A network read must not make the server think the chunk was saved.
         Assert.True(chunk.ModifiedSinceSave);
     }

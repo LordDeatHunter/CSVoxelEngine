@@ -3,6 +3,9 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
 namespace VoxelEngine.Tests.Content.Blocks;
@@ -86,5 +89,41 @@ public sealed class BlockTablesTests
             Assert.True(BlockType.CoversSkyById[id] == BlockType.ContainsSkyCover(blocks),
                 BlockType.ById[id]?.Name ?? id.ToString());
         }
+    }
+
+    [Fact]
+    public void TheTreeAndFallenLogTablesCoverEveryLoadedId()
+    {
+        // The worldgen classes size their per-id tables at first touch, after the content load:
+        // they cover every loaded id, agree with the species data, and read false past the end
+        Assert.True(TreeGenerator.LeafById.Length >= BlockTables.IdCount);
+        for (var id = 0; id < BlockTables.IdCount; id++)
+        {
+            TreeGenerator.IsLeaf((ushort)id);
+            TreeGenerator.IsTreeBlock((ushort)id);
+            FallenLogGenerator.IsFallenLog((ushort)id);
+        }
+
+        var leafy = TreeSpeciesRegistry.All.Where(s => s.HasLeaves).ToArray();
+        Assert.NotEmpty(leafy);
+        Assert.All(leafy, s =>
+        {
+            Assert.True(TreeGenerator.IsLeaf(s.LeavesId), s.Name);
+            Assert.True(TreeGenerator.IsTreeBlock(s.LeavesId), s.Name);
+            Assert.True(TreeGenerator.IsTreeBlock(s.WoodId), s.Name);
+        });
+
+        var logs = TreeGenerator.SpeciesByBiome
+            .Select(s => s?.Worldgen?.FallenLogId ?? BlockType.Air)
+            .Where(id => id != BlockType.Air)
+            .ToArray();
+        Assert.NotEmpty(logs);
+        Assert.All(logs, id => Assert.True(FallenLogGenerator.IsFallenLog(id)));
+
+        Assert.True(BlockTables.IdCount <= ushort.MaxValue, "no id lies past the tables to probe");
+        var past = (ushort)BlockTables.IdCount;
+        Assert.False(TreeGenerator.IsLeaf(past));
+        Assert.False(TreeGenerator.IsTreeBlock(past));
+        Assert.False(FallenLogGenerator.IsFallenLog(past));
     }
 }

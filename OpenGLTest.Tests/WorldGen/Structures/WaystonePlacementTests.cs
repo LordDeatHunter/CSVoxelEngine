@@ -186,7 +186,7 @@ public sealed class WaystonePlacementTests
                 var chunk = new Chunk(null!, new Vector3(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift),
                     generateBlockData: false);
                 ChunkTerrainFill.GenerateBlockData(chunk);
-                Assert.Equal(id, chunk.Blocks[Chunk.Idx(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask)]);
+                Assert.Equal(id, chunk.GetLocalBlock(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask));
             }
         }
     }
@@ -214,7 +214,7 @@ public sealed class WaystonePlacementTests
                 {
                     var chunk = new Chunk(null!, new Vector3(key.Item1, key.Item2, key.Item3), generateBlockData: false);
                     ChunkTerrainFill.GenerateBlockData(chunk);
-                    chunks[key] = blocks = chunk.Blocks;
+                    chunks[key] = blocks = chunk.Storage.ToDense();
                 }
                 var got = blocks[Chunk.Idx(wx & Chunk.SizeMask, wy & Chunk.SizeMask, wz & Chunk.SizeMask)];
                 Assert.True(got == StructureCell.BlockOf(cell),

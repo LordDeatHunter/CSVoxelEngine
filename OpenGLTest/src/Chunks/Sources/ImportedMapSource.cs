@@ -45,7 +45,7 @@ public sealed class ImportedMapSource : IWorldSource
     public const string ChunksDirectoryName = "chunks";
 
     // The blocks of a supplied chunk without a file; RestoreFrom only copies from it
-    private static readonly ChunkSnapshot Empty = new(new ushort[Chunk.BlockCount], state: null, playerPlaced: null);
+    private static readonly ChunkSnapshot Empty = new(ChunkBlocks.Air, state: null, playerPlaced: null);
 
     private readonly IWorldSource _fallback;
     private readonly Dictionary<(int X, int Z), ColumnData> _columns = new();
@@ -178,7 +178,7 @@ public sealed class ImportedMapSource : IWorldSource
                     static name => ContentRegistry.TryResolveBlock(name, out var id) ? id : null);
                 return snapshot.PlayerPlaced == null
                     ? snapshot
-                    : new ChunkSnapshot(snapshot.Blocks, snapshot.State, playerPlaced: null);
+                    : new ChunkSnapshot(snapshot.Storage, snapshot.State, playerPlaced: null);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                       && attempt < SaveConfig.SaveMoveRetries)

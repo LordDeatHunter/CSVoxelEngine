@@ -19,8 +19,8 @@ internal sealed class ChunkCellCache
     // validated by the packed chunk key (always non-negative, so -1 is a safe empty sentinel).
     // The keys are cleared by every BeginFrame: an unload can replace a chunk between
     // frames, and a cached reference must never outlive that. Only the Chunk is cached, never
-    // its block/state arrays — SetBlockRaw swaps in a fresh state array on the first non-zero
-    // write, so a cached array pointer would miss later fluid state.
+    // its block storage or state array — SetBlockRaw swaps in a fresh state array on the first
+    // non-zero write and a fresh storage on a mode upgrade, so a cached one would miss later writes.
     private const int ChunkCacheSize = 16;
     private const int ChunkCacheMask = ChunkCacheSize - 1;
     private readonly Chunk?[] _chunkCache = new Chunk?[ChunkCacheSize];
@@ -56,9 +56,9 @@ internal sealed class ChunkCellCache
     /// The loaded chunk owning a cell, through the frame's direct-mapped cache. A miss probes
     /// the chunk dictionary once and stores the reference; because the keys are cleared every
     /// frame, a hit can never hand back a chunk an unload has since replaced. Only the
-    /// <see cref="Chunk"/> is cached, never its block or state arrays: <see cref="Chunk.SetBlockRaw"/>
-    /// swaps in a fresh state array on the first non-zero write, so a cached array would miss
-    /// later state. The miss path goes through <see cref="ChunkManager.ChunkAt"/>, which keeps
+    /// <see cref="Chunk"/> is cached, never its block storage or state array: <see cref="Chunk.SetBlockRaw"/>
+    /// swaps in a fresh state array on the first non-zero write and a fresh storage on a mode
+    /// upgrade, so a cached one would miss later writes. The miss path goes through <see cref="ChunkManager.ChunkAt"/>, which keeps
     /// the tests' contract that a chunk without ready block data reads as unloaded.
     /// </summary>
     private bool TryGetChunk(int x, int y, int z, out Chunk? chunk)

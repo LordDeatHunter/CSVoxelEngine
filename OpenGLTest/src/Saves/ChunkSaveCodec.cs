@@ -59,14 +59,19 @@ public static class ChunkSaveCodec
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(nameOf);
 
-        var blocks = snapshot.Blocks;
+        // The cells, decoded into the array that becomes the body's indices. Not the thread's
+        // ChunkBlocks.DenseScratch: nameOf is the caller's code and runs mid-write. The name palette
+        // is re-derived from the cells (never the storage's in-memory palette), so the file depends
+        // only on the cells and an edited chunk's stale palette entries never reach it
+        var indices = new ushort[Chunk.BlockCount];
+        snapshot.Storage.CopyRun(0, Chunk.BlockCount, indices);
         var indexOfId = _indexOfId ??= new ushort[ushort.MaxValue + 1];
         var palette = new List<ushort>();
         try
         {
             // Filled in first-seen order; a chunk holds at most BlockCount distinct ids, so a
             // palette index always fits a ushort
-            foreach (var id in blocks)
+            foreach (var id in indices)
             {
                 if (id == BlockType.Air || indexOfId[id] != 0) continue;
                 palette.Add(id);
@@ -85,8 +90,7 @@ public static class ChunkSaveCodec
                 foreach (var id in palette) header.Write(nameOf(id) ?? "");
             }
 
-            var indices = new ushort[Chunk.BlockCount];
-            for (var i = 0; i < indices.Length; i++) indices[i] = indexOfId[blocks[i]];
+            for (var i = 0; i < indices.Length; i++) indices[i] = indexOfId[indices[i]];
             WriteBody(output, snapshot, indices, palette.Count);
         }
         finally
@@ -185,15 +189,20 @@ public static class ChunkSaveCodec
 
         using var deflate = new DeflateStream(input, CompressionMode.Decompress, leaveOpen: true);
 
+        // The cells go through the thread's dense scratch and are compacted right after the loop,
+        // before anything else runs (no callback is invoked while the scratch holds them); names
+        // that resolved to one id, and every unknown one, merge into one palette entry there
         var indices = ReadIndices(deflate, paletteCount);
-        var blocks = new ushort[Chunk.BlockCount];
-        for (var i = 0; i < blocks.Length; i++)
+        var dense = ChunkBlocks.DenseScratch;
+        for (var i = 0; i < dense.Length; i++)
         {
             var index = indices[i];
             if (index > paletteCount)
                 throw new InvalidDataException($"Chunk save cell {i} names palette entry {index} of {paletteCount}.");
-            blocks[i] = idOfIndex[index];
+            dense[i] = idOfIndex[index];
         }
+
+        var storage = ChunkBlocks.FromDense(dense);
 
         byte[]? state = null;
         if ((flags & HasStateFlag) != 0)
@@ -222,7 +231,8 @@ public static class ChunkSaveCodec
         if (unknown != null)
             Log.Warn($"Chunk save names unknown block(s) {string.Join(", ", unknown)}; loaded as air.");
 
-        return new ChunkSnapshot(blocks, state, playerPlaced: placed);
+        // The storage, state and placed arrays are this call's own, so the snapshot takes them over
+        return new ChunkSnapshot(storage, state, placed is { Length: > 0 } ? placed : null);
     }
 
     // The cell indices at the width WriteBody chose for this palette, widened to ushort

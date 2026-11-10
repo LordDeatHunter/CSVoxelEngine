@@ -64,7 +64,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   pack-ice strip), StubTarget, BoxSolids, SkyZoneFinder (sky zones under the seed),
                                #   SyntheticGear (gear items with made-up abilities and modifiers), TowerSiteFixture
                                #   (synthetic tower sites of any radius, floor count and turn), CaveTestWorld
-                               #   (a carved, evenly lit cave for the cave spawn searches)
+                               #   (a carved, evenly lit cave for the cave spawn searches), StorageCells (cells with
+                               #   N distinct ids and the smallest-storage rule, for the save and net codec tests)
                                #   and the four [CollectionDefinition]s (ContentRegistrySwapCollection
                                #   runs the tests that swap the registry)
   Audio/                       # the sfx library and the ambience bed
@@ -198,10 +199,10 @@ tools/                                # asset generators: models, animation clip
                                       #   --check
   generate-tower-lock-textures.py     # deterministic placeholder tower_door (portcullis cutout), skeleton_pile and
                                       #   tower_altar_top tiles, stdlib PNG writer, small palettes; listed in USER_TODO.md; --check
-  generate-forcefield-texture.py      # deterministic placeholder tower_forcefield tile (a faint honeycomb, only the fallback
   generate-critter-models.py          # deterministic dragonfly, crow and deer .bbmodels (their own bone sets around the
                                       #   humanoid six, clips) and skins with cutout texels, on the hell script's machinery;
                                       #   models only, no mob class yet; --check
+  generate-forcefield-texture.py      # deterministic placeholder tower_forcefield tile (a faint honeycomb, only the fallback
                                       #   of the world shader's forcefield term), integer geometry; listed in USER_TODO.md; --check
   generate-cave-ore-textures.py       # deterministic placeholder amethyst_ore, jade_ore and cinnabar_ore tiles: palette swaps
                                       #   of malachite_ore's green shades, stdlib PNG reader and writer; listed in USER_TODO.md;

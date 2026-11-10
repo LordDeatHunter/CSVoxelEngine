@@ -106,21 +106,22 @@ public sealed class CaveBiomeSpotTests
     {
         var chunk = new Chunk(null!, pos, generateBlockData: false);
         ChunkTerrainFill.GenerateBlockData(chunk);
+        var blocks = chunk.Storage.ToDense();
         int x0 = (int)pos.X * Chunk.Size, y0 = (int)pos.Y * Chunk.Size, z0 = (int)pos.Z * Chunk.Size;
 
         for (var x = RoomHalf; x < Chunk.Size - RoomHalf; x++)
         for (var z = RoomHalf; z < Chunk.Size - RoomHalf; z++)
         for (var y = 0; y < Chunk.Size - 3; y++)
         {
-            var floor = chunk.Blocks[Chunk.Idx(x, y, z)];
+            var floor = blocks[Chunk.Idx(x, y, z)];
             if (!BlockType.IsSolid(floor) || !BlockType.Occludes(floor)) continue;
-            if (chunk.Blocks[Chunk.Idx(x, y + 1, z)] != BlockType.Air
-                || chunk.Blocks[Chunk.Idx(x, y + 2, z)] != BlockType.Air) continue;
+            if (blocks[Chunk.Idx(x, y + 1, z)] != BlockType.Air
+                || blocks[Chunk.Idx(x, y + 2, z)] != BlockType.Air) continue;
 
             var i = (x << Chunk.SizeShift) | z;
             var biome = CaveBiomes.At(x0 + x, y0 + y, z0 + z, column.Biomes[i], column.Heights[i]);
             if (biome == CaveBiome.Plain || found.ContainsKey(biome)) continue;
-            if (OpenCellsOver(chunk.Blocks, x, y, z) < MinOpenCells) continue;
+            if (OpenCellsOver(blocks, x, y, z) < MinOpenCells) continue;
 
             found[biome] = new Vector3(x0 + x + 0.5f, y0 + y + 1 + Camera.EyeHeight, z0 + z + 0.5f);
         }

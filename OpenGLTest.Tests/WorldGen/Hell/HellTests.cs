@@ -187,7 +187,7 @@ public sealed class HellTests
             {
                 var wy = chunk.LowerBoundY + y;
                 if (!HellGenerator.InHell(wy)) continue;
-                var block = chunk.Blocks[Chunk.Idx(x, y, z)];
+                var block = chunk.GetLocalBlock(x, y, z);
                 int wx = cx * Chunk.Size + x, wz = cz * Chunk.Size + z;
                 // A hell tree (HellTrees) grows over the point query's rule, into its air only
                 if (BlockType.IsTreeWood(block) || TreeGenerator.IsLeaf(block))

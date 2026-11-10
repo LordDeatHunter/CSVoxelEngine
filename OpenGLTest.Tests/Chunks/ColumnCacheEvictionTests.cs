@@ -172,7 +172,7 @@ public sealed class ColumnCacheEvictionTests
         foreach (var (cx, cz) in new[] { (ProbeX, ProbeZ), (ProbeX + 5, ProbeZ + 7) })
         {
             var chunk = SurfaceChunk(cx * Chunk.Size + 8, cz * Chunk.Size + 8);
-            h = Fnv.Add(h, MemoryMarshal.AsBytes(new ReadOnlySpan<ushort>(chunk.Blocks)));
+            h = Fnv.Add(h, MemoryMarshal.AsBytes(new ReadOnlySpan<ushort>(chunk.Storage.ToDense())));
         }
 
         for (var level = 0; level < LodRegion.Levels.Length; level++)

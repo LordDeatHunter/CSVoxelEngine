@@ -4,11 +4,12 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
 
 ```
     Saves/                     # GL-free world saves: stores, codecs, names, world sources (see "Saves")
-      ChunkSaveCodec.cs        # the chunk file format (v3): block-name palette + Deflate body of byte/ushort indices
+      ChunkSaveCodec.cs        # the chunk file format (v3): block-name palette + Deflate body of byte/ushort indices,
+                               #   written from a dense decode of the storage, read back through ChunkBlocks.FromDense
       CrucibleSaveCodec.cs     # a crucible's metals by name (CrucibleData), shared by player.json, stations.json
                                #   and the inventory snapshot; Import clamps to the capacity
       ChunkSaveStore.cs        # one world's chunk files + side cars: pending map, index, async writer thread
-      ChunkSnapshot.cs         # immutable copy of a chunk's blocks, state bytes and player-placed cells
+      ChunkSnapshot.cs         # immutable copy of a chunk's ids (a ChunkBlocks clone), state bytes and player-placed cells
       ColumnFileCodec.cs       # an imported column file: magic CVXL, version, Deflate body of ColumnData
                                #   (heights, bed, water levels, biomes, dirt depth, corner climate)
       EntitySaveCodec.cs       # reads/writes entities.json

@@ -76,7 +76,7 @@ public sealed class BarrierTests
         // And a real generated chunk there, caves and all
         var chunk = new Chunk(null!, new Vector3(3, coreFloor >> Chunk.SizeShift, -2), generateBlockData: false);
         ChunkTerrainFill.GenerateBlockData(chunk);
-        Assert.All(chunk.Blocks, b => Assert.Equal(BarrierGenerator.BarrierBlock, b));
+        Assert.All(chunk.Storage.ToDense(), b => Assert.Equal(BarrierGenerator.BarrierBlock, b));
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public sealed class BarrierTests
             for (var y = 0; y < Chunk.Size; y++)
             for (var z = 0; z < Chunk.Size; z++)
             {
-                var block = chunk.Blocks[Chunk.Idx(x, y, z)];
+                var block = chunk.GetLocalBlock(x, y, z);
                 var field = BarrierGenerator.IsBarrier(cx * Chunk.Size + x, chunk.LowerBoundY + y, Chunk.Size + z);
                 if (block == BarrierGenerator.BarrierBlock)
                     Assert.True(field, $"barrier off the field at {x},{y},{z} of chunk y {cy}");

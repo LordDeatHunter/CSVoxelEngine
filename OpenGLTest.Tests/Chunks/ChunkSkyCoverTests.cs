@@ -75,7 +75,7 @@ public sealed class ChunkSkyCoverTests
             VoxelCoords.WorldToChunk(site.CenterZ));
         var tower = new Chunk(null!, wall, generateBlockData: false);
         ChunkTerrainFill.GenerateBlockData(tower);
-        Assert.True(BlockType.ContainsSkyCover(tower.Blocks), "the wall chunk holds no tower brick");
+        Assert.True(BlockType.ContainsSkyCover(tower.Storage.IdSpan), "the wall chunk holds no tower brick");
         Assert.True(tower.MayHaveSkyCover);
 
         var surfaceY = ColumnCache.GetHeights(0, 0)[0];

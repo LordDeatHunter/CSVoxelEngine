@@ -176,7 +176,7 @@ public sealed class StampGateTests
             var gated = Generate(pos, timer, stampGates: true);
             var ungated = Generate(pos, null, stampGates: false);
 
-            Assert.True(gated.Blocks.SequenceEqual(ungated.Blocks), $"blocks differ at {pos}");
+            Assert.True(gated.Storage.ToDense().SequenceEqual(ungated.Storage.ToDense()), $"blocks differ at {pos}");
             Assert.True(SameOrBothNull(gated.StateArray, ungated.StateArray), $"state differs at {pos}");
             Assert.True(gated.SolidCount == ungated.SolidCount, $"solid count differs at {pos}");
             Assert.True(gated.SurfaceMinY == ungated.SurfaceMinY, $"surface min y differs at {pos}");
@@ -207,7 +207,7 @@ public sealed class StampGateTests
         Chunk? current = null;
         var timer = new WorldgenStageTimer
         {
-            AfterMark = s => snapshots[s] = ((ushort[])current!.Blocks.Clone(), Clone(current.StateArray)),
+            AfterMark = s => snapshots[s] = ((ushort[])ChunkBlocks.DenseScratch.Clone(), Clone(current!.StateArray)),
         };
 
         foreach (var pos in DefaultSeedSample.Value)

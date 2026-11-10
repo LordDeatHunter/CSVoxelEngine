@@ -47,7 +47,7 @@ public sealed class LightFloodTests
         var center = neighbors[Center]!;
 
         var light = new ushort[LightCount];
-        ChunkLighting.FillLightSnapshot(light, neighbors);
+        ChunkLighting.FillLightSnapshot(light, neighbors.Select(c => c?.Storage).ToArray());
 
         var skyCover = ChunkLighting.AnySkyCover(neighbors);
         var (sun, block, anyTinted) = Flood(center, light, skyCover);

@@ -126,14 +126,14 @@ internal static class ChunkLighting
 
     /// <summary>
     /// Copies the LightSize^3 block volume centered on this chunk straight from the 3x3x3
-    /// neighboring chunks' block arrays, so the fill loop does zero dictionary lookups.
-    /// <paramref name="neighbors"/> comes pre-resolved from <see cref="ChunkMeshBuilder.TryResolveNeighbors"/>,
+    /// neighboring chunks' block storages, so the fill loop does zero dictionary lookups.
+    /// <paramref name="neighbors"/> (each chunk's storage, read once) comes pre-resolved from <see cref="ChunkMeshBuilder.TryResolveNeighbors"/>,
     /// which guarantees the 6 face neighbors are present; the corner and edge slots may still
     /// be null and read as air, which only costs a little light accuracy in the diagonal
     /// corners of the wide light volume. Same thread-safety convention as FillPaddedSnapshot
     /// (block edits race the read; the edit's own remesh wins after).
     /// </summary>
-    internal static void FillLightSnapshot(ushort[] ids, Chunk?[] neighbors)
+    internal static void FillLightSnapshot(ushort[] ids, ChunkBlocks?[] neighbors)
     {
         // Per-axis map from volume coordinate to (chunk 0..2, local block 0..15). The volume
         // spans LightBorder cells into each neighbor: [1, LightBorder) of the previous
@@ -171,8 +171,8 @@ internal static class ChunkLighting
                 var neighbor = neighbors[neighborRow + mapChunk[zStart]];
                 if (neighbor == null) { target.Clear(); continue; }
                 // The low SizeShift bits of blockRow are 0, so blockRow | local == blockRow + local
-                // and the run's local z indices are contiguous in the block array.
-                neighbor.Blocks.AsSpan(blockRow | mapLocal[zStart], runLength[r]).CopyTo(target);
+                // and the run's local z indices are contiguous in Idx order.
+                neighbor.CopyRun(blockRow | mapLocal[zStart], runLength[r], target);
             }
         }
     }

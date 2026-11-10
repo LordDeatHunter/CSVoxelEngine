@@ -56,6 +56,43 @@ public sealed class ClientChunkStreamerTests
         Assert.False(manager.Chunks.ContainsKey(new Vector3(0, 1, 0)));
     }
 
+    /// <summary>
+    /// The id check covers every payload layout: a Uniform chunk whose one id is past the loaded content, and an
+    /// Indexed chunk with one such id in its palette, are both refused before anything is stored. Negative control:
+    /// a check that read only the cells of one layout (or skipped the Uniform id) would store one of them.
+    /// </summary>
+    [Fact]
+    public void AUniformChunkOfAnUnknownIdIsRefusedAndNothingIsStored()
+    {
+        var manager = new ChunkManager(null!);
+        var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (_, _) => { });
+        Assert.True(BlockTables.IdCount <= ushort.MaxValue, "the loaded content fills every id the id type holds");
+        var unknown = (ushort)BlockTables.IdCount;
+
+        var uniform = new ushort[Chunk.BlockCount];
+        Array.Fill(uniform, unknown);
+        var indexed = new ushort[Chunk.BlockCount];
+        Array.Fill(indexed, ContentRegistry.RequireBlock("stone").Id);
+        indexed[Chunk.Idx(7, 8, 9)] = unknown;
+
+        var cases = new (string Name, ushort[] Cells, ChunkBlocks.StorageMode Mode, int Cy)[]
+        {
+            ("uniform", uniform, ChunkBlocks.StorageMode.Uniform, 0),
+            ("indexed", indexed, ChunkBlocks.StorageMode.Indexed, 1),
+        };
+        foreach (var (name, cells, mode, cy) in cases)
+        {
+            var payload = ChunkNetCodec.Encode(new ChunkSnapshot(cells, null, playerPlaced: null));
+            // The payload really travels in the layout under test
+            Assert.True(mode == ChunkNetCodec.Decode(payload).Storage.Mode, name);
+
+            Assert.Throws<InvalidDataException>(() => streamer.ApplyChunk(0, cy, 0, payload));
+            Assert.False(manager.Chunks.ContainsKey(new Vector3(0, cy, 0)), name);
+        }
+
+        Assert.Equal(0, manager.Chunks.Count);
+    }
+
     [Fact]
     public void UpdateRequestsTheNearestChunksAndColumnsWithinABudget()
     {

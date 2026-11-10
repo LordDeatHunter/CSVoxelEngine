@@ -123,7 +123,8 @@ public sealed class ClientChunkStreamer : IColumnSource
     public void ApplyChunk(int cx, int cy, int cz, byte[] payload)
     {
         var snapshot = ChunkNetCodec.Decode(payload);
-        if (!BlockTables.AllInRange(snapshot.Blocks))
+        // A decoded snapshot is compact, so its palette holds exactly the ids its cells use
+        if (!BlockTables.AllInRange(snapshot.Storage.IdSpan))
             throw new InvalidDataException($"chunk ({cx}, {cy}, {cz}) names an id outside this build's content");
         _chunkAsked.Remove((cx, cy, cz));
         _chunks.ApplyStreamedChunk(new Vector3(cx, cy, cz), snapshot);

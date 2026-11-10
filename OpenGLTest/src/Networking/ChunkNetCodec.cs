@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
@@ -9,29 +10,65 @@ using VoxelEngine.Saves;
 namespace VoxelEngine.Networking;
 
 /// <summary>
-/// Compact wire form of one chunk's block data: the <see cref="Chunk.BlockCount"/> block ids and,
-/// when any cell carries one, the same number of state bytes, Deflate-compressed. The multiplayer
-/// client restores streamed chunks from this instead of generating them; player-placed bookkeeping
-/// is not sent, since a client never fells, decays or saves. It also carries one chunk column's
-/// terrain (<see cref="ColumnTerrain"/>: heights, water levels and corner climate), which is all a
-/// client needs from the terrain beyond the blocks. GL-free and content-free: the ids are not
-/// checked against the loaded content here, the client checks them before it applies a chunk.
+/// Compact wire form of one chunk's block data: its ids in the palette form of
+/// <see cref="ChunkBlocks"/> and, when any cell carries one, the <see cref="Chunk.BlockCount"/> state
+/// bytes, Deflate-compressed. The multiplayer client restores streamed chunks from this instead of
+/// generating them; player-placed bookkeeping is not sent, since a client never fells, decays or
+/// saves. It also carries one chunk column's terrain (<see cref="ColumnTerrain"/>: heights, water
+/// levels and corner climate), which is all a client needs from the terrain beyond the blocks.
+/// GL-free and content-free: the ids are not checked against the loaded content here, the client
+/// checks them before it applies a chunk.
 /// </summary>
 /// <remarks>
-/// The block ids travel dense, in <see cref="Chunk.Idx"/> order, at their in-memory width:
-/// one little-endian ushort per cell. The bytes are the array's own
+/// <para>A chunk payload starts with one mode byte, then one of three layouts, all in
+/// <see cref="Chunk.Idx"/> order: <b>Uniform</b> (0), the one id of every cell as a little-endian ushort;
+/// <b>Indexed</b> (1), one byte holding the palette count minus one (1 to
+/// <see cref="ChunkBlocks.PaletteCapacity"/> entries), the palette as little-endian ushorts, then
+/// one index byte per cell; <b>Direct</b> (2), one little-endian ushort per cell. Then a state flag
+/// byte: 0 for none, 1 followed by one state byte per cell. The sender's palette goes out as held,
+/// stale entries included; the decoder rebuilds the storage with <see cref="ChunkBlocks.FromDense"/>,
+/// so a decoded snapshot is always compact and duplicate-free whatever the peer sent.</para>
+/// <para>Palettes and Direct cells are the arrays' own bytes
 /// (<see cref="MemoryMarshal.AsBytes{T}(Span{T})"/>), which assumes a little-endian host, as
-/// <see cref="LodNetCodec"/> does; every supported target is.
+/// <see cref="LodNetCodec"/> does; every supported target is. Every malformed payload (an unknown
+/// mode, an index past the palette, a bad state flag, a truncation anywhere) throws
+/// <see cref="InvalidDataException"/>, the one malformed-frame type the client's message loop
+/// handles.</para>
 /// </remarks>
 public static class ChunkNetCodec
 {
+    private const byte ModeUniform = 0;
+    private const byte ModeIndexed = 1;
+    private const byte ModeDirect = 2;
+
     /// <summary>Encodes a snapshot's blocks and state (its player-placed cells are dropped).</summary>
     public static byte[] Encode(ChunkSnapshot snapshot)
     {
+        var storage = snapshot.Storage;
         using var output = new MemoryStream();
         using (var deflate = new DeflateStream(output, CompressionLevel.Fastest, leaveOpen: true))
         {
-            deflate.Write(MemoryMarshal.AsBytes(snapshot.Blocks.AsSpan()));
+            switch (storage.Mode)
+            {
+                case ChunkBlocks.StorageMode.Uniform:
+                    deflate.WriteByte(ModeUniform);
+                    Span<byte> id = stackalloc byte[sizeof(ushort)];
+                    BinaryPrimitives.WriteUInt16LittleEndian(id, storage.IdSpan[0]);
+                    deflate.Write(id);
+                    break;
+                case ChunkBlocks.StorageMode.Indexed:
+                    var palette = storage.IdSpan;
+                    deflate.WriteByte(ModeIndexed);
+                    deflate.WriteByte((byte)(palette.Length - 1));
+                    deflate.Write(MemoryMarshal.AsBytes(palette));
+                    deflate.Write(storage.IndexSpan);
+                    break;
+                default:
+                    deflate.WriteByte(ModeDirect);
+                    deflate.Write(MemoryMarshal.AsBytes(storage.IdSpan));
+                    break;
+            }
+
             var state = snapshot.State;
             if (state is { Length: Chunk.BlockCount })
             {
@@ -47,24 +84,85 @@ public static class ChunkNetCodec
         return output.ToArray();
     }
 
-    /// <summary>Decodes what <see cref="Encode"/> wrote back into a snapshot.</summary>
+    /// <summary>
+    /// Decodes what <see cref="Encode"/> wrote back into a compact snapshot. A malformed or
+    /// truncated payload throws <see cref="InvalidDataException"/>.
+    /// </summary>
     public static ChunkSnapshot Decode(byte[] payload)
     {
-        using var input = new MemoryStream(payload, writable: false);
-        using var deflate = new DeflateStream(input, CompressionMode.Decompress);
-
-        var blocks = new ushort[Chunk.BlockCount];
-        ReadFully(deflate, MemoryMarshal.AsBytes(blocks.AsSpan()));
-
-        var hasState = deflate.ReadByte();
-        byte[]? state = null;
-        if (hasState == 1)
+        try
         {
-            state = new byte[Chunk.BlockCount];
-            ReadFully(deflate, state);
-        }
+            using var input = new MemoryStream(payload, writable: false);
+            using var deflate = new DeflateStream(input, CompressionMode.Decompress);
 
-        return new ChunkSnapshot(blocks, state, playerPlaced: null);
+            var dense = ChunkBlocks.DenseScratch;
+            var mode = deflate.ReadByte();
+            switch (mode)
+            {
+                case < 0:
+                    throw new InvalidDataException("Chunk payload ended before its mode byte.");
+                case ModeUniform:
+                    Span<byte> id = stackalloc byte[sizeof(ushort)];
+                    ReadFully(deflate, id);
+                    dense.AsSpan().Fill(BinaryPrimitives.ReadUInt16LittleEndian(id));
+                    break;
+                case ModeIndexed:
+                    ReadIndexed(deflate, dense);
+                    break;
+                case ModeDirect:
+                    ReadFully(deflate, MemoryMarshal.AsBytes(dense.AsSpan()));
+                    break;
+                default:
+                    throw new InvalidDataException($"Chunk payload has unknown block mode {mode}.");
+            }
+
+            // Built before the state is read, while nothing else can touch the scratch
+            var storage = ChunkBlocks.FromDense(dense);
+
+            byte[]? state;
+            switch (deflate.ReadByte())
+            {
+                case 0:
+                    state = null;
+                    break;
+                case 1:
+                    state = new byte[Chunk.BlockCount];
+                    ReadFully(deflate, state);
+                    break;
+                case < 0:
+                    throw new InvalidDataException("Chunk payload ended before its state flag.");
+                case var flag:
+                    throw new InvalidDataException($"Chunk payload has state flag {flag}, not 0 or 1.");
+            }
+
+            return new ChunkSnapshot(storage, state, playerPlaced: null);
+        }
+        catch (EndOfStreamException e)
+        {
+            throw new InvalidDataException("Chunk payload ended early.", e);
+        }
+    }
+
+    // An Indexed body: the palette count, the palette and one index byte per cell, gathered into
+    // the dense ids. An index at or past the palette count is refused.
+    private static void ReadIndexed(Stream stream, ushort[] dense)
+    {
+        var countByte = stream.ReadByte();
+        if (countByte < 0)
+            throw new EndOfStreamException("Chunk payload ended before its palette count.");
+        var count = countByte + 1;
+
+        Span<ushort> palette = stackalloc ushort[ChunkBlocks.PaletteCapacity];
+        palette = palette[..count];
+        ReadFully(stream, MemoryMarshal.AsBytes(palette));
+
+        Span<byte> indices = stackalloc byte[Chunk.BlockCount];
+        ReadFully(stream, indices);
+        if (count < ChunkBlocks.PaletteCapacity && indices.IndexOfAnyExceptInRange((byte)0, (byte)(count - 1)) >= 0)
+            throw new InvalidDataException($"Chunk payload has a palette index past its {count} entries.");
+
+        for (var i = 0; i < dense.Length; i++)
+            dense[i] = palette[indices[i]];
     }
 
     /// <summary>
