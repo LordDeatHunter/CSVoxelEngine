@@ -9,6 +9,7 @@ using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.SkyMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
 
@@ -501,7 +502,7 @@ public sealed class EntityPreviewState : IPreviewDriver
             return new Sporeling(type, Vector3.Zero, tier: 0, spawnIn);
         if (string.Equals(type.Name, Magmaborn.EntityName, StringComparison.OrdinalIgnoreCase))
             return new Magmaborn(type, Vector3.Zero, tier: 0, spawnIn);
-        return null;
+        return WildlifeSpecies.Create(type, Vector3.Zero, spawnIn);
     }
 
     private Slime NewSlime() => new(Selected!, SlimeStart);

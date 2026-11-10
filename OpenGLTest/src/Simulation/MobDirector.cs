@@ -11,6 +11,7 @@ using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Interaction;
 using VoxelEngine.Juice;
 using VoxelEngine.Networking.ServerSide;
@@ -41,6 +42,7 @@ internal sealed class MobDirector
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly WildlifeManager? _wildlife;
     private readonly CaveMobManager? _caveMobs;
     private readonly SkeletonManager? _skeletons;
     private readonly SkeletonKingManager? _kings;
@@ -72,8 +74,9 @@ internal sealed class MobDirector
         GoblinManager? goblins, HellMobManager? hellMobs, SkyMobManager? skyMobs, CaveMobManager? caveMobs,
         SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms, IcebergManager? icebergs, BlockDebrisSystem debris,
         FireParticleSystem? embers, PlayerHealth health, List<Mob> mobs, bool serverMode, bool clientMode,
-        StatusEffectBlockWriter? statusBlocks, CampfireManager campfires, MobCaps caps)
+        StatusEffectBlockWriter? statusBlocks, CampfireManager campfires, MobCaps caps, WildlifeManager? wildlife)
     {
+        _wildlife = wildlife;
         _campfires = campfires;
         _caps = caps;
         if (goblins != null && !clientMode) _camps = new GoblinCamps(goblins, PitchCampfire);
@@ -215,6 +218,13 @@ internal sealed class MobDirector
             BillLocalPlayer(_hellMobs.DamageDealtThisFrame);
         }
 
+        // The animals of the wild graze, flee and, provoked, charge
+        if (_wildlife != null)
+        {
+            _wildlife.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris);
+            BillLocalPlayer(_wildlife.DamageDealtThisFrame);
+        }
+
         // The sky's galeraptors dive and its golems slam a shockwave into the ground
         if (_skyMobs != null)
         {
@@ -311,6 +321,8 @@ internal sealed class MobDirector
             ApplyMobBlockActions(_hellMobs.Mobs);
         if (_skyMobs != null)
             ApplyMobBlockActions(_skyMobs.Mobs);
+        if (_wildlife != null)
+            ApplyMobBlockActions(_wildlife.Mobs);
         if (_caveMobs != null)
             ApplyMobBlockActions(_caveMobs.Mobs);
         if (_skeletons != null)
@@ -404,6 +416,9 @@ internal sealed class MobDirector
         if (_skyMobs != null)
             AddLiving(_skyMobs.Mobs);
 
+        if (_wildlife != null)
+            AddLiving(_wildlife.Mobs);
+
         if (_caveMobs != null)
             AddLiving(_caveMobs.Mobs);
 
@@ -451,6 +466,13 @@ internal sealed class MobDirector
         if (_hellMobs != null && HellMobManager.HeightOf(name) > 0f)
         {
             if (_hellMobs.Spawn(name, feet + new Vector3(0f, HellMobManager.HeightOf(name) * 0.5f, 0f)) == null)
+                return false;
+            RefreshMobs();
+            return true;
+        }
+        if (_wildlife != null && WildlifeSpecies.HeightOf(name) > 0f)
+        {
+            if (_wildlife.Spawn(name, feet + new Vector3(0f, WildlifeSpecies.HeightOf(name) * 0.5f, 0f)) == null)
                 return false;
             RefreshMobs();
             return true;

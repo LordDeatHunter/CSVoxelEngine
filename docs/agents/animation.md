@@ -45,6 +45,9 @@ If a clip ever plays mirrored, fix the loader, never the clips.
 - **Action** runs a one-shot clip (`Play("throw")`). Replaying the clip that is already running is
   ignored, and a different one replaces it. The action overrides only the bones its clip keys, with an
   `ActionBlendSeconds` smoothstep in and out, so it returns exactly to the locomotion pose at its end.
+`SetGait(idle, move, referenceSpeed)` swaps the locomotion pair (a deer's walk for its run), fading from the old
+pair to the new over `GaitBlendSeconds`, and `CutAction()` ends the running action early, blending it out without
+firing the events it skipped (see "Wildlife").
 `ConsumeEvent(name)` returns true exactly once per play, when playback crosses the event time.
 `GetPartMatrix(part, rig, feet, facingYaw)` composes the parent chain in System.Numerics row-vector
 order: scale, rotation, then pivot delta plus animated translation, then the parent, down to the root

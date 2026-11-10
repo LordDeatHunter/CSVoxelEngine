@@ -16,6 +16,7 @@ using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Interaction;
@@ -81,6 +82,7 @@ public class World
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly WildlifeManager? _wildlife;
     private readonly CaveMobManager? _caveMobs;
     private readonly SkeletonManager? _skeletons;
     private readonly SkeletonKingManager? _kings;
@@ -351,6 +353,9 @@ public class World
     /// <summary>Live sky mobs (galeraptors and cloud golems), feeding the entity and shadow passes.</summary>
     public IReadOnlyList<SkyMob> SkyMobs => _skyMobs?.Mobs ?? [];
 
+    /// <summary>Live animals of the wild (deer and boars), feeding the entity and shadow passes.</summary>
+    public IReadOnlyList<Animal> Wildlife => _wildlife?.Mobs ?? [];
+
     /// <summary>Live cave mobs (shardlings, sporelings and magmaborn), feeding the entity and shadow passes.</summary>
     public IReadOnlyList<CaveMob> CaveMobs => _caveMobs?.Mobs ?? [];
 
@@ -506,6 +511,11 @@ public class World
             var golemType = EntityRegistry.TryGet(Cloudgolem.EntityName);
             if (flyerType != null || golemType != null)
                 _skyMobs = new SkyMobManager(flyerType, golemType, _mobCaps);
+            var animalTypes = new List<EntityType>();
+            foreach (var name in WildlifeSpecies.Names)
+                if (EntityRegistry.TryGet(name) is { } animalType) animalTypes.Add(animalType);
+            if (animalTypes.Count > 0)
+                _wildlife = new WildlifeManager(animalTypes, _mobCaps);
             var shardlingType = EntityRegistry.TryGet(Shardling.EntityName);
             var sporelingType = EntityRegistry.TryGet(Sporeling.EntityName);
             var magmabornType = EntityRegistry.TryGet(Magmaborn.EntityName);
@@ -548,8 +558,8 @@ public class World
             RightClick = new RightClickAction(this, clientMode);
             Caster = new SpellCaster(this, clientMode);
             ClientMirror = new ClientMirror(this, _chunkManager, _dropManager, _tntManager, _falling, _slimes, _goblins, _hellMobs,
-                _skyMobs, _caveMobs, _skeletons, _kings, _sandworms, _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
-            Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _caveMobs, _skeletons,
+                _skyMobs, _wildlife, _caveMobs, _skeletons, _kings, _sandworms, _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
+            Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _wildlife, _caveMobs, _skeletons,
                 _kings, _sandworms, _icebergs, _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
             Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, sfx, serverMode, clientMode);
             WaystoneTravel = new WaystoneTravel(Camera, LocalPlayer, _chunkManager);
@@ -561,7 +571,7 @@ public class World
                     Edits.NotifyLodEdit);
             Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _caveMobs, _skeletons, _kings, _sandworms,
                 _icebergs, _debris, serverMode ? null : _fire, _health, _mobs, serverMode, clientMode, statusBlocks, _campfires,
-                _mobCaps);
+                _mobCaps, _wildlife);
             Spells = statusBlocks == null
                 ? null
                 : new SpellEffects(this, _chunkManager, statusBlocks, ItemUse, _debris, sfx, serverMode);
@@ -1027,6 +1037,7 @@ public class World
         _goblins?.AnimateMirrors((float)deltaTime, _debris, _chunkManager, DayCycle.NightFactor(LightingTime));
         _hellMobs?.AnimateMirrors((float)deltaTime, _debris);
         _skyMobs?.AnimateMirrors((float)deltaTime, _debris);
+        _wildlife?.AnimateMirrors((float)deltaTime, _debris);
         _caveMobs?.AnimateMirrors((float)deltaTime, _debris);
         _skeletons?.AnimateMirrors((float)deltaTime, _debris);
         _kings?.AnimateMirrors((float)deltaTime, _debris);

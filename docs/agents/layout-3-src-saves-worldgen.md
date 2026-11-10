@@ -107,6 +107,9 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       QuernManager.cs          # block-entity registry for querns: one crushable unit per cell plus a one-rotation spin timer
       SaplingManager.cs        # the saplings planted in the world (an acorn, or any
                                #   ItemUseAction.PlantTree use), GL-free and main thread only
+      WildlifeManager.cs       # the wild animals: heeded targets only, the boar's gore at its impact, herds spawned
+                               #   on dry surface under the wildlife budget, no idle despawn
+      WildlifeSpawnRules.cs    # GL-free: which species a surface spawn becomes for its biome, by weight
       SkyMobManager.cs         # the sky mobs: the galeraptor's strike at its dive impact, the golem's shockwave at its
                                #   slam impact, the sky-band ring spawn on island tops (tier-scaled packs, big-zone golems)
       SandwormGround.cs        # what the worm reads of the ground: the surface height, sand or not, desert or not

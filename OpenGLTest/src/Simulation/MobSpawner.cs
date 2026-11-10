@@ -64,12 +64,7 @@ public static class MobSpawner
             // lake bed counts as wet even where it sits above sea level, so a mob never spawns
             // inside a pond.
             if (height < column.WaterLevel[i]) continue;
-            // A generated column keeps worldgen's undithered biome (ColumnData.Biomes holds the
-            // dithered one); a column the source supplies only has its own biome to go by
-            var biome = source.Supplies(chunkX, chunkZ)
-                ? column.Biomes[i]
-                : TerrainGenerator.BiomeAt(x, z);
-            if (!SpawnsMobs(biome)) continue;
+            if (!SpawnsMobs(SurfaceBiomeAt(chunks, x, z))) continue;
             if (!chunks.TryGetCell(x, height, z, out var ground, out _) || !BlockType.IsSolid(ground)) continue;
             if (!chunks.TryGetCell(x, height + 1, z, out var above1, out _) || BlockType.IsSolid(above1)) continue;
             if (!chunks.TryGetCell(x, height + 2, z, out var above2, out _) || BlockType.IsSolid(above2)) continue;
@@ -85,6 +80,35 @@ public static class MobSpawner
 
         x = groundY = z = 0;
         return false;
+    }
+
+    /// <summary>
+    /// The height of the center of a body standing on ground cell <paramref name="groundY"/>, half its height
+    /// being <paramref name="halfHeight"/>: the floor plus that half, raised by the few float steps it takes for
+    /// the body's bottom (center minus half) not to round to under the floor. Without that a fit test of the
+    /// freshly placed body (<see cref="BoxSweep.IsColliding"/>) reads the ground it stands on as overlapping it
+    /// at the terrain heights where the sum happens to round down.
+    /// </summary>
+    public static float StandingCenterY(int groundY, float halfHeight)
+    {
+        var floor = groundY + 1f;
+        var center = floor + halfHeight;
+        while (center - halfHeight < floor) center = MathF.BitIncrement(center);
+        return center;
+    }
+
+    /// <summary>
+    /// The surface biome of column (<paramref name="x"/>, <paramref name="z"/>) as spawning reads it: a
+    /// generated column keeps worldgen's undithered biome (<c>ColumnData.Biomes</c> holds the dithered one),
+    /// while a column the world source supplies only has its own stored biome to go by.
+    /// </summary>
+    public static Biome SurfaceBiomeAt(ChunkManager chunks, int x, int z)
+    {
+        var chunkX = VoxelCoords.WorldToChunk(x);
+        var chunkZ = VoxelCoords.WorldToChunk(z);
+        var source = chunks.WorldSource;
+        if (!source.Supplies(chunkX, chunkZ)) return TerrainGenerator.BiomeAt(x, z);
+        return source.GetColumn(chunkX, chunkZ).Biomes[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
     }
 
     /// <summary>

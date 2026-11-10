@@ -272,3 +272,44 @@ share every `MobLavaTickSeconds` with the hit flash, a death it causes rolling l
 (`MobLavaTests`). **Ledge caution**: `Mob.IsLedgeAhead` over `LedgeProbe` (live cells, not the
 heightmap) stops a step or a hop that would land more than `MobLedgeMaxDropBlocks` down unless the
 target stands lower (`LedgeCautionTests`).
+
+### Wildlife
+
+The animals of the wild are `Animal`s (`Entities/Wildlife/`): `RealmMob`s that are not hostile by nature, run by one
+`WildlifeManager` (a `RealmMobManager<Animal>`). `WildlifeSpecies` is the one table of them (`WildlifeKind`, entity
+name, factory, content contract, body size), so the manager, the saves, the client mirror, the renderer and the item
+debugger take a new species from it instead of naming it; adding one means a class, a row there, a
+`WildlifeSpawnRules` rule, a `NetEntityKind` after the last one and its numbers in `Config/WildlifeConfig`.
+
+- **Budget.** Animals fill their own cap beside the hostile one (`IMobPopulation.IsWildlife`, `MobCaps.WildlifeCap`:
+  `WildlifeConfig.WildlifeCap` per player, scaled like the natural cap, with its own `WildlifeSpawnHaste`), so a herd
+  never takes an enemy's place nor the other way round; both still count toward the one hard cap.
+- **Spawning.** Each spawn turn searches a dry surface column in the `SpawnMin..MaxRadiusBlocks` ring around a target
+  on the surface (`MobSpawner.TryFindSurfaceSpawn`, leaning toward its heading like every ring), picks the species
+  for the column's biome (`WildlifeSpawnRules.Pick` over `MobSpawner.SurfaceBiomeAt`: deer in forest, taiga and
+  steppe; boars in forest, taiga and savanna; the rare dire boar in forest and taiga), and places its group within
+  `GroupSpawnRadiusBlocks`, each body only where it fits (`BoxSweep.IsColliding`). An animal fades out only when no
+  target keeps it in play (`MobTargets.OutOfPlay`); it never despawns for idling
+  (`RealmMobManager.DespawnsWhenIdle`).
+- **Reacting.** The manager hands an animal a target only when it heeds the players near it (`Animal.Heeds`, judged
+  against the nearest non-immune one, so a creative or flying player concerns nobody); otherwise it wanders and its
+  idle habit plays (`Animal.IdleTick`). `RealmMob.FacesTarget` (false while fleeing: it faces the way it runs) and
+  `RealmMob.ActsThroughAction` (an idle clip does not hold it still) are the two hooks this needs.
+- **Gaits.** A walker with a run clip switches its locomotion pair by its speed with hysteresis
+  (`Animal.ChooseGait` over `EntityAnimator.SetGait`, which fades between pairs), on the server and on a mirror
+  alike since only the velocity is read; breaking into the run cuts an idle clip short (`EntityAnimator.CutAction`).
+  Its other clips are counted actions (`RealmMob.StartAttack(variant)`), so the attack count replays them on clients.
+- **Deer** (`Deer`): watches a player inside `DeerAlertRangeBlocks` (its `alert` clip once), bolts from one inside
+  `DeerFleeRangeBlocks` or one that hurts it for `DeerFleeSeconds` at `DeerRunSpeed`, veering so a herd scatters;
+  grazes when left alone. It never attacks.
+- **Boar and dire boar** (`Boar`): ignores everyone until hurt or crowded (a player within `BoarCrowdRangeBlocks`
+  for `BoarCrowdSeconds`, while it stares), then plays `threat` once and charges in its run, goring at the `gore`
+  clip's `impact` whoever is in `InGoreReach` (billed by the manager, never an immune target). Its anger lasts
+  `BoarAngerSeconds` past its last sight of the target. The dire boar is the same class oversized and is provoked
+  by anyone it notices within `DireBoarNoticeRangeBlocks`.
+- **Health bars.** An animal shows its bar only once hurt (`Animal.ShowsHealthbar`); a provoked boar and the dire
+  boar always do.
+- **Network and saves.** One `NetEntityKind` per species from `Deer` on (`NetEntity.KindOf` / `TryGetWildlife`,
+  protocol 36); a mirror is spawned by its species name and removed like any realm mob. Saves capture them like the
+  sky mobs and restore them settled. `WildlifeTests` drives the rules headless and
+  `visual-examples/wildlife.json` (`VOXEL_TIME=147`) films a herd calm, then reacting to a player on foot.

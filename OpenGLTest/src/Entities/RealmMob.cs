@@ -44,6 +44,15 @@ public abstract class RealmMob : RiggedMob
     /// <summary>A multiplier on the ground walk this frame (a brute's charge); 1 by default.</summary>
     protected virtual float GroundSpeedFactor => 1f;
 
+    /// <summary>Whether the mob turns to face the target it reacts to, as every hunter does. An animal
+    /// running away answers false and faces the way it moves instead.</summary>
+    protected virtual bool FacesTarget => true;
+
+    /// <summary>Whether <see cref="Decide"/> still runs while an action clip plays. False by default: an
+    /// attack holds the mob still until its clip ends. An animal answers true for a clip it would break off
+    /// (grazing, rooting) when somebody comes too close.</summary>
+    protected virtual bool ActsThroughAction => false;
+
     /// <summary>The kind's first attack clip, variant 0 (a swing, a cast, a dive, a slam), started through
     /// <see cref="StartAttack()"/>; a kind with one attack has only this one.</summary>
     public abstract string AttackClip { get; }
@@ -129,8 +138,9 @@ public abstract class RealmMob : RiggedMob
             var to = new Vector3(target.Eye.X - Position.X, 0f, target.Eye.Z - Position.Z);
             var dist = to.Length();
             var toward = dist > 1e-3f ? to / dist : Vector3.Zero;
-            if (dist > 1e-3f) FaceYaw(YawOf(to), deltaTime);
-            move = Animation.IsActionPlaying ? Vector3.Zero : Decide(dist, toward, chunks, target);
+            if (dist > 1e-3f && FacesTarget) FaceYaw(YawOf(to), deltaTime);
+            move = Animation.IsActionPlaying && !ActsThroughAction ? Vector3.Zero : Decide(dist, toward, chunks, target);
+            if (!FacesTarget && move != Vector3.Zero) FaceYaw(YawOf(move), deltaTime);
         }
         else if (wander is { } goal)
         {

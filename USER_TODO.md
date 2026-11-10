@@ -226,15 +226,16 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   height near 3 blocks (`MobConfig.SkeletonKingHeight`).
 - [ ] **Dragonfly, Crow and Deer** — `dragonfly.bbmodel`/`.png` (man-sized, 128x128 skin: green thorax, banded blue
   abdomen, red eyes, cutout wing cells), `crow.bbmodel`/`.png` (64x64, blue-black, cutout feather tips) and
-  `deer.bbmodel`/`.png` (a spotted stag, 128x128). Made by `tools/generate-critter-models.py`; models, rigs and clips
-  only so far (an entity JSON each, no mob class). Keep the six humanoid group names each rig carries among its own
+  `deer.bbmodel`/`.png` (a spotted stag, 128x128). Made by `tools/generate-critter-models.py`. The deer is wired in
+  (`Deer`, whose contract needs `idle`, `walk`, `run`, `graze` and `alert`); the dragonfly and the crow are models, rigs
+  and clips only so far (an entity JSON each, no mob class). Keep the six humanoid group names each rig carries among its own
   bones (wings and forelegs are `ArmL`/`ArmR`), everything nested under `Torso`, the clip names listed in the
   generator's header, the `impact` event on `bite`, `peck`, `swoop` and `butt`, a `hurt` clip that starts and ends at
   the identity (it is added on top of other clips), and the `.bbmodel`'s UV layout.
 - [ ] **Boar and Dire Boar** — `boar.bbmodel` (a wild boar, 64x64 skin) and `dire_boar.bbmodel` (the oversized
   miniboss: charcoal hide, scars, bone spikes, red eyes, 128x128 skin). Built and saved in Blockbench 5 through its
   MCP plugin, so there is **no generator and no PNG beside them** (the skin is embedded): edit them in Blockbench.
-  Models, rigs and clips only so far (an entity JSON each, no mob class). Keep the deer's group names (`Torso`, `Head`,
+  Both are wired in as the one `Boar` class (`Boar.ValidateContent` checks the clips below). Keep the deer's group names (`Torso`, `Head`,
   `ArmL`/`ArmR` forelegs and `LegL`/`LegR` hind legs with their `...Lower` halves, plus `Jaw`, `EarL`/`EarR`, `Tail`),
   everything nested under `Torso`, the clips `idle`, `walk`, `run`, `root`, `threat`, `gore` (with `impact`), `hurt`
   (starts and ends at the identity), `death` and `spawn`, per-face UVs and no rest rotations.

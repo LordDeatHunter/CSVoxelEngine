@@ -340,7 +340,7 @@ public sealed class SlimeManager : IMobPopulation
         while (true)
         {
             var half = Slime.HalfExtentFor(size);
-            position = new Vector3(x + 0.5f, groundY + 1 + half, z + 0.5f);
+            position = new Vector3(x + 0.5f, MobSpawner.StandingCenterY(groundY, half), z + 0.5f);
             if (size <= SlimeSize.Min || !Slime.IsColliding(position, half, chunks))
                 return true;
             size--;

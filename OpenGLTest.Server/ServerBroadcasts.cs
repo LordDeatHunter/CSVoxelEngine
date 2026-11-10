@@ -8,6 +8,7 @@ using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.SkyMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Networking;
@@ -83,6 +84,7 @@ internal sealed class ServerBroadcasts
                 Shardling => NetEntityKind.Shardling,
                 Sporeling => NetEntityKind.Sporeling,
                 Magmaborn => NetEntityKind.Magmaborn,
+                Animal animal => NetEntity.KindOf(animal.Kind),
                 _ => NetEntityKind.Goblin,
             };
             // The int field is a goblin's ammo, a slime's size and a realm mob's attack count (NetEntity)

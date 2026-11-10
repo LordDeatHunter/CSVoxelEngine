@@ -9,6 +9,7 @@ using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Player;
@@ -36,6 +37,7 @@ internal sealed class WorldPersistence
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly WildlifeManager? _wildlife;
     private readonly CaveMobManager? _caveMobs;
     private readonly SkeletonManager? _skeletons;
     private readonly SkeletonKingManager? _kings;
@@ -64,7 +66,7 @@ internal sealed class WorldPersistence
 
     internal WorldPersistence(World world, ChunkSaveStore? saveStore, ChunkManager chunkManager,
         DropManager dropManager, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        SkyMobManager? skyMobs, CaveMobManager? caveMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms, IcebergManager? icebergs,
+        SkyMobManager? skyMobs, WildlifeManager? wildlife, CaveMobManager? caveMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms, IcebergManager? icebergs,
         PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         StationSaveData? savedStations)
@@ -82,6 +84,7 @@ internal sealed class WorldPersistence
         _goblins = goblins;
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
+        _wildlife = wildlife;
         _caveMobs = caveMobs;
         _skeletons = skeletons;
         _kings = kings;
@@ -410,6 +413,7 @@ internal sealed class WorldPersistence
         || (_goblins != null && string.Equals(name, "goblin", StringComparison.OrdinalIgnoreCase))
         || (_hellMobs != null && HellMobManager.HeightOf(name) > 0f)
         || (_skyMobs != null && SkyMobManager.HeightOf(name) > 0f)
+        || (_wildlife != null && WildlifeSpecies.HeightOf(name) > 0f)
         || (_caveMobs != null && CaveMobManager.HeightOf(name) > 0f)
         || (_skeletons != null && SkeletonManager.HeightOf(name) > 0f)
         || (_kings != null && SkeletonKingManager.HeightOf(name) > 0f)
@@ -437,6 +441,8 @@ internal sealed class WorldPersistence
             return _goblins!.Spawn(center, mob.Ammo ?? 0, mob.Torches ?? 0);
         if (SkyMobManager.HeightOf(name) > 0f)
             return _skyMobs!.Spawn(name, center);
+        if (WildlifeSpecies.HeightOf(name) > 0f)
+            return _wildlife!.Spawn(name, center, spawnIn: false);
         // Before the hell fall-through, which would otherwise take the skeleton
         if (SkeletonManager.HeightOf(name) > 0f)
         {
@@ -474,6 +480,7 @@ internal sealed class WorldPersistence
         mobs.AddRange(from t in goblins where !t.IsDead select MobSaveCodec.Capture(t, t.Ammo, torches: t.Torches));
         mobs.AddRange(from t in HellMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(from t in SkyMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
+        mobs.AddRange(from t in _world.Wildlife where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(from t in CaveMobs where !t.IsDead select MobSaveCodec.Capture(t, null, tier: t.Tier));
         mobs.AddRange(from t in Skeletons where !t.IsDead
             select MobSaveCodec.Capture(t, null, tier: t.Tier, floor: t.Floor, outfit: t.Outfit.Code));

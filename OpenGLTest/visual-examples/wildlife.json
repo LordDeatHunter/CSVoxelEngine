@@ -1,0 +1,30 @@
+{
+  // Wildlife: run with VOXEL_SCRIPT=visual-examples/wildlife.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/wildlife/.
+  // The camera hovers over goblins.json's open forest clearing (ground at y 9..10 over x -56..-32,
+  // z 32..68) facing -Z. While it flies it is immune, and an immune player does not concern an animal,
+  // so "herd" and "idle" film the deer, the boars and the dire boar going about their wandering, grazing
+  // and rooting. Then the flight ends: the player lands among them, the deer inside their flee range bolt
+  // ("react") and the dire boar, which turns on anyone it notices, paws the ground and charges ("charge").
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -10 },
+    { "op": "fly" },
+    // Chunks must be loaded before anything can stand on them
+    { "op": "wait", "seconds": 5 },
+    { "op": "spawn", "entity": "deer", "pos": [-43.5, 53.5] },
+    { "op": "spawn", "entity": "deer", "pos": [-40.5, 51.5] },
+    { "op": "spawn", "entity": "deer", "pos": [-46.5, 50.5] },
+    { "op": "spawn", "entity": "boar", "pos": [-38.5, 55.5] },
+    { "op": "spawn", "entity": "boar", "pos": [-48.5, 55.5] },
+    { "op": "spawn", "entity": "dire_boar", "pos": [-43.5, 46.5] },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "herd" },
+    { "op": "wait", "seconds": 9 },
+    { "op": "screenshot", "name": "idle" },
+    { "op": "fly", "on": false },
+    { "op": "wait", "seconds": 1.3 },
+    { "op": "screenshot", "name": "react" },
+    { "op": "wait", "seconds": 2.2 },
+    { "op": "screenshot", "name": "charge" }
+  ]
+}

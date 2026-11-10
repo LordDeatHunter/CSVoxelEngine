@@ -4,6 +4,7 @@ using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.TowerMobs;
+using VoxelEngine.Entities.Wildlife;
 using Xunit;
 
 namespace VoxelEngine.Tests.Entities;
@@ -31,7 +32,8 @@ public sealed class RealmMobMirrorTests
             Shardling.EntityName => new Shardling(type, position, tier: 0, spawnIn: false),
             Sporeling.EntityName => new Sporeling(type, position, tier: 0, spawnIn: false),
             Magmaborn.EntityName => new Magmaborn(type, position, tier: 0, spawnIn: false),
-            _ => new Cloudgolem(type, position, spawnIn: false),
+            Cloudgolem.EntityName => new Cloudgolem(type, position, spawnIn: false),
+            _ => WildlifeSpecies.Create(type, position, spawnIn: false)!,
         };
     }
 
@@ -50,6 +52,9 @@ public sealed class RealmMobMirrorTests
     [InlineData(Shardling.EntityName)]
     [InlineData(Sporeling.EntityName)]
     [InlineData(Magmaborn.EntityName)]
+    [InlineData(Deer.EntityName)]
+    [InlineData(Boar.EntityName)]
+    [InlineData(Boar.DireEntityName)]
     public void AMirrorPlaysItsAttackClipWhenTheServersCountMovesThenReturnsToLocomotion(string kind)
     {
         var mirror = Create(kind, new Vector3(0f, 80f, 0f));
@@ -63,7 +68,7 @@ public sealed class RealmMobMirrorTests
 
         // The server started an attack: the clip plays, and once it ends the locomotion layer has the body again
         mirror.MirrorAttackCount(6);
-        Assert.True(mirror.Animation.IsPlaying(mirror.AttackClip));
+        Assert.True(mirror.Animation.IsPlaying(mirror.AttackClipFor(6)));
         Assert.Equal(6, mirror.AttackCount);
         Animate(mirror, 5f);
         Assert.False(mirror.Animation.IsActionPlaying);

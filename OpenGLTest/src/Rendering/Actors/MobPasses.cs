@@ -10,6 +10,7 @@ using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Graphics;
@@ -62,11 +63,11 @@ internal sealed class MobPasses : IDisposable
 
     private TextureUnits Units => _owner.Units;
 
-    // The realm mob kinds a rig is built for, when their content is registered
+    // The realm mob kinds a rig is built for, when their content is registered: the hostile ones and every wild animal
     private static readonly string[] RealmRigNames =
         [Hellbrute.EntityName, Cinderwitch.EntityName, Galeraptor.EntityName, Cloudgolem.EntityName, Skeleton.EntityName,
             Skeleton.WarriorEntityName, SkeletonKing.EntityName, Shardling.EntityName, Sporeling.EntityName,
-            Magmaborn.EntityName];
+            Magmaborn.EntityName, .. WildlifeSpecies.Names];
 
     internal MobPasses(GL gl, RenderManager owner)
     {

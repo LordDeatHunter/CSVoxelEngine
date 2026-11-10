@@ -119,6 +119,19 @@ public sealed class SpawnPacingTests
     }
 
     [Fact]
+    public void AStandingBodysBottomNeverRoundsToUnderItsFloor()
+    {
+        // Body halves that are not sums of powers of two are the ones a float sum rounds down at some heights
+        foreach (var half in new[] { 0.36f, 0.525f, 0.54f, 0.72f, 0.75f, 0.975f })
+        for (var groundY = -400; groundY <= 400; groundY++)
+        {
+            var center = MobSpawner.StandingCenterY(groundY, half);
+            Assert.True(center - half >= groundY + 1f, $"a body of half {half} on ground {groundY} dips under its floor");
+            Assert.Equal(groundY + 1f + half, center, 3);
+        }
+    }
+
+    [Fact]
     public void AMotionEstimateFollowsSteadyMovementAndRestartsOnATeleport()
     {
         var motion = new MotionEstimate();

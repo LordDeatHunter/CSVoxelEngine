@@ -44,8 +44,13 @@ public sealed class EntityAnimator
     // Longest parent chain composed before a cycle is assumed.
     private const int MaxChainDepth = 16;
 
-    private readonly AnimationClip? _idle;
-    private readonly AnimationClip? _walk;
+    private AnimationClip? _idle;
+    private AnimationClip? _walk;
+    // The locomotion pair a gait change is fading out of, with its walk clock, and how far the fade is (1 = done)
+    private AnimationClip? _fromIdle;
+    private AnimationClip? _fromWalk;
+    private float _fromWalkTime;
+    private float _gaitBlend = 1f;
     private readonly List<string> _pendingEvents = new(4);
 
     private float _idleTime;
@@ -74,7 +79,45 @@ public sealed class EntityAnimator
     public IReadOnlyList<AnimationClip> Clips { get; }
 
     /// <summary>Speed at which the moving clip (walk or fly) plays at its authored rate.</summary>
-    public float WalkReferenceSpeed { get; }
+    public float WalkReferenceSpeed { get; private set; }
+
+    /// <summary>Seconds a gait change (<see cref="SetGait"/>) takes to fade from the old pair to the new.</summary>
+    public const float GaitBlendSeconds = 0.2f;
+
+    /// <summary>
+    /// Switches the locomotion pair to the clips named <paramref name="idleClip"/> and <paramref name="moveClip"/>
+    /// (a deer breaking from its walk into its run, a crow leaving the ground for its flight), the moving one
+    /// authored at <paramref name="referenceSpeed"/>. The pose fades from the old pair to the new over
+    /// <see cref="GaitBlendSeconds"/>; naming the pair already in use only updates the reference speed. A name
+    /// the model lacks leaves that half of the pair empty (the rest pose).
+    /// </summary>
+    public void SetGait(string idleClip, string moveClip, float referenceSpeed)
+    {
+        var idle = Find(idleClip);
+        var walk = Find(moveClip);
+        WalkReferenceSpeed = referenceSpeed > 0f ? referenceSpeed : 1f;
+        if (ReferenceEquals(idle, _idle) && ReferenceEquals(walk, _walk)) return;
+
+        _fromIdle = _idle;
+        _fromWalk = _walk;
+        _fromWalkTime = _walkTime;
+        _idle = idle;
+        _walk = walk;
+        _walkTime = 0f;
+        _gaitBlend = 0f;
+    }
+
+    /// <summary>
+    /// Ends the running action early: it blends back out to the locomotion pose over
+    /// <see cref="ActionBlendSeconds"/> instead of playing to its end, and the events it had not reached
+    /// never fire (a grazing deer that bolts). Does nothing with no action playing.
+    /// </summary>
+    public void CutAction()
+    {
+        if (_action == null) return;
+        _actionTime = MathF.Max(_actionTime, _action.Length - ActionBlendSeconds);
+        _lastActionTime = _actionTime;
+    }
 
     /// <summary>True while any one-shot action is playing.</summary>
     public bool IsActionPlaying => _action != null;
@@ -148,7 +191,12 @@ public sealed class EntityAnimator
             if (_overlayTime >= _overlay.Length) _overlay = null;
         }
         if (_walkBlend > WalkClockMinBlend)
-            _walkTime += deltaTime * MathF.Max(speed / WalkReferenceSpeed, MinWalkRate);
+        {
+            var step = deltaTime * MathF.Max(speed / WalkReferenceSpeed, MinWalkRate);
+            _walkTime += step;
+            _fromWalkTime += step;
+        }
+        if (_gaitBlend < 1f) _gaitBlend = MathF.Min(1f, _gaitBlend + deltaTime / GaitBlendSeconds);
 
         if (_action == null) return;
         var from = _lastActionTime;
@@ -214,9 +262,9 @@ public sealed class EntityAnimator
     /// </summary>
     public AnimationClip.BoneTransform LocalTransform(string bone)
     {
-        var idle = _idle?.Sample(bone, _idleTime) ?? AnimationClip.BoneTransform.Identity;
-        var walk = _walk?.Sample(bone, _walkTime) ?? AnimationClip.BoneTransform.Identity;
-        var pose = Blend(idle, walk, _walkBlend);
+        var pose = Locomotion(_idle, _walk, _walkTime, bone);
+        if (_gaitBlend < 1f)
+            pose = Blend(Locomotion(_fromIdle, _fromWalk, _fromWalkTime, bone), pose, MathUtils.SmoothStep(_gaitBlend));
         if (_action != null && _action.Keys(bone))
             pose = Blend(pose, _action.Sample(bone, _actionTime), ActionWeight);
         if (_overlay != null && _overlay.Keys(bone))
@@ -285,6 +333,11 @@ public sealed class EntityAnimator
         matrix = local * parentMatrix;
         return true;
     }
+
+    // One locomotion pair's pose for a bone: its idle and moving clips blended by the walk weight
+    private AnimationClip.BoneTransform Locomotion(AnimationClip? idle, AnimationClip? walk, float walkTime, string bone) =>
+        Blend(idle?.Sample(bone, _idleTime) ?? AnimationClip.BoneTransform.Identity,
+            walk?.Sample(bone, walkTime) ?? AnimationClip.BoneTransform.Identity, _walkBlend);
 
     private static AnimationClip.BoneTransform Blend(AnimationClip.BoneTransform a,
         AnimationClip.BoneTransform b, float t)

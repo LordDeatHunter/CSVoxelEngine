@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.Wildlife;
 
 namespace VoxelEngine.Networking;
 
@@ -25,6 +26,11 @@ public enum NetEntityKind : byte
     Shardling = 15,
     Sporeling = 16,
     Magmaborn = 17,
+
+    // The animals of the wild, in WildlifeKind order from Deer on (NetEntity.KindOf)
+    Deer = 18,
+    Boar = 19,
+    DireBoar = 20,
 }
 
 /// <summary>
@@ -61,12 +67,24 @@ public enum NetEntityKind : byte
 public readonly record struct NetEntity(NetEntityKind Kind, int Id, Vector3 Position, float Yaw,
     int Health, int Ammo, ushort ItemId, Vector3 Velocity, byte Effects = 0)
 {
-    /// <summary>Whether <paramref name="kind"/> is a mob (a slime, a goblin, a hell, sky, cave or tower mob), the only kinds
-    /// the client's mob reconcile spawns; drops, primed TNT and falling blocks are mirrored apart.</summary>
+    /// <summary>Whether <paramref name="kind"/> is a mob (a slime, a goblin, a hell, sky, cave or tower mob or a wild
+    /// animal), the only kinds the client's mob reconcile spawns; drops, primed TNT and falling blocks are mirrored apart.</summary>
     public static bool IsMob(NetEntityKind kind) =>
         kind is NetEntityKind.Slime or NetEntityKind.Goblin or NetEntityKind.Hellbrute or NetEntityKind.Cinderwitch
             or NetEntityKind.Galeraptor or NetEntityKind.Cloudgolem or NetEntityKind.Sandworm or NetEntityKind.Skeleton
-            or NetEntityKind.SkeletonKing or NetEntityKind.Shardling or NetEntityKind.Sporeling or NetEntityKind.Magmaborn;
+            or NetEntityKind.SkeletonKing or NetEntityKind.Shardling or NetEntityKind.Sporeling or NetEntityKind.Magmaborn
+        || TryGetWildlife(kind, out _);
+
+    /// <summary>The entry kind of a wild animal of <paramref name="species"/>.</summary>
+    public static NetEntityKind KindOf(WildlifeKind species) => (NetEntityKind)((int)NetEntityKind.Deer + (int)species);
+
+    /// <summary>The wild animal an entry <paramref name="kind"/> stands for; false for every other kind.</summary>
+    public static bool TryGetWildlife(NetEntityKind kind, out WildlifeKind species)
+    {
+        var index = (int)kind - (int)NetEntityKind.Deer;
+        species = (WildlifeKind)Math.Max(0, index);
+        return index >= 0 && index < WildlifeSpecies.Names.Length;
+    }
 
     // An iceberg's scale in thousandths fills the low 16 bits of Ammo, its sinking (0..255) the next 8
     private const float IcebergScaleUnits = 1000f;

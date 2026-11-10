@@ -11,6 +11,7 @@ using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Interaction;
@@ -41,6 +42,7 @@ internal sealed class ClientMirror
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly WildlifeManager? _wildlife;
     private readonly CaveMobManager? _caveMobs;
     private readonly SkeletonManager? _skeletons;
     private readonly SkeletonKingManager? _kings;
@@ -63,7 +65,7 @@ internal sealed class ClientMirror
 
     internal ClientMirror(World world, ChunkManager chunkManager, DropManager dropManager, TntManager tntManager,
         FallingBlockManager falling, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        SkyMobManager? skyMobs, CaveMobManager? caveMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms,
+        SkyMobManager? skyMobs, WildlifeManager? wildlife, CaveMobManager? caveMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms,
         IcebergManager? icebergs,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         BlockDebrisSystem debris, PlayerHealth health, List<RemotePlayer> remotePlayers, bool clientMode,
@@ -78,6 +80,7 @@ internal sealed class ClientMirror
         _goblins = goblins;
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
+        _wildlife = wildlife;
         _caveMobs = caveMobs;
         _skeletons = skeletons;
         _kings = kings;
@@ -448,7 +451,7 @@ internal sealed class ClientMirror
         NetEntityKind.Shardling => mob is Shardling shardling && shardling.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
         NetEntityKind.Sporeling => mob is Sporeling sporeling && sporeling.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
         NetEntityKind.Magmaborn => mob is Magmaborn magmaborn && magmaborn.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
-        _ => false,
+        _ => NetEntity.TryGetWildlife(entry.Kind, out var species) && mob is Animal animal && animal.Kind == species,
     };
 
     // A skeleton's look byte as a mirror built from it would pack it again (its tier clamped)
@@ -484,7 +487,10 @@ internal sealed class ClientMirror
             NetEntityKind.Shardling => _caveMobs?.Spawn(Shardling.EntityName, entry.Position, (byte)entry.ItemId),
             NetEntityKind.Sporeling => _caveMobs?.Spawn(Sporeling.EntityName, entry.Position, (byte)entry.ItemId),
             NetEntityKind.Magmaborn => _caveMobs?.Spawn(Magmaborn.EntityName, entry.Position, (byte)entry.ItemId),
-            _ => null,
+            // A wild animal's kind names its species
+            _ => NetEntity.TryGetWildlife(entry.Kind, out var species)
+                ? _wildlife?.Spawn(WildlifeSpecies.NameOf(species), entry.Position)
+                : null,
         };
         mob?.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
         mob?.Effects.SetMirrorMask(entry.Effects);
@@ -511,6 +517,7 @@ internal sealed class ClientMirror
             case Goblin goblin: _goblins?.Remove(goblin); break;
             case HellMob hellMob: _hellMobs?.Remove(hellMob); break;
             case SkyMob skyMob: _skyMobs?.Remove(skyMob); break;
+            case Animal animal: _wildlife?.Remove(animal); break;
             case CaveMob caveMob: _caveMobs?.Remove(caveMob); break;
             case Skeleton skeleton: _skeletons?.Remove(skeleton); break;
             case SkeletonKing king: _kings?.Remove(king); break;

@@ -143,6 +143,8 @@ OpenGLTest/
       ManaConfig.cs            # the mana pool: start max, growth per known part and its cap, the refill time
       SpellConfig.cs           # spell recipe rules: when complexity starts to fizzle, the chance per unit and its cap;
                                #   the staff slot cap and the cast cooldown (CastCooldownSeconds)
+      WildlifeConfig.cs        # the wild animals: their budget and spawn ring, species weights and groups, gaits,
+                               #   the deer's and the boars' bodies, speeds and temper
       MobConfig.cs             # mob caps and shared mob rules (flight's probes, arrival and wander rise), layer difficulty, hell and sky mobs, slimes, goblins (flee, dodge, pack, torches, notice
                                #   pip, cave weights), the cave mobs and their depth tier, healthbars, damage numbers, the realm layer
                                #   difficulty step
@@ -454,6 +456,9 @@ OpenGLTest/
         IcebergSpawnRule.cs    # GL-free spawn band: open water from SpawnColdMin to the freeze threshold
         IcebergWobble.cs       # GL-free render-only bob, pitch and roll of (seed, lighting clock)
       SkyMobs/                 # the sky islands' mobs (see "Sky mobs"): the shared base, the two kinds, the zone difficulty
+      Wildlife/                # the animals of the wild (see "Wildlife"): Animal (heeding, idle habits, gaits), the
+                               #   WildlifeSpecies table, Deer (watches, bolts, grazes), Boar (neutral until crowded or
+                               #   hurt, then charges and gores; the dire boar is the same class oversized)
         SkyMob.cs              # abstract sky mob (a RealmMob): the zone tier it spawned in and its tier-scaled pool
         Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event
         Cloudgolem.cs          # the ground bruiser: walk with ledge caution, the slam clip's impact event, the shockwave

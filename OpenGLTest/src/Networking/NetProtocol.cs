@@ -225,8 +225,11 @@ public static class NetFraming
     /// 35: the <see cref="NetMessage.ServerHello"/> ends with the server's name for every block and item, molten
     /// material, status effect and atlas tile id (<see cref="WireIds"/>), and a client translates every id it reads or
     /// sends through them, so a client whose content is numbered differently still agrees with the server; an equip of
-    /// a stackable and a chest deposit carry their id at id width. An older peer would misread the hello.</summary>
-    public const int ProtocolVersion = 35;
+    /// a stackable and a chest deposit carry their id at id width. An older peer would misread the hello.
+    /// 36: <see cref="NetMessage.EntityList"/> also carries the wild animals (<see cref="NetEntityKind.Deer"/> onward,
+    /// one kind per <c>WildlifeKind</c>); their <see cref="NetEntity.Ammo"/> is the count of their action clips like any
+    /// realm mob's. An older client would not draw them.</summary>
+    public const int ProtocolVersion = 36;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

@@ -12,6 +12,7 @@ using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation.Tower;
@@ -313,6 +314,9 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.True(first.SpawnEntity(Cinderwitch.EntityName, new Vector3(-3f, High - 1f, -3f)));
         Assert.True(first.SpawnEntity(Galeraptor.EntityName, new Vector3(4f, High - 1f, 4f)));
         Assert.True(first.SpawnEntity(Cloudgolem.EntityName, new Vector3(-4f, High - 1f, 4f)));
+        // One of each wild animal
+        foreach (var (name, i) in WildlifeSpecies.Names.Select((name, i) => (name, i)))
+            Assert.True(first.SpawnEntity(name, new Vector3(-8f + 3f * i, High - 1f, 8f)));
         // A tower skeleton above the first floor: its tier cannot be read back from the position
         Assert.True(first.SpawnEntity(Skeleton.EntityName, new Vector3(5f, High - 1f, -5f), tier: 4));
         // A second, first-floor skeleton left unbound, beside the first one bound to a tower floor
@@ -342,14 +346,14 @@ public sealed class WorldLifecycleTests : IDisposable
         // Every hell, sky, cave and tower kind wounded and turned, so the restore keeps each kind and its own state
         var realmSaved = new List<(Type Kind, Vector3 Center, int Health, float Facing)>();
         var realmSpawned = first.HellMobs.Concat<RealmMob>(first.SkyMobs).Concat(first.CaveMobs).Concat(first.Skeletons)
-            .ToList();
+            .Concat(first.Wildlife).ToList();
         foreach (var realmMob in realmSpawned)
         {
             realmMob.RestoreState(realmMob.MaxHealth - 2, 0.75f, Vector3.Zero);
             realmSaved.Add((realmMob.GetType(), realmMob.Position, realmMob.Health, realmMob.Facing));
         }
-        // Two hell, two sky, three cave kinds and two skeletons, each spawned above
-        Assert.Equal(2 + 2 + 3 + 2, realmSaved.Count);
+        // Two hell, two sky, three cave kinds, two skeletons and every wild animal, each spawned above
+        Assert.Equal(2 + 2 + 3 + 2 + WildlifeSpecies.Names.Length, realmSaved.Count);
         var caveTier = tieredCave.Tier;
         var caveCenter = tieredCave.Position;
         var cavePool = tieredCave.MaxHealth;
@@ -383,7 +387,7 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(goblinAmmo, restoredGoblin.Ammo);
         Assert.Equal(goblinHealth, restoredGoblin.Health);
         var restoredRealm = second.HellMobs.Concat<RealmMob>(second.SkyMobs).Concat(second.CaveMobs)
-            .Concat(second.Skeletons).ToList();
+            .Concat(second.Skeletons).Concat(second.Wildlife).ToList();
         Assert.Equal(realmSaved.Count, restoredRealm.Count);
         foreach (var (kind, center, health, facing) in realmSaved)
         {

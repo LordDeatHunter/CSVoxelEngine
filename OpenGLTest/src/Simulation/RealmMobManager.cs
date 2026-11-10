@@ -33,6 +33,25 @@ public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmM
     /// <summary>The global caps every mob kind shares.</summary>
     protected MobCaps Caps { get; }
 
+    /// <inheritdoc />
+    public virtual bool IsWildlife => false;
+
+    /// <summary>Whether the cap this manager's ring spawns answer to has room: the hostile natural cap, or the
+    /// wildlife budget for the animals' manager.</summary>
+    protected virtual bool SpawnAllowed => Caps.AllowsNaturalSpawn;
+
+    /// <summary>How fast the ring spawn timer runs (<see cref="MobCaps.SpawnHaste"/>, or the wildlife side's).</summary>
+    protected virtual float SpawnHaste => Caps.SpawnHaste;
+
+    /// <summary>Whether a mob idle long and far from everybody fades out (<see cref="Mob.ShouldIdleDespawn"/>).
+    /// True for the hostile kinds; animals, idle by nature, stay.</summary>
+    protected virtual bool DespawnsWhenIdle => true;
+
+    /// <summary>The index of the target <paramref name="mob"/> reacts to this frame, or -1: the shared notice and
+    /// interest rule (<see cref="Mob.PickTarget"/>) by default.</summary>
+    protected virtual int PickTarget(TMob mob, IReadOnlyList<IMobTarget> targets, float deltaTime, ChunkManager chunks) =>
+        mob.PickTarget(targets, deltaTime, chunks);
+
     /// <summary>Every mob still drawn: the living ones plus any playing their death.</summary>
     public IReadOnlyList<TMob> Mobs => _mobs;
 
@@ -111,7 +130,7 @@ public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmM
         for (var i = _mobs.Count - 1; i >= 0; i--)
         {
             var mob = _mobs[i];
-            var chased = mob.PickTarget(targets, deltaTime, chunks);
+            var chased = PickTarget(mob, targets, deltaTime, chunks);
             mob.Update(deltaTime, chunks, chased >= 0 && !mob.IsDying ? targets[chased] : null,
                 chased < 0 ? mob.WanderGoal(targets.Count, deltaTime, chunks) : null);
             mob.UpdateHazards(deltaTime, chunks);
@@ -138,7 +157,7 @@ public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmM
 
             // Out of every target's play, or idle long and far off: fades out, dropping nothing
             if (targets.Count > 0 && (MobTargets.OutOfPlay(targets, mob.Position, despawnRadius)
-                                      || mob.ShouldIdleDespawn(targets)))
+                                      || (DespawnsWhenIdle && mob.ShouldIdleDespawn(targets))))
             {
                 OnDespawn(mob);
                 mob.BeginDying();
@@ -180,9 +199,9 @@ public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmM
         out IMobTarget target)
     {
         target = null!;
-        if (!Caps.AllowsNaturalSpawn) return false;
+        if (!SpawnAllowed) return false;
 
-        _spawnTimer += deltaTime * Caps.SpawnHaste;
+        _spawnTimer += deltaTime * SpawnHaste;
         if (_spawnTimer < intervalSeconds) return false;
         _spawnTimer = 0f;
 
