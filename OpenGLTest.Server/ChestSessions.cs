@@ -38,6 +38,7 @@ internal sealed class ChestSessions(ServerState state)
             return;
         }
         player.OpenChest = (x, y, z);
+        state.World.Towers.AlarmPilesNear((x, y, z));
         SendContents(client, x, y, z, chest);
     }
 

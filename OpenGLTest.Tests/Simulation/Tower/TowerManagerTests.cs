@@ -57,6 +57,26 @@ public sealed class TowerManagerTests
         public byte At((int X, int Y, int Z) c) => Chunks.GetBlockGlobal(c.X, c.Y, c.Z);
     }
 
+    [Fact]
+    public void OpeningAChestAlarmsOnlyTheLivePilesOfItsAwakeFloorInRange()
+    {
+        var rig = Setup();
+
+        Assert.Equal(1, rig.Towers.AlarmPilesNear((6, 1, 6)));
+        Assert.True(rig.Floor0.Piles[0].Alarmed);
+        Assert.False(rig.Floor1.Piles[0].Alarmed);
+
+        rig.Floor0.Piles[0].Alarmed = false;
+        rig.Floor0.Piles[0].WavesLeft = 0;
+        Assert.Equal(0, rig.Towers.AlarmPilesNear((6, 1, 6)));
+        Assert.False(rig.Floor0.Piles[0].Alarmed);
+
+        // Floor 1 sleeps until door 0 opens, so a chest up there wakes nothing yet
+        Assert.Equal(0, rig.Towers.AlarmPilesNear((6, 7, 6)));
+        rig.Floor0.DoorOpen = true;
+        Assert.Equal(1, rig.Towers.AlarmPilesNear((6, 7, 6)));
+    }
+
     // Two floors in the origin chunk: floor 0 (band 0..6) and floor 1 (band 6..12), a pile and a two-cell door each
     private static Rig Setup()
     {

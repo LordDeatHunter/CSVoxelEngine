@@ -77,6 +77,30 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
         return null;
     }
 
+    /// <summary>
+    /// Opening the chest at <paramref name="chest"/> forces the awake floor it stands on to raise its piles: every
+    /// pile of that floor with a wave left within <see cref="MobConfig.SkeletonChestAlarmBlocks"/> of the chest is
+    /// <see cref="PileState.Alarmed"/>, so its next wave rises at once, past the near-pile limit. Returns how many
+    /// piles were alarmed; none on a client's mirror or outside a tracked tower.
+    /// </summary>
+    public int AlarmPilesNear((int X, int Y, int Z) chest)
+    {
+        if (writer == null || RecordAt(chest.X, chest.Z) is not { } record) return 0;
+        var k = record.FloorOf(chest.Y);
+        if (!TowerRules.FloorAwake(k, k == 0 || record.Floors[k - 1].DoorOpen)) return 0;
+        var floor = record.Floors[k];
+        var center = new Vector3(chest.X + 0.5f, chest.Y + 0.5f, chest.Z + 0.5f);
+        var alarmed = 0;
+        foreach (var pile in floor.Piles)
+        {
+            if (pile.Depleted || !TowerRules.PileTriggers(pile.Cell, floor.BottomY, floor.TopY, center,
+                    MobConfig.SkeletonChestAlarmBlocks)) continue;
+            pile.Alarmed = true;
+            alarmed++;
+        }
+        return alarmed;
+    }
+
     /// <summary>Owes one skeleton back to floor <paramref name="floor"/>, when that tower and floor are tracked.</summary>
     public void Owe(TowerFloorRef floor)
     {

@@ -567,6 +567,8 @@ public static class MobConfig
     public const int SkeletonPileWaves = 2;
     /// <summary>Seconds a pile waits after a wave before it raises the next one.</summary>
     public const float SkeletonPileWaveSeconds = 6f;
+    /// <summary>How close, horizontally, a pile on a chest's floor must be for opening that chest to force it awake.</summary>
+    public const float SkeletonChestAlarmBlocks = 16f;
     /// <summary>How many living skeletons may stand near a pile on the ground floor before it raises another.</summary>
     public const int SkeletonPileNearLimitBase = 5;
     /// <summary>How many more living skeletons each floor above the ground floor allows near a pile.</summary>

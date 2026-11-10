@@ -188,6 +188,25 @@ public sealed class SkeletonPileManagerTests
     }
 
     [Fact]
+    public void AnAlarmedPileRaisesAtOnceDespiteItsLimitItsCooldownAndNoTargetInRange()
+    {
+        var chunks = WorldWithPile();
+        var skeletons = new SkeletonManager(Type);
+        var floor = FloorWithPile(LoadedPile);
+        var pile = floor.Piles[0];
+        CrowdPile(skeletons, TowerDifficulty.PileNearLimit(Tier));
+        var crowd = skeletons.Mobs.Count;
+        pile.Cooldown = MobConfig.SkeletonPileWaveSeconds;
+        pile.Alarmed = true;
+
+        new SkeletonPileManager().Update(floor, Dt, chunks, skeletons, [PlayerAt(200f, 200f)]);
+
+        Assert.Equal(crowd + TowerDifficulty.PackSize(Tier), skeletons.Mobs.Count);
+        Assert.False(pile.Alarmed);
+        Assert.Equal(MobConfig.SkeletonPileWaves - 1, pile.WavesLeft);
+    }
+
+    [Fact]
     public void AHigherFloorAllowsMoreSkeletonsNearItsPiles()
     {
         for (var tier = 0; tier < MobConfig.TowerMaxTier; tier++)

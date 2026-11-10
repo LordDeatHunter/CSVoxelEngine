@@ -16,7 +16,9 @@ namespace VoxelEngine.Simulation.Tower;
 /// its waves run out. A pile never raises past <see cref="TowerDifficulty.PileNearLimit"/> living skeletons within
 /// <see cref="MobConfig.SkeletonPileNearRadiusBlocks"/> of it (5 on the ground floor, 2 more per floor), so a wave
 /// that would overfill the pile's surroundings is trimmed or waits for kills. A wave counts only when at least one
-/// skeleton rose, so a full near limit, a full hard cap or a walled-in pile keeps it. A pile in an unloaded chunk freezes; a loaded pile cell that lost its block counts as depleted. Skeletons the
+/// skeleton rose, so a full near limit, a full hard cap or a walled-in pile keeps it. A pile a chest has alarmed
+/// (<see cref="PileState.Alarmed"/>) raises its next wave at once, past its trigger range, cooldown and near limit (the
+/// hard cap still holds). A pile in an unloaded chunk freezes; a loaded pile cell that lost its block counts as depleted. Skeletons the
 /// floor is owed (despawned or strayed) rise again at any of its piles, depleted or not, on the same cooldown. It
 /// writes no block (the tower's sweep clears depleted piles). Main thread, authoritative worlds only.
 /// </summary>
@@ -45,9 +47,10 @@ public sealed class SkeletonPileManager
                 pile.WavesLeft = 0;
                 continue;
             }
-            if (pile.Cooldown > 0f || !Triggered(floor, pile, targets)) continue;
-            var raised = Raise(floor, pile, pack, chunks, skeletons);
+            if (!pile.Alarmed && (pile.Cooldown > 0f || !Triggered(floor, pile, targets))) continue;
+            var raised = Raise(floor, pile, pack, chunks, skeletons, pile.Alarmed);
             if (raised == 0) continue;
+            pile.Alarmed = false;
             total += raised;
             pile.WavesLeft--;
             pile.Cooldown = MobConfig.SkeletonPileWaveSeconds;
@@ -93,16 +96,19 @@ public sealed class SkeletonPileManager
         return false;
     }
 
-    // Raises up to count skeletons around the pile, bound to its floor, never past the floor's near-pile limit; stops at
-    // the first refused spawn (hard cap)
+    // Raises up to count skeletons around the pile, bound to its floor, never past the floor's near-pile limit unless
+    // forced (an opened chest); stops at the first refused spawn (hard cap)
     private static int Raise(TowerFloorState floor, PileState pile, int count, ChunkManager chunks,
-        SkeletonManager skeletons)
+        SkeletonManager skeletons, bool forced = false)
     {
         var (x, y, z) = pile.Cell;
-        var near = skeletons.LivingCountNear(new Vector3(x + 0.5f, y + 0.5f, z + 0.5f),
-            MobConfig.SkeletonPileNearRadiusBlocks);
-        count = Math.Min(count, TowerDifficulty.PileNearLimit(floor.Ref.Floor) - near);
-        if (count <= 0) return 0;
+        if (!forced)
+        {
+            var near = skeletons.LivingCountNear(new Vector3(x + 0.5f, y + 0.5f, z + 0.5f),
+                MobConfig.SkeletonPileNearRadiusBlocks);
+            count = Math.Min(count, TowerDifficulty.PileNearLimit(floor.Ref.Floor) - near);
+            if (count <= 0) return 0;
+        }
         var points = TowerRules.SpawnPoints(x, y, z, count,
             (cx, cy, cz) => chunks.TryGetCell(cx, cy, cz, out var id, out _) && !BlockType.IsSolid(id));
         var risen = 0;
