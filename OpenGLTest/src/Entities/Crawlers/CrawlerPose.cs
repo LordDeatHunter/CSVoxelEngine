@@ -1,14 +1,14 @@
 using System.Numerics;
 using VoxelEngine.Entities.Posing;
 
-namespace VoxelEngine.Entities.Spiders;
+namespace VoxelEngine.Entities.Crawlers;
 
 /// <summary>
-/// A spider's pose: its clips for the body, and for the legs the rotations <see cref="SpiderLegs"/> solved against
+/// A spider's pose: its clips for the body, and for the legs the rotations <see cref="CrawlerLegs"/> solved against
 /// the world. A leg bone the running action keys (the raised front legs of the bite, every curled leg of the
 /// death) is handed back to the clip by the action's weight, so the action blends in and out of the planted pose.
 /// </summary>
-public readonly struct SpiderPose(EntityAnimator animation, SpiderLegs legs) : IBonePose
+public readonly struct CrawlerPose(EntityAnimator animation, CrawlerLegs legs) : IBonePose
 {
     /// <inheritdoc/>
     public AnimationClip.BoneTransform LocalTransform(string bone)

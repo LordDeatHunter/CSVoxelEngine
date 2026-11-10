@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Models;
 
-namespace VoxelEngine.Entities.Spiders;
+namespace VoxelEngine.Entities.Crawlers;
 
 /// <summary>
 /// What the leg solver needs to know about a spider model, read once from its Blockbench project: the eight
@@ -12,10 +12,10 @@ namespace VoxelEngine.Entities.Spiders;
 /// legs a side, <c>LegR1</c>..<c>LegR4</c> on +X and <c>LegL1</c>..<c>LegL4</c> on -X (1 the front pair), each a
 /// top-level group whose cubes run straight out along X from its origin (the hip), with a child group named
 /// <c>...Lower</c> whose origin (the knee) sits straight out from the hip and whose cubes run on along X to the
-/// foot. The legs rest flat because the loader has no rest rotations; <see cref="SpiderLegs"/> poses them.
+/// foot. The legs rest flat because the loader has no rest rotations; <see cref="CrawlerLegs"/> poses them.
 /// GL-free and immutable.
 /// </summary>
-public sealed class SpiderRig
+public sealed class CrawlerRig
 {
     /// <summary>Legs per side.</summary>
     public const int LegsPerSide = 4;
@@ -23,7 +23,7 @@ public sealed class SpiderRig
     /// <summary>Legs in all: the right side first (front to back), then the left.</summary>
     public const int LegCount = LegsPerSide * 2;
 
-    private static readonly ConcurrentDictionary<EntityType, SpiderRig> Cache = new();
+    private static readonly ConcurrentDictionary<EntityType, CrawlerRig> Cache = new();
 
     private readonly Dictionary<string, (int Leg, bool Lower)> _bones = new(StringComparer.Ordinal);
 
@@ -35,7 +35,7 @@ public sealed class SpiderRig
         public float Reach => UpperLength + LowerLength;
     }
 
-    private SpiderRig(EntityType type)
+    private CrawlerRig(EntityType type)
     {
         Legs = new Leg[LegCount];
         for (var i = 0; i < LegCount; i++)
@@ -61,8 +61,8 @@ public sealed class SpiderRig
                 throw Broken(type, $"the cubes of '{lowerName}' must run out along X from its origin");
 
             var upperLength = MathF.Abs(knee.X);
-            var azimuth = SpiderConfig.LegAzimuthDegrees[i % LegsPerSide] * (MathF.PI / 180f);
-            var stance = (upperLength + lowerLength) * SpiderConfig.LegStanceShare;
+            var azimuth = CrawlerConfig.LegAzimuthDegrees[i % LegsPerSide] * (MathF.PI / 180f);
+            var stance = (upperLength + lowerLength) * CrawlerConfig.LegStanceShare;
             var rest = new Vector3(upper.Pivot.X + side * MathF.Cos(azimuth) * stance, 0f,
                 upper.Pivot.Z - MathF.Sin(azimuth) * stance);
             Legs[i] = new Leg(upper.Pivot, side, upperLength, lowerLength, rest);
@@ -76,7 +76,7 @@ public sealed class SpiderRig
 
     /// <summary>The rig of <paramref name="type"/>'s model, read on first use; throws naming the model file when it
     /// breaks the contract above.</summary>
-    public static SpiderRig For(EntityType type) => Cache.GetOrAdd(type, static t => new SpiderRig(t));
+    public static CrawlerRig For(EntityType type) => Cache.GetOrAdd(type, static t => new CrawlerRig(t));
 
     /// <summary>Whether <paramref name="bone"/> is a leg segment, and which: the leg's index and whether it is the
     /// lower segment.</summary>

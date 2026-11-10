@@ -2,7 +2,7 @@ using System;
 using System.Numerics;
 using VoxelEngine.Chunks;
 
-namespace VoxelEngine.Entities.Spiders;
+namespace VoxelEngine.Entities.Crawlers;
 
 /// <summary>
 /// The body physics of a mob that walks on every surface: it clings to one face of the block grid at a time
@@ -74,7 +74,7 @@ public sealed class SurfaceCrawler
         {
             var normal = CrawlFrame.NormalOf(index);
             var axis = AxisOf(normal);
-            BoxSweep.MoveOnAxis(position, -Component(normal, axis) * SpiderConfig.ClingReachBlocks, axis, half, chunks,
+            BoxSweep.MoveOnAxis(position, -Component(normal, axis) * CrawlerConfig.ClingReachBlocks, axis, half, chunks,
                 out var found);
             if (!found) continue;
             Attach(normal, CrawlFrame.HeadingOf(normal, angle));
@@ -111,14 +111,14 @@ public sealed class SurfaceCrawler
         if (goal is { } wanted && _commit <= 0f && !wrapping)
         {
             var along = wanted - Normal * Vector3.Dot(wanted, Normal);
-            if (along.LengthSquared() >= SpiderConfig.MinTangentShare * SpiderConfig.MinTangentShare)
+            if (along.LengthSquared() >= CrawlerConfig.MinTangentShare * CrawlerConfig.MinTangentShare)
                 Heading = TurnToward(Vector3.Normalize(along), deltaTime);
         }
 
         var moveSpeed = goal != null ? speed : 0f;
         // Rounding an edge it keeps moving until it has the new face under it
-        if (wrapping) moveSpeed = MathF.Max(moveSpeed, SpiderConfig.WrapMinSpeed);
-        velocity = velocity.Damp(Heading * moveSpeed, SpiderConfig.MoveAccel, deltaTime);
+        if (wrapping) moveSpeed = MathF.Max(moveSpeed, CrawlerConfig.WrapMinSpeed);
+        velocity = velocity.Damp(Heading * moveSpeed, CrawlerConfig.MoveAccel, deltaTime);
         velocity -= Normal * Vector3.Dot(velocity, Normal);
         if (moveSpeed <= 0f && velocity.LengthSquared() < 1e-4f) velocity = Vector3.Zero;
 
@@ -136,7 +136,7 @@ public sealed class SurfaceCrawler
             velocity = WithComponent(velocity, axis, 0f);
             // A wall that carries enough of the heading is climbed; a glancing one is slid along
             var share = Component(Heading, axis) * MathF.Sign(delta);
-            if (share < SpiderConfig.ClimbShare || share <= climbShare) continue;
+            if (share < CrawlerConfig.ClimbShare || share <= climbShare) continue;
             climbAxis = axis;
             climbSign = MathF.Sign(delta);
             climbShare = share;
@@ -148,16 +148,16 @@ public sealed class SurfaceCrawler
             var from = Normal;
             Attach(AxisVector(climbAxis) * -climbSign, from);
             velocity = Heading * moveSpeed;
-            _commit = SpiderConfig.CommitSeconds;
+            _commit = CrawlerConfig.CommitSeconds;
             return;
         }
 
         var down = -Component(Normal, normalAxis);
-        BoxSweep.MoveOnAxis(position, down * SpiderConfig.ClingReachBlocks, normalAxis, half, chunks, out var held);
+        BoxSweep.MoveOnAxis(position, down * CrawlerConfig.ClingReachBlocks, normalAxis, half, chunks, out var held);
         if (held)
         {
             position = BoxSweep.MoveOnAxis(position,
-                down * MathF.Min(SpiderConfig.ClingReachBlocks, SpiderConfig.ClingSpeed * deltaTime), normalAxis, half,
+                down * MathF.Min(CrawlerConfig.ClingReachBlocks, CrawlerConfig.ClingSpeed * deltaTime), normalAxis, half,
                 chunks, out _);
             _wrapGrace = 0f;
             return;
@@ -171,7 +171,7 @@ public sealed class SurfaceCrawler
         }
 
         if (TryWrap(position, half, chunks))
-            velocity = Heading * MathF.Max(moveSpeed, SpiderConfig.WrapMinSpeed);
+            velocity = Heading * MathF.Max(moveSpeed, CrawlerConfig.WrapMinSpeed);
         else
             Detach();
     }
@@ -183,7 +183,7 @@ public sealed class SurfaceCrawler
     {
         var normalAxis = AxisOf(Normal);
         var down = -Component(Normal, normalAxis);
-        var lowered = BoxSweep.MoveOnAxis(position, down * (half.X + SpiderConfig.EdgeDropBlocks), normalAxis, half,
+        var lowered = BoxSweep.MoveOnAxis(position, down * (half.X + CrawlerConfig.EdgeDropBlocks), normalAxis, half,
             chunks, out _);
 
         var first = (normalAxis + 1) % 3;
@@ -199,13 +199,13 @@ public sealed class SurfaceCrawler
         var along = Component(Heading, axis);
         if (MathF.Abs(along) < 0.1f) return false;
         var sign = MathF.Sign(along);
-        BoxSweep.MoveOnAxis(lowered, -sign * SpiderConfig.ClingReachBlocks, axis, half, chunks, out var found);
+        BoxSweep.MoveOnAxis(lowered, -sign * CrawlerConfig.ClingReachBlocks, axis, half, chunks, out var found);
         if (!found) return false;
 
         var from = Normal;
         Attach(AxisVector(axis) * sign, -from);
-        _commit = SpiderConfig.CommitSeconds;
-        _wrapGrace = SpiderConfig.WrapGraceSeconds;
+        _commit = CrawlerConfig.CommitSeconds;
+        _wrapGrace = CrawlerConfig.WrapGraceSeconds;
         return true;
     }
 
@@ -222,9 +222,9 @@ public sealed class SurfaceCrawler
             var paddle = goal is { } wanted && mayGrab ? new Vector3(wanted.X, 0f, wanted.Z) : Vector3.Zero;
             if (paddle.LengthSquared() > 1e-6f)
             {
-                paddle = Vector3.Normalize(paddle) * speed * SpiderConfig.SwimSpeedFactor;
-                velocity.X = MathUtils.Damp(velocity.X, paddle.X, SpiderConfig.MoveAccel, deltaTime);
-                velocity.Z = MathUtils.Damp(velocity.Z, paddle.Z, SpiderConfig.MoveAccel, deltaTime);
+                paddle = Vector3.Normalize(paddle) * speed * CrawlerConfig.SwimSpeedFactor;
+                velocity.X = MathUtils.Damp(velocity.X, paddle.X, CrawlerConfig.MoveAccel, deltaTime);
+                velocity.Z = MathUtils.Damp(velocity.Z, paddle.Z, CrawlerConfig.MoveAccel, deltaTime);
             }
             else
             {
@@ -258,7 +258,7 @@ public sealed class SurfaceCrawler
         var wall = hitX ? new Vector3(-MathF.Sign(move.X), 0f, 0f) : new Vector3(0f, 0f, -MathF.Sign(move.Z));
         Attach(wall, InWater ? Vector3.UnitY : -Vector3.UnitY);
         velocity = Vector3.Zero;
-        _commit = SpiderConfig.CommitSeconds;
+        _commit = CrawlerConfig.CommitSeconds;
         return 0f;
     }
 
@@ -275,7 +275,7 @@ public sealed class SurfaceCrawler
     {
         var side = Vector3.Cross(Normal, Heading);
         var angle = MathF.Atan2(Vector3.Dot(side, target), Vector3.Dot(Heading, target));
-        angle *= 1f - MathF.Exp(-SpiderConfig.TurnRate * deltaTime);
+        angle *= 1f - MathF.Exp(-CrawlerConfig.TurnRate * deltaTime);
         return Flattened(Heading * MathF.Cos(angle) + side * MathF.Sin(angle), Normal, target);
     }
 

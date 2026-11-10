@@ -13,7 +13,7 @@ using VoxelEngine.Entities.Posing;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
-using VoxelEngine.Entities.Spiders;
+using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Player;
 
@@ -163,15 +163,15 @@ public sealed class EntityPreviewState : IPreviewDriver
     /// <summary>
     /// The world matrix of <paramref name="part"/> of the previewed model standing at <paramref name="feet"/>:
     /// the animator's blended pose, or for the chest the active clip alone at its own time, which is what a chest's
-    /// lid shows in the game (<c>ChestLids</c>), or for a spider its own pose, the legs solved onto the ground
-    /// (<see cref="Spider.PartMatrix"/>).
+    /// lid shows in the game (<c>ChestLids</c>), or for a crawler (a spider, the scorpion) its own pose, the legs
+    /// solved onto the ground (<see cref="CrawlerMob.PartMatrix"/>).
     /// </summary>
     public Matrix4x4 PartMatrix(string part, PlayerRig rig, Vector3 feet) =>
         _clipOnly
             ? RigPose.PartMatrix(new ClipPose(Animator.Find(Mode), _clipTime), part, rig,
                 Matrix4x4.CreateRotationY(FacingYaw) * Matrix4x4.CreateTranslation(feet))
-            : _rigged is Spider spider
-                ? spider.PartMatrix(part, rig)
+            : _rigged is CrawlerMob crawler
+                ? crawler.PartMatrix(part, rig)
                 : Animator.GetPartMatrix(part, rig, feet, FacingYaw);
 
     /// <summary>Seconds one play of the active mode lasts: its clip's length, or the life-cycle mode's own length.</summary>
@@ -341,11 +341,11 @@ public sealed class EntityPreviewState : IPreviewDriver
     {
         var mob = _rigged!;
         var walking = IsLocomotion(Mode);
-        // The mirrored velocity is what walks the clip (a client's mob is driven the same way). A spider stands
+        // The mirrored velocity is what walks the clip (a client's mob is driven the same way). A crawler stands
         // on its own body center and walks front first, since its legs step along the velocity
-        var spider = mob as Spider;
-        var center = spider != null ? new Vector3(0f, spider.BodyHalfHeight, 0f) : Vector3.Zero;
-        var along = spider != null ? -Animator.WalkReferenceSpeed : Animator.WalkReferenceSpeed;
+        var crawler = mob as CrawlerMob;
+        var center = crawler != null ? new Vector3(0f, crawler.BodyHalfHeight, 0f) : Vector3.Zero;
+        var along = crawler != null ? -Animator.WalkReferenceSpeed : Animator.WalkReferenceSpeed;
         mob.NetworkSetState(center, 0f, mob.Health, walking ? new Vector3(0f, 0f, along) : Vector3.Zero);
 
         if (string.Equals(Mode, DeathMode, StringComparison.OrdinalIgnoreCase))
@@ -548,6 +548,8 @@ public sealed class EntityPreviewState : IPreviewDriver
         if (Spider.BodySizeOf(type.Name) > 0f)
             return new Spider(type, Vector3.Zero, tier: 0,
                 string.Equals(type.Name, Spider.BroodmotherEntityName, StringComparison.OrdinalIgnoreCase), spawnIn);
+        if (string.Equals(type.Name, Scorpion.EntityName, StringComparison.OrdinalIgnoreCase))
+            return new Scorpion(type, Vector3.Zero, tier: 0, spawnIn);
         return WildlifeSpecies.Create(type, Vector3.Zero, spawnIn);
     }
 

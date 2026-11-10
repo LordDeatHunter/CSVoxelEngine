@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace VoxelEngine.Entities.Spiders;
+namespace VoxelEngine.Entities.Crawlers;
 
 /// <summary>
 /// The analytic two-bone solver of a spider leg: given the hip and the point the foot should reach, both in the

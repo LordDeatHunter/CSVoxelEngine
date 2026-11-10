@@ -34,9 +34,10 @@ public enum NetEntityKind : byte
     Crow = 21,
     Dragonfly = 22,
 
-    // The spiders sit clear of the animals' run, which grows with every new species
+    // The crawlers sit clear of the animals' run, which grows with every new species
     Spider = 64,
     SpiderBroodmother = 65,
+    Scorpion = 66,
 }
 
 /// <summary>
@@ -51,7 +52,7 @@ public enum NetEntityKind : byte
 /// (<c>Skeleton.PackLook</c>) or the Skeleton King's fight phase (1..3, clamped on read;
 /// its <see cref="Ammo"/> is its attack count, naming slam, volley and summon by its remainder modulo 3) or a cave mob's
 /// depth tier (0..<c>MobConfig.CaveMaxTier</c>, clamped on read, fixed at its spawn; its <see cref="Ammo"/> is its attack
-/// count; a spider packs the face it clings to above the tier, <c>Spider.PackStance</c>, and its <see cref="Yaw"/> is its
+/// count; a spider or scorpion packs the face it clings to above the tier, <c>CrawlerMob.PackStance</c>, and its <see cref="Yaw"/> is its
 /// heading's angle on that face) or a wild animal's posture (<c>Animal.Posture</c>: whether a flyer sits on the ground,
 /// which a mirror cannot tell from its velocity); a drop uses
 /// <see cref="ItemId"/>.
@@ -70,7 +71,7 @@ public enum NetEntityKind : byte
 /// <see cref="Effects"/>, a mob's active status effects as a bitmask of each effect's
 /// <c>StatusEffect.Bit</c> (0 for every other kind); the client drops the bits no loaded effect owns.
 /// <see cref="ItemId"/> is a block or item id wide enough for any id; the mob data it carries for a mob kind
-/// fits in a byte, but for a spider's surface in the byte above. GL-free and content-free.
+/// fits in a byte, but for a crawler's surface in the byte above. GL-free and content-free.
 /// </summary>
 public readonly record struct NetEntity(NetEntityKind Kind, int Id, Vector3 Position, float Yaw,
     int Health, int Ammo, ushort ItemId, Vector3 Velocity, byte Effects = 0)
@@ -81,7 +82,7 @@ public readonly record struct NetEntity(NetEntityKind Kind, int Id, Vector3 Posi
         kind is NetEntityKind.Slime or NetEntityKind.Goblin or NetEntityKind.Hellbrute or NetEntityKind.Cinderwitch
             or NetEntityKind.Galeraptor or NetEntityKind.Cloudgolem or NetEntityKind.Sandworm or NetEntityKind.Skeleton
             or NetEntityKind.SkeletonKing or NetEntityKind.Shardling or NetEntityKind.Sporeling or NetEntityKind.Magmaborn
-            or NetEntityKind.Spider or NetEntityKind.SpiderBroodmother
+            or NetEntityKind.Spider or NetEntityKind.SpiderBroodmother or NetEntityKind.Scorpion
         || TryGetWildlife(kind, out _);
 
     /// <summary>The entry kind of a wild animal of <paramref name="species"/>.</summary>

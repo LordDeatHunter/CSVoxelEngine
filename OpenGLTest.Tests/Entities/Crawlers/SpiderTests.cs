@@ -3,14 +3,14 @@ using System.Numerics;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.CaveMobs;
-using VoxelEngine.Entities.Spiders;
+using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Caves;
 using VoxelEngine.Status;
 using VoxelEngine.WorldGen.Caves;
 using Xunit;
 
-namespace VoxelEngine.Tests.Entities.Spiders;
+namespace VoxelEngine.Tests.Entities.Crawlers;
 
 /// <summary>
 /// The spiders' rules, driven headless: both shipped models keep the leg contract and rest within their own reach,
@@ -38,7 +38,7 @@ public sealed class SpiderTests
     private static ChunkManager StoneFloor() => MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
 
     // A stone floor with a cliff: a plateau PlateauTop cells high over the far half of the chunk
-    private static ChunkManager Cliff()
+    internal static ChunkManager Cliff()
     {
         var chunks = StoneFloor();
         var chunk = chunks.Chunks[Vector3.Zero];
@@ -64,7 +64,7 @@ public sealed class SpiderTests
         var type = TypeOf(broodmother);
         Spider.ValidateContent(type);
 
-        foreach (var leg in SpiderRig.For(type).Legs)
+        foreach (var leg in CrawlerRig.For(type).Legs)
         {
             Assert.True(Vector3.Distance(leg.Hip, leg.Rest) < leg.Reach, "a resting foot is out of its leg's reach");
             // The right legs rest on the model's right, the left on its left
@@ -77,7 +77,7 @@ public sealed class SpiderTests
     [InlineData(true)]
     public void ASolvedLegPutsItsFootOnTheTargetWithItsKneeUp(bool broodmother)
     {
-        foreach (var leg in SpiderRig.For(TypeOf(broodmother)).Legs)
+        foreach (var leg in CrawlerRig.For(TypeOf(broodmother)).Legs)
         {
             foreach (var nudge in new[] { Vector3.Zero, new Vector3(0f, 0.2f, 0.15f) * leg.Reach, new Vector3(0f, -0.2f, -0.1f) * leg.Reach })
             {
@@ -102,7 +102,7 @@ public sealed class SpiderTests
     [Fact]
     public void AFootOutOfReachIsAimedAtWithoutStretchingTheLeg()
     {
-        var leg = SpiderRig.For(TypeOf(false)).Legs[0];
+        var leg = CrawlerRig.For(TypeOf(false)).Legs[0];
         var far = leg.Hip + Vector3.Normalize(leg.Rest - leg.Hip) * leg.Reach * 3f;
         LegIk.Solve(leg.Hip, far, leg.Side, leg.UpperLength, leg.LowerLength, Vector3.UnitY, out var upper,
             out var lowerLocal, out var knee);
@@ -209,19 +209,19 @@ public sealed class SpiderTests
             spider.AnimateCosmetics(Dt, chunks);
 
         // A spider standing still settles: no foot keeps stepping in place
-        for (var leg = 0; leg < SpiderRig.LegCount; leg++)
+        for (var leg = 0; leg < CrawlerRig.LegCount; leg++)
             Assert.False(spider.Legs.IsStepping(leg), "a foot is still stepping under a body at rest");
 
         var onFloor = 0;
         var onWall = 0;
-        for (var leg = 0; leg < SpiderRig.LegCount; leg++)
+        for (var leg = 0; leg < CrawlerRig.LegCount; leg++)
         {
             var foot = spider.Legs.Foot(leg);
             if (MathF.Abs(foot.Y - 1f) < 1e-2f) onFloor++;
             else if (MathF.Abs(foot.X - PlateauX) < 1e-2f) onWall++;
         }
 
-        Assert.Equal(SpiderRig.LegCount, onFloor + onWall);
+        Assert.Equal(CrawlerRig.LegCount, onFloor + onWall);
         Assert.True(onFloor > 0 && onWall > 0, $"feet on the floor: {onFloor}, on the wall: {onWall}");
     }
 
@@ -253,7 +253,7 @@ public sealed class SpiderTests
         Assert.Equal(spider.Tier, CaveDifficulty.Clamp((byte)packed));
         var mirror = NewSpider(spider.Position);
         mirror.NetworkSetState(spider.Position, spider.Facing, spider.Health, spider.Velocity);
-        mirror.MirrorSurface(Spider.SurfaceOf(packed));
+        mirror.MirrorSurface(CrawlerMob.SurfaceOf(packed));
         Assert.Equal(spider.SurfaceNormal, mirror.SurfaceNormal);
         Assert.Equal(spider.SurfaceIndex, mirror.SurfaceIndex);
     }

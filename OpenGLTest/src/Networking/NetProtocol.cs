@@ -237,9 +237,11 @@ public static class NetFraming
     /// station frames.
     /// 39: the spiders (<see cref="NetEntityKind.Spider"/>, <see cref="NetEntityKind.SpiderBroodmother"/>) in
     /// <see cref="NetMessage.EntityList"/>: cave mobs whose item field also carries the face they cling to above the
-    /// tier byte (<c>Spider.PackStance</c>) and whose yaw is the heading's angle on that face; an older client would not
-    /// draw them.</summary>
-    public const int ProtocolVersion = 39;
+    /// tier byte (<c>CrawlerMob.PackStance</c>) and whose yaw is the heading's angle on that face; an older client would
+    /// not draw them.
+    /// 40: the scorpion (<see cref="NetEntityKind.Scorpion"/>), a crawler on the wire like the spiders; its attack
+    /// count names pinch (even) and sting (odd). An older client would not draw it.</summary>
+    public const int ProtocolVersion = 40;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

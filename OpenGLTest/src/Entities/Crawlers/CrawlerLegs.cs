@@ -3,7 +3,7 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Interaction;
 
-namespace VoxelEngine.Entities.Spiders;
+namespace VoxelEngine.Entities.Crawlers;
 
 /// <summary>
 /// A spider's eight legs, walked procedurally: every foot stays planted on the world where it landed while the
@@ -14,7 +14,7 @@ namespace VoxelEngine.Entities.Spiders;
 /// planted feet are turned into bone rotations by <see cref="LegIk"/>. Cosmetic: nothing in the simulation reads
 /// it, so a server never runs it. GL-free; main thread only.
 /// </summary>
-public sealed class SpiderLegs
+public sealed class CrawlerLegs
 {
     // A foot farther than this many leg lengths from its rest point was left behind by a teleport: it is re-placed
     private const float SnapReaches = 2.5f;
@@ -26,15 +26,15 @@ public sealed class SpiderLegs
     private const float HeldShare = 0.5f;
     private const int NotStepping = -1;
 
-    private readonly SpiderRig _rig;
-    private readonly Vector3[] _foot = new Vector3[SpiderRig.LegCount];
-    private readonly Vector3[] _from = new Vector3[SpiderRig.LegCount];
-    private readonly Vector3[] _to = new Vector3[SpiderRig.LegCount];
-    private readonly float[] _step = new float[SpiderRig.LegCount];
-    private readonly Quaternion[] _upper = new Quaternion[SpiderRig.LegCount];
-    private readonly Quaternion[] _lower = new Quaternion[SpiderRig.LegCount];
+    private readonly CrawlerRig _rig;
+    private readonly Vector3[] _foot = new Vector3[CrawlerRig.LegCount];
+    private readonly Vector3[] _from = new Vector3[CrawlerRig.LegCount];
+    private readonly Vector3[] _to = new Vector3[CrawlerRig.LegCount];
+    private readonly float[] _step = new float[CrawlerRig.LegCount];
+    private readonly Quaternion[] _upper = new Quaternion[CrawlerRig.LegCount];
+    private readonly Quaternion[] _lower = new Quaternion[CrawlerRig.LegCount];
 
-    public SpiderLegs(SpiderRig rig)
+    public CrawlerLegs(CrawlerRig rig)
     {
         _rig = rig;
         Array.Fill(_step, NotStepping);
@@ -84,18 +84,18 @@ public sealed class SpiderLegs
 
             var off = Vector3.Distance(_foot[i], rest);
             var stretched = Vector3.Distance(_foot[i], hip) > leg.Reach * StretchShare;
-            var urgent = off > leg.Reach * SpiderConfig.LegUrgentShare;
-            if (!urgent && !stretched && off <= leg.Reach * SpiderConfig.LegStepShare) continue;
+            var urgent = off > leg.Reach * CrawlerConfig.LegUrgentShare;
+            if (!urgent && !stretched && off <= leg.Reach * CrawlerConfig.LegStepShare) continue;
             if (!urgent && OtherGroupStepping(i)) continue;
 
             // The step lands ahead of the rest point along the motion, where the body will have carried it
-            var target = rest + velocity * SpiderConfig.LegStepSeconds;
+            var target = rest + velocity * CrawlerConfig.LegStepSeconds;
             var speed = velocity.Length();
-            if (speed > LeadMinSpeed) target += velocity / speed * (leg.Reach * SpiderConfig.LegLeadShare);
+            if (speed > LeadMinSpeed) target += velocity / speed * (leg.Reach * CrawlerConfig.LegLeadShare);
             var hold = FindHold(hip + (target - rest), target, up, center + (target - rest), hipHeight, leg.Reach, chunks);
             // The rest point may lie inside a wall or past a ledge, where the hold it leads to is the one the
             // foot already has: then there is nowhere better to step
-            var held = leg.Reach * SpiderConfig.LegStepShare * HeldShare;
+            var held = leg.Reach * CrawlerConfig.LegStepShare * HeldShare;
             if (Vector3.DistanceSquared(hold, _foot[i]) <= held * held) continue;
             _from[i] = _foot[i];
             _to[i] = hold;
@@ -116,10 +116,10 @@ public sealed class SpiderLegs
         if (!IsPosed) return up;
         // Newell's sum around the ring of feet: the right side front to back, then the left back to front
         var normal = Vector3.Zero;
-        for (var k = 0; k < SpiderRig.LegCount; k++)
+        for (var k = 0; k < CrawlerRig.LegCount; k++)
         {
             var a = _foot[RingIndex(k)];
-            var b = _foot[RingIndex((k + 1) % SpiderRig.LegCount)];
+            var b = _foot[RingIndex((k + 1) % CrawlerRig.LegCount)];
             normal += new Vector3((a.Y - b.Y) * (a.Z + b.Z), (a.Z - b.Z) * (a.X + b.X), (a.X - b.X) * (a.Y + b.Y));
         }
         if (normal.LengthSquared() < 1e-8f) return up;
@@ -140,7 +140,7 @@ public sealed class SpiderLegs
     // Carries every hold along with ground that moves under the body
     private void Treadmill(Vector3 drift)
     {
-        for (var i = 0; i < SpiderRig.LegCount; i++)
+        for (var i = 0; i < CrawlerRig.LegCount; i++)
         {
             _foot[i] += drift;
             _from[i] += drift;
@@ -150,7 +150,7 @@ public sealed class SpiderLegs
 
     private void AdvanceStep(int i, float reach, Vector3 up, float deltaTime)
     {
-        _step[i] += deltaTime / SpiderConfig.LegStepSeconds;
+        _step[i] += deltaTime / CrawlerConfig.LegStepSeconds;
         if (_step[i] >= 1f)
         {
             _foot[i] = _to[i];
@@ -159,7 +159,7 @@ public sealed class SpiderLegs
         }
 
         var t = MathUtils.SmoothStep(_step[i]);
-        var lift = MathF.Sin(_step[i] * MathF.PI) * reach * SpiderConfig.LegStepLiftShare;
+        var lift = MathF.Sin(_step[i] * MathF.PI) * reach * CrawlerConfig.LegStepLiftShare;
         _foot[i] = Vector3.Lerp(_from[i], _to[i], t) + up * lift;
     }
 
@@ -177,19 +177,19 @@ public sealed class SpiderLegs
 
     // The two alternating groups: front-right, second-left, third-right, rear-left against the other four
     private static int GroupOf(int leg) =>
-        (leg % SpiderRig.LegsPerSide + (leg < SpiderRig.LegsPerSide ? 0 : 1)) % 2;
+        (leg % CrawlerRig.LegsPerSide + (leg < CrawlerRig.LegsPerSide ? 0 : 1)) % 2;
 
     private bool OtherGroupStepping(int leg)
     {
         var group = GroupOf(leg);
-        for (var j = 0; j < SpiderRig.LegCount; j++)
+        for (var j = 0; j < CrawlerRig.LegCount; j++)
             if (_step[j] >= 0f && GroupOf(j) != group) return true;
         return false;
     }
 
     // The right legs front to back, then the left legs back to front: once around the body
     private static int RingIndex(int k) =>
-        k < SpiderRig.LegsPerSide ? k : SpiderRig.LegCount - 1 - (k - SpiderRig.LegsPerSide);
+        k < CrawlerRig.LegsPerSide ? k : CrawlerRig.LegCount - 1 - (k - CrawlerRig.LegsPerSide);
 
     // Where a foot resting at 'rest' takes hold: a wall between the hip and the rest point, else the ground under
     // the rest point, else the side of the ledge the body stands on, else nothing (the foot hangs a little low)
@@ -200,11 +200,11 @@ public sealed class SpiderLegs
 
         var above = rest + up * hipHeight;
         if (TryHit(hip, above, chunks, out var hold)) return hold;
-        var below = rest - up * (reach * SpiderConfig.LegProbeDepthShare);
+        var below = rest - up * (reach * CrawlerConfig.LegProbeDepthShare);
         if (TryHit(above, below, chunks, out hold)) return hold;
-        var under = center - up * (reach * SpiderConfig.LegProbeDepthShare);
+        var under = center - up * (reach * CrawlerConfig.LegProbeDepthShare);
         if (TryHit(below, under, chunks, out hold)) return hold;
-        return rest - up * (reach * SpiderConfig.LegDangleShare);
+        return rest - up * (reach * CrawlerConfig.LegDangleShare);
     }
 
     // The first block surface on the segment, by the combat line of sight's walk (plants and fluids are stepped

@@ -5,7 +5,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.CaveMobs;
-using VoxelEngine.Entities.Spiders;
+using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Status;
@@ -15,15 +15,17 @@ namespace VoxelEngine.Simulation.Caves;
 
 /// <summary>
 /// Owns the cave sub-biomes' mobs (<see cref="Shardling"/>s, <see cref="Sporeling"/>s and <see cref="Magmaborn"/>s),
-/// the <see cref="Spider"/>s that crawl through every cave, and the crystal shards the shardlings throw: on the shared
+/// the <see cref="Spider"/>s that crawl through every cave and the desert's <see cref="Scorpion"/>s, and the crystal
+/// shards the shardlings throw: on the shared
 /// realm frame (<see cref="RealmMobManager{TMob}"/>) it launches a shard at each cast release and chills a target a
 /// shard touches (damage plus <c>frostburn</c>), fills every target inside a sporeling's burst with spores (damage plus
 /// <c>spore</c>), sets a target a magmaborn's blow lands on burning and poisons one a spider bites (<c>venom</c>). It
 /// spawns new mobs on dark cave floors (<see cref="MobSpawner.TryFindCaveSpawn"/>) around a target standing
 /// underground outside hell: the floor's cave biome and a roll pick the kind (<see cref="CaveSpawnRules.KindFor"/>),
 /// its depth the tier (<see cref="CaveDifficulty.TierAt"/>), and the pack mates stay on the leader's biome and tier.
-/// At night a spider now and then turns up on the surface too. The broodmother is never spawned here: it is the
-/// spider den's miniboss. Every spawn is judged by the global <see cref="MobCaps"/> it shares with the other mob
+/// At night a spider now and then turns up on the surface too, and scorpions roam the desert's surface (mostly by
+/// night). A scorpion's pinch shoves and its sting poisons. The broodmother is never spawned here: it is the spider
+/// den's miniboss. Every spawn is judged by the global <see cref="MobCaps"/> it shares with the other mob
 /// kinds. Main thread only.
 /// </summary>
 public sealed class CaveMobManager : RealmMobManager<CaveMob>
@@ -38,7 +40,9 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
     private readonly EntityType? _magmabornType;
     private readonly EntityType? _spiderType;
     private readonly EntityType? _broodmotherType;
+    private readonly EntityType? _scorpionType;
     private float _surfaceTimer;
+    private float _desertTimer;
     private int _surfaceCursor;
     // Each shard carries its shardling's damage, scaled by the shardling's tier
     private readonly MobMissiles _shards = new();
@@ -62,8 +66,11 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
     /// (the world's), or caps itself alone when none is given (tests).
     /// </summary>
     public CaveMobManager(EntityType? shardlingType, EntityType? sporelingType, EntityType? magmabornType,
-        MobCaps? caps = null, EntityType? spiderType = null, EntityType? broodmotherType = null) : base(caps)
+        MobCaps? caps = null, EntityType? spiderType = null, EntityType? broodmotherType = null,
+        EntityType? scorpionType = null) : base(caps)
     {
+        if (scorpionType != null) Scorpion.ValidateContent(scorpionType);
+        _scorpionType = scorpionType;
         if (shardlingType != null) Shardling.ValidateContent(shardlingType);
         if (sporelingType != null) Sporeling.ValidateContent(sporelingType);
         if (magmabornType != null) Magmaborn.ValidateContent(magmabornType);
@@ -90,6 +97,7 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
         string.Equals(kind, Shardling.EntityName, StringComparison.OrdinalIgnoreCase) ? MobConfig.CaveShardlingHeight
         : string.Equals(kind, Sporeling.EntityName, StringComparison.OrdinalIgnoreCase) ? MobConfig.CaveSporelingHeight
         : string.Equals(kind, Magmaborn.EntityName, StringComparison.OrdinalIgnoreCase) ? MobConfig.CaveMagmabornHeight
+        : string.Equals(kind, Scorpion.EntityName, StringComparison.OrdinalIgnoreCase) ? ScorpionConfig.BodySize
         : Spider.BodySizeOf(kind);
 
     /// <summary>
@@ -122,6 +130,8 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
             return new Spider(_spiderType, position, tier, broodmother: false, spawnIn);
         if (_broodmotherType != null && string.Equals(kind, Spider.BroodmotherEntityName, StringComparison.OrdinalIgnoreCase))
             return new Spider(_broodmotherType, position, tier, broodmother: true, spawnIn);
+        if (_scorpionType != null && string.Equals(kind, Scorpion.EntityName, StringComparison.OrdinalIgnoreCase))
+            return new Scorpion(_scorpionType, position, tier, spawnIn);
         return null;
     }
 
@@ -190,6 +200,25 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
                     StatusEffects.Apply(target, VenomEffect, spider.VenomScale);
                 }
                 return;
+
+            case Scorpion scorpion:
+                if (!scorpion.TryTakeStrike(out var sting)) return;
+                for (var t = 0; t < targets.Count; t++)
+                {
+                    var target = targets[t];
+                    if (target.IsImmune || !Scorpion.InAttackReach(scorpion.Position, target.Eye)) continue;
+                    if (!sting)
+                    {
+                        Hit(target, scorpion.PinchDamage, scorpion.Position, ScorpionConfig.PinchKnockbackSpeed,
+                            ScorpionConfig.PinchKnockbackLift, scorpion.Type.DisplayName);
+                        continue;
+                    }
+
+                    Hit(target, scorpion.StingDamage, scorpion.Position, ScorpionConfig.StingKnockbackSpeed,
+                        ScorpionConfig.StingKnockbackLift, scorpion.Type.DisplayName);
+                    StatusEffects.Apply(target, VenomEffect, ScorpionConfig.StingVenomScale);
+                }
+                return;
         }
     }
 
@@ -198,7 +227,7 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
     {
         Magmaborn => MobConfig.CaveMagmabornShoveSpeed,
         Sporeling => MobConfig.CaveSporelingShoveSpeed,
-        Spider spider => spider.ShoveSpeed,
+        CrawlerMob crawler => crawler.ShoveSpeed,
         _ => MobConfig.CaveShardlingShoveSpeed,
     };
 
@@ -222,27 +251,31 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
     // underground outside hell is searched around; the floor's cave biome picks the kind and its depth the tier.
     private void UpdateSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
     {
-        if (_shardlingType == null && _sporelingType == null && _magmabornType == null && _spiderType == null) return;
+        if (_shardlingType == null && _sporelingType == null && _magmabornType == null && _spiderType == null
+            && _scorpionType == null) return;
         if (!TryTakeSpawnTurn(deltaTime, targets, MobConfig.CaveMobSpawnIntervalSeconds, out var target)) return;
 
         var eye = target.Eye;
         if (HellGenerator.InHell(MathUtils.FloorToInt(eye.Y - Camera.EyeHeight))) return;
         if (!MobSpawner.TargetUnderground(chunks, eye)) return;
 
-        // Spiders take any cave, so with them the ring accepts every biome's floor
+        // Spiders take any cave and scorpions the desert's, so with them the ring accepts every biome's floor
         var spiders = _spiderType != null;
-        var search = spiders ? RingSearch with { AllowedBiomes = CaveSpawnRules.AllBiomes } : RingSearch;
+        var scorpions = _scorpionType != null;
+        var search = spiders || scorpions ? RingSearch with { AllowedBiomes = CaveSpawnRules.AllBiomes } : RingSearch;
         if (!MobSpawner.TryFindCaveSpawn(chunks, SpawnOrigin.Of(target), search, Biomes, out var x, out var groundY, out var z,
                 out var biome))
             return;
 
-        var kind = CaveSpawnRules.KindFor(biome, Random.Shared.NextSingle(), spiders);
+        var kind = CaveSpawnRules.KindFor(biome, Random.Shared.NextSingle(), spiders, scorpions);
         if (kind == null) return;
 
         var tier = CaveDifficulty.TierAt(groundY + 1);
         if (SpawnOnFloor(kind, x, groundY, z, tier) == null) return;
 
-        var packMax = kind == Spider.EntityName ? SpiderConfig.CavePackMaxSize : MobConfig.CaveMobPackMaxSize;
+        var packMax = kind == Spider.EntityName ? SpiderConfig.CavePackMaxSize
+            : kind == Scorpion.EntityName ? ScorpionConfig.CavePackMaxSize
+            : MobConfig.CaveMobPackMaxSize;
         var pack = 1 + Random.Shared.Next(packMax);
         var leaderEye = new Vector3(x + 0.5f, groundY + 1 + Camera.EyeHeight, z + 0.5f);
         var packSearch = PackSearch with { AllowedBiomes = CaveSpawnRules.Bit(biome) };
@@ -254,28 +287,50 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
         }
     }
 
-    // The odd spider on the surface: at night, on its own slow timer under the shared natural cap, one try on the
-    // dry surface ring of the next target in turn that is not underground
+    // The crawlers of the surface, each on its own timer under the shared natural cap: the odd spider at night, and
+    // the desert's scorpions, mostly by night
     private void UpdateSurfaceSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets, float night)
     {
-        if (_spiderType == null || targets.Count == 0 || !Caps.AllowsNaturalSpawn) return;
-        if (night < 0.5f) return;
+        if (targets.Count == 0 || !Caps.AllowsNaturalSpawn) return;
+        var isNight = night >= 0.5f;
 
-        _surfaceTimer += deltaTime * Caps.SpawnHaste;
-        if (_surfaceTimer < SpiderConfig.SurfaceSpawnIntervalSeconds) return;
-        _surfaceTimer = 0f;
-        if (Random.Shared.NextSingle() >= SpiderConfig.SurfaceSpawnChance) return;
+        if (_spiderType != null && isNight)
+        {
+            _surfaceTimer += deltaTime * Caps.SpawnHaste;
+            if (_surfaceTimer >= SpiderConfig.SurfaceSpawnIntervalSeconds)
+            {
+                _surfaceTimer = 0f;
+                if (Random.Shared.NextSingle() < SpiderConfig.SurfaceSpawnChance
+                    && TryFindSurface(chunks, targets, SpiderConfig.SurfaceSpawnMinRadius,
+                        SpiderConfig.SurfaceSpawnMaxRadius, SpiderConfig.SurfaceSpawnTries, out var x, out var y, out var z))
+                    SpawnOnFloor(Spider.EntityName, x, y, z, tier: 0);
+            }
+        }
 
+        if (_scorpionType == null) return;
+        _desertTimer += deltaTime * Caps.SpawnHaste;
+        if (_desertTimer < ScorpionConfig.SurfaceSpawnIntervalSeconds) return;
+        _desertTimer = 0f;
+        if (!CaveSpawnRules.ScorpionSurfaces(isNight, Random.Shared.NextSingle())) return;
+        // The desert's own: a column of any other biome spawns none
+        if (TryFindSurface(chunks, targets, ScorpionConfig.SurfaceSpawnMinRadius, ScorpionConfig.SurfaceSpawnMaxRadius,
+                ScorpionConfig.SurfaceSpawnTries, out var sx, out var sy, out var sz)
+            && CaveSpawnRules.ScorpionSurfaceBiome(MobSpawner.SurfaceBiomeAt(chunks, sx, sz)))
+            SpawnOnFloor(Scorpion.EntityName, sx, sy, sz, tier: 0);
+    }
+
+    // A dry surface column in the ring of the next target in turn, unless that target is underground or in hell
+    private bool TryFindSurface(ChunkManager chunks, IReadOnlyList<IMobTarget> targets, float minRadius, float maxRadius,
+        int tries, out int x, out int groundY, out int z)
+    {
+        x = groundY = z = 0;
         var index = _surfaceCursor % targets.Count;
         _surfaceCursor = index + 1;
         var target = targets[index];
-        if (HellGenerator.InHell(MathUtils.FloorToInt(target.Eye.Y - Camera.EyeHeight))) return;
-        if (MobSpawner.TargetUnderground(chunks, target.Eye)) return;
-        if (!MobSpawner.TryFindSurfaceSpawn(chunks, SpawnOrigin.Of(target), SpiderConfig.SurfaceSpawnMinRadius,
-                SpiderConfig.SurfaceSpawnMaxRadius, SpiderConfig.SurfaceSpawnTries, out var x, out var groundY, out var z))
-            return;
-
-        SpawnOnFloor(Spider.EntityName, x, groundY, z, tier: 0);
+        if (HellGenerator.InHell(MathUtils.FloorToInt(target.Eye.Y - Camera.EyeHeight))) return false;
+        if (MobSpawner.TargetUnderground(chunks, target.Eye)) return false;
+        return MobSpawner.TryFindSurfaceSpawn(chunks, SpawnOrigin.Of(target), minRadius, maxRadius, tries, out x,
+            out groundY, out z);
     }
 
     // One mob of the kind standing on floor cell (x, y, z) at the given tier; null when the kind is not registered or

@@ -1,14 +1,15 @@
-"""Deterministic generator of the spiders' drop sprite (placeholder art).
+"""Deterministic generator of the crawlers' drop sprites (placeholder art).
 
 Writes, under OpenGLTest/assets/textures/items:
-  spider_silk.png    a loose skein of pale silk
+  spider_silk.png         a loose skein of pale silk
+  scorpion_stinger.png    a scorpion's amber tail bulb with its dark barb
 
-The sprite is drawn at half resolution, one string per row and one character per 2x2 texels of the 32x32 image,
+Each sprite is drawn at half resolution, one string per row and one character per 2x2 texels of the 32x32 image,
 with its own small palette: ' ' is transparent and '#' the outline. The PNG encoder and the write/--check routine
-are the hell mobs' generator's (tools/generate-hell-mob-models.py), so re-running reproduces the file byte for
+are the hell mobs' generator's (tools/generate-hell-mob-models.py), so re-running reproduces every file byte for
 byte. Run from the repo root:
-    python -I tools/generate-spider-item-sprites.py           (writes the file)
-    python -I tools/generate-spider-item-sprites.py --check   (exit 1 if the file differs)
+    python -I tools/generate-crawler-item-sprites.py           (writes the files)
+    python -I tools/generate-crawler-item-sprites.py --check   (exit 1 if a file differs)
 """
 import importlib.util
 import os
@@ -39,8 +40,30 @@ SILK = [
     "         ###    ",
 ]
 
+STINGER = [
+    "                ",
+    "         ####   ",
+    "       ##aaAA#  ",
+    "      #aaAAAhA# ",
+    "     #aaAAAhhA# ",
+    "     #aAAAAAAA# ",
+    "     #aaAAAAAa# ",
+    "      #aaAAAa#  ",
+    "      #daaaa#   ",
+    "     #dd####    ",
+    "    #dd#        ",
+    "   #dd#         ",
+    "  #dt#          ",
+    "  #t#           ",
+    "  ##            ",
+    "                ",
+]
+
 SPRITES = [
     ("spider_silk", SILK, {"#": (118, 124, 132), "s": (196, 202, 206), "S": (226, 230, 232), "w": (250, 250, 248)}),
+    ("scorpion_stinger", STINGER,
+     {"#": (64, 36, 20), "a": (150, 96, 40), "A": (188, 134, 60), "h": (226, 184, 104), "d": (84, 44, 28),
+      "t": (40, 22, 18)}),
 ]
 
 

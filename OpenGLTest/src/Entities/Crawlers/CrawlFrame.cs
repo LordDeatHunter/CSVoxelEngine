@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace VoxelEngine.Entities.Spiders;
+namespace VoxelEngine.Entities.Crawlers;
 
 /// <summary>
 /// The frame a crawler stands in on one face of the block grid: the face's outward normal (one of the six axis

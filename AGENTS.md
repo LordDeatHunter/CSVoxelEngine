@@ -65,7 +65,7 @@ purpose). When you change code, edit the doc section that owns it (and nothing e
 | Biomes, terrain shape, water bodies, snow, scenery, cave biomes | `biomes.md` | `biome-worldgen` |
 | Realm layers (hell, sky), structures, ruins, waystone satellites | `layers-and-structures.md` | `biome-worldgen` |
 | Mob base and shared rules, spawn pacing, slime, goblin, wildlife (deer, boar, crow, dragonfly) | `entities.md` | |
-| Hell, sky, cave mobs, flying rules, spiders | `realm-mobs.md` | |
+| Hell, sky, cave mobs, flying rules, crawlers (spiders, scorpion) | `realm-mobs.md` | |
 | Skeleton, battle tower, Skeleton King, sandworm, icebergs | `tower-and-bosses.md` | |
 | Clips, `EntityAnimator`, player and camera juice | `animation.md` | `item-debugger` |
 | File tree (every source file, one line each) | `layout-1-src-core.md` (src root, App, Audio, Chunks, Config, Content, Core, Data, Effects, Entities), `layout-2-src-graphics-rendering.md` (Graphics ... Rendering), `layout-3-src-saves-worldgen.md` (Saves ... WorldGen), `layout-4-projects-tests-tools.md` (other projects, tests, tools) | `code-cleanup` |

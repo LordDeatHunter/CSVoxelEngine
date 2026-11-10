@@ -10,7 +10,7 @@ using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
-using VoxelEngine.Entities.Spiders;
+using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Networking;
 
@@ -87,6 +87,7 @@ internal sealed class ServerBroadcasts
                 Magmaborn => NetEntityKind.Magmaborn,
                 Spider { IsBroodmother: true } => NetEntityKind.SpiderBroodmother,
                 Spider => NetEntityKind.Spider,
+                Scorpion => NetEntityKind.Scorpion,
                 Animal animal => NetEntity.KindOf(animal.Kind),
                 _ => NetEntityKind.Goblin,
             };
@@ -99,7 +100,7 @@ internal sealed class ServerBroadcasts
                 Sandworm worm => (int)worm.Phase,
                 _ => 0,
             };
-            // The item field is a goblin's torch count, a skeleton's tier, role and outfit, a cave mob's tier (a spider's
+            // The item field is a goblin's torch count, a skeleton's tier, role and outfit, a cave mob's tier (a crawler's
             // with the face it clings to above it), a wild animal's posture or the Skeleton King's phase (0 for the
             // rest); every entry ends with a status-effect mask (NetEntity.Effects), a mob's own
             ushort itemField = mob switch
@@ -107,7 +108,7 @@ internal sealed class ServerBroadcasts
                 Goblin goblin => (byte)goblin.Torches,
                 Skeleton skeleton => Skeleton.PackLook(skeleton.Tier, skeleton.Role, skeleton.Outfit),
                 SkeletonKing king => (byte)king.Phase,
-                Spider spider => spider.PackStance(),
+                CrawlerMob crawler => crawler.PackStance(),
                 CaveMob cave => (byte)cave.Tier,
                 Animal animal => animal.Posture,
                 _ => 0,

@@ -42,8 +42,9 @@ body wears.
 ### Consumables
 
 - [ ] **Mana draught** — `mana_draught.png`.
-- [ ] **Spider silk** — `spider_silk.png` (32x32, drawn at half resolution, a pale skein). Made by
-  `tools/generate-spider-item-sprites.py`: replace it by editing that generator (or remove it in the same change), or a
+- [ ] **Spider silk and scorpion stinger** — `spider_silk.png`, `scorpion_stinger.png` (32x32, drawn at half
+  resolution, small palettes). Made by
+  `tools/generate-crawler-item-sprites.py`: replace them by editing that generator (or remove it in the same change), or a
   re-run puts the placeholder back.
 - [ ] **Wildlife drops** — `raw_venison.png`, `cooked_venison.png`, `raw_boar_meat.png`, `cooked_boar_meat.png`,
   `hide.png`, `crow_feather.png`, `boar_tusk.png`, `dire_tusk.png`, `dragonfly_wing.png` (32x32, drawn at half
@@ -254,12 +255,19 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   `spider_broodmother.bbmodel` (the den's miniboss: near black with crimson markings, green eyes, bone spikes, 128x128
   skin). Built and saved in Blockbench 5 through its MCP plugin, so there is **no generator and no PNG beside them**
   (the skin is embedded): edit them in Blockbench. Both are the one `Spider` class (`Spider.ValidateContent` and
-  `SpiderRig` check the contract). Keep `Body` with `Head` (and `FangL`/`FangR`) and `Abdomen` under it, and the eight
+  `CrawlerRig` check the contract). Keep `Body` with `Head` (and `FangL`/`FangR`) and `Abdomen` under it, and the eight
   legs as **top-level** groups `LegR1..4` (+X) and `LegL1..4` (-X) with a child `...Lower` each: no rest rotations, the
   leg's cubes running straight out along X from the hip origin and the lower group's origin (the knee) straight out
   from it, since the game folds the legs itself (the legs lie flat in the editor; the `idle` clip poses them for
   viewing). Keep the clips `idle`, `walk`, `bite` (with `impact`), `hurt` (starts and ends at the identity), `death`
   (it curls every leg and must outlast the 0.8 s death) and `spawn`, and per-face UVs.
+- [ ] **Giant Scorpion** — `scorpion.bbmodel` (an amber desert scorpion, 64x64 skin, darker claws, a dark barb).
+  Built and saved in Blockbench 5 through its MCP plugin like the spiders (no generator, the skin embedded). It is the
+  `Scorpion` class (`Scorpion.ValidateContent`). Keep the spiders' leg contract (eight top-level `LegR1..4`/`LegL1..4`
+  with a `...Lower` child, lying flat along X, no rest rotations), `Body` > `Abdomen` > `Tail1` > `Tail2` > `Tail3` >
+  `Tail4` > `Stinger`, the claws `ArmL/R` > `ClawL/R` > `PincerL/R` under `Body`, the clips `idle`, `walk`, `pinch` and
+  `sting` (each with `impact`), `hurt` (starts and ends at the identity), `death` (must outlast the 0.8 s death) and
+  `spawn`, and per-face UVs.
 - [ ] **Boar and Dire Boar** — `boar.bbmodel` (a wild boar, 64x64 skin) and `dire_boar.bbmodel` (the oversized
   miniboss: charcoal hide, scars, bone spikes, red eyes, 128x128 skin). Built and saved in Blockbench 5 through its
   MCP plugin, so there is **no generator and no PNG beside them** (the skin is embedded): edit them in Blockbench.

@@ -13,7 +13,7 @@ using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
-using VoxelEngine.Entities.Spiders;
+using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Interaction;
 using VoxelEngine.Particles;
@@ -201,7 +201,7 @@ internal sealed class ClientMirror
                 // A realm mob's attack count moving means the server started an attack: play its clip
                 if (existing is RealmMob realm) realm.MirrorAttackCount(entry.Ammo);
                 if (existing is Animal animal) animal.MirrorPosture((byte)entry.ItemId);
-                if (existing is Spider spider) spider.MirrorSurface(Spider.SurfaceOf(entry.ItemId));
+                if (existing is CrawlerMob crawling) crawling.MirrorSurface(CrawlerMob.SurfaceOf(entry.ItemId));
                 if (existing is Sandworm worm) worm.MirrorPhase(PhaseOf(entry.Ammo));
                 if (existing is SkeletonKing king) king.MirrorPhase(KingPhaseOf((byte)entry.ItemId));
                 if (!_serverMode && existing.Health < before)
@@ -459,6 +459,7 @@ internal sealed class ClientMirror
                                 && spider.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
         NetEntityKind.SpiderBroodmother => mob is Spider { IsBroodmother: true } brood
                                            && brood.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
+        NetEntityKind.Scorpion => mob is Scorpion scorpion && scorpion.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
         _ => NetEntity.TryGetWildlife(entry.Kind, out var species) && mob is Animal animal && animal.Kind == species,
     };
 
@@ -498,6 +499,7 @@ internal sealed class ClientMirror
             NetEntityKind.Spider => _caveMobs?.Spawn(Spider.EntityName, entry.Position, (byte)entry.ItemId),
             NetEntityKind.SpiderBroodmother =>
                 _caveMobs?.Spawn(Spider.BroodmotherEntityName, entry.Position, (byte)entry.ItemId),
+            NetEntityKind.Scorpion => _caveMobs?.Spawn(Scorpion.EntityName, entry.Position, (byte)entry.ItemId),
             // A wild animal's kind names its species
             _ => NetEntity.TryGetWildlife(entry.Kind, out var species)
                 ? _wildlife?.Spawn(WildlifeSpecies.NameOf(species), entry.Position)
@@ -508,7 +510,7 @@ internal sealed class ClientMirror
         // The first count only sets it: an attack already under way when first seen is not replayed
         if (mob is RealmMob realm) realm.MirrorAttackCount(entry.Ammo);
         if (mob is Animal spawned) spawned.MirrorPosture((byte)entry.ItemId);
-        if (mob is Spider crawler) crawler.MirrorSurface(Spider.SurfaceOf(entry.ItemId));
+        if (mob is CrawlerMob crawler) crawler.MirrorSurface(CrawlerMob.SurfaceOf(entry.ItemId));
         if (mob is Sandworm worm) worm.MirrorPhase(PhaseOf(entry.Ammo));
         if (mob is SkeletonKing king) king.MirrorPhase(KingPhaseOf((byte)entry.ItemId));
         return mob;

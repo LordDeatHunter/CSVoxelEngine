@@ -1,4 +1,4 @@
-# Hell, flying, sky and cave mobs, spiders
+# Hell, flying, sky and cave mobs, crawlers
 
 The hell mobs, the flight rules, the sky mobs and the cave mobs.
 
@@ -205,10 +205,14 @@ under the torso) checked at startup (each kind's `ValidateContent` over `EntityC
 
 ### Spiders
 
+The crawlers (`src/Entities/Crawlers/`) are the mobs that walk on every surface on solved legs: the spiders here and the
+scorpion (see "Scorpion" below). What they share is the abstract `CrawlerMob` (a `CaveMob`, so the depth tier scales the
+pool and the blows; shared numbers in `CrawlerConfig`): the clinging, the legs, the drawn body, the knock off a wall and
+the wire stance, everything in this section that is not the bite or the spawning. A kind adds its body size, speed,
+attacks and death roll.
 The giant spider (`spider.json`, hp 18, loot spider silk) and the broodmother (`spider_broodmother.json`, hp 150, a
-miniboss) are one class, `Spider` (`src/Entities/Spiders/`, numbers in `SpiderConfig`): a `CaveMob` (so the depth tier
-scales its pool and bite) that walks on every surface and whose legs are solved against the blocks instead of keyframed.
-Both models were built in Blockbench through its MCP plugin (no generator, the skin embedded; `USER_TODO.md`).
+miniboss) are one class, `Spider` (numbers in `SpiderConfig`). All crawler models were built in Blockbench through its
+MCP plugin (no generator, the skin embedded; `USER_TODO.md`).
 - **Clinging** (`SurfaceCrawler`, GL-free): the body is a cube (`SpiderBodySize` 0.64, the broodmother 1.5), so it
   collides the same on a floor, a wall and a ceiling, and every move is a `BoxSweep`. It holds one face of the grid at a
   time (`Normal`) and follows the part of its goal direction that lies in that face; a goal straight through or away
@@ -219,7 +223,7 @@ Both models were built in Blockbench through its MCP plugin (no generator, the s
   may hang unsupported for `WrapGraceSeconds` while it rounds the corner. With nothing to hold it **falls** (gravity,
   buoyancy and paddling in water, `BodyMotion`), lands on a floor or grabs the first wall it is carried into (out of
   water it climbs up). A floor under water is let go of, so it floats rather than walking a lake bed.
-- **The mob**: `Spider.Locomote` replaces the realm walk: it aims the crawl at the chased target's chest (or the wander
+- **The mob**: `CrawlerMob.Locomote` replaces the realm walk: it aims the crawl at the chased target's chest (or the wander
   point), lets go of a ceiling once the target stands under it within `CeilingDropRadiusBlocks`, and lets go of a wall
   or ceiling when dying. `Mob.Facing` is the heading's angle on the held face (`CrawlFrame`: on a floor the usual yaw).
   In `BiteReach` of the chest (from any side) and off its cooldown it plays `bite`; at the clip's `impact` the manager
@@ -227,20 +231,20 @@ Both models were built in Blockbench through its MCP plugin (no generator, the s
   (`VenomScale`). A blow knocks it off a wall or ceiling (`Shove` lets go and throws it); on a floor it slides like
   any walker, and only there does a player walking into it shove it. It never takes fall damage (`SafeFallBlocks`
   infinite).
-- **Legs** (`SpiderRig`, `SpiderLegs`, `LegIk`, `SpiderPose`): the model contract is four legs a side, `LegR1..4` on
+- **Legs** (`CrawlerRig`, `CrawlerLegs`, `LegIk`, `CrawlerPose`): the model contract is four legs a side, `LegR1..4` on
   +X and `LegL1..4` on -X, each a **top-level** group whose cubes run straight out along X from its origin (the hip),
   with a child `...Lower` whose origin (the knee) sits straight out from the hip (`Spider.ValidateContent` checks it at
-  startup, with `Body`, `Head`, `Abdomen`, idle, walk and `bite` with `impact`). The legs rest flat because the loader
+  startup through `CrawlerMob.RequireCrawler`, with `Body`, `Head`, `Abdomen`, idle, walk and `bite` with `impact`). The legs rest flat because the loader
   has no rest rotations. Each foot stays planted where it took hold while the body moves over it and steps once its
   rest point (fanned by `LegAzimuthDegrees`, `LegStanceShare` of the leg out) is `LegStepShare` of the leg away, to a
   **hold probed in the world** (`FindHold`: a wall between hip and rest point, else the ground under the rest point,
   else the side of the ledge the body stands on, else it hangs), unless that hold is the one it already has; the two
   alternating groups of four take turns. `LegIk.Solve` (analytic two-bone, knee toward the model's up) turns the holds
-  into bone rotations, and `SpiderPose` hands a leg bone back to the clip by the action's weight when the running
+  into bone rotations, and `CrawlerPose` hands a leg bone back to the clip by the action's weight when the running
   action keys it (the raised front legs of `bite`, every curled leg of `death`). The drawn body eases toward the held
   face leaned into the plane of the planted feet (`FeetNormalWeight`), so it tilts over steps and corners.
 - **Shared hooks it added**: `RiggedMob.PartMatrix` (virtual; `RigMeshes.PartMatrix` and so the entity and shadow
-  passes ask the mob), a virtual `RiggedMob.BodyEffect` (a spider pops in and rolls onto its back to die, no lean),
+  passes ask the mob), a virtual `RiggedMob.BodyEffect` (a crawler pops in and has no lean; a spider rolls onto its back to die, `DeathRollRadians`),
   `Mob.AnimateCosmetics` (called for every mob by `AmbientEffects.UpdateSplashes`, so never on a server: the spider
   turns its drawn body and walks its legs there) and `EntityAnimator.ActionKeys`.
 - **Spawning** (`CaveMobManager`): with spiders registered the cave ring search accepts every cave biome and
@@ -251,10 +255,33 @@ Both models were built in Blockbench through its MCP plugin (no generator, the s
   naturally**: it waits for the spider den (plans/TODO.md `P-60`); the `spawn` op and the item debugger raise it.
 - **Plumbing**: the cave mobs' own (saves by kind name with the tier, the `spawn` op names `spider` and
   `spider_broodmother`, `MobPasses`' rig list), plus `NetEntityKind.Spider` 64 and `SpiderBroodmother` 65 (protocol
-  39): the item field packs the held face above the tier byte (`Spider.PackStance`, 0 = airborne) and the yaw is the
-  heading's angle on that face, which `ClientMirror` hands to `Spider.MirrorSurface`. The item debugger's ENTITIES tab
+  39): the item field packs the held face above the tier byte (`CrawlerMob.PackStance`, 0 = airborne) and the yaw is
+  the heading's angle on that face, which `ClientMirror` hands to `CrawlerMob.MirrorSurface`. The item debugger's ENTITIES tab
   shows both with the legs walking on the spot (no world: the ground slides back under the body). Tests: `SpiderTests`.
   `visual-examples/spiders.json` (`VOXEL_TIME=147`) films a surface chase, a climb up a pillar and both kinds in a cave.
 - Known gaps: a mirror's falling spider has no heading on the wire beyond its yaw; the healthbar sits above the body
   in world up, so under a ceiling it is inside the rock; spiders are not drawn in the water mirror; the legs do not
   avoid each other; silk has no use yet; the numbers are first guesses.
+
+### Scorpion
+
+The giant scorpion (`scorpion.json`, hp 34, loot sometimes a scorpion stinger, sometimes a bone) is the desert's
+crawler: `Scorpion` (`ScorpionConfig`), a `CrawlerMob` like the spiders, so it clings, climbs and steps exactly as
+they do (see "Spiders"). Its model adds claws (`ArmL/R` > `ClawL/R` > `PincerL/R`) and a tail chain (`Tail1..4` >
+`Stinger`) under `Body` > `Abdomen`, all clip-driven; `Scorpion.ValidateContent` requires `Body`, `ClawL`, `ClawR`,
+`Tail1`, `Stinger`, the leg contract and `pinch` and `sting`, each with `impact`.
+- **Two attacks** over one count (`AttackVariants` 2: pinch even, sting odd, so a mirror replays the right clip): in
+  `AttackReach` of the target's chest it **stings** when the sting is off its `StingCooldownSeconds` (`StingDamage`,
+  tier-scaled, and `venom` for `StingVenomScale`), else **pinches** when the pinch is off its own (`PinchDamage` and a
+  hard shove, no venom). Each lands at its clip's `impact` (`TryTakeStrike` reports which) on every non-immune target
+  still in reach. A fresh scorpion's first blow is therefore the sting. It dies upright (no roll): the body drops,
+  the legs curl and the tail falls forward.
+- **Spawning** (`CaveMobManager`, `CaveSpawnRules`): in the desert's echo caves the first `CaveSpawnChance` of the kind
+  roll is a scorpion's (`KindFor`; the rest of the roll is judged as in any plain cave, so spiders still turn up), in
+  packs of up to `CavePackMaxSize`. On the surface one try runs every `SurfaceSpawnIntervalSeconds` around a target not
+  underground, always at night and with `DaySpawnChance` by day (`ScorpionSurfaces`), and is kept only on a desert
+  column (`ScorpionSurfaceBiome`), at tier 0.
+- **Plumbing**: as the spiders', plus `NetEntityKind.Scorpion` 66 (protocol 40) and the `spawn` op name `scorpion`.
+  Tests: `ScorpionTests`. `visual-examples/scorpions.json` (`VOXEL_TIME=147`) films one on the deep desert.
+- Known gaps: the tail and claws do not collide (the tail passes through a low ceiling); the stinger has no use yet;
+  the numbers are first guesses.

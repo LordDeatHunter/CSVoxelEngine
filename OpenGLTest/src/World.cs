@@ -12,7 +12,7 @@ using VoxelEngine.Content.Models;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.CaveMobs;
-using VoxelEngine.Entities.Spiders;
+using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
@@ -523,10 +523,11 @@ public class World
             var magmabornType = EntityRegistry.TryGet(Magmaborn.EntityName);
             var spiderType = EntityRegistry.TryGet(Spider.EntityName);
             var broodmotherType = EntityRegistry.TryGet(Spider.BroodmotherEntityName);
+            var scorpionType = EntityRegistry.TryGet(Scorpion.EntityName);
             if (shardlingType != null || sporelingType != null || magmabornType != null || spiderType != null
-                || broodmotherType != null)
+                || broodmotherType != null || scorpionType != null)
                 _caveMobs = new CaveMobManager(shardlingType, sporelingType, magmabornType, _mobCaps, spiderType,
-                    broodmotherType);
+                    broodmotherType, scorpionType);
             if (EntityRegistry.TryGet(Skeleton.EntityName) is { } skeletonType)
                 _skeletons = new SkeletonManager(skeletonType, _mobCaps, EntityRegistry.TryGet(Skeleton.WarriorEntityName));
             if (EntityRegistry.TryGet(SkeletonKing.EntityName) is { } kingType)

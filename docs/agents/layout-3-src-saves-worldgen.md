@@ -128,10 +128,12 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         CaveSpawnSearch.cs     # the cave spawn search's parameters: ring radii, tries, heights, light limits, allowed biomes
         CaveBiomeResolver.cs   # the delegate the search asks a standing cell's cave biome through (a test seam)
         CaveSpawnRules.cs      # GL-free: the biome masks, slimes everywhere but the magma deep, the goblin weight per biome,
-                               #   the cave mob kind per sub-biome, the spiders' share of every cave (KindFor)
+                               #   the cave mob kind per sub-biome, the spiders' share of every cave and the scorpions'
+                               #   of the desert's (KindFor), the scorpion's surface biome and hour
         CaveMobManager.cs      # the cave mobs: the shardlings' shards (MobMissiles; damage + frostburn), the spore burst
-                               #   (spore), the magmaborn's burning blow, the spiders' venom bite, loot, despawn, the ring
-                               #   spawn by cave biome, roll and tier, the rare night spider on the surface
+                               #   (spore), the magmaborn's burning blow, the spiders' venom bite, the scorpion's pinch
+                               #   and sting, loot, despawn, the ring spawn by cave biome, roll and tier, the rare night
+                               #   spider on the surface and the desert's scorpions
       TntManager.cs            # owns the live primed TNT: spawns cubes where firestarter
                                #   strikes and blasts light TNT, ticks their fuses
       Tower/                   # the battle tower's simulation, namespace VoxelEngine.Simulation.Tower
