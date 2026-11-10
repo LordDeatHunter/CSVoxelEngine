@@ -234,8 +234,12 @@ public static class NetFraming
     /// draw the new kinds.
     /// 38: <see cref="NetMessage.StationState"/> ends with the cells of the chests at least one player has open
     /// (<c>ChestLids.WriteNet</c>), so every client swings those lids open and shut; an older peer would misread the
-    /// station frames.</summary>
-    public const int ProtocolVersion = 38;
+    /// station frames.
+    /// 39: the spiders (<see cref="NetEntityKind.Spider"/>, <see cref="NetEntityKind.SpiderBroodmother"/>) in
+    /// <see cref="NetMessage.EntityList"/>: cave mobs whose item field also carries the face they cling to above the
+    /// tier byte (<c>Spider.PackStance</c>) and whose yaw is the heading's angle on that face; an older client would not
+    /// draw them.</summary>
+    public const int ProtocolVersion = 39;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

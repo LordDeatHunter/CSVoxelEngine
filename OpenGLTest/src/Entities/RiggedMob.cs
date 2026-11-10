@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Player;
 
 namespace VoxelEngine.Entities;
 
@@ -96,7 +97,7 @@ public abstract class RiggedMob : Mob
     public abstract float BodyHalfWidth { get; }
 
     /// <summary>Whether the mob currently stands on the ground.</summary>
-    public bool IsGrounded { get; private set; }
+    public bool IsGrounded { get; protected set; }
 
     /// <summary>Where the rig roots: the body center less half its height.</summary>
     public Vector3 Feet => Position - new Vector3(0f, BodyHeight * 0.5f, 0f);
@@ -148,9 +149,18 @@ public abstract class RiggedMob : Mob
         PlayDeathOnce();
     }
 
-    // What the locomotion crossfade runs on: the horizontal speed of a walker, the 3D speed of a flyer
-    private float LocomotionSpeed =>
+    /// <summary>What the locomotion crossfade runs on: the horizontal speed of a walker, the 3D speed of a flyer
+    /// (and of a climber, which overrides it).</summary>
+    protected virtual float LocomotionSpeed =>
         Flies ? _velocity.Length() : MathF.Sqrt(_velocity.X * _velocity.X + _velocity.Z * _velocity.Z);
+
+    /// <summary>
+    /// The world matrix of rig part <paramref name="part"/>, before the <see cref="BodyEffect"/>: posed by the
+    /// animator about the feet and turned by the facing. A kind that stands some other way (a spider on a wall,
+    /// its legs solved against the blocks) overrides it.
+    /// </summary>
+    public virtual Matrix4x4 PartMatrix(string part, PlayerRig rig) =>
+        Animation.GetPartMatrix(part, rig, Feet, Facing);
 
     /// <summary>
     /// The pose the clips cannot give: a forward lean into the walk (backward when backpedaling) or a
@@ -158,7 +168,7 @@ public abstract class RiggedMob : Mob
     /// shrink of the death, and the spawn pop; about the feet for a walker, the body center for a flyer.
     /// Multiply it after the part matrix (row-vector order).
     /// </summary>
-    public Matrix4x4 BodyEffect(Vector3 feet)
+    public virtual Matrix4x4 BodyEffect(Vector3 feet)
     {
         var scale = MathUtils.EaseOutBack(SpawnProgress)
                     * (1f - MathUtils.EaseInCubic(MathUtils.InverseLerp(0.7f, 1f, DeathProgress)));

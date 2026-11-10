@@ -98,6 +98,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     SkyMobs/                   # sky mob contracts, zone difficulty, the flyer's hover and dive, the golem's
                                #   shockwave and ledge caution
     CaveMobs/                  # cave mob contracts, the depth tier and its scaling, the shard band, each attack's event
+    Spiders/                   # the leg contract and solver, climbing a cliff, rounding a ledge, the knock off a wall,
+                               #   footholds, the wire stance, the cave spawn share, the venom bite
     TowerMobs/                 # the skeleton's contract, tier scaling, bow band and line of sight, melee, undead, the ambient rattle's timer and range gate; the
                                #   Skeleton King's contract, leash, shockwave and volley fan, its brain's phases and choices
     Sandworms/                 # the sandworm's chain, brain and pose, its melee through the real punch path
@@ -223,6 +225,7 @@ tools/                                # asset generators: models, animation clip
   generate-mold-models.ps1            # the twelve cast molds' block models under assets/models/block/, from their sprites' alpha silhouettes
   generate-sandworm-model.py          # deterministic sandworm .bbmodel, skin and fang sprite (placeholder art); --check
   generate-spell-sfx.py               # deterministic placeholder spell sounds (spell_cast/impact/fizzle.wav), --check
+  generate-spider-item-sprites.py     # deterministic placeholder sprite of the spiders' drop (spider silk); --check
   generate-wildlife-item-sprites.py   # deterministic placeholder sprites of the wild animals' drops (meats raw and cooked,
                                       #   hide, feather, tusks, dragonfly wing); --check
   generate-wiki-shots.mjs             # the wiki's screenshot scenarios (visual-examples/wiki-*.json) and wiki/data/screenshots.json from one spec of poses and captions

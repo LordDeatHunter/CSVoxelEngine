@@ -236,7 +236,8 @@ internal sealed class MobDirector
         // magma deep's magmaborn set their target burning
         if (_caveMobs != null)
         {
-            _caveMobs.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris);
+            _caveMobs.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris,
+                DayCycle.NightFactor(LightingTime));
             BillLocalPlayer(_caveMobs.DamageDealtThisFrame);
         }
 

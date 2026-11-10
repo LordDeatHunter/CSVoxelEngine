@@ -46,10 +46,9 @@ internal sealed class RigMeshes : IDisposable
         return new RigMeshes(gl, rig, names, meshes, texture);
     }
 
-    /// <summary>The world matrix of part <paramref name="index"/> of <paramref name="mob"/>, posed by its
-    /// animator about its feet, before its body effect.</summary>
-    public Matrix4x4 PartMatrix(RiggedMob mob, int index) =>
-        mob.Animation.GetPartMatrix(PartNames[index], Rig, mob.Feet, mob.Facing);
+    /// <summary>The world matrix of part <paramref name="index"/> of <paramref name="mob"/> as the mob poses it
+    /// (<see cref="RiggedMob.PartMatrix"/>), before its body effect.</summary>
+    public Matrix4x4 PartMatrix(RiggedMob mob, int index) => mob.PartMatrix(PartNames[index], Rig);
 
     public void Dispose()
     {

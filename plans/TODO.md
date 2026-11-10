@@ -5,7 +5,7 @@
 ## Status
 
 Gameplay and content only: performance is in `PERF.md`, tree residue in `TREES.md`, and
-architecture, content schema and threading rules in `AGENTS.md`. Last updated 2026-11-08.
+architecture, content schema and threading rules in `AGENTS.md`. Last updated 2026-11-10.
 **Current priority:** playable loop first. Finish the Act I survival floor (Milestone 1:
 persistence, furnace, metal tiers, forge, armor), then the first dungeon slice (Milestone 2), then
 one slice per remaining arc to prove the dual identity. No food/hunger system is planned.
@@ -245,6 +245,13 @@ single-arc player.
   caves, crystal, fungal and magma-touched sub-biomes with their own atmosphere, exclusive ores
   (amethyst, jade, cinnabar), cave mobs and biome loot. Still open: **hazard zones** (gas pockets,
   unstable ceilings, flooding passages), and a use for the exclusive ores and `P-47`'s crystal.
+- [ ] **`P-60` · Spider dens** — P2, M.
+  An underground den the giant spiders spawn from naturally: a webbed cavern (worldgen site, like a ruin or a
+  goblin camp) with egg sacs, cobweb blocks that slow, and the **broodmother** miniboss at its heart, which never
+  spawns anywhere else. The spiders, the broodmother, their venom and silk drop already exist (`Spider`,
+  `docs/agents/realm-mobs.md` "Spiders"); the den, a use for silk and a unique broodmother drop do not.
+  *Hook:* `CaveMobManager` (a den spawner beside the cave ring; `Spider.BroodmotherEntityName` is only raised by the
+  `spawn` op today), the structure sites in `docs/agents/layers-and-structures.md`.
 - [ ] **`P-56` · Ocean & island content** — P3, M.
   Islands, shipwrecks, reefs, deep-sea POIs; makes the ocean a destination rather than a border.
   Ties `F-19`.

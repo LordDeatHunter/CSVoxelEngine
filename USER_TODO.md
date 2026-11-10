@@ -42,6 +42,9 @@ body wears.
 ### Consumables
 
 - [ ] **Mana draught** — `mana_draught.png`.
+- [ ] **Spider silk** — `spider_silk.png` (32x32, drawn at half resolution, a pale skein). Made by
+  `tools/generate-spider-item-sprites.py`: replace it by editing that generator (or remove it in the same change), or a
+  re-run puts the placeholder back.
 - [ ] **Wildlife drops** — `raw_venison.png`, `cooked_venison.png`, `raw_boar_meat.png`, `cooked_boar_meat.png`,
   `hide.png`, `crow_feather.png`, `boar_tusk.png`, `dire_tusk.png`, `dragonfly_wing.png` (32x32, drawn at half
   resolution, small palettes; the wing's film is half transparent). Made by
@@ -247,6 +250,16 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   bones (wings and forelegs are `ArmL`/`ArmR`), everything nested under `Torso`, the clip names listed in the
   generator's header, the `impact` event on `bite`, `peck`, `swoop` and `butt`, a `hurt` clip that starts and ends at
   the identity (it is added on top of other clips), and the `.bbmodel`'s UV layout.
+- [ ] **Giant Spider and Broodmother** — `spider.bbmodel` (a brown cave spider, 64x64 skin, red eyes) and
+  `spider_broodmother.bbmodel` (the den's miniboss: near black with crimson markings, green eyes, bone spikes, 128x128
+  skin). Built and saved in Blockbench 5 through its MCP plugin, so there is **no generator and no PNG beside them**
+  (the skin is embedded): edit them in Blockbench. Both are the one `Spider` class (`Spider.ValidateContent` and
+  `SpiderRig` check the contract). Keep `Body` with `Head` (and `FangL`/`FangR`) and `Abdomen` under it, and the eight
+  legs as **top-level** groups `LegR1..4` (+X) and `LegL1..4` (-X) with a child `...Lower` each: no rest rotations, the
+  leg's cubes running straight out along X from the hip origin and the lower group's origin (the knee) straight out
+  from it, since the game folds the legs itself (the legs lie flat in the editor; the `idle` clip poses them for
+  viewing). Keep the clips `idle`, `walk`, `bite` (with `impact`), `hurt` (starts and ends at the identity), `death`
+  (it curls every leg and must outlast the 0.8 s death) and `spawn`, and per-face UVs.
 - [ ] **Boar and Dire Boar** — `boar.bbmodel` (a wild boar, 64x64 skin) and `dire_boar.bbmodel` (the oversized
   miniboss: charcoal hide, scars, bone spikes, red eyes, 128x128 skin). Built and saved in Blockbench 5 through its
   MCP plugin, so there is **no generator and no PNG beside them** (the skin is embedded): edit them in Blockbench.

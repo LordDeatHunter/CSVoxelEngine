@@ -1,4 +1,4 @@
-# Hell, flying, sky and cave mobs
+# Hell, flying, sky and cave mobs, spiders
 
 The hell mobs, the flight rules, the sky mobs and the cave mobs.
 
@@ -202,3 +202,59 @@ under the torso) checked at startup (each kind's `ValidateContent` over `EntityC
 - A client's mirror plays the cast and the blows with the server (see "A mirror's attack clip" under "Hell mobs").
 - Known gaps: the shards, like goblin stones and hell bolts, are not on the wire (a client sees only the damage and the
   chill); cave mobs are not drawn in the water mirror; the burst and blows hit players only; the numbers are first guesses.
+
+### Spiders
+
+The giant spider (`spider.json`, hp 18, loot spider silk) and the broodmother (`spider_broodmother.json`, hp 150, a
+miniboss) are one class, `Spider` (`src/Entities/Spiders/`, numbers in `SpiderConfig`): a `CaveMob` (so the depth tier
+scales its pool and bite) that walks on every surface and whose legs are solved against the blocks instead of keyframed.
+Both models were built in Blockbench through its MCP plugin (no generator, the skin embedded; `USER_TODO.md`).
+- **Clinging** (`SurfaceCrawler`, GL-free): the body is a cube (`SpiderBodySize` 0.64, the broodmother 1.5), so it
+  collides the same on a floor, a wall and a ceiling, and every move is a `BoxSweep`. It holds one face of the grid at a
+  time (`Normal`) and follows the part of its goal direction that lies in that face; a goal straight through or away
+  from the face (under `MinTangentShare`) keeps the heading it has, which is what carries it up a wall toward a target
+  beyond it. Walking into a wall that carries `ClimbShare` of its heading it **climbs** it (the new heading is the old
+  normal); walking off an edge it **wraps** onto the face it left (`TryWrap`: the body is tried `EdgeDropBlocks` past the
+  edge and the face behind it there is taken, heading on along the old down), keeps that heading for `CommitSeconds` and
+  may hang unsupported for `WrapGraceSeconds` while it rounds the corner. With nothing to hold it **falls** (gravity,
+  buoyancy and paddling in water, `BodyMotion`), lands on a floor or grabs the first wall it is carried into (out of
+  water it climbs up). A floor under water is let go of, so it floats rather than walking a lake bed.
+- **The mob**: `Spider.Locomote` replaces the realm walk: it aims the crawl at the chased target's chest (or the wander
+  point), lets go of a ceiling once the target stands under it within `CeilingDropRadiusBlocks`, and lets go of a wall
+  or ceiling when dying. `Mob.Facing` is the heading's angle on the held face (`CrawlFrame`: on a floor the usual yaw).
+  In `BiteReach` of the chest (from any side) and off its cooldown it plays `bite`; at the clip's `impact` the manager
+  bills every non-immune target still in reach `BiteDamage` (tier-scaled) with a shove and the `venom` status effect
+  (`VenomScale`). A blow knocks it off a wall or ceiling (`Shove` lets go and throws it); on a floor it slides like
+  any walker, and only there does a player walking into it shove it. It never takes fall damage (`SafeFallBlocks`
+  infinite).
+- **Legs** (`SpiderRig`, `SpiderLegs`, `LegIk`, `SpiderPose`): the model contract is four legs a side, `LegR1..4` on
+  +X and `LegL1..4` on -X, each a **top-level** group whose cubes run straight out along X from its origin (the hip),
+  with a child `...Lower` whose origin (the knee) sits straight out from the hip (`Spider.ValidateContent` checks it at
+  startup, with `Body`, `Head`, `Abdomen`, idle, walk and `bite` with `impact`). The legs rest flat because the loader
+  has no rest rotations. Each foot stays planted where it took hold while the body moves over it and steps once its
+  rest point (fanned by `LegAzimuthDegrees`, `LegStanceShare` of the leg out) is `LegStepShare` of the leg away, to a
+  **hold probed in the world** (`FindHold`: a wall between hip and rest point, else the ground under the rest point,
+  else the side of the ledge the body stands on, else it hangs), unless that hold is the one it already has; the two
+  alternating groups of four take turns. `LegIk.Solve` (analytic two-bone, knee toward the model's up) turns the holds
+  into bone rotations, and `SpiderPose` hands a leg bone back to the clip by the action's weight when the running
+  action keys it (the raised front legs of `bite`, every curled leg of `death`). The drawn body eases toward the held
+  face leaned into the plane of the planted feet (`FeetNormalWeight`), so it tilts over steps and corners.
+- **Shared hooks it added**: `RiggedMob.PartMatrix` (virtual; `RigMeshes.PartMatrix` and so the entity and shadow
+  passes ask the mob), a virtual `RiggedMob.BodyEffect` (a spider pops in and rolls onto its back to die, no lean),
+  `Mob.AnimateCosmetics` (called for every mob by `AmbientEffects.UpdateSplashes`, so never on a server: the spider
+  turns its drawn body and walks its legs there) and `EntityAnimator.ActionKeys`.
+- **Spawning** (`CaveMobManager`): with spiders registered the cave ring search accepts every cave biome and
+  `CaveSpawnRules.KindFor` rolls the kind: `SpiderConfig.CaveSpawnChance` of the floors in a cave with no kind of its own
+  (plain and the echoes; the rest stay empty) and `BiomeCaveSpawnChance` where a kind lives, in packs of up to
+  `CavePackMaxSize`. On the surface they are rare: at night only, every `SurfaceSpawnIntervalSeconds` one try with
+  `SurfaceSpawnChance` on the dry surface ring of a target that is not underground. **The broodmother never spawns
+  naturally**: it waits for the spider den (plans/TODO.md `P-60`); the `spawn` op and the item debugger raise it.
+- **Plumbing**: the cave mobs' own (saves by kind name with the tier, the `spawn` op names `spider` and
+  `spider_broodmother`, `MobPasses`' rig list), plus `NetEntityKind.Spider` 64 and `SpiderBroodmother` 65 (protocol
+  39): the item field packs the held face above the tier byte (`Spider.PackStance`, 0 = airborne) and the yaw is the
+  heading's angle on that face, which `ClientMirror` hands to `Spider.MirrorSurface`. The item debugger's ENTITIES tab
+  shows both with the legs walking on the spot (no world: the ground slides back under the body). Tests: `SpiderTests`.
+  `visual-examples/spiders.json` (`VOXEL_TIME=147`) films a surface chase, a climb up a pillar and both kinds in a cave.
+- Known gaps: a mirror's falling spider has no heading on the wire beyond its yaw; the healthbar sits above the body
+  in world up, so under a ceiling it is inside the rock; spiders are not drawn in the water mirror; the legs do not
+  avoid each other; silk has no use yet; the numbers are first guesses.

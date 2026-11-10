@@ -140,6 +140,10 @@ public sealed class EntityAnimator : IBonePose
         }
     }
 
+    /// <summary>Whether the running action keys <paramref name="bone"/>, and so overrides it by
+    /// <see cref="ActionWeight"/>; false with no action playing.</summary>
+    public bool ActionKeys(string bone) => _action != null && _action.Keys(bone);
+
     /// <summary>True while an additive overlay (<see cref="PlayOverlay"/>) is running.</summary>
     public bool IsOverlayPlaying => _overlay != null;
 

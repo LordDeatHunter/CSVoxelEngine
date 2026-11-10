@@ -13,6 +13,7 @@ using VoxelEngine.Entities.Posing;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.Spiders;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Player;
 
@@ -162,13 +163,16 @@ public sealed class EntityPreviewState : IPreviewDriver
     /// <summary>
     /// The world matrix of <paramref name="part"/> of the previewed model standing at <paramref name="feet"/>:
     /// the animator's blended pose, or for the chest the active clip alone at its own time, which is what a chest's
-    /// lid shows in the game (<c>ChestLids</c>).
+    /// lid shows in the game (<c>ChestLids</c>), or for a spider its own pose, the legs solved onto the ground
+    /// (<see cref="Spider.PartMatrix"/>).
     /// </summary>
     public Matrix4x4 PartMatrix(string part, PlayerRig rig, Vector3 feet) =>
         _clipOnly
             ? RigPose.PartMatrix(new ClipPose(Animator.Find(Mode), _clipTime), part, rig,
                 Matrix4x4.CreateRotationY(FacingYaw) * Matrix4x4.CreateTranslation(feet))
-            : Animator.GetPartMatrix(part, rig, feet, FacingYaw);
+            : _rigged is Spider spider
+                ? spider.PartMatrix(part, rig)
+                : Animator.GetPartMatrix(part, rig, feet, FacingYaw);
 
     /// <summary>Seconds one play of the active mode lasts: its clip's length, or the life-cycle mode's own length.</summary>
     public float Duration
@@ -337,9 +341,12 @@ public sealed class EntityPreviewState : IPreviewDriver
     {
         var mob = _rigged!;
         var walking = IsLocomotion(Mode);
-        // The mirrored velocity is what walks the clip (a client's mob is driven the same way).
-        mob.NetworkSetState(Vector3.Zero, 0f, mob.Health,
-            walking ? new Vector3(0f, 0f, Animator.WalkReferenceSpeed) : Vector3.Zero);
+        // The mirrored velocity is what walks the clip (a client's mob is driven the same way). A spider stands
+        // on its own body center and walks front first, since its legs step along the velocity
+        var spider = mob as Spider;
+        var center = spider != null ? new Vector3(0f, spider.BodyHalfHeight, 0f) : Vector3.Zero;
+        var along = spider != null ? -Animator.WalkReferenceSpeed : Animator.WalkReferenceSpeed;
+        mob.NetworkSetState(center, 0f, mob.Health, walking ? new Vector3(0f, 0f, along) : Vector3.Zero);
 
         if (string.Equals(Mode, DeathMode, StringComparison.OrdinalIgnoreCase))
         {
@@ -382,6 +389,7 @@ public sealed class EntityPreviewState : IPreviewDriver
         }
 
         _rigged!.AnimateMirror(dt);
+        _rigged.AnimateCosmetics(dt, null);
         _rigged.Animation.DrainEvents();
     }
 
@@ -537,6 +545,9 @@ public sealed class EntityPreviewState : IPreviewDriver
             return new Sporeling(type, Vector3.Zero, tier: 0, spawnIn);
         if (string.Equals(type.Name, Magmaborn.EntityName, StringComparison.OrdinalIgnoreCase))
             return new Magmaborn(type, Vector3.Zero, tier: 0, spawnIn);
+        if (Spider.BodySizeOf(type.Name) > 0f)
+            return new Spider(type, Vector3.Zero, tier: 0,
+                string.Equals(type.Name, Spider.BroodmotherEntityName, StringComparison.OrdinalIgnoreCase), spawnIn);
         return WildlifeSpecies.Create(type, Vector3.Zero, spawnIn);
     }
 

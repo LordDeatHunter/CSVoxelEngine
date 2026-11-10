@@ -168,6 +168,8 @@ OpenGLTest/
                                #   the sky biomes and their flora (L-13: SkyBiome*, Meadow*/Frost* rates, vines,
                                #   the tree cells and chances) and the cloud sea (CloudSea*: its band from
                                #   SkyConfig.SkyCloudSea*, cover and detail noises)
+      SpiderConfig.cs          # the giant spider and the broodmother: body, bite, clinging and wrapping, the leg
+                               #   gait, cave and surface spawn chances
       StatusEffectConfig.cs    # status effects: the duration scale cap, the block writer's reach and write caps,
                                #   the mob tint strength, the particle emitter cap and rate
       SkyConfig.cs             # day length, sun and glare, sky dome, stars, moon, moonlight, aurora, clouds, wind,
@@ -509,6 +511,16 @@ OpenGLTest/
         SandwormBrain.cs       # GL-free state machine: thump, dig, breach, air (dive or slide), dash, retreat; the head velocity and the signals
         SandwormChain.cs       # GL-free follow-the-leader chain of segments: fixed link lengths, a bend limit, the taper
         SandwormPose.cs        # GL-free world matrices of the model parts: a segment's, the lower jaw's
+      Spiders/                 # the giant spider and the broodmother (see "Spiders"): surface crawling and solved legs
+        Spider.cs              # the mob (a CaveMob): the crawl toward its target, the ceiling drop, the bite's impact
+                               #   event, the knock off a wall, the drawn orientation, its part matrices and wire stance
+        SurfaceCrawler.cs      # GL-free body physics on any face of the grid: cling, climb a wall, wrap an edge, fall,
+                               #   float and grab
+        CrawlFrame.cs          # GL-free: the six faces by wire index, a heading as an angle on a face, the body rotation
+        SpiderRig.cs           # the leg contract read from a model once: hips, segment lengths, resting foot points
+        SpiderLegs.cs          # the eight feet: planted holds probed in the world, alternating steps, the feet's plane
+        LegIk.cs               # GL-free analytic two-bone solver: upper and lower rotations that put the foot on a point
+        SpiderPose.cs          # the IBonePose of a spider: clips for the body, solved legs unless the action keys them
       Slimes/                  # the slime: the mob, its sizes and its merge
         Slime.cs               # a slime: a gel cube that hops toward the player and only hurts on contact while it is off the ground
         SlimeMerge.cs          # GL-free slime merge: who merges (same size, touching, past the cooldown),

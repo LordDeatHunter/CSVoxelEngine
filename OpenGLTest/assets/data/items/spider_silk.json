@@ -1,0 +1,5 @@
+{
+  // A skein of spider silk, dropped by the giant spiders; nothing consumes it yet. The sprite is placeholder art.
+  "name": "Spider Silk",
+  "texture": "assets/textures/items/spider_silk.png"
+}

@@ -5,6 +5,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.SkyMobs;
+using VoxelEngine.Entities.Spiders;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.ItemDebugger;
@@ -285,6 +286,8 @@ public sealed class EntityPreviewStateTests
     [InlineData(Shardling.EntityName)]
     [InlineData(Sporeling.EntityName)]
     [InlineData(Magmaborn.EntityName)]
+    [InlineData(Spider.EntityName)]
+    [InlineData(Spider.BroodmotherEntityName)]
     [InlineData(Deer.EntityName)]
     [InlineData(Boar.EntityName)]
     [InlineData(Boar.DireEntityName)]

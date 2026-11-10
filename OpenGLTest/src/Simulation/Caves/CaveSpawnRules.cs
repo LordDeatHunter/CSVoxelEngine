@@ -1,5 +1,6 @@
 using System;
 using VoxelEngine.Entities.CaveMobs;
+using VoxelEngine.Entities.Spiders;
 using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.Simulation.Caves;
@@ -8,7 +9,7 @@ namespace VoxelEngine.Simulation.Caves;
 /// Which mob kinds a cave biome holds (plans/CAVE_BIOMES.md CB-4), GL-free: the masks the cave spawn searches filter
 /// by (<see cref="CaveSpawnSearch.AllowedBiomes"/>) and the goblins' per-biome weight. Slimes keep out of the magma
 /// deep; goblins favor the crystal and fungal caves and never take the magma deep either; each sub-biome holds its own
-/// cave mob kind (<see cref="CaveMobKindFor"/>).
+/// cave mob kind (<see cref="CaveMobKindFor"/>), and spiders crawl through all of them (<see cref="KindFor"/>).
 /// </summary>
 public static class CaveSpawnRules
 {
@@ -54,6 +55,21 @@ public static class CaveSpawnRules
         CaveBiome.MagmaDeep => Magmaborn.EntityName,
         _ => null,
     };
+
+    /// <summary>
+    /// The kind a cave spawn found in <paramref name="biome"/> becomes, by <paramref name="roll"/> (0..1): spiders
+    /// live in every cave, so with <paramref name="spiders"/> they take <see cref="SpiderConfig.CaveSpawnChance"/> of
+    /// the floors in a cave with no kind of its own (the rest stay empty) and
+    /// <see cref="SpiderConfig.BiomeCaveSpawnChance"/> of the floors where a kind lives, which keeps the rest. Without
+    /// spiders it is the biome's own kind (<see cref="CaveMobKindFor"/>). Null spawns nothing.
+    /// </summary>
+    public static string? KindFor(CaveBiome biome, float roll, bool spiders)
+    {
+        var own = CaveMobKindFor(biome);
+        if (!spiders) return own;
+        if (own == null) return roll < SpiderConfig.CaveSpawnChance ? Spider.EntityName : null;
+        return roll < SpiderConfig.BiomeCaveSpawnChance ? Spider.EntityName : own;
+    }
 
     /// <summary>The cave biomes that hold a cave mob kind at all (<see cref="CaveMobKindFor"/> not null).</summary>
     public static readonly int CaveMobMask = MaskOf(static biome => CaveMobKindFor(biome) != null);

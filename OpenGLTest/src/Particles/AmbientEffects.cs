@@ -325,7 +325,8 @@ internal sealed class AmbientEffects
     /// (<see cref="WaterSplash.Track"/>): the local player by its swim state, and the mobs, drops,
     /// projectiles, falling cubes and primed TNT by their lowest point. A client's mobs and TNT are
     /// mirrors that keep their trackers across snapshots and splash from the snapshot positions; its
-    /// drops and falling cubes are rebuilt each snapshot, so they never do. Cosmetic: never on a server.
+    /// drops and falling cubes are rebuilt each snapshot, so they never do. The same walk over the mobs advances
+    /// what only the eye sees of each (<see cref="Mob.AnimateCosmetics"/>). Cosmetic: never on a server.
     /// </summary>
     internal void UpdateSplashes(float deltaTime)
     {
@@ -338,6 +339,7 @@ internal sealed class AmbientEffects
         {
             WaterSplash.Track(mob.Splash, mob.Position - new Vector3(0f, mob.BodyHalfHeight, 0f), deltaTime,
                 mob.BodyHalfExtent / PlayerPhysics.PlayerRadius, _chunkManager, _debris, ripples: Ripples);
+            mob.AnimateCosmetics(deltaTime, _chunkManager);
         }
         // Index loops over the read-only lists, so a frame allocates no enumerator
         var drops = _dropManager.Drops;

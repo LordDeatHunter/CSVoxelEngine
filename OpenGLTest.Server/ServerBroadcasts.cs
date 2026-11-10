@@ -10,6 +10,7 @@ using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.Spiders;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Networking;
 
@@ -84,6 +85,8 @@ internal sealed class ServerBroadcasts
                 Shardling => NetEntityKind.Shardling,
                 Sporeling => NetEntityKind.Sporeling,
                 Magmaborn => NetEntityKind.Magmaborn,
+                Spider { IsBroodmother: true } => NetEntityKind.SpiderBroodmother,
+                Spider => NetEntityKind.Spider,
                 Animal animal => NetEntity.KindOf(animal.Kind),
                 _ => NetEntityKind.Goblin,
             };
@@ -96,19 +99,21 @@ internal sealed class ServerBroadcasts
                 Sandworm worm => (int)worm.Phase,
                 _ => 0,
             };
-            // The byte field is a goblin's torch count, a skeleton's tier, role and outfit, a cave mob's tier, a wild animal's posture or the Skeleton King's phase (0 for the
+            // The item field is a goblin's torch count, a skeleton's tier, role and outfit, a cave mob's tier (a spider's
+            // with the face it clings to above it), a wild animal's posture or the Skeleton King's phase (0 for the
             // rest); every entry ends with a status-effect mask (NetEntity.Effects), a mob's own
-            var itemByte = mob switch
+            ushort itemField = mob switch
             {
                 Goblin goblin => (byte)goblin.Torches,
                 Skeleton skeleton => Skeleton.PackLook(skeleton.Tier, skeleton.Role, skeleton.Outfit),
                 SkeletonKing king => (byte)king.Phase,
+                Spider spider => spider.PackStance(),
                 CaveMob cave => (byte)cave.Tier,
                 Animal animal => animal.Posture,
-                _ => (byte)0,
+                _ => 0,
             };
             NetEntityCodec.Write(writer, new NetEntity(kind, IdFor(mob), mob.Position, mob.Facing, mob.Health, ammo,
-                itemByte, mob.Velocity, mob.Effects.Mask));
+                itemField, mob.Velocity, mob.Effects.Mask));
             if (mob is Sandworm { Phase: SandwormPhase.Dig, Telegraph: > 0f } digging)
                 NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.SandwormTarget, IdFor(mob), digging.SurfacePoint, 0f,
                     (int)MathF.Round(digging.Telegraph * 1000f), 0, 0, Vector3.Zero));

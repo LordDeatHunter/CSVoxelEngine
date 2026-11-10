@@ -309,6 +309,15 @@ public abstract class Mob
     /// (<see cref="WaterSplash.Track"/>); cosmetic, so a server never steps it.</summary>
     public WaterSplashTracker Splash { get; } = new();
 
+    /// <summary>
+    /// Advances what only the eye sees of this mob (a spider's legs finding their footholds), once a frame from
+    /// the world's effects pass; never on a server. <paramref name="chunks"/> is null where there is no world (a
+    /// model viewer). Nothing by default.
+    /// </summary>
+    public virtual void AnimateCosmetics(float deltaTime, ChunkManager? chunks)
+    {
+    }
+
     /// <summary>Horizontal half extent of the collision body, used by touch and hit tests.</summary>
     public abstract float BodyHalfExtent { get; }
 
