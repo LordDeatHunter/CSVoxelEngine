@@ -20,7 +20,7 @@ deep ribcage, thick limbs) holding a copper dagger under `ArmR`, so the renderer
 (head and arms under the torso, checked by `Skeleton.ValidateContent` over `EntityContract.RequireHumanoid`) with the same
 clips: idle, walk, `melee` (an `impact` event), `shoot` (a `release` event) and the common hurt, death and spawn. Both
 share `MobConfig.SkeletonHeight` as their body box.
-- **Behavior** (loot bones and sometimes arrows): in `MobConfig.SkeletonMeleeReach` and off its cooldown it strikes (the
+- **Behavior** (loot bones and sometimes arrows; the warrior's own table `loot/skeleton_warrior.json` adds a 5% chance at the `copper_dagger` item it carries, a `slice` weapon, `CopperDaggerLootTests`): in `MobConfig.SkeletonMeleeReach` and off its cooldown it strikes (the
   `melee` clip), and at its `impact` the manager bills `MeleeDamage` with `MeleeKnockbackSpeed` to every non-immune
   target still in reach (`Skeleton.InMeleeReach`): the warrior's dagger stab (`SkeletonMeleeDamage`, `SkeletonMeleeCooldownSeconds`)
   or the archer's weaker punch (`SkeletonArcherPunch*`). The **warrior** never draws a bow: out of reach it walks in. The

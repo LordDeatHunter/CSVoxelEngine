@@ -1,0 +1,10 @@
+{
+  // Copper Dagger: the melee skeletons' weapon (the skeleton warrior carries it in its model); a 5% drop from the
+  // warrior. A quick two-phase slice, lighter than the copper sword. Sprite is committed art.
+  "name": "Copper Dagger",
+  "texture": "assets/textures/items/copper_blade.png",
+  "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.4 },
+  "attack": "slice",
+  "trail": { "color": [240, 150, 80] },
+  "entityDamage": 4
+}
