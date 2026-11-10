@@ -116,6 +116,10 @@ public abstract class Item
     /// name one.</summary>
     public ShrapnelProfile? Shrapnel { get; internal init; }
 
+    /// <summary>The status effect a landed hit with this blade puts on the enemy (its JSON <c>onHit</c>), or null.
+    /// Only a slice or sword item may name one.</summary>
+    public GearPassive? OnHit { get; internal init; }
+
     /// <summary>Damage one left-click hit removes from a block's hardness; the bare-hand
     /// baseline by default.</summary>
     public float BlockDamage { get; internal init; } = Mining.DefaultBlockDamage;
@@ -280,6 +284,7 @@ public abstract class Item
         Attack = spec.Attack;
         TrailColor = spec.TrailColor;
         Shrapnel = spec.Shrapnel;
+        OnHit = spec.OnHit;
         BlockDamage = spec.BlockDamage;
         EntityDamage = spec.EntityDamage;
         ThrowDamage = spec.ThrowDamage;

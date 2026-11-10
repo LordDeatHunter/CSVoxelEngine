@@ -773,7 +773,7 @@ internal sealed class LeftClickAction
         else
         {
             connected = StrikeNearest(player.Eye, player.ViewDirection, damage, maxTargets, cone, shoveSpeed, player.Health,
-                ShrapnelFor(HeldItem(), player.Health)) > 0;
+                ShrapnelFor(HeldItem(), player.Health), HeldItem()) > 0;
         }
 
         if (!connected) return;
@@ -790,7 +790,7 @@ internal sealed class LeftClickAction
     private int ApplySliceDamage(Vector3 origin, Vector3 direction, Item? held, bool returnSwing, PlayerHealth? striker,
         float damageFactor = 1f) =>
         StrikeNearest(origin, direction, Combat.SliceDamage(held, returnSwing, damageFactor), Combat.SliceTargets, cone: false,
-            MobConfig.SlimePunchShoveSpeed, striker, ShrapnelFor(held, striker));
+            MobConfig.SlimePunchShoveSpeed, striker, ShrapnelFor(held, striker), held);
 
     /// <summary>
     /// Lands one sword swing from <paramref name="origin"/> along <paramref name="direction"/> with
@@ -801,22 +801,22 @@ internal sealed class LeftClickAction
         float damageFactor = 1f) =>
         StrikeNearest(origin, direction, Combat.SwordDamage(held, swing, damageFactor), SwordSwings.MaxTargets(swing),
             SwordSwings.IsCone(swing), MobConfig.SlimePunchShoveSpeed * SwordSwings.ShoveFactor(swing), striker,
-            ShrapnelFor(held, striker));
+            ShrapnelFor(held, striker), held);
 
     /// <summary>
     /// Strikes the nearest <paramref name="maxTargets"/> mobs a swing from <paramref name="origin"/> along
     /// <paramref name="direction"/> reaches (the punch cone when <paramref name="cone"/>, else the forward
     /// hemisphere; see <see cref="Combat"/>) with an unobstructed line of sight: each takes
     /// <paramref name="damage"/> and a shove at <paramref name="shoveSpeed"/>, and a landed one sprays
-    /// <paramref name="shrapnel"/>. Returns how many were struck.
+    /// <paramref name="shrapnel"/> and takes <paramref name="weapon"/>'s on-hit effect. Returns how many were struck.
     /// </summary>
     private int StrikeNearest(Vector3 origin, Vector3 direction, int damage, int maxTargets, bool cone,
-        float shoveSpeed, PlayerHealth? striker, ShrapnelProfile shrapnel)
+        float shoveSpeed, PlayerHealth? striker, ShrapnelProfile shrapnel, Item? weapon)
     {
         GatherReached(origin, direction, cone);
         var struck = Math.Min(maxTargets, _strikeScratch.Count);
         for (var i = 0; i < struck; i++)
-            Strikes.StrikeMob(_strikeScratch[i].Mob, damage, origin, striker, shoveSpeed, shrapnel);
+            Strikes.StrikeMob(_strikeScratch[i].Mob, damage, origin, striker, shoveSpeed, shrapnel, weapon);
         return struck;
     }
 

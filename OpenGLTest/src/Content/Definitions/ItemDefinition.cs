@@ -77,6 +77,11 @@ public sealed class ItemDefinition
     /// </summary>
     public ShrapnelDefinition? Shrapnel { get; set; }
 
+    /// <summary>Optional status effect a landed hit with this blade puts on the enemy: the same shape as a gear
+    /// passive (<c>trigger</c> <c>on_hit</c>, <c>effect</c>, <c>chance</c>, <c>scale</c>). Only legal on a <c>slice</c> or
+    /// <c>sword</c> item.</summary>
+    public PassiveDefinition? OnHit { get; set; }
+
     /// <summary>The <c>shrapnel</c> object: how many bone fragments a hit sprays and how hard each hits.</summary>
     public sealed class ShrapnelDefinition
     {

@@ -135,6 +135,7 @@ internal static class ItemLoader
             };
             var trailColor = ParseTrail(definition.Trail, attack, path);
             var shrapnel = ParseShrapnel(definition.Shrapnel, attack, path);
+            var onHit = ParseOnHit(definition.OnHit, attack, path);
 
             var blockDamage = definition.BlockDamage ?? Mining.DefaultBlockDamage;
             if (!float.IsFinite(blockDamage) || blockDamage <= 0f || blockDamage > 1000f)
@@ -186,7 +187,8 @@ internal static class ItemLoader
                 Heals: heals,
                 Rarity: rarity,
                 Equip: equip,
-                Shrapnel: shrapnel));
+                Shrapnel: shrapnel,
+                OnHit: onHit));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, ushort>(ContentRegistry.ItemIds, StringComparer.Ordinal));
@@ -339,6 +341,22 @@ internal static class ItemLoader
         return new GearInfo(slot, modifiers, equip.Set?.Trim(), equip.Visible ?? false, immune, passives, abilities);
     }
 
+    /// <summary>
+    /// The <c>onHit</c> object's effect, or null when the item names none. Only a blade (a slice or sword
+    /// attack) puts an effect on what it hits, and it must be an <c>on_hit</c> trigger.
+    /// </summary>
+    internal static GearPassive? ParseOnHit(ItemDefinition.PassiveDefinition? onHit, AttackPattern attack, string path)
+    {
+        if (onHit == null) return null;
+        if (attack == AttackPattern.Punch)
+            throw new InvalidOperationException(
+                $"Item '{path}' has an onHit object, but only slice and sword items put an effect on what they hit.");
+        var passive = ParsePassive(onHit, path);
+        if (passive.Trigger != PassiveTrigger.OnHit)
+            throw new InvalidOperationException($"Item '{path}' has an onHit trigger other than on_hit.");
+        return passive;
+    }
+
     private static GearPassive ParsePassive(ItemDefinition.PassiveDefinition? passive, string path)
     {
         if (passive == null)
@@ -375,6 +393,9 @@ internal static class ItemLoader
     {
         foreach (var item in ItemRegistry.All)
         {
+            if (item.OnHit is { } onHit && !StatusEffectRegistry.TryGet(onHit.Effect, out _))
+                throw new InvalidOperationException(
+                    $"Item '{item.SourceName}' hits with unknown status effect '{onHit.Effect}'.");
             if (item is not GearItem gear) continue;
             foreach (var effect in gear.Info.Immune)
                 if (!StatusEffectRegistry.TryGet(effect, out _))

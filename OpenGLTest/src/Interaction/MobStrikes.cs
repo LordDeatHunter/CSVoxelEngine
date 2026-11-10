@@ -40,9 +40,10 @@ internal sealed class MobStrikes
     /// that player's worn undead bonus raises a blow against an undead mob. A landed blow also sprays
     /// <paramref name="shrapnel"/>, the payload the weapon path resolved from the held item and the striker's
     /// gear; it stays empty for a thrown item, a spell and a fragment's own hit, so shrapnel never cascades.
+    /// The blade it was struck with (<paramref name="weapon"/>) puts its <c>onHit</c> effect on the mob.
     /// Returns whether the mob's pool accepted the blow.</summary>
     internal bool StrikeMob(Mob mob, int damage, Vector3 from, PlayerHealth? striker = null,
-        float shoveSpeed = MobConfig.SlimePunchShoveSpeed, in ShrapnelProfile shrapnel = default)
+        float shoveSpeed = MobConfig.SlimePunchShoveSpeed, in ShrapnelProfile shrapnel = default, Item? weapon = null)
     {
         var hits = mob.HitsTaken;
         damage = Combat.VersusUndead(damage, mob.IsUndead, striker?.Gear?.Stats.UndeadDamage ?? 0f);
@@ -53,6 +54,9 @@ internal sealed class MobStrikes
             striker?.NoteCombat();
             // Worn gear's on-hit passives (a client never strikes a mob: its mobs are mirrors)
             GearPassives.OnHit(striker, mob, Random.Shared.NextSingle);
+            // The blade's own on-hit effect (a cinder sword sets its target alight)
+            if (weapon?.OnHit is { } onHit && Random.Shared.NextSingle() < onHit.Chance)
+                StatusEffects.Apply(mob, onHit.Effect, onHit.Scale);
             if (!shrapnel.IsEmpty) _world.Shrapnel.Burst(mob, shrapnel, striker);
         }
         ShowLandedHit(mob, hits);

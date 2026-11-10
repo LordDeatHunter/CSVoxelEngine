@@ -61,7 +61,8 @@ public static class ItemFactory
         int Heals = 0,
         Rarity Rarity = Rarity.Common,
         GearInfo? Equip = null,
-        ShrapnelProfile? Shrapnel = null);
+        ShrapnelProfile? Shrapnel = null,
+        GearPassive? OnHit = null);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,
