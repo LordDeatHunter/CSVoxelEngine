@@ -567,6 +567,12 @@ public static class MobConfig
     public const int SkeletonPileWaves = 2;
     /// <summary>Seconds a pile waits after a wave before it raises the next one.</summary>
     public const float SkeletonPileWaveSeconds = 6f;
+    /// <summary>How many living skeletons may stand near a pile on the ground floor before it raises another.</summary>
+    public const int SkeletonPileNearLimitBase = 5;
+    /// <summary>How many more living skeletons each floor above the ground floor allows near a pile.</summary>
+    public const int SkeletonPileNearLimitPerTier = 2;
+    /// <summary>How close, in blocks, a living skeleton must stand to a pile to count against its limit.</summary>
+    public const float SkeletonPileNearRadiusBlocks = 16f;
     /// <summary>Seconds between the tower manager's looks for a tower under each target.</summary>
     public const float TowerScanSeconds = 0.5f;
     /// <summary>A bound skeleton farther than this from its tower's center is released and owed back to its floor.</summary>

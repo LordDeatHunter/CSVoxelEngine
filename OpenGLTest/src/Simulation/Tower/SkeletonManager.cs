@@ -50,6 +50,18 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
         _arrowItemId = ContentRegistry.RequireItem("flint_arrow").Id;
     }
 
+    /// <summary>How many living (not dying) skeletons stand within <paramref name="radius"/> blocks of
+    /// <paramref name="center"/>.</summary>
+    public int LivingCountNear(Vector3 center, float radius)
+    {
+        var radiusSquared = radius * radius;
+        var count = 0;
+        var mobs = Mobs;
+        for (var i = 0; i < mobs.Count; i++)
+            if (!mobs[i].IsDying && Vector3.DistanceSquared(mobs[i].Position, center) <= radiusSquared) count++;
+        return count;
+    }
+
     /// <summary>Arrows in flight; drawn and mirrored like the player's own throws.</summary>
     public IReadOnlyList<ThrownProjectile> Arrows => _arrows.Flying;
 

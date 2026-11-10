@@ -109,8 +109,11 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
 - **Piles** (`SkeletonPileManager`): on an awake floor (floor 0, or the floor below's door open), a pile whose cell holds
   the pile block raises a wave of `TowerDifficulty.PackSize(k)` skeletons at tier `k` (`SkeletonManager.Spawn`, around the
   pile by `TowerRules.SpawnPoints`) when a **non-immune** target stands within `SkeletonPileTriggerBlocks` on that floor's
-  band, every `SkeletonPileWaveSeconds`, for `SkeletonPileWaves` waves, then it is depleted. A wave counts only if one
-  skeleton rose (the hard cap keeps it for later). A pile in an unloaded chunk freezes; a loaded cell without the pile
+  band, every `SkeletonPileWaveSeconds`, for `SkeletonPileWaves` waves, then it is depleted. A pile never raises past `TowerDifficulty.PileNearLimit(k)` living skeletons within
+  `SkeletonPileNearRadiusBlocks` of it (`SkeletonManager.LivingCountNear`; `SkeletonPileNearLimitBase` 5 on floor 0, plus
+  `SkeletonPileNearLimitPerTier` 2 per floor): a wave is trimmed to the room left and waits for kills when there is none, and
+  owed respawns obey the same limit. A wave counts only if one
+  skeleton rose (the near limit and the hard cap keep it for later). A pile in an unloaded chunk freezes; a loaded cell without the pile
   block counts as depleted.
 - **Bound skeletons are never immortal.** Each raised skeleton is tagged with its `TowerFloorRef`. It despawns like any
   mob, and past `TowerSkeletonLeashBlocks` from the tower's center the manager releases it (`SkeletonManager.Release`);

@@ -151,6 +151,49 @@ public sealed class SkeletonPileManagerTests
         Assert.Empty(skeletons.Mobs);
     }
 
+    // Fills the pile's surroundings with `count` living skeletons, as an earlier wave would have left them
+    private static void CrowdPile(SkeletonManager skeletons, int count)
+    {
+        for (var i = 0; i < count; i++)
+            Assert.NotNull(skeletons.Spawn(new Vector3(LoadedPile.X + 0.5f, 1.95f, LoadedPile.Z + 3.5f), 0));
+    }
+
+    [Fact]
+    public void AWaveIsTrimmedToTheRoomLeftUnderTheNearPileLimit()
+    {
+        var chunks = WorldWithPile();
+        var skeletons = new SkeletonManager(Type);
+        var floor = FloorWithPile(LoadedPile);
+        var limit = TowerDifficulty.PileNearLimit(Tier);
+        CrowdPile(skeletons, limit - 1);
+
+        new SkeletonPileManager().Update(floor, Dt, chunks, skeletons, [PlayerAt(8.5f, 11.5f)]);
+
+        Assert.Equal(limit, skeletons.LivingCountNear(new Vector3(8.5f, 1.5f, 8.5f), MobConfig.SkeletonPileNearRadiusBlocks));
+    }
+
+    [Fact]
+    public void AFullPileRaisesNothingAndKeepsItsWaveUntilSkeletonsDie()
+    {
+        var chunks = WorldWithPile();
+        var skeletons = new SkeletonManager(Type);
+        var floor = FloorWithPile(LoadedPile);
+        CrowdPile(skeletons, TowerDifficulty.PileNearLimit(Tier));
+        var crowd = skeletons.Mobs.Count;
+
+        new SkeletonPileManager().Update(floor, Dt, chunks, skeletons, [PlayerAt(8.5f, 11.5f)]);
+
+        Assert.Equal(crowd, skeletons.Mobs.Count);
+        Assert.Equal(MobConfig.SkeletonPileWaves, floor.Piles[0].WavesLeft);
+    }
+
+    [Fact]
+    public void AHigherFloorAllowsMoreSkeletonsNearItsPiles()
+    {
+        for (var tier = 0; tier < MobConfig.TowerMaxTier; tier++)
+            Assert.True(TowerDifficulty.PileNearLimit(tier + 1) > TowerDifficulty.PileNearLimit(tier));
+    }
+
     [Fact]
     public void OwedSkeletonsRiseAgainAtADepletedPile()
     {

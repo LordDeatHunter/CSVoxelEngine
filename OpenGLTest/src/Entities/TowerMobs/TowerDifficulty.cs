@@ -30,4 +30,10 @@ public static class TowerDifficulty
     /// bone pile's wave hook (BT-4).</summary>
     public static int PackSize(int tier) =>
         Math.Min(MobConfig.TowerPackMaxSize, 1 + Clamp(tier) / MobConfig.TowerPackTiersPerExtra);
+
+    /// <summary>How many living skeletons may stand near a pile on <paramref name="tier"/> before it raises another:
+    /// <see cref="MobConfig.SkeletonPileNearLimitBase"/> on the ground floor, <see cref="MobConfig.SkeletonPileNearLimitPerTier"/>
+    /// more on every floor above.</summary>
+    public static int PileNearLimit(int tier) =>
+        MobConfig.SkeletonPileNearLimitBase + Clamp(tier) * MobConfig.SkeletonPileNearLimitPerTier;
 }
