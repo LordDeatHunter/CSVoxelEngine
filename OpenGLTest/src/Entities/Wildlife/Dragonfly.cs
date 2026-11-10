@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 
 namespace VoxelEngine.Entities.Wildlife;
@@ -30,6 +31,12 @@ public sealed class Dragonfly : FlyingAnimal
     private const int BiteAction = 0;
     private const int TakeoffActionIndex = 1;
     private const int LandActionIndex = 2;
+
+    /// <inheritdoc />
+    public override string? HitSoundGroup => SfxLibrary.BugSquishGroup;
+
+    /// <inheritdoc />
+    public override string? DeathSoundGroup => SfxLibrary.BugSquishGroup;
 
     /// <summary>How the dragonfly flies.</summary>
     public static readonly FlightTuning Tuning = new(

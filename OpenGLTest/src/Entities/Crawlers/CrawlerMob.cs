@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.Posing;
@@ -60,6 +61,12 @@ public abstract class CrawlerMob : CaveMob
 
     /// <inheritdoc />
     public override float SafeFallBlocks => float.PositiveInfinity;
+
+    /// <inheritdoc />
+    public override string? HitSoundGroup => SfxLibrary.BugSquishGroup;
+
+    /// <inheritdoc />
+    public override string? DeathSoundGroup => SfxLibrary.BugSquishGroup;
 
     /// <inheritdoc />
     protected override float LocomotionSpeed => Velocity.Length();
