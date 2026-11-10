@@ -1,0 +1,6 @@
+{
+  "name": "Dragonfly",
+  // A man-sized dragonfly: model, rig and clips only so far (tools/generate-critter-models.py); no mob class spawns it
+  "hp": 60,
+  "model": "assets/models/entity/dragonfly.bbmodel"
+}

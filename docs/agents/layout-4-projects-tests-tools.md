@@ -199,6 +199,9 @@ tools/                                # asset generators: models, animation clip
   generate-tower-lock-textures.py     # deterministic placeholder tower_door (portcullis cutout), skeleton_pile and
                                       #   tower_altar_top tiles, stdlib PNG writer, small palettes; listed in USER_TODO.md; --check
   generate-forcefield-texture.py      # deterministic placeholder tower_forcefield tile (a faint honeycomb, only the fallback
+  generate-critter-models.py          # deterministic dragonfly, crow and deer .bbmodels (their own bone sets around the
+                                      #   humanoid six, clips) and skins with cutout texels, on the hell script's machinery;
+                                      #   models only, no mob class yet; --check
                                       #   of the world shader's forcefield term), integer geometry; listed in USER_TODO.md; --check
   generate-cave-ore-textures.py       # deterministic placeholder amethyst_ore, jade_ore and cinnabar_ore tiles: palette swaps
                                       #   of malachite_ore's green shades, stdlib PNG reader and writer; listed in USER_TODO.md;

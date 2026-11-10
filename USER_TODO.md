@@ -213,6 +213,13 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   `volley`, `summon`, `hurt`, `death`, `spawn`) and their events (`impact` on `slam`, `release` on
   `volley`, `summon` on `summon`), which `SkeletonKing.ValidateContent` checks at startup, and a
   height near 3 blocks (`MobConfig.SkeletonKingHeight`).
+- [ ] **Dragonfly, Crow and Deer** — `dragonfly.bbmodel`/`.png` (man-sized, 128x128 skin: green thorax, banded blue
+  abdomen, red eyes, cutout wing cells), `crow.bbmodel`/`.png` (64x64, blue-black, cutout feather tips) and
+  `deer.bbmodel`/`.png` (a spotted stag, 128x128). Made by `tools/generate-critter-models.py`; models, rigs and clips
+  only so far (an entity JSON each, no mob class). Keep the six humanoid group names each rig carries among its own
+  bones (wings and forelegs are `ArmL`/`ArmR`), everything nested under `Torso`, the clip names listed in the
+  generator's header, the `impact` event on `bite`, `peck`, `swoop` and `butt`, a `hurt` clip that starts and ends at
+  the identity (it is added on top of other clips), and the `.bbmodel`'s UV layout.
 - [ ] **Shardling** — `shardling.bbmodel` and `shardling.png` (64x64 skin, small palette: pale violet
   body, white-to-lilac faceted crystal spikes and shard hands, white eyes). Made by
   `tools/generate-cave-mob-models.py`. Keep the humanoid groups (`Torso`, `Head`, `ArmL`, `ArmR`, `LegL`,

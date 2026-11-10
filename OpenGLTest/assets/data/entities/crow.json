@@ -1,0 +1,6 @@
+{
+  "name": "Crow",
+  // A crow: model, rig and clips only so far (tools/generate-critter-models.py); no mob class spawns it
+  "hp": 8,
+  "model": "assets/models/entity/crow.bbmodel"
+}

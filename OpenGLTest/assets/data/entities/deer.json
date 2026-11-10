@@ -1,0 +1,6 @@
+{
+  "name": "Deer",
+  // A spotted stag: model, rig and clips only so far (tools/generate-critter-models.py); no mob class spawns it
+  "hp": 20,
+  "model": "assets/models/entity/deer.bbmodel"
+}

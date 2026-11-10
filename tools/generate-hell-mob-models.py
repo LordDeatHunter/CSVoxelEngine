@@ -448,7 +448,9 @@ def skin(rig):
         if (x, y) not in owner:
             return (0, 0, 0, 0)
         i, face, fx, fy, w, h = owner[(x, y)]
-        return clamp(rig["cubes"][i][4](face, fx, fy, w, h, x, y)) + (255,)
+        color = rig["cubes"][i][4](face, fx, fy, w, h, x, y)
+        # A material may answer RGBA for a cutout texel (a wing's open cells); plain RGB is opaque.
+        return clamp(color[:3]) + (color[3] if len(color) > 3 else 255,)
     return png_bytes(rig["skin"], texel)
 
 
