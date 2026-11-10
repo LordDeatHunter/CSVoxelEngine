@@ -828,7 +828,7 @@ public class RenderManager : IDisposable
         {
             var rot = camera.GetViewMatrix();
             rot.M41 = rot.M42 = rot.M43 = 0f;
-            Sky.RenderSky(rot, camera.GetProjectionMatrix(), camera.ViewDirection, Lighting.SkyFrame);
+            Sky.RenderSky(rot, camera.GetProjectionMatrix(), Lighting.SkyFrame);
         }
 
         // Exactly once a frame, before any pass appends to it: the ring rolls onto its next
