@@ -149,7 +149,8 @@ internal sealed class ThrowAction
             var id = inventory.SelectedBlockId;
             if (id == 0) return false;
             if (!inventory.RemoveTool(instance)) return false;
-            _dropManager.SpawnAt(id, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
+            _dropManager.SpawnAt(id, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f,
+                PlayerConfig.ThrownPickupDelaySeconds);
             return true;
         }
 
@@ -163,7 +164,8 @@ internal sealed class ThrowAction
             // Spend first so a failed spend never duplicates the drop
             if (!inventory.ConsumeSelected()) break;
 
-            _dropManager.SpawnAt(stackId, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
+            _dropManager.SpawnAt(stackId, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f,
+                PlayerConfig.ThrownPickupDelaySeconds);
             thrown = true;
         }
         return thrown;
@@ -277,7 +279,7 @@ internal sealed class ThrowAction
 
             if (alive) continue;
             if (!_clientMode)
-                _dropManager.SpawnAt(projectile.ItemId, projectile.Position);
+                _dropManager.SpawnAt(projectile.ItemId, projectile.Position, pickupDelaySeconds: PlayerConfig.ThrownPickupDelaySeconds);
             _thrown.RemoveAt(i);
         }
     }

@@ -103,6 +103,11 @@ public static class PlayerConfig
     public const float ThrowSpeed = 40f;
     public const float ThrowLifetimeSeconds = 5f;
 
+    // --- Thrown drops: a player's Q-drop or a landed throw waits this long before anyone can
+    // collect it, so the thrower does not snap it straight back up. Mined and mob drops keep the
+    // short ItemDrop grace. ---
+    public const float ThrownPickupDelaySeconds = 2f;
+
     // --- Slime block (the block "bounce" flag): a body that lands on one is thrown back up at
     // this share of its impact and bills no fall damage; below the minimum it just rests ---
     public const float SlimeBlockBounceRestitution = 0.8f;

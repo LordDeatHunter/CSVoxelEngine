@@ -80,13 +80,14 @@ public class DropManager
 
     /// <summary>
     /// Drops a block or item at an exact world position (no cell-center snap), for throws.
-    /// Air and unknown ids drop nothing.
+    /// <paramref name="pickupDelaySeconds"/> is how long it waits before it can be collected (null
+    /// keeps the short default). Air and unknown ids drop nothing.
     /// </summary>
-    public void SpawnAt(ushort blockId, Vector3 position, Vector3? toss = null)
+    public void SpawnAt(ushort blockId, Vector3 position, Vector3? toss = null, float? pickupDelaySeconds = null)
     {
         if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return;
 
-        _drops.Add(new ItemDrop(blockId, position, toss));
+        _drops.Add(new ItemDrop(blockId, position, toss, pickupDelaySeconds));
     }
 
     /// <summary>
