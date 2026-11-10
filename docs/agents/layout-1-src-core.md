@@ -154,7 +154,7 @@ OpenGLTest/
                                #   spring steam, the cave biome motes (CaveMote*)
       PlayerConfig.cs          # break overlay, camera and swing feel (sprint FOV, strafe tilt, hit-stop, throw
                                #   zoom), water depth states, lava speed, throws, slime block, sink blocks, bandage
-      PostProcessConfig.cs     # biome grade, damage fringe, underwater wobble, FXAA, contact AO, godrays, sun dazzle, GPU timer
+      PostProcessConfig.cs     # biome grade, damage fringe, underwater wobble, FXAA, contact AO, godrays, sun dazzle, lens flare, GPU timer
                                #   gate
       SaveConfig.cs            # autosave, save writer retries and shutdown, teardown joins and drain, entity restore
       SandwormConfig.cs        # the sandworm boss: chain, burrow, breach, air and dash numbers, contact, the sand and quake effects
@@ -348,12 +348,14 @@ OpenGLTest/
         LightFlicker.cs        # GL-free per-cell flicker phase + curve for the campfire point lights
         LightTint.cs           # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
       Post/                    # the post pass and screen-space effects: tonemap, eye
-                               #   adaptation, biome grade, contact AO, godrays, sun dazzle, underwater wobble
+                               #   adaptation, biome grade, contact AO, godrays, sun dazzle, lens flare, underwater wobble
         BiomeGrade.cs          # GL-free post color grade from the eye's climate: warm over desert, cool over snow, eased
         ContactAo.cs           # GL-free twin of contact-ao-fragment.glsl (SH-28)
         ContactAoTaps.cs       # the nine raw window depths the contact AO pass reads around one pixel (ContactAo.Occlusion)
         EyeAdaptation.cs       # GL-free exposure target from the voxel light at the eye, eased slower into the dark
         Godrays.cs             # GL-free twin of the godrays' strength (facing, sun height, cloud, wet), scatter and phase
+        LensFlare.cs           # GL-free twin of the lens flare's circles: its strength (off the sun, in view), cover, centers and shape
+        LensFlareGhost.cs      # one circle of the lens flare: offset along the flare's line, radius, hollow, softness, tint, brightness
         SunDazzle.cs           # GL-free twin of the sun dazzle: its strength (facing, disc, wet), disc radius, visibility ease and glow
         Tonemap.cs             # the C# twin of post-fragment.glsl's tonemap, used only
                                #   by tests: exposure, then a per-channel clamp to 0..1

@@ -185,15 +185,16 @@ internal sealed class ScreenPasses : IDisposable
     /// (<see cref="SunDazzleRenderer"/>), added over the finished world right after the godrays, so
     /// it lies over the foreground too. The renderer measures how much of the sun's disc is in open
     /// sky from the HDR scene's own depth texture, so like the godrays it needs no scene copy and
-    /// draws through the color-only HDR framebuffer. Skipped when the frame's strength
-    /// (<see cref="SunDazzle.Intensity"/>, set by <see cref="FrameLighting.SetLighting"/>) is
-    /// negligible, with the sun behind the eye, and when
-    /// <see cref="PostProcessConfig.SunDazzleEnabled"/> is off.
+    /// draws through the color-only HDR framebuffer. The same draw adds the lens flare
+    /// (<see cref="LensFlare"/>), the circles the sun throws across the picture once it is off to
+    /// one side. Skipped when both strengths (<see cref="SunDazzle.Intensity"/> and
+    /// <see cref="LensFlare.Intensity"/>, set by <see cref="FrameLighting.SetLighting"/>, each zero
+    /// with its own switch off) are negligible and with the sun behind the eye.
     /// </summary>
     internal void RenderSunDazzle(Camera? camera)
     {
-        if (camera == null || _dazzle == null || !PostProcessConfig.SunDazzleEnabled) return;
-        if (Lighting.DazzleStrength <= 0.0005f || Targets.HdrColorOnlyFbo == 0) return;
+        if (camera == null || _dazzle == null || Targets.HdrColorOnlyFbo == 0) return;
+        if (Lighting.DazzleStrength <= 0.0005f && Lighting.FlareStrength <= 0.0005f) return;
         if (!TrySunUv(out var sunUv)) return;
         // The eased visibility steps by the time since the pass last drew, so after a pause it
         // takes this frame's measurement whole
@@ -202,7 +203,9 @@ internal sealed class ScreenPasses : IDisposable
         Units.BindUnit(4, TextureTarget.Texture2D, Targets.HdrDepthTex);
         Units.ActiveUnit(0);
         _dazzle.Render(Targets.HdrColorOnlyFbo, Targets.ViewportSize, sunUv,
-            SunDazzle.DiscRadius(GameSettings.SunSize, camera.CurrentFov), Lighting.SunDiscColor * Lighting.DazzleStrength, ease);
+            SunDazzle.DiscRadius(GameSettings.SunSize, camera.CurrentFov), Lighting.SunDiscColor * Lighting.DazzleStrength,
+            Lighting.SunDiscColor * (Lighting.FlareStrength * PostProcessConfig.LensFlareLight),
+            LensFlare.Cover(Lighting.FlareStrength, Lighting.SunDiscColor), ease);
         // The renderer bound unit 5 behind the cache's back, and unit 4 must not keep the scene
         // depth (the next frame renders into it)
         Units.InvalidateTextureUnits();

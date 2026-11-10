@@ -286,15 +286,15 @@ and 0.02-0.05 ms CPU while active, nothing otherwise. `GodraysTests`;
 **Sun dazzle.** The blinding bloom of looking straight at the sun. Where the sun glare above is a faint
 glow in the dome that the terrain hides, the dazzle is light in the eye, added over the whole frame, the
 foreground included: `ScreenPasses.RenderSunDazzle` (`SunDazzleRenderer`), right after the godrays and
-inside their `godPass` profiler row, switched off by `SunDazzleEnabled`. Two draws of one triangle. The
+inside their `godPass` profiler row; `SunDazzleEnabled` zeroes its strength. Two draws of one triangle. The
 first (`dazzle-visibility-fragment.glsl`) is a single fragment into the renderer's own 1x1 `R16F`
 target: it taps the HDR scene's own depth at `SunDazzleTaps` points over the sun's disc
 (`SunDazzle.DiscRadius` of `GameSettings.SunSize`) and counts the ones at the far plane (no terrain,
 tree, cloud, mob or held item; a tap off screen counts as hidden), blended in with
 `SunDazzle.EaseShare` of the time since the pass last drew as its alpha, so the target holds the eased
 share of the disc in open sky with no readback and takes a stale measurement whole. The second
-(`dazzle-fragment.glsl`) adds `SunDazzle.Glow` times that share, additively in linear light through the
-color-only HDR framebuffer: a Gaussian core (`SunDazzleCoreRadius`), a soft veil
+(`dazzle-fragment.glsl`) adds `SunDazzle.Glow` times that share (and the lens flare below), additively in
+linear light through the color-only HDR framebuffer: a Gaussian core (`SunDazzleCoreRadius`), a soft veil
 (`SunDazzleVeilShare`, `SunDazzleVeilReach`) and a fan of rays that starts outside the core
 (`SunDazzleRayShare`, `SunDazzleRayReach`), all in shares of the screen height round the sun's place on
 screen. The frame's strength is `SunDazzle.Intensity` (set by `FrameLighting.SetLighting`) times the
@@ -304,6 +304,24 @@ horizon, in hell and in lava) and zero under water. Cost on the dev GPU at 1080p
 read about 0.41 ms GPU and 0.01 ms CPU with the godrays and the dazzle both drawing (the godrays alone
 about 0.35), nothing otherwise. `SunDazzleTests`;
 `visual-examples/sun-dazzle.json` (`VOXEL_TIME` 395, 418).
+
+**Lens flare.** The row of tinted circles a lens throws across the picture with the sun in view: warm
+gold and orange with a few greenish ones (`PostProcessConfig.LensFlareGhosts`, at most
+`LensFlare.MaxGhosts`, each a `LensFlareGhost`: offset, radius, hollow, softness, tint, brightness).
+Drawn by the sun dazzle's own second draw (`dazzle-fragment.glsl`, no extra pass), so it is hidden with
+the sun's disc by the same eased depth-tap share, and switched off by `LensFlareEnabled`. Each circle
+sits at its offset along the line from the screen center to the sun (`LensFlare.Center`: 1 on the sun,
+negative across the center from it) and is shaded by `LensFlare.Shape`: nothing at and beyond its edge,
+evenly lit for hollow 0 and a ring at 1. A circle is a faint film of its tint rather than pure light:
+the draw blends premultiplied (`One, OneMinusSrcAlpha`; the dazzle writes alpha 0, so it still only
+adds), each circle adding its tint times `LensFlareLight` times the linear sun color and taking
+`LensFlare.Cover` of the picture behind it away (per unit of its brightness, `LensFlareCover`, less
+under a dim sun), so its color still reads over a bright sky or a white cloud, where added light alone
+washed out to white. The frame's strength is `LensFlare.Intensity` (set by `FrameLighting.SetLighting`):
+zero within `LensFlareStartDegrees` of the sun, where the circles would all sit on it and the dazzle
+takes over, full from `LensFlareFullDegrees` to `LensFlareFadeDegrees`, zero `LensFlareGoneDegrees` from
+it, and like the dazzle gone with the disc and under water. `LensFlareTests`;
+`visual-examples/sun-dazzle.json` (`off_sun` over the sky, `flare_across` over the forest).
 
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
 heading turns slowly (`SkyConfig.Wind*`), with `Wind.Offset` its bounded closed-form

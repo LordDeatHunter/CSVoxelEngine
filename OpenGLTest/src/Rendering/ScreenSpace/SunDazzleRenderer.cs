@@ -7,12 +7,13 @@ using VoxelEngine.Effects.Post;
 namespace VoxelEngine.Rendering.ScreenSpace;
 
 /// <summary>
-/// The sun dazzle: the blinding bloom of looking straight at the sun, over the whole frame. Two
-/// draws of one triangle. The first (dazzle-visibility-fragment.glsl) is a single fragment into
+/// The sun dazzle: the blinding bloom of looking straight at the sun, over the whole frame, and
+/// the lens flare (<see cref="LensFlare"/>): the row of tinted circles the sun throws across the
+/// picture when it is off to one side. Two draws of one triangle. The first (dazzle-visibility-fragment.glsl) is a single fragment into
 /// this renderer's own 1x1 target: it counts how much of the sun's disc is in open sky from the
 /// scene depth and blends that into the target, which therefore holds the eased share with no
-/// readback. The second (dazzle-fragment.glsl) adds the glow (<see cref="SunDazzle.Glow"/>) times
-/// that share into the caller's color-only HDR framebuffer, additively in linear light.
+/// readback. The second (dazzle-fragment.glsl) adds the glow (<see cref="SunDazzle.Glow"/>) and
+/// the flare's circles times that share into the caller's color-only HDR framebuffer, in linear light.
 /// Texture units read: 4 (the scene depth) by the first draw, bound by the caller, and 5 (the 1x1
 /// target), bound here around the second. Owns its blend and depth state and puts the world's back
 /// on the way out.
@@ -51,6 +52,11 @@ public sealed class SunDazzleRenderer : IDisposable
         _glow.SetUniform("uVeilReach", PostProcessConfig.SunDazzleVeilReach);
         _glow.SetUniform("uRayShare", PostProcessConfig.SunDazzleRayShare);
         _glow.SetUniform("uRayReach", PostProcessConfig.SunDazzleRayReach);
+        // The lens flare's circles (LensFlare), drawn by the same shader
+        var ghosts = Math.Min(PostProcessConfig.LensFlareGhosts.Length, LensFlare.MaxGhosts);
+        _glow.SetUniform("uGhostCount", ghosts);
+        _glow.SetUniformArray4("uGhostShape", LensFlare.MaxGhosts, LensFlare.PackShapes());
+        _glow.SetUniformArray4("uGhostColor", LensFlare.MaxGhosts, LensFlare.PackColors());
 
         // One float, starting hidden; the first draw replaces it whole (SunDazzle.EaseShare)
         _visibilityTex = gl.GenTexture();
@@ -94,10 +100,13 @@ public sealed class SunDazzleRenderer : IDisposable
     /// <paramref name="sunUv"/> is the sun's place on screen (0..1, possibly off screen) and
     /// <paramref name="discRadius"/> its disc's radius as a share of the screen height
     /// (<see cref="SunDazzle.DiscRadius"/>); <paramref name="color"/> is the linear sun color times
-    /// <see cref="SunDazzle.Intensity"/>; <paramref name="ease"/> is how far the eased share moves
+    /// <see cref="SunDazzle.Intensity"/>, <paramref name="flare"/> the same color times
+    /// <see cref="LensFlare.Intensity"/> and <see cref="PostProcessConfig.LensFlareLight"/> and
+    /// <paramref name="flareCover"/> the flare's <see cref="LensFlare.Cover"/>; <paramref name="ease"/> is how far the eased share moves
     /// toward this frame's measurement (<see cref="SunDazzle.EaseShare"/>).
     /// </summary>
-    public void Render(uint sceneFbo, Vector2D<int> viewportSize, Vector2 sunUv, float discRadius, Vector3 color, float ease)
+    public void Render(uint sceneFbo, Vector2D<int> viewportSize, Vector2 sunUv, float discRadius, Vector3 color, Vector3 flare,
+        float flareCover, float ease)
     {
         var aspect = viewportSize.X / (float)Math.Max(1, viewportSize.Y);
 
@@ -120,8 +129,9 @@ public sealed class SunDazzleRenderer : IDisposable
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, sceneFbo);
         _gl.Viewport(0, 0, (uint)viewportSize.X, (uint)viewportSize.Y);
-        // Light adds: black contributes nothing
-        _gl.BlendFunc(BlendingFactor.One, BlendingFactor.One);
+        // Premultiplied: the dazzle writes alpha 0, so its light simply adds, and the flare's circles
+        // take a little of the picture behind them away; the target's own alpha is left alone
+        _gl.BlendFuncSeparate(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.Zero, BlendingFactor.One);
 
         // Only now is the 1x1 target safe to sample
         _gl.ActiveTexture(TextureUnit.Texture5);
@@ -131,6 +141,8 @@ public sealed class SunDazzleRenderer : IDisposable
         _glow.SetUniform("uSunUv", sunUv);
         _glow.SetUniform("uAspect", aspect);
         _glow.SetUniform("uColor", color);
+        _glow.SetUniform("uFlare", flare);
+        _glow.SetUniform("uFlareCover", flareCover);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);
 

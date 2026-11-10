@@ -527,7 +527,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         UIRenderer.cs          # the UI's GL resources (ui program, count font, text batch, item icons) and shared
                                #   primitives (rects, text, icons, input field); builds the page renderers as internal properties
         UITextCache.cs         # memoized per-frame HUD strings (FPS, compass, coordinates, counts)
-      ScreenSpace/             # full-screen and screen-space passes: post (tonemap, FXAA), contact AO, godrays, sun dazzle, underwater rays
+      ScreenSpace/             # full-screen and screen-space passes: post (tonemap, FXAA), contact AO, godrays, sun dazzle and lens flare, underwater rays
         ContactAoRenderer.cs   # the screen-space contact AO pass (SH-28, contact-ao-fragment.glsl, twin ContactAo)
         GodraysRenderer.cs     # the godrays: a half-res shadow-map march over dry air, then a radial composite toward the sun
         HalfResTarget.cs       # the GL-free sizing arithmetic behind the half-resolution underwater-rays render target
@@ -539,6 +539,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   RenderContactAo: the multiplicative screen-space contact AO
                                #   (ContactAoRenderer) drawn through the color-only HDR FBO while
                                #   sampling the HDR depth texture, placed mid entity pass
-        SunDazzleRenderer.cs   # the sun dazzle: a 1x1 eased depth-tap visibility of the sun's disc, then an additive glow over the frame
+        SunDazzleRenderer.cs   # the sun dazzle and lens flare: a 1x1 eased depth-tap visibility of the sun's disc, then the glow
+                               #   and the flare's circles over the frame
         UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
 ```

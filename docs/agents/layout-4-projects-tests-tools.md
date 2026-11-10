@@ -84,7 +84,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Effects/                     # mirrors src/Effects: one folder per sub-domain of shader twins
     Climate/                   # the biome tint field and its chunk, LOD, pop and texture consumers
     Lighting/                  # the campfire flicker and the block-light tint code
-    Post/                      # biome grade, contact AO, eye adaptation, godrays, sun dazzle, underwater wobble
+    Post/                      # biome grade, contact AO, eye adaptation, godrays, sun dazzle, lens flare, underwater wobble
     Sky/                       # aurora, silver lining, moon, moonlight, sky palette, stars, glare, wind, the cave
                                #   biome atmosphere (CaveClimateTests)
     Surfaces/                  # forcefield, glass, grass, ice, lava, leaf and ore twins, the snow sparkle shader term

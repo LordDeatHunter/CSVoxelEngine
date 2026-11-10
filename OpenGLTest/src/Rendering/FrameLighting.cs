@@ -39,6 +39,9 @@ internal sealed class FrameLighting
     // This frame's sun dazzle strength (SunDazzle.Intensity), set by SetLighting; 0 skips the pass
     private float _dazzleStrength;
 
+    // This frame's lens flare strength (LensFlare.Intensity), set by SetLighting; drawn by the dazzle's pass
+    private float _flareStrength;
+
     // Per-frame lighting state, pushed once per frame via SetLighting and uploaded to the
     // world shader once per frame by RenderManager.ApplyFrameUniforms
     // _sunDir is the world's key light (Moonlight): the sun by day, the moon (the sun negated) once
@@ -200,6 +203,7 @@ internal sealed class FrameLighting
     internal float MoonPhaseFraction => _moonPhase;
     internal float GodrayStrength => _godrayStrength;
     internal float DazzleStrength => _dazzleStrength;
+    internal float FlareStrength => _flareStrength;
     internal Matrix4x4 InvViewProj => _invViewProj;
     internal Matrix4x4 SceneViewProj => _sceneViewProj;
     internal float UnderwaterT => _underwaterT;
@@ -437,6 +441,11 @@ internal sealed class FrameLighting
         _dazzleStrength = camera == null || !PostProcessConfig.SunDazzleEnabled
             ? 0f
             : SunDazzle.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), _sunVisibility, wet);
+        // The lens flare: the circles the sun throws across the picture once it is off to one side,
+        // where the dazzle fades; it goes with the disc and under water the same way
+        _flareStrength = camera == null || !PostProcessConfig.LensFlareEnabled
+            ? 0f
+            : LensFlare.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), _sunVisibility, wet);
         // The aurora shows only from cold lands: the climate at the eye's column, read from the stored
         // corner climate (never worldgen noise, so a client reads what its server streamed), eased so
         // walking across a border fades it; an unknown column eases it out

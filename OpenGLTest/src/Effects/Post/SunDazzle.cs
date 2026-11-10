@@ -33,11 +33,21 @@ public static class SunDazzle
     /// </summary>
     public static float Intensity(float alignment, float sunVisibility, float wet)
     {
-        var degrees = MathUtils.ToDegrees(MathF.Acos(MathUtils.Clamp(alignment, -1f, 1f)));
-        var facing = 1f - MathUtils.SmoothStep(PostProcessConfig.SunDazzleFullDegrees,
-            PostProcessConfig.SunDazzleFacingDegrees, degrees);
+        var facing = Facing(alignment, PostProcessConfig.SunDazzleFullDegrees, PostProcessConfig.SunDazzleFacingDegrees);
         return PostProcessConfig.SunDazzleStrength * facing * MathUtils.Clamp01(sunVisibility)
                * (1f - MathUtils.Clamp01(wet));
+    }
+
+    /// <summary>
+    /// How squarely a camera whose forward has dot <paramref name="alignment"/> with the sun
+    /// direction faces it, 0..1: 1 within <paramref name="fullDegrees"/> of the sun, easing to 0 at
+    /// <paramref name="goneDegrees"/> from it. In degrees rather than the cosine, which is too flat
+    /// near the sun to shape a ramp there.
+    /// </summary>
+    public static float Facing(float alignment, float fullDegrees, float goneDegrees)
+    {
+        var degrees = MathUtils.ToDegrees(MathF.Acos(MathUtils.Clamp(alignment, -1f, 1f)));
+        return 1f - MathUtils.SmoothStep(fullDegrees, goneDegrees, degrees);
     }
 
     /// <summary>
