@@ -529,6 +529,7 @@ internal sealed class LocalPlayer
         }
 
         RespawnPrompt.Update(deltaTime, _health.IsDead);
+        Camera.IsDead = _health.IsDead;
         if (!_health.IsDead)
         {
             _pendingDeathMessage = null;
@@ -555,6 +556,7 @@ internal sealed class LocalPlayer
         Camera.DeathProgress = 0f;
         Player.DeathFall = 0f;
         _health.Respawn();
+        Camera.IsDead = false;
         var home = _hasRespawnEye ? _respawnEye : Camera.Position;
         Camera.TestTeleport(home, Camera.Yaw, Camera.Pitch);
         _fall.Reset(home.Y - Camera.EyeHeight, grounded: false);

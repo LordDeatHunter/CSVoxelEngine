@@ -177,6 +177,8 @@ internal sealed class GameplayInput
 
         // The death screen owns the player while it is up: no keys, clicks or look reach the world
         var deathUp = DeathScreenUp(w);
+        // From the first dead frame, while the body still falls, nothing attacks, uses or places
+        var downed = session.RespawnPromptOf(w).IsDead;
         if (deathUp != deathScreenWasUp)
         {
             deathScreenWasUp = deathUp;
@@ -278,7 +280,7 @@ internal sealed class GameplayInput
         // The [E] panel owns the mouse: clicks equip, hotbar keys rest, and the world runs on.
         // While a text field has focus, E is typing, not a close.
         var ePressed = inputManager.Keyboard?.IsKeyPressed(Key.E) == true;
-        if (ePressed && !eWasPressed && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp
+        if (ePressed && !eWasPressed && !pauseMenuView.IsOpen && !chatView.IsOpen && !downed
             && inventoryView.Focus == InventoryFocus.None && !waystoneInput.HasFocusedField)
         {
             // E closes an open spell builder, waystone screen or anvil recipe list rather than opening the [E] panel over it
@@ -299,7 +301,7 @@ internal sealed class GameplayInput
         panelInput.AssignHoveredRowToHotbar(
             inventoryView.IsOpen && inventoryView.Focus == InventoryFocus.None && !pauseMenuView.IsOpen);
 
-        if (!PanelOpen && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp)
+        if (!PanelOpen && !pauseMenuView.IsOpen && !chatView.IsOpen && !downed)
         {
             // 1-10 grabs the hotbar slot directly; scroll still walks it one step at a time
             for (var i = 0; i < InventoryPanelInput.NumberKeys.Length; i++)
@@ -326,7 +328,7 @@ internal sealed class GameplayInput
         // so a mudball cooks on a lit campfire instead of sailing over it. Hold to charge,
         // release to throw.
         var rightDown = inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true;
-        var rightHeld = rightDown && !PanelOpen && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp;
+        var rightHeld = rightDown && !PanelOpen && !pauseMenuView.IsOpen && !chatView.IsOpen && !downed;
         var rightPressed = rightHeld && !rightWasDown;
         switch (rightHeld)
         {
@@ -386,7 +388,7 @@ internal sealed class GameplayInput
             Forge.Close(recapture: false);
         Forge.Update(w);
         panelInput.Chest.Update(w);
-        if (!rightHeld && (PanelOpen || pauseMenuView.IsOpen || chatView.IsOpen || deathUp))
+        if (!rightHeld && (PanelOpen || pauseMenuView.IsOpen || chatView.IsOpen || downed))
         {
             if (w.Throws.IsThrowCharging) w.Throws.CancelThrowCharge();
             if (w.RightClick.IsUseCharging) w.RightClick.CancelUseCharge();
@@ -413,11 +415,11 @@ internal sealed class GameplayInput
 
             FrameProfiler.Begin(ProfileSection.Breaking);
             w.LeftClick.UpdateBlockBreaking(deltaTime,
-                !PanelOpen && !chatView.IsOpen && !deathUp
+                !PanelOpen && !chatView.IsOpen && !downed
                 && inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
             FrameProfiler.End(ProfileSection.Breaking);
 
-            var middlePressed = !PanelOpen && !chatView.IsOpen && !deathUp
+            var middlePressed = !PanelOpen && !chatView.IsOpen && !downed
                 && inputManager.Mouse?.IsButtonPressed(MouseButton.Middle) == true;
             if (middlePressed && !middleWasPressed)
             {

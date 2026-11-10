@@ -563,7 +563,11 @@ public class Camera : IMobTarget
     Vector3 IMobTarget.Velocity => new(HorizontalVelocity.X, VerticalVelocity, HorizontalVelocity.Y);
 
     /// <inheritdoc />
-    public bool IsImmune => IsCreative || IsFlying;
+    public bool IsImmune => IsCreative || IsFlying || IsDead;
+
+    /// <summary>Whether the local player is dead: set by the health pool's owner each tick. A dead player
+    /// is no target, so mobs lose interest in it from the first dead frame.</summary>
+    public bool IsDead { get; internal set; }
 
     /// <summary>The local player's status effects (its health pool's set), which the physics and the
     /// attack pace read: authoritative in singleplayer, the server's mirror on a client. Null on a

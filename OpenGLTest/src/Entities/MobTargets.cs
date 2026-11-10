@@ -71,7 +71,7 @@ public static class MobTargets
 
     /// <summary>
     /// Index of the target a mob at <paramref name="position"/> chases: the horizontally nearest
-    /// one that is not immune, else (every target immune) the nearest immune one, so mobs still
+    /// one that is not immune or dead, else (every target immune) the nearest immune one, so mobs still
     /// face a lone hovering camera. A target farther than its <see cref="NoticeRadius"/> (shorter
     /// while it sneaks) goes unnoticed. -1 when no target is noticed.
     /// </summary>
@@ -85,6 +85,7 @@ public static class MobTargets
         for (var i = 0; i < targets.Count; i++)
         {
             var target = targets[i];
+            if (target.IsDead) continue;
             var squared = HorizontalDistanceSquared(target.Eye, position);
             var notice = NoticeRadius(target);
             if (squared > notice * notice) continue;
