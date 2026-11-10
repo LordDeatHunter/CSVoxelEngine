@@ -10,10 +10,12 @@ using VoxelEngine.Particles;
 namespace VoxelEngine.Simulation;
 
 /// <summary>
-/// Owns the animals of the wild (<see cref="Animal"/>: <see cref="Deer"/>, <see cref="Boar"/>): on the shared
-/// realm frame (<see cref="RealmMobManager{TMob}"/>) each animal reacts only to the players it heeds
-/// (<see cref="Animal.Heeds"/>) and wanders otherwise, a boar's gore is billed at its impact to every target
-/// still in reach, and nothing despawns for standing idle. It spawns herds on dry surface around the players
+/// Owns the animals of the wild (<see cref="Animal"/>: <see cref="Deer"/>, <see cref="Boar"/>,
+/// <see cref="Crow"/>, <see cref="Dragonfly"/>): on the shared realm frame (<see cref="RealmMobManager{TMob}"/>)
+/// each animal reacts only to the players it heeds (<see cref="Animal.Heeds"/>) and wanders otherwise, an attack
+/// is billed at its impact to every target it still reaches (<see cref="Animal.TryTakeStrike"/>), and nothing
+/// despawns for standing idle. It spawns herds and flocks on dry surface around the players (a flyer in the open
+/// air over its column)
 /// (<see cref="MobSpawner.TryFindSurfaceSpawn(ChunkManager, SpawnOrigin, float, float, int, out int, out int, out int)"/>),
 /// the species picked for the column's biome (<see cref="WildlifeSpawnRules"/>), under the wildlife budget
 /// (<see cref="MobCaps.WildlifeCap"/>) that stands beside the hostile mobs' cap. Main thread only.
@@ -70,19 +72,17 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
         UpdateSpawning(deltaTime, chunks, targets);
     }
 
-    // A boar's gore lands on every non-immune target still in reach at the clip's impact
+    // An attack (a gore, a swoop, a bite) lands on every non-immune target it still reaches at its clip's impact
     /// <inheritdoc />
     protected override void Attack(Animal mob, IReadOnlyList<IMobTarget> targets)
     {
-        if (mob is not Boar boar || !boar.TryTakeGoreImpact()) return;
+        if (!mob.TryTakeStrike()) return;
         for (var t = 0; t < targets.Count; t++)
         {
             var target = targets[t];
-            if (target.IsImmune || !Boar.InGoreReach(boar.Position, target.Eye, boar.GoreReach)) continue;
-            Hit(target, boar.GoreDamage, boar.Position,
-                boar.IsDire ? WildlifeConfig.DireBoarKnockbackSpeed : WildlifeConfig.BoarKnockbackSpeed,
-                boar.IsDire ? WildlifeConfig.DireBoarKnockbackLift : WildlifeConfig.BoarKnockbackLift,
-                boar.Type.DisplayName);
+            if (target.IsImmune || !mob.StrikeReaches(target.Eye)) continue;
+            Hit(target, mob.StrikeDamage, mob.Position, mob.StrikeKnockbackSpeed, mob.StrikeKnockbackLift,
+                mob.Type.DisplayName);
         }
     }
 
@@ -100,12 +100,12 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
                 WildlifeConfig.SpawnMaxRadiusBlocks, WildlifeConfig.SpawnTries, out var x, out var groundY, out var z))
             return;
 
-        var picked = WildlifeSpawnRules.Pick(MobSpawner.SurfaceBiomeAt(chunks, x, z), Random.Shared.NextSingle(),
+        var nearWater = MobSpawner.IsNearSurfaceWater(chunks, x, z, WildlifeConfig.NearWaterRadiusBlocks);
+        var picked = WildlifeSpawnRules.Pick(MobSpawner.SurfaceBiomeAt(chunks, x, z), nearWater, Random.Shared.NextSingle(),
             kind => _types[(int)kind] != null);
         if (picked is not { } rule) return;
 
-        var name = WildlifeSpecies.NameOf(rule.Kind);
-        if (!SpawnStanding(chunks, name, x, groundY, z)) return;
+        if (!Place(chunks, rule.Kind, x, groundY, z)) return;
 
         var group = Random.Shared.Next(rule.GroupMin, rule.GroupMax + 1);
         var leader = new Vector3(x + 0.5f, groundY + 1.5f, z + 0.5f);
@@ -113,17 +113,22 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
         {
             if (MobSpawner.TryFindSurfaceSpawn(chunks, leader, 1f, WildlifeConfig.GroupSpawnRadiusBlocks,
                     WildlifeConfig.GroupSpawnTries, out var mx, out var my, out var mz))
-                SpawnStanding(chunks, name, mx, my, mz);
+                Place(chunks, rule.Kind, mx, my, mz);
         }
     }
 
-    // One animal of the named species standing on ground cell (x, y, z); false when its body would overlap a
-    // block there (a wide body beside a trunk) or the hard cap is full
-    private bool SpawnStanding(ChunkManager chunks, string name, int x, int y, int z)
+    // One animal of the species over ground cell (x, y, z): standing on it, or for a flyer in the air a few
+    // blocks above; false when its body would overlap a block there (a wide body beside a trunk, a flyer under
+    // a canopy) or the hard cap is full
+    private bool Place(ChunkManager chunks, WildlifeKind kind, int x, int y, int z)
     {
+        var name = WildlifeSpecies.NameOf(kind);
         var height = WildlifeSpecies.HeightOf(name);
         var halfWidth = WildlifeSpecies.HalfExtentOf(name);
         var center = new Vector3(x + 0.5f, MobSpawner.StandingCenterY(y, height * 0.5f), z + 0.5f);
+        if (WildlifeSpecies.Flies(kind))
+            center.Y += MathUtils.Lerp(WildlifeConfig.AirSpawnLiftMinBlocks, WildlifeConfig.AirSpawnLiftMaxBlocks,
+                Random.Shared.NextSingle());
         if (BoxSweep.IsColliding(center, new Vector3(halfWidth, height * 0.5f, halfWidth), chunks)) return false;
         return Spawn(name, center) != null;
     }

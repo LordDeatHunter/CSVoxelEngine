@@ -11,7 +11,7 @@ namespace VoxelEngine.Entities.Wildlife;
 /// <see cref="WildlifeConfig.BoarCrowdRangeBlocks"/> of it for <see cref="WildlifeConfig.BoarCrowdSeconds"/>
 /// (it stops and stares meanwhile). Provoked, it paws the ground once (its <c>threat</c> clip), then charges
 /// in its run and gores at the <see cref="ImpactEvent"/> of its <c>gore</c> clip, which the manager bills to
-/// whoever is still in reach (<see cref="TryTakeGoreImpact"/>, <see cref="InGoreReach"/>). Its anger outlasts
+/// whoever is still in reach (<see cref="TryTakeStrike"/>, <see cref="InGoreReach"/>). Its anger outlasts
 /// its last sight of the target by <see cref="WildlifeConfig.BoarAngerSeconds"/>. The dire boar is provoked
 /// by anyone it notices within <see cref="WildlifeConfig.DireBoarNoticeRangeBlocks"/>. Main thread only.
 /// </summary>
@@ -105,11 +105,22 @@ public sealed class Boar : Animal
     /// <inheritdoc />
     protected override bool ActsThroughAction => Animation.IsPlaying(RootClip);
 
-    /// <summary>The damage one gore deals.</summary>
-    public int GoreDamage => IsDire ? WildlifeConfig.DireBoarGoreDamage : WildlifeConfig.BoarGoreDamage;
-
     /// <summary>How far the tusks reach from the body center.</summary>
     public float GoreReach => IsDire ? WildlifeConfig.DireBoarGoreReach : WildlifeConfig.BoarGoreReach;
+
+    /// <inheritdoc />
+    public override int StrikeDamage => IsDire ? WildlifeConfig.DireBoarGoreDamage : WildlifeConfig.BoarGoreDamage;
+
+    /// <inheritdoc />
+    public override float StrikeKnockbackSpeed =>
+        IsDire ? WildlifeConfig.DireBoarKnockbackSpeed : WildlifeConfig.BoarKnockbackSpeed;
+
+    /// <inheritdoc />
+    public override float StrikeKnockbackLift =>
+        IsDire ? WildlifeConfig.DireBoarKnockbackLift : WildlifeConfig.BoarKnockbackLift;
+
+    /// <inheritdoc />
+    public override bool StrikeReaches(Vector3 eye) => InGoreReach(Position, eye, GoreReach);
 
     /// <summary>Whether a boar centered at <paramref name="center"/> with the given <paramref name="reach"/>
     /// can gore a player whose eye is at <paramref name="eye"/>.</summary>
@@ -195,8 +206,8 @@ public sealed class Boar : Animal
         StartAttack(RootAction);
     }
 
-    /// <summary>True once per gore, at the gore clip's impact event; the manager finds the targets in reach.</summary>
-    public bool TryTakeGoreImpact() => Animation.ConsumeEvent(ImpactEvent);
+    /// <inheritdoc />
+    public override bool TryTakeStrike() => Animation.ConsumeEvent(ImpactEvent);
 
     // Makes it angry; a boar that was calm owes its threat display again
     private void Provoke()

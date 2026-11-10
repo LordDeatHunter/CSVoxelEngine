@@ -458,7 +458,9 @@ OpenGLTest/
       SkyMobs/                 # the sky islands' mobs (see "Sky mobs"): the shared base, the two kinds, the zone difficulty
       Wildlife/                # the animals of the wild (see "Wildlife"): Animal (heeding, idle habits, gaits), the
                                #   WildlifeSpecies table, Deer (watches, bolts, grazes), Boar (neutral until crowded or
-                               #   hurt, then charges and gores; the dire boar is the same class oversized)
+                               #   hurt, then charges and gores; the dire boar is the same class oversized), FlyingAnimal
+                               #   (lands, rests, takes off; posture for mirrors), Crow (flock pest: swoops, pecks, caws),
+                               #   Dragonfly (waterside hunter: darts and bites)
         SkyMob.cs              # abstract sky mob (a RealmMob): the zone tier it spawned in and its tier-scaled pool
         Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event
         Cloudgolem.cs          # the ground bruiser: walk with ledge caution, the slam clip's impact event, the shockwave

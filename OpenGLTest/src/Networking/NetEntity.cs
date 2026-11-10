@@ -31,6 +31,8 @@ public enum NetEntityKind : byte
     Deer = 18,
     Boar = 19,
     DireBoar = 20,
+    Crow = 21,
+    Dragonfly = 22,
 }
 
 /// <summary>
@@ -45,7 +47,8 @@ public enum NetEntityKind : byte
 /// (<c>Skeleton.PackLook</c>) or the Skeleton King's fight phase (1..3, clamped on read;
 /// its <see cref="Ammo"/> is its attack count, naming slam, volley and summon by its remainder modulo 3) or a cave mob's
 /// depth tier (0..<c>MobConfig.CaveMaxTier</c>, clamped on read, fixed at its spawn; its <see cref="Ammo"/> is its attack
-/// count); a drop uses
+/// count) or a wild animal's posture (<c>Animal.Posture</c>: whether a flyer sits on the ground, which a mirror
+/// cannot tell from its velocity); a drop uses
 /// <see cref="ItemId"/>.
 /// A sandworm is a mob entry for its head (<see cref="Position"/>, <see cref="Yaw"/> its heading, <see cref="Velocity"/> the
 /// head velocity a client dead-reckons along) whose <see cref="Ammo"/> is its phase (<c>SandwormPhase</c>); its body is

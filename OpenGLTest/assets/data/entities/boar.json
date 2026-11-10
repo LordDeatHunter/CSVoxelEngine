@@ -1,6 +1,6 @@
 {
   "name": "Boar",
-  // A wild boar, authored in Blockbench (model, rig and clips only so far); no mob class spawns it
+  // Neutral until hurt or crowded, then it paws the ground and charges (Boar, WildlifeConfig)
   "hp": 30,
   "model": "assets/models/entity/boar.bbmodel"
 }

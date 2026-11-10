@@ -286,9 +286,11 @@ debugger take a new species from it instead of naming it; adding one means a cla
   never takes an enemy's place nor the other way round; both still count toward the one hard cap.
 - **Spawning.** Each spawn turn searches a dry surface column in the `SpawnMin..MaxRadiusBlocks` ring around a target
   on the surface (`MobSpawner.TryFindSurfaceSpawn`, leaning toward its heading like every ring), picks the species
-  for the column's biome (`WildlifeSpawnRules.Pick` over `MobSpawner.SurfaceBiomeAt`: deer in forest, taiga and
-  steppe; boars in forest, taiga and savanna; the rare dire boar in forest and taiga), and places its group within
-  `GroupSpawnRadiusBlocks`, each body only where it fits (`BoxSweep.IsColliding`). An animal fades out only when no
+  for the column's biome and whether surface water is near (`WildlifeSpawnRules.Pick` over
+  `MobSpawner.SurfaceBiomeAt` and `IsNearSurfaceWater`: deer in forest, taiga and steppe; boars in forest, taiga and
+  savanna; the rare dire boar in forest and taiga; crows on any land; dragonflies only at the waterside), and places
+  its group within `GroupSpawnRadiusBlocks`, each body only where it fits (`BoxSweep.IsColliding` at
+  `MobSpawner.StandingCenterY`, a flyer `AirSpawnLiftMin..MaxBlocks` up in the open air). An animal fades out only when no
   target keeps it in play (`MobTargets.OutOfPlay`); it never despawns for idling
   (`RealmMobManager.DespawnsWhenIdle`).
 - **Reacting.** The manager hands an animal a target only when it heeds the players near it (`Animal.Heeds`, judged
@@ -299,6 +301,22 @@ debugger take a new species from it instead of naming it; adding one means a cla
   (`Animal.ChooseGait` over `EntityAnimator.SetGait`, which fades between pairs), on the server and on a mirror
   alike since only the velocity is read; breaking into the run cuts an idle clip short (`EntityAnimator.CutAction`).
   Its other clips are counted actions (`RealmMob.StartAttack(variant)`), so the attack count replays them on clients.
+- **Strikes.** Every attack lands through one shape: `Animal.TryTakeStrike` (the clip's `impact` event) and
+  `StrikeReaches`, which the manager bills to each non-immune target with the species' `StrikeDamage` and
+  knockback.
+- **Flyers that perch** (`FlyingAnimal`): in the air it steers like any flyer (`FlyToward`); left alone for
+  `FlyerAirMin..MaxSeconds` over solid ground within `FlyerLandDropBlocks` it lands (its `land` clip) and is then a
+  walker standing still under gravity, playing its ground clips for `FlyerPerchMin..MaxSeconds`; it takes off (its
+  `takeoff` clip, with a kick upward) when the rest is over, when hurt, or when it heeds somebody it will not sit
+  still for (`StaysPerchedNear`). The locomotion pair follows the state through `SetGait`, and since a mirror
+  cannot tell a hovering body from a sitting one, the state rides `Animal.Posture` in the entry's item byte.
+- **Crow** (`Crow`): a pest in flocks. A player within `CrowNoticeRangeBlocks` draws it: it circles overhead and
+  swoops (its `swoop` clip flown at the chest), raking whoever is within `CrowStrikeReach` at the impact; on the
+  ground it pecks an ankle within `CrowPeckReach` instead. It soars on its `glide` clip when it has nobody to harass
+  and pecks the dirt or caws while resting.
+- **Dragonfly** (`Dragonfly`): the man-sized hunter of the waterside. A player within `DragonflyNoticeRangeBlocks` is
+  prey: it holds itself over their head and darts in its `bite` clip, biting whoever is within `DragonflyBiteReach`
+  at the impact. On the ground it plays `perch`. Riding one is a later task (`plans/TODO.md`).
 - **Deer** (`Deer`): watches a player inside `DeerAlertRangeBlocks` (its `alert` clip once), bolts from one inside
   `DeerFleeRangeBlocks` or one that hurts it for `DeerFleeSeconds` at `DeerRunSpeed`, veering so a herd scatters;
   grazes when left alone. It never attacks.
@@ -310,6 +328,8 @@ debugger take a new species from it instead of naming it; adding one means a cla
 - **Health bars.** An animal shows its bar only once hurt (`Animal.ShowsHealthbar`); a provoked boar and the dire
   boar always do.
 - **Network and saves.** One `NetEntityKind` per species from `Deer` on (`NetEntity.KindOf` / `TryGetWildlife`,
-  protocol 36); a mirror is spawned by its species name and removed like any realm mob. Saves capture them like the
+  protocol 36, the flyers and the posture byte 37); a mirror is spawned by its species name and removed like any
+  realm mob. Saves capture them like the
   sky mobs and restore them settled. `WildlifeTests` drives the rules headless and
-  `visual-examples/wildlife.json` (`VOXEL_TIME=147`) films a herd calm, then reacting to a player on foot.
+  `visual-examples/wildlife.json` (`VOXEL_TIME=147`) films a herd calm, then reacting to a player on foot, and
+  `visual-examples/wildlife-flyers.json` the crows aloft and resting and a dragonfly coming in.

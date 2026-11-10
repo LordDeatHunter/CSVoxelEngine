@@ -199,6 +199,7 @@ internal sealed class ClientMirror
                 existing.Effects.SetMirrorMask(entry.Effects);
                 // A realm mob's attack count moving means the server started an attack: play its clip
                 if (existing is RealmMob realm) realm.MirrorAttackCount(entry.Ammo);
+                if (existing is Animal animal) animal.MirrorPosture((byte)entry.ItemId);
                 if (existing is Sandworm worm) worm.MirrorPhase(PhaseOf(entry.Ammo));
                 if (existing is SkeletonKing king) king.MirrorPhase(KingPhaseOf((byte)entry.ItemId));
                 if (!_serverMode && existing.Health < before)
@@ -496,6 +497,7 @@ internal sealed class ClientMirror
         mob?.Effects.SetMirrorMask(entry.Effects);
         // The first count only sets it: an attack already under way when first seen is not replayed
         if (mob is RealmMob realm) realm.MirrorAttackCount(entry.Ammo);
+        if (mob is Animal spawned) spawned.MirrorPosture((byte)entry.ItemId);
         if (mob is Sandworm worm) worm.MirrorPhase(PhaseOf(entry.Ammo));
         if (mob is SkeletonKing king) king.MirrorPhase(KingPhaseOf((byte)entry.ItemId));
         return mob;

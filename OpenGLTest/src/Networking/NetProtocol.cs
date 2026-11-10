@@ -228,8 +228,11 @@ public static class NetFraming
     /// a stackable and a chest deposit carry their id at id width. An older peer would misread the hello.
     /// 36: <see cref="NetMessage.EntityList"/> also carries the wild animals (<see cref="NetEntityKind.Deer"/> onward,
     /// one kind per <c>WildlifeKind</c>); their <see cref="NetEntity.Ammo"/> is the count of their action clips like any
-    /// realm mob's. An older client would not draw them.</summary>
-    public const int ProtocolVersion = 36;
+    /// realm mob's. An older client would not draw them.
+    /// 37: two more wild animals (<see cref="NetEntityKind.Crow"/>, <see cref="NetEntityKind.Dragonfly"/>), and a wild
+    /// animal's <see cref="NetEntity.ItemId"/> carries its posture (<c>Animal.Posture</c>); an older client would not
+    /// draw the new kinds.</summary>
+    public const int ProtocolVersion = 37;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

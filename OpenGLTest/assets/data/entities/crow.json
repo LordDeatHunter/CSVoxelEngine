@@ -1,6 +1,6 @@
 {
   "name": "Crow",
-  // A crow: model, rig and clips only so far (tools/generate-critter-models.py); no mob class spawns it
+  // A pest that flies in flocks, swoops at players and lands to strut and caw (Crow, WildlifeConfig)
   "hp": 8,
   "model": "assets/models/entity/crow.bbmodel"
 }

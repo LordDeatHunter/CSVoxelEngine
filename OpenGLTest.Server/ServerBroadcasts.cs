@@ -96,7 +96,7 @@ internal sealed class ServerBroadcasts
                 Sandworm worm => (int)worm.Phase,
                 _ => 0,
             };
-            // The byte field is a goblin's torch count, a skeleton's tier, role and outfit, a cave mob's tier or the Skeleton King's phase (0 for the
+            // The byte field is a goblin's torch count, a skeleton's tier, role and outfit, a cave mob's tier, a wild animal's posture or the Skeleton King's phase (0 for the
             // rest); every entry ends with a status-effect mask (NetEntity.Effects), a mob's own
             var itemByte = mob switch
             {
@@ -104,6 +104,7 @@ internal sealed class ServerBroadcasts
                 Skeleton skeleton => Skeleton.PackLook(skeleton.Tier, skeleton.Role, skeleton.Outfit),
                 SkeletonKing king => (byte)king.Phase,
                 CaveMob cave => (byte)cave.Tier,
+                Animal animal => animal.Posture,
                 _ => (byte)0,
             };
             NetEntityCodec.Write(writer, new NetEntity(kind, IdFor(mob), mob.Position, mob.Facing, mob.Health, ammo,

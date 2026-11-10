@@ -1,0 +1,29 @@
+{
+  // Flying wildlife: run with VOXEL_SCRIPT=visual-examples/wildlife-flyers.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/wildlife-flyers/.
+  // The camera hovers over goblins.json's open forest clearing facing -Z. While it flies it is immune and
+  // concerns no animal, so "aloft" films three crows rising from where they were spawned and wandering, and
+  // "resting" (a rest starts 9 to 22 s after a spawn) usually catches one or more of them sitting on the
+  // ground. Then a dragonfly is spawned ahead and the flight ends: the player lands among them, and "attack"
+  // and "swarm" film the dragonfly coming in to bite and the crows circling and swooping.
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -6 },
+    { "op": "fly" },
+    // Chunks must be loaded before anything can stand on them
+    { "op": "wait", "seconds": 5 },
+    { "op": "spawn", "entity": "crow", "pos": [-43.5, 54.5] },
+    { "op": "spawn", "entity": "crow", "pos": [-41.5, 53.5] },
+    { "op": "spawn", "entity": "crow", "pos": [-45.5, 53.5] },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "aloft" },
+    { "op": "wait", "seconds": 17 },
+    { "op": "screenshot", "name": "resting" },
+    { "op": "spawn", "entity": "dragonfly", "pos": [-43.5, 53.5] },
+    { "op": "fly", "on": false },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "attack" },
+    { "op": "wait", "seconds": 2.5 },
+    { "op": "look", "yaw": -90, "pitch": 25 },
+    { "op": "screenshot", "name": "swarm" }
+  ]
+}

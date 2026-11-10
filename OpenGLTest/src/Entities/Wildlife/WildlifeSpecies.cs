@@ -10,6 +10,8 @@ public enum WildlifeKind : byte
     Deer = 0,
     Boar = 1,
     DireBoar = 2,
+    Crow = 3,
+    Dragonfly = 4,
 }
 
 /// <summary>
@@ -20,7 +22,8 @@ public enum WildlifeKind : byte
 public static class WildlifeSpecies
 {
     /// <summary>The entity file names (<c>assets/data/entities/&lt;name&gt;.json</c>), indexed by <see cref="WildlifeKind"/>.</summary>
-    public static readonly string[] Names = [Deer.EntityName, Boar.EntityName, Boar.DireEntityName];
+    public static readonly string[] Names =
+        [Deer.EntityName, Boar.EntityName, Boar.DireEntityName, Crow.EntityName, Dragonfly.EntityName];
 
     /// <summary>The species an entity name belongs to, or null for any other entity.</summary>
     public static WildlifeKind? KindOf(string name)
@@ -41,6 +44,8 @@ public static class WildlifeSpecies
         WildlifeKind.Deer => new Deer(type, position, spawnIn),
         WildlifeKind.Boar => new Boar(type, position, dire: false, spawnIn),
         WildlifeKind.DireBoar => new Boar(type, position, dire: true, spawnIn),
+        WildlifeKind.Crow => new Crow(type, position, spawnIn),
+        WildlifeKind.Dragonfly => new Dragonfly(type, position, spawnIn),
         _ => null,
     };
 
@@ -52,6 +57,8 @@ public static class WildlifeSpecies
         {
             case WildlifeKind.Deer: Deer.ValidateContent(type); break;
             case WildlifeKind.Boar or WildlifeKind.DireBoar: Boar.ValidateContent(type); break;
+            case WildlifeKind.Crow: Crow.ValidateContent(type); break;
+            case WildlifeKind.Dragonfly: Dragonfly.ValidateContent(type); break;
         }
     }
 
@@ -62,8 +69,13 @@ public static class WildlifeSpecies
         WildlifeKind.Deer => WildlifeConfig.DeerHeight,
         WildlifeKind.Boar => WildlifeConfig.BoarHeight,
         WildlifeKind.DireBoar => WildlifeConfig.DireBoarHeight,
+        WildlifeKind.Crow => WildlifeConfig.CrowHeight,
+        WildlifeKind.Dragonfly => WildlifeConfig.DragonflyHeight,
         _ => 0f,
     };
+
+    /// <summary>Whether <paramref name="kind"/> is a flyer, which spawns in the air over its column.</summary>
+    public static bool Flies(WildlifeKind kind) => kind is WildlifeKind.Crow or WildlifeKind.Dragonfly;
 
     /// <summary>Half the horizontal edge of the named species' body, or 0 for an entity that is not a wild animal.</summary>
     public static float HalfExtentOf(string name) => KindOf(name) switch
@@ -71,6 +83,8 @@ public static class WildlifeSpecies
         WildlifeKind.Deer => WildlifeConfig.DeerHalfExtent,
         WildlifeKind.Boar => WildlifeConfig.BoarHalfExtent,
         WildlifeKind.DireBoar => WildlifeConfig.DireBoarHalfExtent,
+        WildlifeKind.Crow => WildlifeConfig.CrowHalfExtent,
+        WildlifeKind.Dragonfly => WildlifeConfig.DragonflyHalfExtent,
         _ => 0f,
     };
 }

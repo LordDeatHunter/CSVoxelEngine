@@ -6,21 +6,24 @@ using VoxelEngine.Chunks;
 namespace VoxelEngine.Entities.Wildlife;
 
 /// <summary>
-/// An animal of the wild (<see cref="Deer"/>, <see cref="Boar"/>): a <see cref="RealmMob"/> that is not
-/// hostile by nature. Each frame it either heeds the players near it (<see cref="Heeds"/>: it flees,
-/// watches or, provoked, attacks) or goes about its wandering, where its species' idle habit plays
-/// (<see cref="IdleTick"/>: grazing, rooting). A walker with a run clip switches its gait by its speed
-/// (<see cref="ChooseGait"/>), on a client's mirror as on the server, and breaks off an idle clip when it
-/// starts to run. Its counted action clips (<see cref="RealmMob.StartAttack(int)"/>) reach the clients
-/// through the attack count like any realm mob's. Main thread only.
+/// An animal of the wild (<see cref="Deer"/>, <see cref="Boar"/>, the flying <see cref="FlyingAnimal"/>s): a
+/// <see cref="RealmMob"/> that is not hostile by nature. Each frame it either heeds the players near it
+/// (<see cref="Heeds"/>: it flees, watches or attacks) or goes about its wandering, where its species' idle
+/// habit plays (<see cref="IdleTick"/>: grazing, rooting). A walker with a run clip switches its gait by its
+/// speed (<see cref="ChooseGait"/>), on a client's mirror as on the server, and breaks off an idle clip when it
+/// starts to run. An attack lands through one shape for every species (<see cref="TryTakeStrike"/>,
+/// <see cref="StrikeReaches"/>), which the manager bills. Its counted action clips
+/// (<see cref="RealmMob.StartAttack(int)"/>) reach the clients through the attack count like any realm mob's,
+/// and what a mirror cannot tell from the velocity rides its <see cref="Posture"/>. Main thread only.
 /// </summary>
 public abstract class Animal : RealmMob
 {
     private bool _running;
 
-    /// <param name="walkSpeed">The speed its walk clip is authored at.</param>
-    protected Animal(EntityType type, Vector3 position, float walkSpeed, bool spawnIn)
-        : base(type, position, walkSpeed, spawnIn)
+    /// <param name="moveSpeed">The speed its walk (or fly) clip is authored at.</param>
+    /// <param name="flight">Makes the species a flyer; null walks.</param>
+    protected Animal(EntityType type, Vector3 position, float moveSpeed, bool spawnIn, FlightTuning? flight = null)
+        : base(type, position, moveSpeed, spawnIn, flight)
     {
     }
 
@@ -40,6 +43,31 @@ public abstract class Animal : RealmMob
     /// wandering as if nobody were there.
     /// </summary>
     public abstract bool Heeds(IReadOnlyList<IMobTarget> targets);
+
+    /// <summary>True once per attack, at the moment it lands (its clip's impact event); the manager then
+    /// hurts every target <see cref="StrikeReaches"/> holds. Never for a species that does not attack.</summary>
+    public virtual bool TryTakeStrike() => false;
+
+    /// <summary>Whether the attack that just landed reaches a player whose eye is at <paramref name="eye"/>.</summary>
+    public virtual bool StrikeReaches(Vector3 eye) => false;
+
+    /// <summary>The damage one landed attack deals.</summary>
+    public virtual int StrikeDamage => 0;
+
+    /// <summary>The horizontal shove a landed attack gives its target.</summary>
+    public virtual float StrikeKnockbackSpeed => 0f;
+
+    /// <summary>The upward pop a landed attack gives its target.</summary>
+    public virtual float StrikeKnockbackLift => 0f;
+
+    /// <summary>What a client's mirror cannot read from the velocity alone (a flyer sitting on the ground),
+    /// packed into the byte a server broadcasts beside the animal; 0 for a species with nothing to tell.</summary>
+    public virtual byte Posture => 0;
+
+    /// <summary>A client's mirror takes the server's <see cref="Posture"/>.</summary>
+    public virtual void MirrorPosture(byte posture)
+    {
+    }
 
     /// <summary>The clip a walker moves with above its walk (a deer's or a boar's <c>run</c>), or null for
     /// one that only walks.</summary>

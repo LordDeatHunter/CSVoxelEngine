@@ -13,9 +13,10 @@ namespace VoxelEngine.Tests.Entities.Wildlife;
 /// <summary>
 /// The animals of the wild, driven headless: every species' shipped model satisfies its contract, a deer
 /// only watches from afar and bolts away from a player who comes close or hurts it, a boar ignores everyone
-/// until it is crowded or hurt and then charges and gores only those in reach, the species a spawn becomes
-/// follows its biome, the animals fill their own budget beside the hostile mobs', and each species has its
-/// own network kind.
+/// until it is crowded or hurt and then charges and gores only those in reach, a crow and a dragonfly strike a
+/// player they notice from the air, a flyer left alone lands, rests and takes off again (at once when hurt)
+/// and tells its mirror so, the species a spawn becomes follows its biome and the water near it, the animals
+/// fill their own budget beside the hostile mobs', and each species has its own network kind.
 /// </summary>
 public sealed class WildlifeTests
 {
@@ -44,6 +45,40 @@ public sealed class WildlifeTests
 
     private static float HorizontalDistance(Vector3 a, Vector3 b) =>
         new Vector2(a.X - b.X, a.Z - b.Z).Length();
+
+    // A stone floor three chunks on a side around the origin chunk, so a wandering flyer keeps ground under it
+    private static ChunkManager WideFloor()
+    {
+        var chunks = new ChunkManager(null!);
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        for (var cx = -1; cx <= 1; cx++)
+        for (var cz = -1; cz <= 1; cz++)
+        {
+            var chunk = new Chunk(null!, new Vector3(cx, 0, cz), generateBlockData: false) { IsBlockDataReady = true };
+            chunks.Chunks[new Vector3(cx, 0, cz)] = chunk;
+            for (var x = 0; x < Chunk.Size; x++)
+            for (var z = 0; z < Chunk.Size; z++)
+                chunk.SetBlockRaw(x, 0, z, stone, 0);
+        }
+        return chunks;
+    }
+
+    // A flyer of the named species in the air over (x, z), already settled
+    private static T Airborne<T>(WildlifeManager manager, string name, float x, float z, float height = 5f) where T : Animal =>
+        Assert.IsAssignableFrom<T>(manager.Spawn(name, new Vector3(x, 1f + height, z), spawnIn: false));
+
+    // Steps until the condition holds; false when the time runs out first
+    private static bool RunUntil(WildlifeManager manager, ChunkManager chunks, IReadOnlyList<IMobTarget> targets,
+        float seconds, System.Func<bool> done)
+    {
+        var drops = new DropManager();
+        for (var t = 0f; t < seconds; t += Dt)
+        {
+            manager.Update(Dt, chunks, drops, targets);
+            if (done()) return true;
+        }
+        return false;
+    }
 
     [Fact]
     public void EveryShippedSpeciesSatisfiesItsContractAndHasItsOwnBody()
@@ -147,7 +182,7 @@ public sealed class WildlifeTests
         Assert.True(dire.IsDire && !dire.IsProvoked);
         Run(manager, chunks, [player], 0.2f);
         Assert.True(dire.IsProvoked, "a dire boar turns on anyone it notices");
-        Assert.True(dire.GoreDamage > boar.GoreDamage && dire.MaxHealth > boar.MaxHealth);
+        Assert.True(dire.StrikeDamage > boar.StrikeDamage && dire.MaxHealth > boar.MaxHealth);
     }
 
     [Fact]
@@ -169,32 +204,146 @@ public sealed class WildlifeTests
     }
 
     [Fact]
+    public void ACrowHarassesAPlayerItNoticesAndLeavesADistantOneAlone()
+    {
+        var chunks = WideFloor();
+        var manager = NewManager();
+        var crow = Airborne<Crow>(manager, Crow.EntityName, 8f, 8f);
+
+        var distant = PlayerAt(8f + WildlifeConfig.CrowNoticeRangeBlocks + 6f, 8f);
+        Assert.False(crow.Heeds([distant]));
+
+        var near = PlayerAt(8f + WildlifeConfig.CrowNoticeRangeBlocks * 0.5f, 8f);
+        Assert.True(crow.Heeds([near]));
+        Assert.True(RunUntil(manager, chunks, [near], 30f, () => near.DamageTaken > 0), "the crow never struck the player beside it");
+        Assert.Equal(0, distant.DamageTaken);
+
+        // The swoop only rakes what it reaches
+        Assert.True(Crow.InSwoopReach(new Vector3(0f, 1.5f, 0f), StubTarget.EyeAt(new Vector3(0.5f, 0f, 0f))));
+        Assert.False(Crow.InSwoopReach(new Vector3(0f, 1.5f, 0f), StubTarget.EyeAt(new Vector3(WildlifeConfig.CrowStrikeReach + 2f, 0f, 0f))));
+    }
+
+    [Fact]
+    public void ADragonflyDartsAtAPlayerItNoticesAndBitesOnlyInReach()
+    {
+        var chunks = WideFloor();
+        var manager = NewManager();
+        var dragonfly = Airborne<Dragonfly>(manager, Dragonfly.EntityName, 8f, 8f);
+        var player = PlayerAt(8f + WildlifeConfig.DragonflyNoticeRangeBlocks * 0.5f, 8f);
+
+        Assert.True(dragonfly.Heeds([player]));
+        Assert.True(RunUntil(manager, chunks, [player], 30f, () => player.DamageTaken > 0), "the dragonfly never bit the player");
+        Assert.Equal(0, player.DamageTaken % dragonfly.StrikeDamage);
+
+        Assert.False(Dragonfly.InBiteReach(dragonfly.Position, dragonfly.Position + new Vector3(WildlifeConfig.DragonflyBiteReach + 3f, 0f, 0f)));
+        var flier = new StubTarget(player.Eye) { IsFlying = true };
+        Assert.False(dragonfly.Heeds([flier]));
+    }
+
+    [Theory]
+    [InlineData(Crow.EntityName)]
+    [InlineData(Dragonfly.EntityName)]
+    public void AFlyerLeftAloneLandsRestsAndTakesOffAgainAndAtOnceWhenHurt(string name)
+    {
+        var chunks = WideFloor();
+        var manager = NewManager();
+        var flyer = Assert.IsAssignableFrom<FlyingAnimal>(Airborne<Animal>(manager, name, 8f, 8f));
+        // In play, but far beyond anything the flyer reacts to
+        var player = PlayerAt(8f + 60f, 8f);
+        Assert.False(flyer.IsPerched);
+
+        var landBy = WildlifeConfig.FlyerAirMaxSeconds + 30f;
+        Assert.True(RunUntil(manager, chunks, [player], landBy, () => flyer.IsPerched && flyer.IsGrounded),
+            $"the {name} never came down to rest");
+        Assert.True(flyer.Feet.Y < 1.2f, $"a resting {name} should stand on the floor, not hang at {flyer.Feet.Y}");
+
+        Assert.True(RunUntil(manager, chunks, [player], WildlifeConfig.FlyerPerchMaxSeconds + 5f, () => !flyer.IsPerched),
+            $"the {name} never took off again");
+
+        // Resting again, a hit sends it up at once
+        Assert.True(RunUntil(manager, chunks, [player], landBy, () => flyer.IsPerched && flyer.IsGrounded));
+        flyer.TakeDamage(1);
+        Assert.False(flyer.IsPerched);
+    }
+
+    [Theory]
+    [InlineData(Crow.EntityName)]
+    [InlineData(Dragonfly.EntityName)]
+    public void ARestingFlyerTakesOffWhenAPlayerComesNear(string name)
+    {
+        var chunks = WideFloor();
+        var manager = NewManager();
+        var flyer = Assert.IsAssignableFrom<FlyingAnimal>(Airborne<Animal>(manager, name, 8f, 8f));
+        var away = PlayerAt(8f + 60f, 8f);
+        Assert.True(RunUntil(manager, chunks, [away], WildlifeConfig.FlyerAirMaxSeconds + 30f,
+            () => flyer.IsPerched && flyer.IsGrounded && !flyer.Animation.IsActionPlaying));
+
+        // Four blocks off: inside what either species notices, outside a crow's peck
+        var near = PlayerAt(flyer.Position.X + 4f, flyer.Position.Z);
+        Assert.True(RunUntil(manager, chunks, [near], 1.5f, () => !flyer.IsPerched), $"the resting {name} sat still beside a player");
+        Assert.True(RunUntil(manager, chunks, [near], 3f, () => flyer.Feet.Y > 2f), $"the {name} left the ground but did not climb");
+    }
+
+    [Theory]
+    [InlineData(Crow.EntityName)]
+    [InlineData(Dragonfly.EntityName)]
+    public void AFlyersMirrorTakesItsPostureFromTheServer(string name)
+    {
+        var type = EntityRegistry.Require(name);
+        var server = Assert.IsAssignableFrom<FlyingAnimal>(WildlifeSpecies.Create(type, new Vector3(0f, 80f, 0f), spawnIn: false));
+        var mirror = Assert.IsAssignableFrom<FlyingAnimal>(WildlifeSpecies.Create(type, new Vector3(0f, 80f, 0f), spawnIn: false));
+
+        // Every posture a server can report reads back the same on the mirror
+        for (byte posture = 0; posture < 4; posture++)
+        {
+            mirror.MirrorPosture(posture);
+            Assert.Equal(posture, mirror.Posture);
+            Assert.Equal((posture & 1) != 0, mirror.IsPerched);
+        }
+        Assert.Equal(0, server.Posture);
+    }
+
+    [Fact]
     public void ASpawnBecomesOnlyASpeciesLivingInItsBiomeEachAsLikelyAsItsWeight()
     {
         foreach (var biome in System.Enum.GetValues<Biome>())
+        foreach (var nearWater in new[] { false, true })
         {
-            var living = WildlifeSpawnRules.All.Where(r => r.LivesIn(biome)).ToArray();
+            var living = WildlifeSpawnRules.All.Where(r => r.LivesIn(biome, nearWater)).ToArray();
             for (var i = 0; i < 50; i++)
             {
-                var picked = WildlifeSpawnRules.Pick(biome, i / 50f, _ => true);
+                var picked = WildlifeSpawnRules.Pick(biome, nearWater, i / 50f, _ => true);
                 if (living.Length == 0) Assert.Null(picked);
                 else Assert.Contains(picked!.Value.Kind, living.Select(r => r.Kind));
             }
         }
 
         // The ocean is nobody's home, and a species whose content is missing is never picked
-        Assert.Null(WildlifeSpawnRules.Pick(Biome.Ocean, 0.5f, _ => true));
+        Assert.Null(WildlifeSpawnRules.Pick(Biome.Ocean, true, 0.5f, _ => true));
         for (var i = 0; i < 50; i++)
-            Assert.NotEqual(WildlifeKind.Deer, WildlifeSpawnRules.Pick(Biome.Forest, i / 50f, kind => kind != WildlifeKind.Deer)!.Value.Kind);
-        Assert.Null(WildlifeSpawnRules.Pick(Biome.Forest, 0.5f, _ => false));
+            Assert.NotEqual(WildlifeKind.Deer, WildlifeSpawnRules.Pick(Biome.Forest, false, i / 50f, kind => kind != WildlifeKind.Deer)!.Value.Kind);
+        Assert.Null(WildlifeSpawnRules.Pick(Biome.Forest, false, 0.5f, _ => false));
+
+        // A waterside species spawns beside water and never away from it
+        var waterside = WildlifeSpawnRules.All.Where(r => r.NearWater).ToArray();
+        Assert.NotEmpty(waterside);
+        foreach (var rule in waterside)
+        foreach (var biome in rule.Biomes)
+        {
+            Assert.True(rule.LivesIn(biome, nearWater: true));
+            Assert.False(rule.LivesIn(biome, nearWater: false));
+            for (var i = 0; i < 100; i++)
+                Assert.NotEqual(rule.Kind, WildlifeSpawnRules.Pick(biome, false, i / 100f, _ => true)?.Kind);
+            Assert.Contains(Enumerable.Range(0, 400), i => WildlifeSpawnRules.Pick(biome, true, i / 400f, _ => true)?.Kind == rule.Kind);
+        }
 
         // A heavier species takes a larger share of the rolls
-        var forest = WildlifeSpawnRules.All.Where(r => r.LivesIn(Biome.Forest)).OrderBy(r => r.Weight).ToArray();
+        var forest = WildlifeSpawnRules.All.Where(r => r.LivesIn(Biome.Forest, false)).OrderBy(r => r.Weight).ToArray();
         var counts = new Dictionary<WildlifeKind, int>();
         const int rolls = 2000;
         for (var i = 0; i < rolls; i++)
         {
-            var kind = WildlifeSpawnRules.Pick(Biome.Forest, (i + 0.5f) / rolls, _ => true)!.Value.Kind;
+            var kind = WildlifeSpawnRules.Pick(Biome.Forest, false, (i + 0.5f) / rolls, _ => true)!.Value.Kind;
             counts[kind] = counts.GetValueOrDefault(kind) + 1;
         }
         for (var i = 1; i < forest.Length; i++)

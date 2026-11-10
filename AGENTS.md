@@ -64,7 +64,7 @@ purpose). When you change code, edit the doc section that owns it (and nothing e
 | Dedicated server, world sources, wire protocol, intents, client, chat | `multiplayer.md` | |
 | Biomes, terrain shape, water bodies, snow, scenery, cave biomes | `biomes.md` | `biome-worldgen` |
 | Realm layers (hell, sky), structures, ruins, waystone satellites | `layers-and-structures.md` | `biome-worldgen` |
-| Mob base and shared rules, spawn pacing, slime, goblin, wildlife (deer, boar) | `entities.md` | |
+| Mob base and shared rules, spawn pacing, slime, goblin, wildlife (deer, boar, crow, dragonfly) | `entities.md` | |
 | Hell, sky, cave mobs, flying rules | `realm-mobs.md` | |
 | Skeleton, battle tower, Skeleton King, sandworm, icebergs | `tower-and-bosses.md` | |
 | Clips, `EntityAnimator`, player and camera juice | `animation.md` | `item-debugger` |

@@ -260,6 +260,10 @@ single-arc player.
 - [ ] **`F-1` · Mobs — ambient critters** — P2, M.
   Fireflies, butterflies, birds. Could share the particle infrastructure — a cheap first step
   into entities.
+- [ ] **`F-1b` · Rideable dragonfly** — P2, L.
+  The dragonfly (`Entities/Wildlife/Dragonfly`) was modeled as a future mount: its thorax top is flat and clear
+  of the wings, and it already has `perch`, `land` and `takeoff` clips. Still open: taming or saddling, mounting
+  and dismounting, flight input, a rider pose, saves and network sync.
 - [ ] **`F-2` · Mobs — friendly / neutral (farm animals)** — P2, L.
   Cows/sheep/chickens; wandering, breeding, drops, leads. Needs `P-38`. Depends on entity AI.
 - [ ] **`F-3` · Mobs — hostiles (night / caves)** — P2, XL.

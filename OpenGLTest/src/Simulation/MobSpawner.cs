@@ -112,6 +112,26 @@ public static class MobSpawner
     }
 
     /// <summary>
+    /// Whether surface water (a lake, a river, the sea: a column whose terrain lies under its water level) is
+    /// within <paramref name="radius"/> blocks of column (<paramref name="x"/>, <paramref name="z"/>), sampled at
+    /// eight headings on that radius and on half of it; the waterside animals spawn only there.
+    /// </summary>
+    public static bool IsNearSurfaceWater(ChunkManager chunks, int x, int z, float radius)
+    {
+        for (var ring = 1; ring <= 2; ring++)
+        for (var heading = 0; heading < 8; heading++)
+        {
+            var angle = heading * (MathF.Tau / 8f);
+            var sx = MathUtils.FloorToInt(x + 0.5f + MathF.Cos(angle) * radius * ring * 0.5f);
+            var sz = MathUtils.FloorToInt(z + 0.5f + MathF.Sin(angle) * radius * ring * 0.5f);
+            var column = chunks.WorldSource.GetColumn(VoxelCoords.WorldToChunk(sx), VoxelCoords.WorldToChunk(sz));
+            var i = VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(sx), VoxelCoords.WorldToLocal(sz));
+            if (column.Heights[i] < column.WaterLevel[i]) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// The biomes whose surface the ring spawn search takes: every land biome. Only the ocean spawns nothing
     /// (its dry islands and beaches included).
     /// </summary>

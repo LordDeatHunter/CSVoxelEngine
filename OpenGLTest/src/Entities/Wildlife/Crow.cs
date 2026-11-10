@@ -1,0 +1,187 @@
+using System;
+using System.Collections.Generic;
+using System.Numerics;
+using VoxelEngine.Chunks;
+
+namespace VoxelEngine.Entities.Wildlife;
+
+/// <summary>
+/// The crow: a pest that comes in flocks. Left alone it soars about, lands to strut, peck at the ground and
+/// caw, and takes off again. A player within <see cref="WildlifeConfig.CrowNoticeRangeBlocks"/> draws it: it
+/// circles over their head and swoops (its <c>swoop</c> clip flown at the chest), raking at the clip's
+/// <see cref="ImpactEvent"/> whoever is within <see cref="WildlifeConfig.CrowStrikeReach"/>, at most every
+/// <see cref="WildlifeConfig.CrowStrikeMinSeconds"/>..<c>Max</c>. One caught on the ground with a player
+/// beside it pecks at their ankles instead of leaving. Each strike is small; a flock is the nuisance.
+/// Main thread only.
+/// </summary>
+public sealed class Crow : FlyingAnimal
+{
+    /// <summary>The entity file name (<c>assets/data/entities/crow.json</c>).</summary>
+    public const string EntityName = "crow";
+
+    public const string SwoopClip = "swoop";
+    public const string PeckClip = "peck";
+    public const string CawClip = "caw";
+    public const string TakeoffClip = "takeoff";
+    public const string LandClip = "land";
+    public const string GlideClip = "glide";
+
+    /// <summary>Timeline event on the swoop and peck clips at which the beak strikes.</summary>
+    public const string ImpactEvent = "impact";
+
+    // The counted action clips (RealmMob.StartAttack), which a client's mirror replays by this index
+    private const int SwoopAction = 0;
+    private const int PeckAction = 1;
+    private const int CawAction = 2;
+    private const int TakeoffActionIndex = 3;
+    private const int LandActionIndex = 4;
+
+    /// <summary>How the crow flies.</summary>
+    public static readonly FlightTuning Tuning = new(
+        WildlifeConfig.CrowCruiseSpeed, WildlifeConfig.CrowVerticalSpeed, WildlifeConfig.CrowAcceleration,
+        WildlifeConfig.CrowHoverMinBlocks, WildlifeConfig.CrowHoverMaxBlocks, WildlifeConfig.CrowMinClearanceBlocks,
+        WildlifeConfig.CrowBobBlocks, WildlifeConfig.CrowBobHz);
+
+    private float _strikeCooldown = WildlifeConfig.CrowStrikeMinSeconds;
+    private float _habitIn = Roll(WildlifeConfig.CrowHabitMinSeconds, WildlifeConfig.CrowHabitMaxSeconds);
+
+    public Crow(EntityType type, Vector3 position, bool spawnIn = true) : base(type, position, Tuning, spawnIn)
+    {
+    }
+
+    /// <inheritdoc />
+    public override WildlifeKind Kind => WildlifeKind.Crow;
+
+    /// <inheritdoc />
+    public override float BodyHeight => WildlifeConfig.CrowHeight;
+
+    /// <inheritdoc />
+    public override float BodyHalfWidth => WildlifeConfig.CrowHalfExtent;
+
+    /// <inheritdoc />
+    public override float ShoveSpeed => WildlifeConfig.CrowShoveSpeed;
+
+    /// <inheritdoc />
+    public override string AttackClip => SwoopClip;
+
+    /// <inheritdoc />
+    protected override int AttackVariants => 5;
+
+    /// <inheritdoc />
+    protected override string AttackClipOf(int variant) => variant switch
+    {
+        PeckAction => PeckClip,
+        CawAction => CawClip,
+        TakeoffActionIndex => TakeoffClip,
+        LandActionIndex => LandClip,
+        _ => SwoopClip,
+    };
+
+    /// <inheritdoc />
+    protected override (string Idle, string Move) GroundClips => (EntityAnimator.IdleClip, EntityAnimator.WalkClip);
+
+    // In the air even its idle is a wing beat; with nobody to harass it soars on set wings
+    /// <inheritdoc />
+    protected override (string Idle, string Move) AirClips(bool chasing) =>
+        (EntityAnimator.FlyClip, chasing ? EntityAnimator.FlyClip : GlideClip);
+
+    /// <inheritdoc />
+    protected override int TakeoffAction => TakeoffActionIndex;
+
+    /// <inheritdoc />
+    protected override int LandAction => LandActionIndex;
+
+    /// <summary>Whether a crow centered at <paramref name="center"/> on the ground can peck a player whose eye
+    /// is at <paramref name="eye"/>.</summary>
+    public static bool InPeckReach(Vector3 center, Vector3 eye) =>
+        MobTargets.InMeleeReach(center, eye, WildlifeConfig.CrowPeckReach);
+
+    /// <summary>Whether a swooping crow centered at <paramref name="center"/> rakes a player whose eye is at
+    /// <paramref name="eye"/>: its chest within <see cref="WildlifeConfig.CrowStrikeReach"/> in 3D.</summary>
+    public static bool InSwoopReach(Vector3 center, Vector3 eye) =>
+        Vector3.DistanceSquared(center, ChestOf(eye)) <= WildlifeConfig.CrowStrikeReach * WildlifeConfig.CrowStrikeReach;
+
+    /// <summary>Throws, naming the model file, unless the model is a flyer's rig with every clip the crow plays
+    /// and the impact event on its swoop and its peck.</summary>
+    public static void ValidateContent(EntityType type)
+    {
+        EntityContract.RequireFlyer(type, "Crow", SwoopClip, ImpactEvent);
+        EntityContract.RequireEvent(type, "Crow", EntityContract.RequireClip(type, "Crow", PeckClip), ImpactEvent);
+        foreach (var clip in (string[])[EntityAnimator.WalkClip, GlideClip, CawClip, TakeoffClip, LandClip])
+            EntityContract.RequireClip(type, "Crow", clip);
+    }
+
+    /// <inheritdoc />
+    public override bool Heeds(IReadOnlyList<IMobTarget> targets) =>
+        NearestThreatSquared(targets) <= WildlifeConfig.CrowNoticeRangeBlocks * WildlifeConfig.CrowNoticeRangeBlocks;
+
+    /// <inheritdoc />
+    protected override bool StaysPerchedNear(IMobTarget target) => InPeckReach(Position, target.Eye);
+
+    /// <inheritdoc />
+    protected override void TickCooldowns(float scaledDelta) =>
+        _strikeCooldown = MathF.Max(0f, _strikeCooldown - scaledDelta);
+
+    /// <inheritdoc />
+    protected override Vector3 Decide(float dist, Vector3 toward, ChunkManager chunks, IMobTarget target)
+    {
+        if (_strikeCooldown > 0f) return Vector3.Zero;
+
+        if (IsPerched)
+        {
+            if (!InPeckReach(Position, target.Eye)) return Vector3.Zero;
+            Strike(PeckAction);
+            return Vector3.Zero;
+        }
+
+        if (dist <= WildlifeConfig.CrowSwoopRangeBlocks && SeesTarget(Position, target, chunks)) Strike(SwoopAction);
+        return Vector3.Zero;
+    }
+
+    private void Strike(int action)
+    {
+        StartAttack(action);
+        _strikeCooldown = Roll(WildlifeConfig.CrowStrikeMinSeconds, WildlifeConfig.CrowStrikeMaxSeconds);
+    }
+
+    /// <inheritdoc />
+    protected override void IdleTick(float deltaTime)
+    {
+        // Its habits are a bird's on the ground: a peck at the dirt or a caw
+        if (!IsPerched) return;
+        _habitIn -= deltaTime;
+        if (_habitIn > 0f || !IsGrounded || Animation.IsActionPlaying) return;
+        _habitIn = Roll(WildlifeConfig.CrowHabitMinSeconds, WildlifeConfig.CrowHabitMaxSeconds);
+        StartAttack(Random.Shared.Next(2) == 0 ? PeckAction : CawAction);
+    }
+
+    /// <inheritdoc />
+    protected override void FlyToward(IMobTarget? target, Vector3? wander, float deltaTime, ChunkManager chunks)
+    {
+        if (target != null)
+        {
+            var swooping = Animation.IsPlaying(SwoopClip);
+            var goal = swooping ? ChestOf(target.Eye) : FlightSteering.ChaseGoal(target.Eye, HoverHeight);
+            Fly(goal, chasing: true, (swooping ? WildlifeConfig.CrowSwoopSpeedFactor : 1f) * MoveFactor, deltaTime, chunks);
+            return;
+        }
+
+        Fly(wander, chasing: false, (wander == null ? 1f : MobConfig.MobWanderSpeedFactor) * MoveFactor, deltaTime, chunks);
+    }
+
+    /// <inheritdoc />
+    public override bool TryTakeStrike() => Animation.ConsumeEvent(ImpactEvent);
+
+    /// <inheritdoc />
+    public override bool StrikeReaches(Vector3 eye) =>
+        IsPerched ? InPeckReach(Position, eye) : InSwoopReach(Position, eye);
+
+    /// <inheritdoc />
+    public override int StrikeDamage => WildlifeConfig.CrowStrikeDamage;
+
+    /// <inheritdoc />
+    public override float StrikeKnockbackSpeed => WildlifeConfig.CrowKnockbackSpeed;
+
+    /// <inheritdoc />
+    public override float StrikeKnockbackLift => WildlifeConfig.CrowKnockbackLift;
+}

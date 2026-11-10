@@ -288,6 +288,8 @@ public sealed class EntityPreviewStateTests
     [InlineData(Deer.EntityName)]
     [InlineData(Boar.EntityName)]
     [InlineData(Boar.DireEntityName)]
+    [InlineData(Crow.EntityName)]
+    [InlineData(Dragonfly.EntityName)]
     public void EveryRealmEntityHasAPreviewMob(string name)
     {
         var state = new EntityPreviewState();

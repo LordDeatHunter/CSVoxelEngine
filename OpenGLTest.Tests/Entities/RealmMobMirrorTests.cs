@@ -55,6 +55,8 @@ public sealed class RealmMobMirrorTests
     [InlineData(Deer.EntityName)]
     [InlineData(Boar.EntityName)]
     [InlineData(Boar.DireEntityName)]
+    [InlineData(Crow.EntityName)]
+    [InlineData(Dragonfly.EntityName)]
     public void AMirrorPlaysItsAttackClipWhenTheServersCountMovesThenReturnsToLocomotion(string kind)
     {
         var mirror = Create(kind, new Vector3(0f, 80f, 0f));

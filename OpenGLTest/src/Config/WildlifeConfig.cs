@@ -32,6 +32,26 @@ public static class WildlifeConfig
     public const int BoarGroupMax = 3;
     // The dire boar is the rare one: a lone miniboss among many herds
     public const float DireBoarSpawnWeight = 0.25f;
+    public const float CrowSpawnWeight = 1.5f;
+    public const int CrowGroupMin = 2;
+    public const int CrowGroupMax = 4;
+    // Dragonflies keep to the waterside: only a column within NearWaterRadiusBlocks of surface water spawns one
+    public const float DragonflySpawnWeight = 2f;
+    public const int DragonflyGroupMin = 1;
+    public const int DragonflyGroupMax = 2;
+    public const float NearWaterRadiusBlocks = 8f;
+    // A flyer appears in the open air AirSpawnLiftMin..MaxBlocks over the ground cell its spawn found
+    public const float AirSpawnLiftMinBlocks = 3f;
+    public const float AirSpawnLiftMaxBlocks = 6f;
+
+    // --- Flyers that perch (FlyingAnimal) ---
+    // With nobody to react to, a flyer stays up for FlyerAirMin..MaxSeconds, then lands when solid ground
+    // lies within FlyerLandDropBlocks below it and rests for FlyerPerchMin..MaxSeconds before taking off.
+    public const float FlyerAirMinSeconds = 9f;
+    public const float FlyerAirMaxSeconds = 22f;
+    public const float FlyerPerchMinSeconds = 6f;
+    public const float FlyerPerchMaxSeconds = 16f;
+    public const float FlyerLandDropBlocks = 8f;
 
     // --- Gaits (Animal.ChooseGait) ---
     // A walker breaks into its run clip above RunGaitFraction of the way from its walk speed to its run
@@ -91,4 +111,62 @@ public static class WildlifeConfig
     public const int DireBoarGoreDamage = 24;
     public const float DireBoarKnockbackSpeed = 13f;
     public const float DireBoarKnockbackLift = 6f;
+
+    // --- Crow (Crow) ---
+    // A pest in flocks. A player within CrowNoticeRangeBlocks draws it: it circles CrowHoverMin..MaxBlocks
+    // over their head and, within CrowSwoopRangeBlocks horizontally with a clear line, swoops at
+    // CrowSwoopSpeedFactor of its flight and rakes for CrowStrikeDamage whoever is within CrowStrikeReach of
+    // it (in 3D, at the chest) at the impact, every CrowStrikeMin..MaxSeconds. On the ground it pecks an
+    // ankle within CrowPeckReach instead, and left alone it pecks the dirt or caws every
+    // CrowHabitMin..MaxSeconds.
+    public const float CrowHeight = 0.6f;
+    public const float CrowHalfExtent = 0.28f;
+    public const float CrowShoveSpeed = 4f;
+    public const float CrowCruiseSpeed = 7f;
+    public const float CrowVerticalSpeed = 5f;
+    public const float CrowAcceleration = 9f;
+    public const float CrowHoverMinBlocks = 2.5f;
+    public const float CrowHoverMaxBlocks = 5f;
+    public const float CrowMinClearanceBlocks = 0.4f;
+    public const float CrowBobBlocks = 0.2f;
+    public const float CrowBobHz = 0.8f;
+    public const float CrowNoticeRangeBlocks = 10f;
+    public const float CrowSwoopRangeBlocks = 4f;
+    public const float CrowSwoopSpeedFactor = 2f;
+    public const float CrowStrikeReach = 1.5f;
+    public const float CrowPeckReach = 1.3f;
+    public const int CrowStrikeDamage = 2;
+    public const float CrowStrikeMinSeconds = 4f;
+    public const float CrowStrikeMaxSeconds = 8f;
+    public const float CrowKnockbackSpeed = 2f;
+    public const float CrowKnockbackLift = 1f;
+    public const float CrowHabitMinSeconds = 3f;
+    public const float CrowHabitMaxSeconds = 8f;
+
+    // --- Dragonfly (Dragonfly) ---
+    // A man-sized hunter of the waterside. A player within DragonflyNoticeRangeBlocks is prey: it holds
+    // DragonflyHoverMin..MaxBlocks over their head and, within DragonflyDartRangeBlocks horizontally with a
+    // clear line, darts at DragonflyDartSpeedFactor of its flight and bites for DragonflyBiteDamage whoever
+    // is within DragonflyBiteReach at the impact, every DragonflyBiteCooldownSeconds (the first not before
+    // DragonflyFirstBiteDelaySeconds).
+    public const float DragonflyHeight = 0.9f;
+    public const float DragonflyHalfExtent = 0.5f;
+    public const float DragonflyShoveSpeed = 2.5f;
+    public const float DragonflyCruiseSpeed = 8f;
+    public const float DragonflyVerticalSpeed = 6f;
+    public const float DragonflyAcceleration = 12f;
+    public const float DragonflyHoverMinBlocks = 1.5f;
+    public const float DragonflyHoverMaxBlocks = 3.5f;
+    public const float DragonflyMinClearanceBlocks = 0.6f;
+    public const float DragonflyBobBlocks = 0.3f;
+    public const float DragonflyBobHz = 1.2f;
+    public const float DragonflyNoticeRangeBlocks = 16f;
+    public const float DragonflyDartRangeBlocks = 5f;
+    public const float DragonflyDartSpeedFactor = 2.2f;
+    public const float DragonflyBiteReach = 1.9f;
+    public const int DragonflyBiteDamage = 8;
+    public const float DragonflyFirstBiteDelaySeconds = 1f;
+    public const float DragonflyBiteCooldownSeconds = 2.6f;
+    public const float DragonflyKnockbackSpeed = 6f;
+    public const float DragonflyKnockbackLift = 2.5f;
 }

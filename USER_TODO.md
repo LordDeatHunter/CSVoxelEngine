@@ -226,9 +226,8 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   height near 3 blocks (`MobConfig.SkeletonKingHeight`).
 - [ ] **Dragonfly, Crow and Deer** — `dragonfly.bbmodel`/`.png` (man-sized, 128x128 skin: green thorax, banded blue
   abdomen, red eyes, cutout wing cells), `crow.bbmodel`/`.png` (64x64, blue-black, cutout feather tips) and
-  `deer.bbmodel`/`.png` (a spotted stag, 128x128). Made by `tools/generate-critter-models.py`. The deer is wired in
-  (`Deer`, whose contract needs `idle`, `walk`, `run`, `graze` and `alert`); the dragonfly and the crow are models, rigs
-  and clips only so far (an entity JSON each, no mob class). Keep the six humanoid group names each rig carries among its own
+  `deer.bbmodel`/`.png` (a spotted stag, 128x128). Made by `tools/generate-critter-models.py`. All three are wired in, and
+  each class checks the clips it plays at startup (`Deer`, `Crow` and `Dragonfly.ValidateContent`). Keep the six humanoid group names each rig carries among its own
   bones (wings and forelegs are `ArmL`/`ArmR`), everything nested under `Torso`, the clip names listed in the
   generator's header, the `impact` event on `bite`, `peck`, `swoop` and `butt`, a `hurt` clip that starts and ends at
   the identity (it is added on top of other clips), and the `.bbmodel`'s UV layout.
