@@ -209,7 +209,7 @@ bits 0-1 being the facing) and `ChestProfile.TableFor(state)` picks the table, c
 cell's state (`BlockEditor` passes `brokenState`, `Open` reads it), so opening and breaking unopened agree. A slot is a
 stackable or one tool/gear instance with every component (`ChestSlot`, `ItemStack.CloneAs`); moves are
 `ChestTransfer` (conserving, merging up to `ChestConfig.MaxStack`) behind `ChestAccess.Apply`, the same in singleplayer and on
-the server. A break and the stale sweep spill the contents as drops (instances lose their components there). Over the wire
+the server. A break and the stale sweep spill the contents as drops (instances retain their components there). Over the wire
 (protocol 20) the client sends `ChestOpen`/`ChestMove`/`ChestClose` and gets a per-player `ChestContents`; `ChestSessions`
 (server) judges each move against that player's open chest and reach, tells every viewer, and closes the chest when it is
 broken or out of reach. Right-clicking a chest is a `RightClickOutcome.Container` claim (sneak places against it instead);
@@ -218,6 +218,24 @@ whose rows then deposit (one unit, all with shift) while the card's rows withdra
 `RarityStyle` chrome, accent bar and name color as the [E] rows (see "Rarity chrome"). The chest card takes the right side
 of the panel, so the preview, equipment and crafting cards are neither drawn nor clicked while it is up. `ChestTests`, `TowerChestTests`, `ChestServerTests`;
 `visual-examples/chests.json` (`VOXEL_TIME=147`, with the `setblock`, `chest`, `chestrow` and `chestwobble` ops).
+
+**Lantern fuel.** `Simulation/Lanterns/` owns the individual `LanternComponent`, eight-slot list storage and
+fuel clock. Right-click a placed lantern to open it; crouch-right-click it to pick it up (a full Tools pool leaves
+it untouched). That pickup takes precedence over a held lantern. Otherwise crouch-right-click opens the selected
+lantern anywhere; an ordinary click in air opens it, and a click at another block keeps that block's usual
+interaction/placement precedence. The shared chest card draws the list; inventory rows deposit one unit (all with
+Shift), rows on the card withdraw. While this card is open even creative players browse their owned inventory;
+grant Everfuel in the ordinary creative catalog first. `lantern_fuel` admits coal, slimeballs and Everfuel;
+`lantern_quarter_fuel` selects the quarter duration, `lantern_endless_fuel` the non-consuming override.
+
+A lantern spends a stored lump only when its current burn is exhausted. Existing coal `fuel.burnSeconds` is reused
+(60 seconds in current data), so slime lasts 15 seconds; `LanternConfig.SlimeDurationShare` owns the ratio.
+Everfuel freezes the current burn and consumes neither stored fuel nor itself. Only the selected held lantern of a
+living player and loaded placed lanterns advance; unselected, chest-stored, dropped and unloaded lanterns pause,
+including across restarts. Placement transfers the instance even in creative, so it never duplicates its contents.
+The tooltip includes the current burn's progress bar (full with Everfuel); stored reserves remain in the list.
+Held emissive blocks such as torches and active lanterns use `AmbientEffects.LightCells`, separate from flame
+particle emitters. Remote held id and light status come from the server's own inventory.
 
 **Chest model and lid.** In the world a chest is no part of its chunk's mesh: the mesher records each chest cell
 (`ChunkMeshData.ChestCells` -> `Chunk.ChestCells`, the chunks holding one in `ChunkManager.ChestChunks`) and `ChestPasses`

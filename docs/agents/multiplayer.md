@@ -169,6 +169,14 @@ holds it (stale entries cost a few bytes); the decoder refuses every malformed p
 past the palette count, a state flag other than 0 or 1, truncation anywhere) as `InvalidDataException` and compacts the
 cells with `ChunkBlocks.FromDense`, so a decoded snapshot never carries a duplicate or unused id.
 
+**Lanterns (protocol 42).** `LanternOpen` names a positive selected instance in the acting player's own inventory
+or a placed cell (instance 0); `LanternMove` carries only a `ChestMove` intent. `LanternSessions` applies the same
+`LanternAccess` click precedence as gameplay, validates owned selection or loaded/reachable placement on every move,
+and returns `LanternContents` to viewers. `ChestClose` closes either panel. Fuel ticks only on the server;
+clients replace snapshots. `StationState` ends with placed lantern metadata, each drop entry carries an optional
+name-based instance payload, and `PlayerList` ends each entry with authoritative held id and whether it emits.
+Older wire versions are refused by the handshake. No client-authored inventory/fuel is accepted.
+
 **Ids cross the wire by name** (`Networking/WireIds.cs`). Every numbered space is handed out in file-name order at
 startup (blocks and items, molten materials, status effects, atlas tiles), so a client whose content differs from the
 server's by one file would number everything after it differently. The server's numbers are the wire's: its

@@ -234,3 +234,6 @@ tools/                                # asset generators: models, animation clip
   scroll-sprite.py                    # utility: lays one sprite out as a scrolling animation sheet (frames wrapped toward a direction,
                                       #   N px/frame, vertical/horizontal/square), PNG in and out, stdlib only
 ```
+
+Lantern sessions live in `OpenGLTest.Server/LanternSessions.cs`; lantern interaction rules are covered by
+`OpenGLTest.Tests/Interaction/LanternTests.cs` and the TCP tests in `ChestServerTests`.

@@ -40,6 +40,11 @@ last frame). The clock steps the state in fixed 1/60 s slices, and a scrub resta
 steps it up to the time, so scrubbing lands on exactly the frame playing would (a test asserts it for every
 mode). Both preview states are drivers: each mode has a `Duration`, the clock turns their own replay off
 (`Replay`) and owns it. `ITEM_DEBUGGER_SPEED` / `ITEM_DEBUGGER_LOOP` set the playback options at startup.
+The `lantern` scenario op runs the actual right-click chain and opens its claimed lantern through `ChestInput`;
+use `tab`, `search` and `row` to move owned fuel through the normal list. `held-lanterns.json` films empty/torch/lit
+held lighting, storage, tooltip and placed access at night. Item-debugger `ITEM_DEBUGGER_SELECT=lantern` previews the
+same raised carry pose and gravity-aligned hanging matrix as the game.
+
 **ENTITIES** lists every `EntityRegistry` entry and draws the selected one part by part
 through its `EntityAnimator` (`DebugSceneRenderer.RenderEntity`). The shared chest model is listed last as "Chest"
 (`ITEM_DEBUGGER_SELECT=chest`) with the modes OPEN CLOSE WOBBLE: no entity, so each clip plays alone on its own clock,

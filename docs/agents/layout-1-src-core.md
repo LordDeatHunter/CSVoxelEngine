@@ -140,6 +140,7 @@ OpenGLTest/
       JuiceConfig.cs           # landing and footstep dust, slime splat, hit sparks, death poof, blast shake and
                                #   push, falling-block dust, lava steam, tree thud, tower collapse, splashes, tool shatter, pickup
                                #   sparkle, low-health vignette, damage arc, surfacing droplets
+      LanternConfig.cs         # eight fuel slots, slime duration ratio and raised hanging carry pose
       LightingConfig.cs        # alpha cutoff, atlas anisotropy, light spread, shadow cascades, point and fire
                                #   lights, fog, tonemap exposure, eye adaptation
       ManaConfig.cs            # the mana pool: start max, growth per known part and its cap, the refill time

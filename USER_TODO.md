@@ -8,6 +8,8 @@
 
 ## Items
 
+- [ ] **Everfuel** — `items/everfuel.json` currently reuses `coal.png`; replace with a distinct endless-fuel icon.
+
 Paths are under `OpenGLTest/assets/textures/items/`. All sprites are 32x32 RGBA unless noted, with
 transparency around the shape.
 

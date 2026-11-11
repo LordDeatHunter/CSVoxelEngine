@@ -178,6 +178,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   (heights, water levels, corner climate), Deflate-compressed
       InventoryIntent.cs       # one client inventory intent (select, drop, equip, craft, creative grant/clear, pick)
       InventoryIntentCodec.cs  # its bounds-checked wire form
+      LanternNetCodec.cs       # held/placed requests and versioned authoritative fuel/storage answers
       InventoryNetCodec.cs     # the server-owned inventory on the wire (the save JSON shape)
       LodNetCodec.cs           # a far-LOD region's mesh on the wire
       NetAttacks.cs            # what each NetAttackKind stands for: the attack pattern it needs in hand, the
