@@ -103,7 +103,10 @@ public class FluidManager
     /// called once a frame right before <see cref="Update"/> so the cells it schedules ride the
     /// same tick as this frame's block edits.
     /// </summary>
-    public void WakeLoadedChunks(ChunkManager chunks) => _wake.WakeLoadedChunks(chunks);
+    public void WakeLoadedChunks(ChunkManager chunks)
+    {
+        if (Enabled) _wake.WakeLoadedChunks(chunks);
+    }
 
     /// <summary>
     /// Advances the fluid simulation. A new tick starts at most every
@@ -117,6 +120,7 @@ public class FluidManager
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, LodManager? lod = null)
     {
         _hardened.Clear();
+        if (!Enabled) return;
         _accumulator += deltaTime;
 
         _cells.BeginFrame(chunks, lod);

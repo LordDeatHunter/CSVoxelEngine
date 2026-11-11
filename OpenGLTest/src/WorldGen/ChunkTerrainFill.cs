@@ -54,7 +54,7 @@ internal static class ChunkTerrainFill
             StampHellTrees(chunk, blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
             timer?.Mark(Stage.HellTrees);
             StampHellRuins(chunk, blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size, stampGates, timer);
-            Finish(chunk, blocks, column, lowerBoundY, hasWater: false, timer, genStart);
+            Finish(chunk, blocks, column, lowerBoundY, timer, genStart);
             return;
         }
 
@@ -98,7 +98,7 @@ internal static class ChunkTerrainFill
             {
                 StampSky(chunk, blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size,
                     stampGates, timer);
-                Finish(chunk, blocks, column, lowerBoundY, hasWater: false, timer, genStart);
+                Finish(chunk, blocks, column, lowerBoundY, timer, genStart);
                 return;
             }
         }
@@ -180,10 +180,9 @@ internal static class ChunkTerrainFill
 
         // After the carvers (so caves under the sea floor flood) and before the trees and
         // pebbles, which skip submerged columns rather than growing underwater
-        var hasWater = false;
         if (WorldGenerationConfig.WaterEnabled)
         {
-            hasWater = FillWater(blocks, column, lowerBoundY);
+            FillWater(blocks, column, lowerBoundY);
             timer?.Mark(Stage.Water);
             StampMud(blocks, column, worldX0, lowerBoundY, worldZ0);
         }
@@ -405,7 +404,7 @@ internal static class ChunkTerrainFill
         timer?.Mark(Stage.HellTrees);
         StampHellRuins(chunk, blocks, worldX0, lowerBoundY, worldZ0, stampGates, timer);
 
-        Finish(chunk, blocks, column, lowerBoundY, hasWater, timer, genStart);
+        Finish(chunk, blocks, column, lowerBoundY, timer, genStart);
     }
 
     /// <summary>Whether the chunk whose floor is <paramref name="worldY0"/> meets any sky layer's band.</summary>
@@ -504,7 +503,7 @@ internal static class ChunkTerrainFill
 
     /// <summary>The tail every filled chunk shares: the palette build (<see cref="ChunkBlocks.FromDense"/>) that
     /// hands the chunk its storage, the solid count, the sky-cover flag, the fluid frontier and the ready flag.</summary>
-    private static void Finish(Chunk chunk, ushort[] blocks, ColumnData column, int lowerBoundY, bool hasWater,
+    private static void Finish(Chunk chunk, ushort[] blocks, ColumnData column, int lowerBoundY,
         WorldgenStageTimer? timer, long genStart)
     {
         // Carving removed an unknown number of blocks; a recount off the compact storage is cheaper than
@@ -516,11 +515,14 @@ internal static class ChunkTerrainFill
         chunk.MayHaveSkyCover = BlockType.ContainsSkyCover(storage.IdSpan);
         timer?.Mark(Stage.SolidCount);
 
-        // Only a chunk that actually got flooded can have a frontier to report, plus any
-        // chunk low enough to hold lava pockets or hell's lava (the scan itself is fluid-generic)
-        if (hasWater || (WorldGenerationConfig.LavaEnabled && lowerBoundY <= WorldGenerationConfig.LavaMaxY)
-                     || (WorldGenerationConfig.HellEnabled && HellGenerator.WriteBand().Reaches(lowerBoundY)))
+        // Inspect the final palette, after every stamp: cave water above the lava band was
+        // previously missed by the sea-fill flag. A settled lake still reports no frontier.
+        foreach (var id in storage.IdSpan)
+        {
+            if (!BlockType.IsFluid(id)) continue;
             ScanFluidFrontier(chunk, blocks, column, lowerBoundY);
+            break;
+        }
         timer?.Mark(Stage.FluidFrontier);
 
         chunk.IsBlockDataReady = true;
@@ -633,13 +635,10 @@ internal static class ChunkTerrainFill
     /// is what an untouched
     /// state byte reads as, so nothing is written to <c>_state</c> here. A pure per-column function
     /// of world position like the rest of worldgen: neighbors agree at their borders with no shared
-    /// state. Returns whether any cell was flooded, which is what decides if this chunk can have a
-    /// fluid frontier to report.
+    /// state. The final palette, after every feature, decides whether to scan a fluid frontier.
     /// </summary>
-    private static bool FillWater(ushort[] blocks, ColumnData column, int lowerBoundY)
+    private static void FillWater(ushort[] blocks, ColumnData column, int lowerBoundY)
     {
-        var filled = false;
-
         for (var x = 0; x < Size; x++)
         for (var z = 0; z < Size; z++)
         {
@@ -655,11 +654,8 @@ internal static class ChunkTerrainFill
                 var i = Idx(x, y, z);
                 if (blocks[i] != BlockType.Air) continue;
                 blocks[i] = TerrainGenerator.SeaBlock;
-                filled = true;
             }
         }
-
-        return filled;
     }
 
     /// <summary>
