@@ -471,17 +471,29 @@ public sealed class GenerationalCacheTests
         const int entriesPerMap = capacity / generations;
         var cache = new GenerationalCache<int, string>(capacity, generations);
 
-        // Narrow runtime-coupled fault injection, entirely in this test: ConcurrentDictionary
+        // Synthetic runtime-coupled fault injection, entirely in this test: ConcurrentDictionary
         // publishes a node before its checked per-stripe count increment. Force that increment
         // to overflow, demonstrating a real TryAdd exception AFTER publication without OOM.
         // See dotnet/runtime v10.0.0 ConcurrentDictionary.TryAddInternal. No production seam.
         const BindingFlags fields = BindingFlags.Instance | BindingFlags.NonPublic;
-        var current = cache.GetType().GetField("_current", fields)!.GetValue(cache)!;
-        var maps = (ConcurrentDictionary<int, string>[])current.GetType()
-            .GetField("Maps", fields)!.GetValue(current)!;
+        object ReadRequiredField(object owner, string name)
+        {
+            var field = owner.GetType().GetField(name, fields);
+            Assert.True(field is not null,
+                $"test layout changed: expected field {owner.GetType().FullName}.{name}");
+            var value = field!.GetValue(owner);
+            Assert.True(value is not null,
+                $"test layout changed: expected non-null {owner.GetType().FullName}.{name}");
+            return value!;
+        }
+
+        var current = ReadRequiredField(cache, "_current");
+        var maps = Assert.IsType<ConcurrentDictionary<int, string>[]>(ReadRequiredField(current, "Maps"));
+        Assert.NotEmpty(maps);
         var map = maps[0];
-        var tables = map.GetType().GetField("_tables", fields)!.GetValue(map)!;
-        var counts = (int[])tables.GetType().GetField("_countPerLock", fields)!.GetValue(tables)!;
+        var tables = ReadRequiredField(map, "_tables");
+        var counts = Assert.IsType<int[]>(ReadRequiredField(tables, "_countPerLock"));
+        Assert.NotEmpty(counts);
 
         // int key 0 hashes to bucket/stripe 0. This private cache has no other callers or entries.
         counts[0] = int.MaxValue;
