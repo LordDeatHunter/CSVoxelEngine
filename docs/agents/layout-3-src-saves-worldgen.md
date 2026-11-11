@@ -564,3 +564,5 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
   assets/models/player/               # the player rig (player.bbmodel) and its skin
   visual-examples/                    # the VOXEL_SCRIPT scenario JSONs (see `VOXEL_SCRIPT`)
 ```
+
+`WorldGen/Caves/CaveEchoVolumes.cs`: deterministic ellipsoid sites that extend echo materials through solid rock; shared point/map containment.

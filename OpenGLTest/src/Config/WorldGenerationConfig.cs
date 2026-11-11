@@ -965,6 +965,14 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <c>CaveEchoBottomY + CaveEchoDriftBlocks * drift</c>, drift being the echo drift noise in -1..1.</summary>
     public const int CaveEchoBottomY = -200;
 
+    // Bounded 3D echo bodies spread under neighboring columns, beyond the original echo band.
+    public const int CaveEchoVolumeBottomY = -400;
+    public const int CaveEchoVolumeCellBlocks = 128;
+    public const int CaveEchoVolumeRadius = 96;
+    public const int CaveEchoVolumeVerticalRadius = 112;
+    public const int CaveEchoVolumeCacheCapacity = 4096;
+    public const int CaveEchoVolumeCacheGenerations = 4;
+
     /// <summary>How far the echo band's bottom wanders up and down with the echo drift noise (seed offset 179),
     /// so the hand-over to the sub-biomes is never a flat line.</summary>
     public const int CaveEchoDriftBlocks = 24;

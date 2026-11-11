@@ -188,6 +188,31 @@ public sealed class CaveBiomeTests
         }
     }
 
+    [Theory]
+    [InlineData(Biome.Frozen, CaveBiome.FrozenEcho)]
+    public void ExpandedEchoDressesUncarvedRockBelowTheOldBand(Biome surface, CaveBiome expected)
+    {
+        var (cx, cz) = FindColumn(surface, 0xC4FE_0100UL + (ulong)surface);
+        var column = ColumnCache.Get(cx, cz);
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var changed = 0;
+        for (var cy = -23; cy <= -15; cy++)
+        {
+            var map = new CaveBiomeMap();
+            CaveBiomes.Fill(map, column, cx * Chunk.Size, cy * Chunk.Size, cz * Chunk.Size);
+            var blocks = Enumerable.Repeat(stone, Chunk.BlockCount).ToArray();
+            CaveBiomes.Stamp(blocks, map, cx * Chunk.Size, cy * Chunk.Size, cz * Chunk.Size);
+            for (var i = 0; i < blocks.Length; i++)
+            {
+                Assert.NotEqual(BlockType.Air, blocks[i]);
+                if ((CaveBiome)map.Cells[i] != expected) continue;
+                changed++;
+                Assert.Equal(CaveBiomes.Palette(expected).Stone, blocks[i]);
+            }
+        }
+        Assert.True(changed > 0, "expanded material never reached solid rock below the original band");
+    }
+
     [Fact]
     public void BandsAreBoundedAndOrdered()
     {
@@ -210,9 +235,10 @@ public sealed class CaveBiomeTests
 
             if (cave is CaveBiome.FrozenEcho or CaveBiome.DesertEcho)
             {
-                Assert.True(y > WorldGenerationConfig.CaveEchoBottomY - WorldGenerationConfig.CaveEchoDriftBlocks, at);
+                Assert.True(y > Math.Min(WorldGenerationConfig.CaveEchoVolumeBottomY,
+                    WorldGenerationConfig.CaveEchoBottomY - WorldGenerationConfig.CaveEchoDriftBlocks), at);
                 Assert.True(height - y >= WorldGenerationConfig.CaveEchoCoverBlocks, at);
-                Assert.True(surface == (cave == CaveBiome.FrozenEcho ? Biome.Frozen : Biome.Desert), at);
+                if (cave == CaveBiome.DesertEcho) Assert.Equal(Biome.Desert, surface);
             }
 
             if (cave is CaveBiome.Crystal or CaveBiome.Fungal or CaveBiome.MagmaDeep)

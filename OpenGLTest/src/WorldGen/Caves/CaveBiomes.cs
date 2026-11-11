@@ -125,10 +125,11 @@ public static class CaveBiomes
         var fx = ((x & Mask) + 0.5f) * InvStride;
         var fy = ((y & Mask) + 0.5f) * InvStride;
         var fz = ((z & Mask) + 0.5f) * InvStride;
-        return Classify(y, surfaceHeight - y, surfaceBiome,
+        var original = Classify(y, surfaceHeight - y, surfaceBiome,
             Blend(EchoDriftNoise, bx, by, bz, fx, fy, fz),
             Blend(DeepDriftNoise, bx, by, bz, fx, fy, fz),
             Blend(SelectorNoise, bx, by, bz, fx, fy, fz));
+        return CaveEchoVolumes.At(x, y, z, surfaceHeight, original);
     }
 
     /// <summary>
@@ -299,8 +300,7 @@ public static class CaveBiomes
     internal static StampBand WriteBand(ColumnData column)
     {
         var max = SubBandTopY;
-        if (AnyEchoColumn(column))
-            max = Math.Max(max, column.MaxHeight - WorldGenerationConfig.CaveEchoCoverBlocks);
+        max = Math.Max(max, column.MaxHeight - WorldGenerationConfig.CaveEchoCoverBlocks);
         return new StampBand(WorldGenerationConfig.BarrierTopY + 1, max);
     }
 
@@ -350,7 +350,6 @@ public static class CaveBiomes
     internal static bool Fill(CaveBiomeMap map, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         if (worldY0 + Chunk.SizeMask <= WorldGenerationConfig.BarrierTopY) return false;
-        if (worldY0 > SubBandTopY && !AnyEchoColumn(column)) return false;
 
         map.Clear();
 
@@ -434,7 +433,7 @@ public static class CaveBiomes
             }
         }
 
-        return map.Present != 1 << (int)CaveBiome.Plain;
+        return CaveEchoVolumes.Expand(map, column, worldX0, worldY0, worldZ0);
     }
 
     /// <summary>
@@ -600,11 +599,5 @@ public static class CaveBiomes
         return slot;
     }
 
-    /// <summary>Whether any column of the chunk column has a surface biome with a cave echo.</summary>
-    private static bool AnyEchoColumn(ColumnData column)
-    {
-        foreach (var biome in column.Biomes)
-            if (biome is Biome.Frozen or Biome.Desert) return true;
-        return false;
-    }
+
 }
