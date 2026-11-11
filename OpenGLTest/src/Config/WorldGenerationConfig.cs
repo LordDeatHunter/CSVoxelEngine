@@ -364,6 +364,16 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int CaveFluidCellShift = 6;
     public const int CaveFluidSiteMargin = 16;
 
+    // Contained lava bowls: one candidate chunk per 64-cube, only where it meets a dry cave.
+    public const int CaveLavaLakeCellShift = 6;
+    public const int CaveLavaLakeMinRadius = 3;
+    public const int CaveLavaLakeMaxRadius = 6;
+    public const int CaveLavaLakeMinDepth = 2;
+    public const int CaveLavaLakeMaxDepth = 3;
+    public const int CaveLavaLakeBurial = 16;
+    public const float CaveLavaLakeChanceShallow = 0.18f;
+    public const float CaveLavaLakeChanceDeep = 0.8f;
+
     // --- Malachite ore (MalachiteGenerator) ---
     // Common coal-like blobs replacing stone at any depth: cells where the vein field
     // (sampled on the OreNoiseStride lattice and trilinearly interpolated, OreNoiseLattice)

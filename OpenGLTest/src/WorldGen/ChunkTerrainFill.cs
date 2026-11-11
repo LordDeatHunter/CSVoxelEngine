@@ -191,7 +191,10 @@ internal static class ChunkTerrainFill
 
         // After the sea: flooded cells are water, not air, so only dry cave floors pond lava
         if (WorldGenerationConfig.LavaEnabled)
+        {
+            CaveLavaLakes.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
             LavaGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
+        }
         timer?.Mark(Stage.Lava);
 
         // Every species (cacti included) stamps here, wood and leaves with their state bytes.

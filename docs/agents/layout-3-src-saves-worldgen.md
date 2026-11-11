@@ -570,3 +570,5 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
 `WorldGen/Caves/DesertCaves.cs`: bounded, separated desert pocket ellipsoids, composed with elongated noise tunnels.
 
 `WorldGen/Features/Underground/CaveFluidSources.cs`: shared, spaced 3D source-group candidates for cave water and lava.
+
+`WorldGen/Features/Underground/CaveLavaLakes.cs`: depth-weighted, cave-connected prefilled lava bowls with solid rims and bottoms.

@@ -1262,3 +1262,5 @@ Issue #10 sandstone now shares the frozen 3D echo volumes and seed-aware site ca
 Issue #10 desert pockets use hash salt 0x5E81; elongated tunnels reuse seeds 111/112 on separate world-aligned sample channels.
 
 Issue #10 sparse cave fluid groups use hash salt 0x5E82 (one or two candidates per 64-cube); offset 94 is retired with the old water patch mask.
+
+Issue #10 contained cave lava lakes use hash salt 0x5E83; they carve only new procedural terrain and do not rewrite saved chunk snapshots.
