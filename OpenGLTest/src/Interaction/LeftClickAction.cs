@@ -179,10 +179,11 @@ internal sealed class LeftClickAction
             if (!_hasSelectedBlock) return null;
             var cellId = Edits.BlockIdAt(_selectedBlockPosition);
             var (x, y, z) = _selectedBlockPosition.BlockCell();
-            // Any cell of a multiblock shows the whole structure, not its plain part block
+            // Any cell of a multiblock shows the whole structure, not its plain part block; either half of a
+            // two-cell block (a waystone) names its lower half, which the label draws stacked with the upper
             var blockId = Multiblock.TryResolveAnchor(_chunkManager, x, y, z, out var anchorPos, out _, out var anchorType)
                 ? anchorType!.Id
-                : cellId;
+                : TallBlock.LowerOf(cellId);
             var state = LookLabel.For(blockId, Camera.IsCreative, Inventory.Knows, HeldItem());
             if (state.Text.Length == 0) return null;
             return new LookLabelState(state.Text, state.Known, state.Mineable, _selectedBlockPosition,
