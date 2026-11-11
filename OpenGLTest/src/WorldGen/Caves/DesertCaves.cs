@@ -16,7 +16,7 @@ internal static class DesertCaves
         var cz = MathUtils.FloorToInt(z / (float)Cell);
         var h = SplitMix64.Hash(cx ^ (cy * 0x9E37), cz, WorldGenerationConfig.Seed ^ 0x5E81);
         var chance = MathUtils.Lerp(WorldGenerationConfig.DesertPocketChanceShallow,
-            WorldGenerationConfig.DesertPocketChanceDeep, MathUtils.SmoothStep(20f, 320f, depth));
+            WorldGenerationConfig.DesertPocketChanceDeep, MathUtils.SmoothStep(WorldGenerationConfig.DesertPocketDepthStart, WorldGenerationConfig.DesertPocketDepthEnd, depth));
         if (SplitMix64.Unit(h, 0) >= chance) return false;
         var radius = WorldGenerationConfig.DesertPocketMinRadius + (int)(SplitMix64.Mix(h + 1)
             % (ulong)(WorldGenerationConfig.DesertPocketMaxRadius - WorldGenerationConfig.DesertPocketMinRadius + 1));

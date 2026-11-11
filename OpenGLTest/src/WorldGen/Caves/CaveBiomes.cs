@@ -31,7 +31,8 @@ namespace VoxelEngine.WorldGen.Caves;
 /// seam. <see cref="Fill"/> classifies a chunk once into a <see cref="CaveBiomeMap"/> (CB-2) that every
 /// cave consumer reads (the noise cave shape, the ore richness, the exclusive ores) and that
 /// <see cref="Stamp(ushort[], CaveBiomeMap, int, int, int)"/> dresses the caves from. A pure function of
-/// position, the column's stored biome and height, and the seed; thread-safe: the noises are read-only
+/// position, the column's stored biome and height, and the seed. CaveEchoVolumes then extends echo
+/// materials laterally and vertically with the same point/map containment; thread-safe: the noises are read-only
 /// after their reseed, and all scratch lives on the stack or in the caller's map.
 /// </summary>
 public static class CaveBiomes
@@ -293,9 +294,8 @@ public static class CaveBiomes
     /// The world y band in which <see cref="Fill"/> can find a non-plain cell, and so the band the palette
     /// pass can write, over <paramref name="column"/>, from
     /// <see cref="Classify"/>'s bounds with its clamp: nothing at or below the barrier top; a sub-biome
-    /// at most at the echo band's highest bottom; an echo cell only in a frozen or desert column and at
-    /// least the bare cover under that column's top, so at most the cover under the chunk column's
-    /// tallest top.
+    /// at most at the echo band's highest bottom; expanded echo cells need the bare cover under
+    /// their local column top, so none can reach above the cover under this chunk column's tallest top.
     /// </summary>
     internal static StampBand WriteBand(ColumnData column)
     {

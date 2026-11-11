@@ -1229,7 +1229,7 @@ costs of each phase are in `CAVE_BIOMES.md` (Reference); the mobs and chests are
   occluding; ice, sand, gravel and basalt are excluded on purpose.
 * **Shape.** `CaveShape` gives crystal bigger cheese rooms, fungal wider spaghetti tunnels and the
   magma deep both, each boost scaled per region by NoiseCaves' ninth channel (seed offset 182), plus a
-  worm radius factor at the node center. Plain and echo cells carve bit for bit as before.
+  worm radius factor at the node center. Plain and frozen echo use regular carving; DesertEcho uses elongated tunnels and separated large rooms (issue #10).
 * **Ores.** `CaveRichness` shifts the Y-band ores' thresholds per cave biome (negative richer), keeping
   the stamp equal to the point query; `CaveOres` adds amethyst (crystal), jade (fungal) and cinnabar
   (magma deep), seed offsets 183-185, in plain stone of their own biome only.

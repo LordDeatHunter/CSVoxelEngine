@@ -20,7 +20,7 @@ public sealed class CaveSlimeTests
     private const int Floor = CaveTestWorld.Floor;
 
     // A floor deep in hell, its cave inside one chunk like the overworld one's
-    private const int HellFloor = WorldGenerationConfig.HellTopY - 40;
+    private const int HellFloor = ((WorldGenerationConfig.HellTopY - 40) >> Chunk.SizeShift) * Chunk.Size + 4;
 
     private static ChunkManager Cave(int sun, int block, int floor = Floor) => CaveTestWorld.Cave(sun, block, floor);
 

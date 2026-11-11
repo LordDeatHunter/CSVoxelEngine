@@ -21,7 +21,7 @@ internal static class CaveLavaLakes
         var cy = y0 >> Shift;
         var cz = z0 >> Shift;
         var h = SplitMix64.Hash(cx ^ (cy * 0x9E37), cz, WorldGenerationConfig.Seed ^ 0x5E83);
-        level = 6;
+        level = WorldGenerationConfig.CaveLavaLakeLocalLevel;
         radius = WorldGenerationConfig.CaveLavaLakeMinRadius + (int)(SplitMix64.Mix(h + 4)
             % (ulong)(WorldGenerationConfig.CaveLavaLakeMaxRadius - WorldGenerationConfig.CaveLavaLakeMinRadius + 1));
         depth = WorldGenerationConfig.CaveLavaLakeMinDepth + (int)(SplitMix64.Mix(h + 5)
@@ -46,9 +46,9 @@ internal static class CaveLavaLakes
         for (var x = center - rim; x <= center + rim; x++)
         for (var z = center - rim; z <= center + rim; z++)
         {
-            if (y0 + level + 3 > column.Heights[VoxelCoords.ColumnIndex(x, z)] - WorldGenerationConfig.CaveLavaLakeBurial)
+            if (y0 + level + WorldGenerationConfig.CaveLavaLakeAirHeight > column.Heights[VoxelCoords.ColumnIndex(x, z)] - WorldGenerationConfig.CaveLavaLakeBurial)
                 return;
-            for (var y = level - depth - 1; y <= level + 3; y++)
+            for (var y = level - depth - 1; y <= level + WorldGenerationConfig.CaveLavaLakeAirHeight; y++)
                 if (BlockType.IsFluid(blocks[Chunk.Idx(x, y, z)])) return;
         }
 
@@ -61,7 +61,7 @@ internal static class CaveLavaLakes
             if (distance > rim * rim) continue;
             var inside = distance <= radius * radius;
             var bottom = level - depth + (int)(distance / (float)(radius * radius) * (depth - 1));
-            for (var y = level - depth - 1; y <= level + 3; y++)
+            for (var y = level - depth - 1; y <= level + WorldGenerationConfig.CaveLavaLakeAirHeight; y++)
             {
                 var i = Chunk.Idx(x, y, z);
                 if (y <= level)

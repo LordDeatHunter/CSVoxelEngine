@@ -1,0 +1,287 @@
+// Issue #10; default seed 1337, VOXEL_TIME=147. Fixtures from CaveRevampSceneTests and CaveBiomeSpotTests.
+// Lamps are the only scene edits, for visibility. The walkway and both prefilled lakes are unmined generated terrain.
+// Each material shot is below the previous echo band. Output defaults to visual/cave-revamp/.
+{
+  "steps": [
+    {
+      "op": "creative",
+      "on": true
+    },
+    {
+      "op": "fly",
+      "on": true
+    },
+    {
+      "op": "wait",
+      "seconds": 14
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        20.5,
+        -73.38,
+        -13.5
+      ],
+      "yaw": 0,
+      "pitch": -8
+    },
+    {
+      "op": "wait",
+      "seconds": 20
+    },
+    {
+      "op": "setblock",
+      "block": "lamp",
+      "pos": [
+        20,
+        -75,
+        -12
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "lamp",
+      "pos": [
+        26,
+        -75,
+        -12
+      ]
+    },
+    {
+      "op": "wait",
+      "seconds": 3
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "screenshot",
+      "name": "regular_tunnel_before",
+      "hideHud": true
+    },
+    {
+      "op": "fly",
+      "on": false
+    },
+    {
+      "op": "wait",
+      "seconds": 0.3
+    },
+    {
+      "op": "walk",
+      "keys": [
+        "W"
+      ],
+      "seconds": 0.65
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "screenshot",
+      "name": "regular_tunnel_after_walk",
+      "hideHud": true
+    },
+    {
+      "op": "fly",
+      "on": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        -39.5,
+        -86.5,
+        -39.5
+      ],
+      "yaw": -90,
+      "pitch": -40
+    },
+    {
+      "op": "wait",
+      "seconds": 20
+    },
+    {
+      "op": "wait",
+      "seconds": 3
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "screenshot",
+      "name": "shallow_prefilled_lava",
+      "hideHud": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        -23.5,
+        -422.5,
+        40.5
+      ],
+      "yaw": -90,
+      "pitch": -38
+    },
+    {
+      "op": "wait",
+      "seconds": 20
+    },
+    {
+      "op": "wait",
+      "seconds": 3
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "screenshot",
+      "name": "deep_prefilled_lava",
+      "hideHud": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        -572.5,
+        -232.38,
+        -572.5
+      ],
+      "yaw": -90,
+      "pitch": -15
+    },
+    {
+      "op": "wait",
+      "seconds": 20
+    },
+    {
+      "op": "setblock",
+      "block": "lamp",
+      "pos": [
+        -573,
+        -234,
+        -572
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "lamp",
+      "pos": [
+        -574,
+        -234,
+        -573
+      ]
+    },
+    {
+      "op": "wait",
+      "seconds": 3
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "screenshot",
+      "name": "expanded_frozen_rock",
+      "hideHud": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        131.5,
+        -312.38,
+        204.5
+      ],
+      "yaw": -90,
+      "pitch": -8
+    },
+    {
+      "op": "wait",
+      "seconds": 20
+    },
+    {
+      "op": "setblock",
+      "block": "lamp",
+      "pos": [
+        131,
+        -314,
+        205
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "lamp",
+      "pos": [
+        129,
+        -314,
+        204
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "lamp",
+      "pos": [
+        134,
+        -313,
+        201
+      ]
+    },
+    {
+      "op": "wait",
+      "seconds": 3
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "screenshot",
+      "name": "expanded_desert_pocket",
+      "hideHud": true
+    },
+    {
+      "op": "look",
+      "yaw": 0,
+      "pitch": 10
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "screenshot",
+      "name": "desert_pocket_walls",
+      "hideHud": true
+    }
+  ]
+}

@@ -13,8 +13,8 @@ namespace VoxelEngine.WorldGen;
 /// interpolated per block before thresholding, so the cost is a few hundred noise evaluations
 /// per chunk instead of tens of thousands. Twelve channels: eleven cave fields and a shape scale
 /// (seed offset 182, plans/CAVE_BIOMES.md CB-2), sampled only in a chunk holding a cave sub-biome,
-/// which scales that sub-biome's <see cref="CaveShape"/> boosts per region; plain and echo cells
-/// carve exactly as before. All carving is a pure function of world position, the column data and
+/// which scales that sub-biome's <see cref="CaveShape"/> boosts per region; plain and frozen echo cells
+/// use the regular fields, while desert cells use elongated tunnels and bounded pockets. All carving is a pure function of world position, the column data and
 /// the cave biome map (itself a pure function of position), so neighboring chunks agree at their
 /// borders without any shared state.
 /// </summary>

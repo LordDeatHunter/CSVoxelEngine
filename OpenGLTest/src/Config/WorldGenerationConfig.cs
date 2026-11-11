@@ -352,12 +352,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int MudWaterNeighbors = 2;
 
     // --- Lava ---
-    // Deep cave floors pond over with lava sources where a patch mask and a per-cell roll
-    // agree (see LavaGenerator). Pockets sit at or below LavaMaxY and buried under the
+    // Deep cave floors receive spaced source groups and contained, prefilled bowls.
+    // Sources sit at or below LavaMaxY and buried under the
     // terrain, so the surface, ravines and entrances stay dry and sea caves stay water.
     public const bool LavaEnabled = true;
     public const int LavaMaxY = -24;
     public const int LavaBurial = 2;
+    // Retained patch field is the barrier vulcanite proximity mask, not a fluid scatter.
     public const float LavaPatchFrequency = 1f / 128f;
     public const float LavaPatchThreshold = 0.2f;
     // One small source group per 64-cube; candidates stay in its middle half.
@@ -371,6 +372,8 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int CaveLavaLakeMinDepth = 2;
     public const int CaveLavaLakeMaxDepth = 3;
     public const int CaveLavaLakeBurial = 16;
+    public const int CaveLavaLakeLocalLevel = 6;
+    public const int CaveLavaLakeAirHeight = 3;
     public const float CaveLavaLakeChanceShallow = 0.18f;
     public const float CaveLavaLakeChanceDeep = 0.8f;
 
@@ -695,6 +698,8 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int DesertPocketWallBlocks = 3;
     public const float DesertPocketChanceShallow = 0.35f;
     public const float DesertPocketChanceDeep = 0.8f;
+    public const float DesertPocketDepthStart = 20f;
+    public const float DesertPocketDepthEnd = 320f;
 
     // Caverns: rare, wide, flat open spaces that only exist deep down
     public const float CavernFrequency = 1f / 256f;
@@ -991,7 +996,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int CaveEchoBottomY = -200;
 
     // Bounded 3D echo bodies spread under neighboring columns, beyond the original echo band.
-    public const int CaveEchoVolumeBottomY = -400;
+    public const int CaveEchoVolumeBottomY = BarrierTopY + 100;
     public const int CaveEchoVolumeCellBlocks = 128;
     public const int CaveEchoVolumeRadius = 96;
     public const int CaveEchoVolumeVerticalRadius = 112;
