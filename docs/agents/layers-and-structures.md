@@ -11,8 +11,8 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
 - **Bands** (`WorldGenerationConfig`, their order held by `LayerBandTests`): the overworld, whose caves wear
   their "Cave biomes" (a frozen or desert echo down to a wavy line near `CaveEchoBottomY` -200, then crystal,
   fungal or the magma-touched deep under a wavy line near `CaveDeepTopY` -264), down to the
-  barrier band `BarrierTopY..BarrierBottomY` (-300..-400, a gapless core `BarrierFullTopY..BarrierFullBottomY`,
-  -330..-370, between patchy ramps); hell from `HellTopY` (-401) down forever in `HellLayerPeriodBlocks` (96)
+  barrier band `BarrierTopY..BarrierBottomY` (-500..-600, a gapless core `BarrierFullTopY..BarrierFullBottomY`,
+  -530..-570, between patchy ramps); hell from `HellTopY` (-601) down forever in `HellLayerPeriodBlocks` (96)
   layers, each a cavern pocket over a 16-block hellrock slab; above every peak (`ReliefCeilingHeight` 148) and
   the drawn cloud layer (160), the solid cloud slab `CloudSlabBottomY..CloudSlabTopY` (198..203); the cloud sea
   (`SkyConfig.SkyCloudSeaHeight`, `SkyCloudSeaThickness`: 290..301); the sky islands
@@ -120,3 +120,5 @@ waystone's cells too. Measured over the default seed (3600 ruin cells a kind): a
 underground rooms, about 35% of the (rare) hell ruins and 11% of sky ruins (islands are often too small or uneven), at a mean
 center distance of 20-22 blocks (10 on islands). `WaystonePlacementTests`; `visual-examples/waystones.json` (`VOXEL_TIME=147`)
 films the nearest satellite of each realm on the default seed.
+
+Issue #10 translates the entire barrier band and hell entry down exactly 200 blocks. The existing magma-deep entry stays at -264, extending the overworld deep band by 200 blocks; cave/ore bands, ruins, LOD underground bounds, mob spawns, fog, difficulty and waystone realms all read these shared bounds. Hell noise remains world-aligned; newly generated terrain changes, while modified saved chunks keep their snapshots.
