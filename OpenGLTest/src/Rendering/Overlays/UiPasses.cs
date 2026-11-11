@@ -117,7 +117,8 @@ internal sealed class UiPasses
             _owner.Ui.Hud.DrawToast(toast.Text, toast.Alpha);
         if (!panelUp && (menu == null || !menu.IsOpen))
         {
-            _owner.Ui.Hud.DrawHearts(health, maxHealth);
+            if (camera?.IsCreative != true)
+                _owner.Ui.Hud.DrawHearts(health, maxHealth);
             _owner.Ui.Hud.DrawAir(airShare, health);
             _owner.Ui.Hud.DrawMana(manaShare, health, camera?.IsCreative == true);
             _owner.Ui.Hud.DrawEffects(effectMask, health);
