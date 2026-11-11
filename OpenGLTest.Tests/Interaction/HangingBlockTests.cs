@@ -85,11 +85,11 @@ public sealed class HangingBlockTests : IDisposable
         var (x, z) = (4, 6);
         _world.Load(x, ground + 3, z);
 
-        // On the floor there is nothing overhead to hang from: refused, and nothing is spent
-        var held = _world.Player.Inventory.CountFor(lantern);
-        Assert.False(_world.Place(lantern, new Vector3(x, ground, z), Vector3.UnitY));
-        Assert.Equal(held + 1, _world.Player.Inventory.CountFor(lantern));
-        Assert.Equal(BlockType.Air, _world.IdAt(x, ground + 1, z));
+        // A lantern also stands on the floor, recording that support rather than its historical ceiling state.
+        Assert.True(_world.Place(lantern, new Vector3(x, ground, z), Vector3.UnitY));
+        Assert.Equal(lantern, _world.IdAt(x, ground + 1, z));
+        Assert.True(BlockSupport.IsHeldUpBy(lantern, _world.StateAt(x, ground + 1, z),
+            new Vector3(x, ground + 1, z), new Vector3(x, ground, z)));
 
         // Against a ceiling's underside it hangs in the cell below the ceiling
         var ceiling = (X: x, Y: ground + 3, Z: z);

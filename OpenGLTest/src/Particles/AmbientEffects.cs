@@ -73,6 +73,31 @@ internal sealed class AmbientEffects
     // Every cell whose flame the particle system and the point lights draw: campfires plus kilns
     // (and goblin torches in the full update), rebuilt once per update so both consumers read one list
     private readonly List<Vector3> _fireCells = [];
+    private readonly List<Vector3> _lightCells = [];
+
+    /// <summary>Warm point lights include carried items and fueled lanterns without spawning campfire particles.</summary>
+    internal IReadOnlyList<Vector3> LightCells
+    {
+        get
+        {
+            _lightCells.Clear();
+            if (_world.LocalPlayer.LocalContext().Health?.IsDead != true && Simulation.Lanterns.LanternManager.Emits(_world.Inventory))
+                AddHeldLight(_world.Camera.Position, _world.Camera.PlayerYaw, _world.Camera.Pitch, _world.Player);
+            foreach (var remote in _world.RemotePlayers)
+                if (remote.HeldLit) AddHeldLight(remote.Eye, remote.Yaw, remote.Pitch, remote.Model);
+            _world.Lanterns.AppendLights(_chunkManager, _lightCells);
+            _lightCells.AddRange(_fireCells);
+            return _lightCells;
+        }
+    }
+
+    private void AddHeldLight(Vector3 eye, float yaw, float pitch, Player.PlayerModel model)
+    {
+        var hand = model.GetHandAnchorMatrix(eye, yaw, 0f, pitch);
+        var point = Vector3.Transform(Vector3.Zero, hand);
+        if (model.HoldingLantern) point = Vector3.Transform(Vector3.Zero, Player.HeldItemPose.LanternMatrix(hand, yaw));
+        _lightCells.Add(point - Rendering.FrameLighting.FireLightOffset);
+    }
 
     /// <summary>Refills <see cref="_fireCells"/> with the lit campfires and kilns; both update
     /// paths call it after the stations ticked and before the fire particles run.</summary>

@@ -88,6 +88,12 @@ public enum NetMessage : byte
     InventoryRequest = 71,
     /// <summary>Client to server: a <see cref="VoxelEngine.Networking.WorldIntent"/> (break, place, use,
     /// throw, attack, cast, hammer, waystone trip) with its sequence id (<see cref="WorldIntentCodec"/>).</summary>
+    /// <summary>Client request to open a selected held or aimed placed lantern.</summary>
+    LanternOpen = 72,
+    /// <summary>Server-owned target, fuel and eight-slot storage.</summary>
+    LanternContents = 73,
+    /// <summary>Client transfer intent against its open lantern.</summary>
+    LanternMove = 74,
     WorldIntent = 80,
     /// <summary>Server to one client: the sequence id of an intent and whether it was accepted.
     /// Every intent gets exactly one, in order, after its correction and inventory snapshot.</summary>
@@ -242,8 +248,10 @@ public static class NetFraming
     /// 40: the scorpion (<see cref="NetEntityKind.Scorpion"/>), a crawler on the wire like the spiders; its attack
     /// count names pinch (even) and sting (odd). An older client would not draw it.
     /// 41: the chest moves <see cref="Simulation.Chests.ChestMoveKind.LootAll"/> and
-    /// <see cref="Simulation.Chests.ChestMoveKind.QuickStack"/>; an older server would refuse them as malformed.</summary>
-    public const int ProtocolVersion = 41;
+    /// <see cref="Simulation.Chests.ChestMoveKind.QuickStack"/>; an older server would refuse them as malformed.
+    /// 42: lantern requests, placed lanterns in StationState, drop instance payloads,
+    /// and authoritative held id/light in PlayerList.</summary>
+    public const int ProtocolVersion = 42;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

@@ -36,6 +36,9 @@ public class DropManager
 
     public IReadOnlyList<ItemDrop> Drops => _drops;
 
+    /// <summary>An instance-owning block entity claims its loot before ordinary id-only rolls (blasts/support pops).</summary>
+    internal Func<ushort, Vector3, bool>? InstanceLoot { get; set; }
+
     /// <summary>Takes <paramref name="drop"/> out of the world uncollected (a thief's grab); false if it is gone.</summary>
     public bool Remove(ItemDrop drop) => _drops.Remove(drop);
 
@@ -55,6 +58,9 @@ public class DropManager
     /// <summary>
     /// Block ids collected during the most recent <c>Update</c>. Valid until the next one.
     /// </summary>
+    private readonly List<UI.InventoryPanel.ItemStack?> _collectedInstances = [];
+    public IReadOnlyList<UI.InventoryPanel.ItemStack?> CollectedInstances => _collectedInstances;
+
     public ReadOnlySpan<ushort> Collected => CollectionsMarshal.AsSpan(_collected);
 
     /// <summary>
@@ -67,10 +73,12 @@ public class DropManager
     /// <summary>World position of each entry of <see cref="Collected"/> when it was collected. Valid until the next update.</summary>
     public ReadOnlySpan<Vector3> CollectedAt => CollectionsMarshal.AsSpan(_collectedAt);
 
-    /// <summary>
-    /// Drops a block or item at the center of the cell it occupied. Air and unknown ids drop
-    /// nothing.
-    /// </summary>
+    /// <summary>Spawns an owned instance without losing metadata.</summary>
+    public void SpawnInstance(UI.InventoryPanel.ItemStack stack, Vector3 position, Vector3? toss = null, float? delay = null)
+    {
+        _drops.Add(new ItemDrop(stack.DefinitionId, position, toss, delay) { Instance = stack.CloneAs(0) });
+    }
+
     public void Spawn(ushort blockId, Vector3 blockPosition)
     {
         if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return;
@@ -95,11 +103,11 @@ public class DropManager
     /// False (and nothing added) for an id that is neither a block nor an item, the same guard
     /// as <see cref="SpawnAt"/>.
     /// </summary>
-    public bool SpawnRestored(ushort blockId, Vector3 position, Vector3 velocity, float age)
+    public bool SpawnRestored(ushort blockId, Vector3 position, Vector3 velocity, float age, UI.InventoryPanel.ItemStack? instance = null)
     {
         if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return false;
 
-        _drops.Add(new ItemDrop(blockId, position, velocity, age));
+        _drops.Add(new ItemDrop(blockId, position, velocity, age) { Instance = instance });
         return true;
     }
 
@@ -142,6 +150,7 @@ public class DropManager
     /// </summary>
     public void SpawnLoot(ushort blockId, Vector3 blockPosition, int count = 0, int secondary = 0, byte state = 0)
     {
+        if (InstanceLoot?.Invoke(blockId, blockPosition) == true) return;
         _loot.Clear();
         RollLoot(blockId,
             new LootContext((int)blockPosition.X, (int)blockPosition.Y, (int)blockPosition.Z, count, secondary, state),
@@ -204,6 +213,7 @@ public class DropManager
         Func<ushort, bool>? canCollect = null, float range = PickupRange)
     {
         _collected.Clear();
+        _collectedInstances.Clear();
         _collectedBy.Clear();
         _collectedAt.Clear();
         _blockedCollectors.Clear();
@@ -228,6 +238,7 @@ public class DropManager
             if (!wanted && !(canCollect?.Invoke(drop.BlockId) ?? true)) continue;
 
             _collected.Add(drop.BlockId);
+            _collectedInstances.Add(drop.Instance);
             _collectedAt.Add(drop.Position);
             _drops.RemoveAt(i);
         }
@@ -247,6 +258,7 @@ public class DropManager
     public void Update(float deltaTime, IReadOnlyList<DropCollector> collectors, ChunkManager chunks)
     {
         _collected.Clear();
+        _collectedInstances.Clear();
         _collectedBy.Clear();
         _collectedAt.Clear();
         _blockedCollectors.Clear();
@@ -311,6 +323,7 @@ public class DropManager
             if (!drop.Update(deltaTime, target, inRange, chunks)) continue;
 
             _collected.Add(drop.BlockId);
+            _collectedInstances.Add(drop.Instance);
             _collectedAt.Add(drop.Position);
             _collectedBy.Add(nearest);
             _drops.RemoveAt(i);

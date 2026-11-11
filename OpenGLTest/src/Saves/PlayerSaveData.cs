@@ -115,6 +115,8 @@ public sealed class PlayerSaveData
         /// <summary>A crucible's contents; only written for a crucible.</summary>
         public CrucibleData? Crucible { get; set; }
 
+        public Simulation.Lanterns.LanternData? Lantern { get; set; }
+
         /// <summary>A staff's bound spells; only written for a staff with something bound or selected.</summary>
         public StaffData? Staff { get; set; }
 

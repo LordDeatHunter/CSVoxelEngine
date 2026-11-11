@@ -11,4 +11,4 @@ namespace VoxelEngine.UI.Hud;
 /// and <see cref="Rarity"/> (<see cref="Rarities.Of"/>) dresses the box.
 /// </summary>
 public readonly record struct HoverTooltip(
-    Vector2 Anchor, IReadOnlyList<string> Lines, IReadOnlyDictionary<int, Rgba> Colors, Rarity Rarity);
+    Vector2 Anchor, IReadOnlyList<string> Lines, IReadOnlyDictionary<int, Rgba> Colors, Rarity Rarity, float? FuelFraction = null);

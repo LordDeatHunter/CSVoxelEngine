@@ -34,6 +34,9 @@ public interface IScenarioUi
     /// <summary>Closes the chest panel.</summary>
     void CloseChest();
 
+    /// <summary>Right-clicks the held or aimed lantern, then opens its fuel panel.</summary>
+    void OpenLantern();
+
     /// <summary>Clicks a row of the open chest's list, 0-based: it moves one unit (the whole slot when
     /// <paramref name="all"/>) into the inventory.</summary>
     void PickChestRow(int row, bool all);

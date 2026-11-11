@@ -41,16 +41,16 @@ internal sealed class ChestCardRenderer
         // The fill (used/total slots) sits at the right edge in body text; the name gets the rest of the row
         var fill = contents == null ? "" : $"{Used(contents)}/{contents.SlotCount}";
         var fillWidth = fill.Length == 0 ? 0f : _ui.TextWidth(fill, _ui.CountScale) + 12f;
-        _ui.DrawTextCenteredY(_ui.FitText(view.Title, _ui.CountScale, title.Size.X - fillWidth), title.Left, title.Center.Y,
+        _ui.DrawTextCenteredY(_ui.FitText(view.LanternFuel is { } fuel ? (fuel.Endless ? "Lantern: Everfuel" : $"Lantern: {fuel.Remaining:0}s") : view.Title, _ui.CountScale, title.Size.X - fillWidth), title.Left, title.Center.Y,
             _ui.CountScale, AccentGold);
         if (fill.Length > 0)
             _ui.DrawTextCenteredY(fill, title.Right - fillWidth + 12f, title.Center.Y, _ui.CountScale, TextDim);
 
         var search = ChestCardLayout.SearchBox(screen);
-        _ui.DrawInputField(search.Center, search.Size, view.Search.Text, searchFocused, "Search the chest", time);
+        _ui.DrawInputField(search.Center, search.Size, view.Search.Text, searchFocused, view.LanternInstance != null ? "Coal, slime or Everfuel" : "Search the chest", time);
 
-        DrawButton(ChestCardLayout.LootAllButton(screen), "LOOT ALL", contents is { IsEmpty: false }, ReadyGreen);
-        DrawButton(ChestCardLayout.QuickStackButton(screen), "QUICK STACK", contents != null, AccentGold);
+        DrawButton(ChestCardLayout.LootAllButton(screen), view.LanternInstance != null ? "TAKE ALL" : "LOOT ALL", contents is { IsEmpty: false }, ReadyGreen);
+        DrawButton(ChestCardLayout.QuickStackButton(screen), view.LanternInstance != null ? "ADD FUEL" : "QUICK STACK", contents != null, AccentGold);
 
         var list = ChestCardLayout.List(screen);
         if (contents == null)
@@ -62,7 +62,7 @@ internal sealed class ChestCardRenderer
         var rows = view.Rows();
         if (rows.Count == 0)
         {
-            var text = contents.IsEmpty ? "The chest is empty" : "Nothing matches";
+            var text = contents.IsEmpty ? view.LanternInstance != null ? "Add lantern fuel from your inventory" : "The chest is empty" : "Nothing matches";
             _ui.DrawTextCenteredFitted(text, list.Center.X, list.Top + 12f, _ui.CountScale, TextDim, list.Size.X);
             return;
         }

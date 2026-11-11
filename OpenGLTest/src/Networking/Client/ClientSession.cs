@@ -297,8 +297,10 @@ internal sealed class ClientSession
                     var action = (NetPlayerAction)reader.ReadByte();
                     var actionSeq = reader.ReadByte();
                     for (var slot = 0; slot < worn.Length; slot++) worn[slot] = BlockTables.RequireAssigned(reader.ReadId());
+                    var heldId = BlockTables.RequireAssigned(reader.ReadId());
+                    var heldLit = reader.ReadBool();
                     remoteScratch.Add(new RemotePlayerSnapshot(id, name, eye, yaw, pitch, flags, action, actionSeq,
-                        VoxelEngine.Player.ArmorLook.FromWire(worn)));
+                        VoxelEngine.Player.ArmorLook.FromWire(worn), heldId, heldLit));
                 }
                 w.ClientMirror.SyncRemotePlayers(remoteScratch, netPlayerId);
                 break;
@@ -414,6 +416,14 @@ internal sealed class ClientSession
                 foreach (var change in netCellsScratch.Where(offerServerWrite))
                     netApplyScratch.Add(change);
                 w.ClientMirror.ApplyNetworkBlockChanges(netApplyScratch);
+                break;
+            }
+            case NetMessage.LanternContents:
+            {
+                var answer = LanternNetCodec.ReadContents(reader);
+                var panel = w.ChestPanel;
+                if (panel.IsOpen && panel.LanternInstance == answer.Target.Instance && panel.Cell == answer.Target.Cell)
+                    panel.SetLantern(answer.State);
                 break;
             }
             case NetMessage.ChestContents:
@@ -534,8 +544,25 @@ internal sealed class ClientSession
         }
     }
 
-    /// <summary>Asks the server to open the chest at a cell; false when not connected. The answer is a
-    /// <see cref="NetMessage.ChestContents"/>.</summary>
+    /// <summary>Asks the server to validate and open a held or placed lantern.</summary>
+    internal bool SendLanternOpen(int instance, (int X, int Y, int Z) cell)
+    {
+        using var writer = new PacketWriter(NetMessage.LanternOpen, netClient?.Wire);
+        LanternNetCodec.WriteTarget(writer, new(instance, cell));
+        if (netClient == null) return false;
+        netClient.Send(writer.ToArray());
+        return true;
+    }
+
+    internal bool SendLanternMove(VoxelEngine.Simulation.Chests.ChestMove move)
+    {
+        using var writer = new PacketWriter(NetMessage.LanternMove, netClient?.Wire);
+        ChestNetCodec.WriteMove(writer, move);
+        if (netClient == null) return false;
+        netClient.Send(writer.ToArray());
+        return true;
+    }
+
     internal bool SendChestOpen(int x, int y, int z)
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;

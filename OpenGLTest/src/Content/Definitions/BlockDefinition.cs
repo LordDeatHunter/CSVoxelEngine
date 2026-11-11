@@ -334,6 +334,9 @@ public sealed class BlockDefinition
     /// legal on the `model` renderer.</summary>
     public ChestDefinition? Chest { get; set; }
 
+    /// <summary>Individual fuelled lantern, carried as an instance and lit dynamically.</summary>
+    public bool Lantern { get; set; }
+
     /// <summary>The <c>chest</c> object.</summary>
     public sealed class ChestDefinition
     {

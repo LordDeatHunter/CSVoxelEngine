@@ -180,6 +180,8 @@ public sealed class GameServerTests : IDisposable
                             reader.ReadByte();
                             for (var slot = 0; slot < GearConfig.ArmorSlotCount; slot++)
                                 reader.ReadId();
+                            reader.ReadId();
+                            reader.ReadBool();
                         }
                         break;
                     }

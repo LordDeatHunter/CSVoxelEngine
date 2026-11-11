@@ -19,7 +19,7 @@ public static class TooltipLayout
     public static readonly Vector2 AnchorOffset = new(16f, 18f);
 
     public static TooltipBox Compute(IReadOnlyList<string> sourceLines, Vector2 anchor, Vector2 canvas,
-        float maxTextWidth, int maxLines, float lineHeight, TextMeasure measure)
+        float maxTextWidth, int maxLines, float lineHeight, TextMeasure measure, float footerHeight = 0f)
     {
         var padding = UiTheme.Space.Md;
         var lines = new List<string>();
@@ -38,7 +38,7 @@ public static class TooltipLayout
         foreach (var line in lines)
             textWidth = MathF.Max(textWidth, measure(line));
 
-        var size = new Vector2(textWidth + padding * 2f, lines.Count * lineHeight + padding * 2f);
+        var size = new Vector2(textWidth + padding * 2f, lines.Count * lineHeight + padding * 2f + footerHeight);
         var topLeft = anchor + AnchorOffset;
         if (topLeft.X + size.X > canvas.X) topLeft.X = anchor.X - AnchorOffset.X - size.X;
         if (topLeft.Y + size.Y > canvas.Y) topLeft.Y = anchor.Y - AnchorOffset.Y - size.Y;

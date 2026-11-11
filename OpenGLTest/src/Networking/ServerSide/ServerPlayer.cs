@@ -176,6 +176,8 @@ public sealed class ServerPlayer : IMobTarget
     /// that chest only and a change reaches every viewer).</summary>
     public (int X, int Y, int Z)? OpenChest { get; set; }
 
+    public Simulation.Lanterns.LanternTarget? OpenLantern { get; set; }
+
     /// <summary>The cell of the waystone this player last activated (its screen's waystone, which a trip leaves from), or
     /// null; a trip is still judged on the player standing at it.</summary>
     public (int X, int Y, int Z)? AtWaystone { get; set; }

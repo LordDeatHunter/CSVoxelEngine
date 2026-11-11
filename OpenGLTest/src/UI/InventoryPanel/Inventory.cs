@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using VoxelEngine.Content.Blocks;
-using VoxelEngine.Config;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Items;
 using VoxelEngine.Saves;
@@ -106,7 +105,8 @@ public class Inventory
     {
         if (id == 0) return null;
         if (BlockType.ById[id] is { } block)
-            return block is { HasItem: true, Fluid: false } ? InventoryCategory.Blocks : null;
+            return block is { HasItem: true, Fluid: false }
+                ? block.Lantern ? InventoryCategory.Tools : InventoryCategory.Blocks : null;
         return ItemRegistry.TryGet(id)?.StorageCategory;
     }
 
@@ -717,7 +717,8 @@ public class Inventory
         if (!seedTestStock) return;
         foreach (var type in BlockType.Types.Values)
             if (type.HasItem && !type.Fluid)
-                _blocks[type.Id] = StartingStock;
+                if (type.Lantern) Add(type.Id, 1, autoEquip: false);
+                else _blocks[type.Id] = StartingStock;
         // One bucket, since water needs one to reach, plus the axe, found by behavior and
         // display name the way the compass below is.
         if (ItemRegistry.FindByAction(ItemUseAction.PickupFluid) is { } bucket)

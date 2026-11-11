@@ -1,9 +1,8 @@
 {
-  // A torch caged in a copper ring
   "result": "block/lantern",
   "count": 1,
   "ingredients": [
-    { "item": "block/torch", "count": 1 },
-    { "item": "item/copper_ring", "count": 1 }
+    { "item": "item/copper_ring", "count": 6 },
+    { "item": "block/glass_pane", "count": 4 }
   ]
 }

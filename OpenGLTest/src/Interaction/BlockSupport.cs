@@ -34,7 +34,8 @@ public static class BlockSupport
     /// floor block, back through the wall for an attached one (the opposite of its front), and up
     /// for a hanging one.</summary>
     public static Vector3 SupportOffset(BlockType type, byte state) =>
-        type.SupportAttached ? -Chunk.CubeFaces[state & 3].normal
+        type.Lantern ? ((state & 1) != 0 ? -Vector3.UnitY : Vector3.UnitY)
+        : type.SupportAttached ? -Chunk.CubeFaces[state & 3].normal
         : type.SupportAbove ? Vector3.UnitY
         : -Vector3.UnitY;
 

@@ -9,7 +9,9 @@ using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Server;
+using VoxelEngine.Saves;
 using VoxelEngine.Simulation.Chests;
+using VoxelEngine.Simulation.Lanterns;
 using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
@@ -55,6 +57,10 @@ public sealed class ChestServerTests : IDisposable
         public bool Answered;
         public ChestState? Contents;
         public int Answers;
+        public LanternState? Lantern;
+        public int LanternAnswers;
+        public Dictionary<string, (ushort Id, bool Lit)> Held = new();
+        public PlayerSaveData.InventoryData? Inventory;
 
         /// <summary>The newest station snapshot, whole (it ends with the chests that stand open).</summary>
         public byte[]? Stations;
@@ -66,6 +72,27 @@ public sealed class ChestServerTests : IDisposable
                 using var reader = new PacketReader(payload);
                 var message = reader.Message;
                 if (message == NetMessage.StationState) Stations = payload;
+                if (message == NetMessage.PlayerList)
+                {
+                    var count = reader.ReadInt();
+                    for (var i = 0; i < count; i++)
+                    {
+                        reader.ReadInt(); var name = reader.ReadString(); reader.ReadVector3();
+                        reader.ReadFloat(); reader.ReadFloat(); reader.ReadByte(); reader.ReadByte(); reader.ReadByte();
+                        for (var slot = 0; slot < GearConfig.ArmorSlotCount; slot++) reader.ReadId();
+                        Held[name] = (reader.ReadId(), reader.ReadBool());
+                    }
+                }
+                if (message == NetMessage.LanternContents)
+                {
+                    Lantern = LanternNetCodec.ReadContents(reader).State;
+                    LanternAnswers++;
+                }
+                if (message == NetMessage.InventoryState)
+                {
+                    reader.ReadInt();
+                    Inventory = InventoryNetCodec.Decode(reader.ReadBytes());
+                }
                 if (message != NetMessage.ChestContents) continue;
                 var read = ChestNetCodec.ReadContents(reader);
                 Contents = read?.Contents;
@@ -140,6 +167,88 @@ public sealed class ChestServerTests : IDisposable
         var (lx, ly, lz) = VoxelCoords.LocalOf(cell.Item1, cell.Item2, cell.Item3);
         chunk.SetBlockRaw(lx, ly, lz, ContentRegistry.RequireBlock("wooden_chest").Id, 0);
         return cell;
+    }
+
+    [Fact]
+    public void LanternMovesAreAuthoritativeAndSelectionInvalidatesTheSession()
+    {
+        var a = Connect("Alice");
+        var b = Connect("Bob");
+        var player = PlayerOf(a);
+        var coal = ContentRegistry.RequireItem("coal").Id;
+        var lantern = ContentRegistry.RequireBlock("lantern").Id;
+        player.Inventory.Add(lantern);
+        player.Inventory.PickBlock(lantern);
+        var instance = player.Inventory.SelectedToolInstance;
+        player.Aim(player.Position, Vector3.UnitY);
+        player.Inventory.Add(coal, 3);
+        PlayerOf(b).Inventory.Add(coal, 5);
+        Send(b, NetMessage.LanternOpen, w => LanternNetCodec.WriteTarget(w, new(instance, default)));
+        TickUntil(() => _inboxes[b].Answered, "forged held target was not refused");
+        Assert.Null(PlayerOf(b).OpenLantern);
+        Send(b, NetMessage.LanternMove, w => ChestNetCodec.WriteMove(w, ChestMove.DepositStack(coal, 2)));
+        Send(a, NetMessage.LanternOpen, w => LanternNetCodec.WriteTarget(w, new(instance, default)));
+        TickUntil(() => _inboxes[a].LanternAnswers > 0, "owned held lantern never opened");
+        player.Inventory.Add(Flint, 2);
+        Send(a, NetMessage.LanternMove, w => ChestNetCodec.WriteMove(w, ChestMove.DepositStack(Flint, 1)));
+        Send(a, NetMessage.LanternMove, w => ChestNetCodec.WriteMove(w, ChestMove.DepositStack(coal, 2)));
+        TickUntil(() => _inboxes[a].Lantern?.Remaining > 0f, "server did not burn stored fuel");
+        var fuel = LanternState.Held(player.Inventory)!;
+        Assert.Equal(1, fuel.Storage.CountOf(coal));
+        Assert.Equal(1, player.Inventory.CountFor(coal));
+        Assert.Equal(5, PlayerOf(b).Inventory.CountFor(coal));
+        Assert.Equal(2, player.Inventory.CountFor(Flint));
+        Assert.True(LanternManager.Emits(player.Inventory));
+        TickUntil(() => _inboxes[b].Held.TryGetValue("Alice", out var held) && held.Id == lantern && held.Lit,
+            "authoritative held light never reached the other client");
+        var snapshot = Inventory.Empty(); snapshot.Import(_inboxes[a].Inventory!);
+        Assert.True(LanternState.Held(snapshot)!.Remaining > 0);
+        Assert.Equal(1, LanternState.Held(snapshot)!.Storage.CountOf(coal));
+
+        // A queued move after switching cannot keep spending from a stored lantern.
+        player.Inventory.ClearSlot(player.Inventory.SelectedIndex);
+        var remaining = fuel.Remaining;
+        Send(a, NetMessage.LanternMove, w => ChestNetCodec.WriteMove(w, ChestMove.Withdraw(0, 0)));
+        TickUntil(() => player.OpenLantern == null, "changed selection kept the lantern session open");
+        Assert.Equal(remaining, fuel.Remaining);
+        Assert.Equal(1, fuel.Storage.CountOf(coal));
+        Assert.False(LanternManager.Emits(player.Inventory));
+        TickUntil(() => _inboxes[b].Held.TryGetValue("Alice", out var held) && held.Id == 0 && !held.Lit,
+            "switching away left a remote held light behind");
+    }
+
+    [Fact]
+    public void SharedPlacedLanternRejectsUnopenedMovesAndClosesWhenRemoved()
+    {
+        var a = Connect("Alice"); var b = Connect("Bob");
+        var cell = PlaceChest(a);
+        var chunks = _world.GetChunkManager();
+        var (lx, ly, lz) = VoxelCoords.LocalOf(cell.Item1, cell.Item2, cell.Item3);
+        chunks.ChunkAt(cell.Item1, cell.Item2, cell.Item3)!.SetBlockRaw(lx, ly, lz,
+            ContentRegistry.RequireBlock("lantern").Id, 1);
+        var coal = ContentRegistry.RequireItem("coal").Id;
+        foreach (var client in new[] { a, b })
+        {
+            var player = PlayerOf(client);
+            player.Inventory.Add(coal, 2);
+            var center = new Vector3(cell.Item1 + .5f, cell.Item2 + .5f, cell.Item3 + .5f);
+            player.Aim(player.Position, Vector3.Normalize(center - player.Position));
+            Send(client, NetMessage.LanternOpen, w => LanternNetCodec.WriteTarget(w, new(0, cell)));
+            TickUntil(() => _inboxes[client].LanternAnswers > 0, "placed lantern did not open");
+        }
+        Send(a, NetMessage.LanternMove, w => ChestNetCodec.WriteMove(w, ChestMove.DepositStack(coal, 2)));
+        TickUntil(() => _inboxes[b].Lantern?.Remaining > 0f, "other viewer never saw the fuel");
+        Send(b, NetMessage.LanternMove, w => ChestNetCodec.WriteMove(w, ChestMove.Withdraw(0, 0)));
+        TickUntil(() => PlayerOf(b).Inventory.CountFor(coal) == 3, "shared withdrawal never arrived");
+        Assert.Equal(0, PlayerOf(a).Inventory.CountFor(coal));
+        var state = LanternState.Of(_world.Lanterns.Peek(cell))!;
+        Assert.True(state.Remaining > 0);
+        Assert.Equal(0, state.Storage.CountOf(coal));
+        chunks.ChunkAt(cell.Item1, cell.Item2, cell.Item3)!.SetBlockRaw(lx, ly, lz, 0, 0);
+        TickUntil(() => PlayerOf(a).OpenLantern == null && PlayerOf(b).OpenLantern == null, "removed lantern stayed open");
+        var dropped = _world.Drops.Where(d => d.Instance != null && LanternState.Of(d.Instance) != null).ToArray();
+        Assert.Single(dropped);
+        Assert.True(LanternState.Of(dropped[0].Instance)!.Remaining > 0);
     }
 
     private static ushort Flint => ContentRegistry.RequireItem("flint").Id;

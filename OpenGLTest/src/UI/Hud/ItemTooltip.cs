@@ -8,6 +8,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Data;
 using VoxelEngine.Rendering.Overlays;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.Simulation.Lanterns;
 using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.UI.Hud;
@@ -28,7 +29,8 @@ public static class ItemTooltip
     /// <summary>The tooltip for an id hovered at <paramref name="anchor"/> (window pixels): its lines and colors, and
     /// the rarity (<see cref="Rarities.Of"/>) that dresses the box.</summary>
     public static HoverTooltip Hover(Vector2 anchor, ushort id, ItemStack? stack, Equipment? worn) =>
-        new(anchor, Lines(id, stack, worn, out var colors), colors, Rarities.Of(id, stack));
+        new(anchor, Lines(id, stack, worn, out var colors), colors, Rarities.Of(id, stack),
+            LanternState.IsLantern(id) ? LanternState.Of(stack)?.Fraction ?? 0f : null);
 
     /// <summary>
     /// The lines for an id, and the colors of the lines that are not plain: <paramref name="colors"/> maps a line index
@@ -46,6 +48,12 @@ public static class ItemTooltip
         if (BlockType.ById[id] is { } block)
         {
             lines.Add("Block");
+            if (block.Lantern)
+            {
+                var fuel = LanternState.Of(stack);
+                lines.Add(fuel?.Endless == true ? "Everfuel" : $"Fuel {fuel?.Remaining ?? 0f:0.#} s");
+                lines.Add("Right-click in air to fuel");
+            }
             lines.Add($"Hardness {block.Hardness:0.#}");
             if (block.LightEmission > 0) lines.Add($"Light {block.LightEmission}");
             if (block.StackMax >= 2) lines.Add($"Stacks to {block.StackMax}");

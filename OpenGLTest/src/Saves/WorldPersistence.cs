@@ -222,7 +222,8 @@ internal sealed class WorldPersistence
             if (!IsCellLoaded(position))
                 continue;
 
-            if (!_dropManager.SpawnRestored(id, position, ToVector(drop.Velocity), drop.Age ?? 0f))
+            if (!_dropManager.SpawnRestored(id, position, ToVector(drop.Velocity), drop.Age ?? 0f,
+                    drop.Instance == null ? null : InventorySaveCodec.ImportInstance(0, drop.Instance, new List<string>())))
                 (dropped ??= []).Add($"drop '{drop.Item}'");
             _pendingDrops.RemoveAt(i);
         }
@@ -240,7 +241,7 @@ internal sealed class WorldPersistence
             if (TowerFloorOf(mob) is { } floor)
                 _discardedTowerSkeletons.Add(floor);
         _pendingMobs.Clear();
-        _pendingDrops.Clear();
+        _pendingDrops.RemoveAll(drop => drop.Instance == null);
         _pendingIcebergs.Clear();
     }
 
@@ -500,9 +501,10 @@ internal sealed class WorldPersistence
 
         var drops = new List<EntitySaveData.DropData>();
         var unnamed = 0;
-        for (var i = 0; i < _dropSort.Count && drops.Count < SaveConfig.MaxSavedDrops; i++)
+        for (var i = 0; i < _dropSort.Count; i++)
         {
             var drop = _dropSort[i].drop;
+            if (drops.Count >= SaveConfig.MaxSavedDrops && drop.Instance == null) continue;
             if (SaveNames.NameOf(drop.BlockId) is not { } name)
             {
                 unnamed++;
@@ -514,12 +516,13 @@ internal sealed class WorldPersistence
                 Item = name,
                 Position = [drop.Position.X, drop.Position.Y, drop.Position.Z],
                 Velocity = [drop.Velocity.X, drop.Velocity.Y, drop.Velocity.Z],
+                Instance = drop.Instance == null ? null : InventorySaveCodec.ExportInstance(drop.Instance, new List<string>()),
                 Age = drop.Age
             });
         }
         _dropSort.Clear();
-        for (var i = 0; i < _pendingDrops.Count && drops.Count < SaveConfig.MaxSavedDrops; i++)
-            drops.Add(_pendingDrops[i]);
+        for (var i = 0; i < _pendingDrops.Count; i++)
+            if (drops.Count < SaveConfig.MaxSavedDrops || _pendingDrops[i].Instance != null) drops.Add(_pendingDrops[i]);
 
         if (unnamed > 0)
             Log.Warn($"Entity save: skipped {unnamed} drop(s) of an item with no save name");
@@ -565,6 +568,7 @@ internal sealed class WorldPersistence
     {
         if (saved == null)
             return;
+        _world.Lanterns.Restore(saved.Lanterns);
         var skipped = _campfires.Restore(saved.Campfires) + _querns.Restore(saved.Querns)
             + _kilns.Restore(saved.Kilns) + _casting.Restore(saved.Casts) + _world.Chests.Restore(saved.Chests)
             + _world.Waystones.Restore(saved.Waystones) + _world.Smithing.Restore(saved)
@@ -586,6 +590,7 @@ internal sealed class WorldPersistence
             Kilns = _kilns.Capture(),
             Casts = _casting.Capture(),
             Chests = _world.Chests.Capture(),
+            Lanterns = _world.Lanterns.Capture(),
             Waystones = _world.Waystones.Capture(),
             Towers = _world.Towers.Capture(),
         };

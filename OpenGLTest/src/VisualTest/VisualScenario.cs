@@ -216,6 +216,7 @@ public sealed class VisualScenario
             },
             "mine" => new VisualStep { Op = "mine", Seconds = ReadSeconds(element, index) },
             "place" => new VisualStep { Op = "place" },
+            "lantern" => new VisualStep { Op = "lantern" },
             "prime" => new VisualStep { Op = "prime", Pos = ReadPos(element, index, "prime") },
             "fly" => new VisualStep
             {

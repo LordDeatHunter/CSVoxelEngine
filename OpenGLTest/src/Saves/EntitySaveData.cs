@@ -82,6 +82,8 @@ public sealed class EntitySaveData
 
         /// <summary>Seconds since the drop appeared, which carries its pickup delay.</summary>
         public float? Age { get; set; }
+
+        public PlayerSaveData.ToolData? Instance { get; set; }
     }
 
     /// <summary>One drifting iceberg (<see cref="Iceberg"/>). Absent fields restore defaults.</summary>

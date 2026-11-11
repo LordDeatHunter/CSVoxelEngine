@@ -132,7 +132,7 @@ internal sealed class UiPasses
         if (view.IsOpen || view.Transition.Visible)
         {
             _owner.Ui.SetOverlay(new Vector2(0f, view.Transition.SlideY), view.Transition.Alpha);
-            _owner.Ui.Panel.DrawInventoryPanel(inventory, view, time, heading, camera?.IsCreative == true,
+            _owner.Ui.Panel.DrawInventoryPanel(inventory, view, time, heading, camera?.IsCreative == true && chest?.LanternInstance == null,
                 chest is { IsOpen: true });
             _owner.Ui.ClearOverlay();
         }
@@ -218,7 +218,7 @@ internal sealed class UiPasses
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
         // The anchor is the pointer in window pixels; the box is laid out and drawn in canvas units
-        _owner.Ui.Hud.DrawTooltip(_owner.Ui.ToCanvas(hover.Anchor), hover.Lines, hover.Colors, hover.Rarity, time);
+        _owner.Ui.Hud.DrawTooltip(_owner.Ui.ToCanvas(hover.Anchor), hover.Lines, hover.Colors, hover.Rarity, time, hover.FuelFraction);
         _owner.Ui.End();
         Units.InvalidateTextureUnits();
     }

@@ -16,6 +16,8 @@ using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation.Tower;
+using VoxelEngine.Simulation.Lanterns;
+using VoxelEngine.Simulation.Chests;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Structures;
@@ -72,6 +74,53 @@ public sealed class WorldLifecycleTests : IDisposable
         catch (UnauthorizedAccessException)
         {
         }
+    }
+
+    [Fact]
+    public void LanternInventoryPlacedAndDroppedStateSurvivesARealWorldSaveAndReopen()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+        var first = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(first, () => first.IsPlaying, LoadWallSeconds));
+        var lantern = ContentRegistry.RequireBlock("lantern").Id;
+        var coal = ContentRegistry.RequireItem("coal").Id;
+        first.Inventory.Add(lantern);
+        first.Inventory.PickBlock(lantern);
+        first.Inventory.Add(coal, 3);
+        var heldSlot = first.Inventory.SelectedIndex;
+        var state = LanternState.Held(first.Inventory)!;
+        state.Move(first.Inventory, ChestMove.DepositStack(coal, 3));
+        state.Advance(.25f);
+        var remaining = state.Remaining;
+        var placed = LanternCodec.Export(state);
+        placed.Cell = [2, (int)High, 2]; placed.Block = "block/lantern";
+        first.Lanterns.Restore([placed]);
+        var chunk = first.GetChunkManager().ChunkAt(2, (int)High, 2)!;
+        var (lx, ly, lz) = VoxelCoords.LocalOf(2, (int)High, 2);
+        chunk.SetBlockRaw(lx, ly, lz, lantern, 0);
+        // A second independently fuelled lantern goes through the real Q-drop path.
+        first.Inventory.Add(lantern);
+        var thrown = first.Inventory.Tools.Last();
+        first.Inventory.Add(coal, 3);
+        var thrownState = LanternState.Of(thrown)!;
+        thrownState.Move(first.Inventory, ChestMove.DepositStack(coal, 3));
+        thrownState.Advance(.25f);
+        first.Inventory.EquipTool(9, thrown.InstanceId); first.Inventory.Select(9);
+        Assert.True(first.ThrowSelected(false, new Vector3(3f, High, 3f), Vector3.UnitX, first.Inventory));
+        first.Inventory.Select(heldSlot);
+        Assert.True(first.SaveAndDispose());
+        var second = NewWorld(new ChunkSaveStore(_dir));
+        second.GetChunkManager().Headless = true;
+        Assert.Equal(remaining, LanternState.Held(second.Inventory)!.Remaining);
+        Assert.Equal(2, LanternState.Held(second.Inventory)!.Storage.CountOf(coal));
+        Assert.Equal(remaining, LanternState.Of(second.Lanterns.Peek((2, (int)High, 2)))!.Remaining);
+        Assert.True(RunUntil(second, () => second.IsPlaying && second.Drops.Any(d => d.Instance != null), LoadWallSeconds));
+        var drop = second.Drops.First(d => d.Instance != null);
+        Assert.Equal(remaining, LanternState.Of(drop.Instance)!.Remaining);
+        Assert.Equal(2, LanternState.Of(drop.Instance)!.Storage.CountOf(coal));
+        Assert.True(second.SaveAndDispose());
+        Assert.Equal(remaining, Assert.Single(ReadEntitiesFile()!.Drops!, d => d.Instance != null).Instance!.Lantern!.Remaining);
     }
 
     private World NewWorld(ChunkSaveStore? store)

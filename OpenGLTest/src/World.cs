@@ -391,8 +391,8 @@ public class World
     /// <summary>Every live mob (slimes, goblins), feeding targeting and the healthbars.</summary>
     public IReadOnlyList<Mob> Mobs => _mobs;
 
-    /// <summary>Every burning cell this frame, gathered by <see cref="Ambient"/>.</summary>
-    public IReadOnlyList<Vector3> FireCells => Ambient.FireCells;
+    /// <summary>Warm dynamic lights, including active held items and placed lanterns.</summary>
+    public IReadOnlyList<Vector3> FireCells => Ambient.LightCells;
 
     /// <summary>
     /// Builds the world and starts its chunk-generation and LOD workers. With a
@@ -548,6 +548,7 @@ public class World
                 _falling, _tntManager, _mobs, _projectiles, serverMode, _campfires, _kilns, _goblins);
             if (!serverMode)
                 WormEffects = new SandwormEffects(Camera, _debris, _chunkManager);
+            _dropManager.InstanceLoot = (id, cell) => Lanterns.DropRemoved(id, cell, _dropManager);
             Edits = new BlockEditor(this, _chunkManager, _debris, _dropManager, _campfires, _querns, _kilns, _casting,
                 _fluidManager, _leafDecay, _lodManager, _leaves, _falling, _toppling, clientMode, serverMode);
             // Built before the persistence, whose constructor restores the stations (towers included)
@@ -878,7 +879,7 @@ public class World
         Throws.ThrowSelected(wholeStack, eye, forward, inventory);
 
     /// <summary>Runs <paramref name="player"/>'s right-click (see
-    /// <see cref="RightClickAction.TryUseSelected(float, PlayerContext, out RightClickOutcome, bool)"/>);
+    /// <see cref="RightClickAction.TryUseSelected(float, PlayerContext, out RightClickOutcome, bool, bool)"/>);
     /// public for the dedicated server.</summary>
     public bool TryUseSelected(float maxDistance, PlayerContext player, out RightClickOutcome outcome,
         bool allowPlace = true) => RightClick.TryUseSelected(maxDistance, player, out outcome, allowPlace);
@@ -888,6 +889,8 @@ public class World
     /// <summary>The chests that hold state (a block entity registry; authoritative worlds only, a client keeps
     /// only what the server sends the chest it has open).</summary>
     public ChestManager Chests => _chests;
+
+    public Simulation.Lanterns.LanternManager Lanterns { get; } = new();
 
     /// <summary>The chest panel's UI state: which chest is open and what it shows (see <see cref="ChestView"/>).</summary>
     public ChestView ChestPanel { get; } = new();
@@ -1004,19 +1007,12 @@ public class World
     /// <summary>The cell of the altar the newest right-click claim named (<see cref="RightClickOutcome.Altar"/>).</summary>
     public Vector3 LastAltarCell => RightClick.LastAltarCell;
 
-    public bool HasStations =>
-        StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting) || _smithing.HasAny || _towers.HasAny
-        || ChestLids.HasViewed;
+    public bool HasStations => StationNetCodec.AnyWorld(_campfires, _querns, _kilns, _casting,
+        _smithing, _towers, ChestLids, Lanterns);
 
-    /// <summary>Writes every station block entity for the server's broadcast
-    /// (<see cref="NetMessage.StationState"/>).</summary>
-    public void WriteStations(PacketWriter writer)
-    {
-        StationNetCodec.Write(writer, _campfires, _querns, _kilns, _casting);
-        _smithing.WriteNet(writer);
-        _towers.WriteNet(writer);
-        ChestLids.WriteNet(writer);
-    }
+    /// <summary>Writes the server-owned stations, including placed lanterns.</summary>
+    public void WriteStations(PacketWriter writer) => StationNetCodec.WriteWorld(writer,
+        _campfires, _querns, _kilns, _casting, _smithing, _towers, ChestLids, Lanterns);
 
     /// <summary>
     /// One multiplayer-client frame: no local simulation, only the camera (and only once the chunk
@@ -1192,6 +1188,8 @@ public class World
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
         _chests.Update(_chunkManager, _dropManager);
+        Lanterns.Update((float)deltaTime, _chunkManager, _dropManager);
+        Lanterns.UpdateHeld((float)deltaTime, this, _serverMode);
         ChestLids.Update((float)deltaTime, ChestPanel.OpenCell);
         _waystones.Update(_chunkManager);
         _kilns.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);

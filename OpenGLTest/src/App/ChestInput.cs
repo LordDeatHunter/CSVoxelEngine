@@ -1,7 +1,5 @@
-using System;
 using System.Numerics;
 using Silk.NET.Input;
-using VoxelEngine.Content.Blocks;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Platform;
 using VoxelEngine.Rendering;
@@ -70,6 +68,16 @@ internal sealed class ChestInput
             session.SendChestOpen(x, y, z);
     }
 
+    internal void OpenLantern(World world, int instance, Vector3 cell)
+    {
+        var target = cell.BlockCell();
+        var fuel = Connected ? null : world.Lanterns.Resolve(world.LocalPlayer.LocalContext(), world.GetChunkManager(), instance, target);
+        if (!Connected && fuel == null) return;
+        panel.SetInventoryOpen(true);
+        world.ChestPanel.ShowLantern(target, instance, fuel);
+        if (Connected) session.SendLanternOpen(instance, target);
+    }
+
     /// <summary>Closes the chest panel (the [E] list stays up) and tells the server when connected.</summary>
     internal void Close()
     {
@@ -87,6 +95,13 @@ internal sealed class ChestInput
     {
         var view = world.ChestPanel;
         if (!view.IsOpen) return;
+        if (view.LanternInstance is { } instance)
+        {
+            var fuel = world.Lanterns.Resolve(world.LocalPlayer.LocalContext(), world.GetChunkManager(), instance, view.Cell);
+            if (fuel == null) { if (!Connected || instance > 0) Close(); }
+            else if (!Connected) view.SetLantern(fuel);
+            return;
+        }
         var (x, y, z) = view.Cell;
         var outOfReach = !ChestAccess.InReach(world.Camera.Position, x, y, z, World.InteractionReach);
         if (Connected)
@@ -190,10 +205,14 @@ internal sealed class ChestInput
     {
         if (Connected)
         {
-            session.SendChestMove(move);
+            if (world.ChestPanel.LanternInstance != null) session.SendLanternMove(move);
+            else session.SendChestMove(move);
             return;
         }
-        if (world.ChestPanel.Contents is { } chest)
+        if (world.ChestPanel.LanternInstance is { } instance)
+            world.Lanterns.Resolve(world.LocalPlayer.LocalContext(), world.GetChunkManager(), instance, world.ChestPanel.Cell)
+                ?.Move(world.Inventory, move);
+        else if (world.ChestPanel.Contents is { } chest)
             ChestAccess.Apply(world.Inventory, chest, move);
     }
 }
