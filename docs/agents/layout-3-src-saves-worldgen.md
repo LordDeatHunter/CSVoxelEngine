@@ -566,3 +566,5 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
 ```
 
 `WorldGen/Caves/CaveEchoVolumes.cs`: deterministic ellipsoid sites that extend echo materials through solid rock; shared point/map containment.
+
+`WorldGen/Caves/DesertCaves.cs`: bounded, separated desert pocket ellipsoids, composed with elongated noise tunnels.

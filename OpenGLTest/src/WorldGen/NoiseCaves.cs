@@ -11,7 +11,7 @@ namespace VoxelEngine.WorldGen;
 /// the curves where two fields are both near zero (a wide and a narrow variant), and rare flat
 /// caverns deep down. Every field is sampled on a coarse lattice per chunk and trilinearly
 /// interpolated per block before thresholding, so the cost is a few hundred noise evaluations
-/// per chunk instead of tens of thousands. Ten channels: nine cave fields and a shape scale
+/// per chunk instead of tens of thousands. Twelve channels: eleven cave fields and a shape scale
 /// (seed offset 182, plans/CAVE_BIOMES.md CB-2), sampled only in a chunk holding a cave sub-biome,
 /// which scales that sub-biome's <see cref="CaveShape"/> boosts per region; plain and echo cells
 /// carve exactly as before. All carving is a pure function of world position, the column data and
@@ -37,7 +37,9 @@ public static class NoiseCaves
     private const int ChNarrowMask = 7;
     private const int ChShapeScale = 8;
     private const int ChPocket = 9;
-    private const int Channels = 10;
+    private const int ChDesertA = 10;
+    private const int ChDesertB = 11;
+    private const int Channels = 12;
 
     private static FastNoiseLite Cheese;
     private static FastNoiseLite SpaghettiA;
@@ -81,8 +83,9 @@ public static class NoiseCaves
         var samples = ArrayPool<float>.Shared.Rent(Channels * GridCount);
         try
         {
-            SampleLattice(samples, worldX0, worldY0, worldZ0, withShape: caves is not null && caves.AnySubBiome);
-            CarveBlocks(blocks, column, worldY0, samples, caves);
+            SampleLattice(samples, worldX0, worldY0, worldZ0, withShape: caves is not null && caves.AnySubBiome,
+                withDesert: caves is not null && caves.Has(CaveBiome.DesertEcho));
+            CarveBlocks(blocks, column, worldX0, worldY0, worldZ0, samples, caves);
         }
         finally
         {
@@ -93,7 +96,7 @@ public static class NoiseCaves
     // Lattice points sit on world coordinates that are multiples of Stride, so adjacent chunks
     // sample identical values along their shared face. The shape channel is read only by a sub-biome
     // cell, so a chunk without one never samples it
-    private static void SampleLattice(float[] samples, int worldX0, int worldY0, int worldZ0, bool withShape)
+    private static void SampleLattice(float[] samples, int worldX0, int worldY0, int worldZ0, bool withShape, bool withDesert)
     {
         for (var gx = 0; gx < Grid; gx++)
         {
@@ -115,13 +118,20 @@ public static class NoiseCaves
                     samples[ChCavern * GridCount + g] = Cavern.GetNoise(wx, wy * WorldGenerationConfig.CavernYScale, wz);
                     samples[ChNarrowMask * GridCount + g] = NarrowMask.GetNoise(wx, wy, wz);
                     samples[ChPocket * GridCount + g] = Pocket.GetNoise(wx, wy * WorldGenerationConfig.CavePocketYScale, wz);
+                    if (withDesert)
+                    {
+                        samples[ChDesertA * GridCount + g] = SpaghettiA.GetNoise(wx * WorldGenerationConfig.DesertTunnelXScale,
+                            wy * WorldGenerationConfig.SpaghettiYScale, wz);
+                        samples[ChDesertB * GridCount + g] = SpaghettiB.GetNoise(wx * WorldGenerationConfig.DesertTunnelXScale,
+                            wy * WorldGenerationConfig.SpaghettiYScale, wz);
+                    }
                     if (withShape) samples[ChShapeScale * GridCount + g] = ShapeScale.GetNoise(wx, wy, wz);
                 }
             }
         }
     }
 
-    private static void CarveBlocks(ushort[] blocks, ColumnData column, int worldY0, float[] samples,
+    private static void CarveBlocks(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0, float[] samples,
         CaveBiomeMap? caves)
     {
         for (var x = 0; x < Chunk.Size; x++)
@@ -163,6 +173,16 @@ public static class NoiseCaves
                     var tunnelScale = 1f;
                     var cavernBoost = 0f;
                     var biome = caves is null ? CaveBiome.Plain : (CaveBiome)caves.Cells[idx];
+                    if (biome == CaveBiome.DesertEcho)
+                    {
+                        var a = Trilinear(samples, ChDesertA * GridCount + g, fx, fy, fz);
+                        var b = Trilinear(samples, ChDesertB * GridCount + g, fx, fy, fz);
+                        var radius = gate * WorldGenerationConfig.DesertTunnelRadius;
+                        if (a * a + b * b < radius * radius
+                            || DesertCaves.InPocket(worldX0 + x, worldY0 + y, worldZ0 + z, depth, gate))
+                            blocks[idx] = BlockType.Air;
+                        continue;
+                    }
                     if (CaveShape.Shapes(biome))
                     {
                         var k = 1f + WorldGenerationConfig.CaveShapeScaleVariation

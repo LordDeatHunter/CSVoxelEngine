@@ -110,7 +110,7 @@ public sealed class CaveShapeTests
     [Fact]
     public void PlainAndEchoCellsCarveExactlyAsWithoutAMap()
     {
-        foreach (var biome in new[] { CaveBiome.Plain, CaveBiome.FrozenEcho, CaveBiome.DesertEcho })
+        foreach (var biome in new[] { CaveBiome.Plain, CaveBiome.FrozenEcho })
         {
             Assert.False(CaveShape.Shapes(biome));
             var map = MapOf(_ => biome);
@@ -118,6 +118,27 @@ public sealed class CaveShapeTests
                 Assert.True(Carved(cx, cy, cz, map).AsSpan().SequenceEqual(Carved(cx, cy, cz, null)),
                     $"a {biome} map changed the carve of chunk ({cx}, {cy}, {cz})");
         }
+    }
+
+    [Fact]
+    public void DesertUsesDistinctCarvingAndLargePocketsKeepSeparatingWalls()
+    {
+        var map = MapOf(_ => CaveBiome.DesertEcho);
+        Assert.Contains(DeepChunks, c => !Carved(c.Cx, c.Cy, c.Cz, map).SequenceEqual(Carved(c.Cx, c.Cy, c.Cz, null)));
+        var open = 0;
+        var closed = 0;
+        for (var x = -192; x < 192; x += 3)
+        for (var y = -192; y < -64; y += 2)
+        for (var z = -192; z < 192; z += 3)
+        {
+            if (DesertCaves.InPocket(x, y, z, 340, 1f)) open++;
+            else closed++;
+            // Pocket boundaries always preserve walls, including at negative world coordinates.
+            Assert.False(DesertCaves.InPocket(x, y, 0, 340, 1f));
+            Assert.False(DesertCaves.InPocket(0, y, z, 340, 1f));
+            Assert.False(DesertCaves.InPocket(x, -128, z, 340, 1f));
+        }
+        Assert.True(open > 0 && closed > open, "desert rooms must be separate pockets in solid rock");
     }
 
     [Fact]

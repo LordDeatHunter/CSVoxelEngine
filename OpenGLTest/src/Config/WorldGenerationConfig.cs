@@ -671,6 +671,19 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float NarrowSpaghettiMaskStart = -0.1f;    // patches exist where mask noise exceeds this...
     public const float NarrowSpaghettiMaskEnd = 0.3f;       // ...and are fully developed above this
 
+    // Desert caves: long, narrow noise tunnels between bounded large ellipsoid rooms.
+    public const float DesertTunnelXScale = 0.28f;
+    public const float DesertTunnelRadius = 0.075f;
+    public const int DesertPocketCellBlocks = 96;
+    public const int DesertPocketCellHeight = 64;
+    public const int DesertPocketMinRadius = 25;
+    public const int DesertPocketMaxRadius = 36;
+    public const int DesertPocketMinHeight = 12;
+    public const int DesertPocketMaxHeight = 20;
+    public const int DesertPocketWallBlocks = 3;
+    public const float DesertPocketChanceShallow = 0.35f;
+    public const float DesertPocketChanceDeep = 0.8f;
+
     // Caverns: rare, wide, flat open spaces that only exist deep down
     public const float CavernFrequency = 1f / 256f;
     public const float CavernYScale = 3f;
