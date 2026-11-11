@@ -16,8 +16,8 @@ namespace VoxelEngine.WorldGen;
 /// <para>The cache is <c>generations</c> disjoint dictionaries, index 0 newest. A read probes them
 /// newest-first; a miss computes the value and inserts it into the newest; when the newest map has
 /// taken <c>capacity / generations</c> successful inserts the whole array rotates - a fresh empty
-/// map is pushed on the front and the oldest is dropped. Nothing is ever cleared wholesale except by
-/// the seed swap (point 11).</para>
+/// map is pushed on the front and the oldest is dropped. Wholesale clearing requires quiescent
+/// readers (point 11).</para>
 ///
 /// <para><b>1. Values are pure deterministic functions of the key.</b> Every value stored here is
 /// produced by <c>factory(key)</c> with no other input than the key and the CURRENT world seed,
@@ -98,12 +98,12 @@ namespace VoxelEngine.WorldGen;
 /// is data loss the generator cannot rebuild, not a recompute. Point 2 is the whole safety argument,
 /// and it evaporates the moment a value stops being derivable from its key.</para>
 ///
-/// <para><b>11. <see cref="Clear"/> exists ONLY for the world-seed swap.</b> Every value here is a
-/// pure function of (key, seed), so once <c>WorldSeed.Apply</c> changes the seed every entry is
-/// wrong and a wholesale drop is the correct response - the one place this type is ever cleared
-/// wholesale. It is not a thread-safe reset: a worker still reading while it runs could insert an
-/// old-seed value into the fresh node. Excluding that race is the caller's job (Apply runs only
-/// once every worldgen thread is joined).</para>
+/// <para><b>11. <see cref="Clear"/> requires quiescent readers.</b> Every value here is a pure
+/// function of (key, seed), so <c>WorldSeed.Apply</c> clears every cache on a seed/world swap.
+/// The column cache also clears after the last world has safely stopped, releasing derivable
+/// values while the process is between worlds. This is not a thread-safe reset: a reader still
+/// running could insert into an old node. The caller must serialize the clear with all readers,
+/// including direct callers outside a World.</para>
 /// </summary>
 public sealed class GenerationalCache<TKey, TValue> where TKey : notnull
 {
@@ -228,8 +228,8 @@ public sealed class GenerationalCache<TKey, TValue> where TKey : notnull
     /// <summary>
     /// Drops every generation by publishing a fresh, empty node (point 11). A <c>Rotate</c> racing on
     /// the old node loses its CAS and discards its array (point 5), so nothing is retried. The
-    /// diagnostics counters are not reset: they stay monotone. Only for <c>WorldSeed.Apply</c>, whose
-    /// precondition is that no worker thread can read this cache while it runs.
+    /// diagnostics counters are not reset: they stay monotone. The caller must ensure no reader
+    /// can access this cache while it runs.
     /// </summary>
     public void Clear()
     {

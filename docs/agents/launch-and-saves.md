@@ -146,7 +146,10 @@ pure function of the seed: only **deltas** and the seed are written.
   `WorldPersistence.FlushAll` hands every modified chunk, the LOD edit state, the player and the entities to the
   store, then the store shuts down (`SaveWriterShutdownTimeoutSeconds`). Only when every join and
   the drain succeeded are the chunk and LOD slices released to the shared pools, the toppling-tree
-  meshes disposed and `WorldSeed.EndWorld` run; `RenderManager.ForgetWorld` drops its references
+  meshes disposed and `WorldSeed.EndWorld` run. The final live owner also drops the derivable
+  `ColumnCache` values; another live owner retains them, and repeated disposal never clears again.
+  Lifecycle transitions and direct worldgen readers must be serialized, as for `WorldSeed.Apply`.
+  `RenderManager.ForgetWorld` drops its references
   (and the eased underwater/lava eye state). A timed-out join leaves `WorldSeed.WorldIsLive` true,
   so the seed stays locked for the rest of the process and the menu refuses PLAY/CREATE with a
   notice; a false return with the seed free (a writer timeout) is only a warning, but the folder

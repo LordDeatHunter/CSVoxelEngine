@@ -39,8 +39,22 @@ public static class WorldSeed
     /// <summary>Registers a live world; <see cref="Apply"/> refuses to run until it ends.</summary>
     internal static void BeginWorld() => Interlocked.Increment(ref _liveWorlds);
 
-    /// <summary>Ends a world registered by <see cref="BeginWorld"/>, after its workers are joined.</summary>
-    internal static void EndWorld() => Interlocked.Decrement(ref _liveWorlds);
+    /// <summary>
+    /// Ends a world registered by <see cref="BeginWorld"/>, after its generation and LOD workers
+    /// are joined and its mesh work is drained. The last world releases the derivable column values
+    /// while the process is between worlds; the next <see cref="Apply"/> clears them again even
+    /// when it selects the same seed.
+    /// </summary>
+    /// <remarks>
+    /// Lifecycle transitions and direct worldgen readers (including calls made without a World)
+    /// must be serialized by the caller, just as for <see cref="Apply"/>. The live-world count
+    /// distinguishes owners; it does not make a concurrent BeginWorld or cache read safe here.
+    /// </remarks>
+    internal static void EndWorld()
+    {
+        if (Interlocked.Decrement(ref _liveWorlds) == 0)
+            ColumnCache.Reset();
+    }
 
     /// <summary>Whether any world is registered, which makes <see cref="Apply"/> illegal.</summary>
     public static bool WorldIsLive => Volatile.Read(ref _liveWorlds) > 0;
