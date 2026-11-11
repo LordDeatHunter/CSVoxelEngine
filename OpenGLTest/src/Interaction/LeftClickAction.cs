@@ -269,6 +269,14 @@ internal sealed class LeftClickAction
     internal void UpdateBlockBreaking(double deltaTime, bool isHolding)
     {
         if (!IsPlaying) return;
+        // A downed player lands nothing: a swing already in flight (or buffered) is abandoned, not just new presses
+        if (Camera.IsDead)
+        {
+            ResetCombos();
+            StopBreaking();
+            _attackWasPressed = false;
+            return;
+        }
         var justPressed = isHolding && !_attackWasPressed;
         _attackWasPressed = isHolding;
         _anvilCooldown = MathF.Max(0f, _anvilCooldown - (float)deltaTime);
