@@ -451,6 +451,7 @@ public class World
             // A server's camera is nobody, so no effect may land on it; a client's carries the mirror
             if (!serverMode)
                 Camera.Effects = _health.Effects;
+                Camera.Healer = amount => _health.Heal(amount);
             LocalPlayer = new LocalPlayer(this, _health, _dust, _debris, _mobs, serverMode, clientMode);
             var savedPlayer = PlayerSaveCodec.TryParse(saveStore?.ReadFile(PlayerSaveCodec.FileName));
             if (savedPlayer != null)

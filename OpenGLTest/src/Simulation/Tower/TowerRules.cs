@@ -28,6 +28,20 @@ public static class TowerRules
         return dx * dx + dz * dz <= radius * radius;
     }
 
+    /// <summary>
+    /// Whether a target whose eye is at <paramref name="eye"/> stands on the floor between <paramref name="bottomY"/>
+    /// (the slab it stands on) and <paramref name="topY"/> of the tower centered at (<paramref name="centerX"/>,
+    /// <paramref name="centerZ"/>): inside the footprint's <paramref name="outerRadius"/> horizontally and inside the
+    /// floor's band, so a player on another floor or outside the tower is not on it.
+    /// </summary>
+    public static bool OnFloor(Vector3 eye, int centerX, int centerZ, int outerRadius, int bottomY, int topY)
+    {
+        if (eye.Y <= bottomY || eye.Y > topY) return false;
+        var dx = eye.X - (centerX + 0.5f);
+        var dz = eye.Z - (centerZ + 0.5f);
+        return dx * dx + dz * dz <= outerRadius * outerRadius;
+    }
+
     /// <summary>Whether floor <paramref name="floor"/>'s piles may wake: the ground floor always, a higher one only
     /// once the door below it is open.</summary>
     public static bool FloorAwake(int floor, bool previousDoorOpen) => floor == 0 || previousDoorOpen;

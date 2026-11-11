@@ -592,6 +592,13 @@ public class Camera : IMobTarget
         AddKnockback(awayHorizontal, knockbackSpeed, lift);
     }
 
+    /// <summary>Restores the local player's health: the pool lives in <see cref="World"/>, which wires
+    /// <see cref="Healer"/> to it.</summary>
+    public void Heal(int amount) => Healer?.Invoke(amount);
+
+    /// <summary>What <see cref="Heal"/> calls: the world's health pool; null on a camera with none.</summary>
+    internal Action<int>? Healer { get; set; }
+
     /// <summary>The display name of the last mob whose hit landed on this camera (see
     /// <see cref="World"/>'s billing), or null.</summary>
     public string? LastMobAttacker { get; private set; }

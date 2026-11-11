@@ -45,4 +45,8 @@ public interface IMobTarget
     /// upward <paramref name="lift"/>. <paramref name="attacker"/> is the mob's display name, which
     /// a death names in its message.</summary>
     void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift, string? attacker = null);
+
+    /// <summary>Restores up to <paramref name="amount"/> HP (a conquered tower floor's reward); a target with no
+    /// health pool of its own ignores it.</summary>
+    void Heal(int amount) { }
 }

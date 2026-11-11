@@ -281,6 +281,12 @@ public sealed class ServerPlayer : IMobTarget
         StatusDirty = true;
     }
 
+    /// <summary>Restores up to <paramref name="amount"/> HP at once and marks the status for the next send.</summary>
+    public void Heal(int amount)
+    {
+        if (Status.Heal(amount)) StatusDirty = true;
+    }
+
     /// <summary>Whether this player's death has been announced in the chat (the server says it
     /// once per death, and again after a respawn).</summary>
     public bool DeathAnnounced { get; set; }

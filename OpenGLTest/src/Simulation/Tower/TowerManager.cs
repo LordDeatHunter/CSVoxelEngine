@@ -567,8 +567,21 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
                 if (floor.DoorOpen || !TowerRules.DoorMayOpen(k, previousOpen, floor.PilesLeft, floor.Alive)) continue;
                 floor.DoorOpen = true;
                 floor.DoorRemaining.AddRange(floor.DoorCells);
+                HealPlayersOn(record, floor, targets);
                 FloorConquered?.Invoke(record, k);
             }
+        }
+    }
+
+    // Rewards every living player standing on a just-cleared floor with a roll of HP
+    private static void HealPlayersOn(TowerRecord record, TowerFloorState floor, IReadOnlyList<IMobTarget> targets)
+    {
+        for (var i = 0; i < targets.Count; i++)
+        {
+            var target = targets[i];
+            if (target.IsDead) continue;
+            if (!TowerRules.OnFloor(target.Eye, record.CenterX, record.CenterZ, record.OuterRadius, floor.BottomY, floor.TopY)) continue;
+            target.Heal(Random.Shared.Next(MobConfig.TowerFloorClearHealMin, MobConfig.TowerFloorClearHealMax + 1));
         }
     }
 

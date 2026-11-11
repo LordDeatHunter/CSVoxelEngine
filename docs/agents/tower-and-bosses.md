@@ -325,7 +325,7 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
   `Waiting` chunks, `Done`; the in-layer index is not saved, since a rescan is idempotent: a cell no longer holding its
   expected block reads gone); an entry on a tower that is not Defeated is ignored, and a Defeated tower with none (a save from
   before BT-8) starts a fresh collapse. No wire change: clients see the ruin through the `BlockChanges` journal (protocol
-  stays 27). **Floor conquered**: when a floor's door opens (never the roof boss), `TowerManager.FloorConquered` (raised by the
+  stays 27). **Floor conquered**: when a floor's door opens (never the roof boss), every living player standing on it (`TowerRules.OnFloor`) is healed `MobConfig.TowerFloorClearHealMin`..`Max` HP (`IMobTarget.Heal`, authoritative side only), and `TowerManager.FloorConquered` (raised by the
   tick, and on a client when a snapshot shows a mirrored tower's door newly open) makes `Particles/FloorConqueredEffects` play the
   `floor_clear` sfx (camera within `JuiceConfig.FloorConqueredSoundRangeBlocks`) and sweep three cylinders of
   `FireParticleKind.Pulse` motes out of the floor's axis across its whole height to the wall (`FireParticleSystem.PulseCylinder`;

@@ -623,6 +623,9 @@ public static class MobConfig
     public const float SkeletonPileNearRadiusBlocks = 16f;
     /// <summary>Seconds between the tower manager's looks for a tower under each target.</summary>
     public const float TowerScanSeconds = 0.5f;
+    /// <summary>The HP each player standing on a floor gets when it is cleared, rolled between these (inclusive).</summary>
+    public const int TowerFloorClearHealMin = 10;
+    public const int TowerFloorClearHealMax = 30;
     /// <summary>A bound skeleton farther than this from its tower's center is released and owed back to its floor.</summary>
     public const float TowerSkeletonLeashBlocks = 48f;
     /// <summary>Seconds a defeated tower waits before it starts to collapse (BT-8), so the Skeleton King's death and loot
