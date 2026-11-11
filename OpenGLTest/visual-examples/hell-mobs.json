@@ -1,0 +1,42 @@
+{
+  // Hell mobs check (plans/LAYERS.md L-10): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/hell-mobs.json
+  // Shots land in visual/hell-mobs/. The camera hovers (creative flight, so it is immune and the mobs
+  // still chase it) in the layer-0 Ashlands cavern of hell.json, lays a lamp on the floor to each side
+  // of it for light, and spawns a hellbrute and a cinderwitch a few blocks in front with the exact-feet form
+  // of `spawn` (the [x, z] form snaps onto the overworld surface, far above hell). `idle` is taken
+  // just after they pop in, `cast` while the cinderwitch's first bolts fly (its first cast comes
+  // after HellCasterFirstCastDelaySeconds), and the four `slam` shots from the shoulder camera once the brute has closed in under it and
+  // swings (one of them usually catches the fists up or coming down).
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-7.5, -428.5, -2.5], "yaw": 0, "pitch": -60 },
+    { "op": "wait", "seconds": 20 },
+
+    // One lamp to each side, so the brute's path to the camera stays clear
+    { "op": "give", "block": "lamp", "count": 2 },
+    { "op": "place" },
+    { "op": "look", "yaw": 180, "pitch": -60 },
+    { "op": "place" },
+    { "op": "look", "yaw": -90, "pitch": -18 },
+    { "op": "wait", "seconds": 1 },
+
+    { "op": "spawn", "entity": "hellbrute", "pos": [-7.5, -430, -11.5] },
+    { "op": "spawn", "entity": "cinderwitch", "pos": [-4.5, -431, -13.5] },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "idle", "hideHud": true },
+    { "op": "wait", "seconds": 1.2 },
+    { "op": "screenshot", "name": "cast", "hideHud": true },
+    { "op": "wait", "seconds": 2.0 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "look", "yaw": -90, "pitch": -30 },
+    { "op": "screenshot", "name": "slam_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.35 },
+    { "op": "screenshot", "name": "slam_b", "hideHud": true },
+    { "op": "wait", "seconds": 0.35 },
+    { "op": "screenshot", "name": "slam_c", "hideHud": true },
+    { "op": "wait", "seconds": 0.35 },
+    { "op": "screenshot", "name": "slam_d", "hideHud": true }
+  ]
+}

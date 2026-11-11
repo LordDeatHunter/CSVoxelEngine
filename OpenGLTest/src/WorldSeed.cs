@@ -3,8 +3,12 @@ using System.Threading;
 using VoxelEngine.Chunks;
 using VoxelEngine.Lod;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
+using VoxelEngine.WorldGen.Hell;
+using VoxelEngine.WorldGen.Sky;
+using VoxelEngine.WorldGen.Structures;
 
 namespace VoxelEngine;
 
@@ -79,6 +83,17 @@ public static class WorldSeed
         CoalGenerator.Reseed();
         MalachiteGenerator.Reseed();
         HematiteGenerator.Reseed();
+        TinGenerator.Reseed();
+        VulcaniteGenerator.Reseed();
+        BarrierGenerator.Reseed();
+        HellGenerator.Reseed();
+        HellBiomes.Reseed();
+        CaveBiomes.Reseed();
+        CaveOres.Reseed();
+        CloudPatchGenerator.Reseed();
+        CloudSeaGenerator.Reseed();
+        SkyIslands.Reseed();
+        SkyBiomes.Reseed();
         LavaGenerator.Reseed();
         PebbleGenerator.Reseed();
         SnowGenerator.Reseed();
@@ -90,6 +105,9 @@ public static class WorldSeed
         ColumnCache.Reset();
         WormCarver.ResetCellCache();
         TreeGenerator.ResetCaches();
+        HellTrees.ResetCache();
+        SkyTrees.ResetCache();
+        TowerPlacement.ResetCache();
         TerrainPeaks.ResetCaches();
         GreatLakes.ResetCaches();
         WaterBodies.ResetCaches();

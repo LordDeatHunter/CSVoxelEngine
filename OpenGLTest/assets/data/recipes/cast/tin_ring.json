@@ -1,0 +1,10 @@
+{
+  // Pouring molten tin into a fired ring mold; the cast melts back into the same 200 ml
+  // (recipes/melt/tin_ring.json).
+  "mold": "block/fired_mold_ring",
+  "fluid": "tin",
+  "amountMl": 200,
+  "coolSeconds": 2,
+  "result": "item/tin_ring",
+  "count": 1
+}

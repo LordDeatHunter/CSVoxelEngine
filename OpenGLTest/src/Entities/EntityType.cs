@@ -1,15 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
+using VoxelEngine.Player;
 
 namespace VoxelEngine.Entities;
 
 /// <summary>
 /// One entity kind loaded from <c>assets/data/entities/&lt;name&gt;.json</c>: its display name,
 /// health pool, death loot and the Blockbench model it draws from. Unlike blocks and items these
-/// are not byte ids — the handful of live entity kinds are addressed by name through
+/// are not numeric ids — the handful of live entity kinds are addressed by name through
 /// <see cref="EntityRegistry"/>, so an entity never eats a chunk-storage id.
 /// </summary>
 public sealed class EntityType
@@ -26,6 +28,16 @@ public sealed class EntityType
 
     /// <summary>Table rolled on death; null drops nothing.</summary>
     public LootTable? LootTable { get; init; }
+
+    /// <summary>The flat sRGB color (0..1) a hit sprays off this kind (the entity file's
+    /// <c>blood</c>); null sprays nothing.</summary>
+    public Vector3? BloodColor { get; init; } = DefaultBloodColor;
+
+    /// <summary>Red blood: what an entity file that omits <c>blood</c> sprays.</summary>
+    public static readonly Vector3 DefaultBloodColor = new(0.6f, 0.04f, 0.04f);
+
+    /// <summary>Status effect names this kind is immune to (the entity file's <c>immune</c>); empty by default.</summary>
+    public IReadOnlySet<string> Immune { get; init; } = new HashSet<string>();
 
     /// <summary>Blockbench project that supplies the entity's mesh and skin.</summary>
     public required string ModelPath { get; init; }
@@ -59,6 +71,23 @@ public sealed class EntityType
         get => _variants ??= [Model];
         init => _variants = value;
     }
+
+    /// <summary>The item every spawn holds (the entity file's <c>held</c>), 0 for none.</summary>
+    public ushort HeldItemId { get; init; }
+
+    /// <summary>The rig group whose hand holds <see cref="HeldItemId"/>; null when it is 0.</summary>
+    public string? HeldPart { get; init; }
+
+    /// <summary>The held item's transform in the hand anchor's space (its <c>held.display</c>).</summary>
+    public Matrix4x4 HeldTransform { get; init; } = Matrix4x4.Identity;
+
+    /// <summary>
+    /// The world matrix of the held item's sprite: <see cref="HeldTransform"/> under the hand anchor of
+    /// <see cref="HeldPart"/>, posed by <paramref name="animator"/>, so the item swings with that limb. The
+    /// caller multiplies its body effect on, like the parts. Only meaningful when <see cref="HeldItemId"/> is set.
+    /// </summary>
+    public Matrix4x4 HeldMatrix(EntityAnimator animator, PlayerRig rig, Vector3 feet, float facingYaw) =>
+        HeldTransform * animator.HandAnchor(HeldPart!, rig, feet, facingYaw);
 }
 
 /// <summary>

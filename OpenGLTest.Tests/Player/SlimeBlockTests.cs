@@ -15,7 +15,7 @@ public sealed class SlimeBlockTests
 
     private const float Dt = 1f / 60f;
 
-    private static ChunkManager Floor(byte topId)
+    private static ChunkManager Floor(ushort topId)
     {
         var manager = new ChunkManager(null!);
         var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
@@ -29,7 +29,7 @@ public sealed class SlimeBlockTests
 
     // Drops a body from 5 blocks onto the floor and reports the fastest it rose again and whether
     // it came to rest.
-    private static (float Rebound, bool Rested) Drop(byte topId)
+    private static (float Rebound, bool Rested) Drop(ushort topId)
     {
         var manager = Floor(topId);
         var camera = new Camera(null, null);

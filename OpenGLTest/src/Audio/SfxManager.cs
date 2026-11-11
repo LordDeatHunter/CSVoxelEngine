@@ -3,18 +3,14 @@ using System.Collections.Generic;
 using NAudio.Wave;
 using VoxelEngine.UI;
 
-// One-shot playback opens a WinMM device, so the constructor refuses non-Windows up front and
-// catches every remaining failure; Linux and headless runs stay silent like the ambience does.
-#pragma warning disable CA1416
-
 namespace VoxelEngine.Audio;
 
 /// <summary>
 /// One-shot sound effects built on the same NAudio stack as <see cref="AmbienceManager"/>:
 /// every <c>.wav</c> under <c>assets/sfx</c> is decoded into memory at startup, grouped by
 /// <see cref="SfxLibrary"/>, and <see cref="Play"/> mixes a random clip of a group into one
-/// shared output. Never throws out of the constructor: an unreadable clip is skipped with a
-/// warning, and a missing audio device leaves the game silent.
+/// shared <see cref="AudioOutput"/>. Never throws out of the constructor: an unreadable clip is
+/// skipped with a warning, and a missing audio device leaves the game silent.
 /// </summary>
 public sealed class SfxManager : IDisposable
 {
@@ -26,7 +22,7 @@ public sealed class SfxManager : IDisposable
     private readonly Dictionary<string, Group> _groups = new(StringComparer.Ordinal);
     private readonly Random _random = new();
     private readonly SfxMixer? _mixer;
-    private readonly WaveOutEvent? _output;
+    private readonly AudioOutput? _output;
     private bool _disposed;
 
     /// <summary>False when no audio could be started; <see cref="Play"/> then does nothing.</summary>
@@ -34,12 +30,6 @@ public sealed class SfxManager : IDisposable
 
     public SfxManager(string sfxRoot = "assets/sfx")
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            Log.WriteLine("SFX disabled: audio playback is Windows-only.");
-            return;
-        }
-
         try
         {
             foreach (var (name, paths) in SfxLibrary.Scan(sfxRoot))
@@ -70,9 +60,7 @@ public sealed class SfxManager : IDisposable
             }
 
             _mixer = new SfxMixer();
-            _output = new WaveOutEvent();
-            _output.Init(_mixer);
-            _output.Play();
+            _output = new AudioOutput(_mixer);
             Enabled = true;
         }
         catch (Exception e)
@@ -111,7 +99,11 @@ public sealed class SfxManager : IDisposable
     /// </summary>
     internal static int PickIndex(int count, Random random) => count <= 0 ? 0 : random.Next(count);
 
-    private static bool TryLoad(string path, out short[] samples)
+    /// <summary>
+    /// Decodes <paramref name="path"/> into interleaved samples; false when it is not 16-bit stereo
+    /// 44100 Hz PCM. Internal as a test seam, so the shipped clips can be proven loadable.
+    /// </summary>
+    internal static bool TryLoad(string path, out short[] samples)
     {
         samples = [];
         using var reader = new WaveFileReader(path);

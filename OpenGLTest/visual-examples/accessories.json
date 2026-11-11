@@ -1,0 +1,35 @@
+{
+  // Accessories: run with VOXEL_SCRIPT=visual-examples/accessories.json VOXEL_TIME=147 from OpenGLTest/. Shots land
+  // in visual/accessories/. A `give` of gear puts it on (at most four accessories fit), so the cloud boots, the
+  // feather charm and two rings of the metal ladder are worn. The double jump is two fresh Space presses with a
+  // `wait` between them (a wait releases every key): the air jump's shot stands visibly higher than the ground
+  // jump's. A drop with the feather charm bills no fall damage, so the hearts stay full after it.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 62.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "give", "block": "item/cloud_boots", "count": 1 },
+    { "op": "give", "block": "item/feather_charm", "count": 1 },
+    { "op": "give", "block": "item/copper_ring", "count": 1 },
+    { "op": "give", "block": "item/iron_ring", "count": 1 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "worn" },
+
+    // A ground jump, then a second press in the air: the cloud boots' air jump
+    { "op": "walk", "keys": ["Space"], "seconds": 0.1 },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "ground-jump" },
+    { "op": "walk", "keys": ["Space"], "seconds": 0.1 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "air-jump" },
+    { "op": "wait", "seconds": 2 },
+
+    // About 30 blocks straight down, still in survival: the feather charm takes the fall damage away
+    { "op": "teleport", "pos": [-43.5, 42.5, 62.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "feather-landed" },
+    { "op": "view", "mode": "first" },
+    { "op": "screenshot", "name": "feather-landed-hud" }
+  ]
+}

@@ -7,6 +7,7 @@ using VoxelEngine.Content.Shapes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Juice;
 using VoxelEngine.Lod;
+using VoxelEngine.Magic;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
@@ -90,10 +91,10 @@ internal sealed class WorldItemUse : IItemUseWorld
     private PlayerContext ActiveContext => _activeContext ?? LocalPlayer.LocalContext();
     private Inventory ActiveInventory => ActiveContext.Inventory;
 
-    /// <summary>Scenario seam: primes the primable block (TNT) in <paramref name="cell"/> the way a
-    /// firestarter strike does, minus its chance roll, so a script can film a blast. False when the
-    /// cell holds nothing primable.</summary>
-    internal bool TestPrimeTnt(Vector3 cell)
+    /// <summary>Primes the primable block (TNT) in <paramref name="cell"/> the way a firestarter strike
+    /// does, minus its chance roll; used by the scenario <c>prime</c> op and a spell's prime impact.
+    /// False when the cell holds nothing primable.</summary>
+    internal bool PrimeTnt(Vector3 cell)
     {
         var x = MathUtils.FloorToInt(cell.X);
         var y = MathUtils.FloorToInt(cell.Y);
@@ -155,10 +156,10 @@ internal sealed class WorldItemUse : IItemUseWorld
     bool IItemUseWorld.RaycastSolid(float maxDistance, out Vector3 hit, out Vector3 normal) =>
         ActiveContext.Raycast(maxDistance, _chunkManager, out hit, out normal);
 
-    bool IItemUseWorld.TryGetCell(int x, int y, int z, out byte id, out byte state) =>
+    bool IItemUseWorld.TryGetCell(int x, int y, int z, out ushort id, out byte state) =>
         _chunkManager.TryGetCell(x, y, z, out id, out state);
 
-    byte IItemUseWorld.GetBlockAt(Vector3 pos) => Edits.BlockIdAt(pos);
+    ushort IItemUseWorld.GetBlockAt(Vector3 pos) => Edits.BlockIdAt(pos);
 
     bool IItemUseWorld.ScoopFluidCell(Vector3 pos)
     {
@@ -171,7 +172,7 @@ internal sealed class WorldItemUse : IItemUseWorld
         return true;
     }
 
-    bool IItemUseWorld.PourFluidCell(Vector3 pos, byte fluidId)
+    bool IItemUseWorld.PourFluidCell(Vector3 pos, ushort fluidId)
     {
         var changed = _fluidManager.SetCellImmediate(pos, fluidId, FluidState.Source, _chunkManager);
         // Scheduled for uniformity with every other edit path; a flow itself never overwrites a
@@ -182,7 +183,7 @@ internal sealed class WorldItemUse : IItemUseWorld
         return true;
     }
 
-    bool IItemUseWorld.PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state,
+    bool IItemUseWorld.PlaceBlockAtFace(Vector3 hit, Vector3 normal, ushort blockId, byte state,
         out Vector3 placedCell) =>
         Placer.PlaceBlockAtFace(hit, normal, blockId, state, ActiveContext.ViewDirection, out placedCell);
 
@@ -194,7 +195,7 @@ internal sealed class WorldItemUse : IItemUseWorld
             (int)pos.X, (int)pos.Y, (int)pos.Z);
     }
 
-    int IItemUseWorld.PileCountFor(byte blockId, int x, int y, int z, byte state)
+    int IItemUseWorld.PileCountFor(ushort blockId, int x, int y, int z, byte state)
     {
         var pile = BlockType.ById[blockId];
         if (pile == null)
@@ -215,13 +216,13 @@ internal sealed class WorldItemUse : IItemUseWorld
         return changed;
     }
 
-    int IItemUseWorld.PileSecondaryFor(byte blockId, int x, int y, int z, byte state)
+    int IItemUseWorld.PileSecondaryFor(ushort blockId, int x, int y, int z, byte state)
     {
         var pile = BlockType.ById[blockId];
         return pile?.Renderer != BlockRenderer.Pebbles ? 0 : PebbleGenerator.ObsidianCountWithState(x, z, state, pile.StackMax);
     }
 
-    bool IItemUseWorld.SetPileComposition(Vector3 pos, byte blockId, int total, int secondary)
+    bool IItemUseWorld.SetPileComposition(Vector3 pos, ushort blockId, int total, int secondary)
     {
         var chunk = _chunkManager.ChunkAt((int)pos.X, (int)pos.Y, (int)pos.Z);
         if (chunk == null)
@@ -237,7 +238,7 @@ internal sealed class WorldItemUse : IItemUseWorld
     void IItemUseWorld.UnmarkPlayerPlaced(int x, int y, int z) =>
         _chunkManager.UnmarkPlayerPlaced(x, y, z);
 
-    void IItemUseWorld.SpawnLoot(byte blockId, Vector3 pos) =>
+    void IItemUseWorld.SpawnLoot(ushort blockId, Vector3 pos) =>
         _dropManager.SpawnLoot(blockId, pos);
 
     bool IItemUseWorld.IsCampfireLit(int x, int y, int z) => _campfires.IsLit(x, y, z);
@@ -245,15 +246,17 @@ internal sealed class WorldItemUse : IItemUseWorld
     bool IItemUseWorld.IgniteCampfire(int x, int y, int z) => _campfires.Ignite(x, y, z);
 
     bool IItemUseWorld.CanIgniteKiln(int x, int y, int z) =>
-        Interactions.TryTrackKilnAt(x, y, z, out var anchor) && _kilns.CanIgnite(anchor);
+        Interactions.TryTrackKilnAt(x, y, z, out var anchor) && _kilns.CanIgnite(anchor)
+        || Interactions.TryTrackBloomeryAt(x, y, z, out var bloomery) && _world.Smithing.Bloomeries.CanIgnite(bloomery);
 
     bool IItemUseWorld.IgniteKiln(int x, int y, int z) =>
-        Interactions.TryTrackKilnAt(x, y, z, out var anchor) && _kilns.Ignite(anchor);
+        Interactions.TryTrackKilnAt(x, y, z, out var anchor) && _kilns.Ignite(anchor)
+        || Interactions.TryTrackBloomeryAt(x, y, z, out var bloomery) && _world.Smithing.Bloomeries.Ignite(bloomery);
 
-    bool IItemUseWorld.TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, byte sourceId, byte anchorId) =>
+    bool IItemUseWorld.TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, ushort sourceId, ushort anchorId) =>
         Edits.TryConvertMultiblock(hitCell, hitNormal, sourceId, anchorId, ActiveContext.ViewDirection);
 
-    bool IItemUseWorld.IsPrimedTntBlock(byte id) =>
+    bool IItemUseWorld.IsPrimedTntBlock(ushort id) =>
         BlockType.ById[id]?.OnBreak == BlockBreakAction.PrimeTnt;
 
     bool IItemUseWorld.IsCellSubmerged(int x, int y, int z) =>
@@ -269,7 +272,7 @@ internal sealed class WorldItemUse : IItemUseWorld
         return true;
     }
 
-    void IItemUseWorld.SpawnPrimedTnt(Vector3 cell, byte blockId)
+    void IItemUseWorld.SpawnPrimedTnt(Vector3 cell, ushort blockId)
     {
         // A client simulates no TNT: the removed cell was forwarded, and anything the server
         // makes of it arrives in its broadcast. A local fuse would blow a crater only this
@@ -322,6 +325,43 @@ internal sealed class WorldItemUse : IItemUseWorld
         return false;
     }
 
+    bool IItemUseWorld.RestoreMana(float share)
+    {
+        // Same ownership as Heal: this world's own pool in singleplayer and (predicted) on a client,
+        // the sending ServerPlayer's on a server
+        if (!_serverMode)
+            return _health.Mana.TryRestore(share);
+        var context = _activeContext;
+        if (context == null) return false;
+        foreach (var serverPlayer in ServerPlayers)
+        {
+            if (!ReferenceEquals(serverPlayer.Context, context)) continue;
+            if (!serverPlayer.Status.Mana.TryRestore(share)) return false;
+            serverPlayer.StatusDirty = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool IItemUseWorld.LearnParts(IReadOnlyList<string> keys)
+    {
+        // Singleplayer learns and resizes its own pool; a client only predicts the inventory (the
+        // server's InventoryState confirms it and its PlayerStatus carries the new max); a server
+        // teaches the sending ServerPlayer, found through the dispatching context, never World.Inventory
+        if (!_serverMode)
+            return KnownSpellParts.Learn(ActiveInventory, keys, _clientMode ? null : _health.Mana);
+        var context = _activeContext;
+        if (context == null) return false;
+        foreach (var serverPlayer in ServerPlayers)
+        {
+            if (!ReferenceEquals(serverPlayer.Context, context)) continue;
+            if (!KnownSpellParts.Learn(serverPlayer.Inventory, keys, serverPlayer.Status.Mana)) return false;
+            serverPlayer.StatusDirty = true;
+            return true;
+        }
+        return false;
+    }
+
     bool IItemUseWorld.GrowTree(Vector3 cell)
     {
         // The aimed cell names the species (its wood or leaves); the growth writer then finds
@@ -341,12 +381,15 @@ internal sealed class WorldItemUse : IItemUseWorld
         return result.Status == TreeGrowthStatus.Planted;
     }
 
+    bool IItemUseWorld.SummonBoss(string entity, Vector3 cell) =>
+        _clientMode ? _world.CanSummonBoss(entity, cell) : _world.TrySummonBoss(entity, cell);
+
     void IItemUseWorld.ConsumeSelected() => ActiveInventory.ConsumeSelected();
     #endregion
 
     // A tool that ran out of durability shatters: chips of its sprite's color burst off the hand
     // and its hotbar slot flashes (cosmetic: a server draws nothing)
-    private void ToolBroke(byte itemId, int slot)
+    private void ToolBroke(ushort itemId, int slot)
     {
         if (_serverMode) return;
         if (slot >= 0) _hotbarPops.Flash(slot);

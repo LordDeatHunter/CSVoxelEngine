@@ -26,6 +26,8 @@ public static class HudConfig
 
     // Per-second rate the loading screen's shown bar eases toward the real load progress (MathUtils.Damp).
     public const float LoadingProgressDampRate = 6f;
+    // Per-second rate the hearts, the boss bar and the mana bar ease toward their real values (MathUtils.Damp).
+    public const float BarDampRate = 9f;
     // Seconds of wall time for one revolution of the loading screen's spinner.
     public const double LoadingSpinnerPeriodSeconds = 1.2;
     // The loading overlay fades out over this many seconds once the world plays.
@@ -38,6 +40,10 @@ public static class HudConfig
     // the hotbar: fully opaque for the hold, then faded out, about 1.5 s in all.
     public const float HotbarNameHoldSeconds = 1.0f;
     public const float HotbarNameFadeSeconds = 0.5f;
+    // A name too wide for its box (the equipment card's) scrolls back and forth: it rests this long at each end,
+    // and travels at MarqueeSpeed canvas pixels per second.
+    public const float MarqueeHoldSeconds = 1.0f;
+    public const float MarqueeSpeed = 30f;
     // A slot whose count rises (a pickup, a craft result, a server snapshot) bumps its icon to
     // this scale and springs back over the duration. The hotbar's icon fill leaves room for it.
     public const float HotbarPopSeconds = 0.3f;
@@ -59,4 +65,9 @@ public static class HudConfig
     public const float PickupFlySeconds = 0.4f;
     public const float PickupFlyArcPixels = 60f;
     public const float PickupFlyEndScale = 0.6f;
+
+    // The player's active status effects (HudRenderer.DrawEffects): one icon per effect, this many
+    // canvas pixels square, in a row beside the hearts with this gap between icons and before them.
+    public const float EffectIconSize = 28f;
+    public const float EffectIconGap = 6f;
 }

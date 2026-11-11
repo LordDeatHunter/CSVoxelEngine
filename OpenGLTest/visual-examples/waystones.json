@@ -1,0 +1,86 @@
+{
+  // Natural waystones (plans/WAYSTONES.md W-7): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/waystones.json
+  // Shots land in visual/waystones/. With the default seed (found with WaystonePlacement.TryFindSurface/TryFindUnderground/
+  // TryFindHell/TryFindSky over the ruin cells and the island cells), the nearest satellite of each realm stands at (each
+  // waystone two cells tall, the cell given being its lower half, the one the registry keys it by):
+  //   surface pavilion  waystone (29, 12, 58), beside the ruined hall at (16, 13, 65), steppe;
+  //   underground crypt waystone (-204, -162, 122), sealed in rock (filmed from inside only);
+  //   sky arch          waystone (-130, 380, -35), on the island of a cloud pavilion ruin at (-121, 381, -28);
+  //   hell ember ring   waystone (-2607, -446, -411), hell layer 0, beside a basalt cell ruin at (-2592, -365, -390).
+  // The camera flies (so mobs cannot hurt it and the trips are free), films each structure from outside (no HUD) and from
+  // beside its waystone, discovering each one (the popup), then films the teleport list with all four realms and a trip
+  // back to the surface pavilion. The screens themselves (rename, search, a lost row, the mana footer) are filmed by
+  // waystones-ui.json.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "wait", "seconds": 12 },
+
+    // ---- Surface: the pavilion beside its ruin ----
+    { "op": "teleport", "pos": [29.5, 18.0, 86.0], "yaw": -104, "pitch": -12 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "surface-with-ruin", "hideHud": true },
+    { "op": "teleport", "pos": [37.2, 15.5, 72.0], "yaw": -120, "pitch": -6 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "surface-outside", "hideHud": true },
+    { "op": "teleport", "pos": [32.5, 13.8, 58.5], "yaw": 180, "pitch": -12 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "surface-inside", "hideHud": true },
+    // The selection outline hugs the half under the crosshair: the plinth, step and shaft, then the shaft, cap and point
+    { "op": "look", "yaw": 180, "pitch": -19 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "surface-outline-lower" },
+    { "op": "look", "yaw": 180, "pitch": -3 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "surface-outline-upper" },
+    { "op": "waystone", "action": "open", "pos": [29, 12, 58] },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "surface-discovered" },
+    { "op": "waystone", "action": "confirm" },
+    { "op": "waystone", "action": "close" },
+
+    // ---- Sky: the arch on its island ----
+    { "op": "teleport", "pos": [-145.1, 386.0, -50.1], "yaw": 45, "pitch": -12 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "sky-outside", "hideHud": true },
+    { "op": "teleport", "pos": [-127.8, 381.6, -32.8], "yaw": -135, "pitch": -24 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "sky-inside", "hideHud": true },
+    { "op": "waystone", "action": "open", "pos": [-130, 380, -35] },
+    { "op": "waystone", "action": "confirm" },
+    { "op": "waystone", "action": "close" },
+
+    // ---- Underground: the sealed crypt, from inside ----
+    { "op": "teleport", "pos": [-205.6, -160.6, 124.6], "yaw": -45, "pitch": -15 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "underground-inside", "hideHud": true },
+    { "op": "teleport", "pos": [-201.4, -161.3, 120.4], "yaw": 135, "pitch": -8 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "underground-inside-2", "hideHud": true },
+    { "op": "waystone", "action": "open", "pos": [-204, -162, 122] },
+    { "op": "waystone", "action": "confirm" },
+    { "op": "waystone", "action": "close" },
+
+    // ---- Hell: the ember ring in a layer-0 cavern ----
+    { "op": "teleport", "pos": [-2601.5, -439.5, -422.5], "yaw": 112, "pitch": -23 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "screenshot", "name": "hell-outside", "hideHud": true },
+    { "op": "teleport", "pos": [-2601.5, -439.5, -398.5], "yaw": -112, "pitch": -23 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "hell-outside-2", "hideHud": true },
+    { "op": "teleport", "pos": [-2604.0, -444.9, -409.5], "yaw": -158, "pitch": -6 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "hell-inside", "hideHud": true },
+    { "op": "waystone", "action": "open", "pos": [-2607, -446, -411] },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "hell-discovered" },
+    { "op": "waystone", "action": "confirm" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "list" },
+
+    // ---- The trip back: the current waystone is row 1, then the nearest first (crypt, arch, pavilion) ----
+    { "op": "waystone", "action": "teleport", "row": 4 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "arrived" }
+  ]
+}

@@ -42,7 +42,7 @@ public sealed class IcebergManagerTests
         throw new InvalidOperationException("the wind never blew east");
     }
 
-    private static bool OverlapsBlock(ChunkManager chunks, (Vector3 Min, Vector3 Max) box, byte id)
+    private static bool OverlapsBlock(ChunkManager chunks, (Vector3 Min, Vector3 Max) box, ushort id)
     {
         VoxelCoords.CellRange(box.Min, box.Max - new Vector3(1e-4f), out var minX, out var minY, out var minZ,
             out var maxX, out var maxY, out var maxZ);

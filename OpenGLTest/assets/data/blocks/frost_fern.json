@@ -1,0 +1,19 @@
+{
+  // A rimed fern on the frost highland's turf (SkyFlora): cutout, swaying, unsupported without its
+  // ground and dropping nothing. Tile is committed art.
+  "name": "Frost Fern",
+  "model": { "parent": "block/cross", "textures": { "cross": "frost_fern" } },
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "sway": true,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "blocksSight": false,
+  "replaceableByPlacement": true,
+  "loot": "none",
+  "hitbox": { "min": [0.2, 0, 0.2], "max": [0.8, 0.8, 0.8] }
+}

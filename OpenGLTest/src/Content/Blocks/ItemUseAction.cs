@@ -36,8 +36,8 @@ public enum ItemUseAction
     IgniteCampfire,
 
     /// <summary>
-    /// Right-clicks a <see cref="Item.UseBlockId"/> cell to turn the 2x2x2 volume it belongs to
-    /// into the <see cref="Item.UseResultId"/> anchor block (see <see cref="Multiblock"/>).
+    /// Right-clicks a hand-built cube to turn it into the multiblock it is the source of (each
+    /// anchor's <see cref="BlockType.MultiblockSourceId"/>, see <see cref="Multiblock"/>).
     /// The tool is never consumed and never morphs — the converter is an endless misc item.
     /// </summary>
     ConvertMultiblock,
@@ -61,4 +61,24 @@ public enum ItemUseAction
     /// (<see cref="SaplingManager"/>). Refused where the species cannot root.
     /// </summary>
     PlantTree,
+
+    /// <summary>
+    /// Teaches the spell parts in the item's <c>teaches</c> list to the player the use runs for (a
+    /// scroll, <see cref="LearnPartsItem"/>), spending one unit. Refused, and not spent, when every
+    /// part is already known.
+    /// </summary>
+    LearnParts,
+
+    /// <summary>
+    /// Restores the item's <c>restoresMana</c> share of the mana pool to the player the use runs for (a
+    /// mana draught, <see cref="RestoreManaItem"/>), spending one unit. Refused, and not spent, at a full pool.
+    /// </summary>
+    RestoreMana,
+
+    /// <summary>
+    /// Wakes the boss named by the item's <c>use.entity</c> at the aimed cell (the thumper, <see cref="SummonItem"/>),
+    /// spending one unit. Refused, and not spent, where the boss cannot be summoned (not on desert sand, or one
+    /// is already alive).
+    /// </summary>
+    Summon,
 }

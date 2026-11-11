@@ -26,6 +26,45 @@ public static class SfxLibrary
     /// <summary>Group played when the player collects an item drop.</summary>
     public const string PickupGroup = "item_pickup";
 
+    /// <summary>Group played when the player equips an item on the hotbar or wears gear.</summary>
+    public const string EquipGroup = "equip";
+
+    /// <summary>Group played when the player takes worn gear off.</summary>
+    public const string UnequipGroup = "unequip";
+
+    /// <summary>Group played when a chest lid starts to swing open.</summary>
+    public const string ChestOpenGroup = "chest_open";
+
+    /// <summary>Group played when a chest lid starts to swing shut.</summary>
+    public const string ChestCloseGroup = "chest_close";
+
+    /// <summary>Group played when a battle tower's floor is cleared and its door opens.</summary>
+    public const string FloorClearGroup = "floor_clear";
+
+    /// <summary>Group played when a staff casts a spell (the caster's own cast).</summary>
+    public const string SpellCastGroup = "spell_cast";
+
+    /// <summary>Group played where a spell bolt lands near the camera.</summary>
+    public const string SpellImpactGroup = "spell_impact";
+
+    /// <summary>Group played when the caster's own spell fizzles.</summary>
+    public const string SpellFizzleGroup = "spell_fizzle";
+
+    /// <summary>Group played when a hit lands on a skeleton.</summary>
+    public const string SkeletonHitGroup = "skeleton_hit";
+
+    /// <summary>Group played when a hit kills a skeleton.</summary>
+    public const string SkeletonDeathGroup = "skeleton_death";
+
+    /// <summary>Group played ambiently from time to time by a skeleton near the camera.</summary>
+    public const string SkeletonRattleGroup = "skeleton_rattle";
+
+    /// <summary>Group played when a hit lands on a bug (spider, scorpion, dragonfly), and when it dies: a squish.</summary>
+    public const string BugSquishGroup = "squish";
+
+    /// <summary>Group played when a blade (slice, sword or axe chop) starts a swing: a swoosh.</summary>
+    public const string SwooshGroup = "swoosh";
+
     /// <summary>
     /// Every group directly under <paramref name="root"/> (subfolders are ignored, so the
     /// ambience tracks in <c>ambience/</c> never become hit groups). Clips are file-name

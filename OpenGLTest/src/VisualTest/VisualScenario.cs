@@ -4,6 +4,7 @@ using System.IO;
 using System.Numerics;
 using System.Text.Json;
 using Silk.NET.Input;
+using VoxelEngine.Items;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.VisualTest;
@@ -24,6 +25,10 @@ public sealed class VisualStep
     public bool HideHud { get; init; }
     public string? Block { get; init; }
     public int Count { get; init; } = 1;
+
+    /// <summary>The rarity a <c>give</c> step rolls a gear piece at (left unworn); null gives the plain item.</summary>
+    public Rarity? Rarity { get; init; }
+
     public bool On { get; init; } = true;
 
     /// <summary>The entity name a <c>spawn</c> step creates (resolved at run time).</summary>
@@ -32,6 +37,10 @@ public sealed class VisualStep
     /// <summary>The size a <c>spawn</c> step gives a slime (1 when the step names none; other
     /// kinds ignore it).</summary>
     public int Size { get; init; } = 1;
+
+    /// <summary>The tower floor tier a <c>spawn</c> step gives a skeleton (0 when the step names none;
+    /// other kinds ignore it).</summary>
+    public int Tier { get; init; }
 
     /// <summary>True when a <c>spawn</c> step gave only <c>[x, z]</c>, and always for a <c>grow</c>
     /// step: the feet (or the tree's root search) go on top of the terrain column there, and
@@ -47,24 +56,71 @@ public sealed class VisualStep
     /// <summary>Health a <c>damage</c> step takes off every live mob, or off the player.</summary>
     public int Amount { get; init; }
 
-    /// <summary>Who a <c>damage</c> step hurts: <c>mobs</c> (the default, every live mob) or
-    /// <c>player</c> (the local player's health pool).</summary>
+    /// <summary>Who a <c>damage</c> or <c>effect</c> step reaches: <c>mobs</c> (the default, every
+    /// live mob) or <c>player</c> (the local player's health pool).</summary>
     public string Target { get; init; } = "mobs";
+
+    /// <summary>The status effect an <c>effect</c> step applies (resolved at run time).</summary>
+    public string? Effect { get; init; }
+
+    /// <summary>The duration scale an <c>effect</c> step applies its effect with (1 when the step
+    /// names none).</summary>
+    public float Scale { get; init; } = 1f;
 
     /// <summary>The camera mode a <c>view</c> step selects (<c>first</c>, <c>shoulder</c> or <c>orbit</c>).</summary>
     public string? Mode { get; init; }
 
     /// <summary>What a <c>player</c> step makes the player's model do (<c>hurt</c>, <c>punch</c>,
     /// <c>slice</c>, <c>slicereturn</c> (the buffered return slice), <c>cut</c>, <c>backcut</c>,
-    /// <c>chop</c>, <c>equip</c>, <c>charge</c>, <c>release</c>, <c>die</c> or <c>revive</c>).</summary>
+    /// <c>chop</c>, <c>equip</c>, <c>charge</c>, <c>release</c>, <c>die</c> or <c>revive</c>), or what a
+    /// <c>waystone</c> step does to the waystone screen (see <see cref="IScenarioUi.Waystone"/>).</summary>
     public string? Action { get; init; }
 
     /// <summary>The hotbar slot a <c>select</c> step picks, 1-based like the number keys.</summary>
     public int Slot { get; init; }
+
+    /// <summary>The spell part keys (<c>&lt;kind&gt;/&lt;name&gt;</c>) a <c>cast</c> step fires, in
+    /// recipe order (resolved at run time).</summary>
+    public string[] Parts { get; init; } = [];
+
+    /// <summary>The [E] panel tab a <c>tab</c> step opens (<c>blocks</c>, <c>tools</c>, <c>misc</c> or
+    /// <c>crafting</c>).</summary>
+    public string? Tab { get; init; }
+
+    /// <summary>The text a <c>search</c> step types into the [E] panel's search field.</summary>
+    public string? Text { get; init; }
+
+    /// <summary>The listed row a <c>row</c> step picks, 1-based from the top of the list.</summary>
+    public int Row { get; init; }
+
+    /// <summary>The state byte a <c>setblock</c> step writes (a facing, for a chest); 0 by default.</summary>
+    public int State { get; init; }
+
+    /// <summary>Where a <c>hover</c> step puts the pointer, in canvas units; null clears the scripted pointer.</summary>
+    public Vector2? Point { get; init; }
+
+    /// <summary>Units of ore a <c>bloomery</c> step loads.</summary>
+    public int Ore { get; init; }
+
+    /// <summary>Units of fuel a <c>bloomery</c> step loads.</summary>
+    public int Fuel { get; init; }
+
+    /// <summary>The heat (0..1) a lit <c>bloomery</c> step holds the fire at.</summary>
+    public float Heat { get; init; }
+
+    /// <summary>Hammer hits an <c>anvil</c> step has already put in the bloom it lays down.</summary>
+    public int Hits { get; init; }
+
+    /// <summary>The forge metal an <c>anvil</c> step stacks (<see cref="Count"/> of it) instead of laying a bloom;
+    /// null for a bloom.</summary>
+    public string? Metal { get; init; }
+
+    /// <summary>The tower floor (0 = the ground floor) a <c>towerclear</c> step clears; 0 by default.</summary>
+    public int Floor { get; init; }
 }
 
 /// <summary>
-/// A scripted in-game run: teleport/look/wait/walk/mine/place/fly/creative/give/spawn/grow/screenshot steps loaded from
+/// A scripted in-game run: teleport/look/wait/walk/mine/place/fly/creative/give/spawn/grow/damage/effect/cast/screenshot steps loaded from
 /// JSON (<c>VOXEL_SCRIPT</c>), driving the real world-update functions for agent screenshots.
 /// </summary>
 public sealed class VisualScenario
@@ -176,6 +232,7 @@ public sealed class VisualScenario
                 Op = "give",
                 Block = ReadGiveBlock(element, index),
                 Count = ReadGiveCount(element, index),
+                Rarity = ReadGiveRarity(element, index),
             },
             "spawn" => ReadSpawn(element, index),
             "grow" => ReadGrow(element, index),
@@ -189,11 +246,13 @@ public sealed class VisualScenario
                     ? ReadChoice(element, index, "damage", "target", ["mobs", "player"])
                     : "mobs",
             },
+            "effect" => ReadEffect(element, index),
+            "cast" => ReadCast(element, index),
             "view" => new VisualStep { Op = "view", Mode = ReadChoice(element, index, "view", "mode", ["first", "shoulder", "orbit"]) },
             "player" => new VisualStep
             {
                 Op = "player",
-                Action = ReadChoice(element, index, "player", "action", ["hurt", "punch", "slice", "slicereturn", "cut", "backcut", "chop", "equip", "charge", "release", "die", "revive"]),
+                Action = ReadChoice(element, index, "player", "action", ["hurt", "punch", "slice", "slicereturn", "cut", "backcut", "chop", "axechop", "equip", "charge", "release", "throw", "draw", "loose", "cast", "die", "revive"]),
             },
             "select" => new VisualStep
             {
@@ -204,6 +263,74 @@ public sealed class VisualScenario
                     : throw new InvalidOperationException(
                         $"Step {index} (select) needs 'slot' from 1 to {Inventory.SlotCount}."),
             },
+            "panel" => new VisualStep { Op = "panel", On = ReadOpen(element) },
+            "tab" => new VisualStep
+            {
+                Op = "tab",
+                Tab = ReadChoice(element, index, "tab", "tab", ["blocks", "tools", "misc", "gear", "crafting"]),
+            },
+            "search" => new VisualStep
+            {
+                Op = "search",
+                Text = element.TryGetProperty("text", out var searchText) && searchText.ValueKind == JsonValueKind.String
+                    ? searchText.GetString()!
+                    : throw new InvalidOperationException($"Step {index} (search) needs a 'text' string."),
+            },
+            "row" => new VisualStep
+            {
+                Op = "row",
+                Row = element.TryGetProperty("row", out var rowElement) && rowElement.TryGetInt32(out var row) && row >= 1
+                    ? row
+                    : throw new InvalidOperationException($"Step {index} (row) needs 'row', a 1-based row from the top of the list."),
+            },
+            "hover" => ReadHover(element, index),
+            "spellbuilder" => new VisualStep { Op = "spellbuilder", On = ReadOpen(element) },
+            "setblock" => new VisualStep
+            {
+                Op = "setblock",
+                Pos = ReadPos(element, index, "setblock"),
+                Block = ReadGiveBlock(element, index),
+                State = element.TryGetProperty("state", out var stateElement) && stateElement.TryGetInt32(out var st)
+                        && st is >= 0 and <= 255
+                    ? st
+                    : 0,
+            },
+            "bloomery" => new VisualStep
+            {
+                Op = "bloomery",
+                Pos = ReadPos(element, index, "bloomery"),
+                State = ReadInt(element, "state"),
+                Ore = ReadInt(element, "ore"),
+                Fuel = ReadInt(element, "fuel"),
+                On = element.TryGetProperty("lit", out var lit) && lit.ValueKind == JsonValueKind.True,
+                Heat = element.TryGetProperty("heat", out var heat) && heat.TryGetSingle(out var h) ? h : 0.5f,
+            },
+            "anvil" => new VisualStep
+            {
+                Op = "anvil",
+                Pos = ReadPos(element, index, "anvil"),
+                On = !element.TryGetProperty("piece", out var piece) || piece.ValueKind != JsonValueKind.False,
+                Hits = ReadInt(element, "hits"),
+                Metal = element.TryGetProperty("metal", out var metal) ? metal.GetString() : null,
+                Count = element.TryGetProperty("count", out var stack) && stack.TryGetInt32(out var units) ? units : 1,
+            },
+            "hammer" => new VisualStep { Op = "hammer", Pos = ReadPos(element, index, "hammer") },
+            "chest" => ReadChest(element, index),
+            "chestwobble" => new VisualStep { Op = "chestwobble", Pos = ReadPos(element, index, "chestwobble") },
+            "chestrow" => new VisualStep
+            {
+                Op = "chestrow",
+                Row = element.TryGetProperty("row", out var chestRow) && chestRow.TryGetInt32(out var cr) && cr >= 1
+                    ? cr
+                    : throw new InvalidOperationException($"Step {index} (chestrow) needs 'row', a 1-based row of the chest list."),
+                On = element.TryGetProperty("all", out var all) && all.ValueKind == JsonValueKind.True,
+            },
+            "waystone" => ReadWaystone(element, index),
+            "forge" => ReadForge(element, index),
+            "towerclear" => new VisualStep { Op = "towerclear", Floor = ReadInt(element, "floor") },
+            "altar" => new VisualStep { Op = "altar", Pos = ReadPos(element, index, "altar") },
+            "towerdefeat" => new VisualStep { Op = "towerdefeat" },
+            "goblincamp" => ReadGoblinCamp(element, index),
             "screenshot" => new VisualStep
             {
                 Op = "screenshot",
@@ -211,8 +338,86 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, view, player, select or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, forge, chest, chestrow, chestwobble, waystone, towerclear, altar, towerdefeat, goblincamp or screenshot."),
         };
+    }
+
+    private static int ReadInt(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.TryGetInt32(out var n) ? n : 0;
+
+    // chest opens the chest at "pos" [x, y, z] (the [E] list opens beside it), or closes it with "open": false.
+    private static VisualStep ReadChest(JsonElement element, int index)
+    {
+        var open = ReadOpen(element);
+        return open
+            ? new VisualStep { Op = "chest", On = true, Pos = ReadPos(element, index, "chest") }
+            : new VisualStep { Op = "chest", On = false };
+    }
+
+    // waystone drives the waystone screen like a player's clicks: "action" open (with "pos" [x, y, z], the waystone's
+    // cell: a right-click there), confirm, rename, type (with "text", into the rename field or the list's search),
+    // submit, back (Escape), close or teleport (with "row", 1-based).
+    private static VisualStep ReadWaystone(JsonElement element, int index)
+    {
+        var action = ReadChoice(element, index, "waystone", "action",
+            ["open", "confirm", "rename", "type", "submit", "back", "close", "teleport"]);
+        return action switch
+        {
+            "open" => new VisualStep { Op = "waystone", Action = action, Pos = ReadPos(element, index, "waystone") },
+            "type" => new VisualStep
+            {
+                Op = "waystone",
+                Action = action,
+                Text = element.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String
+                    ? text.GetString()!
+                    : throw new InvalidOperationException($"Step {index} (waystone type) needs a 'text' string."),
+            },
+            "teleport" => new VisualStep
+            {
+                Op = "waystone",
+                Action = action,
+                Row = element.TryGetProperty("row", out var rowElement) && rowElement.TryGetInt32(out var row) && row >= 1
+                    ? row
+                    : throw new InvalidOperationException($"Step {index} (waystone teleport) needs 'row', a 1-based row of the list."),
+            },
+            _ => new VisualStep { Op = "waystone", Action = action },
+        };
+    }
+
+    // forge drives the anvil's recipe list like a player's clicks: "action" open (with "pos" [x, y, z], the anvil's cell:
+    // a hammer's right-click there), pick (with "card", 1-based) or close.
+    private static VisualStep ReadForge(JsonElement element, int index)
+    {
+        var action = ReadChoice(element, index, "forge", "action", ["open", "pick", "close"]);
+        return action switch
+        {
+            "open" => new VisualStep { Op = "forge", Action = action, Pos = ReadPos(element, index, "forge") },
+            "pick" => new VisualStep
+            {
+                Op = "forge",
+                Action = action,
+                Row = element.TryGetProperty("card", out var cardElement) && cardElement.TryGetInt32(out var card) && card >= 1
+                    ? card
+                    : throw new InvalidOperationException($"Step {index} (forge pick) needs 'card', a 1-based recipe card."),
+            },
+            _ => new VisualStep { Op = "forge", Action = action },
+        };
+    }
+
+    // "open" defaults to true, so a bare panel or spellbuilder step opens it.
+    private static bool ReadOpen(JsonElement element) =>
+        !element.TryGetProperty("open", out var open) || open.GetBoolean();
+
+    // hover needs "pos": [x, y] in canvas units, or "clear": true to hand the pointer back to the mouse.
+    private static VisualStep ReadHover(JsonElement element, int index)
+    {
+        if (element.TryGetProperty("clear", out var clear) && clear.ValueKind == JsonValueKind.True)
+            return new VisualStep { Op = "hover" };
+        var values = ReadPosValues(element, index, "hover", "[x, y]");
+        if (values.Count != 2)
+            throw new InvalidOperationException(
+                $"Step {index} (hover) needs 'pos' with exactly 2 numbers, got {values.Count}.");
+        return new VisualStep { Op = "hover", Point = new Vector2(values[0], values[1]) };
     }
 
     private static string ReadChoice(JsonElement element, int index, string op, string field, string[] choices)
@@ -248,7 +453,8 @@ public sealed class VisualScenario
     /// <summary>A <c>spawn</c> step: <c>entity</c> names what to create (validated against the
     /// registry only when the step runs, so parsing stays content-free), <c>pos</c> is either
     /// <c>[x, z]</c> (feet snapped onto the terrain) or <c>[x, y, z]</c> (an exact feet position),
-    /// and the optional <c>size</c> (an integer from 1, default 1) is a slime's size.</summary>
+    /// the optional <c>size</c> (an integer from 1, default 1) is a slime's size and the optional
+    /// <c>tier</c> (an integer from 0, default 0) a skeleton's tower floor tier.</summary>
     private static VisualStep ReadSpawn(JsonElement element, int index)
     {
         if (!element.TryGetProperty("entity", out var entity)
@@ -261,22 +467,38 @@ public sealed class VisualScenario
             && (sizeElement.ValueKind != JsonValueKind.Number || !sizeElement.TryGetInt32(out size) || size < 1))
             throw new InvalidOperationException($"Step {index} (spawn) needs 'size' to be an integer from 1.");
 
+        var tier = 0;
+        if (element.TryGetProperty("tier", out var tierElement)
+            && (tierElement.ValueKind != JsonValueKind.Number || !tierElement.TryGetInt32(out tier) || tier < 0))
+            throw new InvalidOperationException($"Step {index} (spawn) needs 'tier' to be an integer from 0.");
+
         var values = ReadPosValues(element, index, "spawn", "[x, z] or [x, y, z]");
         return values.Count switch
         {
             2 => new VisualStep
             {
-                Op = "spawn", Entity = entity.GetString()!.Trim(), Size = size,
+                Op = "spawn", Entity = entity.GetString()!.Trim(), Size = size, Tier = tier,
                 Pos = new Vector3(values[0], 0f, values[1]), SnapToGround = true,
             },
             3 => new VisualStep
             {
-                Op = "spawn", Entity = entity.GetString()!.Trim(), Size = size,
+                Op = "spawn", Entity = entity.GetString()!.Trim(), Size = size, Tier = tier,
                 Pos = new Vector3(values[0], values[1], values[2]),
             },
             _ => throw new InvalidOperationException(
                 $"Step {index} (spawn) needs 'pos' with 2 or 3 numbers, got {values.Count}."),
         };
+    }
+
+    /// <summary>A <c>goblincamp</c> step: pitches a goblin camp at once on the ground of the <c>pos</c> column
+    /// <c>[x, z]</c> (the fire on top of it, its goblins round it), night or not.</summary>
+    private static VisualStep ReadGoblinCamp(JsonElement element, int index)
+    {
+        var values = ReadPosValues(element, index, "goblincamp", "[x, z]");
+        if (values.Count != 2)
+            throw new InvalidOperationException(
+                $"Step {index} (goblincamp) needs 'pos' with exactly 2 numbers ([x, z]), got {values.Count}.");
+        return new VisualStep { Op = "goblincamp", Pos = new Vector3(values[0], 0f, values[1]) };
     }
 
     /// <summary>A <c>grow</c> step: <c>species</c> names the tree (validated against the registry
@@ -308,6 +530,58 @@ public sealed class VisualScenario
         };
     }
 
+    /// <summary>An <c>effect</c> step: <c>effect</c> names the status effect (validated against the
+    /// registry only when the step runs, so parsing stays content-free), the optional <c>target</c>
+    /// is <c>mobs</c> (the default) or <c>player</c>, and the optional <c>scale</c> (a number above 0,
+    /// default 1) scales the effect's duration.</summary>
+    private static VisualStep ReadEffect(JsonElement element, int index)
+    {
+        if (!element.TryGetProperty("effect", out var effect)
+            || effect.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(effect.GetString()))
+            throw new InvalidOperationException($"Step {index} (effect) needs 'effect'.");
+
+        var scale = 1f;
+        if (element.TryGetProperty("scale", out var scaleElement))
+        {
+            if (scaleElement.ValueKind != JsonValueKind.Number
+                || !float.IsFinite(scale = (float)scaleElement.GetDouble())
+                || scale <= 0f)
+                throw new InvalidOperationException($"Step {index} (effect) needs 'scale' above 0.");
+        }
+
+        return new VisualStep
+        {
+            Op = "effect",
+            Effect = effect.GetString()!.Trim(),
+            Target = element.TryGetProperty("target", out _)
+                ? ReadChoice(element, index, "effect", "target", ["mobs", "player"])
+                : "mobs",
+            Scale = scale,
+        };
+    }
+
+    /// <summary>A <c>cast</c> step: <c>parts</c> is a non-empty array of spell part keys, fired from the
+    /// player's eye along its aim with no staff or mana (validated against the registry only when the
+    /// step runs, so parsing stays content-free).</summary>
+    private static VisualStep ReadCast(JsonElement element, int index)
+    {
+        if (!element.TryGetProperty("parts", out var parts)
+            || parts.ValueKind != JsonValueKind.Array
+            || parts.GetArrayLength() == 0)
+            throw new InvalidOperationException($"Step {index} (cast) needs 'parts'.");
+
+        var keys = new string[parts.GetArrayLength()];
+        var i = 0;
+        foreach (var part in parts.EnumerateArray())
+        {
+            if (part.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(part.GetString()))
+                throw new InvalidOperationException($"Step {index} (cast) needs 'parts'.");
+            keys[i++] = part.GetString()!.Trim();
+        }
+        return new VisualStep { Op = "cast", Parts = keys };
+    }
+
     private static float? ReadOptionalFloat(JsonElement element, string field) =>
         element.TryGetProperty(field, out var value) ? (float)value.GetDouble() : null;
 
@@ -324,6 +598,16 @@ public sealed class VisualScenario
         if (count <= 0)
             throw new InvalidOperationException($"Step {index} (give) needs 'count' above 0.");
         return count;
+    }
+
+    // The rarity a give step rolls its gear at (case-insensitive); null when the step names none
+    private static Rarity? ReadGiveRarity(JsonElement element, int index)
+    {
+        if (!element.TryGetProperty("rarity", out var value)) return null;
+        if (value.ValueKind == JsonValueKind.String && Rarities.TryParse(value.GetString(), out var rarity))
+            return rarity;
+        var names = string.Join(", ", Array.ConvertAll(Enum.GetNames<Rarity>(), n => n.ToLowerInvariant()));
+        throw new InvalidOperationException($"Step {index} (give) has an unknown 'rarity'; expected one of {names}.");
     }
 
     private static float ReadSeconds(JsonElement element, int index)

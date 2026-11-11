@@ -90,7 +90,7 @@ public sealed class TreeGraphFromWorldTests
             TreeGrower.Thicken(graph, species);
 
             var cells = TreeRasterizer.Rasterize(graph, species, new VirtualTreeSpace((_, _) => RootY - 1), out var woodCount);
-            var wood = new Dictionary<(int X, int Y, int Z), (byte Id, byte State)>();
+            var wood = new Dictionary<(int X, int Y, int Z), (ushort Id, byte State)>();
             for (var i = 0; i < woodCount; i++)
                 wood[(cells[i].X, cells[i].Y, cells[i].Z)] = (cells[i].Block, cells[i].State);
 

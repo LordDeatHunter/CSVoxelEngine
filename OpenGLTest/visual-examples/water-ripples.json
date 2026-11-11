@@ -1,0 +1,36 @@
+{
+  // Water ripples: run with VOXEL_SCRIPT=visual-examples/water-ripples.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/water-ripples/. The deep sea at x~432, z~0 (sea level 0, surface
+  // at y 0.89): a goblin is dropped in from 6 blocks up while a flying (so immune) camera hovers
+  // 7 blocks away, and the wave packet its entry starts is filmed spreading, thinning, then gone.
+  // Nothing is drawn for a ripple: the water's own normal tilts, so look for the mirror, the
+  // refraction and the glints bending in rings, never for a painted line.
+  //   ring_a: just after the entry, the first waves tight round the goblin
+  //   ring_b: wider, a train of several waves behind the leading edge, calm water ahead of it
+  //   ring_c: wide and thin, the middle calm again
+  //   ring_gone: the surface as it was
+  //   low_a, low_b: a second drop seen from just over the surface, where the mirrored sky bends most
+  "steps": [
+    { "op": "teleport", "pos": [432.5, 4.5, 0.5], "yaw": 0, "pitch": -10 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [432.5, 6.0, 7.5], "yaw": -90, "pitch": -30 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "spawn", "entity": "goblin", "pos": [432.5, 6.0, 0.5] },
+    { "op": "wait", "seconds": 0.85 },
+    { "op": "screenshot", "name": "ring_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "ring_b", "hideHud": true },
+    { "op": "wait", "seconds": 0.9 },
+    { "op": "screenshot", "name": "ring_c", "hideHud": true },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "ring_gone", "hideHud": true },
+    { "op": "teleport", "pos": [440.5, 2.4, 6.5], "yaw": -90, "pitch": -14 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "spawn", "entity": "goblin", "pos": [440.5, 6.0, 0.5] },
+    { "op": "wait", "seconds": 1.1 },
+    { "op": "screenshot", "name": "low_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.7 },
+    { "op": "screenshot", "name": "low_b", "hideHud": true }
+  ]
+}

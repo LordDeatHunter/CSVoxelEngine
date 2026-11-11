@@ -1,4 +1,5 @@
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
 
 namespace VoxelEngine.WorldGen.Features;
 
@@ -31,16 +32,21 @@ public static class FallenLogGenerator
     public const byte FacingAlongX = 2;
 
     // The hollow log of each biome's worldgen tree species, indexed by (int)Biome; 0 = none
-    private static readonly byte[] LogByBiome;
-    private static readonly bool[] FallenLogById = new bool[256];
+    private static readonly ushort[] LogByBiome;
+    private static readonly bool[] FallenLogById;
 
+    // Explicit so the table is sized the first time anything touches this class; RequireLoaded
+    // enforces that this is after ContentRegistry.Load
     static FallenLogGenerator()
     {
+        BlockTables.RequireLoaded(nameof(FallenLogGenerator));
+        FallenLogById = new bool[BlockTables.IdCount];
+
         var species = TreeGenerator.SpeciesByBiome;
-        LogByBiome = new byte[species.Length];
+        LogByBiome = new ushort[species.Length];
         for (var b = 0; b < species.Length; b++)
         {
-            var id = species[b]?.Worldgen?.FallenLogId ?? 0;
+            var id = species[b]?.Worldgen?.FallenLogId ?? BlockType.Air;
             LogByBiome[b] = id;
             if (id != 0) FallenLogById[id] = true;
         }
@@ -50,10 +56,15 @@ public static class FallenLogGenerator
     /// The hollow log of the biome's worldgen tree species, or 0 where the species declares none
     /// (the desert's cactus, the dead tree of the tundra and steppe) or no tree grows.
     /// </summary>
-    public static byte HollowLogFor(Biome biome) => LogByBiome[(int)biome];
+    public static ushort HollowLogFor(Biome biome) => LogByBiome[(int)biome];
 
-    /// <summary>Whether a block is one this generator stamps as some biome's fallen log.</summary>
-    public static bool IsFallenLog(byte id) => FallenLogById[id];
+    /// <summary>Whether a block is one this generator stamps as some biome's fallen log (false
+    /// for an id past the table, which a later, wider content load can produce).</summary>
+    public static bool IsFallenLog(ushort id)
+    {
+        var table = FallenLogById;
+        return (uint)id < (uint)table.Length && table[id];
+    }
 
     /// <summary>
     /// The log a cell holds: its start column (jittered inside the cell), its length and its axis
@@ -89,7 +100,7 @@ public static class FallenLogGenerator
     /// tests share.
     /// </summary>
     public static bool TryGetPlacedLog(int cellX, int cellZ, out int startX, out int startZ, out int length,
-        out bool alongX, out int ground, out byte log)
+        out bool alongX, out int ground, out ushort log)
     {
         ground = 0;
         log = BlockType.Air;
@@ -112,7 +123,7 @@ public static class FallenLogGenerator
     /// turns its tube along the log's axis. Runs on a generation worker thread after the trees,
     /// so a log never displaces one.
     /// </summary>
-    public static void Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         var reach = WorldFeatureConfig.FallenLogMaxLength;
         var shift = WorldFeatureConfig.FallenLogCellShift;

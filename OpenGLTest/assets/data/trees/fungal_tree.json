@@ -1,0 +1,25 @@
+{
+  // The hell's Fungal Grove tree: a pale stem climbing nearly straight up under a flat, glowing cap
+  // (a pad cluster). No worldgen block: HellTrees plants it from the grove's palette
+  // (HellBiomes), one tree cell at a time, grown inside its 8x8 cell, so its reach stays small.
+  "wood": "block/fungal_log",
+  "leaves": "block/fungal_cap",
+  "growth": {
+    "logic": "oak",
+    "signalEnergy": 8,
+    "upProbability": 12,
+    "lowestBranchHeight": 5,
+    "maturitySteps": [16, 26]
+  },
+  "thickness": {
+    "tipPx": 2,
+    "pipeExponent": 1.2,
+    "maxPx": 12,
+    "girthProfile": [[0, 2.2], [1, 1.2]],
+    "trunkShape": "circle",
+    "rim": "block"
+  },
+  "leafCluster": { "shape": "pad", "radius": 2, "hydration": 5, "tipMaxPx": 4, "fullRadiusPx": 12 },
+  // Never drawn (hell has no far LOD); only has to stay valid
+  "lod": { "crownHeight": [5, 8], "crownRadius": 2, "profile": "dome" }
+}

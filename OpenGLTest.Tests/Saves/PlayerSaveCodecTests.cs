@@ -24,6 +24,7 @@ public sealed class PlayerSaveCodecTests
             Creative = true,
             Flying = false,
             Health = 42,
+            Mana = 37.5f,
             LightingClock = 1234.5678,
             RespawnEye = [1f, 70.5f, -2f],
             Inventory = new PlayerSaveData.InventoryData
@@ -43,7 +44,12 @@ public sealed class PlayerSaveCodecTests
                         Name = "item/e",
                         Crucible = new PlayerSaveData.CrucibleData
                         {
-                            Material = "m", MoltenMl = 40, PendingMl = 60, PendingInput = "block/f",
+                            Metals =
+                            [
+                                new PlayerSaveData.MetalData { Material = "m", MoltenMl = 40, PendingMl = 60 },
+                                new PlayerSaveData.MetalData { Material = "n", MoltenMl = 0, PendingMl = 20 },
+                            ],
+                            PendingInput = "block/f",
                         },
                         CustomName = "Old Faithful",
                         Enchantments = new Dictionary<string, int> { ["sharp"] = 2, ["swift"] = 1 },
@@ -67,6 +73,7 @@ public sealed class PlayerSaveCodecTests
         Assert.Equal(original.Creative, back.Creative);
         Assert.Equal(original.Flying, back.Flying);
         Assert.Equal(original.Health, back.Health);
+        Assert.Equal(original.Mana, back.Mana);
         Assert.Equal(original.LightingClock, back.LightingClock);
         Assert.Equal(original.RespawnEye, back.RespawnEye);
 
@@ -95,9 +102,8 @@ public sealed class PlayerSaveCodecTests
             }
 
             Assert.NotNull(tb.Crucible);
-            Assert.Equal(ta.Crucible.Material, tb.Crucible.Material);
-            Assert.Equal(ta.Crucible.MoltenMl, tb.Crucible.MoltenMl);
-            Assert.Equal(ta.Crucible.PendingMl, tb.Crucible.PendingMl);
+            Assert.Equal(ta.Crucible.Metals!.Select(m => (m.Material, m.MoltenMl, m.PendingMl)),
+                tb.Crucible.Metals!.Select(m => (m.Material, m.MoltenMl, m.PendingMl)));
             Assert.Equal(ta.Crucible.PendingInput, tb.Crucible.PendingInput);
         }
 
@@ -125,6 +131,7 @@ public sealed class PlayerSaveCodecTests
         Assert.Null(empty.Creative);
         Assert.Null(empty.Flying);
         Assert.Null(empty.Health);
+        Assert.Null(empty.Mana);
         Assert.Null(empty.LightingClock);
         Assert.Null(empty.RespawnEye);
         Assert.Null(empty.Inventory);

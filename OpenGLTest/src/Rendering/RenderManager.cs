@@ -261,6 +261,7 @@ public class RenderManager : IDisposable
     private int _locEntityTint;
     private int _locFlash;
     private int _locHitFlash;
+    private int _locStatusTint;
     private int _locAlphaCutoff;
     private int[] _locPointPos = [];
     private int[] _locPointColor = [];
@@ -328,6 +329,10 @@ public class RenderManager : IDisposable
     /// <summary>The iceberg draws: one mesh and skin per iceberg variant.</summary>
     internal IcebergPasses IcebergPasses { get; private set; }
 
+    /// <summary>The chest draws: the shared chest model's base and lid for every chest cell, each on its
+    /// block's skin.</summary>
+    internal ChestPasses Chests { get; private set; }
+
     /// <summary>The depth-only sun shadow passes: the near and far cascades' casters; owns the
     /// CHUNK_DRAW shadow program's uniform locations.</summary>
     internal ShadowPass Shadows { get; private set; }
@@ -372,6 +377,8 @@ public class RenderManager : IDisposable
     internal LeafParticleRenderer? Leaves => _leaves;
     internal FireParticleRenderer? Fire => _fire;
     internal BubbleParticleRenderer? Bubbles => _bubbles;
+    /// <summary>This frame's splash ripples for the water shader; packed before <see cref="BeginFrame"/>.</summary>
+    internal RippleField WaterRipples { get; } = new();
     internal SliceTrailRenderer? SliceTrails => _sliceTrails;
     internal EntityHealthbarRenderer? Healthbars => _healthbars;
     internal DamageNumberRenderer? DamageNumbers => _damageNumbers;
@@ -386,6 +393,7 @@ public class RenderManager : IDisposable
     internal int LocAlpha => _locAlpha;
     internal int LocFlash => _locFlash;
     internal int LocHitFlash => _locHitFlash;
+    internal int LocStatusTint => _locStatusTint;
     internal Shader ShadowShader => shadowShader;
     internal Shader ChunkShadowShader => chunkShadowShader;
     internal ChunkDrawBatch ChunkDraws => _chunkDraws;
@@ -464,6 +472,7 @@ public class RenderManager : IDisposable
         // nothing else on this program ever writes them.
         chunkShader.SetUniform("uFlash", 0f);
         chunkShader.SetUniform("uHitFlash", 0f);
+        chunkShader.SetUniform("uStatusTint", Vector4.Zero);
         chunkShader.SetUniform("uAlphaCutoff", LightingConfig.AlphaCutoff);
         // The HDR target first, so every creator after it restores to the scene target it made.
         Targets.CreateHdrTarget();
@@ -484,6 +493,7 @@ public class RenderManager : IDisposable
         _locEntityTint = worldShader.GetUniformLocation("uEntityTint");
         _locFlash = worldShader.GetUniformLocation("uFlash");
         _locHitFlash = worldShader.GetUniformLocation("uHitFlash");
+        _locStatusTint = worldShader.GetUniformLocation("uStatusTint");
         _locAlphaCutoff = worldShader.GetUniformLocation("uAlphaCutoff");
         _locPointPos = worldShader.GetUniformArrayLocations("uPointPos", LightingConfig.MaxPointLights);
         _locPointColor = worldShader.GetUniformArrayLocations("uPointColor", LightingConfig.MaxPointLights);
@@ -574,6 +584,7 @@ public class RenderManager : IDisposable
         Players = new PlayerPasses(gl, this);
         Mobs = new MobPasses(gl, this);
         IcebergPasses = new IcebergPasses(gl, this);
+        Chests = new ChestPasses(gl, this);
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes, atlasIsSrgb: true);
         // The damage numbers are laid out from the HUD's font; without one there is nothing to draw
         if (ui.Font is { } font)
@@ -672,6 +683,16 @@ public class RenderManager : IDisposable
         // Glass blocks and panes share the glass tile; their grazing sky tint (GlassSheen)
         program.SetUniform("uGlassLayer", (float)ContentRegistry.RequireBlock("glass").Top);
         program.SetUniform("uGlassSheen", SurfaceShadingConfig.GlassSheenStrength);
+        // The battle tower dome's self-lit film (ForcefieldShimmer); 0 strength leaves its plain tile
+        program.SetUniform("uForcefieldLayer", (float)ContentRegistry.RequireBlock("tower_forcefield").Top);
+        program.SetUniform("uForcefield", SurfaceShadingConfig.ForcefieldStrength);
+        program.SetUniform("uForcefieldColor",
+            ColorSpace.SrgbToLinear(SurfaceShadingConfig.ForcefieldColor) * SurfaceShadingConfig.ForcefieldGlow);
+        program.SetUniform("uForcefieldTerms", new Vector4(SurfaceShadingConfig.ForcefieldFilmAlpha,
+            SurfaceShadingConfig.ForcefieldRimAlpha, SurfaceShadingConfig.ForcefieldHexAlpha, SurfaceShadingConfig.ForcefieldBandAlpha));
+        program.SetUniform("uForcefieldCells", SurfaceShadingConfig.ForcefieldHexCellsPerBlock);
+        program.SetUniform("uForcefieldFade",
+            new Vector2(SurfaceShadingConfig.ForcefieldDetailFadeNearBlocks, SurfaceShadingConfig.ForcefieldDetailFadeFarBlocks));
         program.SetUniform("uReflValid", 0f);
         // The water model's tuning constants never change at runtime, so they go up once here
         // instead of riding ApplyFrameUniforms every frame.
@@ -692,6 +713,7 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterFoamWidth", WaterRenderConfig.WaterFoamWidthBlocks);
         program.SetUniform("uWaterFoamStrength", WaterRenderConfig.WaterFoamStrength);
         program.SetUniform("uWaterFoamColor", ColorSpace.SrgbToLinear(WaterRenderConfig.WaterFoamColor));
+        RippleUniforms.Init(program);
         // Hashed sun sparkles on the waves (WaterGlitter); 0 strength leaves them off
         program.SetUniform("uWaterGlitter", WaterRenderConfig.WaterGlitterStrength);
         program.SetUniform("uWaterGlitterCells", WaterRenderConfig.WaterGlitterCellsPerBlock);
@@ -701,6 +723,9 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterGlitterFade",
             new Vector2(WaterRenderConfig.WaterGlitterFadeNearBlocks, WaterRenderConfig.WaterGlitterFadeFarBlocks));
         program.SetUniform("uLavaLayer", (float)ContentRegistry.RequireBlock("lava").Top);
+        var lavaSheet = TextureSheetRegistry.TryGet("lava");
+        program.SetUniform("uLavaFrames", (float)(lavaSheet?.Frames ?? 1));
+        program.SetUniform("uLavaFps", lavaSheet?.Fps ?? 0f);
         program.SetUniform("uLavaNormalScale", SurfaceShadingConfig.LavaNormalScale);
         program.SetUniform("uLavaCatchLight", SurfaceShadingConfig.LavaCatchLightStrength);
         program.SetUniform("uLavaCatchPower", SurfaceShadingConfig.LavaCatchLightPower);
@@ -818,7 +843,7 @@ public class RenderManager : IDisposable
         {
             var rot = camera.GetViewMatrix();
             rot.M41 = rot.M42 = rot.M43 = 0f;
-            Sky.RenderSky(rot, camera.GetProjectionMatrix(), camera.ViewDirection, Lighting.SkyFrame);
+            Sky.RenderSky(rot, camera.GetProjectionMatrix(), Lighting.SkyFrame);
         }
 
         // Exactly once a frame, before any pass appends to it: the ring rolls onto its next
@@ -902,8 +927,8 @@ public class RenderManager : IDisposable
     /// these and every later world pass in the frame inherits them. Everything it reads is final
     /// by then: <see cref="FrameLighting.SetLighting"/> (including <c>_nearShadow.ViewProj</c>) runs before
     /// <see cref="BeginFrame"/>, and nothing in a world pass writes these fields.
-    /// <c>uFlash</c>/<c>uHitFlash</c> are entity-only (primed TNT / hurt slimes), so they are
-    /// reset on the plain program alone.
+    /// <c>uFlash</c>/<c>uHitFlash</c>/<c>uStatusTint</c> are entity-only (primed TNT / hurt or
+    /// status-affected mobs), so they are reset on the plain program alone.
     /// Leaves <c>worldShader</c> bound, which is what every caller assumes.
     /// </summary>
     internal void ApplyFrameUniforms()
@@ -914,6 +939,7 @@ public class RenderManager : IDisposable
         ApplyFrameUniformsTo(worldShader, _locPointPos, _locPointColor, _locBlockLightPalette);
         worldShader.SetUniform(_locFlash, 0f);
         worldShader.SetUniform(_locHitFlash, 0f);
+        worldShader.SetUniform(_locStatusTint, Vector4.Zero);
     }
 
     /// <summary>The body of <see cref="ApplyFrameUniforms"/>, run once per world program.
@@ -952,6 +978,7 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterNormalScale", GameSettings.WaterWaves);
         program.SetUniform("uWaterRefractStrength", GameSettings.WaterRefraction);
         program.SetUniform("uWaterCausticStrength", GameSettings.WaterCaustics);
+        RippleUniforms.Apply(program, WaterRipples);
         program.SetUniform("uLightViewProj", _nearShadow.ViewProj);
         program.SetUniform("uShadowStrength", Lighting.ShadowStrength);
         program.SetUniform("uShadowTexel", 1f / LightingConfig.ShadowMapSize);
@@ -1018,6 +1045,7 @@ public class RenderManager : IDisposable
         Stations.Dispose();
         Players.Dispose();
         IcebergPasses.Dispose();
+        Chests.Dispose();
         Mobs.Dispose();
         worldShader.Dispose();
         chunkShader.Dispose();

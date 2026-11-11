@@ -66,15 +66,15 @@ public sealed class PebbleSurfaceTests
     /// above sea level (so no column is wet), then counts the piles and asserts every one of
     /// them sits on a weighted surface.
     /// </summary>
-    private static int StampStripeChunk(int chunkX, int chunkZ, byte pebble, byte stone, byte grass, byte sand)
+    private static int StampStripeChunk(int chunkX, int chunkZ, ushort pebble, ushort stone, ushort grass, ushort sand)
     {
         const int groundLy = 1;
         const int pebbleLy = groundLy + 1;
 
         var cells = Chunk.Size * Chunk.Size;
         var heights = new int[cells];
-        var ground = new byte[cells];
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var ground = new ushort[cells];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
 
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

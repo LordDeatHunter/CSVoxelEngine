@@ -39,8 +39,9 @@ internal sealed class ServerChat
     /// <summary>
     /// Runs one chat command for the player who sent it, on the same table singleplayer uses
     /// (<see cref="ChatCommands"/>): <c>/tp</c> and <c>/give</c> need operator rights, and so does
-    /// <c>/time</c>; the answers are system lines to that player (a time change also goes out as a
-    /// <see cref="NetMessage.TimeSync"/> at once).
+    /// <c>/time</c>, while <c>/locate</c> and <c>/help</c> need none; the answers are system lines to
+    /// that player (a time change also goes out as a <see cref="NetMessage.TimeSync"/> at once, and
+    /// <c>/locate</c>'s carries a link, searched from that player's eye, since a client holds no seed).
     /// </summary>
     private void RunCommand(ClientConnection client, string line)
     {
@@ -74,6 +75,8 @@ internal sealed class ServerChat
                     SendSystem(client, "Usage: /tp x y z");
                     return;
                 }
+                // A /tp ends a waystone trip still waiting for its destination
+                player.WaystoneTrip = null;
                 player.Teleport(target);
                 PlayerSessions.SendPlayerCorrection(client, player.IssueCorrection(), player.Position);
                 SendSystem(client, $"Teleported to {target.X:0.#} {target.Y:0.#} {target.Z:0.#}");
@@ -95,6 +98,13 @@ internal sealed class ServerChat
                 SendSystem(client, $"Gave {request.Count} x {request.Item}");
                 return;
 
+            case ChatCommands.CommandKind.Locate:
+            {
+                var (text, link) = ChatCommands.Locate(parsed.Args, player.Position, _state.World.Towers);
+                SendSystem(client, text, link);
+                return;
+            }
+
             default:
                 SendSystem(client, ChatCommands.HelpText);
                 return;
@@ -103,7 +113,7 @@ internal sealed class ServerChat
 
     // An item or block by plain name (blocks first, like a loot entry) or by its block//item/
     // pinned name
-    private static bool TryResolveContent(string name, out byte id)
+    private static bool TryResolveContent(string name, out ushort id)
     {
         var trimmed = name.Trim();
         if (trimmed.StartsWith("block/", StringComparison.OrdinalIgnoreCase))
@@ -113,21 +123,17 @@ internal sealed class ServerChat
         return ContentRegistry.TryResolveBlock(trimmed, out id) || ContentRegistry.TryResolveItem(trimmed, out id);
     }
 
-    private void SendSystem(ClientConnection client, string text)
+    private static void SendSystem(ClientConnection client, string text, ChatLink? link = null)
     {
         using var writer = new PacketWriter(NetMessage.ChatMessage);
-        writer.Write((byte)ChatKind.System);
-        writer.Write("");
-        writer.Write(text);
+        ChatMessageCodec.Write(writer, new ChatMessage(ChatKind.System, "", text, link));
         client.Send(writer.ToArray());
     }
 
     private void BroadcastChat(ChatKind kind, string sender, string text)
     {
         using var writer = new PacketWriter(NetMessage.ChatMessage);
-        writer.Write((byte)kind);
-        writer.Write(sender);
-        writer.Write(text);
+        ChatMessageCodec.Write(writer, new ChatMessage(kind, sender, text));
         _state.Broadcast(writer.ToArray());
     }
 

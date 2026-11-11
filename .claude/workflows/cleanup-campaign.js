@@ -479,7 +479,7 @@ ${outcomes.length ? `\nAlready committed in this run (the plan already records t
 Write the task text the way the plan's god-class task is written: the goal and the rule it serves; how to approach it (map the jobs first,
 move verbatim, a composition root that builds and owns the components, placement and namespace rules); measurable targets; the hard
 constraints that apply to THIS code (update and render order, threading and GL-thread rules, edit-path hooks, per-frame allocation, wire
-formats, the projects and tests that must keep compiling); and the docs to update (AGENTS.md Layout and every reference to moved members,
+formats, the projects and tests that must keep compiling); and the docs to update (docs/agents/layout-*.md and every reference to moved members,
 the skills, plans/PERF.md, TODO.md, crefs; a file that stays oversized gets its reason recorded in Code organization).
 
 Then brief 3-5 Sonnet scouts, one lens each.
@@ -535,7 +535,7 @@ Write a plan an implementer executes step by step with no further design:
   down in advance: untangling state shared between responsibilities, designing the owner wiring of a tangled group, a move that cuts
   across several groups at once, order- or thread-sensitive rewiring that cannot be specified line by line. Prefer specifying a step
   fully over reserving it; most steps should be sonnet.
-- The docs (AGENTS.md Layout and member references, the skills, plans/PERF.md, TODO.md, crefs) are the final step(s). Never plans/CLEANUP.md:
+- The docs (docs/agents/layout-*.md and member references, the skills, plans/PERF.md, TODO.md, crefs) are the final step(s). Never plans/CLEANUP.md:
   the recorder updates it after the commit.
 - No new tests, no behavior change.
 - openQuestions only for answers that would change the plan.`

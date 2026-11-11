@@ -125,7 +125,7 @@ public sealed class ServerWorldTests : IDisposable
         {
             var chunk = manager.ChunkAt(x, y, fz)!;
             var (lx, ly, lz) = VoxelCoords.LocalOf(x, y, fz);
-            chunk.SetBlockRaw(lx, ly, lz, y == fy - 1 ? dirt : (byte)0, 0);
+            chunk.SetBlockRaw(lx, ly, lz, y == fy - 1 ? dirt : BlockType.Air, 0);
         }
 
         // The builder stands at the eye, another player two blocks along +X
@@ -359,7 +359,7 @@ public sealed class ServerWorldTests : IDisposable
             for (var y = fy - 1; y <= fy + 1; y++)
             {
                 var (lx, ly, lz) = VoxelCoords.LocalOf(x, y, fz);
-                manager.ChunkAt(x, y, fz)!.SetBlockRaw(lx, ly, lz, y == fy - 1 ? stone : (byte)0, 0);
+                manager.ChunkAt(x, y, fz)!.SetBlockRaw(lx, ly, lz, y == fy - 1 ? stone : BlockType.Air, 0);
             }
 
             player.Inventory.Add(dirt, 1);

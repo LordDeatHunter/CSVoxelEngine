@@ -167,7 +167,7 @@ public sealed class AnimationClockTests
         [
             pose.LeftHip, pose.RightHip, pose.LeftKnee, pose.RightKnee, pose.LeftShoulder, pose.RightShoulder,
             pose.LeftElbow, pose.RightElbow, pose.TorsoPitch, pose.Bob, model.DeathFall, model.SwimStrokeProgress,
-            model.Flinch, model.LandingDip, model.MineT, model.SliceProgress,
+            model.Flinch, model.LandingDip, model.MineT, model.SliceProgress, model.CastProgress,
         ];
     }
 
@@ -203,7 +203,7 @@ public sealed class AnimationClockTests
     public void AOneShotPlaysOnceWhenNotLoopingAndAgainWhenLooping()
     {
         foreach (var mode in new[] { PlayerPreviewState.Slice, PlayerPreviewState.Punch, PlayerPreviewState.Throw,
-                     PlayerPreviewState.Hurt, PlayerPreviewState.Jump })
+                     PlayerPreviewState.Hurt, PlayerPreviewState.Cast, PlayerPreviewState.Jump })
         {
             int Activations(bool loop)
             {
@@ -223,6 +223,7 @@ public sealed class AnimationClockTests
                         PlayerPreviewState.Punch => m.MineT < 1f,
                         PlayerPreviewState.Throw => m.IsThrowing || m.ThrowCharge.HasValue,
                         PlayerPreviewState.Hurt => MathF.Abs(m.Flinch) > 0.05f,
+                        PlayerPreviewState.Cast => m.IsCasting,
                         _ => m.AirBlend > 0.7f,
                     };
                     if (now && !active) count++;

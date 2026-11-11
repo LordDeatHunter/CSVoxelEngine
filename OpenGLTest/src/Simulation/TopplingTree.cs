@@ -29,7 +29,7 @@ public class TopplingTree : IDisposable
     /// <summary>One collected block: integer world coords plus its id and state byte (the
     /// <see cref="WoodState"/> or <see cref="LeafState"/> it stood with, which the falling mesh
     /// and the loot roll both read).</summary>
-    public readonly record struct FellBlock(Vector3 Cell, byte Id, byte State);
+    public readonly record struct FellBlock(Vector3 Cell, ushort Id, byte State);
 
     private readonly List<FellBlock> _blocks;
     private readonly Vector3 _pivot;
@@ -84,7 +84,7 @@ public class TopplingTree : IDisposable
     /// thread, and safe whether or not the broken cell was already cleared (it is seeded from
     /// the passed id and state, and the search reads it as absent).
     /// </summary>
-    public static List<FellBlock> Collect(ChunkManager chunks, Vector3 breakCell, byte brokenId, byte brokenState)
+    public static List<FellBlock> Collect(ChunkManager chunks, Vector3 breakCell, ushort brokenId, byte brokenState)
     {
         if (!BlockType.IsTreeWood(brokenId) || WoodState.IsDetached(brokenState))
             return [new FellBlock(breakCell, brokenId, brokenState)];
@@ -269,9 +269,9 @@ public class TopplingTree : IDisposable
     /// felled canopy yields exactly what mining or blasting it would. Single-use: the second
     /// call returns nothing. A tree felled in creative mode yields nothing.
     /// </summary>
-    public List<(byte Id, Vector3 Cell)> TakeDrops()
+    public List<(ushort Id, Vector3 Cell)> TakeDrops()
     {
-        var drops = new List<(byte, Vector3)>();
+        var drops = new List<(ushort, Vector3)>();
         if (_dropsTaken)
             return drops;
         _dropsTaken = true;
@@ -280,7 +280,7 @@ public class TopplingTree : IDisposable
             return drops;
 
         var landed = Matrix4x4.CreateFromAxisAngle(_axis, MathF.PI * 0.5f);
-        var rolled = new List<byte>();
+        var rolled = new List<ushort>();
         foreach (var block in _blocks)
         {
             var cell = RestCell(block, landed);

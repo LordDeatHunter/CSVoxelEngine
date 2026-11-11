@@ -20,7 +20,7 @@ public sealed class ContentTests
     public ContentTests() => TestContent.EnsureLoaded();
 
     [Fact]
-    public void BlockAndItemIdsFitInSharedByteRange()
+    public void EveryBlockAndItemIdIsUniqueAndIndexesTheTables()
     {
         var ids = BlockType.Types.Keys
             .Concat(ItemRegistry.All.Where(i => i is not BlockItem).Select(i => i.Id))
@@ -28,7 +28,12 @@ public sealed class ContentTests
         Assert.NotEmpty(ids);
         Assert.Equal(ids.Length, ids.Distinct().Count());
         Assert.All(ids, id => Assert.NotEqual(BlockType.Air, id));
-        Assert.True(ids.Length <= 255);
+
+        // Blocks and items share one dense id space after air, and every table is sized to exactly it
+        Assert.Equal(ids.Length + 1, BlockTables.IdCount);
+        Assert.All(ids, id => Assert.True(BlockTables.IsAssignedId(id), $"id {id} is outside the tables"));
+        foreach (var (id, type) in BlockType.Types)
+            Assert.Same(type, BlockType.ById[id]);
     }
 
     [Fact]
@@ -78,10 +83,22 @@ public sealed class ContentTests
             .Select(System.IO.Path.GetFileNameWithoutExtension)
             .OrderBy(n => n, StringComparer.Ordinal)
             .ToArray();
-        Assert.Equal(files.Length, TextureAtlas.LayerCount);
-        Assert.Equal(Array.IndexOf(files, "stone"), TextureAtlas.TileOf("stone"));
+        var extraFrames = TextureSheetRegistry.All.Sum(sheet => sheet.Frames - 1);
+        Assert.Equal(files.Length + extraFrames, TextureAtlas.LayerCount);
+        Assert.Equal(Array.IndexOf(TextureAtlas.TileNames.ToArray(), "stone"), TextureAtlas.TileOf("stone"));
         Assert.Equal(TextureAtlas.TileOf("grass_top"), ContentRegistry.RequireBlock("grass").FaceTiles[4]);
         Assert.Equal(TextureAtlas.TileOf("grass_side"), ContentRegistry.RequireBlock("grass").FaceTiles[0]);
+    }
+
+    [Fact]
+    public void TheLavaSpritesheetIsConsecutiveLayersFromItsFirstFrame()
+    {
+        // The fluid shader steps from the lava tile through the following layers, so the frames must be contiguous.
+        var sheet = TextureSheetRegistry.TryGet("lava");
+        Assert.NotNull(sheet);
+        var first = TextureAtlas.TileOf("lava");
+        for (var frame = 1; frame < sheet.Frames; frame++)
+            Assert.Equal(first + frame, TextureAtlas.TileOf($"lava_frame_{frame:00}"));
     }
 
     [Fact]
@@ -205,7 +222,7 @@ public sealed class ContentTests
         var table = ContentRegistry.LootTableFor("stone");
         Assert.NotNull(table);
         var cobble = ContentRegistry.RequireBlock("cobblestone").Id;
-        var into = new List<byte>();
+        var into = new List<ushort>();
         for (var i = 0; i < 10; i++)
         {
             into.Clear();
@@ -231,7 +248,7 @@ public sealed class ContentTests
         var gravel = ContentRegistry.RequireBlock("gravel");
         Assert.NotNull(gravel.LootTable);
         var flint = ContentRegistry.RequireItem("flint").Id;
-        var into = new List<byte>();
+        var into = new List<ushort>();
         var flintRolls = 0;
         const int rolls = 4000;
         for (var i = 0; i < rolls; i++)
@@ -253,7 +270,7 @@ public sealed class ContentTests
     {
         var tnt = ContentRegistry.RequireBlock("tnt");
         Assert.Null(tnt.LootTable);
-        var into = new List<byte>();
+        var into = new List<ushort>();
         DropManager.RollLoot(tnt.Id, new LootContext(0, 0, 0), into);
         Assert.Equal(new[] { tnt.Id }, into);
     }
@@ -261,7 +278,7 @@ public sealed class ContentTests
     [Fact]
     public void NoneLootTableDropsNothing()
     {
-        var into = new List<byte>();
+        var into = new List<ushort>();
         LootTable.None.Roll(new LootContext(0, 0, 0), into);
         Assert.Empty(into);
     }
@@ -317,7 +334,7 @@ public sealed class ContentTests
         Assert.False(BlockRaycaster.RayIntersectsBox(rimOrigin, -Vector3.UnitY, min, max, 10f, out _, out _));
     }
 
-    private static Vector3? DeclaredSrgb(byte id) =>
+    private static Vector3? DeclaredSrgb(ushort id) =>
         BlockLoader.DeclaredLightColor(id) is { } c ? new Vector3(c[0], c[1], c[2]) / 255f : null;
 
     [Fact]

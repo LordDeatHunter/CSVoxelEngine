@@ -27,6 +27,8 @@ internal sealed class BillboardPasses
         _owner = owner;
     }
 
+    private readonly List<Mob> _healthbarMobs = [];
+
     /// <summary>
     /// Draws the five-heart healthbar above every live mob (see
     /// <see cref="EntityHealthbarRenderer"/>), right after the bodies so the row tracks them.
@@ -35,7 +37,13 @@ internal sealed class BillboardPasses
     {
         if (camera == null || mobs.Count == 0 || _owner.Healthbars == null) return;
 
-        _owner.Healthbars.Render(mobs, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
+        // A boss hidden under the ground shows no bar (its bar would hang in the sand)
+        _healthbarMobs.Clear();
+        for (var i = 0; i < mobs.Count; i++)
+            if (mobs[i].ShowsHealthbar) _healthbarMobs.Add(mobs[i]);
+        if (_healthbarMobs.Count == 0) return;
+
+        _owner.Healthbars.Render(_healthbarMobs, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
             Lighting.FogColor, Lighting.FogNear, Lighting.FogFar);
         // The healthbar renderer binds its own heart sprites to unit 0.
         Units.InvalidateTextureUnits();

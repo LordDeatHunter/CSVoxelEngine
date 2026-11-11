@@ -95,7 +95,7 @@ public sealed class WorldTreeSpace : ITreeSpace
         return true;
     }
 
-    private bool TryGetCell(int x, int y, int z, out byte id, out byte state)
+    private bool TryGetCell(int x, int y, int z, out ushort id, out byte state)
     {
         int cx = x >> Chunk.SizeShift, cy = y >> Chunk.SizeShift, cz = z >> Chunk.SizeShift;
         var chunk = _cached;

@@ -2,6 +2,7 @@
   "name": "Baobab Leaves",
   "model": { "parent": "block/cube_all", "textures": { "all": "baobab_leaves" } },
   "hardness": 1,
+  "flammable": true,
   "movementSpeed": 0.5,
   "cutout": true,
   "sway": true,

@@ -146,7 +146,7 @@ public sealed class SettingsMenuView
 /// </summary>
 public static class SettingsLayout
 {
-    public const float PanelWidth = 880f;
+    public const float PanelWidth = 960f;
     public const float PanelTop = 64f;
     public const float PanelBottomMargin = 16f;
     public const float TitleHeight = 44f;
@@ -154,8 +154,8 @@ public static class SettingsLayout
     public const float RowHeight = 46f;
     public const float BackHeight = 52f;
     public const float BackGap = 12f;
-    public const float LabelWidth = 210f;
-    public const float ValueWidth = 100f;
+    public const float LabelWidth = 300f;
+    public const float ValueWidth = 110f;
     public const float TrackHeight = 8f;
     public const float ToggleSize = 24f;
 

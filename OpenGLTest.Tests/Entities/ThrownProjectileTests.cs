@@ -89,4 +89,34 @@ public sealed class ThrownProjectileTests
         Assert.Null(wallHit);
         Assert.False(wallAlive);
     }
+
+    public static TheoryData<float, float, float> Headings => new()
+    {
+        { 0f, 0f, -1f }, { 1f, 0f, 0f }, { 0.3f, -0.8f, 0.5f }, { 0f, 1f, 0f }, { 0f, -1f, 0f }, { -4f, 2f, 7f },
+    };
+
+    [Theory]
+    [MemberData(nameof(Headings))]
+    public void AnAlignedProjectilePointsItsTipAlongItsVelocityWithoutDistortingTheSprite(float x, float y, float z)
+    {
+        var velocity = new Vector3(x, y, z) * 13f;
+        var rotation = ThrownProjectile.AlignedRotation(velocity);
+
+        var tip = Vector3.TransformNormal(Vector3.Normalize(new Vector3(1f, 1f, 0f)), rotation);
+        Assert.True(Vector3.Dot(tip, Vector3.Normalize(velocity)) > 0.9999f);
+        Assert.Equal(1f, rotation.GetDeterminant(), 3);
+        // A pure rotation keeps lengths, so the sprite is neither squashed nor mirrored
+        Assert.Equal(1f, Vector3.TransformNormal(Vector3.UnitZ, rotation).Length(), 3);
+        Assert.Equal(1f, Vector3.TransformNormal(Vector3.UnitX, rotation).Length(), 3);
+    }
+
+    [Fact]
+    public void OnlyTheSpearFliesPointFirst()
+    {
+        var spear = ContentRegistry.RequireItem("spear");
+        Assert.True(spear.IsThrowable && spear.ThrowAligned);
+        Assert.False(ContentRegistry.RequireItem("flint").ThrowAligned);
+        Assert.True(new ThrownProjectile(spear.Id, Vector3.Zero, Vector3.UnitX, 1f, 1f).Aligned);
+        Assert.False(new ThrownProjectile(ContentRegistry.RequireItem("flint").Id, Vector3.Zero, Vector3.UnitX, 1f, 1f).Aligned);
+    }
 }

@@ -71,6 +71,20 @@ internal sealed class PlayerPhysics
 
     /// <summary>Counts strokes started, so the body can start its stroke animation on the same frame.</summary>
     public int SwimStrokeCount { get; private set; }
+
+    /// <summary>Counts jumps taken (a land jump, or one off the bottom of a shallow puddle): the bellows of a
+    /// bloomery beside the player reads it (<see cref="Camera.JumpCount"/>).</summary>
+    public int JumpCount { get; private set; }
+
+    /// <summary>Counts air jumps taken (the cloud boots' one free jump per airtime). Kept apart from
+    /// <see cref="JumpCount"/> on purpose: an air jump starts from no ground, so it never works a bellows.</summary>
+    public int AirJumpCount { get; private set; }
+
+    // Space as it was last frame: the air jump needs a fresh press, so a Space held through a ground
+    // jump (or across a closed menu) never fires it.
+    private bool _spaceWasDown;
+    // The one air jump this airtime still has: spent in the air, back on landing (and in water or flight).
+    private bool _airJumpReady;
     internal const float SinkSpeed = -2f;
     // Pushing into a bank while holding Space lifts the player over it, so getting out of
     // water never needs a ramp
@@ -139,9 +153,18 @@ internal sealed class PlayerPhysics
     public void Update(Camera camera, float deltaTime, IKeyboard? keyboard, ChunkManager chunkManager)
     {
         if (keyboard == null)
+        {
             camera.MarkTogglesHeld();
+            _spaceWasDown = true;
+        }
         if (keyboard == null || chunkManager == null)
             return;
+
+        var spaceDown = keyboard.IsKeyPressed(Key.Space);
+        var spaceEdge = spaceDown && !_spaceWasDown;
+        _spaceWasDown = spaceDown;
+        // A creative double tap may turn flight on or off this frame; that tap is never an air jump
+        var flyingAtStart = camera.IsFlying;
 
         camera.UpdateCreativeToggle(keyboard);
         camera.UpdateFlightToggle(deltaTime, keyboard);
@@ -153,7 +176,9 @@ internal sealed class PlayerPhysics
         _knockback.X = MathUtils.Damp(_knockback.X, 0f, KnockbackDamping, deltaTime);
         _knockback.Z = MathUtils.Damp(_knockback.Z, 0f, KnockbackDamping, deltaTime);
 
-        var sprinting = camera.SprintHeld;
+        // On foot sprinting needs forward: holding only A or D (a side-sprint) runs at walking speed.
+        // Flying sprints in any direction, backward, sideways and up or down included.
+        var sprinting = camera.SprintHeld && (camera.IsFlying || keyboard.IsKeyPressed(Key.W));
         var moveSpeed = BaseSpeed * (sprinting ? (camera.IsFlying ? FlyBoostMultiplier : SprintMultiplier) : 1f);
         var direction = camera.IsOrbit ? camera.ViewDirection : camera.GetForwardVector();
         var right = Vector3.Normalize(Vector3.Cross(direction, Vector3.UnitY));
@@ -211,6 +236,9 @@ internal sealed class PlayerPhysics
         if (!swimming && !_swimLatched || _lastPhase == WaterPhase.Swim && phase != WaterPhase.Swim)
             _diving = false;
         _lastPhase = phase;
+        // The air jump's charge is spent in the air and comes back on landing; water and flight refill it too
+        if (camera.IsGrounded || camera.IsInWater || camera.IsFlying)
+            _airJumpReady = true;
         // Ctrl on foot crouches: slower, never sprinting. While flying Ctrl is "down" instead.
         var sneaking = keyboard.IsKeyPressed(Key.ControlLeft) && !camera.IsFlying && !swimming;
         camera.SetSneaking(sneaking);
@@ -219,8 +247,13 @@ internal sealed class PlayerPhysics
         if (wading) moveSpeed *= PlayerConfig.WadeSpeedFactor;
         if (sneaking) moveSpeed = BaseSpeed * SneakSpeedFactor;
         // Pass-through blocks scale the walk instead of blocking it; flight is noclip.
+        // A slowing status effect (frostburn) scales the same way; flight ignores both.
         camera.SetMovementFactor(BlockMoveFactor(camera, chunkManager));
-        if (!camera.IsFlying) moveSpeed *= camera.MovementFactor;
+        var statusFactor = camera.Effects?.MoveFactor ?? 1f;
+        if (!camera.IsFlying) moveSpeed *= camera.MovementFactor * statusFactor * camera.GearMoveFactor;
+        // Lava is denser than water: body contact drags the walk (and the stroke below) to a crawl,
+        // so a sprint cannot carry through a shallow dip.
+        if (camera.IsInLava && !camera.IsFlying) moveSpeed *= PlayerConfig.LavaSpeedFactor;
         var wish = new Vector2(moveInput.X * moveSpeed, moveInput.Z * moveSpeed);
         float accelRate;
         if (camera.IsFlying)
@@ -239,7 +272,8 @@ internal sealed class PlayerPhysics
                 SwimStrokeCount++;
                 if (moving)
                 {
-                    var burst = SwimBurstSpeed * (backing ? 0.6f : 1f) * camera.MovementFactor;
+                    var burst = SwimBurstSpeed * (backing ? 0.6f : 1f) * camera.MovementFactor * statusFactor * camera.GearMoveFactor;
+                    if (camera.IsInLava) burst *= PlayerConfig.LavaSpeedFactor;
                     _horizontalVelocity = new Vector2(moveInput.X, moveInput.Z) * burst;
                 }
                 _pendingSwimVertical = strokeUp ? SwimBurstUp : strokeDown ? SwimBurstDown : 0f;
@@ -300,6 +334,7 @@ internal sealed class PlayerPhysics
             if (camera.IsGrounded && keyboard.IsKeyPressed(Key.Space))
             {
                 _verticalVelocity = JumpSpeed;
+                JumpCount++;
                 camera.SetGrounded(false);
             }
             else
@@ -324,10 +359,21 @@ internal sealed class PlayerPhysics
         }
         else
         {
-            if (camera.IsGrounded && keyboard.IsKeyPressed(Key.Space))
+            if (camera.IsGrounded && spaceDown)
             {
                 _verticalVelocity = JumpSpeed;
+                JumpCount++;
                 camera.SetGrounded(false);
+            }
+            else if (spaceEdge && _airJumpReady && camera.GearAirJump && !flyingAtStart && !camera.IsFlying
+                     && !camera.IsInWater)
+            {
+                // The cloud boots' air jump, a fresh Space press while airborne: as high as a ground jump,
+                // the horizontal speed (sprint momentum) kept, and JumpCount, which works a bloomery's
+                // bellows, never moved
+                _verticalVelocity = JumpSpeed;
+                _airJumpReady = false;
+                AirJumpCount++;
             }
 
             _verticalVelocity -= Gravity * deltaTime;
@@ -374,6 +420,7 @@ internal sealed class PlayerPhysics
             frameMovement.Y = _verticalVelocity * deltaTime;
         }
 
+        var feetBefore = camera.Position.Y - EyeHeight;
         var afterY = BodyCollision.MoveOnAxis(camera.Position, frameMovement.Y, 1, chunkManager, out var collidedY, camera.BodySolids);
         camera.SetPosition(afterY);
 
@@ -401,8 +448,31 @@ internal sealed class PlayerPhysics
             camera.SetGrounded(false);
         }
 
+        if (frameMovement.Y <= 0f)
+            HoldInSinkLayer(camera, chunkManager, feetBefore, deltaTime);
+
         camera.UpdateShoulderOffset(chunkManager, deltaTime);
         camera.RefreshEyeWaterState(chunkManager);
+    }
+
+    /// <summary>
+    /// A sink block's soft top layer (<see cref="SinkLayer"/>, a cloud) holds a body whose feet stand
+    /// in it: they descend no faster than <see cref="PlayerConfig.SinkBlockSpeed"/> (a fall is caught
+    /// at the layer's top) until they rest on the block's solid part, and the body counts as grounded
+    /// meanwhile, so it jumps, steps and lands as on any ground. The held point lies between where the
+    /// feet were and where the collision sweep took them, so it is free.
+    /// </summary>
+    private void HoldInSinkLayer(Camera camera, ChunkManager chunkManager, float feetBefore, float deltaTime)
+    {
+        if (PlayerBodyProbe.SinkLayerTop(camera.Position, chunkManager) is not { } top)
+            return;
+
+        var feet = camera.Position.Y - EyeHeight;
+        var held = SinkLayer.HoldFeet(feetBefore, feet, top, PlayerConfig.SinkBlockSpeed, deltaTime);
+        if (held > feet)
+            camera.SetPosition(camera.Position with { Y = held + EyeHeight });
+        camera.SetGrounded(true);
+        _verticalVelocity = MathF.Max(_verticalVelocity, -PlayerConfig.SinkBlockSpeed);
     }
 
     /// <summary>

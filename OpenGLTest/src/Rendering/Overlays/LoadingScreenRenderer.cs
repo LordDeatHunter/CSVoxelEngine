@@ -3,6 +3,7 @@ using System.Numerics;
 using VoxelEngine.Data;
 using VoxelEngine.UI.Menus;
 using static VoxelEngine.Rendering.Overlays.UIRenderer;
+using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
 
@@ -61,7 +62,7 @@ internal sealed class LoadingScreenRenderer
             {
                 var center = LoadingScreenLayout.BarCenter(screen);
                 _ui.DrawRect(center, barSize, Faded(SlotBackground, fade));
-                _ui.DrawBorder(center, barSize, SlotBorder, Faded(SlotBorderColor, fade));
+                _ui.DrawBorder(center, barSize, Border.Standard, Faded(SlotBorderColor, fade));
                 var progress = MathUtils.Clamp01(view.ShownProgress);
                 if (progress > 0f)
                 {

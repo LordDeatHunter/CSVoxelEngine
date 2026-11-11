@@ -1,0 +1,7 @@
+{
+  // A sword blade, drawn out of four refined vulcanite on the anvil; hilted in recipes/bleeding_edge.json.
+  "metal": "item/refined_vulcanite",
+  "metalCount": 4,
+  "result": "item/vulcanite_sword_head",
+  "count": 1
+}

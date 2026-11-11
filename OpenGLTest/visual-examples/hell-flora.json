@@ -1,0 +1,35 @@
+{
+  // Hell flora check (plans/LAYERS.md L-9): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/hell-flora.json
+  // Shots land in visual/hell-flora/. The default seed puts a fungal tree (a pale stem under a
+  // glowing teal cap) at (-197, -452, -165) in a layer-1 Fungal Grove, with glow ferns on the moss and
+  // vines hanging from the fungal soil ceiling, and a charred snag at (-68, -366, 19) in the layer-0
+  // Ashlands among ember blooms on the ash. Each spot is looked at ahead, down at the floor and up at
+  // the ceiling; the grove spot of hell.json is shot again for its vines.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+
+    { "op": "teleport", "pos": [-184.5, -548.5, -164.5], "yaw": 180, "pitch": 5 },
+    { "op": "wait", "seconds": 24 },
+    { "op": "screenshot", "name": "fungal_tree", "hideHud": true },
+    { "op": "look", "yaw": 180, "pitch": -45 },
+    { "op": "screenshot", "name": "fungal_floor", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": 30 },
+    { "op": "screenshot", "name": "fungal_vines", "hideHud": true },
+
+    { "op": "teleport", "pos": [-135.5, -526.4, -103.5], "yaw": 180, "pitch": 25 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "grove_ceiling", "hideHud": true },
+    { "op": "look", "yaw": 0, "pitch": -20 },
+    { "op": "screenshot", "name": "grove_ahead", "hideHud": true },
+
+    { "op": "teleport", "pos": [-56.5, -462.5, 19.5], "yaw": 180, "pitch": -10 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "charred_tree", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": -45 },
+    { "op": "screenshot", "name": "ashlands_floor", "hideHud": true },
+    { "op": "look", "yaw": 0, "pitch": 30 },
+    { "op": "screenshot", "name": "ashlands_ceiling", "hideHud": true }
+  ]
+}

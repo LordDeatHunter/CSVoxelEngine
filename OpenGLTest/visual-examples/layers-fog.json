@@ -1,0 +1,29 @@
+{
+  // Realm layer fog and sky check (LayerClimate, plans/LAYERS.md L-4): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/layers-fog.json
+  // Shots land in visual/layers-fog/. Flight holds every pose (noclip, no fall damage).
+  //   surface        the origin at noon: the plain flat sky, the reference
+  //   hell           the eye at y -400, deep under the barrier band: the sky, fog and clear color
+  //                  read a dim red (the rock there is still plain stone until L-5/L-6, so the shot
+  //                  may be mostly the red void seen through culled faces)
+  //   barrier        the eye at y -250, inside the barrier band: no red yet (hell starts below it)
+  //   aloft          the eye at y 450, over the sky islands' band: a slightly deeper, brighter blue
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [0.5, 40.5, 0.5], "yaw": -90, "pitch": 5 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "screenshot", "name": "surface", "hideHud": true },
+
+    { "op": "teleport", "pos": [0.5, -500.5, 0.5], "yaw": -90, "pitch": 0 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "hell", "hideHud": true },
+
+    { "op": "teleport", "pos": [0.5, -350.5, 0.5], "yaw": -90, "pitch": 0 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "barrier", "hideHud": true },
+
+    { "op": "teleport", "pos": [0.5, 450.5, 0.5], "yaw": -90, "pitch": 5 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "aloft", "hideHud": true }
+  ]
+}

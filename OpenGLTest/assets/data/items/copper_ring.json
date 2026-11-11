@@ -1,0 +1,8 @@
+{
+  // Copper Ring: placeholder gear. A full-metal ring, armor only:
+  // worn in an accessory slot, cast in the ring mold (recipes/cast/copper_ring.json), never looted.
+  "name": "Copper Ring",
+  "texture": "assets/textures/items/copper_ring.png",
+  "rarity": "common",
+  "equip": { "slot": "accessory", "armor": 1, "visible": false }
+}

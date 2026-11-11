@@ -1,0 +1,71 @@
+name: Wiki
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'wiki/**'
+      - 'OpenGLTest/assets/**'
+      - 'OpenGLTest/src/WorldGen/Trees/**'
+      - 'OpenGLTest.WikiExport/**'
+      - 'CREDITS.md'
+      - '.github/workflows/wiki.yml'
+  pull_request:
+    paths:
+      - 'wiki/**'
+      - 'OpenGLTest/assets/**'
+      - 'OpenGLTest/src/WorldGen/Trees/**'
+      - 'OpenGLTest.WikiExport/**'
+      - 'CREDITS.md'
+      - '.github/workflows/wiki.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: wiki/package-lock.json
+      # The game needs the .NET 10 SDK (C# 14). The exporter runs the real tree growth engine and writes
+      # the per-step data the wiki's growth slider replays.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Export tree growth data
+        run: dotnet run --project OpenGLTest.WikiExport -c Release -- wiki/public/data/trees
+      - name: Install wiki dependencies
+        working-directory: wiki
+        run: npm ci
+      - name: Test the generator
+        working-directory: wiki
+        run: npm test
+      - name: Build the site
+        working-directory: wiki
+        run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: wiki/.vitepress/dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

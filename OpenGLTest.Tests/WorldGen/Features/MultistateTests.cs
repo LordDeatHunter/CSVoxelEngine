@@ -19,11 +19,11 @@ public sealed class MultistateTests
 {
     public MultistateTests() => TestContent.EnsureLoaded();
 
-    private static byte Pebble => ContentRegistry.RequireBlock("pebble").Id;
-    private static byte Flint => ContentRegistry.RequireItem("flint").Id;
-    private static byte Obsidian => ContentRegistry.RequireItem("obsidian").Id;
-    private static byte BranchPile => ContentRegistry.RequireBlock("branch_pile").Id;
-    private static byte Branch => ContentRegistry.RequireItem("branch").Id;
+    private static ushort Pebble => ContentRegistry.RequireBlock("pebble").Id;
+    private static ushort Flint => ContentRegistry.RequireItem("flint").Id;
+    private static ushort Obsidian => ContentRegistry.RequireItem("obsidian").Id;
+    private static ushort BranchPile => ContentRegistry.RequireBlock("branch_pile").Id;
+    private static ushort Branch => ContentRegistry.RequireItem("branch").Id;
 
     [Fact]
     public void ExplicitStateWinsOverTheWorldgenHash()
@@ -46,7 +46,7 @@ public sealed class MultistateTests
         var table = ContentRegistry.LootTableFor("pebble");
         Assert.NotNull(table);
 
-        var into = new List<byte>();
+        var into = new List<ushort>();
         table.Roll(new LootContext(8, 0, 8, Count: 2), into);
         Assert.Equal([Flint, Flint], into);
 
@@ -119,7 +119,7 @@ public sealed class MultistateTests
         var table = ContentRegistry.LootTableFor("branch_pile");
         Assert.NotNull(table);
 
-        var into = new List<byte>();
+        var into = new List<ushort>();
         table.Roll(new LootContext(8, 0, 8, Count: 3), into);
         Assert.Equal([Branch, Branch, Branch], into);
 
@@ -198,7 +198,7 @@ public sealed class MultistateTests
         for (var total = 1; total <= pile.StackMax; total++)
         for (var obsidian = 0; obsidian <= total; obsidian++)
         {
-            var into = new List<byte>();
+            var into = new List<ushort>();
             table.Roll(new LootContext(8, 0, 8, total, obsidian), into);
             Assert.Equal(total, into.Count);
             Assert.Equal(obsidian, into.Count(id => id == Obsidian));

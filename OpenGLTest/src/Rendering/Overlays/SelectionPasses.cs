@@ -70,7 +70,7 @@ internal sealed class SelectionPasses : IDisposable
     /// as visibly as full cubes. Grown, the boxes enclose the block baked into the chunk mesh,
     /// so the block appears to jump out of the terrain.
     /// </summary>
-    internal void RenderBlockPop(Camera camera, Vector3 blockPosition, byte blockId, float grow,
+    internal void RenderBlockPop(Camera camera, Vector3 blockPosition, ushort blockId, float grow,
         BlockHitbox[]? boxes = null)
     {
         var type = BlockType.ById[blockId];
@@ -133,7 +133,7 @@ internal sealed class SelectionPasses : IDisposable
     /// crack overlay stays readable.
     /// </summary>
     internal void RenderBlockSelection(Camera camera, Vector3 blockPosition, Vector3 hitNormal, float grow = 0f,
-        byte blockId = 0, int hitBoxIndex = 0, BlockHitbox[]? boxes = null, bool mining = false)
+        ushort blockId = 0, int hitBoxIndex = 0, BlockHitbox[]? boxes = null, bool mining = false)
     {
         _owner.SelectionShader.Use();
 
@@ -222,7 +222,7 @@ internal sealed class SelectionPasses : IDisposable
     /// mining.
     /// </summary>
     internal void RenderBlockBreaking(Camera camera, Vector3 blockPosition, float progress, float grow = 0f,
-        byte blockId = 0, BlockHitbox[]? boxes = null)
+        ushort blockId = 0, BlockHitbox[]? boxes = null)
     {
         if (progress <= 0f) return;
 

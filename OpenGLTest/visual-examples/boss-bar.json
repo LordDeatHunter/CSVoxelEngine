@@ -1,0 +1,24 @@
+{
+  // Boss bar check: run from OpenGLTest/ at noon
+  //   $env:VOXEL_SCRIPT='visual-examples/boss-bar.json'; $env:VOXEL_TIME='147'
+  //   bin/Release/net9.0/VoxelEngine.exe
+  // The deep desert of sandworm.json. The worm spawns burrowed, so its floating hearts are hidden while the boss bar
+  // (name over the segmented bar) still shows; damage steps film it full, part empty and nearly gone. Shots land in
+  // visual/boss-bar/ with the HUD on.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [256.5, 16.5, 0.5], "yaw": 0, "pitch": -6 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "screenshot", "name": "none" },
+    { "op": "spawn", "entity": "sandworm", "pos": [276.5, 0.5] },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "full" },
+    { "op": "damage", "amount": 100 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "part" },
+    { "op": "damage", "amount": 100 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "low" }
+  ]
+}

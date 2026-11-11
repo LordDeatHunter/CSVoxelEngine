@@ -1,0 +1,45 @@
+{
+  // The staff cast's gesture and its bolts: run with VOXEL_SCRIPT=visual-examples/animations-cast.json
+  // VOXEL_TIME=147 from OpenGLTest/. Shots land in visual/animations-cast/. The player hovers over
+  // spells.json's flat, dry forest clearing (ground at y 9..10) while the chunks load, then stands on it in
+  // creative (no flight, so the pose is the standing one and nothing can hurt it) with the wooden staff in
+  // hand. The `player` op's `cast` action plays the gesture only (the staff raised, then thrust forward and
+  // eased back over PlayerModel.CastDuration, 0.45 s): raise is ~0.1 s in, thrust ~0.2 s in. The `cast` op
+  // fires a bolt from the eye with no staff or mana (no gesture, burst or sound), so the trail shots pair
+  // the two. Shots are approximate (a frame or two after their wait).
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 12.5, 60.5], "yaw": -90, "pitch": -5 },
+    { "op": "fly" },
+    // Chunks must be loaded before anything can stand on them.
+    { "op": "wait", "seconds": 5 },
+    { "op": "creative" },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "give", "block": "item/wooden_staff", "count": 1 },
+    { "op": "select", "slot": 1 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "ready", "hideHud": true },
+    { "op": "player", "action": "cast" },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "raise", "hideHud": true },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "thrust", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "rest", "hideHud": true },
+    { "op": "view", "mode": "first" },
+    { "op": "player", "action": "cast" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "first_person_thrust", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "player", "action": "cast" },
+    { "op": "cast", "parts": ["element/fire", "shape/projectile"] },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "fire_trail", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "player", "action": "cast" },
+    { "op": "cast", "parts": ["element/frost", "shape/projectile"] },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "frost_trail", "hideHud": true }
+  ]
+}

@@ -192,6 +192,7 @@ public sealed class BiomeTests
         var ore = ContentRegistry.RequireBlock("malachite_ore").Id;
         var coalOre = ContentRegistry.RequireBlock("coal_ore").Id;
         var hematiteOre = ContentRegistry.RequireBlock("hematite_ore").Id;
+        var tinOre = ContentRegistry.RequireBlock("tin_ore").Id;
 
         var sawSand = false;
         var sawGravel = false;
@@ -222,7 +223,7 @@ public sealed class BiomeTests
                     : height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanGravelDepth
                         ? gravel
                         : rock;
-                Assert.True(id == expected || (expected == rock && (id == ore || id == coalOre || id == hematiteOre)),
+                Assert.True(id == expected || (expected == rock && (id == ore || id == coalOre || id == hematiteOre || id == tinOre)),
                     $"ocean floor at ({worldX},{height},{worldZ}) is block {id}, expected {expected}");
                 sawSand |= expected == sand;
                 sawGravel |= expected == gravel;

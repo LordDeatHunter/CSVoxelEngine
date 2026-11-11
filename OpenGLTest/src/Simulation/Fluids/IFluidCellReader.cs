@@ -7,5 +7,5 @@ namespace VoxelEngine.Simulation.Fluids;
 /// </summary>
 internal interface IFluidCellReader
 {
-    bool TryGetCell(int x, int y, int z, out byte id, out byte state);
+    bool TryGetCell(int x, int y, int z, out ushort id, out byte state);
 }

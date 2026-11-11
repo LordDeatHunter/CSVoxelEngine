@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.Rendering.Overlays;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
+using VoxelEngine.UI.Widgets;
 
 namespace VoxelEngine.UI.Hud;
 
@@ -14,14 +15,16 @@ public enum ChatKind
     System,
 }
 
-/// <summary>One line in the chat log.</summary>
-public readonly record struct ChatMessage(ChatKind Kind, string Sender, string Text);
+/// <summary>One line in the chat log: who sent it, its text and, optionally, a clickable span of that text whose click
+/// suggests a command (<see cref="ChatLink"/>; the server's <c>/locate</c> answers with one).</summary>
+public readonly record struct ChatMessage(ChatKind Kind, string Sender, string Text, ChatLink? Link = null);
 
 /// <summary>
 /// GL-free state of the universal chat, shared by singleplayer and multiplayer: a bounded log of
 /// the most recent lines, a single-line input field, a sent-message history walked with the arrow
 /// keys, and the open/closed flag the HUD reads. <see cref="VoxelEngine.App.InputEvents"/> and <see cref="VoxelEngine.App.ChatInput"/> feed it typed characters
-/// and keys; <see cref="ChatRenderer"/> only reads it.
+/// and keys; <see cref="ChatRenderer"/> only reads it. A line may carry a link (<see cref="ChatLink"/>), kept only when
+/// it fits its text; a click on it puts its command into the input through <see cref="Suggest"/>.
 /// <para>
 /// A sent line is returned by <see cref="Submit"/> rather than added: singleplayer echoes it
 /// locally and multiplayer hands it to the server, which broadcasts it back to every client, so
@@ -108,10 +111,11 @@ public sealed class ChatView
         return 1f - MathUtils.SmoothStep(MathUtils.InverseLerp(0f, FadeSeconds, age - HoldSeconds));
     }
 
-    /// <summary>Appends a line, dropping the oldest once the log is full.</summary>
-    public void AddMessage(ChatKind kind, string sender, string text)
+    /// <summary>Appends a line, dropping the oldest once the log is full. A <paramref name="link"/> that does not fit the
+    /// text (<see cref="ChatLink.FitsIn"/>) is dropped, so every stored span is safe to draw and hit-test.</summary>
+    public void AddMessage(ChatKind kind, string sender, string text, ChatLink? link = null)
     {
-        _messages.Add(new ChatMessage(kind, sender, text));
+        _messages.Add(new ChatMessage(kind, sender, text, link is { } l && l.FitsIn(text) ? l : null));
         _arrived.Add(_clock);
         if (_messages.Count > MaxMessages)
         {
@@ -120,7 +124,16 @@ public sealed class ChatView
         }
     }
 
-    public void AddSystem(string text) => AddMessage(ChatKind.System, "", text);
+    public void AddSystem(string text, ChatLink? link = null) => AddMessage(ChatKind.System, "", text, link);
+
+    /// <summary>Puts <paramref name="command"/> into the input, opening the chat when it is closed, without sending it
+    /// (Minecraft's suggest_command): Enter then sends it like a typed line. The sent history is untouched.</summary>
+    public void Suggest(string command)
+    {
+        if (!IsOpen) Open();
+        Input.Set(command);
+        _historyCursor = _history.Count;
+    }
 
     /// <summary>Types one character into the input; refused while closed or by the field's rules.</summary>
     public bool Type(char c) => IsOpen && Input.TryAppend(c);
@@ -187,6 +200,9 @@ public static class ChatLayout
     public static Vector2 InputCenter(Vector2 screen) => new(Left + InputWidth * 0.5f, InputCenterY(screen));
 
     public static Vector2 InputSize => new(InputWidth, InputHeight);
+
+    /// <summary>The input field's box, for the pointer's caret placement.</summary>
+    public static UiRect InputRect(Vector2 screen) => new(InputCenter(screen), InputSize);
 
     /// <summary>Canvas Y of the top text line for a message drawn <paramref name="fromBottom"/> lines up.</summary>
     public static float LineTop(Vector2 screen, bool inputOpen, int fromBottom) =>

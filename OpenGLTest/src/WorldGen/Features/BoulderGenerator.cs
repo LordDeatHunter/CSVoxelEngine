@@ -28,8 +28,8 @@ public static class BoulderGenerator
     internal const int HorizontalReach = 1;
 
     /// <summary>Blocks this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte StoneBlock;
-    public static readonly byte CobblestoneBlock;
+    public static readonly ushort StoneBlock;
+    public static readonly ushort CobblestoneBlock;
 
     static BoulderGenerator()
     {
@@ -43,7 +43,7 @@ public static class BoulderGenerator
     /// cell and the seed.
     /// </summary>
     public static bool TryGetBoulder(int cellX, int cellZ, out int centerX, out int centerZ, out int count,
-        out byte blockId)
+        out ushort blockId)
     {
         centerX = centerZ = 0;
         count = 0;
@@ -66,7 +66,7 @@ public static class BoulderGenerator
     /// column's ground plus one, into air only, clipped at the chunk's border. Runs on a generation
     /// worker thread after the trees, so a boulder never displaces one.
     /// </summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0)
     {
         var shift = WorldFeatureConfig.BoulderCellShift;
         var minCellX = (worldX0 - HorizontalReach) >> shift;

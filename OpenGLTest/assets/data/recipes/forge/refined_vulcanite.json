@@ -1,0 +1,8 @@
+{
+  // Vulcanite shards (the vulcanite_ore drop) refined on the anvil; the refined metal is forged into the heads.
+  // Forged with a smithing hammer from shards stacked on an anvil (see AnvilManager).
+  "metal": "item/vulcanite_shard",
+  "metalCount": 3,
+  "result": "item/refined_vulcanite",
+  "count": 1
+}

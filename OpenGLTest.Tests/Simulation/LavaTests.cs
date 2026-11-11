@@ -177,7 +177,7 @@ public sealed class LavaTests
         var worldX0 = wx & ~(Chunk.Size - 1);
         var worldZ0 = wz & ~(Chunk.Size - 1);
         var worldY0 = WorldGenerationConfig.LavaMaxY & ~(Chunk.Size - 1);
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         var heights = new int[Chunk.Size * Chunk.Size];
         for (var i = 0; i < heights.Length; i++) heights[i] = 50;
         var column = new ColumnData(heights, new byte[heights.Length], new float[heights.Length], new float[heights.Length]);

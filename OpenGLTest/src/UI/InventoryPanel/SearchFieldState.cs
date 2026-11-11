@@ -10,7 +10,7 @@ namespace VoxelEngine.UI.InventoryPanel;
 /// </summary>
 public sealed class SearchFieldState
 {
-    /// <summary>Most characters the query holds; well under <see cref="BitmapFont.MaxLayoutChars"/>.</summary>
+    /// <summary>Most characters the query holds.</summary>
     public const int MaxLength = 32;
 
     public TextFieldState Text { get; } = new(MaxLength);

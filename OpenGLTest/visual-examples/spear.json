@@ -1,0 +1,44 @@
+{
+  // The spear in flight: run with VOXEL_SCRIPT=visual-examples/spear.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/spear/. A creative flier on the open meadow of the animations
+  // scenarios gives itself spears and throws them along +Z (the `throw` player action launches the
+  // selected throwable at full charge, 40 blocks per second, and plays the arm's release). A thrown
+  // spear is a thin sprite and tiny from behind, so each shot throws, waits, and then jumps the
+  // camera beside where the spear will be (x -40, 3.5 blocks off its line, facing it) before
+  // shooting: the spear flies point first along its velocity, level at first and tipping down along
+  // its arc. The first shots are the ready pose and the charge from the shoulder camera; the flight shots are first person. Positions
+  // assume 40 b/s and are approximate.
+  "steps": [
+    { "op": "creative" },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-43.5, 16.5, 60.5], "yaw": 90, "pitch": 0 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "give", "block": "item/spear", "count": 3 },
+    { "op": "select", "slot": 1 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "ready", "hideHud": true },
+    { "op": "player", "action": "charge" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "charge", "hideHud": true },
+    { "op": "view", "mode": "first" },
+    { "op": "teleport", "pos": [-43.5, 16.5, 60.5], "yaw": 90, "pitch": 0 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "player", "action": "throw" },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "teleport", "pos": [-40.0, 16.5, 67.1], "yaw": 180, "pitch": 0 },
+    { "op": "screenshot", "name": "flight_early", "hideHud": true },
+    { "op": "teleport", "pos": [-43.5, 16.5, 60.5], "yaw": 90, "pitch": 0 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "player", "action": "throw" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "teleport", "pos": [-40.0, 16.5, 77.1], "yaw": 180, "pitch": 0 },
+    { "op": "screenshot", "name": "flight_mid", "hideHud": true },
+    { "op": "teleport", "pos": [-43.5, 16.5, 60.5], "yaw": 90, "pitch": 0 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "player", "action": "throw" },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "teleport", "pos": [-40.0, 16.5, 93.1], "yaw": 180, "pitch": 0 },
+    { "op": "screenshot", "name": "flight_late", "hideHud": true }
+  ]
+}

@@ -1,6 +1,9 @@
+using System.Linq;
 using System.Numerics;
+using VoxelEngine.Items;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
 namespace VoxelEngine.Tests.Player;
@@ -18,6 +21,74 @@ public sealed class BreathTests
     {
         for (var t = 0f; t < seconds; t += Dt)
             breath.Step(Dt, underWater, immune);
+    }
+
+    private static Inventory WearingGillCharm(out int instance)
+    {
+        var gill = ItemRegistry.All.OfType<GearItem>().First(g => g.SourceName == "gill_charm");
+        var inventory = Inventory.Empty();
+        Assert.True(inventory.Add(gill.Id));
+        instance = inventory.GearEntries().Last(e => e.ItemId == gill.Id).InstanceId;
+        Assert.True(inventory.Equipment.TryEquipAuto(instance));
+        return inventory;
+    }
+
+    private static PlayerHealth GillWearer()
+    {
+        var health = new PlayerHealth();
+        health.ApplyGear(WearingGillCharm(out _).Equipment, simulatesMana: true);
+        return health;
+    }
+
+    [Fact]
+    public void AnExtraAirLungLastsLongerUnderWaterThanABareOne()
+    {
+        var bare = new PlayerHealth();
+        bare.ApplyGear(Inventory.Empty().Equipment, simulatesMana: true);
+        var gill = GillWearer();
+        Assert.True(gill.Breath.MaxAir > bare.Breath.MaxAir);
+
+        for (var t = 0f; t < bare.Breath.MaxAir + 2f; t += Dt)
+        {
+            bare.UpdateBreath(Dt, eyeUnderWater: true, immune: false);
+            gill.UpdateBreath(Dt, eyeUnderWater: true, immune: false);
+        }
+
+        Assert.Equal(0f, bare.Breath.Air);
+        Assert.True(bare.Health < bare.Max);
+        Assert.True(gill.Breath.Air > 0f);
+        Assert.Equal(gill.Max, gill.Health);
+    }
+
+    [Fact]
+    public void AWiderLungStillEncodesToTheWireStepsAndRoundTrips()
+    {
+        var gill = GillWearer().Breath;
+        Assert.Equal(Breath.NetSteps, gill.NetStep);
+
+        Run(gill, gill.MaxAir * 0.37f, underWater: true);
+        Assert.InRange(gill.NetStep, 0, Breath.NetSteps);
+
+        var mirror = GillWearer().Breath;
+        mirror.SetNetStep(gill.NetStep);
+        Assert.InRange(mirror.Fraction - gill.Fraction, -1f / Breath.NetSteps, 1f / Breath.NetSteps);
+    }
+
+    [Fact]
+    public void TakingOffTheGillCharmClampsTheAirToTheBareLung()
+    {
+        var bareMax = new Breath().MaxAir;
+        var inventory = WearingGillCharm(out var instance);
+        var health = new PlayerHealth();
+        health.ApplyGear(inventory.Equipment, simulatesMana: true);
+        for (var t = 0f; t < 1f; t += Dt)
+            health.UpdateBreath(Dt, eyeUnderWater: true, immune: false);
+        Assert.True(health.Breath.Air > bareMax);
+
+        Assert.True(inventory.Equipment.Unequip(inventory.Equipment.SlotOf(instance)));
+        health.ApplyGear(inventory.Equipment, simulatesMana: true);
+        Assert.True(health.Breath.Air <= bareMax);
+        Assert.InRange(health.Breath.Fraction, 0f, 1f);
     }
 
     [Fact]

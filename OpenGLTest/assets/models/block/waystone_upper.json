@@ -1,0 +1,52 @@
+{
+  // A waystone's upper half, over block/waystone: the rest of the rune-carved shaft (#runes: the top of the panel,
+  // tile rows 12..31), a cap and a stepped point. Like the lower half, every box is narrower than the cell and none
+  // culls, and the realm upper-half blocks' hitboxes are these boxes.
+  "textures": { "particle": "#stone" },
+  "elements": [
+    {
+      "from": [5, 0, 5],
+      "to": [11, 10, 11],
+      "faces": {
+        "north": { "texture": "#runes" },
+        "south": { "texture": "#runes" },
+        "west": { "texture": "#runes" },
+        "east": { "texture": "#runes" }
+      }
+    },
+    {
+      "from": [4, 10, 4],
+      "to": [12, 12, 12],
+      "faces": {
+        "down": { "texture": "#stone" },
+        "up": { "texture": "#stone" },
+        "north": { "texture": "#stone" },
+        "south": { "texture": "#stone" },
+        "west": { "texture": "#stone" },
+        "east": { "texture": "#stone" }
+      }
+    },
+    {
+      "from": [6, 12, 6],
+      "to": [10, 14, 10],
+      "faces": {
+        "up": { "texture": "#stone" },
+        "north": { "texture": "#stone" },
+        "south": { "texture": "#stone" },
+        "west": { "texture": "#stone" },
+        "east": { "texture": "#stone" }
+      }
+    },
+    {
+      "from": [7, 14, 7],
+      "to": [9, 16, 9],
+      "faces": {
+        "up": { "texture": "#stone" },
+        "north": { "texture": "#stone" },
+        "south": { "texture": "#stone" },
+        "west": { "texture": "#stone" },
+        "east": { "texture": "#stone" }
+      }
+    }
+  ]
+}

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
 
 namespace VoxelEngine.Networking.Client;
 
@@ -40,10 +42,14 @@ public sealed class ClientChunkStreamer : IColumnSource
     // column replaces the whole value.
     private readonly ConcurrentDictionary<(int X, int Z), ColumnTerrain> _columns = new();
     private double _time;
+    private readonly WireIds? _wire;
 
-    public ClientChunkStreamer(ChunkManager chunks, Action<int, int, int> requestChunk, Action<int, int> requestColumn)
+    /// <summary><paramref name="wire"/> is the connection's id tables (null keeps the payload's ids as they came).</summary>
+    public ClientChunkStreamer(ChunkManager chunks, Action<int, int, int> requestChunk, Action<int, int> requestColumn,
+        WireIds? wire = null)
     {
         _chunks = chunks;
+        _wire = wire;
         _requestChunk = requestChunk;
         _requestColumn = requestColumn;
         // Everything the client reads from terrain beyond the blocks comes from the server's
@@ -115,11 +121,17 @@ public sealed class ClientChunkStreamer : IColumnSource
         _requestColumn(cx, cz);
     }
 
-    /// <summary>Restores a chunk from a <c>ChunkData</c> payload and schedules it for meshing.</summary>
+    /// <summary>Restores a chunk from a <c>ChunkData</c> payload and schedules it for meshing. A payload naming an id
+    /// outside this build's content throws <see cref="InvalidDataException"/> before anything is stored, which the
+    /// message loop answers by leaving the server.</summary>
     public void ApplyChunk(int cx, int cy, int cz, byte[] payload)
     {
+        var snapshot = ChunkNetCodec.Decode(payload, _wire);
+        // A decoded snapshot is compact, so its palette holds exactly the ids its cells use
+        if (!BlockTables.AllInRange(snapshot.Storage.IdSpan))
+            throw new InvalidDataException($"chunk ({cx}, {cy}, {cz}) names an id outside this build's content");
         _chunkAsked.Remove((cx, cy, cz));
-        _chunks.ApplyStreamedChunk(new Vector3(cx, cy, cz), ChunkNetCodec.Decode(payload));
+        _chunks.ApplyStreamedChunk(new Vector3(cx, cy, cz), snapshot);
     }
 
     /// <summary>

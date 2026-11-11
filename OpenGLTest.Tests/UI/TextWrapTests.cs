@@ -50,7 +50,6 @@ public sealed class TextWrapTests
             foreach (var line in Wrap(text, width, measure))
             {
                 Assert.True(measure(line) <= width || line.Length == 1, $"'{line}' overflows {width}");
-                Assert.True(line.Length <= TextWrap.MaxLineChars);
             }
     }
 
@@ -67,7 +66,7 @@ public sealed class TextWrapTests
                 Assert.False(line.EndsWith(' '));
             }
 
-            if (Words(text).All(w => w.Length <= TextWrap.MaxLineChars && measure(w) <= width))
+            if (Words(text).All(w => measure(w) <= width))
                 Assert.Equal(Words(text), lines.SelectMany(Words));
         }
     }
@@ -112,12 +111,11 @@ public sealed class TextWrapTests
     }
 
     [Fact]
-    public void LongRunsRespectTheGlyphCap()
+    public void ARunLongerThanOneTextBatchWrapsAndKeepsEveryCharacter()
     {
-        var text = new string('a', 200);
-        var lines = Wrap(text, float.MaxValue, Mono);
+        var text = new string('a', 5000);
+        var lines = Wrap(text, 1000f, Mono);
         Assert.True(lines.Count > 1);
-        Assert.All(lines, l => Assert.True(l.Length <= TextWrap.MaxLineChars));
         Assert.Equal(text, string.Concat(lines));
     }
 
@@ -130,6 +128,17 @@ public sealed class TextWrapTests
             int count = Wrap(Status, width, Proportional).Count;
             Assert.True(count <= previous, $"width {width} gave {count} lines after {previous}");
             previous = count;
+        }
+    }
+
+    [Fact]
+    public void RangesSliceToTheLinesWrapReturns()
+    {
+        foreach (var (text, width, measure) in Sweep())
+        {
+            var ranges = new List<(int Start, int Length)>();
+            TextWrap.WrapRanges(text, width, measure, ranges);
+            Assert.Equal(Wrap(text, width, measure), ranges.Select(r => text.Substring(r.Start, r.Length)));
         }
     }
 

@@ -66,7 +66,7 @@ public static class ColumnCache
     /// (ravines cut in) decides how deep to fill; <paramref name="bed"/> (ravines not cut) decides
     /// whether the column is water.
     /// </summary>
-    internal static void GenerateColumn(byte[] blocks, int chunkX, int chunkZ, int x, int z,
+    internal static void GenerateColumn(ushort[] blocks, int chunkX, int chunkZ, int x, int z,
         int terrainHeight, int bed, int dirtDepth, int lowerBoundY, Biome biome)
     {
         var worldX = chunkX * Size + x;

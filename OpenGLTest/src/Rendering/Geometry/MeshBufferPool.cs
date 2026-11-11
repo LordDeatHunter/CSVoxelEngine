@@ -14,8 +14,8 @@ namespace VoxelEngine.Rendering.Geometry;
 /// thread once <see cref="Chunk.UpdateMesh"/> has copied them to the GPU, or when a finished
 /// build is dropped as stale — never on the worker, because a completed
 /// <see cref="ChunkMeshData"/> can wait in the upload queue across frames.
-/// The translucent lists are pooled separately at a smaller rent: most chunks hold no fluid
-/// or glass, so empty ones never touch the pool and ocean chunks rent once at a capacity
+/// The translucent lists are pooled separately at a smaller rent: most chunks hold no visible
+/// fluid or glass, so their builders never rent from that pool and ocean chunks rent at a capacity
 /// that already fits a full 16x16 water top.
 /// <para>
 /// The capacities are instance state because <see cref="LodManager"/> owns a second,
@@ -29,9 +29,9 @@ namespace VoxelEngine.Rendering.Geometry;
 /// from the LOD in-flight bound (see <c>LodManager.MeshBuffers</c>).
 /// </para>
 /// <para>
-/// <c>retainEmptyTranslucent</c> exists for that LOD pool. A chunk mesher only fills the
-/// translucent lists when the chunk holds fluid or glass, so dropping the empty ones costs
-/// nothing; a region build rents its water lists on every build and an inland region fills
+/// <c>retainEmptyTranslucent</c> exists for that LOD pool. A chunk mesher rents translucent
+/// lists only when it emits fluid or glass, so dropping empty placeholders costs nothing;
+/// a region build rents its water lists on every build and an inland region fills
 /// none, so dropping those would drain the pool instead of recycling it.
 /// </para>
 /// </summary>

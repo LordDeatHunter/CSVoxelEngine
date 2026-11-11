@@ -54,7 +54,7 @@ internal static class ChunkLighting
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static int SmoothCornerLight(int face, int j, byte[] sunLight, byte[] blockLight, int lightBase,
-        byte side1Id, byte side2Id, byte cornerId)
+        ushort side1Id, ushort side2Id, ushort cornerId)
     {
         var front = lightBase + LightFaceDelta[face];
         var d = LightAODeltas[face];
@@ -78,7 +78,7 @@ internal static class ChunkLighting
     /// at padded index <paramref name="pIdx"/> (light index <paramref name="lightBase"/>), for an
     /// emitter to interpolate over the geometry it draws inside the cell (<see cref="FaceLight"/>).
     /// </summary>
-    internal static FaceLight SmoothFaceLight(int face, byte[] padded, int pIdx, byte[] sunLight,
+    internal static FaceLight SmoothFaceLight(int face, ushort[] padded, int pIdx, byte[] sunLight,
         byte[] blockLight, int lightBase) =>
         FaceLight.FromCorners(face,
             SmoothCornerCode(face, 0, padded, pIdx, sunLight, blockLight, lightBase),
@@ -86,7 +86,7 @@ internal static class ChunkLighting
             SmoothCornerCode(face, 2, padded, pIdx, sunLight, blockLight, lightBase),
             SmoothCornerCode(face, 3, padded, pIdx, sunLight, blockLight, lightBase));
 
-    private static int SmoothCornerCode(int face, int j, byte[] padded, int pIdx, byte[] sunLight,
+    private static int SmoothCornerCode(int face, int j, ushort[] padded, int pIdx, byte[] sunLight,
         byte[] blockLight, int lightBase)
     {
         var d = AODeltas[face];
@@ -100,7 +100,7 @@ internal static class ChunkLighting
     /// <paramref name="fallbackCell"/> - a face backed against an occluder must not average the
     /// occluder's zero light, or it renders black.
     /// </summary>
-    internal static FaceLight EmitterFaceLight(int face, byte[] padded, int pIdx, byte[] sunLight,
+    internal static FaceLight EmitterFaceLight(int face, ushort[] padded, int pIdx, byte[] sunLight,
         byte[] blockLight, int lightBase, int fallbackCell) =>
         BlockType.Occludes(padded[pIdx + FaceNeighborDelta[face]])
             ? FaceLight.Flat(sunLight[fallbackCell], (byte)(blockLight[fallbackCell] & BlockLevelMask),
@@ -126,14 +126,14 @@ internal static class ChunkLighting
 
     /// <summary>
     /// Copies the LightSize^3 block volume centered on this chunk straight from the 3x3x3
-    /// neighboring chunks' block arrays, so the fill loop does zero dictionary lookups.
-    /// <paramref name="neighbors"/> comes pre-resolved from <see cref="ChunkMeshBuilder.TryResolveNeighbors"/>,
+    /// neighboring chunks' block storages, so the fill loop does zero dictionary lookups.
+    /// <paramref name="neighbors"/> (each chunk's storage, read once) comes pre-resolved from <see cref="ChunkMeshBuilder.TryResolveNeighbors"/>,
     /// which guarantees the 6 face neighbors are present; the corner and edge slots may still
     /// be null and read as air, which only costs a little light accuracy in the diagonal
     /// corners of the wide light volume. Same thread-safety convention as FillPaddedSnapshot
     /// (block edits race the read; the edit's own remesh wins after).
     /// </summary>
-    internal static void FillLightSnapshot(byte[] light, Chunk?[] neighbors)
+    internal static void FillLightSnapshot(ushort[] ids, ChunkBlocks?[] neighbors)
     {
         // Per-axis map from volume coordinate to (chunk 0..2, local block 0..15). The volume
         // spans LightBorder cells into each neighbor: [1, LightBorder) of the previous
@@ -167,12 +167,12 @@ internal static class ChunkLighting
             for (var r = 0; r < runCount; r++)
             {
                 var zStart = runStart[r];
-                var target = light.AsSpan(rowBase + zStart, runLength[r]);
+                var target = ids.AsSpan(rowBase + zStart, runLength[r]);
                 var neighbor = neighbors[neighborRow + mapChunk[zStart]];
                 if (neighbor == null) { target.Clear(); continue; }
                 // The low SizeShift bits of blockRow are 0, so blockRow | local == blockRow + local
-                // and the run's local z indices are contiguous in the block array.
-                neighbor.Blocks.AsSpan(blockRow | mapLocal[zStart], runLength[r]).CopyTo(target);
+                // and the run's local z indices are contiguous in Idx order.
+                neighbor.CopyRun(blockRow | mapLocal[zStart], runLength[r], target);
             }
         }
     }
@@ -205,8 +205,19 @@ internal static class ChunkLighting
     /// levels. Returns whether any lamp seed carries a non-default slot; when none does, every
     /// slot is 0 and the byte is exactly the old level.
     /// </para>
+    /// <para>
+    /// With <paramref name="skyCover"/> (some chunk of the 27-chunk neighborhood may hold a
+    /// <c>coversSky</c> block, <see cref="AnySkyCover"/>), a sun seed must also lie above the highest
+    /// covering cell of its volume column (<see cref="RaiseSeedsUnderSkyCover"/>). That is the battle
+    /// tower's dark interior: the tower stands above the heightmap, which must not be raised (the far
+    /// LOD, water and spawns read it), and its slabs, 7 apart, always fall inside a chunk's volume
+    /// (LightBorder 15 above it). Every seed still enters at 15, so the queued-seed exactness above
+    /// holds unchanged. The rule reads only the volume's own blocks, so a client's streamed copy lights
+    /// exactly like the server, and a collapse's light-radius remesh relights the ruin. Without the
+    /// flag nothing extra runs.
+    /// </para>
     /// </summary>
-    internal static bool ComputeLight(Chunk chunk, byte[] light, byte[] sun, byte[] block, int[] queue)
+    internal static bool ComputeLight(Chunk chunk, ushort[] ids, byte[] sun, byte[] block, int[] queue, bool skyCover)
     {
         var worldY0 = chunk.LowerBoundY - LightBorder;
 
@@ -241,10 +252,12 @@ internal static class ChunkLighting
                 seedStart[colRow + lz] = Math.Clamp(height - worldY0, 0, LightSize);
             }
         }
+        if (skyCover) RaiseSeedsUnderSkyCover(ids, seedStart);
 
         // Every passable seed is set to 15, but only the seeds touching a passable non-seed cell
         // are queued: the cell above a seed is a seed or opaque, the one below is a non-seed only
         // at the column's first seed row, and a lateral one only under its own column's seedStart.
+        var passes = BlockType.PassesLightById;
         for (var lx = 0; lx < LightSize; lx++)
         for (var lz = 0; lz < LightSize; lz++)
         {
@@ -262,24 +275,24 @@ internal static class ChunkLighting
             for (var ly = start; ly < LightSize; ly++)
             {
                 var i = columnBase + ly * LightSize;
-                if (!PassesLight(light[i])) continue;
+                if (!passes[ids[i]]) continue;
                 sun[i] = 15;
 
-                var touchesNonSeed = ly == start && ly > 0 && PassesLight(light[i - LightSize]);
+                var touchesNonSeed = ly == start && ly > 0 && passes[ids[i - LightSize]];
                 if (!touchesNonSeed && ly < sideTop)
                 {
                     // An absent neighbor column has start 0, which never exceeds ly
-                    touchesNonSeed = (westStart > ly && PassesLight(light[i - LightSq]))
-                        || (eastStart > ly && PassesLight(light[i + LightSq]))
-                        || (northStart > ly && PassesLight(light[i - 1]))
-                        || (southStart > ly && PassesLight(light[i + 1]));
+                    touchesNonSeed = (westStart > ly && passes[ids[i - LightSq]])
+                        || (eastStart > ly && passes[ids[i + LightSq]])
+                        || (northStart > ly && passes[ids[i - 1]])
+                        || (southStart > ly && passes[ids[i + 1]]);
                 }
 
                 if (touchesNonSeed) queue[tail++] = i;
             }
         }
 
-        SpreadLight(light, sun, queue, ref head, ref tail);
+        SpreadLight(ids, sun, queue, ref head, ref tail);
 
         // Lamp seeds: emissive cells glow at full strength, then spread like sunlight, each
         // carrying its color slot in bits 4-6.
@@ -290,7 +303,7 @@ internal static class ChunkLighting
         var slotById = BlockType.LightSlot;
         for (var i = 0; i < LightCount; i++)
         {
-            var id = light[i];
+            var id = ids[i];
             var emission = emissionById[id];
             if (emission == 0) continue;
             var slot = slotById[id];
@@ -302,10 +315,45 @@ internal static class ChunkLighting
         // All-default light keeps the plain pass: the values (slot bits all 0) and the cost are
         // exactly what they were before colored light existed
         if (anyTinted)
-            SpreadBlockLight(light, block, queue, ref head, ref tail);
+            SpreadBlockLight(ids, block, queue, ref head, ref tail);
         else
-            SpreadLight(light, block, queue, ref head, ref tail);
+            SpreadLight(ids, block, queue, ref head, ref tail);
         return anyTinted;
+    }
+
+    /// <summary>Whether any resolved chunk of a mesh build's 27-chunk neighborhood may hold a
+    /// <c>coversSky</c> block (<see cref="Chunk.MayHaveSkyCover"/>), which turns the sky-cover rule of
+    /// <see cref="ComputeLight"/> on.</summary>
+    internal static bool AnySkyCover(Chunk?[] neighbors)
+    {
+        foreach (var neighbor in neighbors)
+            if (neighbor is { MayHaveSkyCover: true })
+                return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Raises each volume column's first sun seed row to one above the highest covering cell at or
+    /// above it (<see cref="BlockType.CoversSkyById"/>), scanning top-down, so the cells under a tower
+    /// slab get no sky. A covering block never passes light, so the cell under a raised start stays
+    /// opaque, which is what the queued-seed rule of <see cref="ComputeLight"/> assumes.
+    /// </summary>
+    private static void RaiseSeedsUnderSkyCover(ushort[] ids, Span<int> seedStart)
+    {
+        var covers = BlockType.CoversSkyById;
+        for (var lx = 0; lx < LightSize; lx++)
+        for (var lz = 0; lz < LightSize; lz++)
+        {
+            var col = lx * LightSize + lz;
+            var start = seedStart[col];
+            var columnBase = (lx * LightSize) * LightSize + lz;
+            for (var ly = LightSize - 1; ly >= start; ly--)
+            {
+                if (!covers[ids[columnBase + ly * LightSize]]) continue;
+                seedStart[col] = ly + 1;
+                break;
+            }
+        }
     }
 
     /// <summary>
@@ -343,7 +391,7 @@ internal static class ChunkLighting
     /// slots. Every entry clears its mark when it is dequeued, so all marks are gone on return.
     /// </para>
     /// </summary>
-    internal static void SpreadBlockLight(byte[] light, byte[] levels, int[] queue, ref int head, ref int tail)
+    internal static void SpreadBlockLight(ushort[] ids, byte[] levels, int[] queue, ref int head, ref int tail)
     {
         // The seeds are queued unmarked at [head, tail); mark them
         for (var i = head; i < tail; i++) levels[queue[i]] |= QueuedMark;
@@ -367,12 +415,12 @@ internal static class ChunkLighting
             var ly = rem / LightSize;
             var lz = rem - ly * LightSize;
 
-            if (lx > 0) RaiseTinted(light, levels, queue, ref t, ref count, c - LightSq, next, slotBits);
-            if (lx < LightSize - 1) RaiseTinted(light, levels, queue, ref t, ref count, c + LightSq, next, slotBits);
-            if (ly > 0) RaiseTinted(light, levels, queue, ref t, ref count, c - LightSize, next, slotBits);
-            if (ly < LightSize - 1) RaiseTinted(light, levels, queue, ref t, ref count, c + LightSize, next, slotBits);
-            if (lz > 0) RaiseTinted(light, levels, queue, ref t, ref count, c - 1, next, slotBits);
-            if (lz < LightSize - 1) RaiseTinted(light, levels, queue, ref t, ref count, c + 1, next, slotBits);
+            if (lx > 0) RaiseTinted(ids, levels, queue, ref t, ref count, c - LightSq, next, slotBits);
+            if (lx < LightSize - 1) RaiseTinted(ids, levels, queue, ref t, ref count, c + LightSq, next, slotBits);
+            if (ly > 0) RaiseTinted(ids, levels, queue, ref t, ref count, c - LightSize, next, slotBits);
+            if (ly < LightSize - 1) RaiseTinted(ids, levels, queue, ref t, ref count, c + LightSize, next, slotBits);
+            if (lz > 0) RaiseTinted(ids, levels, queue, ref t, ref count, c - 1, next, slotBits);
+            if (lz < LightSize - 1) RaiseTinted(ids, levels, queue, ref t, ref count, c + 1, next, slotBits);
         }
         head = tail = 0;
     }
@@ -386,10 +434,10 @@ internal static class ChunkLighting
     /// <summary>One neighbor step of <see cref="SpreadBlockLight"/>: a dimmer neighbor, or an
     /// equally lit one holding a higher slot, takes <c>next | slotBits</c>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void RaiseTinted(byte[] light, byte[] levels, int[] queue, ref int tail, ref int count,
+    private static void RaiseTinted(ushort[] ids, byte[] levels, int[] queue, ref int tail, ref int count,
         int n, int next, int slotBits)
     {
-        if (!PassesLight(light[n])) return;
+        if (!PassesLight(ids[n])) return;
         var ln = levels[n];
         var nl = ln & BlockLevelMask;
         // next > 0 always holds here (the caller's level is at least 2)
@@ -415,14 +463,15 @@ internal static class ChunkLighting
     /// (see <see cref="BlockType.Occludes"/>). Which blocks pass is data now:
     /// <c>light.passes</c> in each block's JSON, defaulting to "not a full cube".</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static bool PassesLight(byte blockId) => BlockType.PassesLightById[blockId];
+    internal static bool PassesLight(ushort blockId) => BlockType.PassesLightById[blockId];
 
     /// <summary>One BFS pass: spreads <paramref name="levels"/> through light-passing cells
     /// (see <see cref="PassesLight"/>) of the light snapshot, losing one level per block.
     /// Shared by the sun and lamp passes. Every cell is still enqueued at most once, since
     /// every traversal costs exactly one level.</summary>
-    internal static void SpreadLight(byte[] light, byte[] levels, int[] queue, ref int head, ref int tail)
+    internal static void SpreadLight(ushort[] ids, byte[] levels, int[] queue, ref int head, ref int tail)
     {
+        var passes = BlockType.PassesLightById;
         while (head < tail)
         {
             var c = queue[head++];
@@ -435,17 +484,17 @@ internal static class ChunkLighting
             var ly = rem / LightSize;
             var lz = rem - ly * LightSize;
 
-            if (lx > 0 && PassesLight(light[c - LightSq]) && levels[c - LightSq] < next)
+            if (lx > 0 && passes[ids[c - LightSq]] && levels[c - LightSq] < next)
                 { levels[c - LightSq] = next; queue[tail++] = c - LightSq; }
-            if (lx < LightSize - 1 && PassesLight(light[c + LightSq]) && levels[c + LightSq] < next)
+            if (lx < LightSize - 1 && passes[ids[c + LightSq]] && levels[c + LightSq] < next)
                 { levels[c + LightSq] = next; queue[tail++] = c + LightSq; }
-            if (ly > 0 && PassesLight(light[c - LightSize]) && levels[c - LightSize] < next)
+            if (ly > 0 && passes[ids[c - LightSize]] && levels[c - LightSize] < next)
                 { levels[c - LightSize] = next; queue[tail++] = c - LightSize; }
-            if (ly < LightSize - 1 && PassesLight(light[c + LightSize]) && levels[c + LightSize] < next)
+            if (ly < LightSize - 1 && passes[ids[c + LightSize]] && levels[c + LightSize] < next)
                 { levels[c + LightSize] = next; queue[tail++] = c + LightSize; }
-            if (lz > 0 && PassesLight(light[c - 1]) && levels[c - 1] < next)
+            if (lz > 0 && passes[ids[c - 1]] && levels[c - 1] < next)
                 { levels[c - 1] = next; queue[tail++] = c - 1; }
-            if (lz < LightSize - 1 && PassesLight(light[c + 1]) && levels[c + 1] < next)
+            if (lz < LightSize - 1 && passes[ids[c + 1]] && levels[c + 1] < next)
                 { levels[c + 1] = next; queue[tail++] = c + 1; }
         }
     }

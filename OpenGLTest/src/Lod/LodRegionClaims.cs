@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Threading;
 using VoxelEngine.Chunks;
 
@@ -160,8 +162,13 @@ internal sealed class LodRegionClaims(LodManager owner)
     }
 
     /// <summary>
-    /// The closest region, finest level first, that is neither loaded nor already claimed; claims
-    /// it in <c>_queued</c> and returns it, or null when every level is full.
+    /// The closest region that is neither loaded nor already claimed; claims it in <c>_queued</c> and
+    /// returns it, or null when every level is full. The levels are merged by each region's nearest-point
+    /// distance to the camera in blocks, the finer level first at equal distance: in the steady state
+    /// that is still finest-first (each level's missing regions sit at its own ring's edge), and after a
+    /// long teleport the regions under the camera on every level come first, so a coarse shell left from
+    /// the old ring is buried by its finer children (<see cref="LodCoverPass"/>) within a few builds
+    /// instead of after the whole finest ring.
     /// Internal (rather than private) because it is the only path that fills <c>_queued</c>, and
     /// <see cref="MarkEditedColumn"/> refuses to mark a region that is not in it — so a test of the
     /// dirty-set drain can only produce a dirty region by going through this scan first.
@@ -176,34 +183,67 @@ internal sealed class LodRegionClaims(LodManager owner)
     /// </summary>
     internal (int Level, int X, int Z)? FindClosestNeededRegion()
     {
-        for (var level = 0; level < LodRegion.Levels.Length; level++)
+        var levels = LodRegion.Levels.Length;
+        var camera = _owner.CameraXZ;
+        Span<(int X, int Z)> camRegions = stackalloc (int, int)[levels];
+        Span<int> cursors = stackalloc int[levels];
+        for (var level = 0; level < levels; level++)
+            camRegions[level] = _owner.CameraRegion(level);
+
+        while (true)
         {
-            var (camX, camZ) = _owner.CameraRegion(level);
-
-            foreach (var (dx, dz) in SortedOffsets[level])
+            // Each level's next candidate in its own closest-first order; the nearest of them wins
+            var best = -1;
+            var bestDistSq = float.MaxValue;
+            for (var level = 0; level < levels; level++)
             {
-                var key = (level, camX + dx, camZ + dz);
-                if (_owner.Regions.ContainsKey(key)) continue;
-                if (!_queued.TryAdd(key, 0)) continue;
+                var offsets = SortedOffsets[level];
+                while (cursors[level] < offsets.Length && IsTaken(KeyAt(level, camRegions[level], offsets[cursors[level]])))
+                    cursors[level]++;
+                if (cursors[level] == offsets.Length) continue;
 
-                // The _queued claim succeeded but another worker already holds the key in
-                // _building, so this one must UN-CLAIM _queued before moving on. The rollback is
-                // not optional: ApplyCompletedMeshes' out-of-range branch removes a key from
-                // _queued while its builder may still hold it in _building, so winning _queued
-                // here while losing _building is reachable -- and a _queued entry with nothing
-                // building is a region that never builds and can never re-enter this scan (the
-                // TryAdd above would keep failing), i.e. a permanent hole in the horizon.
-                if (!_building.TryAdd(key, 0))
-                {
-                    _queued.TryRemove(key, out _);
-                    continue;
-                }
-
-                return key;
+                // Strictly nearer only, so a tie keeps the finer level (the loop runs finest first)
+                var distSq = NearestDistanceSq(KeyAt(level, camRegions[level], offsets[cursors[level]]), camera);
+                if (distSq >= bestDistSq) continue;
+                best = level;
+                bestDistSq = distSq;
             }
-        }
+            if (best < 0) return null;
 
-        return null;
+            var key = KeyAt(best, camRegions[best], SortedOffsets[best][cursors[best]++]);
+            if (!_queued.TryAdd(key, 0)) continue;
+
+            // The _queued claim succeeded but another worker already holds the key in
+            // _building, so this one must UN-CLAIM _queued before moving on. The rollback is
+            // not optional: ApplyCompletedMeshes' out-of-range branch removes a key from
+            // _queued while its builder may still hold it in _building, so winning _queued
+            // here while losing _building is reachable -- and a _queued entry with nothing
+            // building is a region that never builds and can never re-enter this scan (the
+            // TryAdd above would keep failing), i.e. a permanent hole in the horizon.
+            if (!_building.TryAdd(key, 0))
+            {
+                _queued.TryRemove(key, out _);
+                continue;
+            }
+
+            return key;
+        }
+    }
+
+    private static (int Level, int X, int Z) KeyAt(int level, (int X, int Z) camRegion, (int dx, int dz) offset) =>
+        (level, camRegion.X + offset.dx, camRegion.Z + offset.dz);
+
+    // Loaded, or claimed by a worker that is building it (or holds it waiting for the upload)
+    private bool IsTaken((int Level, int X, int Z) key) => _owner.Regions.ContainsKey(key) || _queued.ContainsKey(key);
+
+    /// <summary>The squared distance in blocks from the camera's column to the nearest point of a region's footprint
+    /// (0 for the region the camera stands in), so regions of different sizes compare fairly.</summary>
+    internal static float NearestDistanceSq((int Level, int X, int Z) key, Vector2 camera)
+    {
+        var size = LodRegion.Levels[key.Level].RegionBlocks;
+        var dx = MathF.Max(0f, MathF.Max(key.X * size - camera.X, camera.X - (key.X + 1) * size));
+        var dz = MathF.Max(0f, MathF.Max(key.Z * size - camera.Y, camera.Y - (key.Z + 1) * size));
+        return dx * dx + dz * dz;
     }
 
     /// <summary>

@@ -1,0 +1,18 @@
+{
+  // The everyday part of every battle tower chest, nested by the floor tables (tower_floor_low, _mid, _high, _top) and
+  // the roof's tower_treasure: what the tower's skeleton garrison left lying about.
+  "pools": [
+    {
+      "rolls": { "min": 2, "max": 4 },
+      "entries": [
+        { "item": "item/bone", "weight": 5, "count": { "min": 1, "max": 4 } },
+        { "item": "item/flint_arrow", "weight": 4, "count": { "min": 2, "max": 8 } },
+        { "item": "item/coal", "weight": 4, "count": { "min": 2, "max": 5 } },
+        { "item": "item/bandage", "weight": 3 },
+        { "item": "block/torch", "weight": 3, "count": { "min": 2, "max": 6 } },
+        { "item": "item/flint", "weight": 3, "count": { "min": 1, "max": 3 } },
+        { "empty": true, "weight": 3 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "result": "item/bone_breaker_blade",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/iron_sword", "count": 1 },
+    { "item": "item/bone", "count": 3 }
+  ]
+}

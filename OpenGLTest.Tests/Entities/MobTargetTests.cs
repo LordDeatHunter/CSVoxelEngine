@@ -27,10 +27,11 @@ public sealed class MobTargetTests
     private static ChunkManager StoneFloor() => MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
 
     /// <summary>A target at a fixed eye that records every hit it takes.</summary>
-    private sealed class RecordingTarget(Vector3 eye, bool immune = false) : IMobTarget
+    private sealed class RecordingTarget(Vector3 eye, bool immune = false, bool dead = false) : IMobTarget
     {
         public Vector3 Eye { get; } = eye;
-        public bool IsImmune { get; } = immune;
+        public bool IsImmune { get; } = immune || dead;
+        public bool IsDead { get; } = dead;
         public List<int> Hits { get; } = [];
 
         public void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift,
@@ -59,6 +60,17 @@ public sealed class MobTargetTests
     {
         var d = HorizontalDistance(a, b);
         return d * d;
+    }
+
+    [Fact]
+    public void NearestIgnoresADeadTargetEvenWhenItIsTheOnlyOne()
+    {
+        var mob = Vector3.Zero;
+        var dead = new RecordingTarget(new Vector3(2f, 1f, 0f), dead: true);
+        var alive = new RecordingTarget(new Vector3(-6f, 1f, 0f));
+
+        Assert.Equal(1, MobTargets.Nearest([dead, alive], mob));
+        Assert.Equal(-1, MobTargets.Nearest([dead], mob));
     }
 
     [Fact]

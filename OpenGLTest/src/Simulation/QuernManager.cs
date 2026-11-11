@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Stations;
 using VoxelEngine.Networking;
+using VoxelEngine.Saves;
 
 namespace VoxelEngine.Simulation;
 
@@ -32,7 +34,7 @@ public sealed class QuernManager
     public sealed class QuernState
     {
         /// <summary>Waiting crushable id, or 0 when the quern is empty.</summary>
-        public byte InputId;
+        public ushort InputId;
 
         /// <summary>Top angle in radians; advances while spinning, back at rest modulo 2pi.</summary>
         public float Angle;
@@ -72,7 +74,7 @@ public sealed class QuernManager
     /// Puts one crushable unit into an empty quern. Refuses anything with no crush recipe
     /// and anything while the quern already holds a unit.
     /// </summary>
-    public bool TryInsert(int x, int y, int z, byte inputId)
+    public bool TryInsert(int x, int y, int z, ushort inputId)
     {
         if (ContentRegistry.CrushRecipeForInput(inputId) == null) return false;
         var key = (x, y, z);
@@ -115,7 +117,7 @@ public sealed class QuernManager
     }
 
     /// <summary>Every quern cell with state, for the spinning-top render pass.</summary>
-    public IEnumerable<(Vector3 Cell, float Angle, byte InputId)> QuernView()
+    public IEnumerable<(Vector3 Cell, float Angle, ushort InputId)> QuernView()
     {
         foreach (var (key, state) in _querns)
             yield return (new Vector3(key.X, key.Y, key.Z), state.Angle, state.InputId);
@@ -177,6 +179,56 @@ public sealed class QuernManager
         }
     }
 
+    /// <summary>Every tracked quern by content name, for <c>stations.json</c> (at most
+    /// <see cref="StationNetCodec.MaxEntries"/>).</summary>
+    internal List<StationSaveData.QuernData> Capture()
+    {
+        var result = new List<StationSaveData.QuernData>();
+        foreach (var ((x, y, z), state) in _querns)
+        {
+            if (result.Count >= StationNetCodec.MaxEntries) break;
+            result.Add(new StationSaveData.QuernData
+            {
+                Cell = [x, y, z],
+                Input = SaveNames.NameOf(state.InputId),
+                Angle = state.Angle,
+                Spinning = state.Spinning,
+            });
+        }
+        return result;
+    }
+
+    /// <summary>Adds the querns saved by <see cref="Capture"/> to an empty registry. An entry
+    /// with a bad cell, or whose input no longer resolves, is dropped (a quern with a vanished
+    /// input is still registered, empty); returns how many were dropped.</summary>
+    internal int Restore(IReadOnlyList<StationSaveData.QuernData>? saved)
+    {
+        var skipped = 0;
+        if (saved == null) return 0;
+        foreach (var data in saved.Take(StationNetCodec.MaxEntries))
+        {
+            if (!StationSaveCodec.TryCell(data.Cell, out var key))
+            {
+                skipped++;
+                continue;
+            }
+            var state = new QuernState
+            {
+                Angle = float.IsFinite(data.Angle) ? Math.Clamp(data.Angle, 0f, TwoPi) : 0f,
+                Spinning = data.Spinning,
+            };
+            if (data.Input != null)
+            {
+                if (SaveNames.TryResolve(data.Input, out var input))
+                    state.InputId = input;
+                else
+                    skipped++;
+            }
+            _querns[key] = state;
+        }
+        return skipped;
+    }
+
     /// <summary>Writes every tracked quern (its input, top angle and spin), for the station
     /// broadcast (<see cref="StationNetCodec"/>).</summary>
     internal void WriteNet(PacketWriter writer)
@@ -188,7 +240,7 @@ public sealed class QuernManager
         {
             if (leftQuerns-- == 0) break;
             StationNetCodec.WriteCell(writer, x, y, z);
-            writer.Write(state.InputId);
+            writer.WriteId(state.InputId);
             writer.Write(state.Angle);
             writer.Write(state.Spinning);
         }
@@ -207,7 +259,7 @@ public sealed class QuernManager
         for (var i = 0; i < count; i++)
         {
             var key = StationNetCodec.ReadCell(reader);
-            var inputId = reader.ReadByte();
+            var inputId = BlockTables.RequireAssigned(reader.ReadId());
             var angle = StationNetCodec.ReadFinite(reader);
             var spinning = reader.ReadBool();
             _stale.Remove(key);

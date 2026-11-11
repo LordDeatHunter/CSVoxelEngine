@@ -1,5 +1,6 @@
 using System.Linq;
 using VoxelEngine.Graphics;
+using VoxelEngine.Items;
 using Xunit;
 
 namespace VoxelEngine.Tests.Content;
@@ -14,9 +15,9 @@ public sealed class MetalworksRecipeTests
 {
     public MetalworksRecipeTests() => TestContent.EnsureLoaded();
 
-    private static byte Item(string name) => ContentRegistry.RequireItem(name).Id;
+    private static ushort Item(string name) => ContentRegistry.RequireItem(name).Id;
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
     public void EveryPureCopperFormMeltsIntoOneMaterialAndBranchDoesNot()
@@ -27,6 +28,7 @@ public sealed class MetalworksRecipeTests
         string[] pureCopper =
         [
             "malachite_ore", "crushed_copper", "copper_ingot", "copper_pickaxe_head", "copper_axe_head",
+            "copper_sword_head",
         ];
 
         foreach (var name in pureCopper)
@@ -45,13 +47,36 @@ public sealed class MetalworksRecipeTests
     }
 
     [Fact]
+    public void EveryPureBronzeFormMeltsToBronzeAndEveryBronzeMoldCastsIt()
+    {
+        var bronze = ContentRegistry.MoltenMaterialByName("bronze");
+        Assert.NotNull(bronze);
+
+        foreach (var name in new[] { "bronze_ingot", "bronze_pickaxe_head", "bronze_axe_head", "bronze_sword_head", "bronze_ring" })
+        {
+            var recipe = ContentRegistry.MeltRecipeForInput(Item(name));
+            Assert.NotNull(recipe);
+            Assert.Equal(bronze.Id, recipe.MaterialId);
+        }
+
+        // Bronze is cast in the same fired molds as the other metals; the material picks the result.
+        foreach (var mold in new[] { "fired_mold_ingot", "fired_mold_pickaxe", "fired_mold_axe", "fired_mold_sword", "fired_mold_ring" })
+        {
+            var cast = ContentRegistry.CastRecipeFor(Block(mold), bronze.Id);
+            Assert.NotNull(cast);
+            Assert.Equal(bronze.Id, ContentRegistry.MeltRecipeForInput(cast.ResultId)!.MaterialId);
+        }
+    }
+
+    [Fact]
     public void IronCrushesInTheQuernButNeverMelts()
     {
         var crush = ContentRegistry.CrushRecipeForInput(Item("hematite_ore"));
         Assert.NotNull(crush);
         Assert.Equal(Item("crushed_iron"), crush.ResultId);
 
-        // Without a melt recipe KilnManager never accepts the input: that is the "cannot smelt yet" gate.
+        // Without a melt recipe KilnManager never accepts the input: iron is smelted solid-state in the bloomery,
+        // never melted in a crucible.
         foreach (var id in new[]
                  {
                      Item("hematite_ore"), Block("hematite_ore"), Item("crushed_iron"),
@@ -76,6 +101,21 @@ public sealed class MetalworksRecipeTests
             // miscast is never a loss of metal.
             Assert.Equal(cast.AmountMl * cast.ResultCount, melt.AmountMl);
         }
+    }
+
+    [Fact]
+    public void NoCraftingRecipeTakesAnIngotOfAMoltenMetal()
+    {
+        // A molten metal reaches an item only by being cast: an ingot is a storage form, so a
+        // recipe that wants metal asks for a cast part (a ring, a head) instead.
+        var ingots = ContentRegistry.CastRecipesList
+            .Where(cast => cast.MoldId == Block("fired_mold_ingot"))
+            .Select(cast => cast.ResultId)
+            .ToHashSet();
+        Assert.NotEmpty(ingots);
+
+        Assert.DoesNotContain(ContentRegistry.CraftingRecipes,
+            recipe => recipe.Ingredients.Any(i => ingots.Any(i.Accepts)));
     }
 
     [Fact]
@@ -131,5 +171,29 @@ public sealed class MetalworksRecipeTests
         Assert.Equal(
             Enumerable.Range(1, materials.Count).Select(i => (byte)i).ToArray(),
             materials.Select(m => m.Id).ToArray());
+    }
+
+    [Fact]
+    public void SandAndGlassMeltIntoMoltenGlassAndTheBasinCastsItBackIntoABlock()
+    {
+        var glass = ContentRegistry.MoltenMaterialByName("glass");
+        Assert.NotNull(glass);
+
+        foreach (var input in new[] { Block("sand"), Block("glass") })
+        {
+            var melt = ContentRegistry.MeltRecipeForInput(input);
+            Assert.NotNull(melt);
+            Assert.Equal(glass.Id, melt.MaterialId);
+        }
+
+        // The basin is the mold that turns molten material into a block
+        var cast = ContentRegistry.CastRecipeFor(Block("casting_basin"), glass.Id);
+        Assert.NotNull(cast);
+        Assert.False(ItemRegistry.IsItem(cast.ResultId));
+        Assert.True(ContentRegistry.IsCastMold(Block("casting_basin")));
+
+        // Raw clay is not a mold, and copper has no basin recipe
+        Assert.False(ContentRegistry.IsCastMold(Block("casting_basin_raw")));
+        Assert.Null(ContentRegistry.CastRecipeFor(Block("casting_basin"), ContentRegistry.MoltenMaterialByName("copper")!.Id));
     }
 }

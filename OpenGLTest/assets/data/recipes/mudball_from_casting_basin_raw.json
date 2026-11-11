@@ -1,0 +1,9 @@
+{
+  // The reverse of casting_basin_raw.json: unfired, it is still wet clay. A fired basin has no
+  // such recipe.
+  "result": "item/mudball",
+  "count": 4,
+  "ingredients": [
+    { "item": "block/casting_basin_raw", "count": 1 }
+  ]
+}

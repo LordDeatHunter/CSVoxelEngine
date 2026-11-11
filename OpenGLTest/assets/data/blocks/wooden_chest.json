@@ -1,0 +1,13 @@
+{
+  // Wooden Chest: the crafted starter chest: 18 slots, empty until filled. Eight planks (recipes/wooden_chest.json). A chest block entity (ChestManager): right-click opens it, breaking it spills what it holds.
+  "name": "Wooden Chest",
+  "model": { "parent": "block/chest", "textures": { "front": "chest_wooden_front", "side": "chest_wooden_side", "top": "chest_wooden_top" } },
+  "facing": "horizontal",
+  "facingFromLook": true,
+  "hardness": 4,
+  "sfx": "hit_wood",
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": { "min": [0.0625, 0, 0.0625], "max": [0.9375, 0.875, 0.9375] },
+  "chest": { "slots": 18, "skin": "chest_wooden" }
+}

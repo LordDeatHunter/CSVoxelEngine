@@ -95,7 +95,7 @@ public readonly record struct ConnectTarget(string Name, ServerAddress Address);
 /// </summary>
 public sealed class MainMenuView
 {
-    /// <summary>Most characters the seed field accepts (well under <see cref="BitmapFont.MaxLayoutChars"/>).</summary>
+    /// <summary>Most characters the seed field accepts.</summary>
     public const int SeedMaxLength = 32;
 
     /// <summary>Most characters the server address field accepts.</summary>
@@ -153,7 +153,7 @@ public sealed class MainMenuView
 
     /// <summary>
     /// One line shown under a list (a store error, the seed-lock message, a bad address); callers
-    /// keep it under <see cref="BitmapFont.MaxLayoutChars"/> so it never needs wrapping.
+    /// keep it short enough to fit the page, since it is fitted rather than wrapped.
     /// </summary>
     public string? Notice { get; set; }
 

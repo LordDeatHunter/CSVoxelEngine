@@ -282,7 +282,7 @@ public sealed class LodSurfaceTests
         Set(manager, x, h + 3, z, 0);
         Assert.True(LodSurface.RecordEdit(manager, x, h + 3, z));
         var oracleY = h + 2;
-        byte oracleId;
+        ushort oracleId;
         while (!(manager.TryGetCell(x, oracleY, z, out oracleId, out _)
                  && BlockType.IsSolid(oracleId) && BlockType.Occludes(oracleId)))
             oracleY--;
@@ -306,6 +306,23 @@ public sealed class LodSurfaceTests
         Assert.True(LodSurface.RecordEdit(manager, x, oracleY - 1, z));
         Assert.False(LodColumnCaps.LowerColumnBelow(x, oracleY - 1, z));
         AssertOverride(x, z, oracleY, oracleId);
+    }
+
+    [Theory]
+    [InlineData(int.MinValue)]
+    [InlineData(-300)]
+    [InlineData(0)]
+    [InlineData(int.MaxValue)]
+    public void PackRoundTripsTopAndBlockAtTheirExtremes(int top)
+    {
+        foreach (var block in new[] { BlockType.Air, ushort.MaxValue })
+        {
+            var packed = LodSurface.Pack(top, block);
+            Assert.NotEqual(LodSurface.None, packed);
+
+            LodSurface.Unpack(packed, out var actualTop, out var actualBlock);
+            Assert.Equal((top, block), (actualTop, actualBlock));
+        }
     }
 
     [Fact]
@@ -353,14 +370,14 @@ public sealed class LodSurfaceTests
         AssertOverride(x, z, y - 1, 0);
     }
 
-    private static void Set(ChunkManager manager, int x, int y, int z, byte id)
+    private static void Set(ChunkManager manager, int x, int y, int z, ushort id)
     {
         var chunk = manager.ChunkAt(x, y, z);
         Assert.NotNull(chunk);
         chunk.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, id, 0);
     }
 
-    private static void AssertOverride(int x, int z, int top, byte block)
+    private static void AssertOverride(int x, int z, int top, ushort block)
     {
         Assert.True(LodSurface.TryGet(x, z, out var actualTop, out var actualBlock), "no override recorded");
         Assert.Equal(top, actualTop);

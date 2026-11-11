@@ -1,0 +1,21 @@
+{
+  // The battle tower's roof chest beside the altar, reachable only once every floor is cleared: wrought iron, two or
+  // three legendary trinkets, mana draughts and often a modifier scroll.
+  "pools": [
+    { "rolls": 1, "entries": [ { "table": "tower_supplies" } ] },
+    { "rolls": 1, "entries": [ { "item": "item/wrought_iron", "count": { "min": 3, "max": 6 } } ] },
+    {
+      "rolls": { "min": 2, "max": 3 },
+      "entries": [
+        { "item": "item/amulet_of_vigor", "rarity": { "min": "legendary", "max": "legendary" } },
+        { "item": "item/focus_ring", "rarity": { "min": "legendary", "max": "legendary" } },
+        { "item": "item/ember_charm", "rarity": { "min": "legendary", "max": "legendary" } },
+        { "item": "item/fire_charm", "rarity": { "min": "legendary", "max": "legendary" } },
+        { "item": "item/frost_charm", "rarity": { "min": "legendary", "max": "legendary" } },
+        { "item": "item/feather_charm", "rarity": { "min": "legendary", "max": "legendary" } }
+      ]
+    },
+    { "rolls": 1, "entries": [ { "item": "item/mana_draught", "count": { "min": 1, "max": 2 } } ] },
+    { "chance": 0.5, "rolls": 1, "entries": [ { "item": "item/scroll_modifiers" } ] }
+  ]
+}

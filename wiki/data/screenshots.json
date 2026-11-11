@@ -1,0 +1,252 @@
+{
+  "forest": {
+    "title": "Forest",
+    "caption": "Rolling grass hills and oak woods, with the grass tinted by the temperate climate.",
+    "group": "biome"
+  },
+  "steppe": {
+    "title": "Steppe",
+    "caption": "A dry, open grass plain, yellower than the forest, with scattered dead trees.",
+    "group": "biome"
+  },
+  "steppe_desert": {
+    "title": "Steppe meets desert",
+    "caption": "Borders are slopes and ragged patches rather than lines: sand creeps into the dry grass.",
+    "group": "border"
+  },
+  "savanna_desert": {
+    "title": "Savanna meets desert",
+    "caption": "The warm, dry edge where savanna grass gives way to dunes.",
+    "group": "border"
+  },
+  "taiga": {
+    "title": "Taiga",
+    "caption": "A snowy spruce wood.",
+    "group": "biome"
+  },
+  "frozen": {
+    "title": "Frozen tundra",
+    "caption": "Permafrost under snow, with sparse dead shrubs and leafless snags.",
+    "group": "biome"
+  },
+  "ocean_bay": {
+    "title": "Ocean",
+    "caption": "A sandy shore sloping into water with waves, foam and sun glitter.",
+    "group": "biome"
+  },
+  "desert": {
+    "title": "Desert",
+    "caption": "Dunes of sand over sandstone, with cacti and dead trees.",
+    "group": "biome"
+  },
+  "tundra": {
+    "title": "Frozen plain",
+    "caption": "A wide, white tundra under a low horizon.",
+    "group": "biome"
+  },
+  "ragged_border": {
+    "title": "A ragged border",
+    "caption": "A coherent noise breaks material lines into patches, never single columns.",
+    "group": "border"
+  },
+  "steppe_tundra": {
+    "title": "Steppe meets tundra",
+    "caption": "Dry grass fades into frozen ground, with a wide band between sand and snow.",
+    "group": "border"
+  },
+  "savanna": {
+    "title": "Savanna",
+    "caption": "Dry grassland with umbrella-crowned stone pines and wild cotton.",
+    "group": "biome"
+  },
+  "savanna_ground": {
+    "title": "Savanna, ground level",
+    "caption": "Cotton clumps and stone pines on the warm, dry plain.",
+    "group": "biome"
+  },
+  "pack_ice": {
+    "title": "Pack ice",
+    "caption": "In cold seas the water freezes into a walkable sheet, broken into floes.",
+    "group": "biome"
+  },
+  "pack_ice_low": {
+    "title": "Pack ice, ground level",
+    "caption": "Icebergs drift where the sea is just cold enough.",
+    "group": "biome"
+  },
+  "origin_valley": {
+    "title": "The spawn valley",
+    "caption": "Near the spawn the land is kept calm: gentle hills and a wide valley.",
+    "group": "terrain"
+  },
+  "forest_highland": {
+    "title": "Highlands",
+    "caption": "A continent-scale lift raises some regions into highlands.",
+    "group": "terrain"
+  },
+  "range_along": {
+    "title": "A mountain range",
+    "caption": "Ranges are chains hundreds of blocks long, found only inside highlands.",
+    "group": "terrain"
+  },
+  "range_across": {
+    "title": "Across a range",
+    "caption": "Looking across a range, with ridges and valleys running along it.",
+    "group": "terrain"
+  },
+  "arid_plateau": {
+    "title": "An arid plateau",
+    "caption": "In dry land a highland becomes a lifted plateau instead of broken country.",
+    "group": "terrain"
+  },
+  "massif": {
+    "title": "A massif",
+    "caption": "Rare massifs rise to an absolute summit with a pointed, spurred body.",
+    "group": "terrain"
+  },
+  "massif_summit": {
+    "title": "A massif summit",
+    "caption": "The crown of a massif, with snow even in a warm biome.",
+    "group": "terrain"
+  },
+  "lone_peak": {
+    "title": "A lone peak",
+    "caption": "A single peak standing on flat ground.",
+    "group": "terrain"
+  },
+  "island": {
+    "title": "An island",
+    "caption": "Islands rise out of deep water, ringed by sand.",
+    "group": "terrain"
+  },
+  "island_beach": {
+    "title": "An island beach",
+    "caption": "The shore of an island with its beach.",
+    "group": "terrain"
+  },
+  "archipelago": {
+    "title": "An archipelago",
+    "caption": "Islets string out in chains.",
+    "group": "terrain"
+  },
+  "great_lake_elevated": {
+    "title": "A great lake",
+    "caption": "Rare, lobed lakes a few hundred blocks across with islands and shores of their own. In the cold they freeze like any water.",
+    "group": "terrain"
+  },
+  "great_lake_island": {
+    "title": "A lake island",
+    "caption": "A great lake with an island in its main lobe.",
+    "group": "terrain"
+  },
+  "hell_layer0": {
+    "title": "Hell",
+    "caption": "Right under the barrier: a lava-lit cavern under a red haze.",
+    "group": "hell"
+  },
+  "hell_layer1": {
+    "title": "The second layer",
+    "caption": "Every layer is a cavern pocket over an unbroken slab of hellrock, and deeper ones are more open.",
+    "group": "hell"
+  },
+  "hell_layer4": {
+    "title": "Deep hell",
+    "caption": "Deeper layers pond more lava.",
+    "group": "hell"
+  },
+  "hell_ashlands": {
+    "title": "Ashlands",
+    "caption": "Ash over cinder soil, scorched walls, ember blooms and charred trees.",
+    "group": "hell"
+  },
+  "hell_magma": {
+    "title": "Magma Caverns",
+    "caption": "Basalt and magma floors with lava pools.",
+    "group": "hell"
+  },
+  "hell_fungal": {
+    "title": "Fungal Grove",
+    "caption": "Glowing teal fungi, glow ferns, thick vines and fungal trees.",
+    "group": "hell"
+  },
+  "sky_cloud_patches": {
+    "title": "Solid clouds",
+    "caption": "Cloud slabs above every mountain that catch a fall.",
+    "group": "sky"
+  },
+  "sky_cloud_sea": {
+    "title": "The cloud sea",
+    "caption": "A thick sea of solid cloud under the islands, with holes down to the world.",
+    "group": "sky"
+  },
+  "sky_zone": {
+    "title": "Islands in the sky",
+    "caption": "Islands float everywhere in the band and crowd closer together inside zones.",
+    "group": "sky"
+  },
+  "sky_island": {
+    "title": "A floating island",
+    "caption": "Domed grass tops over a tapering, stalactite-hung underside.",
+    "group": "sky"
+  },
+  "sky_meadow": {
+    "title": "Meadow island",
+    "caption": "Grass over dirt over stone, with tall grass, flowers and broad sky oaks.",
+    "group": "sky"
+  },
+  "sky_meadow_above": {
+    "title": "A meadow from above",
+    "caption": "Looking down on a meadow island.",
+    "group": "sky"
+  },
+  "sky_frost": {
+    "title": "Frost highland island",
+    "caption": "Frosted turf over permafrost, with crystal outcrops and glowing crystal trees.",
+    "group": "sky"
+  },
+  "sky_frost_above": {
+    "title": "A frost island from above",
+    "caption": "Looking down on a frost highland island.",
+    "group": "sky"
+  },
+  "waystone_surface": {
+    "title": "A surface waystone",
+    "caption": "An open pavilion with a lantern over the waystone, a short walk from a ruined hall.",
+    "group": "waystone"
+  },
+  "waystone_underground": {
+    "title": "An underground waystone",
+    "caption": "A sealed, lamp-lit crypt with the waystone on a dais. You dig in to reach it.",
+    "group": "waystone"
+  },
+  "waystone_sky": {
+    "title": "A sky waystone",
+    "caption": "A frost-stone plaza under a crystal-keyed arch, on the island of a sky ruin.",
+    "group": "waystone"
+  },
+  "waystone_hell": {
+    "title": "A hell waystone",
+    "caption": "A basalt ring crowned with ember crystal, in the same hell layer as its ruin.",
+    "group": "waystone"
+  },
+  "aurora": {
+    "title": "The aurora",
+    "caption": "Slow green and violet curtains in the night sky of cold lands.",
+    "group": "night"
+  },
+  "aurora_up": {
+    "title": "The aurora overhead",
+    "caption": "Looking up into the curtains.",
+    "group": "night"
+  },
+  "night_sky": {
+    "title": "Stars",
+    "caption": "The star field turns once a day; there is no aurora over the temperate lands.",
+    "group": "night"
+  },
+  "moon": {
+    "title": "The moon",
+    "caption": "The moon goes through phases, and at night it is the world’s key light.",
+    "group": "night"
+  }
+}

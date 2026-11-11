@@ -14,10 +14,10 @@ namespace VoxelEngine.WorldGen.Features;
 public static class CairnGenerator
 {
     /// <summary>Blocks this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte CobblestoneBlock;
+    public static readonly ushort CobblestoneBlock;
 
     /// <summary>Hat block (one stone of a pebble pile); resolved once in the static constructor.</summary>
-    public static readonly byte PebbleBlock;
+    public static readonly ushort PebbleBlock;
 
     // Cobblestone cells in a cairn's stack, under its pebble hat
     private const int StackCells = 3;
@@ -67,7 +67,7 @@ public static class CairnGenerator
     /// Stamps every cairn that reaches this chunk: its stack into air only, clipped at the chunk's
     /// top and bottom. Runs on a generation worker thread after the trees.
     /// </summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0)
     {
         var shift = WorldFeatureConfig.CairnCellShift;
         var minCellX = worldX0 >> shift;
@@ -97,7 +97,7 @@ public static class CairnGenerator
     /// Writes one cairn's stack at column (x, z) whose ground is <paramref name="height"/>: three
     /// cobblestone cells and a one-stone pebble hat, into air only. The test seam for the shape.
     /// </summary>
-    internal static void StampStack(byte[] blocks, int worldY0, int x, int z, int height)
+    internal static void StampStack(ushort[] blocks, int worldY0, int x, int z, int height)
     {
         var lx = x - worldX0Of(x);
         var lz = z - worldX0Of(z);

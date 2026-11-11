@@ -1,0 +1,8 @@
+{
+  // The leather set: wear more of it for more. Counts head, chest and legs pieces only. Members are the items whose equip.set is "leather".
+  "name": "Leather",
+  "bonuses": [
+    { "pieces": 2, "modifiers": { "moveSpeed": 0.05 } },
+    { "pieces": 3, "modifiers": { "armor": 2, "miningSpeed": 0.1 } }
+  ]
+}

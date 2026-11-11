@@ -18,7 +18,7 @@ public enum CraftHitKind
 }
 
 /// <summary>One hit-test result inside the crafting detail card.</summary>
-public readonly record struct CraftHit(CraftHitKind Kind, int IngredientIndex = -1, byte MemberId = 0);
+public readonly record struct CraftHit(CraftHitKind Kind, int IngredientIndex = -1, ushort MemberId = 0);
 
 /// <summary>
 /// GL-free geometry of the [E] inventory's crafting detail card, in canvas units (see

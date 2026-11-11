@@ -2,6 +2,7 @@
   "name": "Water",
   "model": { "parent": "block/cube_all", "textures": { "all": "water_still" } },
   "fluid": true,
+  "freezesTo": "ice",
   "renderer": "fluid",
   "hardness": 0,
   "solid": false,

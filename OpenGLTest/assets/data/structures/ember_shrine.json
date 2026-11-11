@@ -1,0 +1,39 @@
+{
+  "kind": "hell",
+  "weight": 2,
+  "groundLayer": 0,
+  "palette": {
+    "b": "basalt",
+    "e": "ember_crystal",
+    "C": "ruin_chest_hell"
+  },
+  "layers": [
+    [
+      "  bbb  ",
+      " bbbbb ",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      " bbbbb ",
+      "  bbb  "
+    ],
+    [
+      "       ",
+      " e   e ",
+      "       ",
+      "   C   ",
+      "       ",
+      " e   e ",
+      "       "
+    ],
+    [
+      "       ",
+      " e   e ",
+      "       ",
+      "       ",
+      "       ",
+      " e   e ",
+      "       "
+    ]
+  ]
+}

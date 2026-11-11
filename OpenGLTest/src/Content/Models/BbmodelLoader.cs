@@ -120,7 +120,7 @@ public static class BbmodelLoader
 
             var cubesByUuid = IndexCubes(Req(root, "elements", path, "the model"), path,
                 data.ResolutionWidth, data.ResolutionHeight);
-            ReadOutliner(Req(root, "outliner", path, "the model"), path, data, cubesByUuid, null);
+            ReadOutliner(Req(root, "outliner", path, "the model"), path, data, cubesByUuid, IndexGroups(root), null);
 
             var missing = new List<string>();
             foreach (var name in requiredParts)
@@ -130,7 +130,7 @@ public static class BbmodelLoader
                 throw new InvalidOperationException(
                     $"Model '{path}' needs one non-empty group per part; missing: {string.Join(", ", missing)}.");
 
-            ReadAnimations(root, path, data);
+            ReadAnimations(root, path, data, StoresPreviewSigns(root));
             ReadTexture(root, path, readBytes, data);
             return data;
         }
@@ -168,8 +168,37 @@ public static class BbmodelLoader
         return cubes;
     }
 
+    // Blockbench 5 keeps a group's name, origin and rotation in the root 'groups' array and leaves only
+    // its uuid and children in the outliner; this indexes that array by uuid (empty for an older file).
+    private static Dictionary<string, JsonElement> IndexGroups(JsonElement root)
+    {
+        var groups = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        if (!root.TryGetProperty("groups", out var list) || list.ValueKind != JsonValueKind.Array)
+            return groups;
+
+        foreach (var group in list.EnumerateArray())
+        {
+            if (group.ValueKind != JsonValueKind.Object) continue;
+            if (group.TryGetProperty("uuid", out var uuid) && uuid.ValueKind == JsonValueKind.String)
+                groups[uuid.GetString() ?? ""] = group;
+        }
+        return groups;
+    }
+
+    // The element holding an outliner node's group data: the node itself when it carries its origin (a
+    // file from before Blockbench 5), otherwise the root 'groups' entry with the node's uuid.
+    private static JsonElement GroupData(JsonElement node, Dictionary<string, JsonElement> groups)
+    {
+        if (node.TryGetProperty("origin", out _)) return node;
+        return node.TryGetProperty("uuid", out var uuid) && uuid.ValueKind == JsonValueKind.String
+               && groups.TryGetValue(uuid.GetString() ?? "", out var group)
+            ? group
+            : node;
+    }
+
     private static void ReadOutliner(JsonElement outliner, string path, BbmodelData data,
-        Dictionary<string, (Vector3 Min, Vector3 Max, UvRect?[] Faces)> cubesByUuid, string? group)
+        Dictionary<string, (Vector3 Min, Vector3 Max, UvRect?[] Faces)> cubesByUuid,
+        Dictionary<string, JsonElement> groups, string? group)
     {
         if (outliner.ValueKind != JsonValueKind.Array)
             throw new InvalidOperationException($"Model '{path}' has no 'outliner' array.");
@@ -189,9 +218,10 @@ public static class BbmodelLoader
             }
 
             if (entry.ValueKind != JsonValueKind.Object) continue;
-            var name = NameOf(entry);
-            var pivot = ReadVec3(Req(entry, "origin", path, $"group '{name}'"), path, $"group '{name}'") / UnitsPerBlock;
-            if (GroupAngle(entry) != 0f)
+            var info = GroupData(entry, groups);
+            var name = NameOf(info);
+            var pivot = ReadVec3(Req(info, "origin", path, $"group '{name}'"), path, $"group '{name}'") / UnitsPerBlock;
+            if (GroupAngle(info) != 0f)
                 throw new InvalidOperationException(
                     $"Model '{path}' group '{name}' is rotated: keep groups unrotated, posing is procedural.");
 
@@ -207,7 +237,7 @@ public static class BbmodelLoader
                 };
 
             if (entry.TryGetProperty("children", out var children))
-                ReadOutliner(children, path, data, cubesByUuid, name);
+                ReadOutliner(children, path, data, cubesByUuid, groups, name);
         }
     }
 
@@ -237,6 +267,10 @@ public static class BbmodelLoader
             if (!facesEl.TryGetProperty(FaceKeys[f], out var face) || face.ValueKind != JsonValueKind.Object)
                 continue;
             if (face.TryGetProperty("enabled", out var enabled) && !enabled.GetBoolean())
+                continue;
+            // A face the author cleared the texture of (Blockbench writes "texture": null) is one that can never
+            // be seen, such as the side of a wall that stands against another cube: it is left out of the mesh
+            if (face.TryGetProperty("texture", out var faceTexture) && faceTexture.ValueKind == JsonValueKind.Null)
                 continue;
             if (face.TryGetProperty("rotation", out var rotation) && Num(rotation, path, $"cube '{cubeName}'") != 0f)
                 throw new InvalidOperationException(
@@ -268,7 +302,11 @@ public static class BbmodelLoader
     // raises a hanging arm forward, so Blockbench authors type a negative x for that (as in
     // Bedrock's own humanoid animations). This is the one place the sign lives: if a clip plays
     // mirrored, fix it here, never in the clips.
-    private static void ReadAnimations(JsonElement root, string path, BbmodelData data)
+    // That is the convention of files up to format 4.x. Blockbench 5 applies a Generic model's keyframes
+    // as stored and, opening an older file, negates its rotation x and y and its position x; the file it
+    // then saves (meta.format_version 5.0) holds those values, which are the engine's own (see
+    // StoresPreviewSigns), so they are read without the flip.
+    private static void ReadAnimations(JsonElement root, string path, BbmodelData data, bool previewSigns)
     {
         if (!root.TryGetProperty("animations", out var animations) || animations.ValueKind != JsonValueKind.Array)
             return;
@@ -334,7 +372,7 @@ public static class BbmodelLoader
                         throw new InvalidOperationException(
                             $"Model '{path}' animation '{name}' animates group '{animator.Name}' which the outliner does not have.");
 
-                    tracks[bone] = ReadBoneTrack(value, path, name, bone);
+                    tracks[bone] = ReadBoneTrack(value, path, name, bone, previewSigns);
                 }
             }
 
@@ -368,7 +406,20 @@ public static class BbmodelLoader
         }
     }
 
-    private static AnimationClip.BoneTrack ReadBoneTrack(JsonElement animator, string path, string anim, string bone)
+    // True for a file saved by Blockbench 5 or later (meta.format_version 5.0 and up), whose keyframes are
+    // already in the signs the preview applies; a file without the field is read as an older one.
+    private static bool StoresPreviewSigns(JsonElement root)
+    {
+        if (!root.TryGetProperty("meta", out var meta) || meta.ValueKind != JsonValueKind.Object) return false;
+        if (!meta.TryGetProperty("format_version", out var version) || version.ValueKind != JsonValueKind.String)
+            return false;
+
+        var major = (version.GetString() ?? "").Split('.')[0];
+        return int.TryParse(major, NumberStyles.None, CultureInfo.InvariantCulture, out var number) && number >= 5;
+    }
+
+    private static AnimationClip.BoneTrack ReadBoneTrack(JsonElement animator, string path, string anim, string bone,
+        bool previewSigns)
     {
         var rotation = new List<AnimationClip.Keyframe>();
         var position = new List<AnimationClip.Keyframe>();
@@ -415,10 +466,11 @@ public static class BbmodelLoader
                 var raw = new Vector3(AnimNum(point, "x", path, anim, bone), AnimNum(point, "y", path, anim, bone),
                     AnimNum(point, "z", path, anim, bone));
 
+                var flip = previewSigns ? 1f : -1f;
                 var value = channel switch
                 {
-                    "rotation" => new Vector3(-raw.X, -raw.Y, raw.Z),
-                    "position" => new Vector3(-raw.X, raw.Y, raw.Z) / UnitsPerBlock,
+                    "rotation" => new Vector3(flip * raw.X, flip * raw.Y, raw.Z),
+                    "position" => new Vector3(flip * raw.X, raw.Y, raw.Z) / UnitsPerBlock,
                     _ => raw,
                 };
                 target.Add(new AnimationClip.Keyframe(time, value, mode));

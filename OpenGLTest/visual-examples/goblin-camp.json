@@ -1,0 +1,19 @@
+{
+  // A night goblin camp (GoblinCamps): run from OpenGLTest/ with
+  //   VOXEL_TIME=700 VOXEL_SCRIPT=visual-examples/goblin-camp.json
+  // Shots land in visual/goblin-camp/. The goblincamp step pitches a camp at once on the ground of a column in
+  // goblins.json's open forest clearing: its lit fire and four to eight torch-bearing goblins round it. The camera
+  // flies (and so is immune) above the clearing, looking down at the camp, then films it again once the goblins have
+  // milled about the fire.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-44.0, 16.0, 62.5], "yaw": -90, "pitch": -25 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "goblincamp", "pos": [-44, 50] },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "camp", "hideHud": true },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "camp_later", "hideHud": true }
+  ]
+}

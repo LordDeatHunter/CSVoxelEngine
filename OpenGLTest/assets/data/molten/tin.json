@@ -1,0 +1,6 @@
+{
+  // Molten tin: the lava tile, tinted silvery.
+  "name": "Molten Tin",
+  "texture": "lava_still",
+  "color": [190, 205, 225]
+}

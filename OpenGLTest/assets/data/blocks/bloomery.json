@@ -1,0 +1,22 @@
+{
+  // Bloomery: a 2x2x2 volume of bloomery_bricks converted in place by the multiblock converter, exactly like
+  // the mud brick kiln (same shape, same opening on north, same anchor-carries-the-model rule). Only this cell
+  // - the volume's minimum corner - is the anchor; the other seven hold bloomery_part. It smelts crushed iron
+  // into a bloom without ever melting it (BloomeryManager): load ore and fuel, light it, keep its bellows
+  // going by jumping beside it. Mining any cell drops one bloomery_bricks and reverts the rest.
+  "name": "Bloomery",
+  "model": "block/bloomery",
+  "renderer": "multiblock",
+  "multiblock": { "part": "block/bloomery_part", "source": "block/bloomery_bricks" },
+  // It smelts crushed iron into a bloom; a unit that overheats burns to slag instead.
+  "bloomery": { "oreCap": 4, "fuelCap": 4, "ore": "item/crushed_iron", "bloom": "item/bloom", "slag": "item/slag" },
+  "hasItem": false,
+  "hardness": 5,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "sfx": "hit_rock",
+  "loot": "bloomery",
+  "occludes": true,
+  "castsAO": true,
+  "light": { "passes": true }
+}

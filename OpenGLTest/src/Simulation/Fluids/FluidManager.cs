@@ -171,9 +171,10 @@ public class FluidManager
     /// <summary>
     /// Writes a cell outside the tick and remeshes it right away: what a bucket does. Also
     /// schedules the neighborhood, so the flow starts on the next tick. Returns false when the
-    /// cell's chunk is not loaded.
+    /// cell's chunk is not loaded or the cell holds an unbreakable block, which a bucket never
+    /// scoops or pours over.
     /// </summary>
-    public bool SetCellImmediate(Vector3 cell, byte id, byte state, ChunkManager chunks)
+    public bool SetCellImmediate(Vector3 cell, ushort id, byte state, ChunkManager chunks)
     {
         var x = (int)cell.X;
         var y = (int)cell.Y;
@@ -181,8 +182,10 @@ public class FluidManager
 
         var chunk = chunks.ChunkAt(x, y, z);
         if (chunk == null) return false;
+        int lx = x & Chunk.SizeMask, ly = y & Chunk.SizeMask, lz = z & Chunk.SizeMask;
+        if (BlockType.IsUnbreakable(chunk.GetLocalBlock(lx, ly, lz))) return false;
 
-        chunk.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, id, state);
+        chunk.SetBlockRaw(lx, ly, lz, id, state);
 
         var chunkPos = VoxelCoords.ChunkPosOf(x, y, z);
         chunks.ImmediateRemeshWithBorders(chunkPos, cell);

@@ -10,16 +10,24 @@ public delegate float TextMeasure(ReadOnlySpan<char> text);
 /// <summary>Greedy word wrap of UI text against an injected measure; GL-free.</summary>
 public static class TextWrap
 {
-    /// <summary>Longest line ever emitted, so every line fits one DrawText run.</summary>
-    public const int MaxLineChars = BitmapFont.MaxLayoutChars;
-
     /// <summary>Greedy word wrap of <paramref name="text"/> into lines no wider than <paramref name="maxWidth"/>
-    /// under <paramref name="measure"/> and no longer than MaxLineChars, appended to <paramref name="lines"/>.
+    /// under <paramref name="measure"/>, appended to <paramref name="lines"/>.
     /// Words (maximal runs of non-space characters) are kept whole and joined by the source's own spaces;
-    /// a word that alone exceeds the width or the char cap is broken into the longest fitting prefixes,
+    /// a word that alone exceeds the width is broken into the longest fitting prefixes,
     /// at least one character per line so the loop always progresses. Lines carry no leading or trailing
     /// spaces. Null, empty or all-space text appends nothing.</summary>
-    public static void Wrap(string? text, float maxWidth, TextMeasure measure, List<string> lines)
+    public static void Wrap(string? text, float maxWidth, TextMeasure measure, List<string> lines) =>
+        Wrap(text, maxWidth, measure, lines, null);
+
+    /// <summary>The same lines <see cref="Wrap(string?, float, TextMeasure, List{string})"/> makes, appended to
+    /// <paramref name="ranges"/> as slices (start, length) of the source instead of substrings, so a caller can map a
+    /// span of the source onto the lines it landed on.</summary>
+    public static void WrapRanges(string? text, float maxWidth, TextMeasure measure, List<(int Start, int Length)> ranges) =>
+        Wrap(text, maxWidth, measure, null, ranges);
+
+    // The one wrap: each line is emitted as a slice of the source to whichever list is given
+    private static void Wrap(string? text, float maxWidth, TextMeasure measure, List<string>? lines,
+        List<(int Start, int Length)>? ranges)
     {
         if (string.IsNullOrEmpty(text))
             return;
@@ -49,7 +57,7 @@ public static class TextWrap
             }
 
             if (lineStart >= 0)
-                lines.Add(text.Substring(lineStart, lineEnd - lineStart));
+                Emit(text, lineStart, lineEnd - lineStart, lines, ranges);
 
             if (Fits(span[wordStart..wordEnd], maxWidth, measure))
             {
@@ -63,7 +71,7 @@ public static class TextWrap
             int pos = wordStart;
             while (true)
             {
-                int max = Math.Min(wordEnd - pos, MaxLineChars);
+                int max = wordEnd - pos;
                 int k = max;
                 while (k > 1 && !Fits(span.Slice(pos, k), maxWidth, measure))
                     k--;
@@ -73,15 +81,21 @@ public static class TextWrap
                     lineEnd = wordEnd;
                     break;
                 }
-                lines.Add(text.Substring(pos, k));
+                Emit(text, pos, k, lines, ranges);
                 pos += k;
             }
         }
 
         if (lineStart >= 0)
-            lines.Add(text.Substring(lineStart, lineEnd - lineStart));
+            Emit(text, lineStart, lineEnd - lineStart, lines, ranges);
+    }
+
+    private static void Emit(string text, int start, int length, List<string>? lines, List<(int Start, int Length)>? ranges)
+    {
+        lines?.Add(text.Substring(start, length));
+        ranges?.Add((start, length));
     }
 
     private static bool Fits(ReadOnlySpan<char> candidate, float maxWidth, TextMeasure measure) =>
-        candidate.Length <= MaxLineChars && measure(candidate) <= maxWidth;
+        measure(candidate) <= maxWidth;
 }

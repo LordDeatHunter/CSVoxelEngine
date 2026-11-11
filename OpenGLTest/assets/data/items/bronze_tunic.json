@@ -1,0 +1,8 @@
+{
+  // Bronze Tunic: placeholder gear. Wearable in the chest slot; its
+  // fixed stats are the equip object, and a piece found in loot may also roll modifiers on its stack.
+  "name": "Bronze Tunic",
+  "texture": "assets/textures/items/bronze_tunic.png",
+  "rarity": "uncommon",
+  "equip": { "slot": "chest", "armor": 4, "modifiers": { "maxHealth": 10 }, "set": "bronze", "visible": true }
+}

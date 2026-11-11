@@ -1,0 +1,8 @@
+{
+  "result": "item/mana_draught",
+  "count": 1,
+  "ingredients": [
+    { "item": "block/crystal_block", "count": 1 },
+    { "item": "item/cotton", "count": 1 }
+  ]
+}

@@ -69,7 +69,7 @@ public static class TreeWoodShape
     /// parent is A. Symmetric by construction: swapping the cells and flipping the direction
     /// asks the same two parent questions.
     /// </summary>
-    public static bool Connects(byte idA, byte stateA, byte idB, byte stateB, int dirAtoB)
+    public static bool Connects(ushort idA, byte stateA, ushort idB, byte stateB, int dirAtoB)
     {
         if (idA != idB || !BlockType.IsTreeWood(idA)) return false;
         if (WoodState.IsDetached(stateA) || WoodState.IsDetached(stateB)) return false;
@@ -79,7 +79,7 @@ public static class TreeWoodShape
 
     /// <summary>Bit <c>i</c> set when the cell connects to its neighbor in direction
     /// <c>i</c>; the spans hold the six neighbor ids and states in CubeFaces order.</summary>
-    public static int ConnectionMask(byte id, byte state, ReadOnlySpan<byte> nbIds, ReadOnlySpan<byte> nbStates)
+    public static int ConnectionMask(ushort id, byte state, ReadOnlySpan<ushort> nbIds, ReadOnlySpan<byte> nbStates)
     {
         var mask = 0;
         for (var dir = 0; dir < 6; dir++)
@@ -95,7 +95,7 @@ public static class TreeWoodShape
     /// the node's own width, so it continues the node face; a full-cube or detached cell never
     /// plugs, and a tree-wood neighbor is handled by <see cref="Connects"/> instead.
     /// </summary>
-    public static int PlugMask(byte state, ReadOnlySpan<byte> nbIds)
+    public static int PlugMask(byte state, ReadOnlySpan<ushort> nbIds)
     {
         if (!IsThin(state)) return 0;
         var mask = 0;
@@ -154,12 +154,12 @@ public static class TreeWoodShape
     /// <summary>Whether a neighbor counts as rim mass for <paramref name="id"/>'s bevel: the
     /// same wood, a full cube and attached to a tree. A detached log or a thin limb beside a
     /// shell leaves its edge exposed, so the shell rounds off there.</summary>
-    public static bool IsRimMass(byte id, byte nbId, byte nbState) =>
+    public static bool IsRimMass(ushort id, ushort nbId, byte nbState) =>
         nbId == id && WoodState.IsFullCube(nbState) && !WoodState.IsDetached(nbState);
 
     /// <summary>Whether a cell bevels at all: an attached full-cube trunk shell of a pixel-rim
     /// species. Everything else keeps its plain shape and never reads its neighbors.</summary>
-    public static bool CanBevel(byte id, byte state) =>
+    public static bool CanBevel(ushort id, byte state) =>
         BlockType.HasPixelRim(id) && WoodState.IsShell(state) && WoodState.IsFullCube(state)
         && !WoodState.IsDetached(state);
 
@@ -177,7 +177,7 @@ public static class TreeWoodShape
     /// the two quarter rounds face each other. Because a cell only ever removes its own material,
     /// the diagonal never matters and no diagonal neighbor has to be read or remeshed.
     /// </summary>
-    public static int RimCornerMask(byte id, byte state, ReadOnlySpan<byte> nbIds, ReadOnlySpan<byte> nbStates)
+    public static int RimCornerMask(ushort id, byte state, ReadOnlySpan<ushort> nbIds, ReadOnlySpan<byte> nbStates)
     {
         if (!CanBevel(id, state)) return 0;
         var minZ = IsRimMass(id, nbIds[0], nbStates[0]);
@@ -265,7 +265,7 @@ public static class TreeWoodShape
     /// thin cell returns its node box plus one tube box per connection; a beveled pixel-rim
     /// shell returns its <see cref="RimBoxes"/>.
     /// </summary>
-    public static BlockHitbox[] GetBoxes(byte id, byte state, ReadOnlySpan<byte> nbIds, ReadOnlySpan<byte> nbStates)
+    public static BlockHitbox[] GetBoxes(ushort id, byte state, ReadOnlySpan<ushort> nbIds, ReadOnlySpan<byte> nbStates)
     {
         var type = BlockType.ById[id];
         if (type == null) return FullCubeBoxes;
@@ -302,7 +302,7 @@ public static class TreeWoodShape
     /// chunk manager. A full cube that cannot bevel reads nothing beyond its own state and
     /// allocates nothing.
     /// </summary>
-    public static BlockHitbox[] GetBoxesAt(byte id, ChunkManager chunks, int x, int y, int z)
+    public static BlockHitbox[] GetBoxesAt(ushort id, ChunkManager chunks, int x, int y, int z)
     {
         var type = BlockType.ById[id];
         if (type == null) return FullCubeBoxes;
@@ -311,7 +311,7 @@ public static class TreeWoodShape
         var state = chunks.GetStateGlobal(x, y, z);
         if (!IsThin(state) && !CanBevel(id, state)) return type.Hitboxes;
 
-        Span<byte> ids = stackalloc byte[6];
+        Span<ushort> ids = stackalloc ushort[6];
         Span<byte> states = stackalloc byte[6];
         ReadNeighbors(chunks, x, y, z, ids, states);
         return GetBoxes(id, state, ids, states);
@@ -325,7 +325,7 @@ public static class TreeWoodShape
     /// wood and bevel-capable shells read their neighbors. Touching a face exactly counts,
     /// matching the cell-granular collision test this refines.
     /// </summary>
-    public static bool OverlapsShape(byte id, ChunkManager chunks, int x, int y, int z, Vector3 min, Vector3 max)
+    public static bool OverlapsShape(ushort id, ChunkManager chunks, int x, int y, int z, Vector3 min, Vector3 max)
     {
         var cell = new Vector3(x, y, z);
         var type = BlockType.ById[id];
@@ -343,7 +343,7 @@ public static class TreeWoodShape
             return false;
         }
 
-        Span<byte> ids = stackalloc byte[6];
+        Span<ushort> ids = stackalloc ushort[6];
         Span<byte> states = stackalloc byte[6];
         ReadNeighbors(chunks, x, y, z, ids, states);
         if (bevels)
@@ -375,7 +375,7 @@ public static class TreeWoodShape
     }
 
     // Six face neighbors in CubeFaces order, read through the manager (unloaded reads air)
-    private static void ReadNeighbors(ChunkManager chunks, int x, int y, int z, Span<byte> ids, Span<byte> states)
+    private static void ReadNeighbors(ChunkManager chunks, int x, int y, int z, Span<ushort> ids, Span<byte> states)
     {
         for (var dir = 0; dir < 6; dir++)
         {

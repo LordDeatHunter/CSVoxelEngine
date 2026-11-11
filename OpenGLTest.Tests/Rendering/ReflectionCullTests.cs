@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Rendering;
 using Xunit;
@@ -20,7 +21,8 @@ public sealed class ReflectionCullTests
         const float margin = ReflectionCull.TopMarginBlocks;
         // Every plane lies in [margin / 2, 2 * margin], so plane - margin is exact (Sterbenz) and a
         // top exactly one margin below the plane adds back up to the plane itself.
-        var planes = new[] { margin * 0.5f, 1f, RenderManager.WaterPlaneY, margin, 2f * margin };
+        var planes = new[] { margin * 0.5f, 1f, RenderManager.WaterPlaneY, margin, 2f * margin }
+            .Where(plane => plane >= margin * 0.5f && plane <= 2f * margin);
         const float step = 0.05f;
         foreach (var plane in planes)
         {

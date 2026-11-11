@@ -29,6 +29,36 @@ public sealed class InventoryPanelLayoutTests
     }
 
     [Fact]
+    public void TabHitsAreExactlyTheDrawnRectsSoTheGapHitsNothing()
+    {
+        for (var t = 0; t + 1 < InventoryPanelLayout.Tabs.Length; t++)
+        {
+            var (center, size) = InventoryPanelLayout.TabRect(t, Screen);
+            var inside = new Vector2(center.X + size.X * 0.5f - 0.5f, center.Y);
+            Assert.Equal(InventoryPanelLayout.Tabs[t], InventoryPanelLayout.TabAt(inside, Screen));
+
+            var gap = new Vector2(center.X + size.X * 0.5f + InventoryPanelLayout.TabGap * 0.5f, center.Y);
+            Assert.Null(InventoryPanelLayout.TabAt(gap, Screen));
+        }
+    }
+
+    [Theory]
+    [InlineData(800f)]
+    [InlineData(1280f)]
+    [InlineData(1920f)]
+    public void TheDetailCardNeverOverlapsTheListPanelWhenThereIsRoomAndStaysOnScreen(float width)
+    {
+        var screen = new Vector2(width, 1080f);
+        var (center, size) = InventoryPanelLayout.DetailCardRect(screen);
+        Assert.True(center.X + size.X * 0.5f <= screen.X);
+
+        var panelRight = InventoryPanelLayout.PanelLeft + InventoryPanelLayout.PanelWidth(screen);
+        var room = screen.X - InventoryPanelLayout.PanelRightMargin - size.X >= panelRight + InventoryPanelLayout.DetailGap;
+        if (room)
+            Assert.True(center.X - size.X * 0.5f >= panelRight);
+    }
+
+    [Fact]
     public void RowCenterHitsItsRowAfterScrolling()
     {
         var rowCount = OverflowingRows();
@@ -101,6 +131,23 @@ public sealed class InventoryPanelLayoutTests
             Assert.Equal(offset,
                 InventoryPanelLayout.OffsetForThumbTop(center.Y - size.Y * 0.5f, rowCount, Screen), 2);
         }
+    }
+
+    [Theory]
+    [InlineData(800f)]
+    [InlineData(1920f)]
+    public void TheScopeButtonSitsBesideTheSearchFieldInsideThePanelWithoutOverlappingIt(float width)
+    {
+        var screen = new Vector2(width, 1080f);
+        var (box, boxSize) = InventoryPanelLayout.SearchBoxRect(screen);
+        var (button, buttonSize) = InventoryPanelLayout.ScopeButtonRect(screen);
+
+        Assert.True(InventoryPanelLayout.ScopeButtonAt(button, screen));
+        Assert.False(InventoryPanelLayout.SearchBoxAt(button, screen));
+        Assert.True(InventoryPanelLayout.SearchBoxAt(box, screen));
+        Assert.False(InventoryPanelLayout.ScopeButtonAt(box, screen));
+        Assert.True(box.X + boxSize.X * 0.5f < button.X - buttonSize.X * 0.5f);
+        Assert.True(button.X + buttonSize.X * 0.5f <= InventoryPanelLayout.PanelLeft + InventoryPanelLayout.PanelWidth(screen));
     }
 
     [Fact]

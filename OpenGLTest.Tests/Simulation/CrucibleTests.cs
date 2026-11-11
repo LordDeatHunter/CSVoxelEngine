@@ -159,7 +159,7 @@ public sealed class CrucibleTests
         var expectedPending = kilns.StateAt(2, 2, 2)!.Contents.PendingMl;
         Assert.True(kilns.TryTakeCrucible(anchor, out var takenId, out var taken));
         Assert.Equal(Crucible.Id, takenId);
-        Assert.Equal(Copper, taken.MaterialId);
+        Assert.Equal([Copper], taken.Metals.Select(m => m.MaterialId));
         Assert.Equal(start.MoltenMl, taken.MoltenMl);
         Assert.Equal(expectedPending, taken.PendingMl);
 
@@ -175,14 +175,14 @@ public sealed class CrucibleTests
         var a = new MeltRecipe("a", 1, 1, unit);
         var b = new MeltRecipe("b", 2, 2, unit);
 
-        Assert.True(KilnManager.CanAccept(default, a, capacity));
+        Assert.True(KilnManager.CanAccept(default, a, capacity, canAlloy: false));
         // A vessel already holding material 1 refuses material 2
-        Assert.False(KilnManager.CanAccept(new CrucibleComponent(1, unit, 0), b, capacity));
+        Assert.False(KilnManager.CanAccept(new CrucibleComponent(1, unit, 0), b, capacity, canAlloy: false));
         // Pending counts toward the capacity just like molten does
-        Assert.False(KilnManager.CanAccept(new CrucibleComponent(1, capacity - unit, unit), a, capacity));
-        Assert.True(KilnManager.CanAccept(new CrucibleComponent(1, capacity - unit, 0), a, capacity));
-        // An empty vessel takes anything, whatever stale material id it still carries
-        Assert.True(KilnManager.CanAccept(new CrucibleComponent(1, 0, 0), b, capacity));
+        Assert.False(KilnManager.CanAccept(new CrucibleComponent(1, capacity - unit, unit), a, capacity, canAlloy: false));
+        Assert.True(KilnManager.CanAccept(new CrucibleComponent(1, capacity - unit, 0), a, capacity, canAlloy: false));
+        // A vessel emptied of material 1 forgets it and takes anything
+        Assert.True(KilnManager.CanAccept(new CrucibleComponent(1, 0, 0), b, capacity, canAlloy: false));
     }
 
     [Fact]
@@ -199,7 +199,7 @@ public sealed class CrucibleTests
         var charged = state.Contents.TotalMl;
 
         // Cold: nothing melts however long it stands
-        kilns.Update(10f * KilnManager.MeltSeconds, manager, drops);
+        kilns.Update(10f * Kiln.Kiln!.MeltSeconds, manager, drops);
         Assert.Equal(0, state.Contents.MoltenMl);
         Assert.Equal(charged, state.Contents.PendingMl);
         Assert.Equal(0f, KilnManager.MeltProgress01(state));
@@ -207,18 +207,55 @@ public sealed class CrucibleTests
         Assert.True(kilns.TryAddFuel(anchor, Coal));
         Assert.True(kilns.Ignite(anchor));
 
-        kilns.Update(KilnManager.MeltSeconds * 0.5f, manager, drops);
+        kilns.Update(Kiln.Kiln!.MeltSeconds * 0.5f, manager, drops);
         Assert.Equal(0, state.Contents.MoltenMl);
         Assert.InRange(KilnManager.MeltProgress01(state), 0.45f, 0.55f);
         Assert.Equal(charged, state.Contents.TotalMl);
 
-        kilns.Update(KilnManager.MeltSeconds * 0.5f + 0.01f, manager, drops);
+        kilns.Update(Kiln.Kiln!.MeltSeconds * 0.5f + 0.01f, manager, drops);
         Assert.Equal(KilnManager.MeltChunkMl, state.Contents.MoltenMl);
         Assert.Equal(charged, state.Contents.TotalMl);
 
-        kilns.Update(KilnManager.MeltSeconds, manager, drops);
+        kilns.Update(Kiln.Kiln!.MeltSeconds, manager, drops);
         Assert.Equal(2 * KilnManager.MeltChunkMl, state.Contents.MoltenMl);
         Assert.Equal(charged, state.Contents.TotalMl);
+    }
+
+    /// <summary>
+    /// Fire time a kiln running <paramref name="profile"/> takes to turn its first chunk molten,
+    /// measured in fine steps.
+    /// </summary>
+    private static float SecondsToFirstChunk(KilnProfile profile)
+    {
+        var anchor = new Vector3(2, 2, 2);
+        var (manager, kilns, drops) = ConvertedKiln(anchor);
+        var state = kilns.StateAt(2, 2, 2)!;
+        state.Profile = profile;
+        Assert.True(kilns.TryPlaceCrucible(anchor, Crucible.Id, default));
+        var ore = MeltOf("malachite_ore");
+        while (state.Contents.PendingMl < 2 * KilnManager.MeltChunkMl)
+            Assert.True(kilns.TryInsertMelt(anchor, ore.InputId));
+        Assert.True(kilns.TryAddFuel(anchor, Coal));
+        Assert.True(kilns.Ignite(anchor));
+
+        const float dt = 0.005f;
+        var seconds = 0f;
+        while (state.Contents.MoltenMl == 0)
+        {
+            kilns.Update(dt, manager, drops);
+            seconds += dt;
+            Assert.True(seconds < Coal.FuelSeconds, "the first chunk never melted");
+        }
+        Assert.Equal(KilnManager.MeltChunkMl, state.Contents.MoltenMl);
+        return seconds;
+    }
+
+    [Fact]
+    public void AKilnTwiceAsFastMeltsAChunkInHalfTheTime()
+    {
+        var slow = SecondsToFirstChunk(KilnProfile.Create(KilnProfile.Default.FuelCap, 1f, false));
+        var fast = SecondsToFirstChunk(KilnProfile.Create(KilnProfile.Default.FuelCap, 2f, false));
+        Assert.InRange(fast, slow * 0.5f - 0.01f, slow * 0.5f + 0.01f);
     }
 
     [Fact]
@@ -237,9 +274,9 @@ public sealed class CrucibleTests
 
         // Stepping finely across a whole tick: the drawn pool only ever rises, and never by
         // more than the step is worth - i.e. the 100 ml bookkeeping is invisible
-        var dt = KilnManager.MeltSeconds / 20f;
+        var dt = Kiln.Kiln!.MeltSeconds / 20f;
         var previous = KilnManager.DisplayMoltenMl(state);
-        var perStep = KilnManager.MeltChunkMl * dt / KilnManager.MeltSeconds + 1e-3f;
+        var perStep = KilnManager.MeltChunkMl * dt / Kiln.Kiln!.MeltSeconds + 1e-3f;
         for (var i = 0; i < 25; i++)
         {
             kilns.Update(dt, manager, drops);
@@ -260,12 +297,12 @@ public sealed class CrucibleTests
         Assert.True(kilns2.Ignite(anchor));
 
         // Run the fire down to a sliver so it goes out in the middle of a chunk
-        kilns2.Update(KilnManager.MeltSeconds * 0.25f, manager2, drops2);
+        kilns2.Update(Kiln.Kiln!.MeltSeconds * 0.25f, manager2, drops2);
         Assert.True(state2.Lit);
-        state2.BurnLeft = KilnManager.MeltSeconds * 0.25f;
+        state2.BurnLeft = Kiln.Kiln!.MeltSeconds * 0.25f;
         var before = KilnManager.DisplayMoltenMl(state2);
 
-        kilns2.Update(KilnManager.MeltSeconds * 0.5f, manager2, drops2);
+        kilns2.Update(Kiln.Kiln!.MeltSeconds * 0.5f, manager2, drops2);
         Assert.False(state2.Lit);
         Assert.True(KilnManager.DisplayMoltenMl(state2) >= before);
         Assert.True(KilnManager.MeltProgress01(state2) > 0f);
@@ -295,7 +332,7 @@ public sealed class CrucibleTests
         // A second input of the same material: the hint follows the last thing put in
         Assert.True(kilns.TryInsertMelt(anchor, crushed.InputId));
         Assert.Equal(crushed.InputId, state.Contents.PendingInputId);
-        Assert.Equal(Copper, state.Contents.MaterialId);
+        Assert.Equal([Copper], state.Contents.Metals.Select(m => m.MaterialId));
         Assert.Equal(ore.AmountMl + crushed.AmountMl, state.Contents.PendingMl);
 
         Assert.True(kilns.TryTakeCrucible(anchor, out _, out var taken));
@@ -306,7 +343,7 @@ public sealed class CrucibleTests
         Assert.Equal(crushed.InputId, otherKilns.StateAt(2, 2, 2)!.Contents.PendingInputId);
 
         // A component written the way every older caller writes it is unchanged by the new field
-        Assert.Equal<byte>(0, default(CrucibleComponent).PendingInputId);
+        Assert.Equal(BlockType.Air, default(CrucibleComponent).PendingInputId);
         Assert.Equal(new CrucibleComponent(Copper, 1, 2), new CrucibleComponent(Copper, 1, 2, 0));
     }
 
@@ -337,7 +374,7 @@ public sealed class CrucibleTests
 
         Assert.True(kilns.Ignite(anchor));
 
-        var dt = KilnManager.MeltSeconds / 20f;
+        var dt = Kiln.Kiln!.MeltSeconds / 20f;
         var previous = KilnManager.DisplayPendingMl(state);
         for (var i = 0; i < 25; i++)
         {

@@ -1,0 +1,6 @@
+{
+  // Crushing does not change how much metal a chunk holds.
+  "input": "item/crushed_tin",
+  "fluid": "tin",
+  "amountMl": 100
+}

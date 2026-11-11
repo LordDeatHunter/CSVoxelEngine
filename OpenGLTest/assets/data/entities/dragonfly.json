@@ -1,0 +1,8 @@
+{
+  "name": "Dragonfly",
+  // A man-sized hunter of the waterside that darts in to bite and perches on the ground (Dragonfly, WildlifeConfig)
+  "blood": { "color": [170, 200, 50] },
+  "hp": 36,
+  "loot": "dragonfly",
+  "model": "assets/models/entity/dragonfly.bbmodel"
+}

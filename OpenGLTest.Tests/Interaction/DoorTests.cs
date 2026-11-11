@@ -40,16 +40,16 @@ public sealed class DoorTests : IDisposable
     private static BlockType Door() => Lowers().First(t => t.Openable);
 
     [Fact]
-    public void ATwoCellBlockPairsAHeldLowerHalfWithAnUpperHalfPickedAsIt()
+    public void ATwoCellBlockPairsALowerHalfWithAnUpperHalfPickedAsIt()
     {
         var lowers = Lowers();
         Assert.NotEmpty(lowers);
         var cell = new Vector3(2, 5, -3);
         foreach (var lower in lowers)
         {
+            // Only the lower half is ever held (a door; a waystone pair has no item at all)
             var upper = BlockType.ById[lower.UpperHalfId]!;
             Assert.Equal(lower.Id, upper.LowerHalfId);
-            Assert.True(lower.HasItem);
             Assert.False(upper.HasItem);
             Assert.Equal((lower.HasHorizontalFacing, lower.Openable), (upper.HasHorizontalFacing, upper.Openable));
             Assert.Equal(lower.Id, BlockType.PickId(upper.Id));
@@ -65,7 +65,7 @@ public sealed class DoorTests : IDisposable
         Assert.False(TallBlock.TryGetPartner(ContentRegistry.RequireBlock("stone").Id, cell, out _, out _));
     }
 
-    private (int X, int Y, int Z) PlaceDoor(byte door, int x, int z, int facing)
+    private (int X, int Y, int Z) PlaceDoor(ushort door, int x, int z, int facing)
     {
         _world!.Player.Context.ViewDirection = Chunk.CubeFaces[facing].normal;
         Assert.True(_world.Place(door, new Vector3(x, _world.Top, z), Vector3.UnitY));

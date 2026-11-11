@@ -308,7 +308,7 @@ public sealed class TreeFellingTests
         var otherWood = TreeSpeciesRegistry.All.First(s => s.WoodId != oak.WoodId).WoodId;
         // A lone ring stack whose parent (the core) is gone: only what it stands on can hold it
         var shell = WoodState.Encode(WoodState.FullCube, 2, true);
-        (byte Id, byte State, TreeSupportResult Expected)[] grounds =
+        (ushort Id, byte State, TreeSupportResult Expected)[] grounds =
         [
             (oak.LeavesId, LeafState.Encode(1, false), TreeSupportResult.Unsupported),
             (otherWood, WoodState.Encode(WoodState.FullCube, WoodState.ParentRoot, false), TreeSupportResult.Unsupported),

@@ -22,6 +22,10 @@ internal sealed class BodyPartMatrices
         var feet = eyePos - new Vector3(0f, Camera.EyeHeight, 0f);
         if (backOffset != 0f)
         {
+            // A forward lean (flight) swings the chest toward the eye; shift the body back by how far the
+            // torso top moves forward, so looking down never lands on the upper torso from behind.
+            var hipY = rig.Parts.TryGetValue("ThighL", out var hipPart) ? hipPart.Pivot.Y : PelvisFallback;
+            backOffset += MathF.Max(0f, MathF.Sin(-pose.TorsoPitch)) * MathF.Max(0f, Camera.EyeHeight - hipY);
             var yawBase = yawDeg * MathF.PI / 180f;
             feet -= new Vector3(MathF.Cos(yawBase) * backOffset, 0f, MathF.Sin(yawBase) * backOffset);
         }
@@ -73,10 +77,11 @@ internal sealed class BodyPartMatrices
             fore = LimbFrames.FrameOf(Matrix4x4.CreateFromAxisAngle(swingAxis, elbow));
             _model.Overlays.ApplyArmFrames(side, ref upper, ref fore);
             // The arm now hangs off the torso, so the torso's twist turns it too. The authored poses (a blade
-            // swing's sweep, the cocked throw, the punch) were tuned in body space, so while one is showing the twist
+            // swing's sweep, the cocked throw, the cast, the punch) were tuned in body space, so while one is showing the twist
             // is taken back out of the arm's yaw and its hand path stays where it was; an idle arm simply follows
             // the torso round.
-            var authored = side > 0f ? MathUtils.Clamp01(MathF.Max(blade.Stroke, MathF.Max(_model.ThrowArm.ThrowArmWeight(), _model.Jab.PunchActivity()))) : 0f;
+            var authored = side > 0f ? MathUtils.Clamp01(MathF.Max(MathF.Max(blade.Stroke, CastMotion.Weight(_model.CastProgress)),
+                MathF.Max(_model.ThrowArm.ThrowArmWeight(), _model.Jab.PunchActivity()))) : 0f;
             if (authored > 0f && mods.TorsoYaw != 0f)
                 upper = LimbFrames.FrameOf(Matrix4x4.CreateFromQuaternion(upper) * Matrix4x4.CreateRotationY(-mods.TorsoYaw * authored));
         }

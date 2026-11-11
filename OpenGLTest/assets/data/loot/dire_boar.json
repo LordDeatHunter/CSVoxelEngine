@@ -1,0 +1,23 @@
+{
+  // The miniboss pays out: a pile of meat, hides and its trophy tusk, every time.
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/raw_boar_meat", "weight": 1, "count": { "min": 3, "max": 5 } }
+      ]
+    },
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/hide", "weight": 1, "count": { "min": 2, "max": 3 } }
+      ]
+    },
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/dire_tusk", "weight": 1, "count": 1 }
+      ]
+    }
+  ]
+}

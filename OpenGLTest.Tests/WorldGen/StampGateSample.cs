@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
+using VoxelEngine.WorldGen.Sky;
+using VoxelEngine.WorldGen.Structures;
 
 namespace VoxelEngine.Tests.WorldGen;
 
@@ -25,7 +28,10 @@ namespace VoxelEngine.Tests.WorldGen;
 /// on the frozen plains and oases. Every chunk column a site's footprint touches is added;</item>
 /// <item>for every column, every chunk from two below its lowest ground to one above its tallest
 /// ground plus the tree reach, plus the chunk holding its highest water level and the one above
-/// it. The sky chunks in that range simply take the fill's early-out.</item>
+/// it. The sky chunks in that range simply take the fill's early-out;</item>
+/// <item>the nearest battle tower (<see cref="TowerPlacement.TryFindNearest"/>): a seam-crossing 2x2
+/// block of chunk columns holding its center, every chunk from one below its foundation to one above
+/// its top.</item>
 /// </list>
 /// The default set is sized for the default test suite; setting the environment variable
 /// <see cref="ExhaustiveVariable"/> to <c>1</c> scales every count up (thousands of chunks) for
@@ -131,7 +137,95 @@ internal static class StampGateSample
         foreach (var pos in extraChunks)
             AddChunk(pos);
 
+        // The barrier band lies far below every column's ground: one anchor column's chunk stack
+        // through it, one chunk past each edge, so its gate both admits and skips a filled chunk,
+        // and on down through hell's first two layers, whose wholly-hell chunks take the fill's
+        // hell path (gated) against the whole pipeline (ungated). The stack reaches up through the
+        // cave sub-biome band to one chunk past its highest reach, so the cave shape, the cave biome
+        // ore richness and the exclusive cave ores meet real sub-biome cells
+        if (columns.Count > 0)
+        {
+            var (bcx, bcz) = columns[0];
+            var hellBottom = WorldGenerationConfig.HellTopY - 2 * WorldGenerationConfig.HellLayerPeriodBlocks;
+            for (var cy = hellBottom >> Chunk.SizeShift;
+                 cy <= (CaveBiomes.SubBandTopY >> Chunk.SizeShift) + 1; cy++)
+                AddChunk(new Vector3(bcx, cy, bcz));
+        }
+
+        // The cloud slab lies far above every column's ground: the chunk stacks through it of the
+        // anchor column and of the nearest chunk column holding cloud, one chunk past each edge, so
+        // its gate both admits and skips and the sky chunk's short path meets real cloud
+        if (columns.Count > 0)
+        {
+            var (ccx, ccz) = columns[0];
+            var cloudy = NearestCloudColumn(ccx, ccz);
+            for (var cy = (WorldGenerationConfig.CloudSlabBottomY >> Chunk.SizeShift) - 1;
+                 cy <= (WorldGenerationConfig.CloudSlabTopY >> Chunk.SizeShift) + 1; cy++)
+            {
+                AddChunk(new Vector3(ccx, cy, ccz));
+                AddChunk(new Vector3(cloudy.Cx, cy, cloudy.Cz));
+            }
+
+            // The cloud sea, one chunk past each edge, over the anchor column; and the island band
+            // through the nearest island's column, one chunk past each edge, so the island gate both
+            // admits and skips and the short path meets real island
+            for (var cy = (SkyIslandConfig.CloudSeaBottomY >> Chunk.SizeShift) - 1;
+                 cy <= (SkyIslandConfig.CloudSeaTopY >> Chunk.SizeShift) + 1; cy++)
+                AddChunk(new Vector3(ccx, cy, ccz));
+
+            var island = NearestIslandColumn(ccx, ccz);
+            for (var cy = (WorldGenerationConfig.SkyIslandBottomY >> Chunk.SizeShift) - 1;
+                 cy <= (WorldGenerationConfig.SkyIslandTopY >> Chunk.SizeShift) + 1; cy++)
+                AddChunk(new Vector3(island.Cx, cy, island.Cz));
+        }
+
+        // The nearest battle tower: the 2x2 block of chunk columns whose shared corner lies nearest
+        // its center (so it crosses a seam and holds the center column), every chunk from one below
+        // its foundation to one above its top, so the tower gate meets real tower cells, including
+        // the upper chunks only the raised early-out keeps filled
+        if (TowerPlacement.TryFindNearest(0, 0, 6, out var tower))
+        {
+            var tcx0 = (tower.CenterX - Chunk.Size / 2) >> Chunk.SizeShift;
+            var tcz0 = (tower.CenterZ - Chunk.Size / 2) >> Chunk.SizeShift;
+            for (var tcx = tcx0; tcx <= tcx0 + 1; tcx++)
+            for (var tcz = tcz0; tcz <= tcz0 + 1; tcz++)
+            for (var cy = tower.MinChunkY - 1; cy <= tower.MaxChunkY + 1; cy++)
+                AddChunk(new Vector3(tcx, cy, tcz));
+        }
+
         return chunks;
+    }
+
+    /// <summary>The chunk column of the center of the sky island nearest (cx, cz), by rings of island cells.</summary>
+    private static (int Cx, int Cz) NearestIslandColumn(int cx, int cz)
+    {
+        var gx0 = (cx << Chunk.SizeShift) / SkyIslandConfig.IslandCellBlocks;
+        var gz0 = (cz << Chunk.SizeShift) / SkyIslandConfig.IslandCellBlocks;
+        for (var ring = 0; ring <= 200; ring++)
+        for (var dx = -ring; dx <= ring; dx++)
+        for (var dz = -ring; dz <= ring; dz++)
+        {
+            if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != ring) continue;
+            if (SkyIslands.TryGetIsland(gx0 + dx, gz0 + dz, out var island))
+                return ((int)MathF.Floor(island.CenterX) >> Chunk.SizeShift, (int)MathF.Floor(island.CenterZ) >> Chunk.SizeShift);
+        }
+
+        return (cx, cz);
+    }
+
+    /// <summary>The chunk column nearest (cx, cz), by rings, with a cloud column at its center.</summary>
+    private static (int Cx, int Cz) NearestCloudColumn(int cx, int cz)
+    {
+        for (var ring = 0; ring <= MaxSiteRing * 4; ring++)
+        for (var dx = -ring; dx <= ring; dx++)
+        for (var dz = -ring; dz <= ring; dz++)
+        {
+            if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != ring) continue;
+            if (CloudPatchGenerator.TryGetColumn(((cx + dx) << Chunk.SizeShift) + 8, ((cz + dz) << Chunk.SizeShift) + 8, out _, out _))
+                return (cx + dx, cz + dz);
+        }
+
+        return (cx, cz);
     }
 
     /// <summary>

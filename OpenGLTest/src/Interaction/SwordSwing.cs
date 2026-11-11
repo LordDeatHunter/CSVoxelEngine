@@ -18,4 +18,9 @@ public enum SwordSwing : byte
     /// <summary>The finisher: a slow overhead chop straight down onto the one target under the aim, at the
     /// highest power and a heavier shove.</summary>
     Chop = 2,
+
+    /// <summary>An axe's mining swing: a quick overhead chop that is not part of the sword's chain
+    /// (<see cref="SwordSwings.Next"/> never reaches it). Its length follows the axe's hit pace
+    /// (<see cref="Player.PlayerModel.StartAxeChop"/>), so each hit lands as the blade comes down.</summary>
+    AxeChop = 3,
 }

@@ -1,17 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Loot;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;
+using VoxelEngine.Content.Stations;
 using VoxelEngine.Graphics;
 using VoxelEngine.Player;
 using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine.Content.Blocks;
 
-/// <summary>Reads and validates the shape-related fields of a block's JSON (material, flame, facing and support, pane, facingFromLook, open, tree wood, collidesByHitbox and hitboxes), each error naming the block file.</summary>
+/// <summary>Reads and validates the shape-related fields of a block's JSON (material, flame, facing and support, multiblock size, pane, facingFromLook, open, tree wood, collidesByHitbox and hitboxes), each error naming the block file.</summary>
 internal static class BlockSchemaParser
 {
     /// <summary>
@@ -173,6 +177,177 @@ internal static class BlockSchemaParser
             throw new InvalidOperationException($"Block '{path}' declares an open object without a model.");
         return ParseHitboxes(open.Hitbox, path)
                ?? throw new InvalidOperationException($"Block '{path}' declares an open object without a hitbox.");
+    }
+
+    /// <summary>
+    /// Reads a multiblock anchor's <c>multiblock.size</c>, the edge length of its cubic volume in
+    /// cells: <see cref="MultiblockShape.DefaultSize"/> when omitted, and anything outside
+    /// <see cref="MultiblockShape.MinSize"/>..<see cref="MultiblockShape.MaxSize"/> (the most the
+    /// state byte's two bits per offset hold) throws naming the file. 0 for a block that is not
+    /// an anchor.
+    /// </summary>
+    internal static int ParseMultiblockSize(BlockDefinition.MultiblockDefinition? definition, string path)
+    {
+        if (definition == null) return 0;
+        var size = definition.Size ?? MultiblockShape.DefaultSize;
+        if (!MultiblockShape.IsValidSize(size))
+            throw new InvalidOperationException(
+                $"Block '{path}' has multiblock.size {size}; a multiblock is {MultiblockShape.MinSize}..{MultiblockShape.MaxSize} cells along each edge.");
+        return size;
+    }
+
+    /// <summary>
+    /// Reads a kiln anchor's <c>kiln</c> object into its <see cref="KilnProfile"/>: omitted
+    /// fields take the plain kiln's (fuel cap 4, speed 1, no alloying), and a fuel cap or melt
+    /// speed <see cref="KilnProfile.Create"/> refuses throws naming the file. The layout is the
+    /// one of the anchor's <paramref name="multiblockSize"/> (<see cref="KilnLayout.ForSize"/>),
+    /// and a size no kiln model exists for throws too; a block with no multiblock (0) keeps the
+    /// default, since the renderer check refuses it anyway. Null for a block that is not a kiln.
+    /// </summary>
+    internal static KilnProfile? ParseKiln(BlockDefinition.KilnDefinition? definition, string path,
+        int multiblockSize = MultiblockShape.DefaultSize)
+    {
+        if (definition == null) return null;
+        KilnProfile profile;
+        try
+        {
+            profile = KilnProfile.Create(
+                definition.FuelCap ?? KilnProfile.Default.FuelCap,
+                definition.MeltSpeed ?? KilnProfile.Default.MeltSpeed,
+                definition.CanAlloy ?? KilnProfile.Default.CanAlloy);
+        }
+        catch (ArgumentException e)
+        {
+            throw new InvalidOperationException($"Block '{path}' has a kiln object with {e.Message}", e);
+        }
+
+        if (multiblockSize == 0) return profile;
+        var layout = KilnLayout.ForSize(multiblockSize)
+            ?? throw new InvalidOperationException(
+                $"Block '{path}' is a kiln of multiblock.size {multiblockSize}, but kiln models exist only for sizes {string.Join(", ", KilnLayout.All.Select(l => l.VolumeSize))}.");
+        return profile with { Layout = layout };
+    }
+
+    /// <summary>Reads a bloomery anchor's <c>bloomery</c> object into its <see cref="BloomeryProfile"/>: omitted fields
+    /// take the defaults and a cap <see cref="BloomeryProfile.Create"/> refuses throws naming the file. Null for a
+    /// block that is not a bloomery.</summary>
+    internal static BloomeryProfile? ParseBloomery(BlockDefinition.BloomeryDefinition? definition, string path)
+    {
+        if (definition == null) return null;
+        try
+        {
+            return BloomeryProfile.Create(definition.OreCap ?? BloomeryProfile.DefaultOreCap,
+                definition.FuelCap ?? BloomeryProfile.DefaultFuelCap,
+                ResolveItemName(definition.Ore, "bloomery.ore", path),
+                ResolveItemName(definition.Bloom, "bloomery.bloom", path),
+                ResolveItemName(definition.Slag, "bloomery.slag", path));
+        }
+        catch (ArgumentException e)
+        {
+            throw new InvalidOperationException($"Block '{path}' has a bloomery object with {e.Message}", e);
+        }
+    }
+
+    /// <summary>A required block or item name of a block's object, resolved to its shared id; a missing or unknown
+    /// name throws naming the file and the field.</summary>
+    private static ushort ResolveItemName(string? name, string field, string path)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new InvalidOperationException($"Block '{path}' needs {field}, which names the item it works.");
+        if (ContentFiles.TryResolve(name, out var id)) return id;
+        throw new InvalidOperationException($"Block '{path}' names '{name}' in {field}, which is not a registered block or item.");
+    }
+
+    /// <summary>Reads a block's <c>anvil</c> object into its <see cref="AnvilProfile"/>. An anvil is a plain model
+    /// block; a multiblock is refused. Null for a block that is not an anvil.</summary>
+    /// <summary>Validates a block's <c>spritesheet</c> object into its <see cref="TextureSheet"/>.</summary>
+    internal static TextureSheet ParseSpritesheet(BlockDefinition.SpritesheetDefinition definition, string path)
+    {
+        var texture = definition.Texture;
+        if (string.IsNullOrWhiteSpace(texture))
+            throw new InvalidOperationException($"Block '{path}' has a spritesheet without a texture name.");
+        var cols = definition.Cols ?? 0;
+        var rows = definition.Rows ?? 0;
+        if (cols < 1 || rows < 1)
+            throw new InvalidOperationException($"Block '{path}' has a spritesheet without a positive cols and rows.");
+        var frames = definition.Frames ?? cols * rows;
+        if (frames < 1 || frames > cols * rows)
+            throw new InvalidOperationException(
+                $"Block '{path}' has spritesheet.frames {frames}; expected 1..{cols * rows}.");
+        var fps = definition.Fps ?? 8f;
+        if (!(fps > 0f) || float.IsInfinity(fps))
+            throw new InvalidOperationException($"Block '{path}' has spritesheet.fps {fps}; expected a positive number.");
+        return new TextureSheet(texture, cols, rows, frames, fps);
+    }
+
+    internal static AnvilProfile? ParseAnvil(BlockDefinition.AnvilDefinition? definition, BlockRenderer renderer,
+        string path)
+    {
+        if (definition == null) return null;
+        if (renderer is not BlockRenderer.Model)
+            throw new InvalidOperationException(
+                $"Block '{path}' declares an anvil object with renderer \"{renderer}\"; an anvil is a plain model block.");
+        try
+        {
+            return AnvilProfile.Create(definition.Hits ?? AnvilProfile.DefaultHits,
+                ResolveItemName(definition.Input, "anvil.input", path),
+                ResolveItemName(definition.Result, "anvil.result", path),
+                ResolveItemName(definition.Slag, "anvil.slag", path));
+        }
+        catch (ArgumentException e)
+        {
+            throw new InvalidOperationException($"Block '{path}' has an anvil object with {e.Message}", e);
+        }
+    }
+
+    /// <summary>
+    /// Reads a block's <c>chest</c> object: its slot count (1..<see cref="ChestConfig.MaxSlots"/>) and the optional loot
+    /// table a never-opened one rolls, which must be a loaded loot table (loot tables load before blocks), or instead a
+    /// non-empty <c>tiers</c> list of loaded loot tables (at most <see cref="ChestProfile.MaxTiers"/>), one per tier of
+    /// a tiered chest; <c>loot</c> and <c>tiers</c> are exclusive. Its <c>skin</c> must name a PNG under
+    /// <c>textures/chests</c> (<see cref="ChestModel.SkinPath"/>). A chest is a plain model block; any other renderer
+    /// is refused. Null for a block that is not a chest.
+    /// </summary>
+    internal static ChestProfile? ParseChest(BlockDefinition.ChestDefinition? definition, BlockRenderer renderer,
+        string path)
+    {
+        if (definition == null) return null;
+        if (renderer != BlockRenderer.Model)
+            throw new InvalidOperationException($"Block '{path}' has a chest object but is not a model block.");
+        if (definition.Slots is not { } slots || slots < 1 || slots > ChestConfig.MaxSlots)
+            throw new InvalidOperationException(
+                $"Block '{path}' has chest.slots {definition.Slots}; expected 1..{ChestConfig.MaxSlots}.");
+        if (string.IsNullOrWhiteSpace(definition.Skin))
+            throw new InvalidOperationException($"Block '{path}' has a chest object without a chest.skin.");
+        var skin = definition.Skin.Trim();
+        var skinPath = ChestModel.SkinPath(ContentRegistry.AssetsRoot, skin);
+        if (!File.Exists(skinPath))
+            throw new InvalidOperationException(
+                $"Block '{path}' has chest.skin '{skin}', but '{skinPath}' does not exist.");
+        var loot = string.IsNullOrWhiteSpace(definition.Loot) ? null : definition.Loot.Trim();
+        if (loot != null && !ContentRegistry.LootTables.ContainsKey(loot))
+            throw new InvalidOperationException($"Block '{path}' has chest.loot '{loot}', which is not a loot table.");
+        if (definition.Tiers == null) return new ChestProfile(slots, loot, Skin: skin);
+
+        if (loot != null)
+            throw new InvalidOperationException($"Block '{path}' has both chest.loot and chest.tiers; give one.");
+        if (definition.Tiers.Length == 0)
+            throw new InvalidOperationException($"Block '{path}' has an empty chest.tiers list.");
+        if (definition.Tiers.Length > ChestProfile.MaxTiers)
+            throw new InvalidOperationException(
+                $"Block '{path}' has {definition.Tiers.Length} chest.tiers; at most {ChestProfile.MaxTiers}.");
+        var tiers = new List<string>(definition.Tiers.Length);
+        foreach (var entry in definition.Tiers)
+        {
+            if (string.IsNullOrWhiteSpace(entry))
+                throw new InvalidOperationException($"Block '{path}' has a blank chest.tiers entry.");
+            var name = entry.Trim();
+            if (!ContentRegistry.LootTables.ContainsKey(name))
+                throw new InvalidOperationException(
+                    $"Block '{path}' has chest.tiers entry '{name}', which is not a loot table.");
+            tiers.Add(name);
+        }
+        return new ChestProfile(slots, null, tiers, skin);
     }
 
     /// <summary>

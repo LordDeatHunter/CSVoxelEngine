@@ -26,7 +26,7 @@ internal static class TreeStamper
     /// border, and a tree's unchecked base cell can sit in an earlier tree's leaves -- wood is
     /// first-come, leaves never go over anything.
     /// </summary>
-    public static void Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         var r = TreeGenerator.ReachHorizontal;
         var x1 = worldX0 + Chunk.Size;
@@ -108,7 +108,7 @@ internal static class TreeStamper
     // base cell walks, and it stops at its own floor, so roots never cross a chunk floor: a chunk
     // reads only its own blocks, every chunk stays a pure function of position, and no root stub
     // can be left hanging in a cave below.
-    private static void StampRoots(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
+    private static void StampRoots(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
         TreeBatches.TreeShape shape)
     {
         var lx = shape.X - worldX0;

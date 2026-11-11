@@ -122,7 +122,7 @@ public sealed class CreativeCatalogTests
 
         Assert.DoesNotContain(InventorySearch.Search(stone.DisplayName, empty),
             h => h.Kind == SearchHitKind.Inventory);
-        Assert.Contains(InventorySearch.Search(stone.DisplayName, empty, includeCatalog: true),
+        Assert.Contains(InventorySearch.Search(stone.DisplayName, empty, creative: true),
             h => h.Kind == SearchHitKind.Inventory && h.Id == stone.Id);
     }
 }

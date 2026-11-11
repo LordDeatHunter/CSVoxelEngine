@@ -1,0 +1,72 @@
+{
+  // The underground waystone (plans/WAYSTONES.md): a sealed stone-brick chamber of its own near an underground room
+  // (WaystonePlacement), lit by lamps set in its walls, the waystone raised on a dais of slabs. The player digs in.
+  "kind": "underground",
+  "satellite": true,
+  "groundLayer": 1,
+  "palette": {
+    "b": "stone_bricks",
+    "c": "cobblestone",
+    "l": "lamp",
+    "h": "cobblestone_slab",
+    "d": "stone_bricks",
+    "W": "waystone_underground",
+    "U": "waystone_underground_upper"
+  },
+  "layers": [
+    [
+      "ccccccc",
+      "cbbbbbc",
+      "cbbbbbc",
+      "cbbbbbc",
+      "cbbbbbc",
+      "cbbbbbc",
+      "ccccccc"
+    ],
+    [
+      "bbbbbbb",
+      "b.....b",
+      "b.hhh.b",
+      "b.hdh.b",
+      "b.hhh.b",
+      "b.....b",
+      "bbbbbbb"
+    ],
+    [
+      "bbblbbb",
+      "b.....b",
+      "b.....b",
+      "l..W..l",
+      "b.....b",
+      "b.....b",
+      "bbblbbb"
+    ],
+    [
+      "bbbbbbb",
+      "b.....b",
+      "b.....b",
+      "b..U..b",
+      "b.....b",
+      "b.....b",
+      "bbbbbbb"
+    ],
+    [
+      "bbbbbbb",
+      "b.....b",
+      "b.....b",
+      "b.....b",
+      "b.....b",
+      "b.....b",
+      "bbbbbbb"
+    ],
+    [
+      "ccccccc",
+      "cbbbbbc",
+      "cbbbbbc",
+      "cbbbbbc",
+      "cbbbbbc",
+      "cbbbbbc",
+      "ccccccc"
+    ]
+  ]
+}

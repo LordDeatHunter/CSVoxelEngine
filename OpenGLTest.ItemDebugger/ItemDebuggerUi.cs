@@ -67,7 +67,7 @@ public sealed class DebugSlider
 /// </summary>
 public sealed class ItemDebuggerUi
 {
-    public readonly record struct GridEntry(byte Id, string Name, bool IsBlock);
+    public readonly record struct GridEntry(ushort Id, string Name, bool IsBlock);
 
     /// <summary>The trees tab's growth step slider, which the program drags by label.</summary>
     public const string TreeStepSlider = "Step";

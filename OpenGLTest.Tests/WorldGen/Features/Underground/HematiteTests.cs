@@ -40,7 +40,7 @@ public sealed class HematiteTests
         // A stone chunk the ceiling runs through: nothing above it may change
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var y0 = (MaxY >> 4) << 4;
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         for (var x0 = 0; x0 < 128; x0 += Chunk.Size)
         for (var z0 = 0; z0 < 128; z0 += Chunk.Size)
         {
@@ -68,7 +68,7 @@ public sealed class HematiteTests
         // A row of chunks wholly below the ceiling, so a rare ore still turns up somewhere
         var y0 = ((MaxY >> 4) << 4) - Chunk.Size;
         var oreCells = 0;
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         for (var x0 = 0; x0 < 128; x0 += Chunk.Size)
         for (var z0 = 0; z0 < 128; z0 += Chunk.Size)
         {

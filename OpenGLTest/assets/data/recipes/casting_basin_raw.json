@@ -1,0 +1,10 @@
+{
+  // Four mudballs pressed into a raw casting basin. Uncrafts back through
+  // mudball_from_casting_basin_raw.json and fires on a lit campfire via
+  // cook/casting_basin_raw.json.
+  "result": "block/casting_basin_raw",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/mudball", "count": 4 }
+  ]
+}

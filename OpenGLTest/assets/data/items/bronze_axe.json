@@ -1,0 +1,8 @@
+{
+  "name": "Bronze Axe",
+  "texture": "assets/textures/items/bronze_axe.png",
+  "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.4 },
+  "blockDamage": 2.5,
+  "entityDamage": 6,
+  "tool": { "power": 2.5, "hitDelayMs": 225 }
+}

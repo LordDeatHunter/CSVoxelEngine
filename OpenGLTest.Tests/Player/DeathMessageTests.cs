@@ -9,6 +9,8 @@ namespace VoxelEngine.Tests.Player;
 /// </summary>
 public sealed class DeathMessageTests
 {
+    public DeathMessageTests() => TestContent.EnsureLoaded();
+
     [Fact]
     public void TheLineNamesTheKillerForAMob()
     {
@@ -30,6 +32,23 @@ public sealed class DeathMessageTests
         Assert.Equal("Player died", DeathMessages.For("Player", DamageSource.None, null));
         // A named killer never leaks into a non-mob line
         Assert.Equal("Player fell", DeathMessages.For("Player", DamageSource.Fall, "Goblin"));
+    }
+
+    [Fact]
+    public void MagicDeathSaysTheEffectPhrase()
+    {
+        const string phrase = "burned to death";
+        var line = DeathMessages.For("Player", DamageSource.Magic, phrase);
+        Assert.StartsWith("Player", line);
+        Assert.Contains(phrase, line);
+
+        // Without a phrase the line still names the player
+        foreach (var none in new[] { null, "" })
+        {
+            var plain = DeathMessages.For("Player", DamageSource.Magic, none);
+            Assert.StartsWith("Player", plain);
+            Assert.NotEqual("Player", plain.Trim());
+        }
     }
 
     [Fact]

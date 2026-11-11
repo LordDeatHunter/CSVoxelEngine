@@ -1,0 +1,10 @@
+{
+  // Pouring molten glass into a casting basin yields a glass block. Cast files are named by
+  // their result and keyed by (mold, fluid); the basin is the mold that makes blocks.
+  "mold": "block/casting_basin",
+  "fluid": "glass",
+  "amountMl": 100,
+  "coolSeconds": 3,
+  "result": "block/glass",
+  "count": 1
+}

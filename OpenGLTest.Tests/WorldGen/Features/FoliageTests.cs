@@ -129,18 +129,18 @@ public sealed class FoliageTests
         var branch = ContentRegistry.RequireItem("branch").Id;
 
         var grassSupport = Support(into => TallGrass.LootTable!.Roll(new LootContext(3, 40, -7), into));
-        Assert.Equal(new HashSet<byte> { vine }, grassSupport);
+        Assert.Equal(new HashSet<ushort> { vine }, grassSupport);
 
         var shrubSupport = Support(into => DeadShrub.LootTable!.Roll(new LootContext(3, 40, -7), into));
-        Assert.Equal(new HashSet<byte> { branch }, shrubSupport);
+        Assert.Equal(new HashSet<ushort> { branch }, shrubSupport);
     }
 
     private const int LootRolls = 500;
 
-    private static HashSet<byte> Support(Action<List<byte>> roll)
+    private static HashSet<ushort> Support(Action<List<ushort>> roll)
     {
-        var into = new List<byte>();
-        var ids = new HashSet<byte>();
+        var into = new List<ushort>();
+        var ids = new HashSet<ushort>();
         for (var i = 0; i < LootRolls; i++)
         {
             into.Clear();
@@ -171,9 +171,9 @@ public sealed class FoliageTests
         var cells = Chunk.Size * Chunk.Size;
         var groundY = WorldGenerationConfig.SeaLevel + 20;
         var heights = new int[cells];
-        var ground = new byte[cells];
-        var cover = new byte[cells];
-        var blocks = new byte[Chunk.BlockCount];
+        var ground = new ushort[cells];
+        var cover = new ushort[cells];
+        var blocks = new ushort[Chunk.BlockCount];
 
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

@@ -23,7 +23,7 @@ public sealed class GravelPocketTests
         var column = UniformColumn(30);
         var heights = column.Heights;
 
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         for (var x = 0; x < Chunk.Size; x++)
         for (var y = 1; y < Chunk.Size; y++)
         for (var z = 0; z < Chunk.Size; z++)
@@ -63,7 +63,7 @@ public sealed class GravelPocketTests
 
         // Every column's surface far above the scan volume, so all of it lies inside the burial band
         var column = UniformColumn(200);
-        void Stamp(byte[] blocks, int x0, int y0, int z0) => GravelPocketGenerator.Stamp(blocks, column, x0, y0, z0);
+        void Stamp(ushort[] blocks, int x0, int y0, int z0) => GravelPocketGenerator.Stamp(blocks, column, x0, y0, z0);
 
         var loose = OreScan.StampedCells(Stamp, stone, b => b == gravel || b == sand);
         var stoneLeft = OreScan.StampedCells(Stamp, stone, b => b == stone);

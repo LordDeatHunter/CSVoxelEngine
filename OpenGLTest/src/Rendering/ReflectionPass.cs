@@ -255,7 +255,7 @@ internal sealed class ReflectionPass
         // they belong; only the cloud cover in front of them is measured from the mirrored eye,
         // as the mirror's clouds are drawn from it. The lens glare is the camera's, not the
         // sky's, so the mirror never reflects it.
-        Sky.RenderSky(mirrorRot, camera.GetProjectionMatrix(), mirroredFwd,
+        Sky.RenderSky(mirrorRot, camera.GetProjectionMatrix(),
             Lighting.SkyFrame with { Eye = mirroredPos, GlareColor = Vector3.Zero });
         // SkyPasses.RenderSun leaves its own program and its disc on unit 0; the mirrored world draws
         // below want ours and the atlas back.
@@ -412,7 +412,7 @@ internal sealed class ReflectionPass
         if (Mobs.SlimeMesh != null)
             foreach (var slime in entities.Slimes)
                 if (KeepForMirror(eye, slime.Position)) _mirrorSlimes.Add(slime);
-        if (Mobs.GoblinMeshes != null)
+        if (Mobs.GoblinRig != null)
             foreach (var goblin in entities.Goblins)
                 if (KeepForMirror(eye, goblin.Position)) _mirrorGoblins.Add(goblin);
         // A berg's waterline center feeds the reuse motion signal, so a drifting berg refreshes it

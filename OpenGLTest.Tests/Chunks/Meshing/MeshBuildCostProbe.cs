@@ -21,7 +21,9 @@ namespace VoxelEngine.Tests.Chunks.Meshing;
 /// relative before/after figure, never as an in-game rate.
 ///
 /// Case A is the default-color scene (every lamp on the warm palette slot). Case B swaps
-/// every second lamp for <c>blue_lamp</c> and only runs once that block exists.
+/// every second lamp for <c>blue_lamp</c> and only runs once that block exists. Cases C1 and C2 measure the battle
+/// tower's sky cover (BT-10): C1 raises the cover flag with no covering cell in the volume (every column scanned, none
+/// covered), C2 lays a brick roof over the volume's top.
 /// </summary>
 public sealed class MeshBuildCostProbe
 {
@@ -37,14 +39,14 @@ public sealed class MeshBuildCostProbe
     private const int TimedBuilds = 300;
     private const int Seed = 26;
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
     public void GreedyMeshBuildCost()
     {
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var lamp = Block("lamp");
-        byte[] solids = [Block("stone"), Block("dirt"), Block("oak_leaves"), Block("glass")];
+        ushort[] solids = [Block("stone"), Block("dirt"), Block("oak_leaves"), Block("glass")];
 
         // Fill in a fixed order: the dictionary's enumeration order changes per process
         var chunks = manager.Chunks.Values
@@ -57,7 +59,7 @@ public sealed class MeshBuildCostProbe
             for (var z = 0; z < Chunk.Size; z++)
             {
                 var r = rng.NextDouble();
-                var id = r < 0.55 ? (byte)0
+                var id = r < 0.55 ? BlockType.Air
                     : r < 0.565 ? lamp
                     : solids[rng.Next(solids.Length)];
                 chunk.SetBlockRaw(x, y, z, id, 0);
@@ -65,7 +67,7 @@ public sealed class MeshBuildCostProbe
 
         Measure("A (default-color lamps)", manager, center);
 
-        byte blueLamp;
+        ushort blueLamp;
         try
         {
             blueLamp = Block("blue_lamp");
@@ -85,6 +87,22 @@ public sealed class MeshBuildCostProbe
                     chunk.SetBlockRaw(x, y, z, blueLamp, 0);
 
         Measure("B (every second lamp blue)", manager, center);
+
+        // C1, the sky cover's worst case: one tower brick in a neighbor's corner cell, outside the light volume, raises
+        // the neighborhood's flag, so every volume column is scanned from the top down and none is covered
+        var brick = Block("tower_bricks");
+        var west = manager.Chunks[center.Position + new System.Numerics.Vector3(-1, 0, 0)];
+        west.SetBlockRaw(0, 0, 0, brick, 0);
+        Assert.True(ChunkLighting.AnySkyCover([west]));
+        Measure("C1 (sky-cover flag, one brick outside the volume)", manager, center);
+
+        // C2: a full brick roof at the top of the volume (local y 14 of the chunk above), so each column's scan stops
+        // at its first cell and everything under the roof gets no sun: the tower chunk's rebuild cost
+        var above = manager.Chunks[center.Position + new System.Numerics.Vector3(0, 1, 0)];
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var z = 0; z < Chunk.Size; z++)
+            above.SetBlockRaw(x, 14, z, brick, 0);
+        Measure("C2 (brick roof over the volume)", manager, center);
     }
 
     private void Measure(string label, ChunkManager manager, Chunk center)

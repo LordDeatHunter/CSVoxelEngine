@@ -3,7 +3,7 @@ using Pose = VoxelEngine.Player.PlayerModel.Pose;
 
 namespace VoxelEngine.Player.Posing;
 
-/// <summary>The body-wide secondary motion laid over the pose: landing dip, crouch, flinch, sway, equip dip, the blade swings' and the throw's twist and lean, the swim tilt, head turn and death fall.</summary>
+/// <summary>The body-wide secondary motion laid over the pose: landing dip, crouch, flinch, sway, equip dip, the blade swings' and the throw's twist and lean, the cast's lean, the swim tilt, head turn and death fall.</summary>
 internal sealed class SecondaryMotion
 {
     private readonly PlayerModel _model;
@@ -52,9 +52,10 @@ internal sealed class SecondaryMotion
             RootYaw = blade.RootYaw,
             Shoulders = _model.SwayPitch + dip * 0.3f,
             RightShoulderExtra = -_model.EquipLowering * 0.9f,
-            TorsoPitch = -dip * 0.2f - crouch * 0.25f + _model.Flinch * 0.3f + throwLean - blade.Dip * 0.22f + blade.Lean,
+            TorsoPitch = -dip * 0.2f - crouch * 0.25f + _model.Flinch * 0.3f + throwLean - blade.Dip * 0.22f + blade.Lean
+                         + _model.Bow.TorsoLean() + CastMotion.Lean(_model.CastProgress),
             Drop = dip * 0.12f + crouch * 0.17f + blade.Dip * 0.06f,
-            TorsoYaw = MathF.Sin(_model.WalkPhase) * 0.1f * move + blade.TorsoTwist + throwTwist
+            TorsoYaw = MathF.Sin(_model.WalkPhase) * 0.1f * move + blade.TorsoTwist + throwTwist + _model.Bow.TorsoTwist()
                        - PunchPose.PunchTwist * PunchPose.PunchWeights(_model.MineT).Extend,
             // The body also leans a little toward whichever side its shoulders are being pulled out to.
             TorsoRoll = MathF.Cos(_model.WalkPhase) * 0.035f * move + blade.TorsoRoll + _model.Flinch * 0.08f

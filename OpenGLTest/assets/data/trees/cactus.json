@@ -18,9 +18,11 @@
   "worldgen": {
     "biomes": ["desert"],
     "density": 0.010,
-    "openness": 0,
+    // The forest's openness mask thins the cacti to none across its open stretches, so a desert
+    // alternates between cactus groves and empty dunes instead of one even scatter
+    "openness": 1,
     "spawnClear": false,
-    "spacing": 2,
+    "spacing": 4,
     "maxSlope": 2,
     "minSoil": 0,
     "minGround": 1,

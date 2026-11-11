@@ -1,0 +1,14 @@
+{
+  // The faintly glowing shards of a crystal tree's crown (trees/crystal_tree.json): the species' leaves,
+  // so a crown cut off its trunk decays. It glows a pale cyan of its own palette slot. Cutout, no sway
+  // (crystal does not bend), dropping nothing. Tile is committed art.
+  "name": "Crystal Leaves",
+  "model": { "parent": "block/cube_all", "textures": { "all": "crystal_leaves" } },
+  "hardness": 1,
+  "movementSpeed": 0.5,
+  "cutout": true,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "emission": 7, "color": [176, 236, 255], "passes": true },
+  "loot": "none"
+}

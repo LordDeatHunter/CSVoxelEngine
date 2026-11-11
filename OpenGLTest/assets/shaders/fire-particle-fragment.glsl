@@ -16,6 +16,21 @@ vec3 SrgbToLinear(vec3 c) {
 }
 
 void main() {
+    if (fEmissive > 1.5) {
+        // A flame tongue: u across, v up from the base; a teardrop that is widest low and tapers to a tip
+        float x = (fUv.x - 0.5) * 2.0;
+        float y = fUv.y;
+        float w = max(pow(1.0 - y, 0.75) * (0.35 + 0.65 * smoothstep(0.0, 0.25, y)), 0.02);
+        float side = abs(x) / w;
+        float shape = smoothstep(1.0, 0.2, side) * (1.0 - y * y);
+        float alpha = fTint.a * shape;
+        if (alpha < 0.01) discard;
+        float core = (1.0 - smoothstep(0.0, 0.8, side)) * (1.0 - y);
+        vec3 col = SrgbToLinear(fTint.rgb) * (0.8 + 0.5 * core);
+        float f = clamp((fDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
+        FragColor = vec4(col, alpha * (1.0 - f * f));
+        return;
+    }
     float d = length(fUv - vec2(0.5)) * 2.0;
     float shape = smoothstep(1.0, 0.35, d);
     float alpha = fTint.a * shape;

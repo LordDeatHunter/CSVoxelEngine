@@ -1,0 +1,9 @@
+{
+  "name": "Broodmother",
+  // The spider den's miniboss (the same Spider class with broodmother set, SpiderConfig). It never spawns in
+  // the open: only a den raises it (plans/TODO.md), or a scenario's spawn
+  "blood": { "color": [70, 120, 210] },
+  "hp": 150,
+  "loot": "spider_broodmother",
+  "model": "assets/models/entity/spider_broodmother.bbmodel"
+}

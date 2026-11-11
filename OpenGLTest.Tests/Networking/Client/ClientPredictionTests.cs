@@ -13,7 +13,7 @@ namespace VoxelEngine.Tests.Networking.Client;
 /// </summary>
 public sealed class ClientPredictionTests
 {
-    private static NetCellChange Cell(byte id) => new(4, 70, -2, id, 0);
+    private static NetCellChange Cell(ushort id) => new(4, 70, -2, id, 0);
 
     [Fact]
     public void ACorrectionForAnOlderIntentNeverOverwritesANewerPrediction()

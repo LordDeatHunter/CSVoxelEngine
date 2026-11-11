@@ -33,7 +33,7 @@ public sealed class MovementRulesTests
     // A single block to step up onto
     private static readonly (int X, int Y, int Z) Step = (4, 1, 12);
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
 
     /// <summary>The stone floor at y = 0 with the wall and the step on it.</summary>
     private static ChunkManager Course()
@@ -58,23 +58,58 @@ public sealed class MovementRulesTests
     /// returns the index of the first rejected state, or -1 when every one was taken. A rejected
     /// state snaps the walk back to where the rules left it, as the client would be.
     /// </summary>
-    private static int FirstRejection(ChunkManager chunks, IReadOnlyList<Vector3> path, bool flying = false)
+    private static int FirstRejection(ChunkManager chunks, IReadOnlyList<Vector3> path, bool flying = false,
+        int airJumps = 0, MovementState? state = null)
     {
-        var state = new MovementState();
+        state ??= new MovementState();
         var at = path[0];
         for (var i = 1; i < path.Count; i++)
         {
-            if (MovementRules.Judge(at, path[i], Dt, flying, chunks, state, out at) == MoveVerdict.Rejected)
+            if (MovementRules.Judge(at, path[i], Dt, flying, chunks, state, out at, airJumps: airJumps)
+                == MoveVerdict.Rejected)
                 return i;
         }
         return -1;
     }
 
     private static void AssertNeverRejected(string what, ChunkManager chunks, IReadOnlyList<Vector3> path,
-        bool flying = false)
+        bool flying = false, int airJumps = 0, MovementState? state = null)
     {
-        var rejected = FirstRejection(chunks, path, flying);
+        var rejected = FirstRejection(chunks, path, flying, airJumps, state);
         Assert.True(rejected < 0, $"{what}: state {rejected} of {path.Count} was rejected");
+    }
+
+    /// <summary>
+    /// States from <paramref name="phase"/> on, every <see cref="Dt"/> for <paramref name="seconds"/>,
+    /// of a body at <paramref name="start"/> whose feet are launched upward at each
+    /// <c>(At, Speed)</c> in <paramref name="launches"/> (from the height they had at that instant,
+    /// mid-air or not) and pulled down by the client's gravity until they rest on the floor
+    /// (<see cref="Resting"/>). Before the first launch the feet fall from where they start.
+    /// </summary>
+    private static List<Vector3> Ballistic(Vector3 start, (float At, float Speed)[] launches, float seconds,
+        float phase = 0f)
+    {
+        var feet0 = start.Y - Camera.EyeHeight;
+        var path = new List<Vector3>();
+        for (var i = 0; i * Dt <= seconds + 1e-4f; i++)
+        {
+            var t = phase + i * Dt;
+            var baseFeet = feet0;
+            var baseTime = 0f;
+            var speed = 0f;
+            foreach (var (at, launch) in launches)
+            {
+                if (at > t) break;
+                baseFeet = FeetAfter(baseFeet, speed, at - baseTime);
+                baseTime = at;
+                speed = launch;
+            }
+            path.Add(new Vector3(start.X, FeetAfter(baseFeet, speed, t - baseTime) + Camera.EyeHeight, start.Z));
+        }
+        return path;
+
+        static float FeetAfter(float from, float speed, float time) =>
+            MathF.Max(Resting, from + speed * time - 0.5f * PlayerPhysics.Gravity * time * time);
     }
 
     /// <summary>
@@ -228,9 +263,10 @@ public sealed class MovementRulesTests
         Assert.Equal(MoveVerdict.Rejected, Judge(course, ground, high, out var stayed));
         Assert.Equal(ground, stayed);
 
-        // The same climb spread over many states, each within the rise cap, is a hover: rejected
-        // once the grace runs out
-        var climb = Line(ground, new Vector3(0f, 10f / ((float)grace * 1.5f), 0f), (float)grace * 1.5f);
+        // A slow climb shorter than one jump, spread over many states each within the rise cap, is a
+        // hover: rejected once the grace runs out
+        var height = MovementRules.JumpApexBlocks * 0.5f;
+        var climb = Line(ground, new Vector3(0f, height / ((float)grace * 1.5f), 0f), (float)grace * 1.5f);
         for (var i = 1; i < climb.Count; i++)
             Assert.True(climb[i].Y - climb[i - 1].Y
                         <= NetworkConfig.NetMaxRiseBlocksPerSecond * Dt + NetworkConfig.NetRiseSlackBlocks);
@@ -238,6 +274,13 @@ public sealed class MovementRulesTests
         Assert.True(climbRejected > 0, "a slow climb without flight was never rejected");
         Assert.True(climbRejected * Dt > grace - Dt * 0.5);
         Assert.Equal(-1, FirstRejection(course, climb, flying: true));
+
+        // The ten-block climb spread the same way outgrows one airtime's rise budget before the grace
+        var tall = Line(ground, new Vector3(0f, 10f / ((float)grace * 1.5f), 0f), (float)grace * 1.5f);
+        var tallRejected = FirstRejection(course, tall);
+        Assert.True(tallRejected > 0, "a ten-block climb without flight was never rejected");
+        Assert.True(tallRejected * Dt < grace, $"rejected after {tallRejected * Dt} s, past the grace");
+        Assert.Equal(-1, FirstRejection(course, tall, flying: true));
     }
 
     [Fact]
@@ -284,21 +327,25 @@ public sealed class MovementRulesTests
     /// <summary>
     /// The states the client's own physics reports at its cadence over <paramref name="seconds"/> for
     /// a body starting at <paramref name="eye"/> with <paramref name="keys"/> held for the first
-    /// <paramref name="holdSeconds"/>.
+    /// <paramref name="holdSeconds"/>, or, when <paramref name="keysAt"/> is given, with the keys it
+    /// names for each moment instead. <paramref name="airJump"/> wears the cloud boots' air jump.
     /// </summary>
     private static List<Vector3> Simulated(ChunkManager chunks, Vector3 eye, float seconds,
-        Silk.NET.Input.Key[] keys, float holdSeconds)
+        Silk.NET.Input.Key[] keys, float holdSeconds, bool airJump = false,
+        Func<float, Silk.NET.Input.Key[]>? keysAt = null)
     {
         const float step = 1f / 120f;
         var camera = new Camera(null, null);
         camera.TestTeleport(eye, yaw: 0f, pitch: 0f);
+        camera.GearAirJump = airJump;
         var keyboard = new ScriptedKeyboard();
         var path = new List<Vector3> { camera.Position };
         var sinceState = 0f;
         for (var t = 0f; t < seconds; t += step)
         {
-            if (t < holdSeconds) keyboard.Press(keys);
-            else keyboard.ReleaseAll();
+            keyboard.ReleaseAll();
+            if (keysAt != null) keyboard.Press(keysAt(t));
+            else if (t < holdSeconds) keyboard.Press(keys);
             camera.Update(step, keyboard, chunks);
             sinceState += step;
             if (sinceState < Dt) continue;
@@ -326,5 +373,150 @@ public sealed class MovementRulesTests
         // A stroke up from the float, out over the surface and back down to it
         var hop = Simulated(pool, floating[^1], 4f, [Silk.NET.Input.Key.Space], 0.1f);
         AssertNeverRejected("float stroke hop", pool, hop);
+    }
+
+    [Fact]
+    public void ABodySinkingIntoASinkBlockIsNeverCorrectedNorAHoverer()
+    {
+        var sink = ContentRegistry.RequireBlock("cloud_block").Id;
+        var clouds = MobTestWorld.Floor(sink);
+        var grace = (float)NetworkConfig.NetHoverGraceSeconds;
+
+        // The client's own fall onto the block, the slow sink and standing sunk for longer than the
+        // hover grace: every state is taken, and the sunk body reads grounded
+        var settle = Simulated(clouds, Eye(4.5f, 6f, 4.5f), 3f + grace * 2f, [], 0f);
+        AssertNeverRejected("fall and sink", clouds, settle);
+        var sunk = settle[^1];
+        Assert.True(sunk.Y - Camera.EyeHeight < 1f - SinkLayer.MaxSink * 0.5f, "the body never sank in");
+        Assert.True(PlayerBodyProbe.Grounded(sunk, clouds));
+
+        // Walking across the sunk layer and jumping back out of it
+        AssertNeverRejected("walk sunk", clouds, Simulated(clouds, sunk, 1.5f, [Silk.NET.Input.Key.W], 1.5f));
+        AssertNeverRejected("jump out", clouds, Simulated(clouds, sunk, 2f, [Silk.NET.Input.Key.Space], 0.1f));
+
+        // The same sunk point over stone is inside a solid: refused
+        var stone = MobTestWorld.Floor(Stone);
+        Assert.Equal(MoveVerdict.Rejected, Judge(stone, Eye(4.5f, Resting, 4.5f), sunk, out _));
+    }
+
+    // How long a jump climbs
+    private const float Up = PlayerPhysics.JumpSpeed / PlayerPhysics.Gravity;
+    private const float J = PlayerPhysics.JumpSpeed;
+
+    // The first state index at or after a moment
+    private static int IndexAt(float time) => (int)MathF.Floor(time / Dt);
+
+    [Fact]
+    public void AnAirJumpWearerMayHopOnceAndASecondHopIsRejected()
+    {
+        // A ground jump and one air hop climb twice in a row, still inside the hover grace
+        Assert.True(2f * PlayerPhysics.JumpSpeed / PlayerPhysics.Gravity < NetworkConfig.NetHoverGraceSeconds);
+
+        var course = Course();
+        var start = Eye(2.5f, Resting, 10.5f);
+        foreach (var hopAt in new[] { Up, 1.5f * Up })
+        {
+            var path = Ballistic(start, [(0f, J), (hopAt, J)], 2f);
+            AssertNeverRejected($"hop at {hopAt:0.00} s, a wearer", course, path, airJumps: 1);
+
+            // Without the boots the same hop outclimbs one airtime
+            var rejected = FirstRejection(course, path);
+            Assert.True(rejected > IndexAt(hopAt), $"hop at {hopAt:0.00} s: rejected at state {rejected}");
+        }
+
+        // A second air hop is rejected even for a wearer
+        var twice = Ballistic(start, [(0f, J), (Up, J), (2f * Up, J)], 2.5f);
+        var second = FirstRejection(course, twice, airJumps: 1);
+        Assert.True(second > IndexAt(2f * Up), $"a second air hop: rejected at state {second}");
+    }
+
+    [Fact]
+    public void TheClientsOwnDoubleJumpIsNeverRejectedForAWearer()
+    {
+        var floor = MobTestWorld.Floor(Stone);
+        var start = Eye(1.5f, Resting, 8.5f);
+        const float settle = 0.3f;
+        const float frame = 1f / 120f;
+        Silk.NET.Input.Key[] space = [Silk.NET.Input.Key.Space];
+        Silk.NET.Input.Key[] none = [];
+        Silk.NET.Input.Key[] sprint = [Silk.NET.Input.Key.W, Silk.NET.Input.Key.ShiftLeft];
+        Silk.NET.Input.Key[] sprintSpace = [Silk.NET.Input.Key.W, Silk.NET.Input.Key.ShiftLeft, Silk.NET.Input.Key.Space];
+
+        // A one-frame press, the ground jump, then a fresh press at the given moment, the air jump
+        Func<float, Silk.NET.Input.Key[]> Taps(float hopAt, Silk.NET.Input.Key[] held, Silk.NET.Input.Key[] tap) =>
+            t => (t >= settle && t < settle + frame) || (t >= settle + hopAt && t < settle + hopAt + frame)
+                ? tap
+                : t >= settle ? held : none;
+
+        var apex = Simulated(floor, start, 2f, none, 0f, airJump: true, keysAt: Taps(Up, none, space));
+        AssertNeverRejected("double jump at the apex", floor, apex, airJumps: 1);
+        Assert.True(FirstRejection(floor, apex) > 0, "the double jump was taken without the boots");
+
+        var sprinting = Simulated(floor, start, 2f, none, 0f, airJump: true,
+            keysAt: Taps(1.5f * Up, sprint, sprintSpace));
+        AssertNeverRejected("sprinting double jump on the way down", floor, sprinting, airJumps: 1);
+    }
+
+    [Fact]
+    public void ABunnyHopWhoseLandingNoStateSawIsNotAnAirHop()
+    {
+        var course = Course();
+        var start = Eye(2.5f, Resting, 10.5f);
+        var period = 2f * Up;
+        const int hops = 3;
+        var launches = new (float, float)[hops];
+        for (var i = 0; i < hops; i++)
+            launches[i] = (i * period, J);
+        var path = Ballistic(start, launches, hops * period - Dt, phase: Dt * 0.5f);
+
+        // No state between the first and the last stands on the floor: every landing fell between two
+        for (var i = 1; i < path.Count - 1; i++)
+            Assert.False(PlayerBodyProbe.Grounded(path[i], course), $"state {i} stands on the floor");
+        // Together the hops climb past one airtime's budget, so only the landings between states keep them legal
+        Assert.True(hops * MovementRules.JumpApexBlocks > MovementRules.AirRiseBudget(0, new MovementState()));
+
+        AssertNeverRejected("bunny hop between states", course, path);
+    }
+
+    [Fact]
+    public void AQueuedLiftOrABounceWidensTheBudgetButAFakeBounceDoesNot()
+    {
+        var course = Course();
+
+        // A jump, then a mob's lift on the way down: too high for one airtime on its own, legal once the
+        // hit queued its lift
+        var lift = MobConfig.CloudgolemKnockbackLift;
+        var lifted = Ballistic(Eye(2.5f, Resting, 10.5f), [(0f, J), (1.5f * Up, lift)], 1.2f);
+        Assert.True(FirstRejection(course, lifted) > 0, "a lift in mid-air was taken with no queued hit");
+        var hit = new MovementState();
+        hit.GrantLift(lift);
+        AssertNeverRejected("a queued lift", course, lifted, state: hit);
+
+        // A fall onto a slime block flung back up faster than any jump, though below the rise cap
+        var slime = ContentRegistry.RequireBlock("slime_block").Id;
+        var bouncy = MobTestWorld.Floor(Stone);
+        var floorChunk = bouncy.Chunks[Vector3.Zero];
+        for (var x = 3; x <= 5; x++)
+        for (var z = 3; z <= 5; z++)
+            floorChunk.SetBlockRaw(x, 0, z, slime, 0);
+        var plain = MobTestWorld.Floor(Stone);
+
+        var budget = MovementRules.AirRiseBudget(0, new MovementState());
+        var least = MathF.Sqrt(2f * PlayerPhysics.Gravity * budget);
+        var bounce = (least + NetworkConfig.NetMaxRiseBlocksPerSecond) * 0.5f;
+        Assert.True(bounce < NetworkConfig.NetMaxRiseBlocksPerSecond);
+        Assert.True(bounce * bounce / (2f * PlayerPhysics.Gravity) > budget);
+
+        const float drop = 6f;
+        var land = MathF.Sqrt(2f * (drop - Resting) / PlayerPhysics.Gravity);
+        // States half a cadence either side of the landing, so none stands on the floor
+        var phase = (land % Dt + Dt * 0.5f) % Dt;
+        // Down, back up past the apex and part of the way down again, short of a second landing
+        var path = Ballistic(Eye(4.5f, drop, 4.5f), [(land, bounce)], land + 1.5f * bounce / PlayerPhysics.Gravity, phase);
+        for (var i = 0; i < path.Count; i++)
+            Assert.False(PlayerBodyProbe.Grounded(path[i], bouncy), $"state {i} stands on the floor");
+
+        AssertNeverRejected("a slime block bounce", bouncy, path);
+        Assert.True(FirstRejection(plain, path) > 0, "the same bounce off plain stone was taken");
     }
 }

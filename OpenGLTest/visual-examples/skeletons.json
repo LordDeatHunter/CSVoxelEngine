@@ -1,0 +1,48 @@
+{
+  // Skeletons check (plans/BATTLE_TOWER.md BT-3): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/skeletons.json
+  // Shots land in visual/skeletons/. The camera hovers (creative flight, so it is immune and the skeletons still
+  // aim at it) at standing height over the open, flat, dry forest clearing goblins.json uses (ground at y 9..10
+  // over x -56..-32, z 32..68, no trunks), facing -Z. The tower floors' dressing walls block the line of sight a
+  // shot needs, so the skeletons are filmed outdoors. A tier-0 skeleton and a tier-5 one stand side by side about
+  // 7 blocks in front of the camera, inside the 5..14 bow band with nothing in between. `idle` is taken just after
+  // they pop in (inside SkeletonFirstShotDelaySeconds, 1.2 s), `shot_draw` about 0.4 s into the shoot clip and
+  // `shot_release` at its release (0.6 s), first person; `shot_arrow` switches to the shoulder camera turned
+  // aside, so the arrows cross the frame toward the player instead of flying head-on. Then the camera moves
+  // beside the tier-0 skeleton, inside its melee reach, and the shoulder camera films the rake (and the tier-5
+  // skeleton shooting behind it) over five shots.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-43.0, 12.6, 56.5], "yaw": -90, "pitch": -4 },
+    // Chunks must be loaded before anything can stand on them
+    { "op": "wait", "seconds": 8 },
+
+    { "op": "spawn", "entity": "skeleton", "pos": [-45.0, 11, 49.5] },
+    { "op": "spawn", "entity": "skeleton", "pos": [-41.0, 11, 49.5], "tier": 5 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "idle", "hideHud": true },
+    { "op": "wait", "seconds": 1.2 },
+    { "op": "screenshot", "name": "shot_draw", "hideHud": true },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "shot_release", "hideHud": true },
+    // From the shoulder, turned away, so the arrows cross the frame toward the player instead of head-on
+    { "op": "view", "mode": "shoulder" },
+    { "op": "look", "yaw": -40, "pitch": -6 },
+    { "op": "wait", "seconds": 0.12 },
+    { "op": "screenshot", "name": "shot_arrow", "hideHud": true },
+
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "teleport", "pos": [-46.6, 12.6, 49.5], "yaw": -50, "pitch": -12 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "melee_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "melee_b", "hideHud": true },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "melee_c", "hideHud": true },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "melee_d", "hideHud": true },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "melee_e", "hideHud": true }
+  ]
+}

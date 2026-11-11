@@ -8,7 +8,7 @@ Frame time (F#), worldgen, meshing and streaming (G#). Ids F4, F5 and F13 (and t
 comments still cite) exist only in git history or under Ruled out. Every number names its machine and
 date; a win not yet measured is labeled *estimated*. Landed items are summarized under Reference;
 `git log -p -- plans/PERF.md` has the full write-ups (history was trimmed on 2026-10-28, 2026-10-31
-and 2026-11-05). Last updated 2026-11-05.
+and 2026-11-05). Last updated 2026-11-10.
 
 ## In progress
 
@@ -67,6 +67,12 @@ bold title, then **Files**, **Win** (measured or estimated), **Verify** and **In
     Suspects: `MeshBufferPool` misses, LOH-sized LOD lists.
   - **Win**: estimated; fewer gen0 pauses during streaming. **Verify**: the `gc` token pair.
     **Invariant**: no new per-frame allocation; pools hold no edit state.
+  - **Scoped result (PR5 refresh, master `996fdf2`)**: eager translucent rents made a dry full mesh
+    consume and discard the returned wet pair; lazy rents keep it available. The matched seed-71234
+    fixture measured dry 44,344→8,456 B/build (−35,888 B, 80.9%) with identical geometry/light/fluid
+    metadata hashes; mixed-wet stayed 4,296 B/build. The wet→dry→wet regression fails on base and passes
+    on the refresh. This fixture result does not establish a whole-game allocation or FPS gain.
+    The catch-up's only conflict was deleted `PERF_TODO.md`; this is the scoped note in its current home.
 
 - [ ] **`F12` Shared per-frame chunk walks** (CPU, low priority while GPU-bound).
   - **Files**: `TerrainPasses.RenderWorld`/`CullWater`, `ShadowPass` (two cascades), `ReflectionPass`:
@@ -74,6 +80,18 @@ bold title, then **Files**, **Win** (measured or estimated), **Verify** and **In
     visible list for `RenderWorld` and `CullWater`; column-level skips.
   - **Win**: estimated; CPU only, worth it once the frame is CPU-bound. **Verify**: perf-fly CPU rows of
     the render sections. **Invariant**: zero per-frame allocation; static comparers; per-pass draw order unchanged.
+
+- [ ] **`F14` Tower collapse worst frame** (CPU, low priority: once per conquered tower; over its 1.0 ms ceiling).
+  - **Measured** (`TowerCollapseCostProbe`, the largest tower, radius 24, 8 floors, dev machine, 2026-11-09): the
+    collapse's main-thread step costs 0.25-0.33 ms mean, p90 0.55-0.61, p99 0.70-1.09, but 7-27 of its 2059 frames
+    pass 1 ms and the worst after the first frame is 5.8-8.2 ms (the first frame 10-15 ms, JIT). The step's 32 writes
+    each run `TowerBlockWriter`'s hooks (`MarkAreaDirty` over the light radius, the fluid and leaf-decay schedules,
+    the LOD notify); the spikes are unattributed (GC, a costly write, tier-up).
+  - **Files**: `Simulation/Tower/TowerCollapse.cs`, `TowerBlockWriter.cs`. Capture a `// TEMP-DIAG` per-write timer
+    first; ideas: batch the `MarkAreaDirty` per chunk per frame instead of per write, lower the write cap.
+  - **Win**: estimated; the worst frame of a collapse. **Verify**: rerun the probe and an in-game `X` capture of the
+    `entities` row during a `towerdefeat`. **Invariant**: every edit-path hook still runs for every cell; the ruin is
+    unchanged.
 
 ### B. Worldgen, meshing and streaming
 
@@ -122,6 +140,23 @@ justify one.
     worker), `WorldLoadGate`. Time a large save's loading phase before proposing region files (a save-format change).
   - **Win**: unknown until measured. **Verify**: a loading-phase timer on a heavily edited world. **Invariant**: the
     store's write and lookup ordering (`ChunkSaveStore`'s class doc).
+  - **Note**: the chunk save is v3 since 2026-11-10 (ids widened to `ushort`; a chunk whose palette passes 255 names
+    stores 2-byte indices per cell), so any restore IO number taken before then predates the format. Palette chunk
+    storage (also 2026-11-10) kept the v3 bytes identical; a restore now ends in `ChunkBlocks.FromDense` (or a clone
+    of an already compact snapshot), a few us a chunk on the worker.
+
+- [ ] **`G10` A/B the per-id tables now that they are not `static readonly`** (measure first).
+  - **Files**: `BlockType.cs` (the per-id tables, sized at load by `Content/Blocks/BlockTables.Allocate`), and their
+    hot readers: `ChunkMesher`/`ChunkMeshBuilder`, `ChunkLighting`, `ChunkTerrainFill` and the feature stamps,
+    `Simulation/Fluids`. Widening ids to `ushort` dropped `readonly` from the tables, so the JIT can no longer fold
+    them as constants. The memory side is settled: palette chunk storage (`Chunks/ChunkBlocks`) holds the 17,077-chunk
+    rest ring's ids in ~49.6 MB against 136.6 MB dense (RTX 3070 machine, 2026-11-10; see "Palette chunk storage"
+    under Landed results); the light flood's dense id snapshot is still ~195 KB per mesh build.
+  - **Win**: unknown; the palette-storage capture compared against d29c0735 (already widened), so the table A/B
+    itself is still unmeasured. Hoist a table into a local in any hot
+    loop that still reads it per cell (`ChunkLighting.SpreadLight` already does). **Verify**: perf-fly fps pairs,
+    `MeshBuildCostProbe` and `WorldgenCostProbe` pairs against the pre-widening commit. **Invariant**: tables are
+    never reallocated while workers run.
 
 ## Reference
 
@@ -245,6 +280,36 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
 - LOD build medians 17.7 / 17.6 / 65.3 ms at levels 0/1/2, tracking the 36/100/324 prefetched
   columns; cold sweep of 203 coarsest regions ~41 s; first finest region cold 1.1-1.5 s, warm ~7 ms;
   full 17,077-chunk ring ~5.0 s with 4 generation threads (headless).
+- Hell chunks (`L-6`, 2026-11-07, `WorldgenCostProbe` `hell` class): a wholly-hell chunk skips the
+  overworld pipeline, warm 0.024 ms (the stamp 0.019 ms) against deepStone's 0.92 ms; cold 0.33 ms.
+- Sky chunks (`L-12`, 2026-11-07, `WorldgenCostProbe` `skyIsland` and `cloudSea` classes): a chunk in
+  the island band or the cloud sea takes the sky short path, warm 0.031 ms (island stamp 0.030 ms) and
+  0.05-0.11 ms (sea stamp); cold 3.9 / 7.8 ms, all but the stamp being the column-cache neighborhood
+  scan every chunk pays. Open sky in the island band costs a few zone hash rolls (the zone gate).
+  With the biomes and skins (`L-7`/`L-8`, same probe and 6 chunks, two runs each against a HEAD
+  worktree): the stamp warm 0.15-0.16 ms mean against 0.019-0.022 ms before, cold 0.25-0.30 ms against
+  0.03; whole chunk warm 0.16-0.17 ms, still under a fifth of deepStone's ~0.7 ms. The open field now
+  covers a one-cell ring and the skin reach (up to 7^3 lattice points, 18x18x21 blends) and every cell
+  near open cavern is classified; the biome and pool noises sit on per-layer 2D lattices (4 and 9
+  points a chunk), which made no measurable difference, so the halo field and the per-cell classify are
+  the cost. Untried: a halo only where a wall test can reach it.
+  With the flora (`L-9`, same probe, two runs each): the stamp warm 0.26 ms mean (0.14-0.18 with the
+  flora rule stubbed out: the vine scan reads up to 6 mask cells over every air cell and the mask
+  grew 3 rows for it), the `HellTrees` stage warm 0.003 ms and cold 0.6-0.75 ms mean (a cold sample
+  regrows every tree it crosses; in game a tree is grown once per cell and layer and cached). Untried:
+  a per-column vine pass in the stamp instead of the per-cell scan.
+- Sky biomes and flora (`L-13`, 2026-11-07, `WorldgenCostProbe` `skyIsland` class, one run each): a
+  sky-island chunk warm 0.065 ms against 0.034 before (the island stamp 0.061 ms, now asking the flora
+  rule per cell, and the `SkyTrees` stage 0.006 ms); cold 4.1-4.3 ms against 3.9, of which `SkyTrees`
+  0.33 ms mean (a cold sample regrows every tree it crosses; in game a tree is grown once per cell and
+  cached). Untried: the stamp asking the flora rule only at the top, the plant cell and the vine run.
+- Sky islands everywhere (2026-11-07, `IslandOpenSkyWeight` 0.7, 112-block island cells, `TouchesLand`, the
+  zone gate gone; `WorldgenCostProbe` `skyIsland` class, one run each, different island samples since the
+  layout moved): a sky-island chunk warm 0.14 ms against 0.34 ms at the previous commit (island stamp 0.10
+  against 0.22, `RuinsSky` 0.018 against 0.077), cold 5.0 against 12.1 ms (the column scan). Over a grid of
+  6400 band chunks at y 352 around the origin the island stamp averages 17 us a chunk (three passes) against
+  10-25 us at the previous commit, though the band now holds about 30x as many islands: the old zone and
+  landmass gate cost about what the 2 x 2 island rolls cost now.
 - Identity recipe: dump `LandHeight`, `WaterLevelAt` and `SurfaceWaterWeight` bits before and after
   on a +-20000 grid at stride 37, plus `Compute` on 1000 random chunk columns; zero changes allowed
   outside the intended footprint.
@@ -282,6 +347,17 @@ and steps the far key light by under half a texel between renders).
   6250 -> 4275 us (-32%), blue lamps 7299 -> 4772 us. An `EdgeFlags` table in `SpreadLight` gained under 1%.
 - **G6 chunk-level stamp gates** (`StampBand`, `StampGateTests`): warm fill -14% to -64% per chunk class
   (above-surface 0.477 -> 0.171 ms); a new feature stamp must add its band and its `StampGateTests` row.
+- **Palette chunk storage** (`Chunks/ChunkBlocks`; RTX 3070, 16 cpus, Release, 2026-11-10, interleaved against a
+  d29c0735 worktree). Memory: the `VOXEL_SPAWN=0,30,0 VOXEL_TIME=60` rest ring (17,077 chunks) held ~6,050 Uniform /
+  ~11,020 Indexed / 0 Direct chunks, ids ~49.6 MB vs 136.6 MB dense (-64%; ~4,250 Indexed chunks already edited
+  by the fluid settle); perf-fly ended at 7,659 / 9,418 / 0, 42.4 MB vs 136.6 MB. Frame time within noise: rest
+  pairs 4.68/4.57, 4.35/4.21, 4.29/4.18 ms (after/before; every CPU row moved together by ~1%), perf-fly means
+  4.30/3.99, 4.02/4.08, 3.93/3.98 ms with the same worst-frame spread, a 25 s pour of `flow-water.json` 6.21/5.84,
+  5.85/6.24 ms (`fluidTick` 0.08 ms both). Probes, after/before: `MeshBuildCostProbe` within ~1% in every case,
+  `WorldgenCostProbe` warm all-classes mean 0.342-0.348 vs 0.336-0.343 ms (`FromDense` costs ~5-8 us a chunk,
+  charged to the `SolidCount` stage), `TowerCollapseCostProbe` step mean 0.194 vs 0.190 ms over six pairs once the
+  Indexed `Get`/`CopyRun` read the 256-slot palette without a bounds check (before that it leaned ~0.03 ms worse).
+  **Trap:** the tower probe's step mean is bimodal run to run (~0.14 or ~0.20 ms); judge it over five or more pairs.
 
 ### Not chasing (recorded so it is not re-proposed)
 

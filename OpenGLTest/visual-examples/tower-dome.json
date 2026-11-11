@@ -1,0 +1,51 @@
+{
+  // The battle tower's sealed roof (see "The sealed roof" under "Battle tower"): the raised parapet and the forcefield dome
+  // (TowerDome, drawn by the forcefield term in test-fragment.glsl). Run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/tower-dome.json     (noon: the film should be barely there)
+  //   VOXEL_TIME=700 VOXEL_SCRIPT=visual-examples/tower-dome.json     (night: a faint glow)
+  // Shots land in visual/tower-dome/ (the second run overwrites the first). The tower is battle-tower.json's: center
+  // (2920, -1411), radius 21 (west wall face at x 2899), roof slab at y 45, the parapet solid to y 48 with its merlons
+  // at y 49, where the dome stands, and the dome's apex at y 61. The camera flies throughout.
+  // Shots: the tower top from afar, the dome close up from just outside the wall, the dome from above with the roof seen
+  // through it, from the roof looking up across the dome, the raised wall from the roof, out over the merlons through the
+  // forcefield; then towerdefeat (the camera inside the footprint, so it names this tower) and the collapse clearing the
+  // dome first: 5 s after it (the 4 s delay, then the top-down pass) and 9 s after it, from the close exterior pose.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [2868.5, 40.5, -1402.5], "yaw": -9, "pitch": 2 },
+    { "op": "wait", "seconds": 15 },
+
+    { "op": "teleport", "pos": [2860.5, 66.5, -1411.5], "yaw": 0, "pitch": -8 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "exterior_far", "hideHud": true },
+
+    { "op": "teleport", "pos": [2893.5, 53.5, -1405.5], "yaw": -8, "pitch": 14 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "exterior_near", "hideHud": true },
+
+    { "op": "teleport", "pos": [2902.5, 74.5, -1411.5], "yaw": 0, "pitch": -50 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "exterior_above", "hideHud": true },
+
+    { "op": "teleport", "pos": [2906.5, 47.6, -1411.5], "yaw": 0, "pitch": 28 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "roof_up", "hideHud": true },
+
+    { "op": "teleport", "pos": [2905.5, 47.6, -1411.5], "yaw": 180, "pitch": 8 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "roof_wall", "hideHud": true },
+
+    { "op": "teleport", "pos": [2902.5, 50.6, -1411.5], "yaw": 180, "pitch": 0 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "roof_out", "hideHud": true },
+
+    { "op": "teleport", "pos": [2920.5, 66.5, -1411.5], "yaw": 0, "pitch": -30 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "towerdefeat" },
+    { "op": "teleport", "pos": [2893.5, 53.5, -1405.5], "yaw": -8, "pitch": 14 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "screenshot", "name": "collapse_dome", "hideHud": true },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "collapse_top", "hideHud": true }
+  ]
+}

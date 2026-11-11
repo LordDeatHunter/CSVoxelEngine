@@ -84,6 +84,20 @@ internal sealed class ArmOverlays
             }
         }
 
+        // A bow's draw: the item arm out forward, the other arm folded back to the cheek
+        var bowBody = _model.Bow.BodyWeight();
+        var bowDraw = _model.Bow.DrawWeight();
+        if (right && bowBody > 0.001f)
+        {
+            LimbFrames.Blend(ref upper, LimbFrames.UpperFrame(side, BowPose.BowArmRoll, BowPose.BowArmFlex, BowPose.BowArmYaw), bowBody);
+            LimbFrames.Blend(ref fore, LimbFrames.ForeFrame(side, BowPose.BowForearmFlex, 0f), bowBody);
+        }
+        else if (!right && bowDraw > 0.001f)
+        {
+            LimbFrames.Blend(ref upper, LimbFrames.UpperFrame(side, BowPose.StringArmRoll, BowPose.StringArmFlex, BowPose.StringArmYaw), bowDraw);
+            LimbFrames.Blend(ref fore, LimbFrames.ForeFrame(side, BowPose.StringForearmFlex, BowPose.StringForearmBend), bowDraw);
+        }
+
         if (!right) return;
 
         // Punch: the flare is full at the chamber and gone again at full extension, where the IK

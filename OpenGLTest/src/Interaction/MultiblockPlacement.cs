@@ -5,16 +5,19 @@ using VoxelEngine.Content.Shapes;
 namespace VoxelEngine.Interaction;
 
 /// <summary>
-/// GL-free search for the 2x2x2 volume a right-click meant, shared by the converter item's world
-/// hook and the tests.
+/// GL-free search for the cubic volume (<c>size</c> cells along every edge) a right-click meant,
+/// shared by the converter item's world hook and the tests.
 ///
 /// <para>
-/// The clicked cell is one corner of the volume, which always extends <b>into</b> the face that
-/// was hit (away from the player). Which of the four volumes containing that corner is taken is
-/// decided in screen terms, in the order right-down, right-up, left-down, left-up: "right" is the
-/// player's screen-right when looking at the face, "down" the opposite of screen-up. The first
-/// candidate whose eight cells are all the source block wins, so building a neat 2x2x2 and
-/// clicking any of its front cells always converts that cube.
+/// The clicked cell lies on the volume's front face, and the volume always extends <b>into</b>
+/// the face that was hit (away from the player). Which of the volumes whose front face holds that
+/// cell is taken is decided in screen terms, "right" being the player's screen-right when looking
+/// at the face and "down" the opposite of screen-up: the volume reaching farthest right wins, and
+/// among those the one reaching farthest down. For a 2x2x2 that is the order right-down,
+/// right-up, left-down, left-up over the four volumes the clicked corner belongs to. The first
+/// candidate whose cells are all the source block wins, so building a neat cube and clicking any
+/// of its front cells always converts that cube. A cell inside the volume, touching none of its
+/// faces (<see cref="Multiblock.IsInterior"/>), may be air instead, so a hollow shell qualifies.
 /// </para>
 /// <para>
 /// The structure's opening ends up facing the player: on a side face that is the hit normal
@@ -25,22 +28,15 @@ namespace VoxelEngine.Interaction;
 public static class MultiblockPlacement
 {
     /// <summary>
-    /// The four candidate volumes as (right, up) signs in screen space, tried in this order:
-    /// right-down, right-up, left-down, left-up.
-    /// </summary>
-    public static readonly (int Right, int Up)[] CandidateOrder = [(1, -1), (1, 1), (-1, -1), (-1, 1)];
-
-    /// <summary>
-    /// Finds the volume a click on <paramref name="clickedCell"/>'s
+    /// Finds the <paramref name="size"/>-cell volume a click on <paramref name="clickedCell"/>'s
     /// <paramref name="hitNormal"/> face means, reading the world through
     /// <paramref name="blockAt"/> (an unloaded cell must read as air, i.e. never
     /// <paramref name="sourceId"/>). Returns the volume's minimum corner as
     /// <paramref name="anchor"/> and the facing of the structure's front (an engine face index
-    /// 0..3), or false when none of the four candidates is built entirely from
-    /// <paramref name="sourceId"/>.
+    /// 0..3), or false when no candidate is built entirely from <paramref name="sourceId"/>.
     /// </summary>
-    public static bool TryFindVolume(Func<int, int, int, byte> blockAt, byte sourceId, Vector3 clickedCell,
-        Vector3 hitNormal, Vector3 viewForward, out Vector3 anchor, out int facing)
+    public static bool TryFindVolume(Func<int, int, int, ushort> blockAt, ushort sourceId, int size,
+        Vector3 clickedCell, Vector3 hitNormal, Vector3 viewForward, out Vector3 anchor, out int facing)
     {
         anchor = Vector3.Zero;
 
@@ -62,51 +58,57 @@ public static class MultiblockPlacement
             facing = MultiblockShape.FacingOf(-horizontal);
         }
 
-        if (facing < 0) return false;
+        if (facing < 0 || !MultiblockShape.IsValidSize(size)) return false;
 
         var right = Vector3.Cross(screenUp, normal);
         var depth = -normal;
         var (clickX, clickY, clickZ) = VoxelCoords.BlockCellOf(clickedCell);
 
-        foreach (var (signRight, signUp) in CandidateOrder)
+        // A candidate's front face spans right steps rightStart..rightStart + size - 1 and up
+        // steps upStart..upStart + size - 1 from the clicked cell: rightmost first, then lowest
+        for (var rightStart = 0; rightStart > -size; rightStart--)
+        for (var upStart = 1 - size; upStart <= 0; upStart++)
         {
-            var step = right * signRight;
-            var up = screenUp * signUp;
-
-            var minX = int.MaxValue;
-            var minY = int.MaxValue;
-            var minZ = int.MaxValue;
-            var fits = true;
-
-            for (var a = 0; a < Multiblock.Size && fits; a++)
-            for (var b = 0; b < Multiblock.Size && fits; b++)
-            for (var k = 0; k < Multiblock.Size && fits; k++)
-            {
-                var offset = step * a + up * b + depth * k;
-                var x = clickX + (int)MathF.Round(offset.X);
-                var y = clickY + (int)MathF.Round(offset.Y);
-                var z = clickZ + (int)MathF.Round(offset.Z);
-
-                if (blockAt(x, y, z) != sourceId)
-                {
-                    fits = false;
-                    break;
-                }
-
-                if (x < minX) minX = x;
-                if (y < minY) minY = y;
-                if (z < minZ) minZ = z;
-            }
-
-            if (!fits) continue;
-
-            // The anchor is the volume's minimum corner on every axis, whatever the facing
-            anchor = new Vector3(minX, minY, minZ);
-            return true;
+            if (TryCandidate(blockAt, sourceId, size, clickX, clickY, clickZ,
+                    right * rightStart, screenUp * upStart, right, screenUp, depth, out anchor))
+                return true;
         }
 
         facing = -1;
         return false;
+    }
+
+    /// <summary>Whether the candidate volume whose front face starts at the clicked cell moved
+    /// by <paramref name="rightOrigin"/> + <paramref name="upOrigin"/> is all source block (or air
+    /// inside it); its minimum corner on every axis (whatever the facing) is the anchor.</summary>
+    private static bool TryCandidate(Func<int, int, int, ushort> blockAt, ushort sourceId, int size,
+        int clickX, int clickY, int clickZ, Vector3 rightOrigin, Vector3 upOrigin,
+        Vector3 right, Vector3 up, Vector3 depth, out Vector3 anchor)
+    {
+        anchor = Vector3.Zero;
+        var minX = int.MaxValue;
+        var minY = int.MaxValue;
+        var minZ = int.MaxValue;
+
+        for (var a = 0; a < size; a++)
+        for (var b = 0; b < size; b++)
+        for (var k = 0; k < size; k++)
+        {
+            var offset = rightOrigin + upOrigin + right * a + up * b + depth * k;
+            var x = clickX + (int)MathF.Round(offset.X);
+            var y = clickY + (int)MathF.Round(offset.Y);
+            var z = clickZ + (int)MathF.Round(offset.Z);
+
+            var id = blockAt(x, y, z);
+            if (id != sourceId && !(id == 0 && Multiblock.IsInterior(a, b, k, size))) return false;
+
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (z < minZ) minZ = z;
+        }
+
+        anchor = new Vector3(minX, minY, minZ);
+        return true;
     }
 
     /// <summary>The unit axis a vector points most strongly along.</summary>

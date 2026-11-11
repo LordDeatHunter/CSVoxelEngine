@@ -180,7 +180,7 @@ public sealed class GroundDust
     /// sizes (<see cref="BlockDebrisSystem.Skirt"/>), none when it settled <paramref name="submerged"/>.
     /// Returns how many chips it spawned.
     /// </summary>
-    public static int LandBlock(Vector3 cell, byte blockId, float fallBlocks, bool submerged, BlockDebrisSystem debris,
+    public static int LandBlock(Vector3 cell, ushort blockId, float fallBlocks, bool submerged, BlockDebrisSystem debris,
         IColumnSource? columns = null, Random? random = null)
     {
         if (submerged) return 0;
@@ -226,7 +226,7 @@ public sealed class GroundDust
     /// a fluid is looked through. False when nothing is underfoot.
     /// </summary>
     public static bool TryFindSurface(ChunkManager chunks, Vector3 feet, float halfWidth, out Vector3 cell,
-        out byte blockId)
+        out ushort blockId)
     {
         var x0 = MathUtils.FloorToInt(feet.X);
         var z0 = MathUtils.FloorToInt(feet.Z);
@@ -248,7 +248,7 @@ public sealed class GroundDust
         return false;
     }
 
-    private static bool Probe(ChunkManager chunks, int x, int y, int z, out Vector3 cell, out byte blockId)
+    private static bool Probe(ChunkManager chunks, int x, int y, int z, out Vector3 cell, out ushort blockId)
     {
         blockId = chunks.GetBlockGlobal(x, y, z);
         cell = new Vector3(x, y, z);
@@ -259,7 +259,7 @@ public sealed class GroundDust
 
     // What dust can come off: a solid block, or a stack block a body stands in or on (a snow
     // drift's partial layers are walked through, yet that is the ground the feet scuff).
-    private static bool StandsOn(byte id) =>
+    private static bool StandsOn(ushort id) =>
         id != BlockType.Air && !BlockType.IsFluid(id)
         && (BlockType.IsSolid(id) || BlockType.ById[id] is { StackMax: > 0 });
 }

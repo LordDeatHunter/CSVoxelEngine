@@ -20,8 +20,8 @@ public sealed class TreeWoodShapeTests
 {
     public TreeWoodShapeTests() => TestContent.EnsureLoaded();
 
-    private static byte Oak => ContentRegistry.RequireBlock("oak_log").Id;
-    private static byte Spruce => ContentRegistry.RequireBlock("spruce_log").Id;
+    private static ushort Oak => ContentRegistry.RequireBlock("oak_log").Id;
+    private static ushort Spruce => ContentRegistry.RequireBlock("spruce_log").Id;
 
     private const float Eps = 1e-5f;
 
@@ -49,9 +49,9 @@ public sealed class TreeWoodShapeTests
                 TreeWoodShape.Connects(oak, b, oak, a, TreeWoodShape.Opposite(dir)));
 
         // A cell's mask bit toward a neighbor equals that neighbor's mask bit back toward it
-        Span<byte> ids = stackalloc byte[6];
+        Span<ushort> ids = stackalloc ushort[6];
         Span<byte> nbStates = stackalloc byte[6];
-        Span<byte> backIds = stackalloc byte[6];
+        Span<ushort> backIds = stackalloc ushort[6];
         Span<byte> backStates = stackalloc byte[6];
         var seed = 12345u;
         for (var trial = 0; trial < 500; trial++)
@@ -61,7 +61,7 @@ public sealed class TreeWoodShapeTests
             {
                 // Mostly oak, sometimes air or spruce, so foreign neighbors are in the sweep too
                 var pick = Next(ref seed) % 8;
-                ids[dir] = pick == 0 ? (byte)0 : pick == 1 ? Spruce : oak;
+                ids[dir] = pick == 0 ? BlockType.Air : pick == 1 ? Spruce : oak;
                 nbStates[dir] = states[(int)(Next(ref seed) % (uint)states.Length)];
             }
 
@@ -149,7 +149,7 @@ public sealed class TreeWoodShapeTests
 
         var state = WoodState.Encode(thickness, parent, false);
         chunk.SetBlockRaw(Cx, Cy, Cz, oak, state);
-        Span<byte> ids = stackalloc byte[6];
+        Span<ushort> ids = stackalloc ushort[6];
         Span<byte> nbStates = stackalloc byte[6];
         var strangerPlaced = false;
         for (var dir = 0; dir < 6; dir++)
@@ -226,7 +226,7 @@ public sealed class TreeWoodShapeTests
         var child = WoodState.Encode(4, 5, false);
         chunk.SetBlockRaw(Cx, Cy + 1, Cz, oak, child);
 
-        Span<byte> ids = stackalloc byte[6];
+        Span<ushort> ids = stackalloc ushort[6];
         Span<byte> nbStates = stackalloc byte[6];
         ids[4] = oak;
         nbStates[4] = child;
@@ -277,7 +277,7 @@ public sealed class TreeWoodShapeTests
         var state = WoodState.Encode(5, WoodState.ParentRoot, false);
         var half = TreeWoodShape.HalfWidth(WoodState.Thickness(state));
 
-        Span<byte> ids = stackalloc byte[6];
+        Span<ushort> ids = stackalloc ushort[6];
         Span<byte> nbStates = stackalloc byte[6];
         var floating = TreeWoodShape.GetBoxes(oak, state, ids, nbStates);
         Assert.Equal(0.5f - half, floating.Min(b => b.Min.Y), Eps);
@@ -300,7 +300,7 @@ public sealed class TreeWoodShapeTests
         manager.Chunks[MeshTestWorld.HighAbove + new Vector3(0, -1, 0)]
             .SetBlockRaw(Cx, Chunk.Size - 1, Cz, stone, 0);
 
-        Span<byte> ids = stackalloc byte[6];
+        Span<ushort> ids = stackalloc ushort[6];
         Span<byte> nbStates = stackalloc byte[6];
         ids[5] = stone;
         var boxes = TreeWoodShape.GetBoxes(oak, state, ids, nbStates);
@@ -355,12 +355,12 @@ public sealed class TreeWoodShapeTests
         ]);
     }
 
-    private static byte PixelRimWood => TreeSpeciesRegistry.All.First(s => s.Rim == TrunkRim.Pixel).WoodId;
+    private static ushort PixelRimWood => TreeSpeciesRegistry.All.First(s => s.Rim == TrunkRim.Pixel).WoodId;
 
     // The boxes of one placed cell, from its neighbors in the configuration
-    private static BlockHitbox[] BoxesOf(byte wood, Dictionary<(int, int, int), byte> cells, RimCell c)
+    private static BlockHitbox[] BoxesOf(ushort wood, Dictionary<(int, int, int), byte> cells, RimCell c)
     {
-        Span<byte> ids = stackalloc byte[6];
+        Span<ushort> ids = stackalloc ushort[6];
         Span<byte> states = stackalloc byte[6];
         for (var dir = 0; dir < 6; dir++)
         {

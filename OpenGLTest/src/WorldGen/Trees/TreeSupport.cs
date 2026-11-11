@@ -37,7 +37,7 @@ public sealed class TreeSupport(int cap)
     /// <summary>Whether cell A links to its neighbor B lying in direction
     /// <paramref name="dirAtoB"/>: a parent edge, or two attached shells of the same tree wood
     /// stacked vertically. Symmetric, like <see cref="TreeWoodShape.Connects"/>.</summary>
-    public static bool Links(byte idA, byte stateA, byte idB, byte stateB, int dirAtoB)
+    public static bool Links(ushort idA, byte stateA, ushort idB, byte stateB, int dirAtoB)
     {
         if (TreeWoodShape.Connects(idA, stateA, idB, stateB, dirAtoB))
             return true;
@@ -49,12 +49,12 @@ public sealed class TreeSupport(int cap)
 
     /// <summary>Whether a block holds a shell up: solid, and neither tree wood nor leaves, so a
     /// wide trunk resting on another tree or on a canopy is not grounded.</summary>
-    public static bool IsGround(byte id) =>
+    public static bool IsGround(ushort id) =>
         BlockType.IsSolid(id) && !BlockType.IsTreeWood(id) && !TreeGenerator.IsLeaf(id);
 
     /// <summary>Whether a wood cell is an anchor: a root, or a shell whose cell below
     /// (<paramref name="belowId"/>) is real ground.</summary>
-    public static bool IsAnchor(byte state, byte belowId) =>
+    public static bool IsAnchor(byte state, ushort belowId) =>
         WoodState.IsRoot(state) || (WoodState.IsShell(state) && IsGround(belowId));
 
     /// <summary>
@@ -112,7 +112,8 @@ public sealed class TreeSupport(int cap)
                 var ny = cy + TreeDirections.Dy[dir];
                 var nz = cz + TreeDirections.Dz[dir];
 
-                byte nid, nstate;
+                ushort nid;
+                byte nstate;
                 if (hasExcluded && nx == ex && ny == ey && nz == ez)
                 {
                     nid = 0;

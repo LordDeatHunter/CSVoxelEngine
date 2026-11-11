@@ -9,7 +9,7 @@ public sealed class BlockDebrisTests
 {
     public BlockDebrisTests() => TestContent.EnsureLoaded();
 
-    private static byte StoneId => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort StoneId => ContentRegistry.RequireBlock("stone").Id;
 
     private static (ChunkManager Chunks, Chunk Center) Setup()
     {

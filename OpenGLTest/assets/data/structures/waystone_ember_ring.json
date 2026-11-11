@@ -1,0 +1,72 @@
+{
+  // The hell waystone (plans/WAYSTONES.md): a shrine ring near a hell ruin (WaystonePlacement). A basalt disc with a
+  // scorched hellrock heart on a two-layer foundation (hell floors are rough: the foundation fills the dips and the layer
+  // over the disc carves the bulges), eight basalt pillars round it, the diagonal ones crowned with ember crystal.
+  "kind": "hell",
+  "satellite": true,
+  "groundLayer": 2,
+  "palette": {
+    "b": "basalt",
+    "h": "hellrock",
+    "r": "scorched_hellrock",
+    "e": "ember_crystal",
+    "W": "waystone_hell",
+    "U": "waystone_hell_upper"
+  },
+  "layers": [
+    [
+      " hhhhh ",
+      "hhhhhhh",
+      "hhhhhhh",
+      "hhhhhhh",
+      "hhhhhhh",
+      "hhhhhhh",
+      " hhhhh "
+    ],
+    [
+      " hhhhh ",
+      "hhhhhhh",
+      "hhhhhhh",
+      "hhhhhhh",
+      "hhhhhhh",
+      "hhhhhhh",
+      " hhhhh "
+    ],
+    [
+      " bbbbb ",
+      "bbbbbbb",
+      "bbrrrbb",
+      "bbrrrbb",
+      "bbrrrbb",
+      "bbbbbbb",
+      " bbbbb "
+    ],
+    [
+      " ..b.. ",
+      ".b...b.",
+      ".......",
+      "b..W..b",
+      ".......",
+      ".b...b.",
+      " ..b.. "
+    ],
+    [
+      "   b   ",
+      " e   e ",
+      "       ",
+      "b  U  b",
+      "       ",
+      " e   e ",
+      "   b   "
+    ],
+    [
+      "   e   ",
+      "       ",
+      "       ",
+      "e     e",
+      "       ",
+      "       ",
+      "   e   "
+    ]
+  ]
+}

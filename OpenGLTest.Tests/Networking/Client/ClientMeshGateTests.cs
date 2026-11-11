@@ -26,7 +26,7 @@ public sealed class ClientMeshGateTests
     // whole test, as a real caller passes while the focus is unchanged.
     private readonly Vector3[] _foci = [Center];
 
-    private readonly byte _stone;
+    private readonly ushort _stone;
 
     public ClientMeshGateTests()
     {
@@ -43,11 +43,11 @@ public sealed class ClientMeshGateTests
         var manager = new ChunkManager(null!) { Headless = true };
         var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (_, _) => { });
 
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         if (centerHasStone) blocks[Chunk.Idx(8, 8, 8)] = _stone;
-        manager.ApplyStreamedChunk(Center, new ChunkSnapshot(blocks, null, null));
+        manager.ApplyStreamedChunk(Center, new ChunkSnapshot(blocks, null, playerPlaced: null));
         foreach (var offset in Vector3Directions.CardinalDirections)
-            manager.ApplyStreamedChunk(Center + offset, new ChunkSnapshot(new byte[Chunk.BlockCount], null, null));
+            manager.ApplyStreamedChunk(Center + offset, new ChunkSnapshot(new ushort[Chunk.BlockCount], null, playerPlaced: null));
 
         return (manager, streamer, manager.Chunks[Center]);
     }

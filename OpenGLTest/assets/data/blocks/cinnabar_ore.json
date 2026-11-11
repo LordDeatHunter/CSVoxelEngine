@@ -1,0 +1,9 @@
+{
+  "name": "Cinnabar Ore",
+  "model": { "parent": "block/cube_all", "textures": { "all": "cinnabar_ore" } },
+  "material": { "metallic": 0.45, "roughness": 0.3, "normalStrength": 1.0 },
+  "sfx": "hit_rock",
+  "hardness": 16,
+  "requiresTool": true,
+  "tools": { "pickaxe": 3 }
+}

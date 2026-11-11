@@ -1,7 +1,7 @@
 export const meta = {
   name: 'plan-and-implement',
   description: 'Sonnet scouts the codebase, Opus designs the plan, Opus implements it step by step, then build/test + Opus acceptance review (set ARCHITECT_MODEL to "fable" to go back to Fable, which falls back to Opus if unavailable)',
-  whenToUse: 'ONLY for larger workloads in CSVoxelEngine: multi-file features, cross-cutting refactors, or bug fixes and audits whose design is unclear and that deserve a plan before code. Before invoking, the calling agent must judge whether it can do the task well enough itself (small or well-scoped changes, single-area fixes, quick investigations): if so, do it directly and do NOT run this workflow, since it costs roughly 20 minutes and 1M tokens. Pass the task as args: a string, or {task, extraContext?, maxFixRounds?, dryRun?}. dryRun stops after the plan.',
+  whenToUse: 'ONLY for larger workloads in CSVoxelEngine (mid-sized work: use plan-and-implement-lite instead): multi-file features, cross-cutting refactors, or bug fixes and audits whose design is unclear and that deserve a plan before code. Before invoking, the calling agent must judge whether it can do the task well enough itself (small or well-scoped changes, single-area fixes, quick investigations): if so, do it directly and do NOT run this workflow, since it costs roughly 20 minutes and 1M tokens. Pass the task as args: a string, or {task, extraContext?, maxFixRounds?, dryRun?}. dryRun stops after the plan.',
   phases: [
     { title: 'Scout', detail: 'Sonnet maps the relevant code from four angles', model: 'sonnet' },
     { title: 'Architect', detail: 'Opus drafts the plan, Sonnet answers its open questions, Opus red-teams and finalizes', model: 'opus' },
@@ -21,11 +21,11 @@ const dryRun = !!(args && args.dryRun)
 
 const REPO = `
 Repository: C# / .NET 9 Minecraft-style voxel engine using Silk.NET. Working directory is the repo root.
-Read AGENTS.md before anything else — it is the authoritative guide (all code lives under the "VoxelEngine" root namespace with one sub-namespace per folder; Release builds only; GL calls only on the render thread;
+AGENTS.md (already in your context) is the authoritative guide; it is small and indexes the reference docs in docs/agents/ (grep them by heading and read only the section you need, never a whole file) (all code lives under the "VoxelEngine" root namespace with one sub-namespace per folder; Release builds only; GL calls only on the render thread;
 chunk work happens on worker threads). plans/TODO.md and plans/PERF.md hold in-flight plans and known debt.
-The system "dotnet" has no SDK — always use ~/.dotnet/dotnet.exe:
-  build: ~/.dotnet/dotnet.exe build OpenGLTest.sln -c Release
-  tests: ~/.dotnet/dotnet.exe test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release
+The code is C# 14 and needs the .NET 10 SDK, which is the system "dotnet" (~/.dotnet is a 9.0.100 SDK that cannot compile it); prefix with DOTNET_ROLL_FORWARD=LatestMajor:
+  build: DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release
+  tests: DOTNET_ROLL_FORWARD=LatestMajor dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release
 `.trim()
 
 const TASK = `TASK:\n${task}${extraContext ? `\n\nADDITIONAL CONTEXT FROM THE USER:\n${extraContext}` : ''}`
@@ -263,7 +263,7 @@ const ARCHITECT_ROLE = `${REPO}
 You are the software architect for this change. You design; you do not write the implementation.
 You may read any file to check the scouts' claims, but do NOT modify files.
 Produce a plan an implementer can execute step by step without asking questions:
-- Steps are ordered and each must leave the solution building (~/.dotnet/dotnet.exe build OpenGLTest.sln -c Release).
+- Steps are ordered and each must leave the solution building (DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release).
 - Name exact files, types and methods. Say what to add, change or delete, and why.
 - Respect the constraints the scouts found (threading, perf, namespace "VoxelEngine", Release-only).
 - Every step has an acceptance check. Non-trivial behaviour gets an xUnit test in OpenGLTest.Tests/.
@@ -383,7 +383,7 @@ const IMPLEMENTER_ROLE = `${REPO}
 You are the implementer. The architecture is decided — execute your assigned step faithfully. Do not redesign, do not start other steps,
 do not refactor unrelated code. If the plan is wrong in a way that blocks you, make the smallest local deviation that unblocks the step
 and record it in "deviations". Work in the current working tree (no branches, no commits, no stashes).
-Before returning: run ~/.dotnet/dotnet.exe build OpenGLTest.sln -c Release and fix every error and every new warning you introduced.
+Before returning: run DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release and fix every error and every new warning you introduced.
 If the step adds tests, run them. Set buildPassed honestly.`
 
 const implemented = []

@@ -61,7 +61,7 @@ public sealed class AcornTests
         Assert.NotNull(oak.LootTable);
         Assert.NotSame(oak.LootTable, spruce.LootTable);
 
-        var into = new System.Collections.Generic.List<byte>();
+        var into = new System.Collections.Generic.List<ushort>();
         var acorns = 0;
         for (var i = 0; i < 3000; i++)
         {

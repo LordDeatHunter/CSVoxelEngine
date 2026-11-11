@@ -32,7 +32,7 @@ public sealed class MalachiteTests
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
         var water = ContentRegistry.RequireBlock("water").Id;
 
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         for (var i = 0; i < blocks.Length; i++) blocks[i] = stone;
         blocks[Chunk.Idx(1, 1, 1)] = dirt;
         blocks[Chunk.Idx(2, 2, 2)] = water;

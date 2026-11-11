@@ -1,0 +1,18 @@
+{
+  // The burnt trunk of a charred tree (trees/charred_tree.json) in the hell's Ashlands: leafless tree
+  // wood, its thickness in the state byte. Tiles are committed art.
+  "name": "Charred Log",
+  "model": {
+    "parent": "block/cube_column",
+    "textures": { "end": "charred_log_top", "side": "charred_log_side" }
+  },
+  "hardness": 12,
+  "renderer": "tree_wood",
+  "sfx": "hit_wood",
+  "requiresTool": true,
+  "tools": { "axe": 1 },
+  "wood": {
+    "tipHardness": 0.25,
+    "loot": [ { "minThickness": 0, "loot": "wood" }, { "minThickness": 7, "loot": "self" } ]
+  }
+}

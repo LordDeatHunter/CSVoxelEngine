@@ -38,7 +38,10 @@ public static class LodNetCodec
         return output.ToArray();
     }
 
-    public static LodMeshData Decode(byte[] payload)
+    /// <summary>Decodes what <see cref="Encode"/> wrote. On a client, <paramref name="wire"/> moves every vertex's atlas
+    /// layer from the server's tile numbering to this run's, so the far terrain wears the same textures even when the
+    /// two atlases are ordered differently.</summary>
+    public static LodMeshData Decode(byte[] payload, WireIds? wire = null)
     {
         using var input = new MemoryStream(payload, writable: false);
         using var deflate = new DeflateStream(input, CompressionMode.Decompress);
@@ -49,9 +52,9 @@ public static class LodNetCodec
         var z = reader.ReadInt32();
         var yMin = reader.ReadSingle();
         var yMax = reader.ReadSingle();
-        var vertices = ReadVertices(reader);
+        var vertices = ReadVertices(reader, wire);
         var indices = ReadIndices(reader);
-        var waterVertices = ReadVertices(reader);
+        var waterVertices = ReadVertices(reader, wire);
         var waterIndices = ReadIndices(reader);
         var cyMin = ReadInts(reader);
         var cyMax = ReadInts(reader);
@@ -66,13 +69,19 @@ public static class LodNetCodec
             writer.Write(MemoryMarshal.AsBytes(CollectionsMarshal.AsSpan(vertices)));
     }
 
-    private static List<Vertex> ReadVertices(BinaryReader reader)
+    private static List<Vertex> ReadVertices(BinaryReader reader, WireIds? wire)
     {
         var count = reader.ReadInt32();
         if (count <= 0)
             return [];
         var bytes = reader.ReadBytes(count * Marshal.SizeOf<Vertex>());
-        return [.. MemoryMarshal.Cast<byte, Vertex>(bytes)];
+        List<Vertex> vertices = [.. MemoryMarshal.Cast<byte, Vertex>(bytes)];
+        if (wire == null)
+            return vertices;
+        var span = CollectionsMarshal.AsSpan(vertices);
+        for (var i = 0; i < span.Length; i++)
+            span[i].Layer = wire.TileToLocal(span[i].Layer);
+        return vertices;
     }
 
     private static void WriteIndices(BinaryWriter writer, List<ushort> indices)

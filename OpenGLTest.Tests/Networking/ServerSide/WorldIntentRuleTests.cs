@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
@@ -22,7 +23,7 @@ public sealed class WorldIntentRuleTests
 
     private static readonly Vector3 Eye = new(0.5f, 65.62f, 0.5f);
 
-    private static byte BlockOf(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort BlockOf(string name) => ContentRegistry.RequireBlock(name).Id;
 
     private static WorldIntent RoundTrip(int seq, WorldIntent intent, out int readSeq)
     {
@@ -48,6 +49,9 @@ public sealed class WorldIntentRuleTests
             WorldIntent.Throw(Eye, direction, 0.75f),
             WorldIntent.AttackWith(Eye, direction, NetAttackKind.SliceReturn),
             WorldIntent.AttackWith(Eye, direction, NetAttackKind.SwordChop),
+            WorldIntent.Hammer(Eye, direction, cell),
+            WorldIntent.Waystone(Eye, direction, (-300, -420, 77)),
+            WorldIntent.Forge(Eye, direction, cell, 200),
         };
 
         var seq = 40;
@@ -64,7 +68,29 @@ public sealed class WorldIntentRuleTests
             Assert.Equal(intent.Normal, back.Normal);
             Assert.Equal(intent.Charge, back.Charge);
             Assert.Equal(intent.Attack, back.Attack);
+            Assert.Equal(intent.Recipe, back.Recipe);
         }
+    }
+
+    [Fact]
+    public void AForgePickEditsNoCellButAnswersWithTheInventoryAndDrawsFromTheEditRate()
+    {
+        var back = RoundTrip(6, WorldIntent.Forge(Eye, Vector3.UnitX, new Vector3(4f, 70f, -9f), 77), out _);
+        Assert.Equal(NetIntentKind.Forge, back.Kind);
+        // The result lands in the inventory the client predicted; no cell changes, and a flood is capped
+        Assert.False(back.EditsCells);
+        Assert.True(back.PredictsInventory);
+        Assert.True(back.IsRateLimited);
+    }
+
+    [Fact]
+    public void AForgePickCarriesTheHighestResultId()
+    {
+        var back = RoundTrip(3, WorldIntent.Forge(Eye, Vector3.UnitX, new Vector3(4f, 70f, -9f), ushort.MaxValue),
+            out var readSeq);
+        Assert.Equal(3, readSeq);
+        Assert.Equal(ushort.MaxValue, back.Recipe);
+        Assert.Equal(new Vector3(4f, 70f, -9f), back.Cell);
     }
 
     [Fact]
@@ -110,12 +136,71 @@ public sealed class WorldIntentRuleTests
         // The kind past the last one is unknown
         using var writer = new PacketWriter(NetMessage.WorldIntent);
         writer.Write(1);
-        writer.Write((byte)(NetIntentKind.Respawn + 1));
+        writer.Write((byte)(Enum.GetValues<NetIntentKind>().Max() + 1));
         writer.Write(Eye);
         writer.Write(Vector3.UnitX);
         using var reader = new PacketReader(writer.ToArray());
         _ = reader.Message;
         Assert.Throws<InvalidDataException>(() => WorldIntentCodec.Read(reader, out _));
+    }
+
+    [Fact]
+    public void AWaystoneTripNamesItsDestinationEditsNoCellAndDrawsFromTheEditRate()
+    {
+        var direction = Vector3.Normalize(new Vector3(0.5f, -0.25f, -1f));
+        var back = RoundTrip(5, WorldIntent.Waystone(Eye, direction, (1200, -350, -64)), out _);
+        Assert.Equal(NetIntentKind.Waystone, back.Kind);
+        Assert.Equal((1200, -350, -64), (back.X, back.Y, back.Z));
+        // A trip changes no cell and spends nothing the client predicted, but a flood of them is still capped
+        Assert.False(back.EditsCells);
+        Assert.False(back.PredictsInventory);
+        Assert.True(back.IsRateLimited);
+    }
+
+    [Fact]
+    public void ACastRoundTripsEverySlotAStaffCanHaveAndEditsNoCell()
+    {
+        var direction = Vector3.Normalize(new Vector3(0.5f, -0.25f, -1f));
+        for (var slot = 0; slot < SpellConfig.StaffMaxSlots; slot++)
+        {
+            var back = RoundTrip(slot + 1, WorldIntent.Cast(Eye, direction, slot), out var readSeq);
+            Assert.Equal(slot + 1, readSeq);
+            Assert.Equal(NetIntentKind.Cast, back.Kind);
+            Assert.Equal(slot, back.Slot);
+            Assert.Equal(Eye, back.Eye);
+            Assert.True(Vector3.Distance(direction, back.Direction) < 1e-5f);
+            Assert.False(back.HasCell);
+
+            // A cast writes no cell, so it waits on no correction, but it still draws an edit token
+            Assert.False(back.EditsCells);
+            Assert.True(back.IsRateLimited);
+        }
+    }
+
+    [Fact]
+    public void ACastSlotPastAnyStaffIsAMalformedFrame()
+    {
+        static PacketReader CastFrame(int slot)
+        {
+            using var writer = new PacketWriter(NetMessage.WorldIntent);
+            writer.Write(1);
+            writer.Write((byte)NetIntentKind.Cast);
+            writer.Write(Eye);
+            writer.Write(Vector3.UnitX);
+            writer.Write((byte)slot);
+            var reader = new PacketReader(writer.ToArray());
+            _ = reader.Message;
+            return reader;
+        }
+
+        using (var last = CastFrame(SpellConfig.StaffMaxSlots - 1))
+            Assert.Equal(SpellConfig.StaffMaxSlots - 1, WorldIntentCodec.Read(last, out _).Slot);
+
+        using (var past = CastFrame(SpellConfig.StaffMaxSlots))
+            Assert.Throws<InvalidDataException>(() => WorldIntentCodec.Read(past, out _));
+
+        using (var far = CastFrame(byte.MaxValue))
+            Assert.Throws<InvalidDataException>(() => WorldIntentCodec.Read(far, out _));
     }
 
     [Fact]

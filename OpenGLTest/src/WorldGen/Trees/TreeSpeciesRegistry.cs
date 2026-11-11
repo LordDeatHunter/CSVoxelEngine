@@ -28,7 +28,7 @@ public static class TreeSpeciesRegistry
     /// so the growth item never turns an oak into a snag; a leafless species with a wood of its own
     /// still resolves to itself.
     /// </summary>
-    public static TreeSpecies? ForBlock(byte blockId)
+    public static TreeSpecies? ForBlock(ushort blockId)
     {
         TreeSpecies? leafless = null;
         foreach (var species in _byName.Values)

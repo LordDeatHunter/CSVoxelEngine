@@ -1,0 +1,5 @@
+{
+  // A forge metal (recipes/forge/refined_vulcanite.json): stacked on the anvil and refined there, never crafted.
+  "name": "Vulcanite Shard",
+  "texture": "assets/textures/items/vulcanite_shard.png"
+}

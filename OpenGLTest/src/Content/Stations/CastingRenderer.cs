@@ -1,3 +1,5 @@
+using System;
+
 namespace VoxelEngine.Content.Stations;
 
 /// <summary>
@@ -56,7 +58,43 @@ public static class CastingRenderer
     /// or pokes through the slab top.
     /// </summary>
     public static float LiquidHeight(float fill01) =>
-        MathUtils.Lerp(PocketFloorY + 0.005f, PocketTopY - 0.01f, MathUtils.Clamp01(fill01));
+        Mold.LiquidHeightAt(fill01);
+
+    /// <summary>
+    /// One pocket's levels in cell space: a slab or bowl whose molten sheet rises from
+    /// <see cref="FloorY"/> to <see cref="TopY"/>, inside a rim <see cref="Inset"/> wide. The mold
+    /// constants above are <see cref="Mold"/>; a casting basin's deeper bowl is <see cref="Basin"/>.
+    /// </summary>
+    public readonly record struct Pocket(float FloorY, float TopY, float Inset)
+    {
+        /// <summary>Inner width: the cell less a rim on each side.</summary>
+        public float Width => 1f - 2f * Inset;
+
+        /// <summary>Edge of a block result: as wide as the pocket allows without standing out of it,
+        /// so a deep bowl shows a cube and a shallow slab a flatter, depth-fitted one.</summary>
+        public float ResultCubeSize => MathF.Min(TopY - FloorY, Width);
+
+        /// <summary>Height of a block result's center: resting on the pocket floor.</summary>
+        public float ResultCubeY => FloorY + ResultCubeSize * 0.5f;
+
+        /// <summary>Height of the molten surface for a pour <paramref name="fill01"/> full, kept
+        /// strictly inside the pocket at both ends (see <see cref="CastingRenderer.LiquidHeight"/>).</summary>
+        public float LiquidHeightAt(float fill01) =>
+            MathUtils.Lerp(FloorY + 0.005f, TopY - 0.01f, MathUtils.Clamp01(fill01));
+    }
+
+    /// <summary>The pocket of every fired mold (the constants above).</summary>
+    public static readonly Pocket Mold = new(PocketFloorY, PocketTopY, PocketInset);
+
+    /// <summary>The casting basin's pocket: a 2 px floor under a 6 px deep bowl with a 2 px rim,
+    /// mirroring <c>assets/models/block/casting_basin.json</c> (<c>CastingTests</c> pins the tie).</summary>
+    public static readonly Pocket Basin = new(2f / 16f, 8f / 16f, 2f / 16f);
+
+    /// <summary>
+    /// The pocket a cast that yields <paramref name="resultIsBlock"/> sits in: block casts are
+    /// poured in the basin, item casts in a mold slab.
+    /// </summary>
+    public static Pocket PocketFor(bool resultIsBlock) => resultIsBlock ? Basin : Mold;
 
     /// <summary>
     /// Opacity of the molten sheet while the cast cools. Complementary to

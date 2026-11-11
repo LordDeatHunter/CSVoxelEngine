@@ -25,7 +25,7 @@ public sealed class FirestarterKilnTests
         return ItemFactory.Create("firestarter", spec);
     }
 
-    private static StubItemUseWorld WorldAiming(Vector3 cell, byte id)
+    private static StubItemUseWorld WorldAiming(Vector3 cell, ushort id)
     {
         var world = new StubItemUseWorld { RaycastHits = true, RaycastHit = cell, RaycastNormal = Vector3.UnitY };
         world.Cells[((int)cell.X, (int)cell.Y, (int)cell.Z)] = (id, 0);

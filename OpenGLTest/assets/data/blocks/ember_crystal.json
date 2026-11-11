@@ -1,0 +1,9 @@
+{
+  // A glowstone-like light block hanging in the Ashlands and Magma Caverns ceilings: full light in
+  // the ember color. Tile is committed art.
+  "name": "Ember Crystal",
+  "model": { "parent": "block/cube_all", "textures": { "all": "ember_crystal" } },
+  "sfx": "hit_rock",
+  "hardness": 2,
+  "light": { "emission": 15, "color": [255, 90, 40] }
+}

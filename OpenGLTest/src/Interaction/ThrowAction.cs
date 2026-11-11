@@ -7,6 +7,8 @@ using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Caves;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Interaction;
@@ -23,6 +25,10 @@ internal sealed class ThrowAction
     private readonly ChunkManager _chunkManager;
     private readonly DropManager _dropManager;
     private readonly GoblinManager? _goblins;
+    private readonly HellMobManager? _hellMobs;
+    private readonly CaveMobManager? _caveMobs;
+    private readonly SkeletonManager? _skeletons;
+    private readonly SkeletonKingManager? _kings;
     private readonly List<Mob> _mobs;
     private readonly List<ThrownProjectile> _projectiles;
     private readonly bool _clientMode;
@@ -34,8 +40,13 @@ internal sealed class ThrowAction
     private MobStrikes Strikes => _world.Strikes;
 
     internal ThrowAction(World world, ChunkManager chunkManager, DropManager dropManager, GoblinManager? goblins,
+        HellMobManager? hellMobs, CaveMobManager? caveMobs, SkeletonManager? skeletons, SkeletonKingManager? kings,
         List<Mob> mobs, List<ThrownProjectile> projectiles, bool clientMode)
     {
+        _kings = kings;
+        _hellMobs = hellMobs;
+        _caveMobs = caveMobs;
+        _skeletons = skeletons;
         _world = world;
         _chunkManager = chunkManager;
         _dropManager = dropManager;
@@ -48,15 +59,16 @@ internal sealed class ThrowAction
     private readonly List<ThrownProjectile> _thrown = [];
 
     private float _throwChargeSeconds;
-    private byte _throwItemId;
+    private ushort _throwItemId;
     private float _throwBaseDamage;
 
     internal bool IsThrowCharging { get; private set; }
 
     internal float ThrowCharge01 => MathUtils.Clamp01(_throwChargeSeconds / PlayerConfig.ThrowChargeSeconds);
 
-    /// <summary>Rebuilds the projectile list (<c>_projectiles</c>) from the player's throws and the
-    /// goblins' stones, with indexed loops so a frame allocates no enumerator.</summary>
+    /// <summary>Rebuilds the projectile list (<c>_projectiles</c>) from the player's throws, the
+    /// goblins' stones, the hell casters' fire bolts, the shardlings' crystal shards, the skeletons' arrows and the
+    /// Skeleton Kings' bones, with indexed loops so a frame allocates no enumerator.</summary>
     internal void RefreshProjectiles()
     {
         _projectiles.Clear();
@@ -67,6 +79,30 @@ internal sealed class ThrowAction
             var stones = _goblins.Stones;
             for (var i = 0; i < stones.Count; i++)
                 _projectiles.Add(stones[i]);
+        }
+        if (_hellMobs != null)
+        {
+            var bolts = _hellMobs.Bolts;
+            for (var i = 0; i < bolts.Count; i++)
+                _projectiles.Add(bolts[i]);
+        }
+        if (_caveMobs != null)
+        {
+            var shards = _caveMobs.Shards;
+            for (var i = 0; i < shards.Count; i++)
+                _projectiles.Add(shards[i]);
+        }
+        if (_skeletons != null)
+        {
+            var arrows = _skeletons.Arrows;
+            for (var i = 0; i < arrows.Count; i++)
+                _projectiles.Add(arrows[i]);
+        }
+        if (_kings != null)
+        {
+            var bones = _kings.Bones;
+            for (var i = 0; i < bones.Count; i++)
+                _projectiles.Add(bones[i]);
         }
     }
 
@@ -113,7 +149,8 @@ internal sealed class ThrowAction
             var id = inventory.SelectedBlockId;
             if (id == 0) return false;
             if (!inventory.RemoveTool(instance)) return false;
-            _dropManager.SpawnAt(id, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
+            _dropManager.SpawnAt(id, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f,
+                PlayerConfig.ThrownPickupDelaySeconds);
             return true;
         }
 
@@ -127,7 +164,8 @@ internal sealed class ThrowAction
             // Spend first so a failed spend never duplicates the drop
             if (!inventory.ConsumeSelected()) break;
 
-            _dropManager.SpawnAt(stackId, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f);
+            _dropManager.SpawnAt(stackId, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f,
+                PlayerConfig.ThrownPickupDelaySeconds);
             thrown = true;
         }
         return thrown;
@@ -203,7 +241,7 @@ internal sealed class ThrowAction
     /// no longer holds that item. The release half of a throw, apart from the local player's
     /// charge and arm pose.
     /// </summary>
-    private bool TryLaunchThrow(Inventory inventory, byte id, float baseDamage, float charge01,
+    private bool TryLaunchThrow(Inventory inventory, ushort id, float baseDamage, float charge01,
         Vector3 eye, Vector3 forward, bool creative)
     {
         if (id == 0 || inventory.SelectedBlockId != id || inventory.SelectedCount <= 0)
@@ -241,7 +279,7 @@ internal sealed class ThrowAction
 
             if (alive) continue;
             if (!_clientMode)
-                _dropManager.SpawnAt(projectile.ItemId, projectile.Position);
+                _dropManager.SpawnAt(projectile.ItemId, projectile.Position, pickupDelaySeconds: PlayerConfig.ThrownPickupDelaySeconds);
             _thrown.RemoveAt(i);
         }
     }

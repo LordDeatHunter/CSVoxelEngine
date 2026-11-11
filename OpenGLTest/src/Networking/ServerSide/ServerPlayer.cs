@@ -3,9 +3,13 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Entities;
 using VoxelEngine.Items;
+using VoxelEngine.Magic;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation.Waystones;
+using VoxelEngine.Status;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.Networking.ServerSide;
 
@@ -64,6 +68,12 @@ public sealed class ServerPlayer : IMobTarget
     public RateLimiter EditLimiter { get; } = new(NetworkConfig.NetEditIntentsPerSecond,
         NetworkConfig.NetEditIntentBurst);
 
+    /// <summary>
+    /// Paces this player's casts: at most one per <see cref="SpellConfig.CastCooldownSeconds"/>,
+    /// less <see cref="NetworkConfig.NetCastSlackSeconds"/> of network jitter.
+    /// </summary>
+    public CastPacing Casting { get; } = new();
+
     private double _lastAttackAt = double.NegativeInfinity;
     // The last attack that landed, which paces the next (a sword swing waits for the one before it)
     private NetAttackKind _lastAttackKind;
@@ -90,7 +100,8 @@ public sealed class ServerPlayer : IMobTarget
     /// </summary>
     public bool TryAttack(NetAttackKind kind, Item? held, double now, double slackSeconds)
     {
-        if (now - _lastAttackAt + slackSeconds < AttackPacing.MinGapSeconds(_lastAttackKind, kind, held))
+        if (now - _lastAttackAt + slackSeconds < AttackPacing.MinGapSeconds(_lastAttackKind, kind, held,
+                Inventory.Equipment.Stats.AttackSpeedFactor))
             return false;
         _lastAttackAt = now;
         _lastAttackKind = kind;
@@ -123,7 +134,7 @@ public sealed class ServerPlayer : IMobTarget
 
     /// <summary>
     /// Points <see cref="Context"/> at an intent's eye and aim, with this player's current creative
-    /// flag, before the world applies it.
+    /// and sneaking flags, before the world applies it.
     /// </summary>
     public void Aim(Vector3 eye, Vector3 direction)
     {
@@ -131,6 +142,7 @@ public sealed class ServerPlayer : IMobTarget
         Context.Forward = direction;
         Context.ViewDirection = direction;
         Context.IsCreative = Creative;
+        Context.RemoteSneaking = IsSneaking;
     }
 
     public int Id { get; }
@@ -155,6 +167,26 @@ public sealed class ServerPlayer : IMobTarget
     /// client only mirrors it. Persisted with the player.
     /// </summary>
     public PlayerHealth Status { get; } = new();
+
+    /// <summary>The player's status effects (its pool's set): mob and spell effects land here, and
+    /// <see cref="TickStatus"/> ticks them.</summary>
+    public StatusEffectSet Effects => Status.Effects;
+
+    /// <summary>The cell of the chest this player has open, or null (the server keeps it so a move is judged against
+    /// that chest only and a change reaches every viewer).</summary>
+    public (int X, int Y, int Z)? OpenChest { get; set; }
+
+    /// <summary>The cell of the waystone this player last activated (its screen's waystone, which a trip leaves from), or
+    /// null; a trip is still judged on the player standing at it.</summary>
+    public (int X, int Y, int Z)? AtWaystone { get; set; }
+
+    /// <summary>The waystone trip waiting for its destination to load, or null. While it waits the player is held over
+    /// the destination, immune, and its states move nothing (a correction is awaited); it ends with the landing.</summary>
+    public WaystoneArrivalHold? WaystoneTrip { get; set; }
+
+    /// <summary>The registry and discovered-list versions the client's waystone rows were last built from, so the
+    /// server sends fresh rows only when either moved.</summary>
+    public (int Registry, int Discovered) WaystoneRowsSent { get; set; } = (-1, -1);
 
     /// <summary>The player's current health, 0..<see cref="PlayerHealth.MaxHealth"/>.</summary>
     public int Health => Status.Health;
@@ -200,8 +232,14 @@ public sealed class ServerPlayer : IMobTarget
     /// </summary>
     public bool AcceptsStatePosition(int ack) => ack >= _awaitedCorrection;
 
-    /// <summary>What the movement rules remember between this player's states (its hover time).</summary>
+    /// <summary>What the movement rules remember between this player's states (its hover time and airtime climb).</summary>
     public MovementState Movement { get; } = new();
+
+    /// <summary>
+    /// Air jumps this player's worn gear grants per airtime (the cloud boots' <see cref="GearAbility.AirJump"/>),
+    /// judged by <see cref="MovementRules"/>.
+    /// </summary>
+    public int AirJumps => Inventory.Equipment.Has(GearAbility.AirJump) ? 1 : 0;
 
     /// <summary>The accepted camera eye position.</summary>
     public Vector3 Position { get; set; }
@@ -209,8 +247,18 @@ public sealed class ServerPlayer : IMobTarget
     /// <summary>The mobs chase and hit this player at its accepted eye.</summary>
     Vector3 IMobTarget.Eye => Position;
 
-    /// <summary>No mob hurts a creative, flying or dead player.</summary>
-    public bool IsImmune => Creative || Flying || IsDead;
+    private readonly MotionEstimate _motion = new();
+
+    /// <summary>How the accepted eye has been moving (<see cref="ObserveMotion"/>), which the ring spawners lead.</summary>
+    Vector3 IMobTarget.Velocity => _motion.Velocity;
+
+    /// <summary>Feeds the velocity estimate the eye's position this frame; the world's mob update calls it once a
+    /// frame for every connected player.</summary>
+    public void ObserveMotion(float deltaTime) => _motion.Observe(Position, deltaTime);
+
+    /// <summary>No mob hurts a creative, flying or dead player, nor one held on a waystone trip (it is not really there
+    /// yet).</summary>
+    public bool IsImmune => Creative || Flying || IsDead || WaystoneTrip != null;
 
     /// <summary>The client's cosmetic sneaking flag: mobs notice a sneaking player from half as far.</summary>
     public bool IsSneaking => ((NetPlayerFlags)Flags & NetPlayerFlags.Sneaking) != 0;
@@ -228,7 +276,15 @@ public sealed class ServerPlayer : IMobTarget
         if (awayHorizontal.LengthSquared() > 1e-6f)
             _pendingKnockback = Vector3.Normalize(awayHorizontal) * knockbackSpeed;
         _pendingLift = MathF.Max(_pendingLift, lift);
+        // The client plays the lift once the status arrives, so its rise must not be judged an air hop
+        if (lift > 0f) Movement.GrantLift(lift);
         StatusDirty = true;
+    }
+
+    /// <summary>Restores up to <paramref name="amount"/> HP at once and marks the status for the next send.</summary>
+    public void Heal(int amount)
+    {
+        if (Status.Heal(amount)) StatusDirty = true;
     }
 
     /// <summary>Whether this player's death has been announced in the chat (the server says it
@@ -257,45 +313,113 @@ public sealed class ServerPlayer : IMobTarget
     /// one whose surroundings are not loaded (<see cref="PlayerBodyProbe.IsKnown"/>), is not judged.
     /// <paramref name="solids"/> (the server's icebergs) count as ground, so a rider lands on its berg.
     /// </summary>
-    public void ObserveAcceptedState(ChunkManager chunks, double stateGapSeconds, IBodySolids? solids = null)
+    public bool ObserveAcceptedState(ChunkManager chunks, double stateGapSeconds, IBodySolids? solids = null)
     {
         if (IsDead || !PlayerBodyProbe.IsKnown(Position, chunks))
-            return;
-        var feet = Position.Y - Camera.EyeHeight;
-        var fall = _fall.Observe(feet, PlayerBodyProbe.Grounded(Position, chunks, solids), Flying,
-            PlayerBodyProbe.InWater(Position, chunks), Creative,
-            NetValidation.AllowedDistance(stateGapSeconds, NetworkConfig.NetMaxMoveBlocksPerSecond));
-        if (fall > 0)
         {
-            Status.TakeDamage(fall);
+            _jumpTracked = false;
+            return false;
+        }
+        var feet = Position.Y - Camera.EyeHeight;
+        var grounded = PlayerBodyProbe.Grounded(Position, chunks, solids);
+        var inWater = PlayerBodyProbe.InWater(Position, chunks);
+        var fall = _fall.Observe(feet, grounded, Flying, inWater, Creative,
+            NetValidation.AllowedDistance(stateGapSeconds, NetworkConfig.NetMaxMoveBlocksPerSecond),
+            cushioned: PlayerBodyProbe.LandingCushioned(Position, chunks));
+        // Worn no_fall_damage gear (the feather charm) negates the blow; read from the inventory itself, so it holds
+        // even before the first status tick applied the gear, and a negated fall never dirties the status
+        if (fall > 0 && !Inventory.Equipment.Has(GearAbility.NoFallDamage))
+        {
+            Status.TakeDamage(fall, DamageSource.Fall);
             StatusDirty = true;
         }
+
+        // A jump is the step off the ground that rises: grounded last state, airborne and higher now (an
+        // auto-step stays grounded, a drop off a ledge does not rise, and an airborne rise such as the cloud
+        // boots' air jump starts from no ground). It is what works a bloomery's bellows.
+        var jumped = _jumpTracked && _wasGrounded && !grounded && !Flying && !inWater
+                     && feet - _lastFeet > NetworkConfig.NetJumpRiseBlocks;
+        _jumpTracked = true;
+        _wasGrounded = grounded;
+        _lastFeet = feet;
+        return jumped;
     }
+
+    private bool _jumpTracked;
+    private bool _wasGrounded;
+    private float _lastFeet;
 
     /// <summary>
     /// The per-tick half of the status: lava burns a body standing in it, an empty lung drowns one
-    /// with its eye under water (creative and flight are immune, an unloaded body is not judged) and
-    /// the damage flash decays. A dead player is left
-    /// as it is until <see cref="Respawn"/>.
+    /// with its eye under water (creative and flight are immune, an unloaded body is not judged), the
+    /// status effects tick (cleared while creative or flying), the damage flash decays and health and
+    /// mana regenerate. A dead player is left as it is until <see cref="Respawn"/>, but for its status
+    /// effects, which are cleared. A change of the active effects (an expiry here, or an application
+    /// since the last tick) marks the status dirty too. The cave biome at the eye is read here as well
+    /// (<see cref="EyeCaveBiome"/>, kept as it was while dead) and marks the status dirty only when it changes.
     /// </summary>
     public void TickStatus(float dt, ChunkManager chunks)
     {
         if (IsDead)
+        {
+            Status.Effects.Clear();
+            NoteEffectMask();
             return;
+        }
+        _caveProbe.Update(chunks.WorldSource, Position);
+        NoteCaveBiome();
+        // Worn gear sizes the pools; a change marks the status dirty through the max checks below
+        Status.ApplyGear(Inventory.Equipment, simulatesMana: true);
         var before = Status.Health;
         var airBefore = Status.Breath.NetStep;
+        var manaBefore = Status.Mana.NetMana;
+        var maxManaBefore = Status.Mana.Max;
         var known = PlayerBodyProbe.IsKnown(Position, chunks);
         var inLava = known && PlayerBodyProbe.InLava(Position, chunks);
         Status.UpdateLava(dt, inLava, Creative || Flying);
         // Drowning: an unloaded body is not judged, so it never drains (it refills)
         var underWater = known && PlayerBodyProbe.EyeInFluid(Position, chunks, out var eyeInLava) && !eyeInLava;
         Status.UpdateBreath(dt, underWater, Creative || Flying);
+        Status.UpdateEffects(dt, Creative || Flying);
+        NoteEffectMask();
         UpdateCactusContact(dt, chunks);
         Status.Update(dt);
         // Regeneration: the sprint bit is the client's own claim, but it only ever slows its sender's healing
         Status.UpdateRegen(dt, ((NetPlayerFlags)Flags & NetPlayerFlags.Sprinting) != 0, Creative || Flying);
-        if (Status.Health != before || Status.IsDead || Status.Breath.NetStep != airBefore)
+        Status.UpdateMana(dt);
+        // Mana is reported in whole units, so a regenerating pool sends about one status a second
+        if (Status.Health != before || Status.IsDead || Status.Breath.NetStep != airBefore
+            || Status.Mana.NetMana != manaBefore || Status.Mana.Max != maxManaBefore)
             StatusDirty = true;
+    }
+
+    // The effect mask the client was last told about (or is about to be, once StatusDirty is answered)
+    private byte _reportedEffectMask;
+
+    // Marks the status dirty when the active effects differ from the last reported mask
+    private void NoteEffectMask()
+    {
+        var mask = Status.Effects.Mask;
+        if (mask == _reportedEffectMask)
+            return;
+        _reportedEffectMask = mask;
+        StatusDirty = true;
+    }
+
+    // The eye's cave biome probe (CB-3, memoized per cell) and the biome the client was last told about
+    private readonly EyeCaveBiomeProbe _caveProbe = new();
+    private CaveBiome _reportedCaveBiome;
+
+    /// <summary>The cave biome at the player's eye (plain outside caves), sent in its <c>PlayerStatus</c>.</summary>
+    public CaveBiome EyeCaveBiome => _caveProbe.Current;
+
+    // Marks the status dirty when the eye's cave biome differs from the last reported one
+    private void NoteCaveBiome()
+    {
+        if (_caveProbe.Current == _reportedCaveBiome)
+            return;
+        _reportedCaveBiome = _caveProbe.Current;
+        StatusDirty = true;
     }
 
     // Standing against a cactus pricks: one tick per ContactDamage.TickSeconds while the reported
@@ -308,25 +432,35 @@ public sealed class ServerPlayer : IMobTarget
             PlayerPhysics.PlayerRadius, PlayerPhysics.PlayerHeight, out var damage);
         var tick = ContactDamage.Tick(ref _contactTimer, dt, (int)damage, !(Creative || Flying));
         if (tick > 0)
-            Status.TakeDamage(tick);
+            Status.TakeDamage(tick, DamageSource.Cactus);
     }
 
     private float _contactTimer;
 
     /// <summary>
     /// The server moves the player: the accepted eye jumps to <paramref name="eye"/> and the fall
-    /// and the hover time are forgotten, since a teleport is never a fall or a hover.
+    /// and the movement memory (hover time, airtime climb, lift credit) are forgotten, since a
+    /// teleport is never a fall, a hover or a climb.
     /// </summary>
     public void Teleport(Vector3 eye)
     {
         Position = eye;
         Aim(eye, Forward);
         _fall.Reset(eye.Y - Camera.EyeHeight, grounded: false);
-        Movement.AirborneStillSeconds = 0;
+        Movement.Reset();
+        _jumpTracked = false;
     }
 
-    /// <summary>Forgets the fall built up so far, at the current position (after a correction).</summary>
-    public void ResetFall() => _fall.Reset(Position.Y - Camera.EyeHeight, grounded: false);
+    /// <summary>
+    /// Forgets the fall built up so far, at the current position (after a correction). The movement
+    /// memory is kept on purpose: a correction never refills the airtime rise budget, so being
+    /// corrected again and again cannot climb.
+    /// </summary>
+    public void ResetFall()
+    {
+        _fall.Reset(Position.Y - Camera.EyeHeight, grounded: false);
+        _jumpTracked = false;
+    }
 
     /// <summary>
     /// Brings a dead player back: full health, at its <see cref="RespawnEye"/> or else
@@ -370,24 +504,26 @@ public sealed class ServerPlayer : IMobTarget
     public bool InventoryChanged { get; set; }
 
     /// <summary>Whether a pickup of an id would fit this player's inventory (a cached method group).</summary>
-    public Func<byte, bool> CanAcceptDrop { get; }
+    public Func<ushort, bool> CanAcceptDrop { get; }
 
     /// <summary>Unit look direction from <see cref="Yaw"/> and <see cref="Pitch"/>.</summary>
     public Vector3 Forward => Vector3Utils.FromYawPitch(Yaw, Pitch);
 
     /// <summary>
-    /// Applies a saved player file: the pose when it has one, the inventory, the health, the respawn
-    /// eye, and the modes only as far as <paramref name="allowCreative"/> lets this server grant them.
-    /// Returns whether a position was restored, so the caller can spawn the player where they left.
+    /// Applies a saved player file: the pose when it has one, the inventory, health and mana (through
+    /// <see cref="SavedPlayerPools.Apply"/>, known parts before mana), the respawn eye, and the modes only as far as <paramref name="allowCreative"/> lets this server grant them.
+    /// A newcomer (no file, or one saved before spell parts could be learned) gets the
+    /// <see cref="StarterKit"/>. Returns whether a position was restored, so the caller can spawn the
+    /// player where they left.
     /// </summary>
     public bool Restore(PlayerSaveData? saved, bool allowCreative)
     {
+        if (saved != null)
+            SavedPlayerPools.Apply(saved, Inventory, Status);
+        if (StarterKit.NeededBy(saved))
+            StarterKit.GiveTo(Inventory);
         if (saved == null)
             return false;
-        if (saved.Inventory is { } inventory)
-            Inventory.Import(inventory);
-        if (saved.Health is { } health)
-            Status.Restore(health);
         if (saved.RespawnEye is { Length: 3 } r)
             RespawnEye = new Vector3(r[0], r[1], r[2]);
         Creative = allowCreative && saved.Creative == true;
@@ -409,6 +545,7 @@ public sealed class ServerPlayer : IMobTarget
         Creative = Creative,
         Flying = Flying,
         Health = Status.Health,
+        Mana = Status.Mana.Current,
         RespawnEye = RespawnEye is { } r ? [r.X, r.Y, r.Z] : null,
         Inventory = Inventory.Export(),
     };

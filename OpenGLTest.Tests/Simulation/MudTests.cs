@@ -10,7 +10,7 @@ public sealed class MudTests
 {
     public MudTests() => TestContent.EnsureLoaded();
 
-    private static ChunkManager DirtBasin(out byte dirt, out byte mud, out byte water)
+    private static ChunkManager DirtBasin(out ushort dirt, out ushort mud, out ushort water)
     {
         var manager = new ChunkManager(null!);
         var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
@@ -27,12 +27,12 @@ public sealed class MudTests
         return manager;
     }
 
-    private static void SetWater(ChunkManager manager, byte water, bool present)
+    private static void SetWater(ChunkManager manager, ushort water, bool present)
     {
         var chunk = manager.Chunks[Vector3.Zero];
         for (var x = 7; x <= 9; x++)
         for (var z = 7; z <= 9; z++)
-            chunk.SetBlockRaw(x, 2, z, present ? water : (byte)0, present ? FluidState.Source : (byte)0);
+            chunk.SetBlockRaw(x, 2, z, present ? water : BlockType.Air, present ? FluidState.Source : (byte)0);
     }
 
     private static void ScheduleWater(FluidManager fluids)
@@ -42,7 +42,7 @@ public sealed class MudTests
             fluids.ScheduleAround(x, 2, z);
     }
 
-    private static byte Cell(ChunkManager manager, int x, int y, int z)
+    private static ushort Cell(ChunkManager manager, int x, int y, int z)
     {
         Assert.True(manager.TryGetCell(x, y, z, out var id, out _));
         return id;
@@ -135,7 +135,7 @@ public sealed class MudTests
         Assert.Equal(mud, Cell(manager, 8, 1, 8));
     }
 
-    private static ChunkManager SubmergedStack(out byte dirt, out byte mud, out byte water,
+    private static ChunkManager SubmergedStack(out ushort dirt, out ushort mud, out ushort water,
         out int centerX, out int centerY, out int centerZ)
     {
         dirt = ContentRegistry.RequireBlock("dirt").Id;
@@ -188,7 +188,7 @@ public sealed class MudTests
     /// How many of the 26 neighbors hold water. Ice counts: the snow pass runs after the mud pass,
     /// so a cold pond's single surface cell was water when the mud was stamped and only froze later.
     /// </summary>
-    private static int CountWaterAround(ChunkManager manager, int x, int y, int z, byte water, byte ice)
+    private static int CountWaterAround(ChunkManager manager, int x, int y, int z, ushort water, ushort ice)
     {
         var count = 0;
         for (var dx = -1; dx <= 1; dx++)

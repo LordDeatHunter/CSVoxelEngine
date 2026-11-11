@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Player;
@@ -58,7 +59,7 @@ public sealed class ClientIntentFlowTests : IDisposable
         }
     }
 
-    private static byte Dirt => ContentRegistry.RequireBlock("dirt").Id;
+    private static ushort Dirt => ContentRegistry.RequireBlock("dirt").Id;
 
     private void Connect()
     {
@@ -71,6 +72,10 @@ public sealed class ClientIntentFlowTests : IDisposable
             Thread.Sleep(5);
         }
         Assert.Equal(NetworkStatus.Handshaken, _connection.Status);
+        // A newcomer holds the starter kit's hint scroll; this flow starts from an empty hand
+        Assert.True(_host.TryGetPlayer(_connection.Server!.Value.PlayerId, out var joined));
+        joined.Inventory.RemoveAll(ItemRegistry.RequireItem(StarterKit.HintScrollName).Id);
+        joined.InventoryChanged = true;
 
         _client = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
         _client.GetChunkManager().Headless = true;
@@ -160,8 +165,7 @@ public sealed class ClientIntentFlowTests : IDisposable
         var count = reader.ReadInt();
         _cells.Clear();
         for (var i = 0; i < count; i++)
-            _cells.Add(new NetCellChange(reader.ReadInt(), reader.ReadInt(), reader.ReadInt(), reader.ReadByte(),
-                reader.ReadByte()));
+            _cells.Add(NetCellChangeCodec.Read(reader));
     }
 
     /// <summary>
@@ -188,16 +192,16 @@ public sealed class ClientIntentFlowTests : IDisposable
         }
     }
 
-    private (byte Id, byte State) ServerCell(Vector3 cell)
+    private (ushort Id, byte State) ServerCell(Vector3 cell)
     {
         Assert.True(_server.GetChunkManager().TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out var state));
         return (id, state);
     }
 
-    private byte ClientCell(Vector3 cell) =>
-        _client!.GetChunkManager().TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out _) ? id : (byte)255;
+    private ushort ClientCell(Vector3 cell) =>
+        _client!.GetChunkManager().TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out _) ? id : ushort.MaxValue;
 
-    private void SetServerCell(int x, int y, int z, byte id)
+    private void SetServerCell(int x, int y, int z, ushort id)
     {
         var chunk = _server.GetChunkManager().ChunkAt(x, y, z)!;
         var (lx, ly, lz) = VoxelCoords.LocalOf(x, y, z);
@@ -235,7 +239,7 @@ public sealed class ClientIntentFlowTests : IDisposable
         for (var x = fx - 3; x <= fx + 3; x++)
         for (var y = fy - 1; y <= fy + 4; y++)
         for (var z = fz - 3; z <= fz + 3; z++)
-            SetServerCell(x, y, z, y == fy - 1 ? Dirt : (byte)0);
+            SetServerCell(x, y, z, y == fy - 1 ? Dirt : BlockType.Air);
         var front = new Vector3(fx + 2, fy + 1, fz);
         SetServerCell(fx + 2, fy + 1, fz, Dirt);
 

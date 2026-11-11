@@ -1,0 +1,5 @@
+{
+  // A forge metal: forged from vulcanite shards, then into the vulcanite tool heads (recipes/forge/).
+  "name": "Refined Vulcanite",
+  "texture": "assets/textures/items/vulcanite_ingot.png"
+}

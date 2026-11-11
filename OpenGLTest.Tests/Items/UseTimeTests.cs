@@ -1,5 +1,6 @@
 using System;
 using VoxelEngine.Items;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
 namespace VoxelEngine.Tests.Items;
@@ -95,5 +96,33 @@ public sealed class UseTimeTests : IDisposable
         Assert.False(world.RightClick.TryBeginUseCharge());
         Assert.False(world.RightClick.IsUseCharging);
         _ = bandage;
+    }
+
+    [Fact]
+    public void ADrawnBowHoldsAtFullDrawAndNeverRunsItsUseByItself()
+    {
+        var world = NewClientWorld(out _);
+        var bow = ContentRegistry.RequireItem("bow");
+        Assert.Equal(VoxelEngine.Content.Blocks.UsePose.Bow, bow.UsePose);
+        Assert.True(world.Inventory.Add(bow.Id));
+        // Add equips a fresh find into the first free slot: find the one holding the bow
+        for (var slot = 0; slot < Inventory.SlotCount && world.Inventory.SelectedBlockId != bow.Id; slot++)
+            world.Inventory.Select(slot);
+        Assert.Equal(bow.Id, world.Inventory.SelectedBlockId);
+
+        Assert.True(world.RightClick.TryBeginUseCharge());
+        // Far past the seconds a plain use would have completed after
+        for (var t = 0f; t < bow.UseSeconds * 3f; t += Dt)
+            world.RightClick.UpdateUseCharge(Dt);
+
+        Assert.True(world.RightClick.IsUseCharging);
+        Assert.Equal(1f, world.Player.UseCharge!.Value, 3);
+        Assert.Equal(1, world.Inventory.CountFor(bow.Id));
+
+        // Letting go plays the release from the full draw
+        world.RightClick.CancelUseCharge();
+        Assert.False(world.RightClick.IsUseCharging);
+        Assert.True(world.Player.BowReleaseProgress < 1f);
+        Assert.Equal(1f, world.Player.BowReleaseCharge, 3);
     }
 }

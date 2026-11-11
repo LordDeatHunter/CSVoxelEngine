@@ -12,6 +12,8 @@
   "flame": [8, 10.5, 8],
   // Pops (dropping itself) when the block it stands on goes, and a flow washes it away
   "needsSupport": true,
+  // Only on a full block face: never on a branch, a waystone, stairs or a slab
+  "supportFullFace": true,
   // Placed against a block's side it becomes the wall torch, leaning out from that wall
   "wallBlock": "block/wall_torch",
   "hitbox": { "min": [0.375, 0, 0.375], "max": [0.625, 0.625, 0.625] }

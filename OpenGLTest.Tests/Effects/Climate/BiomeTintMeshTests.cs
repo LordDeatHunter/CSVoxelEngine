@@ -55,7 +55,7 @@ public sealed class BiomeTintMeshTests
         }
     }
 
-    private static (ChunkManager Manager, Chunk Center) Slab(byte id)
+    private static (ChunkManager Manager, Chunk Center) Slab(ushort id)
     {
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         for (var x = 0; x < Chunk.Size; x++)
@@ -141,7 +141,7 @@ public sealed class BiomeTintMeshTests
     [Fact]
     public void TintDoesNotFragmentMerges()
     {
-        static int TopQuads(byte id, ushort layer)
+        static int TopQuads(ushort id, ushort layer)
         {
             var (manager, center) = Slab(id);
             var mesh = center.GenerateMeshData(manager);

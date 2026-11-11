@@ -1,0 +1,13 @@
+{
+  // A worldgen-only battle tower brick: unbreakable until the tower collapses (BT-8), so no
+  // gameplay path removes it. The tile is stone_bricks with its palette swapped, from
+  // committed art.
+  "name": "Tower Bricks",
+  "model": { "parent": "block/cube_all", "textures": { "all": "tower_bricks" } },
+  "sfx": "hit_rock",
+  "hasItem": false,
+  "loot": "none",
+  "unbreakable": true,
+  // Keeps the tower floors dark under their slabs until the collapse (BT-10)
+  "coversSky": true
+}

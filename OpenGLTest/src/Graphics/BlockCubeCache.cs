@@ -25,15 +25,15 @@ namespace VoxelEngine.Graphics;
 public class BlockCubeCache : IDisposable
 {
     private readonly GL _gl;
-    private readonly Dictionary<byte, Mesh> _meshes = new();
-    private readonly Dictionary<byte, Mesh> _tintedMeshes = new();
-    private readonly Dictionary<byte, Mesh> _surfaceMeshes = new();
+    private readonly Dictionary<ushort, Mesh> _meshes = new();
+    private readonly Dictionary<ushort, Mesh> _tintedMeshes = new();
+    private readonly Dictionary<ushort, Mesh> _surfaceMeshes = new();
     private Mesh? _colorChip;
 
     public BlockCubeCache(GL gl) => _gl = gl;
 
     /// <summary>The cube for a block type, or null for air and unknown ids.</summary>
-    public Mesh? Get(byte blockId)
+    public Mesh? Get(ushort blockId)
     {
         if (_meshes.TryGetValue(blockId, out var mesh))
             return mesh;
@@ -48,7 +48,7 @@ public class BlockCubeCache : IDisposable
         mesh = type.BakedModel == null ? CreateFallbackCube(type)
             : type.Renderer == BlockRenderer.Multiblock
                 ? Primitives.CreateBlockModel(_gl, type.BakedModel.Quads,
-                    1f / MultiblockShape.Size, MultiblockShape.Size / 2f)
+                    1f / type.MultiblockSize, type.MultiblockSize / 2f)
                 : Primitives.CreateBlockModel(_gl, type.BakedModel);
         _meshes[blockId] = mesh;
         return mesh;
@@ -60,7 +60,7 @@ public class BlockCubeCache : IDisposable
     /// <see cref="BuildTintedCube"/>, whose tinted quads take their color from the plain
     /// path's per-draw <c>uBiomeTint</c>, so one cached mesh serves every cell.
     /// </summary>
-    public Mesh? GetTinted(byte blockId)
+    public Mesh? GetTinted(ushort blockId)
     {
         var type = BlockType.ById[blockId];
         if (type?.BiomeTint == null) return Get(blockId);
@@ -96,7 +96,7 @@ public class BlockCubeCache : IDisposable
     /// biome-tinted quads, like <see cref="GetTinted"/>'s, take the per-draw <c>uBiomeTint</c>.
     /// Null for air, unknown ids and a block whose tiles were never baked.
     /// </summary>
-    public Mesh? GetSurface(byte blockId)
+    public Mesh? GetSurface(ushort blockId)
     {
         if (_surfaceMeshes.TryGetValue(blockId, out var mesh))
             return mesh;

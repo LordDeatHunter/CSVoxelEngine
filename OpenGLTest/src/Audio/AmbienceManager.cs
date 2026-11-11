@@ -5,19 +5,15 @@ using NAudio.Wave.SampleProviders;
 using NLayer.NAudioSupport;
 using VoxelEngine.UI;
 
-// WinMM playback is Windows-only by design; the constructor refuses non-Windows up front
-// and catches every remaining failure, so Linux and headless runs stay silent. MP3s decode
-// through managed NLayer rather than AudioFileReader, whose Windows build is only picked
-// when the app itself targets a -windows TFM.
-#pragma warning disable CA1416
-
 namespace VoxelEngine.Audio;
 
 /// <summary>
 /// Looping day/night ambience with a slow crossfade. Volumes track the lighting pass's
 /// dayness (0 at night, 1 in full day), so dawn and dusk fade one loop out while fading
-/// the other in. Never throws out of the constructor: a missing file, missing codec or
-/// missing audio device logs one warning and leaves the game silent.
+/// the other in. MP3s decode through managed NLayer (AudioFileReader's MP3 decoder is
+/// Windows-only) and play through <see cref="AudioOutput"/>, so every OS hears them. Never
+/// throws out of the constructor: a missing file, missing codec or missing audio device logs
+/// one warning and leaves the game silent.
 /// </summary>
 public sealed class AmbienceManager : IDisposable
 {
@@ -43,11 +39,6 @@ public sealed class AmbienceManager : IDisposable
         Voice? night = null;
         try
         {
-            if (!OperatingSystem.IsWindows())
-            {
-                Log.WriteLine("Ambience disabled: audio playback is Windows-only.");
-                return;
-            }
             if (!File.Exists(dayPath) || !File.Exists(nightPath))
             {
                 Log.WriteLine($"Ambience disabled: missing '{dayPath}' or '{nightPath}'.");
@@ -137,7 +128,7 @@ public sealed class AmbienceManager : IDisposable
         public long SourceLength => _source.Length;
         private readonly ManagedMpegStream _source;
         private readonly LoopStream _loop;
-        private readonly WaveOutEvent? _output;
+        private readonly AudioOutput? _output;
 
         public Voice(string path, bool startPlaying = true)
         {
@@ -151,7 +142,7 @@ public sealed class AmbienceManager : IDisposable
                 _source = source;
                 _loop = loop;
                 if (startPlaying)
-                    _output = StartLoop(Volume.ToWaveProvider());
+                    _output = new AudioOutput(Volume.ToWaveProvider16());
             }
             catch
             {
@@ -163,22 +154,6 @@ public sealed class AmbienceManager : IDisposable
 
         public int ReadLoop(byte[] buffer, int offset, int count) =>
             _loop.Read(buffer, offset, count);
-
-        private static WaveOutEvent StartLoop(IWaveProvider source)
-        {
-            var output = new WaveOutEvent();
-            try
-            {
-                output.Init(source);
-                output.Play();
-                return output;
-            }
-            catch
-            {
-                output.Dispose();
-                throw;
-            }
-        }
 
         public void Dispose()
         {

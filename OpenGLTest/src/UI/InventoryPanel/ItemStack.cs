@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using VoxelEngine.Items;
-using VoxelEngine.Simulation;
 
 namespace VoxelEngine.UI.InventoryPanel;
 
@@ -10,31 +9,6 @@ public record struct DurabilityComponent(int UsesLeft, int MaxUses)
 {
     public float Fraction => MaxUses > 0 ? MathUtils.Clamp01(UsesLeft / (float)MaxUses) : 1f;
     public bool IsBroken => MaxUses > 0 && UsesLeft <= 0;
-}
-
-/// <summary>
-/// Crucible component: what one vessel holds. <paramref name="MoltenMl"/> is metal that has
-/// already melted and can be poured; <paramref name="PendingMl"/> is solid charge still waiting
-/// on a fire. Both are the same material, so a crucible only ever accepts a melt input whose
-/// material matches — or anything at all while it is empty.
-///
-/// <para>
-/// <paramref name="PendingInputId"/> is the block/item id of the <em>last</em> melt input charged
-/// in (0 = none recorded). It is display-only — the kiln's render pass draws that item as the
-/// lump waiting over the pool — and only meaningful while <paramref name="PendingMl"/> is above
-/// zero; it takes no part in <see cref="KilnManager.CanAccept"/>, capacity or melting. Its
-/// default keeps every three-argument construction (<c>new CrucibleComponent(copper, ml, ml)</c>,
-/// <c>default</c>) valid and equal to what it was before the field existed.
-/// </para>
-/// </summary>
-public record struct CrucibleComponent(byte MaterialId, int MoltenMl, int PendingMl,
-    byte PendingInputId = 0)
-{
-    /// <summary>Everything in the vessel, for the capacity check.</summary>
-    public int TotalMl => MoltenMl + PendingMl;
-
-    /// <summary>Whether the vessel holds nothing, whatever material id it still remembers.</summary>
-    public bool IsEmpty => TotalMl == 0;
 }
 
 /// <summary>Cooldown component: earliest scene time the item may be used again.</summary>
@@ -64,8 +38,8 @@ public sealed class ItemStack
     /// <summary>The singleton this stack is an instance of; never null past construction.</summary>
     public Item Item { get; private set; }
 
-    /// <summary>Definition id, mirroring <see cref="Item.Id"/> for byte-oriented callers.</summary>
-    public byte DefinitionId => Item.Id;
+    /// <summary>Definition id, mirroring <see cref="Item.Id"/> for callers that hold an id.</summary>
+    public ushort DefinitionId => Item.Id;
 
     /// <summary>Units in this stack. Tool instances stay at 1; pool counts live in
     /// <see cref="Inventory"/>, which hands out one stack view per tool.</summary>
@@ -77,7 +51,7 @@ public sealed class ItemStack
 
     private readonly Dictionary<Type, object> _components = new();
 
-    public ItemStack(int instanceId, byte definitionId)
+    public ItemStack(int instanceId, ushort definitionId)
         : this(instanceId, ItemRegistry.TryGet(definitionId)
             ?? throw new InvalidOperationException(
                 $"No item with id {definitionId} is registered; content must load first."))
@@ -92,6 +66,22 @@ public sealed class ItemStack
             Set(new DurabilityComponent(item.MaxDurability, item.MaxDurability));
         Set(new CooldownComponent(0));
         Set(new DisplayNameComponent(null));
+    }
+
+    /// <summary>
+    /// A copy of this stack as instance <paramref name="instanceId"/>: the same item with every component and
+    /// enchantment, which is how a tool or piece of gear keeps its spells, metals and rolled modifiers when it moves
+    /// between an inventory and a chest. The cooldown is reset, since it is a clock of one session.
+    /// </summary>
+    public ItemStack CloneAs(int instanceId)
+    {
+        var copy = new ItemStack(instanceId, Item) { Count = Count };
+        foreach (var (type, value) in _components)
+            if (type != typeof(CooldownComponent))
+                copy._components[type] = value;
+        foreach (var (enchantment, level) in Enchantments)
+            copy.Enchantments[enchantment] = level;
+        return copy;
     }
 
     /// <summary>Morphs the stack into another item in place, topping durability up when the new

@@ -1,0 +1,79 @@
+{
+  // Idle skeletons crumbling back into their piles, and the Skeleton King's slam shrapnel: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/tower-idle-shrapnel.json
+  // Shots land in visual/tower-idle-shrapnel/. The tower is battle-tower.json's (center (2920, -1411), floor 0's slab at
+  // y 10, roof at y 45, altar cell (2920, 46, -1411)). Beside floor 0's pile at (2916, -1411) (the only pile within
+  // MobConfig.SkeletonPileTriggerBlocks of this spot) the player turns survival twice, a wave's cooldown apart, so the
+  // pile raises both its waves and is spent (the sweep clears its block); between and after those blinks the player is
+  // creative (immune, so the pile stays asleep and the skeletons only face it). The damage step wounds both skeletons
+  // and the shot looks up at their hearts. Then the player flies well past the notice radius (but inside the despawn
+  // radius and the tower leash) for longer than MobConfig.SkeletonPileReturnIdleSeconds, so both crumble back into the
+  // floor (owed). Back on floor 0 flying the floor is empty. Turning creative off (which also ends flight; a plain
+  // "fly off" keeps creative, so the player would stay immune and no pile would wake) lands a survival player: a spent
+  // pile raises only owed skeletons, so the one that rises at its spot is a crumbled one raised again, at full health.
+  // Then, like skeleton-king.json, the floors are cleared, the altar raises the king, and its slam is filmed from the
+  // shoulder view (wind-up, the first shards out) and then from above, where the shards fly out all round (the
+  // player has moved away, so none is stopped on it).
+  // Shots: hurt, crumbled, risen_again, slam_windup, slam_shards, slam_spread, slam_spread_late.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [2868.5, 30.5, -1402.5], "yaw": -9, "pitch": 2 },
+    { "op": "wait", "seconds": 15 },
+
+    { "op": "creative", "on": true },
+    { "op": "teleport", "pos": [2912.5, 12.6, -1410.5], "yaw": 0, "pitch": -22 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "creative", "on": false },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "creative", "on": true },
+    { "op": "wait", "seconds": 6 },
+    { "op": "creative", "on": false },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "creative", "on": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "damage", "amount": 15 },
+    { "op": "look", "pitch": 8 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "hurt" },
+
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [2860.5, 40.5, -1410.5], "yaw": 0, "pitch": 0 },
+    { "op": "wait", "seconds": 22 },
+    { "op": "teleport", "pos": [2912.5, 12.6, -1410.5], "yaw": 0, "pitch": -22 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "crumbled", "hideHud": true },
+
+    { "op": "creative", "on": false },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "look", "pitch": 8 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "risen_again" },
+
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "towerclear", "floor": 0 },
+    { "op": "towerclear", "floor": 1 },
+    { "op": "towerclear", "floor": 2 },
+    { "op": "towerclear", "floor": 3 },
+    { "op": "towerclear", "floor": 4 },
+    { "op": "wait", "seconds": 1.5 },
+
+    { "op": "altar", "pos": [2920, 46, -1411] },
+    { "op": "teleport", "pos": [2902.5, 50.5, -1410.5], "yaw": 0, "pitch": -8 },
+    { "op": "wait", "seconds": 5.5 },
+
+    { "op": "view", "mode": "shoulder" },
+    { "op": "teleport", "pos": [2918.2, 49.3, -1412.2], "yaw": 36, "pitch": 4 },
+    { "op": "wait", "seconds": 0.55 },
+    { "op": "screenshot", "name": "slam_windup", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slam_shards", "hideHud": true },
+
+    { "op": "view", "mode": "first" },
+    { "op": "teleport", "pos": [2918.0, 55.5, -1410.5], "yaw": 0, "pitch": -58 },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "slam_spread", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "slam_spread_late", "hideHud": true }
+  ]
+}

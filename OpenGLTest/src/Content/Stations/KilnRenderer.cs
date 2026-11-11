@@ -1,5 +1,4 @@
 using System;
-using System.Numerics;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Entities;
 using VoxelEngine.Simulation;
@@ -7,39 +6,16 @@ using VoxelEngine.Simulation;
 namespace VoxelEngine.Content.Stations;
 
 /// <summary>
-/// Authoring contract of the mud brick kiln's model: where its opening is and where the things
-/// it holds sit inside it. Every number here mirrors
-/// <c>assets/models/block/mud_brick_kiln.json</c>, which is authored in 0..32 model units with
-/// the opening on north (-Z) - so these are cell-space values in the volume's local frame,
-/// 0..<see cref="MultiblockShape.Size"/> on every axis, and <see cref="ToWorld"/> turns one of
-/// them onto the kiln's actual facing.
+/// What every kiln draws the same way, whatever its model: the crucible bowl's own geometry (the
+/// <c>crucible</c> item model), the size of a fuel lump, the waiting charge resting over the bowl's
+/// rim and the curves that grow the molten pool and shrink that charge. Where those props stand
+/// inside a given kiln's opening is its <see cref="KilnLayout"/>.
 ///
 /// GL-free and pure, like <see cref="QuernRenderer"/>: the manager, the render pass and the
 /// tests all read the same constants instead of re-deriving the geometry.
 /// </summary>
 public static class KilnRenderer
 {
-    /// <summary>West edge of the opening (model x = 8, between the two piers).</summary>
-    public const float OpeningMinX = 8f / 16f;
-
-    /// <summary>East edge of the opening (model x = 24).</summary>
-    public const float OpeningMaxX = 24f / 16f;
-
-    /// <summary>Top of the hearth floor the fire and the crucible stand on (model y = 2).</summary>
-    public const float OpeningFloorY = 2f / 16f;
-
-    /// <summary>Underside of the lintel closing the opening (model y = 18).</summary>
-    public const float OpeningCeilingY = 18f / 16f;
-
-    /// <summary>Depth of the opening: the hearth's back wall (model z = 12), measured from the
-    /// structure's front face at z = 0.</summary>
-    public const float OpeningDepthZ = 12f / 16f;
-
-    /// <summary>Center of the bowl a crucible rests on inside the hearth: on the floor and
-    /// toward the front so it can be reached. The bowl spans z 0.03..0.53 around this, which
-    /// leaves <see cref="FireLocal"/>'s flame at 0.55 standing just behind its back wall.</summary>
-    public static readonly Vector3 CrucibleLocal = new(1f, OpeningFloorY, 0.28f);
-
     /// <summary>Half the crucible bowl's outer footprint (model x/z 4..12 of 16).</summary>
     public const float CrucibleOuterHalf = 4f / 16f;
 
@@ -64,16 +40,6 @@ public static class KilnRenderer
         MathUtils.Lerp(CrucibleFloorY + 0.03f, CrucibleTopY - 0.03f,
             capacityMl > 0 ? MathUtils.Clamp01(ml / capacityMl) : 0f);
 
-    /// <summary>Where the kiln's flame burns: centered between the piers, just above the hearth
-    /// floor and behind the crucible.</summary>
-    public static readonly Vector3 FireLocal = new(1f, 0.25f, 0.55f);
-
-    /// <summary>Center of the fuel row at the back of the hearth: far enough forward that a unit
-    /// lying flat (<see cref="FuelSize"/> across) stays clear of the back wall at
-    /// <see cref="OpeningDepthZ"/>, and still behind the flame. Consumed by the casting run's
-    /// render pass.</summary>
-    public static readonly Vector3 FuelLocal = new(1f, OpeningFloorY, 0.62f);
-
     /// <summary>Edge length one stored unit of fuel is drawn at: a lump the size of a dropped
     /// item.</summary>
     public const float FuelSize = ItemDrop.Size;
@@ -93,22 +59,31 @@ public static class KilnRenderer
     /// bowl itself.</summary>
     public const float PendingSize = 2f * CrucibleOuterHalf * 0.8f;
 
-    /// <summary>Bottom-center of that lump in the volume's local frame: over the bowl, just above
-    /// its rim. The render pass lifts by half the drawn size to center the mesh on it.</summary>
-    public static readonly Vector3 PendingLocal =
-        new(CrucibleLocal.X, OpeningFloorY + CrucibleTopY + PendingGap, CrucibleLocal.Z);
+    /// <summary>How far up the next lump of the waiting stack sits, as a share of the lump below
+    /// it; under 1 so they nest rather than hover.</summary>
+    public const float PendingStackStep = 0.7f;
+
+    /// <summary>Most waiting lumps drawn at once; a bigger charge still reads as a full stack.</summary>
+    public const int MaxPendingLumps = 6;
 
     /// <summary>
-    /// How big the waiting lump is drawn, as a fraction 0..1 of <see cref="PendingSize"/>: full
-    /// while a whole unit or more is still solid, then shrinking linearly to nothing as the last
-    /// unit melts, so it vanishes exactly when the charge does instead of cutting out - the
-    /// continuity <see cref="KilnManager.DisplayMoltenMl"/> gives the pool below it. A unit size
-    /// of 0 (no melt recipe recorded) still reads as a whole lump while anything is pending.
+    /// The waiting charge as a stack of lumps: <c>Count</c> pieces, all full size except the
+    /// top one, which is drawn at <c>LastScale</c> (0..1, a fraction of <see cref="PendingSize"/>)
+    /// and is the unit currently melting. The drawn volume <c>(Count - 1) + LastScale</c> equals
+    /// the pending units, so it falls continuously and vanishes exactly when the charge does
+    /// - the continuity <see cref="KilnManager.DisplayMoltenMl"/> gives the pool below it. A unit
+    /// size of 0 (no melt recipe recorded) still reads as one whole lump while anything is
+    /// pending.
     /// </summary>
-    public static float PendingScale01(float displayPendingMl, int unitMl) =>
-        unitMl > 0
-            ? MathUtils.Clamp01(displayPendingMl / unitMl)
-            : displayPendingMl > 0f ? 1f : 0f;
+    public static (int Count, float LastScale) PendingStack(float displayPendingMl, int unitMl)
+    {
+        if (displayPendingMl <= 0f) return (0, 0f);
+        if (unitMl <= 0) return (1, 1f);
+
+        var units = displayPendingMl / unitMl;
+        var count = (int)MathF.Ceiling(units);
+        return (count, MathUtils.Clamp01(units - (count - 1)));
+    }
 
     /// <summary>The yaw that turns a prop's local +Z - an upright sprite's front face - out of
     /// the kiln's opening.</summary>
@@ -117,10 +92,4 @@ public static class KilnRenderer
         var front = MultiblockShape.FrontNormal(facing);
         return MathF.Atan2(front.X, front.Z);
     }
-
-    /// <summary>Turns a local point of the volume into a world position for a kiln whose anchor
-    /// cell (the volume's minimum corner) is <paramref name="anchor"/> and which faces
-    /// <paramref name="facing"/>.</summary>
-    public static Vector3 ToWorld(Vector3 anchor, int facing, Vector3 local) =>
-        anchor + MultiblockShape.RotatePoint(local, facing);
 }

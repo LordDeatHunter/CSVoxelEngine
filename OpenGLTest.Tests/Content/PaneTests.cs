@@ -25,8 +25,8 @@ public sealed class PaneTests
 {
     private const int FloorY = 4;
 
-    private readonly byte _pane;
-    private readonly byte _stone;
+    private readonly ushort _pane;
+    private readonly ushort _stone;
 
     public PaneTests()
     {
@@ -35,7 +35,7 @@ public sealed class PaneTests
         _stone = ContentRegistry.RequireBlock("stone").Id;
     }
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     private static IEnumerable<Vertex[]> Quads(List<Vertex> vertices)
     {
@@ -56,7 +56,7 @@ public sealed class PaneTests
                                  && q.Average(v => v.Position.Z) is var cz && cz > z && cz < z + 1);
 
     // The arm mask of a pane whose four horizontal neighbors (north, south, west, east) hold ids
-    private static int Mask(params byte[] ids) => PaneShape.ConnectionMask(ids, new byte[ids.Length]);
+    private static int Mask(params ushort[] ids) => PaneShape.ConnectionMask(ids, new byte[ids.Length]);
 
     private static (Vector3 Min, Vector3 Max) Union(IEnumerable<BlockHitbox> boxes) =>
         (boxes.Select(b => b.Min).Aggregate(Vector3.Min), boxes.Select(b => b.Max).Aggregate(Vector3.Max));
@@ -96,7 +96,7 @@ public sealed class PaneTests
 
         for (var dir = 0; dir < PaneShape.Directions; dir++)
         {
-            var ids = new byte[PaneShape.Directions];
+            var ids = new ushort[PaneShape.Directions];
             foreach (var id in connects)
             {
                 ids[dir] = id;
@@ -169,7 +169,7 @@ public sealed class PaneTests
     }
 
     // A pane at (8, FloorY + 1, 8) on a stone floor with the given cells around it, meshed
-    private (ChunkManager Manager, Chunk Center, ChunkMeshData Mesh) MeshPaneAt(params (int X, int Y, int Z, byte Id)[] around)
+    private (ChunkManager Manager, Chunk Center, ChunkMeshData Mesh) MeshPaneAt(params (int X, int Y, int Z, ushort Id)[] around)
     {
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         for (var x = 0; x < Chunk.Size; x++)
@@ -189,7 +189,7 @@ public sealed class PaneTests
         var y = FloorY + 1;
         var layouts = new[]
         {
-            Array.Empty<(int, int, int, byte)>(),
+            Array.Empty<(int, int, int, ushort)>(),
             [(7, y, 8, _pane), (9, y, 8, _pane)],
             [(8, y, 7, _stone), (9, y, 8, _pane)],
             [(8, y, 7, _pane), (8, y, 9, _pane), (7, y, 8, _pane), (9, y, 8, _stone)],
@@ -255,7 +255,7 @@ public sealed class PaneTests
 
     // Block light just under the middle of a stone floor spanning the chunk, with a lamp right
     // above the middle cell, which holds either a pane or more stone
-    private float LightUnderTheMiddle(byte middle)
+    private float LightUnderTheMiddle(ushort middle)
     {
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var origin = center.Position * Chunk.Size;

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace VoxelEngine.Chunks;
 
-/// <summary>The loaded chunks that have something to draw, kept in step with their meshes by swap-remove, and <see cref="MeshVersion"/>, which moves whenever the loaded, meshed set changes. Owned by <see cref="ChunkManager"/>, which forwards the three public members; main thread only.</summary>
+/// <summary>The loaded chunks that have something to draw, kept in step with their meshes by swap-remove, and <see cref="MeshVersion"/>, which moves whenever the loaded, meshed set changes. Owned by <see cref="ChunkManager"/>, which forwards the four public members; main thread only.</summary>
 internal sealed class ChunkRenderLists
 {
     /// <summary>
@@ -24,6 +24,14 @@ internal sealed class ChunkRenderLists
     public readonly List<Chunk> TranslucentRenderable = new(512);
 
     /// <summary>
+    /// Every loaded chunk whose mesh recorded a chest cell (<see cref="Chunk.ChestCells"/>), which the chest pass
+    /// walks. Kept apart from <see cref="Renderable"/> because a chest draws no chunk geometry: a chunk holding
+    /// nothing but a chest has no mesh and never enters that list. Same swap-remove contract
+    /// (<see cref="Chunk.ChestRenderIndex"/>), same thread.
+    /// </summary>
+    public readonly List<Chunk> ChestChunks = new(64);
+
+    /// <summary>
     /// Bumped whenever the set of loaded, meshed chunks changes: a chunk enters or leaves
     /// <see cref="Renderable"/>, a chunk is meshed for the first time (even with an empty mesh,
     /// which never enters <see cref="Renderable"/>), or a chunk is unloaded. A consumer that
@@ -39,6 +47,7 @@ internal sealed class ChunkRenderLists
     /// </summary>
     internal void SyncRenderable(Chunk chunk)
     {
+        SyncChests(chunk);
         var wants = chunk.HasMesh || chunk.HasTranslucentMesh;
 
         if (!wants)
@@ -75,6 +84,37 @@ internal sealed class ChunkRenderLists
         RemoveTranslucent(chunk);
     }
 
+    // Keeps ChestChunks matching whether the chunk's last mesh recorded a chest cell
+    private void SyncChests(Chunk chunk)
+    {
+        if (chunk.ChestCells == null)
+        {
+            RemoveChests(chunk);
+            return;
+        }
+
+        if (chunk.ChestRenderIndex >= 0) return;
+        chunk.ChestRenderIndex = ChestChunks.Count;
+        ChestChunks.Add(chunk);
+    }
+
+    private void RemoveChests(Chunk chunk)
+    {
+        var index = chunk.ChestRenderIndex;
+        if (index < 0) return;
+
+        var last = ChestChunks.Count - 1;
+        if (index != last)
+        {
+            var moved = ChestChunks[last];
+            ChestChunks[index] = moved;
+            moved.ChestRenderIndex = index;
+        }
+
+        ChestChunks.RemoveAt(last);
+        chunk.ChestRenderIndex = -1;
+    }
+
     private void RemoveTranslucent(Chunk chunk)
     {
         var index = chunk.TranslucentRenderIndex;
@@ -102,6 +142,7 @@ internal sealed class ChunkRenderLists
         // Unload calls this while slices are still set (Dispose nulls them after), so the
         // translucent membership is dropped here too rather than trusting the caller.
         RemoveTranslucent(chunk);
+        RemoveChests(chunk);
 
         var index = chunk.RenderIndex;
         if (index < 0) return;

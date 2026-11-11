@@ -42,6 +42,9 @@ public static class SimulationConfig
     public const int TreeFellWoodCap = 2048;
     public const int TreeFellTotalCap = 4096;
 
+    /// <summary>How many of a felled tree's chunks (nearest to the feller first) remesh synchronously, so the standing tree vanishes the frame its falling copy appears; the rest rebuild through the dirty queue.</summary>
+    public const int TreeFellSyncRemeshChunks = 8;
+
     // --- Reactive tree growth (TreeGrowthWriter) ---
     // Node cap of a grown tree (graph nodes only, never shells); it also bounds the
     // TreeGraph.FromWorld rebuild walk. Kept well under the fell's wood cap so a grown tree's

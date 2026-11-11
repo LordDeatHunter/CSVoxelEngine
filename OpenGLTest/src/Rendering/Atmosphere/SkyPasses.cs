@@ -38,14 +38,14 @@ internal sealed class SkyPasses
     /// keep the camera's roll, since the world is drawn with that roll too. <paramref name="frame"/>
     /// is the frame's night sky, seen from the pass's own eye.
     /// </summary>
-    internal void RenderSky(Matrix4x4 viewRotation, Matrix4x4 projection, Vector3 forward, in SkyDomeFrame frame)
+    internal void RenderSky(Matrix4x4 viewRotation, Matrix4x4 projection, in SkyDomeFrame frame)
     {
         if (!Matrix4x4.Invert(viewRotation * projection, out var inv))
             inv = Matrix4x4.Identity;
         // The dome reads the true sun, never the key light: its glow, stars and moon mask follow it
         _owner.SkyDome?.Render(inv, Lighting.Sky, Lighting.SkySunDir, Lighting.SkyTint, Lighting.SkyTintAmount, frame);
-        RenderSun(forward, projection);
-        RenderMoon(forward, projection);
+        RenderSun(viewRotation, projection);
+        RenderMoon(viewRotation, projection);
     }
 
     /// <summary>
@@ -55,7 +55,7 @@ internal sealed class SkyPasses
     /// depth-free like the sun, so the terrain drawn after it occludes it; RenderSky draws it for the
     /// mirror as well, and the Snell window shows it through the scene copy.
     /// </summary>
-    private void RenderMoon(Vector3 forward, Matrix4x4 projection)
+    private void RenderMoon(Matrix4x4 viewRotation, Matrix4x4 projection)
     {
         if (Lighting.MoonVisibility <= 0f) return;
 
@@ -67,8 +67,7 @@ internal sealed class SkyPasses
         _owner.MoonShader.Use();
         Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.MoonTexture);
 
-        var viewRot = Matrix4x4.CreateLookAt(Vector3.Zero, forward, Vector3.UnitY);
-        _owner.MoonShader.SetUniform("uViewProj", viewRot * projection);
+        _owner.MoonShader.SetUniform("uViewProj", viewRotation * projection);
         _owner.MoonShader.SetUniform("uSunDir", -Lighting.SkySunDir);
         _owner.MoonShader.SetUniform("uHalfSize", 2f * 100f * MathF.Tan(MathUtils.ToRadians(
             SkyConfig.MoonAngularRadiusDeg * SkyConfig.MoonGlowScale)));
@@ -101,10 +100,11 @@ internal sealed class SkyPasses
     /// translation removed, so it effectively sits at infinity and never parallaxes as the
     /// player walks. And it blends additively (One, One), so the shader's black background
     /// contributes nothing and the glow brightens the sky rather than graying it.
-    /// Takes the facing and projection rather than a camera, so the reflection pass can draw
-    /// the same disc through its mirrored forward vector.
+    /// Takes the translation-free view (with the camera's roll, so the disc wobbles with the sprint
+    /// like the dome) and projection rather than a camera, so the reflection pass can draw
+    /// the same disc through its mirrored view.
     /// </summary>
-    private void RenderSun(Vector3 forward, Matrix4x4 projection)
+    private void RenderSun(Matrix4x4 viewRotation, Matrix4x4 projection)
     {
         if (Lighting.SunVisibility <= 0f) return;
 
@@ -117,8 +117,7 @@ internal sealed class SkyPasses
         Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.SunTexture);
 
         // Rotation only: dropping the camera position is what pins the quad at infinity
-        var viewRot = Matrix4x4.CreateLookAt(Vector3.Zero, forward, Vector3.UnitY);
-        _owner.SunShader.SetUniform("uViewProj", viewRot * projection);
+        _owner.SunShader.SetUniform("uViewProj", viewRotation * projection);
         _owner.SunShader.SetUniform("uSunDir", Lighting.SkySunDir);
         // The quad has to hold the whole glow, so it is sized to the glow's angular radius and
         // the shader keeps the textured disc inside the inner uDiscFraction of it. The unit

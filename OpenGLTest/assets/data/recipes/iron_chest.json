@@ -1,0 +1,14 @@
+{
+  "result": "block/iron_chest",
+  "count": 1,
+  "ingredients": [
+    {
+      "item": "item/crushed_iron",
+      "count": 8
+    },
+    {
+      "item": "block/oak_planks",
+      "count": 4
+    }
+  ]
+}

@@ -10,7 +10,7 @@ namespace VoxelEngine.Content.Shapes;
 /// <c>(size / 2, y, size / 2)</c>, which map the footprint onto itself: the one definition of how
 /// anything authored facing north (its front on -Z) turns to another horizontal facing. A facing
 /// is the engine face index of the front's outward normal (north -Z = 0, south +Z = 1,
-/// west -X = 2, east +X = 3). A multiblock turns its 2x2x2 volume with it (size 2, see
+/// west -X = 2, east +X = 3). A multiblock turns its whole volume with it (its size, see
 /// <see cref="MultiblockShape"/>) and a single-cell facing block (a wall torch, size 1) its cell.
 /// GL-free and pure, so the content bake, the mesher's pre-rotated models and the tests share it.
 /// </summary>

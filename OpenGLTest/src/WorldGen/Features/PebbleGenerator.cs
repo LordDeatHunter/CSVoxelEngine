@@ -25,13 +25,13 @@ public static class PebbleGenerator
     private static FastNoiseLite PatchNoise;
 
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte PebbleBlock;
+    public static readonly ushort PebbleBlock;
 
     /// <summary>Obsidian block whose tile tints obsidian stones; resolved once.</summary>
-    public static readonly byte ObsidianBlock;
+    public static readonly ushort ObsidianBlock;
 
     /// <summary>Obsidian shard item that grounds and grows obsidian-bearing piles.</summary>
-    public static readonly byte ObsidianItem;
+    public static readonly ushort ObsidianItem;
 
     static PebbleGenerator()
     {
@@ -95,7 +95,7 @@ public static class PebbleGenerator
         UnitHash(x, z, ObsidianSalt, i) < WorldFeatureConfig.PebbleObsidianChance;
 
     /// <summary>Whether the held item builds obsidian-bearing piles.</summary>
-    public static bool IsObsidianItem(byte itemId) => itemId == ObsidianItem;
+    public static bool IsObsidianItem(ushort itemId) => itemId == ObsidianItem;
 
     /// <summary>Packs a player pile: total stones with that many obsidian among them.</summary>
     public static byte StateFor(int total, int obsidian) => (byte)(total + (obsidian << 2));
@@ -117,7 +117,7 @@ public static class PebbleGenerator
     /// below leaves the cell empty instead of floating). Runs on a generation worker thread,
     /// after the trees.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

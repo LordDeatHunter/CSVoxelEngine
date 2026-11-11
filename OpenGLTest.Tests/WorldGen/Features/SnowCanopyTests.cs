@@ -40,7 +40,7 @@ public sealed class SnowCanopyTests
         var column = new ColumnData(heights, new byte[heights.Length], new float[heights.Length],
             new float[heights.Length], waterLevel: water);
 
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var leaves = ContentRegistry.RequireBlock("spruce_leaves").Id;
         var worldX0 = worldX - (worldX & Chunk.SizeMask);

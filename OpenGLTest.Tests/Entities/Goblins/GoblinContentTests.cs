@@ -63,7 +63,7 @@ public sealed class GoblinContentTests
         var type = EntityRegistry.Require("goblin");
         Assert.NotNull(type.LootTable);
 
-        var into = new List<byte>();
+        var into = new List<ushort>();
         for (var i = 0; i < 64; i++)
             type.LootTable!.Roll(new LootContext(0, 0, 0, 0), into);
 

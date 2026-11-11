@@ -77,7 +77,7 @@ internal static class ChunkFluidQueries
     // The live world as a FluidFlow cell reader: unloaded chunks report no cell
     private readonly struct LiveCells(ChunkManager m) : IFluidCellReader
     {
-        public bool TryGetCell(int x, int y, int z, out byte id, out byte state) =>
+        public bool TryGetCell(int x, int y, int z, out ushort id, out byte state) =>
             m.TryGetCell(x, y, z, out id, out state);
     }
 

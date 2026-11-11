@@ -2,7 +2,7 @@
 
 ## Status
 
-Tracks particles, animations and other non-gameplay feel work. Last updated 2026-11-05. Nothing in progress (V-11 and V-12 landed, not yet filmed: no scenario op opens the [E] panel or drops items).
+Tracks particles, animations and other non-gameplay feel work. Last updated 2026-11-06. Nothing in progress. The player and tools section has landed and been filmed (V-1 axe side swing with its chips, canopy shake and the permanent slit chopped into a natural trunk's hit face, deeper with every hit, V-2, V-3, V-13 flight, V-14 swim legs, V-15 bow, V-16 spear). V-6 landed and filmed; V-11 and V-12 landed, not yet filmed: no scenario op opens the [E] panel or drops items. Open follow-ups: rain should call `RippleSystem.Spawn` per drop that lands on water (for V-5); a remote player shows neither another player's axe chop nor bow draw (neither is on the wire); a thrown spear does not stick in the block it hits and the trunk itself never shudders (only its leaves shake).
 
 ## In progress
 
@@ -10,25 +10,10 @@ Tracks particles, animations and other non-gameplay feel work. Last updated 2026
 
 ## Open
 
-### Player and tools
-
-- [ ] **`V-1` Axe tree-chopping animation** - P1, L.
-  An overhead chop for axes, with feedback on the tree itself:
-  - Player swing: a chop mode for axe items, reusing `SwordMotion.Shape` and `BladeSwingFrame`, with a matching mode in `PlayerPreviewState`.
-  - Wood chips on every hit.
-  - Tree shudder with a leaf burst per hit.
-  - A **progressive notch** carved into the trunk as damage builds, before the tree topples.
-
-  **Hook**: `BlockDebrisSystem` (chips), `LeafParticleSystem` (leaves), `SelectionPasses.RenderBlockBreaking` (nearest hook for the crack; the notch needs a wood-cell mesh variant in `TreeWoodEmitter`), `TopplingTree` (the fell).
-  **Verify**: item debugger `ITEM_DEBUGGER_PLAYER_ANIM=chop`; a new `visual-examples/animations-axe.json` (`VOXEL_TIME=147`).
-- [ ] **`V-2` Dust puff on block place** - P2, S. A small puff tinted by the placed block. **Hook**: `BlockDebrisSystem.Puff`, `BlockPlacer`.
-- [ ] **`V-3` Block-break camera nudge** - P2, S. A tiny camera kick on heavy hits (a chop, an ore break). **Hook**: `HeadMotion` hit kick.
-
 ### World ambience
 
 - [ ] **`V-4` Fireflies and pollen motes** - P2, M. Fireflies in the forest at night, pollen and dust drifting by day, carried by the wind. **Hook**: `Wind.cs`, a `FireParticleSystem`-style system owned by `AmbientEffects`.
 - [ ] **`V-5` Rain and snow weather** - P2, XL. Precipitation particles plus a wet-surface look. **Hook**: `FrameLighting.WindDirection` (already reserved for this), a new weather clock.
-- [ ] **`V-6` Water ripple rings** - P2, M. Expanding rings where a body enters the water, a thrown item lands or rain falls. **Hook**: `WaterSplashTracker` crossings.
 - [ ] **`V-7` Footprints in snow and sand** - P3, L. Fading decals from the player and mobs.
 
 ### Combat and mobs

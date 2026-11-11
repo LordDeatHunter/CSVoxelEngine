@@ -18,7 +18,7 @@ public sealed class CanopyAddedTests
     private const int X = 934_567;
     private const int Z = -865_432;
 
-    private static byte Leaf => ContentRegistry.RequireBlock("oak_leaves").Id;
+    private static ushort Leaf => ContentRegistry.RequireBlock("oak_leaves").Id;
 
     public CanopyAddedTests() => TestContent.EnsureLoaded();
 

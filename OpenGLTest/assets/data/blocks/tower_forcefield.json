@@ -1,0 +1,17 @@
+{
+  // The battle tower's roof dome: worldgen stamps it on the shell of a low dome standing on the parapet
+  // (TowerDome), so a player can neither climb onto the roof from outside nor leave it mid-fight but down
+  // the stair. Unbreakable, solid and item-less, so only the tower's collapse (BT-8) clears it. Drawn in
+  // the translucent pass as a faint shimmering film (the forcefield term in test-fragment.glsl,
+  // ForcefieldShimmer); it passes light and covers no sky, so the roof stays sunlit. The tile is only the
+  // fallback where that term is off, placeholder art from tools/generate-tower-lock-textures.py.
+  "name": "Forcefield",
+  "model": { "parent": "block/cube_all", "textures": { "all": "tower_forcefield" } },
+  "translucent": true,
+  "cullSelf": true,
+  "castsAO": false,
+  "light": { "passes": true },
+  "hasItem": false,
+  "loot": "none",
+  "unbreakable": true
+}

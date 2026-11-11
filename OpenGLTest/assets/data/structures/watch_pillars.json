@@ -1,0 +1,40 @@
+{
+  "kind": "surface",
+  "weight": 1,
+  "groundLayer": 1,
+  "palette": {
+    "c": "cobblestone",
+    "b": "stone_bricks",
+    "C": "ruin_chest_surface"
+  },
+  "layers": [
+    [
+      "ccccc",
+      "ccccc",
+      "ccccc",
+      "ccccc",
+      "ccccc"
+    ],
+    [
+      "b...b",
+      ".....",
+      "..C..",
+      ".....",
+      "b...b"
+    ],
+    [
+      "b...b",
+      ".....",
+      ".....",
+      ".....",
+      "b...b"
+    ],
+    [
+      "b....",
+      ".....",
+      ".....",
+      ".....",
+      "....b"
+    ]
+  ]
+}

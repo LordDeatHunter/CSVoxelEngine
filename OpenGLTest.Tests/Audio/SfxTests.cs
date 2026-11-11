@@ -31,6 +31,23 @@ public sealed class SfxTests
         Assert.Single(groups[SfxLibrary.DefaultGroup]);
     }
 
+    [Theory]
+    [InlineData(SfxLibrary.SpellCastGroup)]
+    [InlineData(SfxLibrary.SpellImpactGroup)]
+    [InlineData(SfxLibrary.SpellFizzleGroup)]
+    public void EverySpellGroupExistsAndEachOfItsClipsLoads(string group)
+    {
+        var groups = SfxLibrary.Scan(Path.Combine(TestContent.FindAssetsRoot(), "sfx"));
+
+        Assert.True(groups.TryGetValue(group, out var clips));
+        Assert.NotEmpty(clips);
+        Assert.All(clips, path =>
+        {
+            Assert.True(SfxManager.TryLoad(path, out var samples), path);
+            Assert.NotEmpty(samples);
+        });
+    }
+
     [Fact]
     public void ConfiguredAmbiencePathsExist()
     {

@@ -3,6 +3,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 
 namespace VoxelEngine.Saves;
 
@@ -12,7 +13,7 @@ namespace VoxelEngine.Saves;
 /// older or hand-edited file degrades field by field instead of failing the load; vectors travel
 /// as <c>float[3]</c>.
 /// <para>
-/// Content is referenced by name, never by byte id: a mob by its <see cref="EntityType.Name"/>,
+/// Content is referenced by name, never by numeric id: a mob by its <see cref="EntityType.Name"/>,
 /// a drop by its <see cref="SaveNames"/> name (<c>block/...</c> or <c>item/...</c>). Whoever
 /// restores the data drops an entry whose name no longer resolves.
 /// </para>
@@ -49,6 +50,25 @@ public sealed class EntitySaveData
         /// <summary>Torches still carried (<see cref="Goblin.Torches"/>); only meaningful for a
         /// goblin. Absent, as in a file saved before goblins carried torches, restores none.</summary>
         public int? Torches { get; set; }
+
+        /// <summary>The tower floor tier (<see cref="Skeleton.Tier"/>) of a skeleton, or the tier a Skeleton King
+        /// summons its skeletons at (<see cref="SkeletonKingHome.SummonTier"/>, informational: a restored king takes it
+        /// from its tower). Absent restores tier 0. Saved explicitly because, unlike a hell mob's layer, it cannot be
+        /// read back from the position.</summary>
+        public int? Tier { get; set; }
+
+        /// <summary>The placement cell (cellX, cellZ) of the tower whose floor lock this skeleton counts toward
+        /// (<see cref="Skeleton.Floor"/>), or the tower a Skeleton King is bound to (<see cref="SkeletonKingHome.Tower"/>,
+        /// with no <see cref="TowerFloor"/>); absent for an unbound mob.</summary>
+        public int[]? TowerCell { get; set; }
+
+        /// <summary>The tower floor whose lock this skeleton counts toward, with <see cref="TowerCell"/>; absent
+        /// for an unbound mob.</summary>
+        public int? TowerFloor { get; set; }
+
+        /// <summary>A skeleton's outfit code (<see cref="SkeletonOutfit.Code"/>); absent, as in a file saved before
+        /// skeletons wore armor, restores bare bones. Its role is its <see cref="Type"/>.</summary>
+        public int? Outfit { get; set; }
     }
 
     /// <summary>One item drop lying (or falling) in the world.</summary>

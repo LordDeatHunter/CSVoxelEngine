@@ -13,7 +13,7 @@ public sealed class InventoryFullWarningTests
 {
     public InventoryFullWarningTests() => TestContent.EnsureLoaded();
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
 
     [Fact]
     public void ADropInReachThePoolRefusesIsReported()

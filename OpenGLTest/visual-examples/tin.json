@@ -1,0 +1,24 @@
+{
+  // Tin check: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/tin.json
+  // Shots land in visual/tin/. Lays tin ore beside malachite on the barren frozen plain of
+  // ore-twinkle.json to compare the two tiles, then equips the tin sword for a held-item shot.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-1111.5, 50.5, 584.5], "yaw": -90, "pitch": -30 },
+    { "op": "wait", "seconds": 16 },
+    { "op": "teleport", "pos": [-1111.5, 21.4, 584.5], "yaw": -90, "pitch": -31 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "give", "block": "malachite_ore", "count": 1 },
+    { "op": "look", "yaw": -97, "pitch": -30 },
+    { "op": "place" },
+    { "op": "give", "block": "tin_ore", "count": 1 },
+    { "op": "look", "yaw": -83, "pitch": -30 },
+    { "op": "place" },
+    { "op": "select", "slot": 9 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "teleport", "pos": [-1111.5, 22.0, 583.0], "yaw": -90, "pitch": -24 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "ores", "hideHud": true }
+  ]
+}

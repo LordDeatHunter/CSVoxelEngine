@@ -1,0 +1,7 @@
+{
+  "result": "item/bronze_cap",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/bronze_ring", "count": 5 }
+  ]
+}

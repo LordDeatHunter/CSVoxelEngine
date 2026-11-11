@@ -1,22 +1,27 @@
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Interaction;
+using VoxelEngine.Magic;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.ServerSide;
+using VoxelEngine.Simulation.Smithing;
 
 namespace VoxelEngine.Server;
 
-/// <summary>Replays a player's intents through the singleplayer rules and answers each one in order: the authoritative cells around a world intent's target, the inventory when it could change or was refused, then the result. Also refuses the retired raw block edit. Main thread only.</summary>
+/// <summary>Replays a player's intents (breaks, placements, uses, throws, attacks, casts, hammer hits, anvil forges, waystone trips, respawns and inventory actions) through the singleplayer rules and answers each one in order: the authoritative cells around a world intent's target, the inventory when it could change or was refused, then the result. Also refuses the retired raw block edit. Main thread only.</summary>
 internal sealed class IntentReplay
 {
     private readonly ServerState _state;
+    private readonly WaystoneSessions _waystones;
 
     // Scratch for one correction's cells
     private readonly List<NetCellChange> _correctionScratch = [];
 
-    internal IntentReplay(ServerState state)
+    internal IntentReplay(ServerState state, WaystoneSessions waystones)
     {
         _state = state;
+        _waystones = waystones;
     }
 
     internal void OnBlockEdit(ClientConnection client, PacketReader reader)
@@ -84,7 +89,7 @@ internal sealed class IntentReplay
         var accepted = player.AcceptSeq(seq)
                        && (player.IsDead
                            ? intent.Kind == NetIntentKind.Respawn && RespawnFor(client, player)
-                           : ApplyWorldIntent(player, intent));
+                           : ApplyWorldIntent(client, player, intent));
         if (intent.EditsCells && intent.HasCell
             && NetValidation.InEditReach(player.Position, intent.X, intent.Y, intent.Z, NetworkConfig.NetMaxEditReachBlocks))
             SendCellCorrection(client, seq, intent.X, intent.Y, intent.Z, radius: 1);
@@ -96,9 +101,11 @@ internal sealed class IntentReplay
     /// <summary>
     /// The rules every world intent of a living player passes before the world replays it: the
     /// world is playing, the intent was aimed from (near) where the player is, and an edit fits the
-    /// player's edit rate. A living player has nothing to respawn from, so its respawn is refused.
+    /// player's edit rate (a cast draws from it too, as a spam cap; its own pace is the player's
+    /// <see cref="ServerPlayer.Casting"/>). A living player has nothing to respawn from, so its
+    /// respawn is refused.
     /// </summary>
-    private bool ApplyWorldIntent(ServerPlayer player, in WorldIntent intent)
+    private bool ApplyWorldIntent(ClientConnection client, ServerPlayer player, in WorldIntent intent)
     {
         if (intent.Kind == NetIntentKind.Respawn)
             return false;
@@ -116,6 +123,7 @@ internal sealed class IntentReplay
         {
             case NetIntentKind.BreakStart:
             case NetIntentKind.BreakComplete:
+            case NetIntentKind.Hammer:
                 player.NoteAction(NetPlayerAction.Punch);
                 break;
             case NetIntentKind.Throw:
@@ -134,13 +142,30 @@ internal sealed class IntentReplay
             case NetIntentKind.Place:
                 return PlaceFor(player, intent);
             case NetIntentKind.Use:
+            {
                 // The right-click chain short of its placement fallback: a click the client did
-                // not place with never places here either
-                return _state.World.TryUseSelected(World.InteractionReach, context, out _, allowPlace: false);
+                // not place with never places here either. A waystone it claimed is discovered
+                // here, for this player, and its client told what to show.
+                var used = _state.World.TryUseSelected(World.InteractionReach, context, out var outcome, allowPlace: false);
+                if (outcome == RightClickOutcome.Waystone)
+                {
+                    var cell = _state.World.LastWaystoneCell;
+                    _waystones.OnActivated(client, player, ((int)cell.X, (int)cell.Y, (int)cell.Z));
+                }
+                return used;
+            }
             case NetIntentKind.Throw:
                 return _state.World.ThrowFor(context, intent.Charge);
             case NetIntentKind.Attack:
                 return AttackFor(player, intent);
+            case NetIntentKind.Cast:
+                return CastFor(player, intent);
+            case NetIntentKind.Hammer:
+                return HammerFor(player, intent);
+            case NetIntentKind.Waystone:
+                return _waystones.TripFor(player, intent);
+            case NetIntentKind.Forge:
+                return ForgeFor(player, intent);
             default:
                 return false;
         }
@@ -152,7 +177,7 @@ internal sealed class IntentReplay
         _state.World.RaycastFor(player.Context, includeFluids: false, out var hit, out normal) && hit == intent.Cell;
 
     // A loaded cell holding a block that can be mined: not air, not a fluid
-    private bool TryMineable(in WorldIntent intent, out byte id, out byte state) =>
+    private bool TryMineable(in WorldIntent intent, out ushort id, out byte state) =>
         _state.World.GetChunkManager().TryGetCell(intent.X, intent.Y, intent.Z, out id, out state)
         && id != 0 && !BlockType.IsFluid(id);
 
@@ -163,7 +188,8 @@ internal sealed class IntentReplay
             return false;
         var inventory = player.Inventory;
         player.Breaking.Start(intent.X, intent.Y, intent.Z, id, state, inventory.HeldItem,
-            inventory.SelectedBlockId, inventory.SelectedToolInstance, _state.Elapsed);
+            inventory.SelectedBlockId, inventory.SelectedToolInstance, _state.Elapsed,
+            inventory.Equipment.Stats.MiningFactor);
         return true;
     }
 
@@ -179,6 +205,32 @@ internal sealed class IntentReplay
         var verdict = player.Breaking.Complete(intent.X, intent.Y, intent.Z, id, inventory.SelectedBlockId,
             inventory.SelectedToolInstance, player.Creative, _state.Elapsed, NetworkConfig.NetBreakSlackSeconds);
         return verdict == BreakVerdict.Break && _state.World.BreakBlockFor(player.Context, intent.Cell);
+    }
+
+    /// <summary>
+    /// One hammer hit on the anvil the intent names: a smithing hammer in hand, the player's own ray landing on
+    /// the anvil's cell, and the anvil's own hit gap run down (the hammer's pace, less jitter slack). The anvil
+    /// manager counts the hit and, on the last, drops the result and slag; the station broadcast carries the rest.
+    /// </summary>
+    private bool HammerFor(ServerPlayer player, in WorldIntent intent)
+    {
+        var held = player.Inventory.HeldItem;
+        if (!Mining.IsHammer(held) || !AimsAt(player, intent, out _))
+            return false;
+        var gap = Mining.HitGapSeconds(held, player.Inventory.Equipment.Stats.MiningFactor);
+        return _state.World.HammerFor(intent.Cell, gap, BloomeryConfig.HammerSlackSeconds).Kind != AnvilHitKind.Refused;
+    }
+
+    /// <summary>
+    /// A pick from the anvil's recipe list: a smithing hammer in hand, the player's own ray landing on the anvil's cell,
+    /// then the forge itself (<see cref="SmithingStations.Forge"/>), which needs the recipe offered for the stack on the
+    /// anvil and room for its result. The inventory snapshot and the station broadcast carry the outcome.
+    /// </summary>
+    private bool ForgeFor(ServerPlayer player, in WorldIntent intent)
+    {
+        if (!Mining.IsHammer(player.Inventory.HeldItem) || !AimsAt(player, intent, out _))
+            return false;
+        return _state.World.Smithing.Forge(intent.Cell, intent.Recipe, player.Inventory);
     }
 
     private bool PlaceFor(ServerPlayer player, in WorldIntent intent)
@@ -217,6 +269,26 @@ internal sealed class IntentReplay
                 _state.World.SwordFor(player.Context, NetAttacks.SwordSwingOf(intent.Attack));
                 break;
         }
+        return true;
+    }
+
+    /// <summary>
+    /// Casts the held staff's slot the intent names through the one cast seam
+    /// (<see cref="World.CastFor"/>): a staff in hand, the slot its selected one and bound to a
+    /// valid recipe, the player's own cast pace, then the mana billed last (free in creative). The
+    /// pool is sent at once on a spend or a refusal for mana.
+    /// </summary>
+    private bool CastFor(ServerPlayer player, in WorldIntent intent)
+    {
+        var verdict = _state.World.CastFor(player.Context, intent.Slot, player.Casting, _state.Elapsed,
+            NetworkConfig.NetCastSlackSeconds);
+        // TickStatus only sees a mana change across its own tick, so a spend between ticks, or a cast
+        // refused on mana the client predicted from a stale mirror, must send the pool now
+        if (verdict is CastVerdict.Cast or CastVerdict.NoMana)
+            player.StatusDirty = true;
+        if (verdict != CastVerdict.Cast)
+            return false;
+        player.NoteAction(NetPlayerAction.Cast);
         return true;
     }
 
@@ -265,13 +337,7 @@ internal sealed class IntentReplay
         writer.Write(seq);
         writer.Write(_correctionScratch.Count);
         foreach (var cell in _correctionScratch)
-        {
-            writer.Write(cell.X);
-            writer.Write(cell.Y);
-            writer.Write(cell.Z);
-            writer.Write(cell.Id);
-            writer.Write(cell.State);
-        }
+            NetCellChangeCodec.Write(writer, cell);
         client.Send(writer.ToArray());
     }
 }
