@@ -34,7 +34,7 @@ internal static class MeshTestWorld
         return (manager, center);
     }
 
-    internal static void FillAll(Chunk chunk, byte id)
+    internal static void FillAll(Chunk chunk, ushort id)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var y = 0; y < Chunk.Size; y++)
@@ -42,7 +42,7 @@ internal static class MeshTestWorld
             chunk.SetBlockRaw(x, y, z, id, 0);
     }
 
-    internal static void FillWalledArea(ChunkManager manager, byte id)
+    internal static void FillWalledArea(ChunkManager manager, ushort id)
     {
         foreach (var chunk in manager.Chunks.Values) FillAll(chunk, id);
     }

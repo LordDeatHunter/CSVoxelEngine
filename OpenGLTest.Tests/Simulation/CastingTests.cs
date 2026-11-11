@@ -42,7 +42,7 @@ public sealed class CastingTests
     private const float Reach = 10f;
 
     /// <summary>One chunk holding a single mold block at the origin, so Update sees a live cell.</summary>
-    private static ChunkManager MoldWorld(byte moldId)
+    private static ChunkManager MoldWorld(ushort moldId)
     {
         var manager = new ChunkManager(null!);
         var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
@@ -52,11 +52,11 @@ public sealed class CastingTests
         return manager;
     }
 
-    private static void SetCell(ChunkManager manager, byte id) =>
+    private static void SetCell(ChunkManager manager, ushort id) =>
         manager.Chunks[Vector3.Zero]!.SetBlockRaw(0, 0, 0, id, 0);
 
     private static (CastingManager Casting, ChunkManager Chunks, DropManager Drops, Inventory Inventory,
-        ItemStack Stack, CastRecipe Recipe, byte MoldId) Setup(int moltenMl = -1)
+        ItemStack Stack, CastRecipe Recipe, ushort MoldId) Setup(int moltenMl = -1)
     {
         var moldId = ContentRegistry.RequireBlock("fired_mold_pickaxe").Id;
         var recipe = ContentRegistry.CastRecipeFor(moldId, Copper)!;
@@ -230,7 +230,7 @@ public sealed class CastingTests
         Assert.Equal(halfCharge, state.FilledMl);
         var emptied = stack.Get<CrucibleComponent>();
         Assert.Equal(0, emptied.MoltenMl);
-        Assert.Equal(0, emptied.MaterialId);
+        Assert.True(emptied.IsEmpty);
         Assert.False(state.Cooling);
         Assert.False(state.Pouring);
 
@@ -248,8 +248,8 @@ public sealed class CastingTests
         var (casting, chunks, drops, inventory, stack, recipe, moldId) = Setup();
         var pourTime = recipe.AmountMl / CastingManager.PourMlPerSecond + 1f;
 
-        // A vessel with no material in it has nothing to pour
-        stack.Set(new CrucibleComponent(0, recipe.AmountMl, 0));
+        // An empty vessel has nothing to pour
+        stack.Set(default(CrucibleComponent));
         Assert.False(casting.TryStartPour(Cell, moldId, stack));
         Assert.Null(casting.StateAt(0, 0, 0));
 
@@ -356,5 +356,44 @@ public sealed class CastingTests
         Assert.All(blasted.Drops, drop => Assert.Equal(recipe.ResultId, drop.BlockId));
         Assert.Null(casting.StateAt(0, 0, 0));
         Assert.False(casting.HasAny);
+    }
+
+    [Fact]
+    public void AnEmptyMoldTakesTheMostOfTheMoltenMetalsItCastsAndAHalfFilledOneItsOwn()
+    {
+        var mold = ContentRegistry.RequireBlock("fired_mold_ingot").Id;
+        var copper = Copper;
+        var tin = ContentRegistry.MoltenMaterialByName("tin")!.Id;
+        var glass = ContentRegistry.MoltenMaterialByName("glass")!.Id;
+        Assert.NotNull(ContentRegistry.CastRecipeFor(mold, copper));
+        Assert.NotNull(ContentRegistry.CastRecipeFor(mold, tin));
+        Assert.Null(ContentRegistry.CastRecipeFor(mold, glass));
+
+        // The larger molten pool wins, whichever metal it is; pending charge and metals the mold
+        // does not cast never count
+        foreach (var (big, small) in new[] { (copper, tin), (tin, copper) })
+        {
+            var mixed = new CrucibleComponent([new CrucibleMetal(big, 400, 0), new CrucibleMetal(small, 200, 600),
+                new CrucibleMetal(glass, 900, 0)]);
+            Assert.Equal(big, CastingManager.PourRecipe(mold, mixed)!.MaterialId);
+        }
+        Assert.Null(CastingManager.PourRecipe(mold, new CrucibleComponent(glass, 900, 0)));
+
+        // A mold started with one metal drains only that one from a mixed vessel
+        var (casting, chunks, drops, inventory, stack, recipe, moldId) = Setup();
+        stack.Set(new CrucibleComponent(Copper, recipe.AmountMl / 2, 0));
+        Assert.True(casting.TryStartPour(Cell, moldId, stack));
+        casting.Update(recipe.AmountMl / CastingManager.PourMlPerSecond, chunks, drops, inventory, stack.InstanceId,
+            Standing, Reach);
+        var other = ContentRegistry.MoltenMaterials.First(m => m.Id != Copper && ContentRegistry.CastRecipeFor(moldId, m.Id) != null).Id;
+        stack.Set(new CrucibleComponent([new CrucibleMetal(other, recipe.AmountMl * 4, 0),
+            new CrucibleMetal(Copper, recipe.AmountMl, 0)]));
+        Assert.True(casting.TryStartPour(Cell, moldId, stack));
+        casting.Update(recipe.AmountMl / CastingManager.PourMlPerSecond + 1f, chunks, drops, inventory, stack.InstanceId,
+            Standing, Reach);
+        var left = stack.Get<CrucibleComponent>();
+        Assert.Equal(recipe.AmountMl * 4, left.MoltenOf(other));
+        // The mold took only what it still lacked of its own metal: the half it already had
+        Assert.Equal(recipe.AmountMl / 2, left.MoltenOf(Copper));
     }
 }

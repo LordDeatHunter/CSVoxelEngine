@@ -5,7 +5,7 @@ namespace VoxelEngine.Core;
 
 /// <summary>
 /// The GL-free, state-free velocity steps every loose body shares: item drops, primed TNT, falling
-/// blocks, thrown projectiles, goblins, slimes and mining debris. Each caller keeps its own test of
+/// blocks, thrown projectiles, goblins, slimes, flying mobs and mining debris. Each caller keeps its own test of
 /// which point of its body is under the fluid surface and its own guards (grounded, landed,
 /// sliding); only the steps and their numbers live here. The player is not a loose body: it keeps
 /// its own gravity (<c>PlayerPhysics.Gravity</c>) and water rules. Main thread.
@@ -71,6 +71,14 @@ internal static class BodyMotion
     /// <summary>The upward speed a landing at <paramref name="impact"/> bounces back with: <paramref name="damping"/> of it from <paramref name="minImpact"/> up, none below it or when the water <paramref name="absorbed"/> the impact.</summary>
     internal static float Bounce(float impact, bool absorbed, float minImpact, float damping) =>
         !absorbed && impact >= minImpact ? impact * damping : 0f;
+
+    /// <summary>A flying body's velocity eased toward <paramref name="desired"/> on all three axes at
+    /// <paramref name="rate"/> (<see cref="MathUtils.Damp"/>): no gravity and no friction, so a knock
+    /// carries it off course for a moment before it steers back.</summary>
+    internal static Vector3 Steer(Vector3 velocity, Vector3 desired, float rate, float deltaTime) =>
+        new(MathUtils.Damp(velocity.X, desired.X, rate, deltaTime),
+            MathUtils.Damp(velocity.Y, desired.Y, rate, deltaTime),
+            MathUtils.Damp(velocity.Z, desired.Z, rate, deltaTime));
 
     /// <summary>Damps a resting body's horizontal speed by <see cref="GroundFriction"/>.</summary>
     internal static void DampOnGround(ref Vector3 velocity, float deltaTime)

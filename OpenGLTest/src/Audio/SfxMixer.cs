@@ -7,7 +7,7 @@ namespace VoxelEngine.Audio;
 /// <summary>
 /// Mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline. All
 /// clips share one format (validated at load), so no resampling is needed. A small lock
-/// guards the active list against <see cref="Read"/>, which NAudio calls on its playback
+/// guards the active list against <see cref="Read"/>, which the audio output calls on its playback
 /// thread while the game thread is free to start another one-shot.
 /// </summary>
 internal sealed class SfxMixer : IWaveProvider, IDisposable

@@ -20,7 +20,7 @@ public sealed class TorchFlameTests
 {
     public TorchFlameTests() => TestContent.EnsureLoaded();
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
     public void EveryTorchsTopFaceCropsTheCapPieceOfTheTorchTile()

@@ -24,13 +24,17 @@ public static class WorldFeatureConfig
     // Meadow cross-blocks in clumps on dry grass, only where the forest is open enough
     public const bool FlowersEnabled = true;
     public const int MeadowCellShift = 5;
-    public const int MeadowRadius = 4;
+    public const int MeadowRadius = 8;
     public const int MeadowJitter = 3;
     public const int MeadowMinMembers = 4;
     public const float MeadowClumpChance = 0.45f;
-    public const float MeadowEdgeDensity = 0.25f;
+    public const float MeadowEdgeDensity = 0.4f;
     // ForestOpenness a clump's center needs: the open stretches between the woodland
     public const float MeadowMinOpenness = 0.55f;
+    // Inside a meadow, at most one flower per MeadowFlowerSpacing x MeadowFlowerSpacing patch, rolled
+    // with MeadowFlowerChance: the flowers spread over the meadow instead of bunching up
+    public const int MeadowFlowerSpacing = 3;
+    public const float MeadowFlowerChance = 0.7f;
 
     // --- Foliage (FoliageGenerator) ---
     // Ground cover on the biome's own surface: forest grass tufts are common, desert dead shrubs
@@ -144,7 +148,40 @@ public static class WorldFeatureConfig
     // --- Desert wells (DesertWellGenerator): a sandstone ring around a sunken pool ---
     public const bool DesertWellsEnabled = true;
     public const int WellCellShift = 7;
-    public const float WellChance = 0.06f;
+    public const float WellChance = 0.012f;
+
+    // --- Ruins (RuinPlacement): hand-authored structure templates with loot chests, stamped on a hashed cell grid ---
+    public const bool RuinsEnabled = true;
+    public const int RuinCellShift = 7;
+    public const float RuinSurfaceChance = 0.12f;
+    public const float RuinUndergroundChance = 0.3f;
+    public const float RuinHellChance = 0.35f;
+    public const float RuinSkyChance = 0.2f;
+    // The share of sky ruins that keep their loot chest (the rest stand with the chest left out)
+    public const float RuinSkyChestChance = 0.25f;
+    // The largest ground step across a surface ruin footprint, and across a sky island top under one
+    public const int RuinSurfaceMaxStep = 2;
+    public const int RuinSkyMaxStep = 2;
+    // Rock an underground room keeps between its roof and the ground over its center
+    public const int RuinUndergroundCover = 16;
+
+    // --- Waystones (WaystonePlacement): a waystone structure a short walk from a placed ruin, never on its own ---
+    public const bool WaystonesEnabled = true;
+    // The share of placed ruins that get a waystone satellite
+    public const float WaystoneSatelliteChance = 0.2f;
+    // The share of battle towers that get a waystone in front of their entrance (WaystonePlacement.TryFindTower)
+    public const float WaystoneTowerChance = 0.8f;
+    // How far a tower's waystone may stray from straight out of the entrance: half-angle in radians, and extra columns of
+    // distance past the clearance, both rolled per try
+    public const float WaystoneTowerSpreadRadians = 0.35f;
+    public const float WaystoneTowerExtraDistance = 6f;
+    // The rolled distance between the ruin's center and the waystone's (pushed farther when their footprints would meet)
+    public const float WaystoneMinDistance = 12f;
+    public const float WaystoneMaxDistance = 30f;
+    // Empty columns kept at least between a ruin's footprint and its waystone's
+    public const int WaystoneRuinGap = 2;
+    // Distances and directions tried in order for a waystone's site, the first that passes its realm's rule winning
+    public const int WaystoneSiteTries = 3;
 
     // --- Geodes (GeodeGenerator): a crystal-lined hollow sphere deep in rock ---
     public const bool GeodesEnabled = true;

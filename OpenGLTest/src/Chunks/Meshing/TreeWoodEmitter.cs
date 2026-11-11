@@ -28,11 +28,11 @@ internal static class TreeWoodEmitter
     /// keeps the atlas texel density at every thickness.
     /// </summary>
     internal static void EmitTreeWood(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        ushort[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos)
     {
         var state = paddedState[pIdx];
-        Span<byte> nbIds = stackalloc byte[6];
+        Span<ushort> nbIds = stackalloc ushort[6];
         Span<byte> nbStates = stackalloc byte[6];
         Span<FaceLight> lights = stackalloc FaceLight[6];
         var lightBase = LightIdx(x, y, z);
@@ -88,10 +88,10 @@ internal static class TreeWoodEmitter
     /// material), so <paramref name="idx"/> must be a cell whose horizontal neighbors lie inside
     /// the 18^3 snapshot: the meshed cell itself or its vertical neighbors.
     /// </summary>
-    internal static int RimMaskInSnapshot(byte[] padded, byte[] paddedState, int idx, byte id)
+    internal static int RimMaskInSnapshot(ushort[] padded, byte[] paddedState, int idx, ushort id)
     {
         if (!TreeWoodShape.CanBevel(id, paddedState[idx])) return 0;
-        Span<byte> ids = stackalloc byte[6];
+        Span<ushort> ids = stackalloc ushort[6];
         Span<byte> states = stackalloc byte[6];
         for (var i = 0; i < 4; i++)
         {
@@ -111,7 +111,7 @@ internal static class TreeWoodEmitter
     /// neighbor's far side is never read; a cap needs the whole mask, whose horizontal reads
     /// stay inside the snapshot for a vertical neighbor.
     /// </summary>
-    internal static bool RimFaceFull(byte[] padded, byte[] paddedState, int nbIdx, byte id, int side)
+    internal static bool RimFaceFull(ushort[] padded, byte[] paddedState, int nbIdx, ushort id, int side)
     {
         if (!TreeWoodShape.CanBevel(id, paddedState[nbIdx])) return true;
         if (side >= 4) return RimMaskInSnapshot(padded, paddedState, nbIdx, id) == 0;
@@ -131,7 +131,7 @@ internal static class TreeWoodEmitter
     /// face toward this cell is whole (<see cref="RimFaceFull"/>; this cell is rim mass for it,
     /// so a horizontal one always is, and a detached log is never carved).
     /// </summary>
-    internal static bool RimBoundaryHidden(byte[] padded, byte[] paddedState, int pIdx, byte id, int face)
+    internal static bool RimBoundaryHidden(ushort[] padded, byte[] paddedState, int pIdx, ushort id, int face)
     {
         var nbIdx = pIdx + ChunkFaceTables.FaceNeighborDelta[face];
         var nb = padded[nbIdx];
@@ -169,7 +169,7 @@ internal static class TreeWoodEmitter
     /// shell under a narrower one keeps its exposed rim.
     /// </summary>
     internal static void EmitRimWood(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        ushort[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos, int mask)
     {
         if (vertices.Count > ushort.MaxValue - 4 * MaxRimQuads) return;
@@ -311,7 +311,7 @@ internal static class TreeWoodEmitter
     /// never see-through. The hitboxes stay the whole cube; the bite is cosmetic.
     /// </summary>
     internal static void EmitEaten(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        ushort[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos, int biteFace, int depthPx)
     {
         if (vertices.Count > ushort.MaxValue - 4 * MaxBiteQuads) return;

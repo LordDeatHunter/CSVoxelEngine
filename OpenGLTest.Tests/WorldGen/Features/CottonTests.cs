@@ -23,7 +23,7 @@ public sealed class CottonTests
     public void BreakingACottonPlantAlwaysYieldsCottonAndNothingElse()
     {
         var cotton = ContentRegistry.RequireItem("cotton").Id;
-        var into = new List<byte>();
+        var into = new List<ushort>();
         for (var i = 0; i < 200; i++)
         {
             into.Clear();

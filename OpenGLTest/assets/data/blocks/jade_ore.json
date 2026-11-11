@@ -1,0 +1,9 @@
+{
+  "name": "Jade Ore",
+  "model": { "parent": "block/cube_all", "textures": { "all": "jade_ore" } },
+  "material": { "metallic": 0.25, "roughness": 0.3, "normalStrength": 1.0 },
+  "sfx": "hit_rock",
+  "hardness": 12,
+  "requiresTool": true,
+  "tools": { "pickaxe": 2 }
+}

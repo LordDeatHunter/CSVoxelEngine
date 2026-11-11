@@ -4,7 +4,10 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Spells;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Data;
+using VoxelEngine.Entities;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 
@@ -15,7 +18,7 @@ internal static class ItemLoader
 {
     internal static void LoadItems(List<(string Name, string Path)> files)
     {
-        var types = new Dictionary<byte, Item>();
+        var types = new Dictionary<ushort, Item>();
         foreach (var (name, path) in files)
         {
             var definition = ContentFiles.ReadJson<ItemDefinition>(path);
@@ -34,9 +37,15 @@ internal static class ItemLoader
                 "heal" => ItemUseAction.Heal,
                 "grow_tree" => ItemUseAction.GrowTree,
                 "plant_tree" => ItemUseAction.PlantTree,
+                "learn_parts" => ItemUseAction.LearnParts,
+                "restore_mana" => ItemUseAction.RestoreMana,
+                "summon" => ItemUseAction.Summon,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock, heal, grow_tree or plant_tree."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock, heal, grow_tree, plant_tree, learn_parts, restore_mana or summon."),
             };
+            var teaches = ParseTeaches(definition, action, path);
+            var restoresMana = ParseRestoresMana(definition, action, path);
+            var heals = ParseHeals(definition, action, path);
 
             var durability = definition.Durability ?? 0;
             if (durability < 0 || durability > 1000)
@@ -85,6 +94,8 @@ internal static class ItemLoader
             }
 
             var staff = ParseStaff(definition, path);
+            var equip = ParseEquip(definition, staff != null, path);
+            var rarity = ParseRarity(definition.Rarity, path);
 
             var id = ContentRegistry.ItemIds[name];
 
@@ -123,6 +134,8 @@ internal static class ItemLoader
                     $"Item '{path}' has unknown attack '{definition.Attack}'; expected punch, slice or sword."),
             };
             var trailColor = ParseTrail(definition.Trail, attack, path);
+            var shrapnel = ParseShrapnel(definition.Shrapnel, attack, path);
+            var onHit = ParseOnHit(definition.OnHit, attack, path);
 
             var blockDamage = definition.BlockDamage ?? Mining.DefaultBlockDamage;
             if (!float.IsFinite(blockDamage) || blockDamage <= 0f || blockDamage > 1000f)
@@ -144,6 +157,9 @@ internal static class ItemLoader
             if (definition.ThrowAligned && throwDamage == null)
                 throw new InvalidOperationException($"Item '{path}' sets throwAligned but has no throwDamage.");
 
+            if (definition.ThrowBlock != null && throwDamage == null)
+                throw new InvalidOperationException($"Item '{path}' sets throwBlock but has no throwDamage.");
+
             types[id] = ItemFactory.Create(name, new ItemFactory.ItemSpec(
                 id, definition.Name ?? name, definition.Texture,
                 action,
@@ -158,15 +174,24 @@ internal static class ItemLoader
                 CrucibleCapacityMl: crucibleCapacity,
                 UseSeconds: useSeconds,
                 TreeName: use?.Tree,
+                EntityName: use?.Entity,
                 TrailColor: trailColor,
                 ThrowAligned: definition.ThrowAligned,
+                ThrowBlockId: ResolveUseTarget(definition.ThrowBlock, "throwBlock", path),
                 UsePose: usePose,
                 StaffSlots: staff?.Slots ?? 0,
                 StaffTier: staff?.Tier ?? 0,
-                StaffTags: staff?.Tags));
+                StaffTags: staff?.Tags,
+                Teaches: teaches,
+                RestoresMana: restoresMana,
+                Heals: heals,
+                Rarity: rarity,
+                Equip: equip,
+                Shrapnel: shrapnel,
+                OnHit: onHit));
         }
 
-        ItemRegistry.Publish(types, new Dictionary<string, byte>(ContentRegistry.ItemIds, StringComparer.Ordinal));
+        ItemRegistry.Publish(types, new Dictionary<string, ushort>(ContentRegistry.ItemIds, StringComparer.Ordinal));
     }
 
     /// <summary>
@@ -183,6 +208,26 @@ internal static class ItemLoader
             throw new InvalidOperationException(
                 $"Item '{path}' has a trail.color that is not three integers in 0..255.");
         return new Rgba((byte)color[0], (byte)color[1], (byte)color[2]);
+    }
+
+    /// <summary>
+    /// The <c>shrapnel</c> object's profile, or null when the item names none. Only a blade (a slice or
+    /// sword attack) sprays bone fragments, so a shrapnel object on a punch item is refused.
+    /// </summary>
+    internal static ShrapnelProfile? ParseShrapnel(ItemDefinition.ShrapnelDefinition? shrapnel,
+        AttackPattern attack, string path)
+    {
+        if (shrapnel == null) return null;
+        if (attack == AttackPattern.Punch)
+            throw new InvalidOperationException(
+                $"Item '{path}' has a shrapnel object, but only slice and sword items spray bone fragments.");
+        if (shrapnel.Count is not { } count || count is < 1 or > 32)
+            throw new InvalidOperationException(
+                $"Item '{path}' has shrapnel.count {shrapnel.Count}; expected 1..32 fragments.");
+        if (shrapnel.Damage is not { } damage || damage is < 1 or > 100)
+            throw new InvalidOperationException(
+                $"Item '{path}' has shrapnel.damage {shrapnel.Damage}; expected 1..100.");
+        return new ShrapnelProfile(count, damage);
     }
 
     /// <summary>
@@ -218,6 +263,220 @@ internal static class ItemLoader
         return (slots, tier, set);
     }
 
+    /// <summary>The item's rarity, common when it names none; an unknown name is refused naming the file.</summary>
+    internal static Rarity ParseRarity(string? text, string path)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return Rarity.Common;
+        if (Rarities.TryParse(text, out var rarity)) return rarity;
+        throw new InvalidOperationException(
+            $"Item '{path}' has unknown rarity '{text}'; expected common, uncommon, rare, epic or legendary.");
+    }
+
+    /// <summary>
+    /// The <c>equip</c> object compiled, or null when the item is not wearable. Gear is neither a staff, a
+    /// crucible nor a <c>use</c> item; its slot is required, its modifiers must name known stats with finite
+    /// values, its passives known triggers and its abilities known names. Status effect names are matched in <see cref="ValidateGear"/>,
+    /// once the effects have loaded.
+    /// </summary>
+    internal static GearInfo? ParseEquip(ItemDefinition definition, bool isStaff, string path)
+    {
+        if (definition.Equip is not { } equip) return null;
+        if (isStaff || definition.Crucible != null || definition.Use != null)
+            throw new InvalidOperationException(
+                $"Item '{path}' is wearable gear but also declares a use, staff or crucible.");
+        if (!GearSlots.TryParse(equip.Slot, out var slot))
+            throw new InvalidOperationException(
+                $"Item '{path}' has equip.slot '{equip.Slot}'; expected head, chest, legs, feet, gloves or accessory.");
+
+        var modifiers = new List<GearModifier>();
+        if (equip.Armor is { } armor)
+        {
+            if (armor < 0 || armor > GearConfig.ArmorCap)
+                throw new InvalidOperationException(
+                    $"Item '{path}' has equip.armor {armor}; expected 0..{GearConfig.ArmorCap}.");
+            if (armor > 0) modifiers.Add(new GearModifier(GearStat.Armor, armor));
+        }
+        if (equip.Modifiers != null)
+            foreach (var (statName, value) in equip.Modifiers)
+            {
+                if (!GearStats.TryParse(statName, out var stat))
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has equip.modifiers stat '{statName}'; expected armor, maxHealth, maxMana, "
+                        + "manaRegen, moveSpeed, miningSpeed, attackSpeed, attackDamage or undeadDamage.");
+                if (!float.IsFinite(value) || MathF.Abs(value) > 1000f)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has equip.modifiers.{statName} {value}; expected a finite number up to 1000.");
+                if (equip.Armor != null && stat == GearStat.Armor)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' sets armor both as equip.armor and in equip.modifiers.");
+                modifiers.Add(new GearModifier(stat, value));
+            }
+
+        var immune = new HashSet<string>(StringComparer.Ordinal);
+        if (equip.Immune != null)
+            foreach (var effect in equip.Immune)
+            {
+                if (string.IsNullOrWhiteSpace(effect))
+                    throw new InvalidOperationException($"Item '{path}' has a blank equip.immune entry.");
+                immune.Add(effect.Trim());
+            }
+
+        var passives = new List<GearPassive>();
+        if (equip.Passives != null)
+            foreach (var passive in equip.Passives)
+                passives.Add(ParsePassive(passive, path));
+
+        if (string.IsNullOrWhiteSpace(equip.Set) && equip.Set != null)
+            throw new InvalidOperationException($"Item '{path}' has a blank equip.set.");
+        var abilities = GearAbility.None;
+        foreach (var name in equip.Abilities ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new InvalidOperationException($"Item '{path}' has a blank equip.abilities entry.");
+        if (!GearAbilities.TryParse(name, out var ability))
+            throw new InvalidOperationException(
+                $"Item '{path}' has equip.abilities '{name}'; expected air_jump, no_fall_damage, extra_air, magnet or bone_shrapnel.");
+            abilities |= ability;
+        }
+        return new GearInfo(slot, modifiers, equip.Set?.Trim(), equip.Visible ?? false, immune, passives, abilities);
+    }
+
+    /// <summary>
+    /// The <c>onHit</c> object's effect, or null when the item names none. Only a blade (a slice or sword
+    /// attack) puts an effect on what it hits, and it must be an <c>on_hit</c> trigger.
+    /// </summary>
+    internal static GearPassive? ParseOnHit(ItemDefinition.PassiveDefinition? onHit, AttackPattern attack, string path)
+    {
+        if (onHit == null) return null;
+        if (attack == AttackPattern.Punch)
+            throw new InvalidOperationException(
+                $"Item '{path}' has an onHit object, but only slice and sword items put an effect on what they hit.");
+        var passive = ParsePassive(onHit, path);
+        if (passive.Trigger != PassiveTrigger.OnHit)
+            throw new InvalidOperationException($"Item '{path}' has an onHit trigger other than on_hit.");
+        return passive;
+    }
+
+    private static GearPassive ParsePassive(ItemDefinition.PassiveDefinition? passive, string path)
+    {
+        if (passive == null)
+            throw new InvalidOperationException($"Item '{path}' has an empty equip.passives entry.");
+        var trigger = passive.Trigger?.Trim().ToLowerInvariant() switch
+        {
+            "on_hit" => PassiveTrigger.OnHit,
+            "on_damaged" => PassiveTrigger.OnDamaged,
+            "low_health" => PassiveTrigger.LowHealth,
+            _ => throw new InvalidOperationException(
+                $"Item '{path}' has passive trigger '{passive.Trigger}'; expected on_hit, on_damaged or low_health."),
+        };
+        if (string.IsNullOrWhiteSpace(passive.Effect))
+            throw new InvalidOperationException($"Item '{path}' has a passive with no effect.");
+        var chance = passive.Chance ?? 1f;
+        if (!float.IsFinite(chance) || chance <= 0f || chance > 1f)
+            throw new InvalidOperationException(
+                $"Item '{path}' has passive chance {passive.Chance}; expected 0..1 exclusive of 0.");
+        var scale = passive.Scale ?? 1f;
+        if (!float.IsFinite(scale) || scale <= 0f)
+            throw new InvalidOperationException($"Item '{path}' has passive scale {passive.Scale}; expected above 0.");
+        var below = passive.Below ?? 0.3f;
+        if (!float.IsFinite(below) || below <= 0f || below > 1f)
+            throw new InvalidOperationException(
+                $"Item '{path}' has passive below {passive.Below}; expected 0..1 exclusive of 0.");
+        return new GearPassive(trigger, passive.Effect.Trim(), chance, scale, below);
+    }
+
+    /// <summary>
+    /// Matches every gear item's immunities and passive effects against the loaded status effects, so a typo
+    /// fails content load naming the item.
+    /// </summary>
+    internal static void ValidateGear()
+    {
+        foreach (var item in ItemRegistry.All)
+        {
+            if (item.OnHit is { } onHit && !StatusEffectRegistry.TryGet(onHit.Effect, out _))
+                throw new InvalidOperationException(
+                    $"Item '{item.SourceName}' hits with unknown status effect '{onHit.Effect}'.");
+            if (item is not GearItem gear) continue;
+            foreach (var effect in gear.Info.Immune)
+                if (!StatusEffectRegistry.TryGet(effect, out _))
+                    throw new InvalidOperationException(
+                        $"Item '{item.SourceName}' is immune to unknown status effect '{effect}'.");
+            foreach (var passive in gear.Info.Passives)
+                if (!StatusEffectRegistry.TryGet(passive.Effect, out _))
+                    throw new InvalidOperationException(
+                        $"Item '{item.SourceName}' has a passive applying unknown status effect '{passive.Effect}'.");
+        }
+    }
+
+    /// <summary>
+    /// The <c>teaches</c> list, trimmed, or null when the item has none. Checks the shape only: spell
+    /// parts load after items, so each key is matched against them in <see cref="ValidateLearnParts"/>.
+    /// The list belongs to, and is required by, <c>use.action: "learn_parts"</c>.
+    /// </summary>
+    internal static string[]? ParseTeaches(ItemDefinition definition, ItemUseAction action, string path)
+    {
+        var teaches = definition.Teaches;
+        if (action != ItemUseAction.LearnParts)
+        {
+            if (teaches != null)
+                throw new InvalidOperationException($"Item '{path}' has teaches but its use.action is not learn_parts.");
+            return null;
+        }
+        if (teaches is not { Length: > 0 })
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'learn_parts' without teaches: list the spell part keys (<kind>/<name>) it teaches.");
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var keys = new string[teaches.Length];
+        for (var i = 0; i < teaches.Length; i++)
+        {
+            if (string.IsNullOrWhiteSpace(teaches[i]))
+                throw new InvalidOperationException($"Item '{path}' has a blank entry in teaches.");
+            keys[i] = teaches[i].Trim();
+            if (!seen.Add(keys[i]))
+                throw new InvalidOperationException($"Item '{path}' teaches '{keys[i]}' twice.");
+        }
+        return keys;
+    }
+
+    /// <summary>
+    /// The <c>restoresMana</c> share, 0 when the item has none. It belongs to, and is required by,
+    /// <c>use.action: "restore_mana"</c>, and must lie in (0, 1].
+    /// </summary>
+    internal static float ParseRestoresMana(ItemDefinition definition, ItemUseAction action, string path)
+    {
+        var share = definition.RestoresMana;
+        if (action != ItemUseAction.RestoreMana)
+        {
+            if (share != null)
+                throw new InvalidOperationException($"Item '{path}' has restoresMana but its use.action is not restore_mana.");
+            return 0f;
+        }
+        if (share is not { } value || !float.IsFinite(value) || value <= 0f || value > 1f)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'restore_mana' without a restoresMana share in (0, 1].");
+        return value;
+    }
+
+    /// <summary>
+    /// The health a heal item restores: its <c>heals</c>, or the bandage's amount when it declares none; 0 for
+    /// an item that does not heal. <c>heals</c> belongs only to <c>use.action: "heal"</c> and must be 1 or more.
+    /// </summary>
+    internal static int ParseHeals(ItemDefinition definition, ItemUseAction action, string path)
+    {
+        var heals = definition.Heals;
+        if (action != ItemUseAction.Heal)
+        {
+            if (heals != null)
+                throw new InvalidOperationException($"Item '{path}' has heals but its use.action is not heal.");
+            return 0;
+        }
+        if (heals is not { } value) return PlayerConfig.BandageHealAmount;
+        if (value < 1)
+            throw new InvalidOperationException($"Item '{path}' has heals {value}; expected 1 or more.");
+        return value;
+    }
+
     private readonly record struct ParsedSheet(int Cols, int Rows, int Frames, ItemAnimationMode Mode, float Fps);
 
     private static ParsedSheet ParseSpritesheet(ItemDefinition.SpritesheetDefinition? sheet, string path)
@@ -249,13 +508,17 @@ internal static class ItemLoader
         return new ParsedSheet(cols, rows, frames, mode, fps);
     }
 
-    private readonly record struct ParsedDisplay(Vector3 Rotation, Vector3 Translation, float Scale);
+    internal readonly record struct ParsedDisplay(Vector3 Rotation, Vector3 Translation, float Scale)
+    {
+        /// <summary>The transform these values compose to (<see cref="Item.ComposeDisplay"/>).</summary>
+        public Matrix4x4 Matrix => Item.ComposeDisplay(Rotation, Translation, Scale);
+    }
 
     /// <summary>
-    /// Reads an item's held-in-hand transform, defaulting to the upright side-facing tool
-    /// pose when the file says nothing.
+    /// Reads a held-in-hand transform (an item's <c>display</c>, or an entity's <c>held.display</c>),
+    /// defaulting to the upright side-facing tool pose when the file says nothing.
     /// </summary>
-    private static ParsedDisplay ParseDisplay(ItemDefinition.DisplayDefinition? display, string path)
+    internal static ParsedDisplay ParseDisplay(ItemDefinition.DisplayDefinition? display, string path)
     {
         if (display == null)
             return new ParsedDisplay(new Vector3(-30f, 10f, 0f), Vector3.Zero, 1f);
@@ -263,7 +526,7 @@ internal static class ItemLoader
         var scale = display.Scale ?? 1f;
         if (!float.IsFinite(scale) || scale <= 0f)
             throw new InvalidOperationException(
-                $"Item '{path}' has display.scale {display.Scale}; expected a positive number.");
+                $"'{path}' has display.scale {display.Scale}; expected a positive number.");
 
         return new ParsedDisplay(ReadTriple(display.Rotation, "rotation"),
             ReadTriple(display.Translation, "translation"), scale);
@@ -273,14 +536,14 @@ internal static class ItemLoader
             if (values == null) return field == "rotation" ? new Vector3(-30f, 10f, 0f) : Vector3.Zero;
             if (values.Length != 3 || values.Any(v => !float.IsFinite(v)))
                 throw new InvalidOperationException(
-                    $"Item '{path}' has display.{field} with {values?.Length ?? 0} entries; expected 3 finite numbers.");
+                    $"'{path}' has display.{field} with {values?.Length ?? 0} entries; expected 3 finite numbers.");
             return new Vector3(values[0], values[1], values[2]);
         }
     }
 
     // Items are parsed before blocks, so only the id maps exist here; what those ids turn out
     // to be is checked in ValidateItemUses once the runtime tables are filled.
-    private static byte ResolveUseTarget(string? name, string field, string path)
+    private static ushort ResolveUseTarget(string? name, string field, string path)
     {
         if (name == null) return 0;
 
@@ -312,7 +575,10 @@ internal static class ItemLoader
                     ValidateIgniteCampfire(item, path);
                     break;
                 case ItemUseAction.Heal:
-                    ValidateHeal(item, path);
+                    ValidateHeal(item, path, "heal");
+                    break;
+                case ItemUseAction.RestoreMana:
+                    ValidateHeal(item, path, "restore_mana");
                     break;
                 case ItemUseAction.GrowTree:
                     ValidateGrowTree(item, path);
@@ -322,6 +588,12 @@ internal static class ItemLoader
                     break;
                 case ItemUseAction.ConvertMultiblock:
                     ValidateConvertMultiblock(item, path);
+                    break;
+                case ItemUseAction.LearnParts:
+                    ValidateLearnParts(item, path);
+                    break;
+                case ItemUseAction.Summon:
+                    ValidateSummon(item, path);
                     break;
                 default:
                     ValidateFluidAction(item, path);
@@ -370,14 +642,36 @@ internal static class ItemLoader
                 $"Item '{path}' has use.action 'ignite_campfire' without durability: ignite items must declare uses before breaking.");
     }
 
-    private static void ValidateHeal(Item item, string path)
+    // A self-restoring use (heal, restore_mana) spends from its stack and targets nobody
+    private static void ValidateHeal(Item item, string path, string action)
     {
         if (item.UseResultId != 0)
             throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'heal' with a use.result: a heal spends from its stack, it never morphs.");
+                $"Item '{path}' has use.action '{action}' with a use.result: it spends from its stack, it never morphs.");
         if (item.UseFluidId != 0 || item.UseBlockId != 0)
             throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'heal' with a use.fluid or use.block: a heal targets nobody.");
+                $"Item '{path}' has use.action '{action}' with a use.fluid or use.block: it targets nobody.");
+    }
+
+    /// <summary>
+    /// A scroll spends from its stack and targets nobody, and every key it teaches must name a loaded
+    /// spell part (they load after items and blocks, before this check).
+    /// </summary>
+    internal static void ValidateLearnParts(Item item, string path)
+    {
+        if (item.UseResultId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'learn_parts' with a use.result: a scroll spends from its stack, it never morphs.");
+        if (item.UseFluidId != 0 || item.UseBlockId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'learn_parts' with a use.fluid or use.block: a scroll targets nobody.");
+        if (item is not LearnPartsItem scroll)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'learn_parts' but is not built as a scroll (a staff or a crucible cannot teach).");
+        foreach (var key in scroll.Teaches)
+            if (SpellPartRegistry.TryGetByKey(key) == null)
+                throw new InvalidOperationException(
+                    $"Item '{path}' teaches '{key}', which is not a spell part key (<kind>/<name>).");
     }
 
     private static void ValidateGrowTree(Item item, string path)
@@ -388,6 +682,19 @@ internal static class ItemLoader
         if (item.UseFluidId != 0 || item.UseBlockId != 0)
             throw new InvalidOperationException(
                 $"Item '{path}' has use.action 'grow_tree' with a use.fluid or use.block: the tree is read from the aimed cell.");
+    }
+
+    private static void ValidateSummon(Item item, string path)
+    {
+        if (string.IsNullOrWhiteSpace(item.UseEntityName))
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'summon' without use.entity: name the entity file under assets/data/entities/.");
+        if (EntityRegistry.TryGet(item.UseEntityName) == null)
+            throw new InvalidOperationException(
+                $"Item '{path}' summons entity '{item.UseEntityName}', which is not under assets/data/entities/.");
+        if (item.UseResultId != 0 || item.UseFluidId != 0 || item.UseBlockId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'summon' with a use.result, use.fluid or use.block: summoning spends from its stack, it never morphs.");
     }
 
     private static void ValidatePlantTree(Item item, string path)
@@ -403,25 +710,13 @@ internal static class ItemLoader
                 $"Item '{path}' has use.action 'plant_tree' with a use.fluid or use.block: the ground is read from the aimed cell.");
     }
 
+    // A converter names no structure: it presses whichever multiblock the clicked cube is the
+    // source of (each anchor's own multiblock.source), so it carries none of the use fields
     private static void ValidateConvertMultiblock(Item item, string path)
     {
-        var source = BlockType.ById[item.UseBlockId];
-        if (source == null)
+        if (item.UseBlockId != 0 || item.UseResultId != 0 || item.UseFluidId != 0)
             throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'convert_multiblock' but its use.block is not a block.");
-        var anchor = BlockType.ById[item.UseResultId];
-        if (anchor == null)
-            throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'convert_multiblock' but its use.result is not a block.");
-        if (anchor.Renderer != BlockRenderer.Multiblock)
-            throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'convert_multiblock' but block '{anchor.Name}' is not a multiblock anchor.");
-        if (anchor.MultiblockSourceId != item.UseBlockId)
-            throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'convert_multiblock' naming '{source.Name}' in use.block, but '{anchor.Name}' is built from '{BlockType.ById[anchor.MultiblockSourceId]?.Name}'.");
-        if (item.UseFluidId != 0)
-            throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'convert_multiblock' with a use.fluid: that field belongs to the bucket actions.");
+                $"Item '{path}' has use.action 'convert_multiblock' with a use.block, use.result or use.fluid: a converter presses any multiblock built from the clicked cube, which each anchor's multiblock.source names.");
     }
 
     // The bucket actions: pour or scoop a fluid block, morphing into the use.result item.

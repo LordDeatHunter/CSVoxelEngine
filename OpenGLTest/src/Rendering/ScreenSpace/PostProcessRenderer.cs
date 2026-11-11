@@ -32,6 +32,9 @@ public sealed class PostProcessRenderer : IDisposable
         // until the first Render sets the frame's).
         _shader.Use();
         _shader.SetUniform("uScene", 0);
+        _shader.SetUniform("uDepth", 1);
+        _shader.SetUniform("uWavePushBlocks", JuiceConfig.FloorConqueredShockwavePushBlocks);
+        _shader.SetUniform("uWaveCount", 0);
         _shader.SetUniform("uExposure", LightingConfig.TonemapExposure);
         _shader.SetUniform("uGrade", System.Numerics.Vector3.One);
         _shader.SetUniform("uDamageFringe", 0f);
@@ -69,7 +72,8 @@ public sealed class PostProcessRenderer : IDisposable
     /// is the scene texture's size in pixels, which FXAA clamps its taps to. <paramref name="effects"/>
     /// are the frame's camera effects: the exposure (eye adaptation) and the color grade.
     /// </summary>
-    public void Render(Vector2D<int> viewport, in PostEffects effects)
+    public void Render(Vector2D<int> viewport, in PostEffects effects, in System.Numerics.Matrix4x4 viewProj,
+        in System.Numerics.Matrix4x4 invViewProj)
     {
         _gl.Disable(EnableCap.DepthTest);
         _gl.DepthMask(false);
@@ -82,6 +86,7 @@ public sealed class PostProcessRenderer : IDisposable
         _shader.SetUniform("uDamageFringe", effects.DamageFringe);
         _shader.SetUniform("uUnderwater", effects.Underwater);
         _shader.SetUniform("uTime", effects.Time);
+        SetShockwaves(effects.Shockwaves, viewProj, invViewProj);
         _gl.BindVertexArray(_vao);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);
@@ -90,6 +95,23 @@ public sealed class PostProcessRenderer : IDisposable
         _gl.Enable(EnableCap.DepthTest);
         _gl.Enable(EnableCap.Blend);
         _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+    }
+
+    // Uploads the shells (the shader's arrays: center and radius, then bottom, top, strength and half thickness)
+    private void SetShockwaves(System.Collections.Generic.IReadOnlyList<Shockwave>? waves, in System.Numerics.Matrix4x4 viewProj,
+        in System.Numerics.Matrix4x4 invViewProj)
+    {
+        var count = Math.Min(waves?.Count ?? 0, Shockwave.Max);
+        _shader.SetUniform("uWaveCount", count);
+        if (count == 0) return;
+        _shader.SetUniform("uViewProj", viewProj);
+        _shader.SetUniform("uInvViewProj", invViewProj);
+        for (var i = 0; i < count; i++)
+        {
+            var w = waves![i];
+            _shader.SetUniform($"uWaveA[{i}]", new System.Numerics.Vector4(w.Center, w.Radius));
+            _shader.SetUniform($"uWaveB[{i}]", new System.Numerics.Vector4(w.BottomY, w.TopY, w.Strength, w.HalfThickness));
+        }
     }
 
     public void Dispose()

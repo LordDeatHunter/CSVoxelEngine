@@ -23,10 +23,10 @@ internal static class TreeCanopy
     // right foliage. Entries are a pure function of the chunk column (BuildCanopyTops reads only
     // the cell batches, themselves a pure function of their cell), so eviction is always safe --
     // edits never enter here, they live in CanopyDisturbed, which the CALLERS consult.
-    internal sealed class CanopyColumns(int[] tops, byte[] leafBlocks)
+    internal sealed class CanopyColumns(int[] tops, ushort[] leafBlocks)
     {
         public readonly int[] Tops = tops;
-        public readonly byte[] LeafBlocks = leafBlocks;
+        public readonly ushort[] LeafBlocks = leafBlocks;
     }
 
     // Its one engine caller is the far LOD: LodRegion.BuildMeshData asks TryGetCanopy once per
@@ -68,27 +68,27 @@ internal static class TreeCanopy
     private static readonly Func<(int X, int Z), ulong[]> NewDisturbedWords = static _ => new ulong[DisturbedWords];
 
     // Canopy a reactive growth added (TreeGrowthWriter): per fine column, the grown tree's real top
-    // leaf cell and its leaf block, packed like LodSurface (top << 8 | block), LodSurface.None where
+    // leaf cell and its leaf block, packed by LodSurface.Pack into a long, LodSurface.None where
     // none. The generated canopy knows nothing of a tree the player grew, so without this a grown
     // crown stays invisible at range until a reload. It wins over a disturbed marker (a grow
     // poisons its columns and then adds the real top back) and over the generated canopy, and
     // PoisonCanopy clears it, so a later mine, fell, blast or decay removes the grown crown again.
     // Gameplay truth like CanopyDisturbed, so it never enters a GenerationalCache; same publish
     // order as LodSurface (the bucket through the dictionary, each element by Volatile.Write).
-    private static readonly ConcurrentDictionary<(int X, int Z), int[]> CanopyAdded = new();
+    private static readonly ConcurrentDictionary<(int X, int Z), long[]> CanopyAdded = new();
 
     private static int _canopyAddedVersion;
 
-    private static int[] NewAddedBucket()
+    private static long[] NewAddedBucket()
     {
-        var bucket = new int[Chunk.Size * Chunk.Size];
+        var bucket = new long[Chunk.Size * Chunk.Size];
         Array.Fill(bucket, LodSurface.None);
         return bucket;
     }
 
     private static int FineIndex(int x, int z) => ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
 
-    private static bool TryGetAdded(int x, int z, out int top, out byte leaf)
+    private static bool TryGetAdded(int x, int z, out int top, out ushort leaf)
     {
         top = 0;
         leaf = BlockType.Air;
@@ -161,7 +161,7 @@ internal static class TreeCanopy
             [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
     }
 
-    public static byte CanopyLeafBlock(int x, int z)
+    public static ushort CanopyLeafBlock(int x, int z)
     {
         if (TryGetAdded(x, z, out _, out var addedLeaf))
             return addedLeaf;
@@ -172,8 +172,8 @@ internal static class TreeCanopy
         return leaf;
     }
 
-    /// <summary>The grown canopy over (x, z); see <see cref="TryGetCanopy(int, int, bool, out int, out byte)"/>.</summary>
-    public static bool TryGetCanopy(int x, int z, out int top, out byte leaf) =>
+    /// <summary>The grown canopy over (x, z); see <see cref="TryGetCanopy(int, int, bool, out int, out ushort)"/>.</summary>
+    public static bool TryGetCanopy(int x, int z, out int top, out ushort leaf) =>
         TryGetCanopy(x, z, proxy: false, out top, out leaf);
 
     /// <summary>
@@ -184,7 +184,7 @@ internal static class TreeCanopy
     /// grown trees, which never runs tree growth (the far rings, <see cref="LodLevelSpec.ProxyCanopy"/>).
     /// Safe to call from any thread.
     /// </summary>
-    public static bool TryGetCanopy(int x, int z, bool proxy, out int top, out byte leaf)
+    public static bool TryGetCanopy(int x, int z, bool proxy, out int top, out ushort leaf)
     {
         if (TryGetAdded(x, z, out top, out leaf))
             return true;
@@ -229,7 +229,7 @@ internal static class TreeCanopy
     /// <see cref="PoisonCanopy"/> for the column, which is what clears an older record. Main
     /// thread. Returns false when the column already held exactly this record.
     /// </summary>
-    public static bool SetCanopyAdded(int x, int z, int top, byte leaf)
+    public static bool SetCanopyAdded(int x, int z, int top, ushort leaf)
     {
         var packed = LodSurface.Pack(top, leaf);
         var bucket = CanopyAdded.GetOrAdd((x >> Chunk.SizeShift, z >> Chunk.SizeShift), static _ => NewAddedBucket());
@@ -246,12 +246,12 @@ internal static class TreeCanopy
     internal static int CanopyAddedVersion => Volatile.Read(ref _canopyAddedVersion);
 
     /// <summary>A copy of every added-canopy bucket that holds a record, for the per-world LOD edit save (<c>LodEditState</c>). Main thread.</summary>
-    internal static List<(int CX, int CZ, int[] Values)> ExportCanopyAdded()
+    internal static List<(int CX, int CZ, long[] Values)> ExportCanopyAdded()
     {
-        var result = new List<(int CX, int CZ, int[] Values)>();
+        var result = new List<(int CX, int CZ, long[] Values)>();
         foreach (var (key, bucket) in CanopyAdded)
         {
-            var copy = new int[bucket.Length];
+            var copy = new long[bucket.Length];
             var any = false;
             for (var i = 0; i < copy.Length; i++)
             {
@@ -270,11 +270,11 @@ internal static class TreeCanopy
     /// import never undoes a grow made first. Call before <c>LodManager.Start</c>. Leaves
     /// <see cref="CanopyAddedVersion"/> alone: the imported state is what the file holds.
     /// </summary>
-    internal static void ImportCanopyAdded(IEnumerable<(int CX, int CZ, int[] Values)> buckets)
+    internal static void ImportCanopyAdded(IEnumerable<(int CX, int CZ, long[] Values)> buckets)
     {
         foreach (var (cx, cz, values) in buckets)
         {
-            int[]? bucket = null;
+            long[]? bucket = null;
             var n = Math.Min(values.Length, Chunk.Size * Chunk.Size);
             for (var i = 0; i < n; i++)
             {
@@ -336,7 +336,7 @@ internal static class TreeCanopy
         var x1 = x0 + Chunk.Size;
         var z1 = z0 + Chunk.Size;
         var tops = new int[Chunk.Size * Chunk.Size];
-        var leaves = new byte[Chunk.Size * Chunk.Size];
+        var leaves = new ushort[Chunk.Size * Chunk.Size];
 
         var cx0 = TreeGenerator.CellOf(x0 - r);
         var cx1 = TreeGenerator.CellOf(x1 - 1 + r);
@@ -381,7 +381,7 @@ internal static class TreeCanopy
         var x0 = chunkX * Chunk.Size;
         var z0 = chunkZ * Chunk.Size;
         var tops = new int[Chunk.Size * Chunk.Size];
-        var leaves = new byte[Chunk.Size * Chunk.Size];
+        var leaves = new ushort[Chunk.Size * Chunk.Size];
 
         for (var tx = x0 - TreeGenerator.ProxyReach; tx < x0 + Chunk.Size + TreeGenerator.ProxyReach; tx++)
         for (var tz = z0 - TreeGenerator.ProxyReach; tz < z0 + Chunk.Size + TreeGenerator.ProxyReach; tz++)

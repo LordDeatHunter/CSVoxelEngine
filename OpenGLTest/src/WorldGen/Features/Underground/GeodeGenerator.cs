@@ -14,9 +14,9 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 public static class GeodeGenerator
 {
     /// <summary>Blocks this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte CrystalBlock;
+    public static readonly ushort CrystalBlock;
 
-    private static readonly byte StoneBlock;
+    private static readonly ushort StoneBlock;
 
     static GeodeGenerator()
     {
@@ -52,7 +52,7 @@ public static class GeodeGenerator
     /// crystal on the shell and air in the heart, clipped at the chunk's border. Runs on a
     /// generation worker thread after the carvers.
     /// </summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0)
     {
         var reach = WorldFeatureConfig.GeodeMaxRadius;
         var shift = WorldFeatureConfig.GeodeCellShift;

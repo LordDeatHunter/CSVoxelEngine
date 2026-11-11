@@ -9,15 +9,19 @@ using VoxelEngine.Juice;
 using VoxelEngine.Player;
 using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
+using VoxelEngine.UI.SpellBuilder;
+using VoxelEngine.UI.Forge;
+using VoxelEngine.UI.Waystone;
 
 namespace VoxelEngine.Rendering.Overlays;
 
 /// <summary>
 /// The UI hand-off: the HUD pass over the finished frame (the underwater wash, the damage
 /// vignette, the crosshair and look-at label, the compass or clock, the hotbar, hearts and toasts,
-/// the [E] panel and the pause menu), the chat, tooltip and player-list passes after it, and the
+/// the [E] panel, the spell builder, the waystone screen and the pause menu), the chat, tooltip and player-list passes after it, and the
 /// world-less frames: the main menu, the opaque loading screen and the loading fade over the first
 /// playing frames. Every pass draws through the one <see cref="UIRenderer"/> its owner builds,
 /// straight into the default framebuffer in display space. Render thread only.
@@ -31,6 +35,9 @@ internal sealed class UiPasses
     private TextureUnits Units => _owner.Units;
     private RenderTargets Targets => _owner.Targets;
 
+    // Space between the boss bar block and the look-at label pushed below it
+    private const float BossBarLabelGap = 8f;
+
     internal UiPasses(GL gl, RenderManager owner)
     {
         _gl = gl;
@@ -43,8 +50,12 @@ internal sealed class UiPasses
         int health = PlayerHealth.MaxHealth, float airShare = 1f, float manaShare = 1f, float damageFlash = 0f, HotbarNameFade? hotbarName = null,
         HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null,
         CrosshairState crosshair = default, LookLabelState? lookAt = null, string? staffSlot = null,
-        byte effectMask = 0)
+        byte effectMask = 0, SpellBuilderView? builder = null, int maxHealth = PlayerHealth.MaxHealth,
+        ChestView? chest = null, WaystoneView? waystone = null, BossBarState? boss = null, ForgeView? forge = null)
     {
+        // Any panel (the [E] inventory, the spell builder, the waystone screen or the anvil's recipe list) hides the
+        // crosshair and the status row.
+        var panelUp = view.IsOpen || builder?.IsOpen == true || waystone?.IsOpen == true || forge?.IsOpen == true;
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize, UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
 
@@ -60,7 +71,7 @@ internal sealed class UiPasses
         }
 
         // The hit flash and the low-health pulse share the vignette's one full-screen pass
-        var lowHealth = LowHealthVignette.Intensity((float)health / PlayerHealth.MaxHealth, time,
+        var lowHealth = LowHealthVignette.Intensity((float)health / maxHealth, time,
             dead: health <= 0, creative: camera?.IsCreative == true);
         // ...and so do the damage direction arc toward the last blow (DamageDirection) and the
         // droplets streaking down after the eye surfaced (SurfacingDroplets)
@@ -74,18 +85,25 @@ internal sealed class UiPasses
         // The compass and the clock share the top-center strip; the look-at label rides below it
         var hasCompass = camera != null && HasCompassEquipped(inventory);
         var hasClock = camera != null && HasClockEquipped(inventory);
-        if (!view.IsOpen && (menu == null || !menu.IsOpen))
+        if (!panelUp && (menu == null || !menu.IsOpen))
         {
             _owner.Ui.Hud.DrawCrosshair(crosshair.ThrowCharge, crosshair.BreakProgress, crosshair.HitMarker);
+            // The boss bar takes the spot under the strip, pushing the look-at label below it
+            var labelTop = TopStripRenderer.LookLabelTop(hasCompass, hasClock, showCoordinates);
+            if (boss is { } bar)
+            {
+                _owner.Ui.Hud.DrawBossBar(bar.Name, bar.Share, labelTop);
+                labelTop += HudRenderer.BossBarBlockHeight + BossBarLabelGap;
+            }
             // The look-at label (its debug lines ride the profiler overlay, i.e. X)
             if (lookAt is { } label)
-                _owner.Ui.TopStrip.DrawLookLabel(label, time, showProfiler,
-                    TopStripRenderer.LookLabelTop(hasCompass, hasClock, showCoordinates));
+                _owner.Ui.TopStrip.DrawLookLabel(label, time, showProfiler, labelTop);
         }
         if (hasCompass)
             _owner.Ui.TopStrip.DrawCompass(camera!.Yaw, camera.Position, showCoordinates);
         else if (hasClock)
             _owner.Ui.TopStrip.DrawClock(Clock.DayNumber(lightingTime), Clock.Readout(lightingTime));
+        _owner.Ui.Hud.BeginBars(time);
         _owner.Ui.Hud.DrawFps(fps);
         if (showProfiler)
             _owner.Ui.Hud.DrawProfiler(FrameProfiler.Lines);
@@ -97,9 +115,10 @@ internal sealed class UiPasses
         // The day/first-pickup/full-inventory toast rides above the item-name row
         if (toast is { Alpha: > 0f, Text.Length: > 0 })
             _owner.Ui.Hud.DrawToast(toast.Text, toast.Alpha);
-        if (!view.IsOpen && (menu == null || !menu.IsOpen))
+        if (!panelUp && (menu == null || !menu.IsOpen))
         {
-            _owner.Ui.Hud.DrawHearts(health);
+            if (camera?.IsCreative != true)
+                _owner.Ui.Hud.DrawHearts(health, maxHealth);
             _owner.Ui.Hud.DrawAir(airShare, health);
             _owner.Ui.Hud.DrawMana(manaShare, health, camera?.IsCreative == true);
             _owner.Ui.Hud.DrawEffects(effectMask, health);
@@ -109,11 +128,56 @@ internal sealed class UiPasses
                 _owner.Ui.Hud.DrawHotbarName(hotbarName.Name, hotbarName.Alpha);
         }
         view.Transition.Step(view.IsOpen, time);
+        view.StepMotion(time);
         if (view.IsOpen || view.Transition.Visible)
         {
             _owner.Ui.SetOverlay(new Vector2(0f, view.Transition.SlideY), view.Transition.Alpha);
-            _owner.Ui.Panel.DrawInventoryPanel(inventory, view, time, heading, camera?.IsCreative == true);
+            _owner.Ui.Panel.DrawInventoryPanel(inventory, view, time, heading, camera?.IsCreative == true,
+                chest is { IsOpen: true });
             _owner.Ui.ClearOverlay();
+        }
+        if (chest != null)
+        {
+            chest.Transition.Step(chest.IsOpen, time);
+            if (chest.IsOpen || chest.Transition.Visible)
+            {
+                _owner.Ui.SetOverlay(new Vector2(0f, chest.Transition.SlideY), chest.Transition.Alpha);
+                _owner.Ui.ChestCard.Draw(chest, view.Focus == InventoryFocus.ChestSearch, view.HoverCanvas, time, heading);
+                _owner.Ui.ClearOverlay();
+            }
+        }
+        // A row dragged toward a slot rides the pointer over the panel, the chest card and the hotbar
+        if (view.IsOpen && view.Drag is { Lifted: true } drag && view.HoverCanvas is { } pointer)
+            _owner.Ui.Panel.DrawDraggedRow(drag.Id, pointer, heading, time);
+        if (builder != null)
+        {
+            builder.Transition.Step(builder.IsOpen, time);
+            if (builder.IsOpen || builder.Transition.Visible)
+            {
+                _owner.Ui.SetOverlay(new Vector2(0f, builder.Transition.SlideY), builder.Transition.Alpha);
+                _owner.Ui.SpellBuilder.DrawSpellBuilder(inventory, builder);
+                _owner.Ui.ClearOverlay();
+            }
+        }
+        if (waystone != null)
+        {
+            waystone.Transition.Step(waystone.IsOpen, time);
+            if (waystone.IsOpen)
+            {
+                _owner.Ui.SetOverlay(new Vector2(0f, waystone.Transition.SlideY), waystone.Transition.Alpha);
+                _owner.Ui.Waystone.Draw(waystone, time);
+                _owner.Ui.ClearOverlay();
+            }
+        }
+        if (forge != null)
+        {
+            forge.Transition.Step(forge.IsOpen, time);
+            if (forge.IsOpen)
+            {
+                _owner.Ui.SetOverlay(new Vector2(0f, forge.Transition.SlideY), forge.Transition.Alpha);
+                _owner.Ui.Forge.Draw(forge, time, camera != null ? Compass.HeadingFromYaw(camera.Yaw) : 0f);
+                _owner.Ui.ClearOverlay();
+            }
         }
         if (menu != null && settings != null)
             _owner.Ui.Menu.DrawPauseMenu(menu, settings);
@@ -145,14 +209,16 @@ internal sealed class UiPasses
     }
 
     /// <summary>Draws one hover tooltip (see <see cref="HudRenderer.DrawTooltip"/>), or nothing when
-    /// the cursor hovers nothing.</summary>
-    internal void RenderTooltip(IWindow window, (Vector2 Anchor, IReadOnlyList<string> Lines)? tooltip)
+    /// the cursor hovers nothing. <paramref name="time"/> is the world's lighting clock, the one the
+    /// rows' icons and chrome animate on.</summary>
+    internal void RenderTooltip(IWindow window, HoverTooltip? tooltip, float time)
     {
         if (tooltip is not { Lines.Count: > 0 } hover) return;
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
-        _owner.Ui.Hud.DrawTooltip(hover.Anchor, hover.Lines);
+        // The anchor is the pointer in window pixels; the box is laid out and drawn in canvas units
+        _owner.Ui.Hud.DrawTooltip(_owner.Ui.ToCanvas(hover.Anchor), hover.Lines, hover.Colors, hover.Rarity, time);
         _owner.Ui.End();
         Units.InvalidateTextureUnits();
     }
@@ -184,7 +250,7 @@ internal sealed class UiPasses
     /// framebuffer is cleared and written directly, in display space like the HUD. Render thread only.
     /// </summary>
     internal void RenderMenuFrame(IWindow window, MainMenuView? menu, SettingsMenuView settings,
-        LoadingScreenView? loading, double time)
+        LoadingScreenView? loading, double time, Vector2? pointerWindow)
     {
         Units.InvalidateTextureUnits();
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
@@ -195,6 +261,8 @@ internal sealed class UiPasses
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
+        // Menu buttons light up from the pointer, which the gameplay pass sets but this frame never reaches.
+        _owner.Ui.Pointer = pointerWindow is { } p ? _owner.Ui.ToCanvas(p) : null;
         if (loading != null)
             _owner.Ui.LoadingScreen.DrawLoadingScreen(loading, time, opaque: true);
         else if (menu != null)
@@ -221,7 +289,7 @@ internal sealed class UiPasses
 
     // The compass item id, resolved once: null when no item named "compass" is registered,
     // in which case the HUD compass never shows rather than throwing every frame.
-    private byte? _compassId;
+    private ushort? _compassId;
     private bool _compassResolved;
 
     private bool HasCompassEquipped(Inventory inventory)
@@ -242,7 +310,7 @@ internal sealed class UiPasses
     }
 
     // The clock item id, resolved once like the compass's
-    private byte? _clockId;
+    private ushort? _clockId;
     private bool _clockResolved;
 
     private bool HasClockEquipped(Inventory inventory)

@@ -1,0 +1,27 @@
+{
+  // Bone shrapnel: run with VOXEL_SCRIPT=visual-examples/bone-shrapnel.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/bone-shrapnel/.
+  // The camera hovers (fly: immune, so the slimes cannot knock it about) three blocks from two slimes in the
+  // open forest clearing the other mob scripts use (ground at y 9..10 over x -56..-32, z 32..68). The
+  // Bone-Breaker Blade is in hand and the Bone Charm is worn, so this films the sharpened burst; drop the
+  // charm's `give` step to shoot the blade's own weaker one. `mine` drives the blade's left-click: its first
+  // swing lands at the impact frame and the shot is taken while the bone fragments are still in the air.
+  // One run presses the attack once (`mine` holds the button from the first frame), so a second swing needs
+  // its own run.
+  "steps": [
+    { "op": "teleport", "pos": [-42.0, 12.5, 64.5], "yaw": -90, "pitch": -30 },
+    { "op": "fly" },
+    // Chunks must be loaded before the slimes can stand on them
+    { "op": "wait", "seconds": 5 },
+    { "op": "give", "block": "item/bone_breaker_blade" },
+    { "op": "give", "block": "item/bone_charm" },
+    { "op": "spawn", "entity": "slime", "pos": [-43.0, 61.5] },
+    { "op": "spawn", "entity": "slime", "pos": [-41.0, 61.5] },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "ready" },
+    { "op": "mine", "seconds": 0.55 },
+    { "op": "screenshot", "name": "burst" },
+    { "op": "wait", "seconds": 0.18 },
+    { "op": "screenshot", "name": "burst_late" }
+  ]
+}

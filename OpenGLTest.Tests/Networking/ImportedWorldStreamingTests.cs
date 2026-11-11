@@ -90,7 +90,7 @@ public sealed class ImportedWorldStreamingTests : IDisposable
     private string SaveDir => Path.Combine(_root, "save");
     private string MapDir => Path.Combine(_root, "map");
 
-    private static byte Sandstone => ContentRegistry.RequireBlock("sandstone").Id;
+    private static ushort Sandstone => ContentRegistry.RequireBlock("sandstone").Id;
 
     private static bool InInterior(Vertex v) =>
         v.Position.X >= InteriorMin && v.Position.X < InteriorMax
@@ -142,9 +142,9 @@ public sealed class ImportedWorldStreamingTests : IDisposable
     }
 
     // A chunk whose cells at or below top are block and the rest air
-    private static ChunkSnapshot Slab(int cy, int top, byte block)
+    private static ChunkSnapshot Slab(int cy, int top, ushort block)
     {
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         for (var x = 0; x < Chunk.Size; x++)
         for (var y = 0; y < Chunk.Size; y++)
         for (var z = 0; z < Chunk.Size; z++)
@@ -217,7 +217,7 @@ public sealed class ImportedWorldStreamingTests : IDisposable
         Assert.True(AllLoaded(), "the cells under test never loaded");
     }
 
-    private static byte CellOf(World world, Vector3 cell)
+    private static ushort CellOf(World world, Vector3 cell)
     {
         Assert.True(world.GetChunkManager().TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out _),
             $"cell {cell} is not loaded");

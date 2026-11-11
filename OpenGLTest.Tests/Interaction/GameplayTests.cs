@@ -10,7 +10,7 @@ public sealed class GameplayTests
 {
     public GameplayTests() => TestContent.EnsureLoaded();
 
-    private static ChunkManager SingleChunk(out Chunk chunk, out byte stone)
+    private static ChunkManager SingleChunk(out Chunk chunk, out ushort stone)
     {
         var manager = new ChunkManager(null!);
         chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);

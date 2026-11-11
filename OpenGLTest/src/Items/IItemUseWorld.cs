@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Interaction;
 
@@ -27,44 +28,44 @@ public interface IItemUseWorld
     bool RaycastSolid(float maxDistance, out Vector3 hit, out Vector3 normal);
 
     /// <summary>Cell contents with its fluid/state byte.</summary>
-    bool TryGetCell(int x, int y, int z, out byte id, out byte state);
+    bool TryGetCell(int x, int y, int z, out ushort id, out byte state);
 
     /// <summary>Block id at a world position; 0 (air) for unloaded chunks.</summary>
-    byte GetBlockAt(Vector3 pos);
+    ushort GetBlockAt(Vector3 pos);
 
     /// <summary>Removes a fluid cell immediately (scoop): the only fluid write that remeshes on
     /// the spot instead of on the next tick.</summary>
     bool ScoopFluidCell(Vector3 pos);
 
     /// <summary>Places a fluid source immediately (pour).</summary>
-    bool PourFluidCell(Vector3 pos, byte fluidId);
+    bool PourFluidCell(Vector3 pos, ushort fluidId);
 
     /// <summary>Grounds one block against a raycast hit face; state rides into the state byte
     /// (a fresh rock pile starts at 1) and <paramref name="placedCell"/> reports the cell that was
     /// filled, which is the hit cell itself when it held a stack the placement took over.</summary>
-    bool PlaceBlockAtFace(Vector3 hit, Vector3 normal, byte blockId, byte state, out Vector3 placedCell);
+    bool PlaceBlockAtFace(Vector3 hit, Vector3 normal, ushort blockId, byte state, out Vector3 placedCell);
 
     /// <summary>Runs after a block went down (sand topples when placed into thin air).</summary>
     void AfterPlaced(Vector3 pos);
 
     /// <summary>Units in a player-built pile cell (branch piles read state directly, pebbles mix
     /// in the worldgen hash).</summary>
-    int PileCountFor(byte blockId, int x, int y, int z, byte state);
+    int PileCountFor(ushort blockId, int x, int y, int z, byte state);
 
     /// <summary>Obsidian share of a pebble pile cell; 0 for every other pile.</summary>
-    int PileSecondaryFor(byte blockId, int x, int y, int z, byte state);
+    int PileSecondaryFor(ushort blockId, int x, int y, int z, byte state);
 
     /// <summary>Writes a pile cell's unit count.</summary>
     bool SetPileCount(Vector3 pos, byte count);
 
     /// <summary>Writes a pebble pile cell's total and obsidian share; other piles ignore the share.</summary>
-    bool SetPileComposition(Vector3 pos, byte blockId, int total, int secondary);
+    bool SetPileComposition(Vector3 pos, ushort blockId, int total, int secondary);
 
     /// <summary>Drops nothing check for a pour that displaces a fragile block.</summary>
     void UnmarkPlayerPlaced(int x, int y, int z);
 
     /// <summary>Loot pop for a block displaced by a pour (creative pours drop nothing).</summary>
-    void SpawnLoot(byte blockId, Vector3 pos);
+    void SpawnLoot(ushort blockId, Vector3 pos);
 
     /// <summary>Lit campfire entity at this cell.</summary>
     bool IsCampfireLit(int x, int y, int z);
@@ -72,25 +73,25 @@ public interface IItemUseWorld
     /// <summary>Lights the campfire entity; false when there is none to light.</summary>
     bool IgniteCampfire(int x, int y, int z);
 
-    /// <summary>Whether this cell belongs to a kiln structure that is unlit and holds fuel, so a
-    /// strike would light it. Any of the structure's eight cells answers for the whole.</summary>
+    /// <summary>Whether this cell belongs to a kiln structure that is unlit and holds fuel, or to a bloomery that is
+    /// unlit and holds ore and fuel, so a strike would light it. Any cell of the structure answers for the whole.</summary>
     bool CanIgniteKiln(int x, int y, int z);
 
-    /// <summary>Lights the kiln this cell belongs to, spending its first unit of fuel; false when
-    /// there is no kiln to light or it holds none.</summary>
+    /// <summary>Lights the kiln or bloomery this cell belongs to, spending its first unit of fuel; false when
+    /// there is none to light or it is not ready.</summary>
     bool IgniteKiln(int x, int y, int z);
 
     /// <summary>
-    /// Turns the 2x2x2 volume of <paramref name="sourceId"/> that the clicked face belongs to
+    /// Turns the volume (the anchor's size) of <paramref name="sourceId"/> that the clicked face belongs to
     /// into the <paramref name="anchorId"/> multiblock, with its opening pointed back at the
     /// player. The world picks the volume from its own camera (see
     /// <see cref="MultiblockPlacement.TryFindVolume"/>), so item code passes only the hit.
     /// False when no candidate volume is whole.
     /// </summary>
-    bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, byte sourceId, byte anchorId);
+    bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, ushort sourceId, ushort anchorId);
 
     /// <summary>Whether this block id primes into TNT instead of dropping.</summary>
-    bool IsPrimedTntBlock(byte id);
+    bool IsPrimedTntBlock(ushort id);
 
     /// <summary>Whether a TNT cell touches fluid and must refuse to prime.</summary>
     bool IsCellSubmerged(int x, int y, int z);
@@ -99,7 +100,7 @@ public interface IItemUseWorld
     bool RemoveCellForPrime(Vector3 cell);
 
     /// <summary>Spawns the live primed cube.</summary>
-    void SpawnPrimedTnt(Vector3 cell, byte blockId);
+    void SpawnPrimedTnt(Vector3 cell, ushort blockId);
 
     /// <summary>Neighbors of an edit recompute their fluid levels.</summary>
     void ScheduleFluidAround(Vector3 cell);
@@ -123,6 +124,14 @@ public interface IItemUseWorld
     /// bandage); false when they are at full health, so the use is never spent for nothing.</summary>
     bool Heal(int amount);
 
+    /// <summary>Restores <paramref name="share"/> (0..1) of the mana pool to the player the use runs for (a
+    /// mana draught); false at a full pool, so the use is never spent for nothing.</summary>
+    bool RestoreMana(float share);
+
+    /// <summary>Teaches the spell part <paramref name="keys"/> to the player the use runs for (a scroll);
+    /// false when every one is already known, so the scroll is never spent for nothing.</summary>
+    bool LearnParts(IReadOnlyList<string> keys);
+
     /// <summary>
     /// Grows the tree the targeted cell belongs to (ash on a trunk or a canopy) by a few pulses
     /// (<see cref="SimulationConfig.AshGrowthPulses"/>), through the same reactive growth
@@ -139,6 +148,14 @@ public interface IItemUseWorld
     /// use is never spent for nothing.
     /// </summary>
     bool PlantTree(string species, Vector3 hit, Vector3 normal);
+
+    /// <summary>
+    /// Wakes the boss <paramref name="entity"/> at the aimed solid <paramref name="cell"/> (the thumper's
+    /// sandworm: the cell must be desert sand, and only one may be alive). A world that simulates spawns it, a
+    /// client only judges the same rule as a prediction. False where it cannot be woken, so the use is never
+    /// spent for nothing.
+    /// </summary>
+    bool SummonBoss(string entity, Vector3 cell);
 }
 
 /// <summary>Inputs to <see cref="Item.OnUse"/> beyond the world itself: how far the aim reaches

@@ -1,0 +1,7 @@
+{
+  // Boar off the campfire: the heartier of the two meats (use.action "heal" with heals; HealItem).
+  "name": "Cooked Boar Meat",
+  "texture": "assets/textures/items/cooked_boar_meat.png",
+  "use": { "action": "heal", "seconds": 1.4 },
+  "heals": 40
+}

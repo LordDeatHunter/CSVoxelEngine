@@ -23,7 +23,7 @@ internal static class StackEmitter
     /// the ground's top face, which still draws because pebbles never occlude.
     /// </summary>
     internal static void EmitPebbles(int worldX0, int worldZ0, List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        ushort[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos)
     {
         var worldX = worldX0 + x;
@@ -83,7 +83,7 @@ internal static class StackEmitter
     /// because branch piles never occlude.
     /// </summary>
     internal static void EmitBranchPile(int worldX0, int worldZ0, List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        ushort[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos)
     {
         var worldX = worldX0 + x;
@@ -131,7 +131,7 @@ internal static class StackEmitter
     /// the cell below cannot occlude, since a layer normally rests on ground that draws its own top.
     /// </summary>
     internal static void EmitSnowLayers(int worldX0, int worldY0, int worldZ0, List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        ushort[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos)
     {
         var worldX = worldX0 + x;

@@ -1,0 +1,9 @@
+{
+  "result": "item/flint_arrow",
+  "count": 4,
+  "ingredients": [
+    { "item": "item/branch", "count": 1 },
+    { "item": "item/flint", "count": 1 },
+    { "item": "item/bone", "count": 1 }
+  ]
+}

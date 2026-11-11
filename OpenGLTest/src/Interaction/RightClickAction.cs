@@ -4,13 +4,14 @@ using VoxelEngine.Items;
 using VoxelEngine.Magic;
 using VoxelEngine.Networking;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// The right-click action: the chain that hands a right-click to the first thing that claims it (a
-/// station or an openable block, then a held staff's cast, then the held item's own use, otherwise
+/// station or an openable block, then a spell table, then a held staff's cast, then the held item's own use, otherwise
 /// a placement), for the
 /// local player or a server's player, plus the local player's timed use charge. Owned by
 /// <see cref="World"/>; main thread only.
@@ -39,14 +40,15 @@ internal sealed class RightClickAction
     }
 
     private float _useChargeSeconds;
-    private byte _useItemId;
+    private ushort _useItemId;
 
     // The slot the last local cast went out on, which a client's Cast intent names
     private int _castSlot;
 
     /// <summary>
     /// Right-click: runs the first thing that claims the click - a campfire, quern, kiln or cast
-    /// mold interaction, then a held staff's cast of its selected spell slot (through
+    /// mold interaction or an openable block, then a spell table (claimed with no side effect unless
+    /// a block is in hand), then a held staff's cast of its selected spell slot (through
     /// <see cref="SpellCaster"/>; a staff never places, and a client raises a
     /// <see cref="NetIntentKind.Cast"/> intent for its server to bill and run), then the selected
     /// slot's own <see cref="Item.OnUse"/> (a bucket scoops
@@ -57,9 +59,29 @@ internal sealed class RightClickAction
     /// here owned it - a mudball aimed at a lit campfire cooks instead of being thrown.
     /// False unless the world is playing: nothing may edit an unloaded world.
     /// </summary>
-    internal bool TryUseSelected(float maxDistance)
+    internal bool TryUseSelected(float maxDistance) => TryUseSelected(maxDistance, out _);
+
+    /// <summary>
+    /// <see cref="TryUseSelected(float)"/> that also hands back what claimed the click, so the
+    /// caller can open the spell builder on a <see cref="RightClickOutcome.SpellTable"/> claim (a
+    /// client raises a plain Use intent for it, like any other non-placement claim).
+    /// </summary>
+    internal bool TryUseSelected(float maxDistance, out RightClickOutcome outcome) =>
+        UseLocal(maxDistance, beginTimedUse: false, out outcome);
+
+    /// <summary>
+    /// The input's right-click: <see cref="TryUseSelected(float, out RightClickOutcome)"/>, except that a held item with
+    /// a timed use (<see cref="Item.UseSeconds"/>) starts charging once no block, station or staff has claimed the click
+    /// (<see cref="RightClickOutcome.UseCharge"/>), so a chest, door or altar under the crosshair always wins over a bandage.
+    /// </summary>
+    internal bool TryUseOrBeginCharge(float maxDistance, out RightClickOutcome outcome) =>
+        UseLocal(maxDistance, beginTimedUse: true, out outcome);
+
+    private bool UseLocal(float maxDistance, bool beginTimedUse, out RightClickOutcome outcome)
     {
-        var claimed = TryUseSelected(maxDistance, LocalPlayer.LocalContext(), out var outcome);
+        var claimed = TryUseSelected(maxDistance, LocalPlayer.LocalContext(), out outcome, beginTimedUse: beginTimedUse);
+        // A charge that just began is no use yet: its completion runs the click again, and that one raises the intent
+        if (outcome == RightClickOutcome.UseCharge) return true;
         // A connected client predicted the click; the server replays it for this player. A
         // placement names the face it went against (the server checks the player can see it), any
         // other claim only the cell under the crosshair, which scopes the correction sent back.
@@ -86,7 +108,7 @@ internal sealed class RightClickAction
     /// placement fallback (a server replaying a click the client said was not a placement).
     /// </summary>
     internal bool TryUseSelected(float maxDistance, PlayerContext player, out RightClickOutcome outcome,
-        bool allowPlace = true)
+        bool allowPlace = true, bool beginTimedUse = false)
     {
         outcome = RightClickOutcome.None;
         if (!IsPlaying) return false;
@@ -101,11 +123,48 @@ internal sealed class RightClickAction
         }
 
         if (Interactions.TryCookOrCollect(maxDistance, player) || Interactions.TryQuernInteract(maxDistance, player)
-                                                  || Interactions.TryKilnInteract(maxDistance, player) || Interactions.TryCastInteract(maxDistance, player)
+                                                  || Interactions.TryKilnInteract(maxDistance, player) || Interactions.TryBloomeryInteract(maxDistance, player)
+                                                  || Interactions.TryAnvilInteract(maxDistance, player) || Interactions.TryCastInteract(maxDistance, player)
                                                   || Interactions.TryToggleOpenable(maxDistance, player))
         {
             LocalPlayer.PunchSwing();
             outcome = RightClickOutcome.Station;
+            return true;
+        }
+        // A chest claims the click like the spell table does: opening it is not a strike and changes nothing here
+        if (Interactions.TryOpenChest(maxDistance, player, out var chestCell))
+        {
+            LastContainerCell = chestCell;
+            outcome = RightClickOutcome.Container;
+            return true;
+        }
+        // A spell table claims the click before the staff casts; opening the builder is not a strike
+        if (Interactions.TryOpenSpellTable(maxDistance, player))
+        {
+            outcome = RightClickOutcome.SpellTable;
+            return true;
+        }
+        // A waystone claims it the same way: discovering it and opening its screen is the local player's own business
+        if (Interactions.TryOpenWaystone(maxDistance, player, out var waystoneCell))
+        {
+            LastWaystoneCell = waystoneCell;
+            outcome = RightClickOutcome.Waystone;
+            return true;
+        }
+        // A hammer on an anvil holding a metal stack claims it the same way: the local player opens the recipe list
+        if (Interactions.TryOpenForge(maxDistance, player, out var forgeCell))
+        {
+            LastForgeCell = forgeCell;
+            outcome = RightClickOutcome.Forge;
+            return true;
+        }
+        // A tower altar claims it too: the authoritative world begins the ritual (singleplayer, or a server replaying a
+        // client's Use intent through this same chain), a client only judges it from its mirror
+        if (Interactions.TryUseAltar(maxDistance, player, out var altarCell))
+        {
+            LastAltarCell = altarCell;
+            LastAltarVerdict = _world.UseAltar(altarCell);
+            outcome = RightClickOutcome.Altar;
             return true;
         }
         var item = player.Inventory.HeldItem;
@@ -116,8 +175,14 @@ internal sealed class RightClickAction
             var slot = HeldStaff.SelectedSlot(player.Inventory);
             if (Caster.CastFor(player, slot, Caster.LocalPacing, _world.Now, 0) != CastVerdict.Cast) return false;
             _castSlot = slot;
-            LocalPlayer.PunchSwing();
+            LocalPlayer.CastSwing();
             outcome = RightClickOutcome.Cast;
+            return true;
+        }
+        // A timed use charges only once nothing above claimed the click
+        if (beginTimedUse && TryBeginUseCharge(player.Inventory))
+        {
+            outcome = RightClickOutcome.UseCharge;
             return true;
         }
         if (item == null || item is BlockItem || item.UseAction == ItemUseAction.None)
@@ -131,6 +196,22 @@ internal sealed class RightClickAction
         return true;
     }
 
+    /// <summary>The cell of the chest the newest <see cref="RightClickOutcome.Container"/> claim opened.</summary>
+    internal System.Numerics.Vector3 LastContainerCell { get; private set; }
+
+    /// <summary>The cell of the waystone the newest <see cref="RightClickOutcome.Waystone"/> claim named.</summary>
+    internal System.Numerics.Vector3 LastWaystoneCell { get; private set; }
+
+    /// <summary>The cell of the anvil the newest <see cref="RightClickOutcome.Forge"/> claim named.</summary>
+    internal System.Numerics.Vector3 LastForgeCell { get; private set; }
+
+    /// <summary>The cell of the altar the newest <see cref="RightClickOutcome.Altar"/> claim named.</summary>
+    internal System.Numerics.Vector3 LastAltarCell { get; private set; }
+
+    /// <summary>What the newest <see cref="RightClickOutcome.Altar"/> claim came to: the ritual's start on the
+    /// authoritative side, a prediction from the mirror on a client.</summary>
+    internal AltarVerdict LastAltarVerdict { get; private set; }
+
     /// <summary>Whether a timed use is charging (see <see cref="TryBeginUseCharge"/>).</summary>
     internal bool IsUseCharging { get; private set; }
 
@@ -140,12 +221,14 @@ internal sealed class RightClickAction
     /// early (<see cref="CancelUseCharge"/>) spends nothing. False for anything else, which uses
     /// on the click or charges a throw. False unless the world is playing.
     /// </summary>
-    internal bool TryBeginUseCharge()
+    internal bool TryBeginUseCharge() => TryBeginUseCharge(Inventory);
+
+    private bool TryBeginUseCharge(Inventory holder)
     {
         if (!IsPlaying) return false;
         if (IsUseCharging) return true;
-        var id = Inventory.SelectedBlockId;
-        if (id == 0 || Inventory.SelectedCount <= 0) return false;
+        var id = holder.SelectedBlockId;
+        if (id == 0 || holder.SelectedCount <= 0) return false;
         if (ItemRegistry.TryGet(id) is not { } item || item.UseSeconds <= 0f) return false;
         IsUseCharging = true;
         _useChargeSeconds = 0f;

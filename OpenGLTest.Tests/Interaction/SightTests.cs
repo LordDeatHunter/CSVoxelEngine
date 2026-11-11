@@ -12,7 +12,7 @@ public sealed class SightTests
 {
     public SightTests() => TestContent.EnsureLoaded();
 
-    private static ChunkManager Row(byte midId)
+    private static ChunkManager Row(ushort midId)
     {
         var (manager, center) = MeshTestWorld.WalledArea();
         MeshTestWorld.FillAll(center, BlockType.Air);

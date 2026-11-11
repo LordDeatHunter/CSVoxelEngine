@@ -4,17 +4,21 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.StatusEffects;
+using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Juice;
+using VoxelEngine.Particles.Heave;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.Particles;
 
 /// <summary>
 /// The world's ambient effects: the burning cells the fire particles and the warm point lights
 /// share (<see cref="FireCells"/>), steam off hardening lava and hot springs, the embers over
-/// lava vents, the torch flames, the particles of the mobs' status effects, the local player's
+/// lava vents, the torch flames, the particles of the mobs' status effects, the cave biome motes, the local player's
 /// bubbles, the water splashes of every body and the camera shake of a blast. Never gameplay: nothing here changes the simulation. The fire-cell
 /// and lava-vent gathers run on a headless server too, while the splashes, bubbles and torch flames
 /// skip it. Owned by <see cref="World"/>, which keeps the particle systems it feeds and draws them;
@@ -62,7 +66,7 @@ internal sealed class AmbientEffects
         _goblins = goblins;
     }
 
-    /// <summary>Every burning cell this frame (campfires, lit kilns and
+    /// <summary>Every burning cell this frame (campfires, lit kilns, lit bloomeries and
     /// goblin torches), feeding both the fire particles and the warm point lights.</summary>
     internal IReadOnlyList<Vector3> FireCells => _fireCells;
 
@@ -77,6 +81,7 @@ internal sealed class AmbientEffects
         _fireCells.Clear();
         _fireCells.AddRange(_campfires.LitCells);
         _fireCells.AddRange(_kilns.LitCells);
+        _fireCells.AddRange(_world.Smithing.Bloomeries.LitCells);
     }
 
     /// <summary>Adds every goblin's lit torch to <see cref="_fireCells"/>, right after
@@ -175,14 +180,141 @@ internal sealed class AmbientEffects
         }
     }
 
+    // The cave motes owed but not yet spawned (UpdateCaveMotes), so the rate holds at any frame rate
+    private float _caveMoteDebt;
+
+    /// <summary>
+    /// The drifting motes of the cave biome at the eye (CB-3, <see cref="CaveClimate.Motes"/>: embers in the
+    /// magma deep, sparks in crystal and fungal caves, steam glints in a frozen echo, dust in a desert one):
+    /// at the biome's rate, owed across frames so the rate is independent of the frame rate and capped at
+    /// <see cref="ParticleConfig.CaveMoteMaxPerFrame"/>, each at a random open cell within
+    /// <see cref="ParticleConfig.CaveMoteRadius"/> of the eye (a point inside a solid block is tried again up to
+    /// <see cref="ParticleConfig.CaveMoteSpawnTries"/> times), puffed on the campfire particle instance.
+    /// Cosmetic: singleplayer, and a client from its mirrored cave biome, never a headless server.
+    /// </summary>
+    internal void UpdateCaveMotes(float deltaTime, CaveBiome biome)
+    {
+        if (_serverMode || deltaTime <= 0f)
+            return;
+        var (kind, rate) = CaveClimate.Motes(biome);
+        if (kind is not { } moteKind)
+        {
+            _caveMoteDebt = 0f;
+            return;
+        }
+
+        _caveMoteDebt += deltaTime * rate;
+        var owed = (int)_caveMoteDebt;
+        if (owed <= 0)
+            return;
+        _caveMoteDebt -= owed;
+        owed = Math.Min(owed, ParticleConfig.CaveMoteMaxPerFrame);
+
+        var eye = Camera.RenderEye;
+        const float radius = ParticleConfig.CaveMoteRadius;
+        for (var m = 0; m < owed; m++)
+        {
+            for (var attempt = 0; attempt < ParticleConfig.CaveMoteSpawnTries; attempt++)
+            {
+                var offset = new Vector3(Random.Shared.NextSingle() * 2f - 1f, Random.Shared.NextSingle() * 2f - 1f,
+                    Random.Shared.NextSingle() * 2f - 1f) * radius;
+                if (offset.LengthSquared() > radius * radius) continue;
+                var point = eye + offset;
+                var block = _chunkManager.GetBlockGlobal((int)MathF.Floor(point.X), (int)MathF.Floor(point.Y),
+                    (int)MathF.Floor(point.Z));
+                if (BlockType.IsSolid(block)) continue;
+                _fire.Puff(point, 1, ParticleConfig.CaveMoteSpread, moteKind);
+                break;
+            }
+        }
+    }
+
+    // The altar tops of the towers whose ritual runs this frame (UpdateRitualEffects), and its two clocks
+    private readonly List<Vector3> _ritualAltars = [];
+    private float _ritualSparkDebt;
+    private float _ritualShakeClock;
+
+    /// <summary>The Skeleton King's slams heaving the ground (<see cref="UpdateKingEffects"/>), drawn by the entity pass.</summary>
+    internal GroundHeave Heave { get; } = new();
+
+    /// <summary>
+    /// The Skeleton King's shows: the altar ritual's (<see cref="UpdateRitualEffects"/>) and each slam's, whose club,
+    /// landed within <see cref="JuiceConfig.SlamHeaveEffectRangeBlocks"/> of the eye on the authoritative world or a
+    /// client's mirror (<see cref="SkeletonKing.TryTakeSlamLanded"/>), heaves the ground round the strike
+    /// (<see cref="GroundHeave"/>) and jolts the camera by its distance. Cosmetic: singleplayer and a client, never a
+    /// headless server.
+    /// </summary>
+    internal void UpdateKingEffects(float deltaTime)
+    {
+        if (_serverMode || deltaTime <= 0f)
+            return;
+        UpdateRitualEffects(deltaTime);
+
+        var eye = Camera.RenderEye;
+        var kings = _world.SkeletonKings;
+        for (var i = 0; i < kings.Count; i++)
+        {
+            if (!kings[i].TryTakeSlamLanded(out var strike)) continue;
+            var distance = Vector3.Distance(strike, eye);
+            if (distance > JuiceConfig.SlamHeaveEffectRangeBlocks) continue;
+            Heave.Raise(_chunkManager, strike);
+            Camera.AddShake(ShakeFalloff.Trauma(JuiceConfig.SlamShakeStrength, JuiceConfig.SlamShakeNearBlocks,
+                JuiceConfig.SlamShakeRangeBlocks, distance));
+        }
+        Heave.Update(deltaTime);
+    }
+
+    /// <summary>
+    /// The altar ritual's show: every tower altar whose ritual runs (<see cref="Simulation.Tower.TowerManager.RitualAltars"/>,
+    /// on the authoritative world or a client's mirrored records) within
+    /// <see cref="MobConfig.SkeletonKingRitualEffectRangeBlocks"/> of the eye throws sparks off its top at
+    /// <see cref="MobConfig.SkeletonKingRitualSparksPerSecond"/> on the campfire particle instance, and the nearest one
+    /// rumbles the camera every <see cref="MobConfig.SkeletonKingRitualShakePulseSeconds"/>, by its distance
+    /// (<see cref="ShakeFalloff"/>).
+    /// </summary>
+    private void UpdateRitualEffects(float deltaTime)
+    {
+        _ritualAltars.Clear();
+        _world.Towers.RitualAltars(_ritualAltars);
+        if (_ritualAltars.Count == 0)
+        {
+            _ritualSparkDebt = 0f;
+            _ritualShakeClock = 0f;
+            return;
+        }
+
+        var eye = Camera.RenderEye;
+        const float reach = MobConfig.SkeletonKingRitualEffectRangeBlocks * MobConfig.SkeletonKingRitualEffectRangeBlocks;
+        _ritualSparkDebt += MobConfig.SkeletonKingRitualSparksPerSecond * deltaTime;
+        var sparks = (int)_ritualSparkDebt;
+        _ritualSparkDebt -= sparks;
+        var nearest = float.MaxValue;
+        for (var i = 0; i < _ritualAltars.Count; i++)
+        {
+            var top = _ritualAltars[i];
+            var d2 = Vector3.DistanceSquared(top, eye);
+            if (d2 > reach) continue;
+            nearest = Math.Min(nearest, d2);
+            if (sparks > 0)
+                _fire.Puff(top, sparks, 0.8f, FireParticleKind.Spark);
+        }
+
+        _ritualShakeClock += deltaTime;
+        if (_ritualShakeClock < MobConfig.SkeletonKingRitualShakePulseSeconds || nearest == float.MaxValue) return;
+        _ritualShakeClock = 0f;
+        Camera.AddShake(ShakeFalloff.Trauma(MobConfig.SkeletonKingRitualShakeStrength,
+            MobConfig.SkeletonKingRitualShakeNearBlocks, MobConfig.SkeletonKingRitualEffectRangeBlocks,
+            MathF.Sqrt(nearest)));
+    }
+
     /// <summary>Shakes the local camera for a TNT blast at <paramref name="center"/>, by its distance
     /// (<see cref="ShakeFalloff"/>). Cosmetic: singleplayer and a client.</summary>
     internal void ShakeForBlast(Vector3 center) =>
         Camera.AddShake(ShakeFalloff.Trauma(JuiceConfig.BlastShakeStrength, TntManager.BlastRadius,
             JuiceConfig.BlastShakeRangeBlocks, Vector3.Distance(Camera.Position, center)));
 
-    /// <summary>The live water ripple rings every splash crossing starts (<see cref="UpdateSplashes"/>),
-    /// drawn by <see cref="RippleRenderer"/>.</summary>
+    /// <summary>The live water ripples every splash crossing starts (<see cref="UpdateSplashes"/>), shaded
+    /// by the water itself (<see cref="RippleField"/>).</summary>
     internal RippleSystem Ripples { get; } = new();
 
     // The local player's water-splash memory (its swim state, Camera.IsInWater)
@@ -193,7 +325,8 @@ internal sealed class AmbientEffects
     /// (<see cref="WaterSplash.Track"/>): the local player by its swim state, and the mobs, drops,
     /// projectiles, falling cubes and primed TNT by their lowest point. A client's mobs and TNT are
     /// mirrors that keep their trackers across snapshots and splash from the snapshot positions; its
-    /// drops and falling cubes are rebuilt each snapshot, so they never do. Cosmetic: never on a server.
+    /// drops and falling cubes are rebuilt each snapshot, so they never do. The same walk over the mobs advances
+    /// what only the eye sees of each (<see cref="Mob.AnimateCosmetics"/>). Cosmetic: never on a server.
     /// </summary>
     internal void UpdateSplashes(float deltaTime)
     {
@@ -206,6 +339,7 @@ internal sealed class AmbientEffects
         {
             WaterSplash.Track(mob.Splash, mob.Position - new Vector3(0f, mob.BodyHalfHeight, 0f), deltaTime,
                 mob.BodyHalfExtent / PlayerPhysics.PlayerRadius, _chunkManager, _debris, ripples: Ripples);
+            mob.AnimateCosmetics(deltaTime, _chunkManager);
         }
         // Index loops over the read-only lists, so a frame allocates no enumerator
         var drops = _dropManager.Drops;

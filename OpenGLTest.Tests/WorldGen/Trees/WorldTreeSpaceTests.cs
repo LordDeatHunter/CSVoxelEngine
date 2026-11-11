@@ -26,7 +26,7 @@ public sealed class WorldTreeSpaceTests
         return chunks;
     }
 
-    private static void Write(ChunkManager chunks, (int X, int Y, int Z) cell, byte id, byte state = 0) =>
+    private static void Write(ChunkManager chunks, (int X, int Y, int Z) cell, ushort id, byte state = 0) =>
         StampedTree.WriteCell(chunks, cell, id, state);
 
     [Fact]
@@ -55,7 +55,7 @@ public sealed class WorldTreeSpaceTests
     {
         var species = Leafy;
         var other = StampedTree.WorldgenSpecies.First(s => s.HasLeaves && s.LeavesId != species.LeavesId);
-        var fluid = (byte)Enumerable.Range(1, 255).First(id => BlockType.ById[id] != null && BlockType.IsFluid((byte)id));
+        var fluid = BlockType.Types.Keys.Order().First(BlockType.IsFluid);
 
         foreach (var (id, state) in new[]
                  {
@@ -119,9 +119,8 @@ public sealed class WorldTreeSpaceTests
     public void CoverIsPlantableButNotFree()
     {
         var species = Leafy;
-        var cover = Enumerable.Range(1, 255)
-            .Where(id => BlockType.ById[id] != null)
-            .SelectMany(id => Enumerable.Range(0, 256).Select(state => (Id: (byte)id, State: (byte)state)))
+        var cover = BlockType.Types.Keys.Order()
+            .SelectMany(id => Enumerable.Range(0, 256).Select(state => (Id: id, State: (byte)state)))
             .First(c => BlockType.IsReplaceableByPlacement(c.Id, c.State));
 
         var chunks = Loaded();

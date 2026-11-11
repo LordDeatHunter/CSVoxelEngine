@@ -1,5 +1,8 @@
+using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
@@ -7,6 +10,7 @@ using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;
+using VoxelEngine.Content.Stations;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Entities;
@@ -32,113 +36,140 @@ namespace VoxelEngine;
 public sealed record BlockType
 {
     /// <summary>Air is not a registered block; id 0 always means "nothing here".</summary>
-    public const byte Air = 0;
+    public const ushort Air = 0;
 
     /// <summary>Damage a block takes before it breaks; one hit deals the held tool's power.
     /// See <see cref="Mining"/>.</summary>
     public const float DefaultHardness = 5f;
     public const float DefaultFriction = 0.999f;
 
-    /// <summary>Every registered block by id; null where no block owns that id.</summary>
-    public static readonly BlockType?[] ById = new BlockType?[256];
+    /// <summary>Every registered block by id; null where no block owns that id. Like every per-id table here it
+    /// holds 256 placeholder entries until <see cref="BlockTables.Allocate"/> sizes it to the loaded id count.</summary>
+    public static BlockType?[] ById { get; internal set; } = new BlockType?[256];
 
     /// <summary>Light emitted by each block id (0-15), indexed like <see cref="ById"/>.</summary>
-    public static readonly byte[] Emission = new byte[256];
+    public static byte[] Emission { get; internal set; } = new byte[256];
 
     /// <summary>Block-light palette slot of each block id's emitted color (0 = the default
     /// warm color), indexed like <see cref="ById"/>; see <see cref="BlockLightPalette"/>.</summary>
-    public static readonly byte[] LightSlot = new byte[256];
+    public static byte[] LightSlot { get; internal set; } = new byte[256];
 
     /// <summary>Whether voxel light travels through each block id; see Chunk's light passes.</summary>
-    public static readonly bool[] PassesLightById = new bool[256];
+    public static bool[] PassesLightById { get; internal set; } = new bool[256];
 
     /// <summary>Every registered block keyed by id, for code that enumerates types.</summary>
-    public static IReadOnlyDictionary<byte, BlockType> Types { get; internal set; } =
-        new Dictionary<byte, BlockType>();
+    public static IReadOnlyDictionary<ushort, BlockType> Types { get; internal set; } =
+        new Dictionary<ushort, BlockType>();
 
-    // bool[256] mirrors of the per-block flags the mesher asks about by neighbor id
-    internal static readonly bool[] SolidById = new bool[256];
-    internal static readonly bool[] CollidesByHitboxById = new bool[256];
-    internal static readonly bool[] OccludesById = new bool[256];
-    internal static readonly bool[] CastsAoById = new bool[256];
+    // Flat mirrors of the per-block flags the mesher asks about by neighbor id
+    internal static bool[] SolidById = new bool[256];
+    internal static bool[] CollidesByHitboxById = new bool[256];
+    internal static bool[] OccludesById = new bool[256];
+    internal static bool[] CastsAoById = new bool[256];
 
     // Stack blocks whose solidity depends on their state byte (snow layers): the state at which
     // they become solid, or 0 when solidity is state-independent like every other block.
-    internal static readonly byte[] StackSolidStateById = new byte[256];
+    internal static byte[] StackSolidStateById = new byte[256];
 
     // How fast the player moves through each block while inside it; 0 is a solid collider.
-    internal static readonly float[] MovementSpeedById = new float[256];
-    internal static readonly float[] FrictionById = new float[256];
+    internal static float[] MovementSpeedById = new float[256];
+    internal static float[] FrictionById = new float[256];
 
     // Natural pebble scatter density multiplier of each block as an exposed surface: 0 means
     // this surface never grows pebbles. See PebbleGenerator.
-    internal static readonly float[] PebbleWeightById = new float[256];
+    internal static float[] PebbleWeightById = new float[256];
 
     // Whether a sprinting footfall on the block kicks up dust (loose ground). See GroundDust.
-    internal static readonly bool[] FootstepDustById = new bool[256];
+    internal static bool[] FootstepDustById = new bool[256];
 
     // Whether a body landing on the block is sprung back up (a slime block, see PlayerPhysics).
-    internal static readonly bool[] BounceById = new bool[256];
+    internal static bool[] BounceById = new bool[256];
+
+    // Whether a body landing on the block takes no fall damage (a cloud block, see FallTracker).
+    internal static bool[] SoftLandingById = new bool[256];
+
+    // The top share of the cell a player body sinks into (0 = a plain collider), see SinkLayer.
+    internal static float[] SinkById = new float[256];
 
     // Whether the block stops a line of sight (a punch, a throw check); a plant never does.
-    internal static readonly bool[] BlocksSightById = new bool[256];
+    internal static bool[] BlocksSightById = new bool[256];
 
     // Damage a body touching the block takes per contact tick (a cactus); 0 is harmless.
-    internal static readonly float[] ContactDamageById = new float[256];
+    internal static float[] ContactDamageById = new float[256];
 
     // Whether the block is the reworked trees' wood (the tree_wood renderer), whose thickness
     // and parent direction live in the state byte. Read per voxel by the mesher's connection
     // test and per DDA step by the raycast, so flat like the other flags.
-    internal static readonly bool[] TreeWoodById = new bool[256];
+    internal static bool[] TreeWoodById = new bool[256];
+
+    // Whether the block is solid and its model fills the whole cell, so every face is a full square: what a
+    // supportFullFace block mounts on. Tree wood is answered by its state instead (HoldsFullFace).
+    internal static bool[] FullCubeById = new bool[256];
 
     // Whether the tree wood belongs to a species whose trunk rim is "pixel": its outer shells
     // bevel their exposed corners (TreeWoodShape.RimBoxes). Set from the compiled tree species,
     // read per cell by the mesher, the raycast and body collision.
-    internal static readonly bool[] PixelRimById = new bool[256];
+    internal static bool[] PixelRimById = new bool[256];
 
     // Whether the block is a pane (the pane renderer), which reaches arms toward neighboring
     // panes: read per neighbor by the pane emitter and the pane shape
-    internal static readonly bool[] PaneById = new bool[256];
+    internal static bool[] PaneById = new bool[256];
 
     // Each pane's post, arm and rail dimensions (its "pane" JSON), null for every other block:
     // read per neighbor by the pane emitter and the pane shape, beside PaneById
-    internal static readonly PaneProfile?[] PaneProfileById = new PaneProfile?[256];
+    internal static PaneProfile?[] PaneProfileById = new PaneProfile?[256];
 
     // Whether the binary greedy mesher may merge this block's faces: a plain full cube whose
     // six faces are the untransformed cube faces (see ModelBakeSteps.BakesGreedy). Anything
     // else goes through the per-quad scalar path.
-    internal static readonly bool[] GreedyById = new bool[256];
+    internal static bool[] GreedyById = new bool[256];
 
     // The fluid simulation asks these of every neighbor cell it looks at, so they get the
     // same flat-array treatment as the mesher's flags
-    internal static readonly bool[] FluidById = new bool[256];
-    internal static readonly bool[] ReplaceableById = new bool[256];
+    internal static bool[] FluidById = new bool[256];
+    internal static bool[] ReplaceableById = new bool[256];
 
     // Whether a placement takes this block's own cell over instead of filling the neighbor
     // across the hit face (layered snow); only ever fires on a non-solid state.
-    internal static readonly bool[] ReplaceableByPlacementById = new bool[256];
+    internal static bool[] ReplaceableByPlacementById = new bool[256];
 
     // Per-fluid simulation tuning (see BlockDefinition.FlowDefinition): ticks between updates,
     // sideways spread range, and whether adjacent sources multiply. Water's defaults.
-    internal static readonly byte[] FluidTickDivisorById = new byte[256];
-    internal static readonly byte[] FluidRangeById = new byte[256];
-    internal static readonly bool[] FluidInfiniteById = new bool[256];
+    internal static byte[] FluidTickDivisorById = new byte[256];
+    internal static byte[] FluidRangeById = new byte[256];
+    internal static bool[] FluidInfiniteById = new bool[256];
 
     // Contact hardening: a fluid cell holding HardensTouchingId next to it becomes HardensToId
     // (lava beside water becomes cobblestone). Zero means the fluid never hardens.
-    internal static readonly byte[] HardensToById = new byte[256];
-    internal static readonly byte[] HardensTouchingById = new byte[256];
+    internal static ushort[] HardensToById = new ushort[256];
+    internal static ushort[] HardensTouchingById = new ushort[256];
 
     // Status-effect block interaction (StatusEffectBlockRule): whether an igniting effect burns
     // the block away, the solid a freezing effect turns a fluid source into, and the fluid a
     // thawing effect melts a block back into. Zero means the block never freezes or melts.
-    internal static readonly bool[] FlammableById = new bool[256];
-    internal static readonly byte[] FreezesToById = new byte[256];
-    internal static readonly byte[] MeltsToById = new byte[256];
+    internal static bool[] FlammableById = new bool[256];
+    internal static ushort[] FreezesToById = new ushort[256];
+    internal static ushort[] MeltsToById = new ushort[256];
+
+    // Blocks no gameplay path may remove (IsUnbreakable); only Chunk.CollapseWriteAt replaces one
+    internal static bool[] UnbreakableById = new bool[256];
+
+    // Blocks that hide the sky from the cells under them in a light volume (coversSky: the battle
+    // tower's bricks); ChunkLighting reads it per cell while it scans a covered neighborhood
+    internal static bool[] CoversSkyById = new bool[256];
+
+    /// <summary>The ids whose <see cref="CoversSkyById"/> is true, as a vectorized search set over a ushort
+    /// id span (the chars are the ids reinterpreted; empty until the blocks load).</summary>
+    internal static SearchValues<char> SkyCoverChars = SearchValues.Create(ReadOnlySpan<char>.Empty);
+
+    /// <summary>Whether <paramref name="blocks"/> holds any <c>coversSky</c> block. Vectorized
+    /// and allocation-free, so a whole chunk's ids are cheap to scan.</summary>
+    internal static bool ContainsSkyCover(ReadOnlySpan<ushort> blocks) =>
+        MemoryMarshal.Cast<ushort, char>(blocks).IndexOfAny(SkyCoverChars) >= 0;
 
     // Gravity checks run per block edit (not per voxel), but the flat shape keeps the
     // support test a single array read like the other per-id questions
-    internal static readonly bool[] FallsById = new bool[256];
+    internal static bool[] FallsById = new bool[256];
 
     /// <summary>String id: the block's file name under <c>assets/data/blocks</c>.</summary>
     public required string Name { get; init; }
@@ -146,8 +177,8 @@ public sealed record BlockType
     /// <summary>Display name for inventory rows and preview headings.</summary>
     public required string DisplayName { get; init; }
 
-    /// <summary>Byte id assigned at load; what chunk storage holds.</summary>
-    public required byte Id { get; init; }
+    /// <summary>Id assigned at load; what chunk storage holds.</summary>
+    public required ushort Id { get; init; }
 
     /// <summary>Sound group played when this block is mined or hit (see <see cref="SfxManager"/>),
     /// resolved from the block's <c>sfx</c> JSON and defaulting to
@@ -191,6 +222,14 @@ public sealed record BlockType
     /// <see cref="PlayerConfig.SlimeBlockBounceRestitution"/>. Read through
     /// <see cref="BouncesAt"/>.</summary>
     public bool Bounces { get; init; }
+
+    /// <summary>Whether a body landing on the block takes no fall damage (a cloud block). Read
+    /// through <see cref="SoftLandingAt"/>.</summary>
+    public bool SoftLanding { get; init; }
+
+    /// <summary>The top share of the cell a player body sinks into slowly (0 for a plain collider);
+    /// see <see cref="VoxelEngine.Player.SinkLayer"/>. Read through <see cref="SinkOf"/>.</summary>
+    public float Sink { get; init; }
 
     /// <summary>Whether the block stops a line of sight (a punch, a throw check); a plant never
     /// does. Read through <see cref="BlocksSightAt"/> by the sight-only ray walk.</summary>
@@ -298,25 +337,51 @@ public sealed record BlockType
     /// other renderer.</summary>
     public PaneProfile? Pane { get; init; }
 
-    /// <summary>Block filling the seven non-anchor cells of this multiblock's 2x2x2 volume, or
+    /// <summary>Block filling the non-anchor cells of this multiblock's volume, or
     /// 0 when the block is not a <see cref="BlockRenderer.Multiblock"/> anchor. Resolved after
     /// every block is loaded, since the part's own file may come later alphabetically.</summary>
-    public byte MultiblockPartId { get; internal set; }
+    public ushort MultiblockPartId { get; internal set; }
 
     /// <summary>Plain block this multiblock is built from and reverts to (mud bricks for the
     /// kiln), or 0 when the block is not a multiblock anchor.</summary>
-    public byte MultiblockSourceId { get; internal set; }
+    public ushort MultiblockSourceId { get; internal set; }
 
-    /// <summary>Whether this multiblock anchor is a kiln: it holds fuel, can be lit and is
-    /// swept for structural damage. Only ever set on a <see cref="BlockRenderer.Multiblock"/>
-    /// block.</summary>
-    public bool Kiln { get; init; }
+    /// <summary>Edge length in cells of this multiblock anchor's cubic volume (its
+    /// <c>multiblock.size</c>, 2 for the kiln), which every structure rule and the model's
+    /// rotation center read; 0 when the block is not a multiblock anchor.</summary>
+    public int MultiblockSize { get; init; }
+
+    /// <summary>The kiln profile of this multiblock anchor (its <c>kiln</c> object), or null when
+    /// it is not a kiln. A kiln holds fuel, can be lit and is swept for structural damage. Only
+    /// ever set on a <see cref="BlockRenderer.Multiblock"/> block.</summary>
+    public KilnProfile? Kiln { get; init; }
+
+    /// <summary>The bloomery profile of this multiblock anchor (its <c>bloomery</c> object), or null when it is not a
+    /// bloomery. Only ever set on a <see cref="BlockRenderer.Multiblock"/> block.</summary>
+    public BloomeryProfile? Bloomery { get; init; }
+
+    /// <summary>The anvil profile of this block (its <c>anvil</c> object), or null when it is not an anvil.</summary>
+    public AnvilProfile? Anvil { get; init; }
+
+    /// <summary>The chest profile of this block (its <c>chest</c> object), or null when it is not a chest. A chest is a
+    /// block entity: it holds stacks, spills them when it breaks and, for a ruin chest, rolls its loot on first use.</summary>
+    public ChestProfile? Chest { get; init; }
+
+    /// <summary>Whether this block is a spell builder station (the spell table): a right-click
+    /// with a staff in hand opens the spell builder UI client-side. It has no block entity and
+    /// keeps no state of its own.</summary>
+    public bool SpellBuilder { get; init; }
+
+    /// <summary>Whether this block is a waystone: discovered by a right-click, a teleport destination once
+    /// discovered. Its name, first discoverer and lost flag live in <see cref="World.Waystones"/>, created on first
+    /// use; the block keeps no state of its own.</summary>
+    public bool Waystone { get; init; }
 
     /// <summary>
     /// The baked model pre-rotated to each of the four horizontal facings, indexed by facing 0..3
     /// (<c>[0]</c> is <see cref="BakedModel"/> itself, the authored north-facing bake), which the
     /// mesher picks by the state byte's low two bits. Null for every block but a
-    /// <see cref="BlockRenderer.Multiblock"/> anchor (turned about its 2x2x2 volume, see
+    /// <see cref="BlockRenderer.Multiblock"/> anchor (turned about its own volume, see
     /// <see cref="MultiblockShape.Rotate"/>) and a <see cref="HasHorizontalFacing"/> block
     /// (turned about its own cell, see <see cref="HorizontalFacing.RotateModel"/>).
     /// </summary>
@@ -354,6 +419,10 @@ public sealed record BlockType
     /// (a pebble, a plant) is displaced and drops its loot. It still pops when the block holding
     /// it up is mined, which is <see cref="BlockSupport"/>'s rule, not this one.</summary>
     public bool FlowResistant { get; init; }
+
+    /// <summary>Whether a <see cref="NeedsSupport"/> block is only held up by a full block face
+    /// (<see cref="HoldsFullFace"/>), never by a thin or shaped solid block (a torch).</summary>
+    public bool SupportFullFace { get; init; }
 
     /// <summary>Whether a <see cref="NeedsSupport"/> block hangs off the cell behind its front
     /// (a wall torch) instead of standing on the cell below; only ever set together with
@@ -393,24 +462,24 @@ public sealed record BlockType
 
     /// <summary>The block a placement against a block's side becomes instead of this one (a
     /// torch's wall torch), or 0 when the block only ever places as itself; see
-    /// <see cref="Placement.TryMount(byte, byte, System.Numerics.Vector3, bool, out byte, out byte)"/>.</summary>
-    public byte WallBlockId { get; internal set; }
+    /// <see cref="Placement.TryMount(ushort, byte, System.Numerics.Vector3, bool, out ushort, out byte)"/>.</summary>
+    public ushort WallBlockId { get; internal set; }
 
     /// <summary>The upper half of a two-cell block whose lower half this is (a door), or 0; see
     /// <see cref="TallBlock"/>.</summary>
-    public byte UpperHalfId { get; internal set; }
+    public ushort UpperHalfId { get; internal set; }
 
     /// <summary>The lower half of a two-cell block whose upper half this is (a door's top), or 0;
     /// see <see cref="TallBlock"/>.</summary>
-    public byte LowerHalfId { get; internal set; }
+    public ushort LowerHalfId { get; internal set; }
 
     /// <summary>The block whose item this one is picked as (a wall torch picks its torch), or 0
     /// when it is picked as itself; see <see cref="PickId"/>.</summary>
-    public byte ItemBlockId { get; internal set; }
+    public ushort ItemBlockId { get; internal set; }
 
     /// <summary>The id a pick-block of a cell holding <paramref name="blockId"/> asks the
     /// inventory for: its <see cref="ItemBlockId"/> when it has one, else the block itself.</summary>
-    public static byte PickId(byte blockId) =>
+    public static ushort PickId(ushort blockId) =>
         ById[blockId] is { ItemBlockId: not 0 } type ? type.ItemBlockId : blockId;
 
     /// <summary>Whether a placement aimed at this block fills its own cell and discards it
@@ -439,21 +508,28 @@ public sealed record BlockType
 
     /// <summary>Block id this fluid becomes on touching <see cref="HardensTouchingId"/>;
     /// 0 when the fluid never hardens.</summary>
-    public byte HardensToId { get; internal set; }
+    public ushort HardensToId { get; internal set; }
 
     /// <summary>Fluid block id whose contact hardens this one; 0 when it never hardens.</summary>
-    public byte HardensTouchingId { get; internal set; }
+    public ushort HardensTouchingId { get; internal set; }
 
     /// <summary>Whether an igniting status effect burns this block away to air, dropping nothing.</summary>
     public bool Flammable { get; init; }
 
+    /// <summary>Whether no gameplay path may remove this block (see <see cref="IsUnbreakable"/>).</summary>
+    public bool Unbreakable { get; init; }
+
+    /// <summary>Whether the block hides the sky from every cell under it in a light volume (see
+    /// <see cref="CoversSkyById"/>).</summary>
+    public bool CoversSky { get; init; }
+
     /// <summary>Solid block a source of this fluid becomes under a freezing status effect;
     /// 0 when it never freezes.</summary>
-    public byte FreezesToId { get; internal set; }
+    public ushort FreezesToId { get; internal set; }
 
     /// <summary>Fluid this block becomes, as a source, under a thawing status effect;
     /// 0 when it never melts.</summary>
-    public byte MeltsToId { get; internal set; }
+    public ushort MeltsToId { get; internal set; }
 
     /// <summary>What happens when the block is destroyed.</summary>
     public BlockBreakAction OnBreak { get; init; } = BlockBreakAction.Drop;
@@ -523,13 +599,13 @@ public sealed record BlockType
     /// <summary>Whether a block is solid to bodies. The raycast still targets non-solid blocks
     /// (it hits any non-air cell), so this only gates movement and drop physics.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsSolid(byte blockId) => SolidById[blockId];
+    public static bool IsSolid(ushort blockId) => SolidById[blockId];
 
     /// <summary>Whether the body collides with the block's <see cref="Hitboxes"/> instead of the
     /// whole cell (a mold slab). Named <c>...Of</c> because a static method may not share the
     /// instance property's name; mirrors <see cref="MovementSpeedOf"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool CollidesByHitboxOf(byte blockId) => CollidesByHitboxById[blockId];
+    public static bool CollidesByHitboxOf(ushort blockId) => CollidesByHitboxById[blockId];
 
     /// <summary>
     /// Whether a cell collides with bodies, honoring a stack block whose partial stacks are
@@ -538,7 +614,7 @@ public sealed record BlockType
     /// <see cref="IsSolid"/>. Callers that only have an id still use <see cref="IsSolid"/>.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsSolidCell(byte blockId, byte state) =>
+    public static bool IsSolidCell(ushort blockId, byte state) =>
         StackSolidStateById[blockId] != 0 ? state >= StackSolidStateById[blockId] : SolidById[blockId];
 
     /// <summary>
@@ -546,77 +622,95 @@ public sealed record BlockType
     /// positive value also means the block never blocks the body.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float MovementSpeedOf(byte blockId) => MovementSpeedById[blockId];
+    public static float MovementSpeedOf(ushort blockId) => MovementSpeedById[blockId];
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float FrictionOf(byte blockId) => FrictionById[blockId];
+    public static float FrictionOf(ushort blockId) => FrictionById[blockId];
 
     /// <summary>Natural pebble scatter density multiplier of the block as an exposed surface;
     /// <c>0</c> means the surface never grows pebbles. See <see cref="PebbleGenerator"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float PebbleWeightOf(byte blockId) => PebbleWeightById[blockId];
+    public static float PebbleWeightOf(ushort blockId) => PebbleWeightById[blockId];
 
     /// <summary>Whether a sprinting footfall on the block kicks up dust; see <see cref="FootstepDust"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool KicksFootstepDust(byte blockId) => FootstepDustById[blockId];
+    public static bool KicksFootstepDust(ushort blockId) => FootstepDustById[blockId];
 
     /// <summary>Whether a body landing on the block is sprung back up (a slime block).</summary>
-    public static bool BouncesAt(byte blockId) => BounceById[blockId];
+    public static bool BouncesAt(ushort blockId) => BounceById[blockId];
+
+    /// <summary>Whether a body landing on the block takes no fall damage (a cloud block).</summary>
+    public static bool SoftLandingAt(ushort blockId) => SoftLandingById[blockId];
+
+    /// <summary>The top share of the cell a player body sinks into, 0 for a plain collider.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float SinkOf(ushort blockId) => SinkById[blockId];
 
     /// <summary>Whether the block stops a line of sight (a plant never does).</summary>
-    public static bool BlocksSightAt(byte blockId) => BlocksSightById[blockId];
+    public static bool BlocksSightAt(ushort blockId) => BlocksSightById[blockId];
 
     /// <summary>Damage a body touching the block takes per contact tick (0 when harmless).</summary>
-    public static float ContactDamageAt(byte blockId) => ContactDamageById[blockId];
+    public static float ContactDamageAt(ushort blockId) => ContactDamageById[blockId];
 
     /// <summary>Whether a block fully hides a neighboring full cube's face.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool Occludes(byte blockId) => OccludesById[blockId];
+    public static bool Occludes(ushort blockId) => OccludesById[blockId];
 
     /// <summary>Whether a block darkens neighboring faces via ambient occlusion. This is the
     /// raw JSON flag (<c>castsAO</c>, defaulting to <see cref="Solid"/>); meshing must read
     /// <see cref="OccludesAO"/> instead, so a thin shape can never darken a face it does not
     /// fully block.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool CastsAO(byte blockId) => CastsAoById[blockId];
+    public static bool CastsAO(ushort blockId) => CastsAoById[blockId];
 
     /// <summary>Whether a block actually blocks a neighboring face's corner/edge for ambient
     /// occlusion: only a fully occupying block (see <see cref="Occludes"/>) counts. Leaves pass
     /// light and thin shapes (tree wood, pebbles, flowers) never fill the corner voxel, so
     /// they leave AO at full brightness even when their JSON flag is set.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool OccludesAO(byte blockId) => OccludesById[blockId] && CastsAoById[blockId];
+    public static bool OccludesAO(ushort blockId) => OccludesById[blockId] && CastsAoById[blockId];
 
     /// <summary>Whether a block id is tree wood (<see cref="BlockRenderer.TreeWood"/>), whose
     /// state byte is a <see cref="WoodState"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsTreeWood(byte blockId) => TreeWoodById[blockId];
+    public static bool IsTreeWood(ushort blockId) => TreeWoodById[blockId];
+
+    /// <summary>Whether every face of the cell is a full solid square: a solid full-cube block, or tree wood at full
+    /// thickness (a branch or a thin trunk is not).</summary>
+    public static bool HoldsFullFace(ushort blockId, byte state) =>
+        TreeWoodById[blockId] ? WoodState.IsFullCube(state) : FullCubeById[blockId];
 
     /// <summary>Whether a tree-wood id belongs to a <c>rim: "pixel"</c> species, so its trunk
     /// shells bevel their exposed corners (<see cref="TreeWoodShape.RimCornerMask"/>).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool HasPixelRim(byte blockId) => PixelRimById[blockId];
+    public static bool HasPixelRim(ushort blockId) => PixelRimById[blockId];
 
     /// <summary>Whether a block id is a pane (<see cref="BlockRenderer.Pane"/>), whose shape
     /// follows its neighbors (<see cref="PaneShape"/>).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsPane(byte blockId) => PaneById[blockId];
+    public static bool IsPane(ushort blockId) => PaneById[blockId];
 
     /// <summary>Whether the greedy mesher handles this block (a plain full cube in the
     /// <see cref="BlockRenderer.Model"/> renderer); false sends it down the per-quad path.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsGreedy(byte blockId) => GreedyById[blockId];
+    public static bool IsGreedy(ushort blockId) => GreedyById[blockId];
 
     /// <summary>Whether a block id is a flowing fluid; see <see cref="IsFluid"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsFluid(byte blockId) => FluidById[blockId];
+    public static bool IsFluid(ushort blockId) => FluidById[blockId];
+
+    /// <summary>Whether no gameplay path may remove or overwrite the block (its <c>unbreakable</c>
+    /// JSON flag): mining, creative, blasts, buckets, placement and status or spell block actions
+    /// all leave it. The one sanctioned write over it is <c>Chunk.CollapseWriteAt</c>.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsUnbreakable(ushort blockId) => UnbreakableById[blockId];
 
     /// <summary>Whether a fluid or a placement may overwrite the cell without destroying
     /// anything worth keeping: air, plus the fragile <see cref="NeedsSupport"/> blocks, which
     /// pop (rolling their loot) when water washes over them. Fluids themselves are not
     /// replaceable here — a flow into an existing fluid cell is a level recompute, not a
-    /// write — but every caller that displaces water tests <see cref="IsFluid(byte)"/> too.</summary>
+    /// write — but every caller that displaces water tests <see cref="IsFluid(ushort)"/> too.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsReplaceable(byte blockId) => ReplaceableById[blockId];
+    public static bool IsReplaceable(ushort blockId) => ReplaceableById[blockId];
 
     /// <summary>Whether a placement aimed at this block fills the block's own cell and discards it,
     /// instead of filling the neighbor across the hit face. Opted into with the block's
@@ -625,10 +719,10 @@ public sealed record BlockType
     /// <see cref="IsSolidCell"/>). Independent of <see cref="IsReplaceable"/>, which is the fluid
     /// flow and bucket pour path.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsReplaceableByPlacement(byte blockId, byte state) =>
+    public static bool IsReplaceableByPlacement(ushort blockId, byte state) =>
         ReplaceableByPlacementById[blockId] && !IsSolidCell(blockId, state);
 
     /// <summary>Whether a block id is gravity-affected; see <see cref="Falls"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsFalling(byte blockId) => FallsById[blockId];
+    public static bool IsFalling(ushort blockId) => FallsById[blockId];
 }

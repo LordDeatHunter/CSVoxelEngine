@@ -6,6 +6,7 @@ using VoxelEngine.Items;
 using VoxelEngine.UI;
 using VoxelEngine.UI.InventoryPanel;
 using static VoxelEngine.Rendering.Overlays.UIRenderer;
+using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
 
@@ -94,9 +95,9 @@ internal sealed class CraftCardRenderer
 
     private void DrawBoxButton(Vector2 center, float size, string label, Rgba bg, Rgba border, Rgba text)
     {
-        _ui.DrawRect(center, new Vector2(size), bg);
-        _ui.DrawBorder(center, new Vector2(size), 1.5f, border);
-        _ui.DrawTextCentered(label, center.X, center.Y - 8f, _ui.CountScale, text);
+        _ui.DrawRect(center, new Vector2(size), _ui.IsHovered(center, new Vector2(size)) ? ButtonHover : bg);
+        _ui.DrawBorder(center, new Vector2(size), Border.Thin, border);
+        _ui.DrawTextMiddle(label, center, _ui.CountScale, text);
     }
 
     internal void DrawCraftDetail(Inventory inventory, InventoryView view, float time, float headingDegrees)
@@ -110,7 +111,7 @@ internal sealed class CraftCardRenderer
                 top + CraftCardLayout.EmptyHeight * 0.5f);
             var size = new Vector2(width, CraftCardLayout.EmptyHeight);
             _ui.DrawRect(center, size, PanelBackground);
-            _ui.DrawBorder(center, size, SlotBorder, SlotBorderColor);
+            _ui.DrawBorder(center, size, Border.Standard, SlotBorderColor);
             _ui.DrawRect(new Vector2(center.X, top + 3f), new Vector2(width - 4f, 2f), AccentGold);
             var avail = CraftCardLayout.InnerWidthFor(_ui.ScreenSize) - 8f;
             _ui.DrawTextCenteredFitted("Crafting", center.X, top + CraftCardLayout.Pad, _ui.HeadScale, Rgba.White, avail);
@@ -123,7 +124,7 @@ internal sealed class CraftCardRenderer
 
         var scroll = layout.ClampScroll(view.CraftScrollOffset);
         _ui.DrawRect(layout.CardCenter, layout.CardSize, PanelBackground);
-        _ui.DrawBorder(layout.CardCenter, layout.CardSize, SlotBorder, SlotBorderColor);
+        _ui.DrawBorder(layout.CardCenter, layout.CardSize, Border.Standard, SlotBorderColor);
         _ui.DrawRect(new Vector2(layout.CardCenter.X, top + 3f), new Vector2(layout.Width - 4f, 2f), AccentGold);
 
         if (layout.Overflows)
@@ -189,8 +190,8 @@ internal sealed class CraftCardRenderer
         var batchMinus = layout.BatchMinusCenter(scroll);
         var batchPlus = layout.BatchPlusCenter(scroll);
         DrawBoxButton(batchMinus, CraftCardLayout.StepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
-        _ui.DrawTextCentered(session.Batch.ToString(), layout.BatchCountCenter(scroll).X,
-            batchMinus.Y - 8f, _ui.CountScale, Rgba.White);
+        _ui.DrawTextMiddle(session.Batch.ToString(), layout.BatchCountCenter(scroll) with { Y = batchMinus.Y },
+            _ui.CountScale, Rgba.White);
         DrawBoxButton(batchPlus, CraftCardLayout.StepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
         var maxBatch = session.MaxAffordable(inventory);
         var maxX = layout.BatchMaxX(scroll);
@@ -200,7 +201,7 @@ internal sealed class CraftCardRenderer
             _ui.CountScale, maxBatch >= session.Batch ? ReadyGreen : DangerRed);
 
         var separatorY = layout.ContentY(pad + layout.HeaderHeight + CraftCardLayout.HeaderGap - 5f, scroll);
-        _ui.DrawRect(new Vector2(cardCenterX, separatorY), new Vector2(innerWidth, 1.5f), SlotBorderColor);
+        _ui.DrawRect(new Vector2(cardCenterX, separatorY), new Vector2(innerWidth, Border.Thin), SlotBorderColor);
 
         var ingLeft = layout.Left + pad + ingPad;
         for (var i = 0; i < recipe.Ingredients.Length; i++)
@@ -233,14 +234,14 @@ internal sealed class CraftCardRenderer
             if (fed.MemberId != 0)
                 _ui.DrawIdIcon(new Vector2(fedCx, fedCy), 30f, fed.MemberId, headingDegrees, time);
             else
-                _ui.DrawTextCentered("?", fedCx, fedCy - 8f, _ui.CountScale, TextDim);
+                _ui.DrawTextMiddle("?", new Vector2(fedCx, fedCy), _ui.CountScale, TextDim);
 
             var minus = layout.IngMinusCenter(i, scroll);
             var plus = layout.IngPlusCenter(i, scroll);
             var fedText = $"{fed.Count} / {need} fed";
             var fedAvail = minus.X - CraftCardLayout.IngStepBox * 0.5f - (fedCx + 24f) - 8f;
-            _ui.DrawText(_ui.FitText(fedText, _ui.CountScale, Math.Max(20f, fedAvail)),
-                new Vector2(fedCx + 24f, fedCy - 8f), _ui.CountScale,
+            _ui.DrawTextCenteredY(_ui.FitText(fedText, _ui.CountScale, Math.Max(20f, fedAvail)),
+                fedCx + 24f, fedCy, _ui.CountScale,
                 fed.Count >= need ? ReadyGreen : Rgba.White);
             DrawBoxButton(minus, CraftCardLayout.IngStepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
             DrawBoxButton(plus, CraftCardLayout.IngStepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
@@ -254,7 +255,7 @@ internal sealed class CraftCardRenderer
                 var owned = inventory.CountFor(members[c]);
                 var isPicked = picked != 0 && picked == members[c];
                 _ui.DrawRect(chipC, new Vector2(chipSize), owned > 0 ? ChipBackground : SlotBackground);
-                _ui.DrawBorder(chipC, new Vector2(chipSize), isPicked ? 2.5f : 1.5f,
+                _ui.DrawBorder(chipC, new Vector2(chipSize), isPicked ? Border.Selected : Border.Thin,
                     isPicked ? AccentGold : SlotBorderColor);
                 _ui.DrawIdIcon(chipC with { Y = chipC.Y - 3f }, 26f, members[c], headingDegrees, time);
                 var ownedText = owned.ToString();
@@ -279,9 +280,9 @@ internal sealed class CraftCardRenderer
         var buttonS = layout.ButtonSize;
         var total = recipe.ResultCount * session.Batch;
         _ui.DrawRect(buttonC, buttonS, ready ? ButtonReady : ButtonDisabled);
-        _ui.DrawBorder(buttonC, buttonS, 2f, ready ? Rgba.White : SlotBorderColor);
-        _ui.DrawTextCentered(session.Batch > 1 ? $"CRAFT  x{total}" : "CRAFT",
-            buttonC.X, buttonC.Y - 9f, _ui.HeadScale,
+        _ui.DrawBorder(buttonC, buttonS, Border.Standard, ready ? Rgba.White : SlotBorderColor);
+        _ui.DrawTextMiddle(session.Batch > 1 ? $"CRAFT  x{total}" : "CRAFT",
+            buttonC, _ui.HeadScale,
             ready ? ButtonTextReady : ButtonTextDisabled);
     }
 }

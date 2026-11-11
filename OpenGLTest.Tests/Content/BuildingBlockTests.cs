@@ -49,6 +49,39 @@ public sealed class BuildingBlockTests
         Assert.True(checkedAny);
     }
 
+    private static bool Inside(BakedQuad quad, BlockHitbox box) =>
+        quad.Positions.All(p => p.X >= box.Min.X - 1e-4f && p.Y >= box.Min.Y - 1e-4f && p.Z >= box.Min.Z - 1e-4f
+                                && p.X <= box.Max.X + 1e-4f && p.Y <= box.Max.Y + 1e-4f && p.Z <= box.Max.Z + 1e-4f);
+
+    [Fact]
+    public void EveryShapeCollidingModelsBoxesHugItsParts()
+    {
+        // Beyond the overall bounds: every drawn quad lies inside one of the boxes (nothing drawn sticks out of what
+        // the raycast, the outline and the body hit), and every box is filled to its edges by the quads inside it (no
+        // box reaches into air the model leaves empty), on every facing
+        foreach (var type in BlockType.Types.Values)
+        {
+            if (!type.CollidesByHitbox || type.Renderer != BlockRenderer.Model) continue;
+            var models = type.RotatedModels ?? [type.BakedModel!];
+            var boxes = type.RotatedHitboxes ?? [type.Hitboxes];
+            for (var facing = 0; facing < models.Length; facing++)
+            {
+                foreach (var quad in models[facing].Quads)
+                    Assert.True(boxes[facing].Any(box => Inside(quad, box)),
+                        $"{type.Name} facing {facing}: a quad at {quad.Positions[0]} lies outside every box");
+                foreach (var box in boxes[facing])
+                {
+                    var inside = models[facing].Quads.Where(q => Inside(q, box)).ToArray();
+                    Assert.True(inside.Length > 0, $"{type.Name} facing {facing}: box {box.Min}..{box.Max} holds nothing drawn");
+                    var positions = inside.SelectMany(q => q.Positions).ToArray();
+                    var (min, max) = (positions.Aggregate(Vector3.Min), positions.Aggregate(Vector3.Max));
+                    Assert.True(Vector3.Distance(min, box.Min) < 1e-4f && Vector3.Distance(max, box.Max) < 1e-4f,
+                        $"{type.Name} facing {facing}: box {box.Min}..{box.Max} reaches past its parts {min}..{max}");
+                }
+            }
+        }
+    }
+
     [Fact]
     public void AFloorSlabIsStoodOnAtItsTopNotWalledOff()
     {

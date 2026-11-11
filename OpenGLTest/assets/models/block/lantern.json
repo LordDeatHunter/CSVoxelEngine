@@ -1,8 +1,7 @@
 {
     // A lantern hanging from the block above it: a 6x7 copper cage, a lid and a 1 px chain up to
-    // the cell's top. Every face crops its part out of the lantern tile with an explicit uv (see
-    // tools/generate-lantern-texture.py for where each part lies and why the side and up/down uvs
-    // are written mirrored). The cage and lid are unshaded like the torch, so the glow never
+    // the cell's top. Every face crops its part out of the lantern tile with an explicit uv (the side and up/down
+    // uvs are written mirrored). The cage and lid are unshaded like the torch, so the glow never
     // darkens with the face it is on. Faces hidden inside the model (the lid's underside, the
     // chain's ends) are left out.
     "textures": {

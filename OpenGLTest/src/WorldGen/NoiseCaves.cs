@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using VoxelEngine.Chunks;
+using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.WorldGen;
 
@@ -10,8 +11,12 @@ namespace VoxelEngine.WorldGen;
 /// the curves where two fields are both near zero (a wide and a narrow variant), and rare flat
 /// caverns deep down. Every field is sampled on a coarse lattice per chunk and trilinearly
 /// interpolated per block before thresholding, so the cost is a few hundred noise evaluations
-/// per chunk instead of tens of thousands. All carving is a pure function of world position and
-/// the column data, so neighboring chunks agree at their borders without any shared state.
+/// per chunk instead of tens of thousands. Nine channels: the eight cave fields and a shape scale
+/// (seed offset 182, plans/CAVE_BIOMES.md CB-2), sampled only in a chunk holding a cave sub-biome,
+/// which scales that sub-biome's <see cref="CaveShape"/> boosts per region; plain and echo cells
+/// carve exactly as before. All carving is a pure function of world position, the column data and
+/// the cave biome map (itself a pure function of position), so neighboring chunks agree at their
+/// borders without any shared state.
 /// </summary>
 public static class NoiseCaves
 {
@@ -30,7 +35,8 @@ public static class NoiseCaves
     private const int ChNarrowB = 5;
     private const int ChCavern = 6;
     private const int ChNarrowMask = 7;
-    private const int Channels = 8;
+    private const int ChShapeScale = 8;
+    private const int Channels = 9;
 
     private static FastNoiseLite Cheese;
     private static FastNoiseLite SpaghettiA;
@@ -40,6 +46,7 @@ public static class NoiseCaves
     private static FastNoiseLite NarrowB;
     private static FastNoiseLite NarrowMask;
     private static FastNoiseLite Cavern;
+    private static FastNoiseLite ShapeScale;
 
     static NoiseCaves() => Reseed();
 
@@ -57,19 +64,22 @@ public static class NoiseCaves
         NarrowB = TerrainGenerator.MakeNoise(122, WorldGenerationConfig.NarrowSpaghettiFrequency);
         NarrowMask = TerrainGenerator.MakeNoise(123, WorldGenerationConfig.NarrowSpaghettiMaskFrequency);
         Cavern = TerrainGenerator.MakeNoise(131, WorldGenerationConfig.CavernFrequency);
+        ShapeScale = TerrainGenerator.MakeNoise(182, WorldGenerationConfig.CaveShapeScaleFrequency);
     }
 
     /// <summary>
     /// Clears cave air out of a freshly filled chunk. <paramref name="blocks"/> is the chunk's
     /// block array (Chunk.Idx layout) and (worldX0, worldY0, worldZ0) its lowest corner.
+    /// <paramref name="caves"/> is the chunk's cave biome map, null when every cell is plain.
     /// </summary>
-    public static void Carve(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Carve(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0,
+        CaveBiomeMap? caves = null)
     {
         var samples = ArrayPool<float>.Shared.Rent(Channels * GridCount);
         try
         {
-            SampleLattice(samples, worldX0, worldY0, worldZ0);
-            CarveBlocks(blocks, column, worldY0, samples);
+            SampleLattice(samples, worldX0, worldY0, worldZ0, withShape: caves is not null && caves.AnySubBiome);
+            CarveBlocks(blocks, column, worldY0, samples, caves);
         }
         finally
         {
@@ -78,8 +88,9 @@ public static class NoiseCaves
     }
 
     // Lattice points sit on world coordinates that are multiples of Stride, so adjacent chunks
-    // sample identical values along their shared face
-    private static void SampleLattice(float[] samples, int worldX0, int worldY0, int worldZ0)
+    // sample identical values along their shared face. The shape channel is read only by a sub-biome
+    // cell, so a chunk without one never samples it
+    private static void SampleLattice(float[] samples, int worldX0, int worldY0, int worldZ0, bool withShape)
     {
         for (var gx = 0; gx < Grid; gx++)
         {
@@ -100,12 +111,14 @@ public static class NoiseCaves
                     samples[ChNarrowB * GridCount + g] = NarrowB.GetNoise(wx, wy * WorldGenerationConfig.SpaghettiYScale, wz);
                     samples[ChCavern * GridCount + g] = Cavern.GetNoise(wx, wy * WorldGenerationConfig.CavernYScale, wz);
                     samples[ChNarrowMask * GridCount + g] = NarrowMask.GetNoise(wx, wy, wz);
+                    if (withShape) samples[ChShapeScale * GridCount + g] = ShapeScale.GetNoise(wx, wy, wz);
                 }
             }
         }
     }
 
-    private static void CarveBlocks(byte[] blocks, ColumnData column, int worldY0, float[] samples)
+    private static void CarveBlocks(ushort[] blocks, ColumnData column, int worldY0, float[] samples,
+        CaveBiomeMap? caves)
     {
         for (var x = 0; x < Chunk.Size; x++)
         {
@@ -140,14 +153,30 @@ public static class NoiseCaves
                     var fy = ((y % Stride) + 0.5f) * InvStride;
                     var g = gx * GridSq + gy * Grid + gz;
 
-                    if (IsCave(samples, g, fx, fy, fz, depth, gate, intensity))
+                    // The cave biome's shape: a plain or echo cell keeps a boost of 0f and a scale of 1f, and
+                    // subtracting 0f or multiplying by 1f is exact, so it carves bit for bit as before
+                    var cheeseBoost = 0f;
+                    var tunnelScale = 1f;
+                    var cavernBoost = 0f;
+                    var biome = caves is null ? CaveBiome.Plain : (CaveBiome)caves.Cells[idx];
+                    if (CaveShape.Shapes(biome))
+                    {
+                        var k = 1f + WorldGenerationConfig.CaveShapeScaleVariation
+                            * Trilinear(samples, ChShapeScale * GridCount + g, fx, fy, fz);
+                        cheeseBoost = CaveShape.CheeseBoost(biome) * k * gate;
+                        tunnelScale = 1f + CaveShape.TunnelBoost(biome) * k;
+                        cavernBoost = CaveShape.CavernBoost(biome) * k;
+                    }
+
+                    if (IsCave(samples, g, fx, fy, fz, depth, gate, intensity, cheeseBoost, tunnelScale, cavernBoost))
                         blocks[idx] = BlockType.Air;
                 }
             }
         }
     }
 
-    private static bool IsCave(float[] samples, int g, float fx, float fy, float fz, float depth, float gate, float intensity)
+    private static bool IsCave(float[] samples, int g, float fx, float fy, float fz, float depth, float gate,
+        float intensity, float cheeseBoost, float tunnelScale, float cavernBoost)
     {
         // Cheese rooms: threshold falls with depth so rooms grow; the gate term closes them near the surface
         var cheese = Trilinear(samples, ChCheese * GridCount + g, fx, fy, fz);
@@ -155,14 +184,15 @@ public static class NoiseCaves
             WorldGenerationConfig.CheeseThresholdShallow,
             WorldGenerationConfig.CheeseThresholdDeep,
             MathUtils.SmoothStep(WorldGenerationConfig.CheeseDepthStart, WorldGenerationConfig.CheeseDepthEnd, depth));
-        if (cheese > cheeseThreshold - intensity + (1f - gate))
+        if (cheese > cheeseThreshold - intensity + (1f - gate) - cheeseBoost)
             return true;
 
         // Wide spaghetti: inside the tube around the curve where both fields are zero
         var a = Trilinear(samples, ChSpaghettiA * GridCount + g, fx, fy, fz);
         var b = Trilinear(samples, ChSpaghettiB * GridCount + g, fx, fy, fz);
         var thick = Trilinear(samples, ChThickness * GridCount + g, fx, fy, fz);
-        var radius = gate * (WorldGenerationConfig.SpaghettiRadius + WorldGenerationConfig.SpaghettiRadiusVariation * thick + intensity * 0.5f);
+        var radius = gate * (WorldGenerationConfig.SpaghettiRadius + WorldGenerationConfig.SpaghettiRadiusVariation * thick + intensity * 0.5f)
+                     * tunnelScale;
         if (a * a + b * b < radius * radius)
             return true;
 
@@ -175,7 +205,7 @@ public static class NoiseCaves
         {
             a = Trilinear(samples, ChNarrowA * GridCount + g, fx, fy, fz);
             b = Trilinear(samples, ChNarrowB * GridCount + g, fx, fy, fz);
-            radius = gate * narrowMask * (WorldGenerationConfig.NarrowSpaghettiRadius + intensity * 0.25f);
+            radius = gate * narrowMask * (WorldGenerationConfig.NarrowSpaghettiRadius + intensity * 0.25f) * tunnelScale;
             if (a * a + b * b < radius * radius)
                 return true;
         }
@@ -185,7 +215,7 @@ public static class NoiseCaves
         if (cavernScale > 0f)
         {
             var cavern = Trilinear(samples, ChCavern * GridCount + g, fx, fy, fz);
-            if (cavern * cavernScale > WorldGenerationConfig.CavernThreshold - intensity)
+            if (cavern * cavernScale > WorldGenerationConfig.CavernThreshold - intensity - cavernBoost)
                 return true;
         }
 

@@ -16,8 +16,8 @@ public class EntityLightTests
 {
     private const int FloorY = 4;
 
-    private readonly byte _stone;
-    private readonly byte _emitter;
+    private readonly ushort _stone;
+    private readonly ushort _emitter;
 
     public EntityLightTests()
     {

@@ -176,9 +176,9 @@ public class WorldSeedTests
         return max >> Chunk.SizeShift;
     }
 
-    private static byte[] BlocksOf(Chunk chunk)
+    private static ushort[] BlocksOf(Chunk chunk)
     {
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         var i = 0;
         for (var x = 0; x < Chunk.Size; x++)
         for (var y = 0; y < Chunk.Size; y++)

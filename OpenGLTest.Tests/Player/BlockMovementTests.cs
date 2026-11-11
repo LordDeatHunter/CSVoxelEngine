@@ -15,7 +15,7 @@ public sealed class BlockMovementTests
 
     // One chunk: a stone floor at y=0, plus a body-height field of `fill` from x=4 on
     // (air means no field). The player starts at x=2.5 on the floor facing +X.
-    private static ChunkManager Field(byte fill, out Camera camera)
+    private static ChunkManager Field(ushort fill, out Camera camera)
     {
         var manager = new ChunkManager(null!);
         var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);
@@ -90,7 +90,7 @@ public sealed class BlockMovementTests
     [Fact]
     public void IceGlidesFurtherThanStoneAfterRelease()
     {
-        static float GlideAfterRelease(byte floorId)
+        static float GlideAfterRelease(ushort floorId)
         {
             var manager = new ChunkManager(null!);
             var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);

@@ -14,7 +14,7 @@ public sealed class PlacementTests
 {
     public PlacementTests() => TestContent.EnsureLoaded();
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
     public void PartialSnowIsTakenOverByAPlacementAndAFullStackIsNot()

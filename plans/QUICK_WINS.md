@@ -29,7 +29,7 @@ None open. Add an idea as `- [ ] **`Q-n` Title** - P#, S.` plus a **Hook** (wher
   around it. (The kiln was not: multiblock, fuel, crucible, molds and casting.)
 
 Art a feature needs is generated as a placeholder (a deterministic script under `tools/`) and
-listed in `USER_TODO.md` (local, never committed) for replacement. A feature that needs sound
-files waits in TODO.md instead, since there are none to use yet.
+listed in `USER_TODO.md` at the repo root for replacement. A feature that needs sound files waits
+in TODO.md instead, since there are none to use yet.
 
 

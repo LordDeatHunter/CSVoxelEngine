@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using VoxelEngine.Tests.Support;
 using VoxelEngine.WorldGen;
 using Xunit;
 using static VoxelEngine.Chunks.Chunk;
@@ -140,8 +139,8 @@ public sealed class ColumnCacheGenerationTests
     private static void AssertEquivalent(int chunkX, int chunkZ, int x, int z,
         int height, int bed, byte dirtDepth, int lowerBoundY, Biome biome)
     {
-        var expected = Enumerable.Repeat((byte)0xA5, Size * Size * Size).ToArray();
-        var actual = (byte[])expected.Clone();
+        var expected = Enumerable.Repeat((ushort)0xA5A5, Size * Size * Size).ToArray();
+        var actual = (ushort[])expected.Clone();
         LegacyGenerateColumn(expected, chunkX, chunkZ, x, z, height, bed, dirtDepth, lowerBoundY, biome);
         ColumnCache.GenerateColumn(actual, chunkX, chunkZ, x, z, height, bed, dirtDepth, lowerBoundY, biome);
         Assert.Equal(expected, actual);
@@ -149,7 +148,7 @@ public sealed class ColumnCacheGenerationTests
 
     // Frozen copy of the pre-optimization implementation. This is the behavior oracle; the
     // candidate's predicates are deliberately not reproduced here.
-    private static void LegacyGenerateColumn(byte[] blocks, int chunkX, int chunkZ, int x, int z,
+    private static void LegacyGenerateColumn(ushort[] blocks, int chunkX, int chunkZ, int x, int z,
         int terrainHeight, int bed, int dirtDepth, int lowerBoundY, Biome biome)
     {
         var worldX = chunkX * Size + x;

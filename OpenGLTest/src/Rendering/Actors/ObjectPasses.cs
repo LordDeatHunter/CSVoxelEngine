@@ -5,6 +5,8 @@ using VoxelEngine.Entities;
 using VoxelEngine.Graphics;
 using VoxelEngine.Items;
 using VoxelEngine.Particles;
+using VoxelEngine.Particles.Collapse;
+using VoxelEngine.Particles.Heave;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 
@@ -12,7 +14,8 @@ namespace VoxelEngine.Rendering.Actors;
 
 /// <summary>
 /// The loose-object draws of the entity pass: the floating item drops, the thrown items in
-/// flight, primed TNT, falling sand and gravel, the mining debris and the toppling trees. Each
+/// flight, primed TNT, falling sand and gravel, the mining debris, the blocks a collapsing tower
+/// throws off and the toppling trees. Each
 /// Draw* core takes its own view-projection and a mirror flag, so the water mirror redraws the
 /// same objects through them. Owns no GL resource: the world program and the item and block
 /// caches stay owned by <see cref="RenderManager"/>. Render thread only.
@@ -98,9 +101,10 @@ internal sealed class ObjectPasses
         foreach (var projectile in thrown)
         {
             Mesh? mesh;
-            if (ItemRegistry.IsItem(projectile.ItemId))
+            var renderId = projectile.RenderId;
+            if (ItemRegistry.IsItem(renderId))
             {
-                if (!_owner.ItemMeshes.TryGet(projectile.ItemId, out mesh, out var itemTexture)) continue;
+                if (!_owner.ItemMeshes.TryGet(renderId, out mesh, out var itemTexture)) continue;
                 Units.BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
                 atlasBound = false;
             }
@@ -112,7 +116,7 @@ internal sealed class ObjectPasses
                     atlasBound = true;
                 }
 
-                mesh = _owner.BlockCubes.Get(projectile.ItemId);
+                mesh = _owner.BlockCubes.Get(renderId);
                 if (mesh == null) continue;
             }
 
@@ -233,6 +237,65 @@ internal sealed class ObjectPasses
         // Shader.SetUniform writes to the bound program, so this reset is only valid here,
         // with worldShader still bound; it keeps uBiomeTint white unless a tinted draw is in
         // flight, for the plain draws that follow (toppling tree, drops, entities)
+        _owner.WorldShader.SetUniform(_owner.LocBiomeTint, Vector3.One);
+    }
+
+    /// <summary>
+    /// Draws the blocks a collapsing tower throws off (<see cref="CollapseDebris"/>): whole cubes of the block that fell,
+    /// tumbling and rolling about their centers, at full opacity until they burst into chips. Untinted, like the
+    /// tower's own blocks, so <c>uBiomeTint</c> stays the white <see cref="RenderBlockDebris"/> leaves it at.
+    /// </summary>
+    internal void RenderCollapseDebris(Camera camera, IReadOnlyList<CollapseDebris> debris)
+    {
+        if (camera == null || debris.Count == 0) return;
+
+        _owner.WorldShader.Use();
+        _owner.BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+        foreach (var block in debris)
+        {
+            var mesh = _owner.BlockCubes.GetTinted(block.BlockId);
+            if (mesh == null) continue;
+
+            var model = Matrix4x4.CreateScale(block.Size)
+                        * Matrix4x4.CreateFromQuaternion(block.Orientation)
+                        * Matrix4x4.CreateTranslation(block.Position);
+            _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(block.Position));
+            mesh.Render();
+        }
+    }
+
+    /// <summary>
+    /// Draws the ground a Skeleton King's slam heaves (<see cref="GroundHeave"/>): a copy of each heaving block raised
+    /// over the real one, a hair narrower so its sides never fight a neighbor's or the real block's faces. A block that
+    /// has barely left the ground is skipped, since its copy would fight the real top face.
+    /// </summary>
+    internal void RenderGroundHeave(Camera camera, GroundHeave heave)
+    {
+        if (camera == null || heave.Blocks.Count == 0) return;
+
+        _owner.WorldShader.Use();
+        _owner.BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+        var narrow = Matrix4x4.CreateScale(0.996f, 1f, 0.996f);
+        var blocks = heave.Blocks;
+        for (var i = 0; i < blocks.Count; i++)
+        {
+            var block = blocks[i];
+            var lift = heave.LiftOf(block);
+            if (lift < JuiceConfig.SlamHeaveMinDrawLift) continue;
+            var mesh = _owner.BlockCubes.GetTinted(block.BlockId);
+            if (mesh == null) continue;
+
+            var center = block.Center + new Vector3(0f, lift, 0f);
+            var model = narrow * Matrix4x4.CreateTranslation(center);
+            _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(center));
+            // A grass copy takes its column's tint, like a break chip (RenderBlockDebris)
+            _owner.WorldShader.SetUniform(_owner.LocBiomeTint, block.Tint);
+            mesh.Render();
+        }
         _owner.WorldShader.SetUniform(_owner.LocBiomeTint, Vector3.One);
     }
 

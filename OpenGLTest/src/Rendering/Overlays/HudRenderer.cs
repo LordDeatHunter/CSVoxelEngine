@@ -5,11 +5,14 @@ using Silk.NET.OpenGL;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Data;
 using VoxelEngine.Graphics;
+using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.UI.Widgets;
 using static VoxelEngine.Rendering.Overlays.UIRenderer;
+using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
 
@@ -32,14 +35,16 @@ internal sealed class HudRenderer : IDisposable
     private const float HeartDrawWidth = 30f;
     private const float HeartDrawHeight = 32f;
     private const float HeartStride = 30f;
-    private const float HeartGap = 10f;
+    // The hearts clear the mana bar between them and the hotbar
+    private const float HeartGap = ManaBarGap + ManaBarHeight + 6f;
     // The air bubbles ride a row above the hearts, right-aligned with it like Minecraft's
     private const float BubbleDrawSize = 34f;
     private const float BubbleStride = 28f;
     private const float BubbleGap = 6f;
-    // The mana bar sits in the margin under the hotbar, so it never meets the bubbles, the item name
-    // or the toast, which all stack above the hearts
-    private const float ManaBarHeight = 6f;
+    // The mana bar sits just above the hotbar, under the hearts, which with the bubbles, the item name
+    // and the toast stack above it
+    private const float ManaBarHeight = 12f;
+    private const float ManaBarGap = 4f;
     private static readonly Rgba ManaTrack = Rgba.Gray(0.04f, 0.6f);
     private static readonly Rgba ManaFill = new(70, 130, 255, 230);
     // The selected item's name (DrawHotbarName) sits this far above the hearts row, leaving room
@@ -57,8 +62,6 @@ internal sealed class HudRenderer : IDisposable
     private const float ToastRowGap = 26f;
     // Smallest width of the Tab player list panel; a long name widens it
     private const float PlayerListWidth = 200f;
-
-    private const float SelectedBorder = 3f;
 
     // Fraction of a slot the icon's footprint fills, leaving a margin inside the border
     private const float IconFill = 0.72f;
@@ -85,19 +88,38 @@ internal sealed class HudRenderer : IDisposable
     private readonly uint[] _effectIcons = new uint[StatusEffect.MaxKinds];
 
     // Heart sprites with the 1px side padding cropped out of their UVs (see the Heart
-    // metrics above): full width for empty/full, left half for a half heart.
+    // metrics above); a partly filled heart clips the full sprite with a scissor.
     private readonly Mesh _heartEmptyMesh;
     private readonly Mesh _heartFullMesh;
-    private readonly Mesh _heartHalfMesh;
 
     // The crosshair's five cropped pieces (see DrawCrosshair)
     private readonly Mesh _crosshairCenterMesh;
     private readonly Mesh[] _crosshairArmMeshes;
 
+    // The boss bar: a name line over a bar cut from the 48x32 boss_health sheet (16 px segments, 16 px rows),
+    // drawn at two canvas units per texture pixel
+    private const float BossBarWidth = 640f;
+    private const float BossBarHeight = 32f;
+    private const float BossBarNameGap = 12f;
+    private readonly SegmentedBarRenderer _bossBar;
+
+    // The shown values of the hearts, the boss bar and the mana bar, which ease toward the real ones
+    // (-1 until the first draw, so a bar starts at its true value instead of sliding in)
+    private float _shownHealth = -1f;
+    private float _shownBoss = -1f;
+    private float _shownMana = -1f;
+    private float _barDt;
+    private bool _bossDrawn;
+    private float _barTime = -1f;
+
+    /// <summary>How much vertical room the boss bar block (name and bar) takes under <c>top</c>, in canvas units.</summary>
+    internal static float BossBarBlockHeight => TextSize.Body + BossBarNameGap + BossBarHeight;
+
     internal HudRenderer(GL gl, UIRenderer ui)
     {
         _gl = gl;
         _ui = ui;
+        _bossBar = new SegmentedBarRenderer(gl, ui, "assets/textures/ui/boss_health.png", 16, 16);
 
         _crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
         _heartTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/heart.png");
@@ -108,10 +130,8 @@ internal sealed class HudRenderer : IDisposable
             if (effect.IconPath != null)
                 _effectIcons[effect.Id] = TextureLoader.LoadFromFile(gl, effect.IconPath);
         var heartUv = new UvRect(new Vector2(1f / 32f, 0f), new Vector2(31f / 32f, 1f));
-        var heartHalfUv = new UvRect(new Vector2(1f / 32f, 0f), new Vector2(16f / 32f, 1f));
         _heartEmptyMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
         _heartFullMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
-        _heartHalfMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartHalfUv);
 
         // The crosshair's five pieces, cropped out of the 16x16 texture: a 4x4 center dot and four
         // 5x4 pills with an empty row and column between them (see DrawCrosshair)
@@ -123,6 +143,25 @@ internal sealed class HudRenderer : IDisposable
             Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(0f, 6f, 5f, 10f)),
             Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(11f, 6f, 16f, 10f)),
         ];
+    }
+
+    /// <summary>
+    /// Starts a HUD frame at <paramref name="time"/> (seconds): the step the hearts, boss bar and mana
+    /// bar ease by this frame. Call once before their draws.
+    /// </summary>
+    internal void BeginBars(float time)
+    {
+        _barDt = _barTime < 0f ? 0f : time - _barTime;
+        if (!_bossDrawn)
+            _shownBoss = -1f;
+        _bossDrawn = false;
+        _barTime = time;
+    }
+
+    private float Ease(ref float shown, float target)
+    {
+        shown = shown < 0f ? target : MathUtils.Damp(shown, target, HudConfig.BarDampRate, _barDt);
+        return shown;
     }
 
     // One crosshair piece's pixel rect (y measured from the texture's top) as a UV rect
@@ -210,31 +249,54 @@ internal sealed class HudRenderer : IDisposable
 
     /// <summary>
     /// The survival hearts: 10 in a row centered above the hotbar, 1 heart per 10 HP.
-    /// Every heart draws its empty shell first and the red heart over it — full, left
-    /// half (5 HP steps), or nothing — so damage reads heart by heart like Minecraft.
+    /// Every heart draws its empty shell first and the red heart over it, clipped from the
+    /// left to its exact share of the (eased) HP, so damage reads continuously.
     /// </summary>
-    internal void DrawHearts(int health)
+    internal void DrawHearts(int health, int maxHealth = PlayerHealth.MaxHealth)
     {
-        var hp = Math.Clamp(health, 0, PlayerHealth.MaxHealth);
+        var hp = Math.Clamp(Ease(ref _shownHealth, health), 0f, maxHealth);
+        // Ten hearts always: each stands for a tenth of the pool, so gear that grows the pool grows every heart
+        var perHeart = maxHealth / (float)PlayerHealth.HeartCount;
         var rowWidth = HeartDrawWidth + (PlayerHealth.HeartCount - 1) * HeartStride;
         var firstX = (_ui.ScreenSize.X - rowWidth) * 0.5f + HeartDrawWidth * 0.5f;
         var hotbarTop = _ui.ScreenSize.Y - BottomMargin - SlotSize;
         var centerY = hotbarTop - HeartGap - HeartDrawHeight * 0.5f;
         var fullSize = new Vector2(HeartDrawWidth, HeartDrawHeight);
-        var halfSize = new Vector2(HeartDrawWidth * 0.5f, HeartDrawHeight);
 
         for (var i = 0; i < PlayerHealth.HeartCount; i++)
         {
             var center = new Vector2(firstX + i * HeartStride, centerY);
             _ui.DrawMesh(_heartEmptyMesh, RectTransform(center, fullSize), Rgba.White, _heartEmptyTexture);
 
-            var fill = Math.Clamp(hp - i * PlayerHealth.HpPerHeart, 0, PlayerHealth.HpPerHeart);
-            if (fill >= PlayerHealth.HpPerHeart)
+            var share = Math.Clamp((hp - i * perHeart) / perHeart, 0f, 1f);
+            if (share <= 0f) continue;
+            if (share >= 1f - 1e-3f)
+            {
                 _ui.DrawMesh(_heartFullMesh, RectTransform(center, fullSize), Rgba.White, _heartTexture);
-            else if (fill >= PlayerHealth.HpPerHeart / 2)
-                _ui.DrawMesh(_heartHalfMesh,
-                    RectTransform(center with { X = center.X - HeartDrawWidth * 0.25f }, halfSize),
-                    Rgba.White, _heartTexture);
+                continue;
+            }
+            DrawHeartFill(center, fullSize, share);
+        }
+    }
+
+    /// <summary>
+    /// A partly filled heart: the red heart clipped to its left <paramref name="share"/>, so the HP reads
+    /// to the pixel instead of in half-heart steps.
+    /// </summary>
+    private void DrawHeartFill(Vector2 center, Vector2 size, float share)
+    {
+        var topLeft = center - size * 0.5f + _ui.OverlayOffset;
+        var (sx, sy, sw, sh) = UiCanvas.ScissorRect(topLeft, new Vector2(size.X * share, size.Y),
+            _ui.Scale, _ui.WindowSize, _ui.FramebufferSize);
+        _gl.Enable(EnableCap.ScissorTest);
+        _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
+        try
+        {
+            _ui.DrawMesh(_heartFullMesh, RectTransform(center, size), Rgba.White, _heartTexture);
+        }
+        finally
+        {
+            _gl.Disable(EnableCap.ScissorTest);
         }
     }
 
@@ -265,7 +327,7 @@ internal sealed class HudRenderer : IDisposable
     }
 
     /// <summary>
-    /// The mana bar: a thin bar as wide as the hotbar row, centered in the margin under it, its blue
+    /// The mana bar: a bar as wide as the hotbar row, just above it, its blue
     /// fill growing from the left with <paramref name="manaShare"/>. Hidden while dead and in
     /// <paramref name="creative"/>, which casts for free.
     /// </summary>
@@ -274,12 +336,25 @@ internal sealed class HudRenderer : IDisposable
         if (health <= 0 || creative)
             return;
         var width = HotbarLayout.RowWidth();
-        var centerY = _ui.ScreenSize.Y - BottomMargin * 0.5f;
+        var centerY = _ui.ScreenSize.Y - BottomMargin - SlotSize - ManaBarGap - ManaBarHeight * 0.5f;
         var left = (_ui.ScreenSize.X - width) * 0.5f;
         _ui.DrawRect(new Vector2(_ui.ScreenSize.X * 0.5f, centerY), new Vector2(width, ManaBarHeight), ManaTrack);
-        var fill = MathUtils.Clamp01(manaShare) * width;
+        var fill = MathUtils.Clamp01(Ease(ref _shownMana, manaShare)) * width;
         if (fill > 0.5f)
             _ui.DrawRect(new Vector2(left + fill * 0.5f, centerY), new Vector2(fill, ManaBarHeight), ManaFill);
+    }
+
+    /// <summary>
+    /// The boss bar: the boss's name centered over a bar centered on the screen, its top at <paramref name="top"/>
+    /// and filled left to right by <paramref name="share"/>. The name is drawn whole, never cut or wrapped.
+    /// </summary>
+    internal void DrawBossBar(string name, float share, float top)
+    {
+        _bossDrawn = true;
+        var centerX = _ui.ScreenSize.X * 0.5f;
+        _ui.DrawTextCentered(name, centerX, top, _ui.CountScale, Rgba.White);
+        _bossBar.Draw(new Vector2(centerX - BossBarWidth * 0.5f, top + TextSize.Body + BossBarNameGap),
+            BossBarWidth, BossBarHeight, Ease(ref _shownBoss, share));
     }
 
     /// <summary>
@@ -323,7 +398,7 @@ internal sealed class HudRenderer : IDisposable
     {
         if (_ui.Font == null || names.Count == 0) return;
 
-        var lineHeight = CountCapHeight + 6f;
+        var lineHeight = TextSize.Body + 6f;
         var width = PlayerListWidth;
         foreach (var name in names)
             width = MathF.Max(width, _ui.Font.MeasureSize(name, _ui.CountScale).X + 32f);
@@ -342,33 +417,47 @@ internal sealed class HudRenderer : IDisposable
 
     /// <summary>
     /// One hover tooltip (see <see cref="ItemTooltip"/>): a panel just below-right of the cursor
-    /// with the hovered item's lines, clamped inside the canvas.
+    /// with the hovered item's lines, clamped inside the canvas. The box wears the hovered item's rarity
+    /// chrome (<see cref="RarityChromeRenderer"/>, animated on <paramref name="time"/>), or the plain
+    /// border for a Common item.
     /// </summary>
-    internal void DrawTooltip(Vector2 anchor, IReadOnlyList<string> lines)
+    internal void DrawTooltip(Vector2 anchor, IReadOnlyList<string> lines, IReadOnlyDictionary<int, Rgba> colors,
+        Rarity rarity, float time)
     {
         if (_ui.Font == null || lines.Count == 0) return;
 
-        var lineHeight = CountCapHeight + 6f;
-        var width = TooltipWidth;
-        foreach (var line in lines)
-            width = MathF.Max(width, _ui.Font.MeasureSize(line, _ui.CountScale).X + 24f);
-        var height = lineHeight * lines.Count + 16f;
-        var center = anchor + new Vector2(16f + width * 0.5f, 18f + height * 0.5f);
-        center.X = Math.Clamp(center.X, width * 0.5f + 4f, _ui.ScreenSize.X - width * 0.5f - 4f);
-        center.Y = Math.Clamp(center.Y, height * 0.5f + 4f, _ui.ScreenSize.Y - height * 0.5f - 4f);
-        _ui.DrawRect(center, new Vector2(width, height), PanelBackground);
-        _ui.DrawBorder(center, new Vector2(width, height), SlotBorder, SlotBorderColor);
-
-        var top = center.Y - height * 0.5f + 8f;
+        // Each source line wraps to the tooltip's width and keeps its own color on every wrapped row; the layout then clamps the
+        // row count and places the box beside the anchor (canvas units) inside the canvas
+        float Measure(ReadOnlySpan<char> text) => _ui.Font.MeasureSize(text.ToString(), _ui.CountScale).X;
+        var wrapped = new List<string>();
+        var rowColors = new List<Rgba>();
         for (var i = 0; i < lines.Count; i++)
         {
-            _ui.DrawText(lines[i], new Vector2(center.X - width * 0.5f + 12f, top + lineHeight * i),
-                _ui.CountScale, i == 0 ? Rgba.White : TextDim);
+            var before = wrapped.Count;
+            TextWrap.Wrap(lines[i], TooltipMaxTextWidth, Measure, wrapped);
+            var color = colors.TryGetValue(i, out var picked) ? picked : i == 0 ? Rgba.White : TextDim;
+            for (var row = before; row < wrapped.Count; row++) rowColors.Add(color);
         }
+
+        var lineHeight = TextSize.Body + 6f;
+        var layout = TooltipLayout.Compute(wrapped, anchor, _ui.ScreenSize, TooltipMaxTextWidth, TooltipMaxLines, lineHeight, Measure);
+        _ui.DrawRect(layout.Box.Center, layout.Box.Size, PanelBackground);
+        // The chrome's border band stands in for the plain border
+        var style = RarityStyle.Of(rarity);
+        if (style.HasChrome)
+            _ui.Chrome.DrawTooltip(layout.Box.Center, layout.Box.Size, style, time);
+        else
+            _ui.DrawBorder(layout.Box.Center, layout.Box.Size, Border.Standard, SlotBorderColor);
+
+        var pad = UiTheme.Space.Md;
+        for (var i = 0; i < layout.Lines.Count; i++)
+            _ui.DrawText(layout.Lines[i], new Vector2(layout.Box.Left + pad, layout.Box.Top + pad + lineHeight * i),
+                _ui.CountScale, rowColors[i]);
     }
 
-    // Smallest width of a tooltip panel; a long line widens it
-    private const float TooltipWidth = 120f;
+    // The widest a tooltip line runs before it wraps, and the most rows a tooltip shows
+    private const float TooltipMaxTextWidth = 320f;
+    private const int TooltipMaxLines = 18;
 
     /// <summary>
     /// One toast line (<see cref="HudToast"/>) centered a little above the item-name row, at
@@ -380,9 +469,13 @@ internal sealed class HudRenderer : IDisposable
         if (_ui.Font == null || a <= 0.004f || string.IsNullOrEmpty(text)) return;
 
         var heartsTop = HotbarLayout.Top(_ui.ScreenSize) - HeartGap - HeartDrawHeight;
-        var top = heartsTop - HotbarNameGap - CountCapHeight - ToastRowGap;
+        var top = heartsTop - HotbarNameGap - TextSize.Body - ToastRowGap;
         _ui.TextFade = a;
         var size = _ui.Font.MeasureSize(text, _ui.CountScale);
+        // A small panel behind the line, so it reads over any scene
+        var panel = new Vector2(size.X + UiTheme.Space.Lg * 2f, TextSize.Body + UiTheme.Space.Md);
+        var center = new Vector2(_ui.ScreenSize.X * 0.5f, top + TextSize.Body * 0.5f);
+        _ui.DrawRect(center, panel, new Rgba(PanelBackground.R, PanelBackground.G, PanelBackground.B, (byte)(PanelBackground.A * a)));
         _ui.DrawText(text, new Vector2((_ui.ScreenSize.X - size.X) * 0.5f, top), _ui.CountScale, Rgba.White);
         _ui.TextFade = 1f;
     }
@@ -398,7 +491,7 @@ internal sealed class HudRenderer : IDisposable
         if (_ui.Font == null || a <= 0.004f || string.IsNullOrEmpty(name)) return;
 
         var heartsTop = HotbarLayout.Top(_ui.ScreenSize) - HeartGap - HeartDrawHeight;
-        var top = heartsTop - HotbarNameGap - CountCapHeight;
+        var top = heartsTop - HotbarNameGap - TextSize.Body;
         _ui.TextFade = a;
         try
         {
@@ -420,7 +513,7 @@ internal sealed class HudRenderer : IDisposable
         if (_ui.Font == null || string.IsNullOrEmpty(label)) return;
 
         var left = (_ui.ScreenSize.X + HotbarLayout.RowWidth()) * 0.5f + StaffSlotGap;
-        var top = HotbarLayout.CenterY(_ui.ScreenSize) - CountCapHeight * 0.5f;
+        var top = HotbarLayout.CenterY(_ui.ScreenSize) - TextSize.Body * 0.5f;
         _ui.DrawText(label, new Vector2(left, top), _ui.CountScale, Rgba.White);
     }
 
@@ -429,7 +522,7 @@ internal sealed class HudRenderer : IDisposable
 
     /// <summary>
     /// Draws the frame-timing table under the FPS text: a translucent panel sized to the block
-    /// so it reads over bright terrain, then one <see cref="UIRenderer.DrawText"/> line per row. The lines
+    /// so it reads over bright terrain, then one <see cref="UIRenderer.DrawText(string, Vector2, float, Rgba)"/> line per row. The lines
     /// are already formatted by <see cref="FrameProfiler"/> (rebuilt once a second), so this
     /// allocates nothing per frame.
     /// </summary>
@@ -478,7 +571,7 @@ internal sealed class HudRenderer : IDisposable
 
             _ui.DrawRect(center, slotSize, selected ? SelectedBackground : SlotBackground);
             _ui.DrawBorder(center, slotSize,
-                selected ? SelectedBorder : SlotBorder,
+                selected ? Border.Selected : Border.Standard,
                 selected ? SelectedBorderColor : SlotBorderColor);
             // A broken tool's slot flashes: a bright panel fading out (HotbarPickupPop.FlashAt)
             var flash = pops?.FlashAt(i) ?? 0f;
@@ -569,10 +662,10 @@ internal sealed class HudRenderer : IDisposable
         foreach (var icon in _effectIcons)
             if (icon != 0)
                 _gl.DeleteTexture(icon);
+        _bossBar.Dispose();
         _bubbleMesh.Dispose();
         _heartEmptyMesh.Dispose();
         _heartFullMesh.Dispose();
-        _heartHalfMesh.Dispose();
         _crosshairCenterMesh.Dispose();
         foreach (var arm in _crosshairArmMeshes)
             arm.Dispose();

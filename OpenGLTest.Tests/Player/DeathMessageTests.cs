@@ -9,6 +9,8 @@ namespace VoxelEngine.Tests.Player;
 /// </summary>
 public sealed class DeathMessageTests
 {
+    public DeathMessageTests() => TestContent.EnsureLoaded();
+
     [Fact]
     public void TheLineNamesTheKillerForAMob()
     {

@@ -1,0 +1,25 @@
+{
+  // The frost highland's crystal tree: a slim glassy spire on the conifer logic under a narrow cone of
+  // glowing crystal leaves. No worldgen block: SkyTrees plants it from the frost highland's palette
+  // (SkyBiomes), grown inside its 16x16 cell and under the island band's top.
+  "wood": "block/crystal_log",
+  "leaves": "block/crystal_leaves",
+  "growth": {
+    "logic": "conifer",
+    "signalEnergy": 11,
+    "upProbability": 5,
+    "lowestBranchHeight": 2,
+    "maturitySteps": [35, 55]
+  },
+  "thickness": {
+    "tipPx": 1,
+    "pipeExponent": 1.6,
+    "maxPx": 10,
+    "girthProfile": [[0, 2.0], [1, 1.0]],
+    "trunkShape": "circle",
+    "rim": "block"
+  },
+  "leafCluster": { "shape": "cone", "radius": 2, "hydration": 4, "tipMaxPx": 2, "minRadius": 1, "fullRadiusPx": 8 },
+  // Never drawn (the sky has no far LOD); only has to stay valid
+  "lod": { "crownHeight": [6, 9], "crownRadius": 2, "profile": "cone" }
+}

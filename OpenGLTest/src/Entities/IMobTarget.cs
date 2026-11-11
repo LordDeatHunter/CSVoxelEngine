@@ -14,6 +14,11 @@ public interface IMobTarget
     /// <summary>The player's eye; the body box hangs <see cref="Camera.EyeHeight"/> below it.</summary>
     Vector3 Eye { get; }
 
+    /// <summary>How fast and which way the player moves, in blocks per second: the ring spawners lead a
+    /// moving player (<see cref="Simulation.SpawnOrigin"/>) and drop the mobs it leaves far behind
+    /// (<see cref="MobTargets.OutOfPlay"/>). Zero for a target that does not report it.</summary>
+    Vector3 Velocity => Vector3.Zero;
+
     /// <summary>Whether no mob hit can hurt this player right now (creative or flying). Mobs still
     /// chase an immune player when no other is in play, so a hovering camera can film them.</summary>
     bool IsImmune { get; }
@@ -27,8 +32,8 @@ public interface IMobTarget
     /// an iceberg. The camera's own flight flag, or a connected player's server-owned one.</summary>
     bool IsFlying => false;
 
-    /// <summary>Whether the player is dead: a dead body pushes nothing. Only a connected player
-    /// reports its server-owned death here; the local camera keeps the default.</summary>
+    /// <summary>Whether the player is dead: a dead body pushes nothing. A connected player
+    /// reports its server-owned death here, the local camera its health pool's. Mobs lose interest in a dead player.</summary>
     bool IsDead => false;
 
     /// <summary>The target's status effects, null where nothing may apply them (a stand-in target, a
@@ -40,4 +45,8 @@ public interface IMobTarget
     /// upward <paramref name="lift"/>. <paramref name="attacker"/> is the mob's display name, which
     /// a death names in its message.</summary>
     void TakeHit(int damage, Vector3 awayHorizontal, float knockbackSpeed, float lift, string? attacker = null);
+
+    /// <summary>Restores up to <paramref name="amount"/> HP (a conquered tower floor's reward); a target with no
+    /// health pool of its own ignores it.</summary>
+    void Heal(int amount) { }
 }

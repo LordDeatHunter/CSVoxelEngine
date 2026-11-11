@@ -643,7 +643,7 @@ public sealed class MeshingTests
         // Ring the top-face AO neighborhood with canopy and thin wood: every side/corner
         // sample around the +Y face sits on leaves or a branch. A full-cube neighbor here
         // would drag corners to AO 0 (black); these must leave it at full brightness.
-        var ring = new (int x, int z, byte id)[]
+        var ring = new (int x, int z, ushort id)[]
         {
             (7, 7, leaves), (7, 8, branch), (7, 9, leaves),
             (8, 7, branch), (8, 9, leaves),

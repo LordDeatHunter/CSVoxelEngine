@@ -62,7 +62,7 @@ public sealed class DebugSceneRenderer : IDisposable
     private readonly int[] _locPointColor;
     // Resolved in the ctor body after ContentRegistry.Load: a field initializer would run first,
     // against an empty registry.
-    private readonly byte _flintId;
+    private readonly ushort _flintId;
     // Entity rigs, built the first time the ENTITIES tab shows each one.
     private readonly Dictionary<(string Type, int Variant), EntityPreview> _entityPreviews = new();
 
@@ -186,8 +186,8 @@ public sealed class DebugSceneRenderer : IDisposable
 
     /// <summary>
     /// Draws the entity <paramref name="state"/> previews, part by part, at the origin: each part
-    /// from the state's <see cref="EntityAnimator.GetPartMatrix"/>, the flint in the hand when the
-    /// rig has one, and the hurt mode's hit-flash tint. Same frame setup as <see cref="Render"/>.
+    /// from the state's <see cref="EntityPreviewState.PartMatrix"/>, the flint in the hand when the
+    /// rig has one, the item its entity file holds, and the hurt mode's hit-flash tint. Same frame setup as <see cref="Render"/>.
     /// </summary>
     public void RenderEntity(Matrix4x4 viewProj, Vector3 eyePos, EntityPreviewState state, float time,
         Vector2D<int> size)
@@ -206,7 +206,7 @@ public sealed class DebugSceneRenderer : IDisposable
         BindArray(0, preview.Texture);
         for (var i = 0; i < preview.Parts.Length; i++)
             Draw(preview.Parts[i],
-                animator.GetPartMatrix(preview.PartNames[i], preview.Rig, feet, state.FacingYaw) * effect, viewProj);
+                state.PartMatrix(preview.PartNames[i], preview.Rig, feet) * effect, viewProj);
 
         if (state.ShowsHeldStone && _itemMeshes.TryGet(_flintId, out var stone, out var stoneTex))
         {
@@ -214,6 +214,13 @@ public sealed class DebugSceneRenderer : IDisposable
             var model = Matrix4x4.CreateScale(Goblin.HeldStoneScale)
                         * animator.HandAnchor(Goblin.HandPart, preview.Rig, feet, state.FacingYaw) * effect;
             Draw(stone, model, viewProj);
+        }
+
+        // The item the kind's entity file holds (the skeleton warrior's dagger), as the game's MobPasses draws it
+        if (type.HeldItemId != 0 && _itemMeshes.TryGet(type.HeldItemId, out var held, out var heldTex))
+        {
+            BindArray(0, heldTex);
+            Draw(held, type.HeldMatrix(animator, preview.Rig, feet, state.FacingYaw) * effect, viewProj);
         }
         _world.SetUniform("uHitFlash", 0f);
     }

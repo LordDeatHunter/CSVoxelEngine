@@ -19,11 +19,12 @@ public sealed class StationSaveTests
 {
     public StationSaveTests() => TestContent.EnsureLoaded();
 
-    private static byte Mudball => ContentRegistry.RequireItem("mudball").Id;
-    private static byte MalachiteChunk => ContentRegistry.RequireItem("malachite_ore").Id;
+    private static ushort Mudball => ContentRegistry.RequireItem("mudball").Id;
+    private static ushort MalachiteChunk => ContentRegistry.RequireItem("malachite_ore").Id;
     private static Item Coal => ContentRegistry.RequireItem("coal");
     private static BlockType Kiln => ContentRegistry.RequireBlock("mud_brick_kiln");
     private static byte Copper => ContentRegistry.MoltenMaterialByName("copper")!.Id;
+    private static byte Tin => ContentRegistry.MoltenMaterialByName("tin")!.Id;
 
     private sealed record Stations(CampfireManager Campfires, QuernManager Querns, KilnManager Kilns,
         CastingManager Casting)
@@ -103,8 +104,10 @@ public sealed class StationSaveTests
         var before = Stations.Empty();
         var anchor = new Vector3(8, 2, 3);
         before.Kilns.Ensure(anchor, 0, Kiln.Id);
+        // Every metal of a mixed vessel, molten and pending, comes back
         Assert.True(before.Kilns.TryPlaceCrucible(anchor, ContentRegistry.RequireItem("crucible").Id,
-            new CrucibleComponent(Copper, 200, 300, MalachiteChunk)));
+            new CrucibleComponent([new CrucibleMetal(Copper, 200, 300), new CrucibleMetal(Tin, 0, 100)],
+                MalachiteChunk)));
 
         var after = ThroughTheFile(before, out _);
         var original = before.Kilns.StateAt(8, 2, 3)!;
@@ -155,8 +158,7 @@ public sealed class StationSaveTests
     public void OutOfRangeNumbersAreRefusedNotRestored()
     {
         var data = Running().Capture();
-        data.Kilns![0].Fuel = KilnManager.MaxFuel + 1;
-        data.Kilns[0].MoltenMl = -5;
+        data.Kilns![0].Fuel = ContentRegistry.RequireBlock("mud_brick_kiln").Kiln!.FuelCap + 1;
         data.Querns![0].Cell = [1, 2];
 
         var into = Stations.Empty();

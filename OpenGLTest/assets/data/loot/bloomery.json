@@ -1,0 +1,7 @@
+{
+  // Every mined cell of a bloomery yields the one bloomery_bricks block it was built from; the other seven
+  // cells revert to bloomery_bricks in place.
+  "pools": [
+    { "rolls": 1, "entries": [ { "item": "block/bloomery_bricks" } ] }
+  ]
+}

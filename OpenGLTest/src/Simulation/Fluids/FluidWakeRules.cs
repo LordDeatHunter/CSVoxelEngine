@@ -12,7 +12,7 @@ internal static class FluidWakeRules
     /// <see cref="Chunk.FluidFrontier"/>'s worker-thread scan so both halves of the wake-up
     /// agree with <see cref="FluidSpread.CanFlowInto"/> on what counts as somewhere to go.
     /// </summary>
-    internal static bool IsFlowTarget(byte id) => !BlockType.IsFluid(id) && BlockType.IsReplaceable(id);
+    internal static bool IsFlowTarget(ushort id) => !BlockType.IsFluid(id) && BlockType.IsReplaceable(id);
 
     /// <summary>
     /// Whether a generated fluid may wake into a cell: a flow target at or below its column's
@@ -22,7 +22,7 @@ internal static class FluidWakeRules
     /// This is the first clause of <see cref="IsWakeTarget"/>, which both halves of the wake (the
     /// worker-thread <see cref="Chunk.FluidFrontier"/> scan and the border scan) now call.
     /// </summary>
-    internal static bool IsCarvedFlowTarget(byte id, int worldY, int columnHeight) =>
+    internal static bool IsCarvedFlowTarget(ushort id, int worldY, int columnHeight) =>
         IsFlowTarget(id) && worldY <= columnHeight;
 
     /// <summary>
@@ -37,7 +37,7 @@ internal static class FluidWakeRules
     /// restored chunk) wakes against any replaceable neighbor. Shared by
     /// <see cref="Chunk.FluidFrontier"/>'s worker-thread scan and <see cref="FluidWakeScanner.WakeBorders"/>.
     /// </summary>
-    internal static bool IsWakeTarget(byte targetId, int targetY, int targetColumnHeight,
+    internal static bool IsWakeTarget(ushort targetId, int targetY, int targetColumnHeight,
         int fluidY, int fluidColumnHeight, int fluidColumnWaterLevel) =>
         IsFlowTarget(targetId)
         && (targetY <= targetColumnHeight

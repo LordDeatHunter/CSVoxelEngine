@@ -17,7 +17,7 @@ namespace VoxelEngine.Interaction;
 public static class Mining
 {
     /// <summary>Gap between hits for a bare hand or any item that declares no tool pace.</summary>
-    public const float DefaultHitGapMs = 300f;
+    public const float DefaultHitGapMs = 600f;
 
     /// <summary>Mining tier a bare hand counts as when a block's <c>tools</c> gate is checked.</summary>
     public const float DefaultPower = 0.5f;
@@ -30,22 +30,28 @@ public static class Mining
     /// deals to an enemy.</summary>
     public const float DefaultEntityDamage = 1f;
 
-    /// <summary>Whether the held item may damage this block under its requiresTool gate.</summary>
-    public static bool CanMine(byte blockId, Item? held)
+    /// <summary>Whether the held item may damage this block under its requiresTool gate. Never
+    /// for a fluid or an unbreakable block, which nothing mines.</summary>
+    public static bool CanMine(ushort blockId, Item? held)
     {
         var block = BlockType.ById[blockId];
-        return block is { Fluid: false } && !Refused(block, held);
+        return block is { Fluid: false, Unbreakable: false } && !Refused(block, held);
     }
 
     /// <summary>Whether <paramref name="held"/> is an axe: a member of the <c>axe</c> tag, which swings an
     /// overhead chop at what it mines instead of a punch.</summary>
     public static bool IsAxe(Item? held) => held != null && ContentRegistry.IsInTag("axe", held.Id);
 
-    /// <summary>Damage one hit deals, or 0 when the block's gate refuses the held item.</summary>
-    public static float HitDamage(byte blockId, Item? held)
+    /// <summary>Whether <paramref name="held"/> is a smithing hammer: a member of the <c>hammer</c> tag, which works
+    /// a bloom on an anvil (<see cref="Simulation.Smithing.AnvilManager"/>) instead of mining it.</summary>
+    public static bool IsHammer(Item? held) => held != null && ContentRegistry.IsInTag("hammer", held.Id);
+
+    /// <summary>Damage one hit deals, or 0 when the block's gate refuses the held item. An
+    /// unbreakable block takes no damage from anything.</summary>
+    public static float HitDamage(ushort blockId, Item? held)
     {
         var block = BlockType.ById[blockId];
-        if (block == null || block.Fluid) return 0f;
+        if (block == null || block.Fluid || block.Unbreakable) return 0f;
         return Refused(block, held) ? 0f : BlockDamage(held);
     }
 
@@ -55,7 +61,7 @@ public static class Mining
     /// <see cref="BlockType.TipHardness"/> of it at the thinnest up to all of it at a full cube
     /// (so placed, detached wood is as hard as a trunk). 0 for an unknown id.
     /// </summary>
-    public static float HardnessOf(byte blockId, byte state)
+    public static float HardnessOf(ushort blockId, byte state)
     {
         var type = BlockType.ById[blockId];
         if (type == null) return 0f;

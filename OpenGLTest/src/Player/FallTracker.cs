@@ -36,7 +36,8 @@ public sealed class FallTracker
     /// The first observation only seeds the state. A landing (grounded after airborne) bills
     /// the drop from the peak feet height unless <paramref name="creative"/>,
     /// <paramref name="inWater"/> or <paramref name="cushioned"/> (a bounce block caught it,
-    /// which springs the body back up); <paramref name="flying"/> and a step larger than
+    /// which springs the body back up, or a soft-landing block;
+    /// <see cref="PlayerBodyProbe.LandingCushioned"/>); <paramref name="flying"/> and a step larger than
     /// <paramref name="maxStepBlocks"/> reset the peak to the current feet.
     /// </summary>
     public int Observe(float feet, bool grounded, bool flying, bool inWater, bool creative, float maxStepBlocks,

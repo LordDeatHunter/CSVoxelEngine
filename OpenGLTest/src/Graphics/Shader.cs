@@ -225,6 +225,19 @@ public class Shader : IDisposable
             _gl.Uniform3(locations[i], values[i].X, values[i].Y, values[i].Z);
     }
 
+    /// <summary>
+    /// Sets the leading elements of a vec4 array uniform declared with <paramref name="capacity"/>
+    /// elements (the splash ripples); the rest keep their old values, which the shader's own count
+    /// uniform must leave unread. The locations are cached by name, so no strings are built per call.
+    /// </summary>
+    public void SetUniformArray4(string name, int capacity, ReadOnlySpan<Vector4> values)
+    {
+        var locations = GetUniformArrayLocations(name, capacity);
+        var count = Math.Min(locations.Length, values.Length);
+        for (var i = 0; i < count; i++)
+            _gl.Uniform4(locations[i], values[i].X, values[i].Y, values[i].Z, values[i].W);
+    }
+
     public void SetUniform(string name, Vector4 value) => SetUniform(GetUniformLocation(name), value);
 
     public void SetUniform(int location, Vector4 value) =>

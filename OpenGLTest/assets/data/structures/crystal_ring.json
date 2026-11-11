@@ -1,0 +1,32 @@
+{
+  "kind": "sky",
+  "weight": 1,
+  "groundLayer": 0,
+  "palette": {
+    "k": "crystal_block",
+    "C": "ruin_chest_sky"
+  },
+  "layers": [
+    [
+      "kkkkk",
+      "k...k",
+      "k.C.k",
+      "k...k",
+      "kkkkk"
+    ],
+    [
+      "k...k",
+      "     ",
+      "     ",
+      "     ",
+      "k...k"
+    ],
+    [
+      "k...k",
+      "     ",
+      "     ",
+      "     ",
+      "k...k"
+    ]
+  ]
+}

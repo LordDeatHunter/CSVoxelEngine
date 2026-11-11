@@ -5,7 +5,7 @@
 ## Status
 
 Gameplay and content only: performance is in `PERF.md`, tree residue in `TREES.md`, and
-architecture, content schema and threading rules in `AGENTS.md`. Last updated 2026-11-05.
+architecture, content schema and threading rules in `AGENTS.md`. Last updated 2026-11-10.
 **Current priority:** playable loop first. Finish the Act I survival floor (Milestone 1:
 persistence, furnace, metal tiers, forge, armor), then the first dungeon slice (Milestone 2), then
 one slice per remaining arc to prove the dual identity. No food/hunger system is planned.
@@ -26,16 +26,19 @@ Nothing.
 The smallest bundle that makes the world a *game*: stakes and an advance (no food system).
 Mostly content JSON plus small systems; high feel, low engine risk. In order:
 
-1. **`P-3` generic furnace / smelter** — `sand -> glass`, `mud -> brick`, and the iron bloom;
-   generalizes the kiln pattern and becomes the automation seed. Lands before `P-2` gating.
-2. **`P-43` anvil / forge** — pulled into this milestone: iron goes `crushed_iron` -> furnace
-   bloom -> forge-shaped parts (this replaces the earlier idea of routing iron through the kiln's
-   molten path).
+1. **`P-3` generic furnace / smelter** — `sand -> glass` and `mud -> brick`; generalizes the kiln
+   pattern and becomes the automation seed. Lands before `P-2` gating. (The iron bloom shipped as the
+   bloomery, see `AGENTS.md` "The bloomery and the anvil".)
+2. **`P-43` anvil / forge** — the iron half shipped: `crushed_iron` -> bloomery bloom -> anvil ->
+   `wrought_iron` stacked on the anvil and forged into iron parts and armor (`recipes/forge/`, never through the kiln's
+   molten path). What remains is
+   steel (carburizing) and anything else the anvil should shape.
 3. **`P-7` / `P-25` metal tiers** — iron, tin, bronze, steel as the tier ladder (`P-44` covers the
    alloys). Progression, processing requirements and per-tier recipes are **TBD, defined later**.
 4. **Armor (in `P-7`)** — flat damage reduction from summed armor points (capped), equipped from
    the inventory panel, shown in HUD/tooltip, with worn armor drawn on `PlayerModel` and remote
    players (this pulls `V-14` in). *Hook:* the damage pipeline (`PlayerHealth`, `IMobTarget.TakeHit`).
+   Accessory abilities, the ring ladder and the set rule change are done (`AGENTS.md` "Gear and equipment").
 
 #### Milestone 2 — Arc A vertical slice: the first dungeon
 
@@ -44,6 +47,8 @@ Prove the fantasy half. Infrastructure first, in order: `M-15` (structure templa
 (`P-17`), then the first magic slice, the spell builder with a few parts (`P-14`, `MAGIC.md`). A single hand-authored crypt with loot, a spawner
 room and a boss is enough to make health, combat and loot matter and to give survival a
 destination. Placing it needs a world-site hook, the one worldgen touch this milestone allows.
+The **battle tower** (`BT-1`..`BT-10`, done, see `BATTLE_TOWER.md`) is the large-scale form of this dungeon: a multi-floor
+landmark with skeleton piles, chests, dark floors, a boss altar and a collapse.
 
 #### Milestone 3 — Arc B vertical slice: first power
 
@@ -69,7 +74,7 @@ the other while still being faster together.
   A timed, fuel-consuming station modeled on the campfire's `cookSeconds` and the quern's
   block-entity pattern. First jobs: `sand -> glass`, `mud -> brick`, and a plain
   `crushed_copper -> copper_ingot` route that does not need the full kiln. Feeds `P-6` and is
-  step zero of the automation chain.
+  step zero of the automation chain. The iron bloomery is the shipped sibling (`P-59` automates it).
 - [ ] **`P-5` · Light progression: torch -> lamp -> fire as fuel** — P1, S–M.
   A cheap **torch** block (emission ~14, `needsSupport`) before the existing `lamp` (emission
   15). Wire placed lights into the shader's 8 point-light budget so a torch casts dynamic light,
@@ -78,7 +83,7 @@ the other while still being faster together.
   Fire as station fuel; per-wood burn times; campfire already burns ~30 s. Add `P-41` charcoal
   as the renewable, portable fuel. Feeds `P-3` and the kiln.
 - [ ] **`P-7` · Metal tiers beyond copper** — P1, L. **Milestone 1.**
-  Tier ladder: iron, tin, bronze (`P-44`), steel; anvil/forge (`P-43`), tool tiers 2–4, richer ore
+  Tier ladder: iron (shipped: bloomery, anvil, iron tools and armor), tin, bronze (`P-44`), steel; anvil/forge (`P-43`), tool tiers 2–4, richer ore
   gating (`P-25`). Progression, processing requirements and recipes are TBD, defined later.
   Includes armor: flat capped damage reduction, equip from the inventory panel, HUD/tooltip, and
   worn models on `PlayerModel`/remote players (`V-14`).
@@ -126,7 +131,8 @@ the other while still being faster together.
 - [ ] **`P-14` · Magic system core** — P2, L. **Tracked in `MAGIC.md` (`MG-*`).**
   Mana, staffs with bound slots, a station-built spell builder (element + shape + modifiers +
   trigger), scrolls and research that unlock parts. The first slice is the builder with a few
-  parts; the fireball is one of its signature example spells, shared with `F-4`.
+  parts (fire, frost, nature) plus a data-driven status-effect system; the fireball is one of its
+  signature example spells, shared with `F-4`.
 - [ ] **`P-15` · Skill tree / character build** — P2, L.
   Spend XP (`P-9`) across branches; informs both combat and non-combat perks. Needs `U-12`.
 - [ ] **`P-16` · Dungeons & towers (structured POIs)** — P2, L.
@@ -137,11 +143,13 @@ the other while still being faster together.
 - [ ] **`P-18` · Enchanting / item magic** — P3, L.
   Spell effects bound to gear; a crafting-station cousin of the magic system. Cross-links `P-29`,
   `P-48`.
-- [ ] **`P-43` · Forge & anvil (metal shaping)** — P1, M. **Milestone 1.**
-  After casting: hammer ingots into shaped parts, the gate to iron/steel tiers (`P-7`).
+- [ ] **`P-43` · Forge & anvil (metal shaping)** — P1, S–M. **Milestone 1.**
+  The anvil and the smithing hammer shipped with the bloomery (a bloom hammered into wrought iron), and the anvil now
+  forges stacked wrought iron into the iron heads, armor and ring (`recipes/forge/`, a recipe list per metal). Left: steel
+  (carburizing wrought iron), the gate to the upper tiers (`P-7`).
 - [ ] **`P-44` · Alloys** — P2, M.
-  Bronze from copper + tin, and later steel; the alloy step that makes mixed mining worthwhile.
-  Combines with `P-25`.
+  Bronze from copper + tin (tin ore, the 3x3x3 alloy furnace, bronze tools) shipped (see `AGENTS.md`
+  "Recipes, cast molds and metalworks"); steel remains. Combines with `P-25`.
 
 #### Arc B — expert automation
 
@@ -154,6 +162,11 @@ the other while still being faster together.
 - [ ] **`P-21` · Machine chains & processing** — P2, L.
   Crusher, sawmill, smeltery, assembler; multi-step recipes with byproducts. The quern is step
   zero; `P-3` is step one.
+- [ ] **`P-59` · Bloomery automation** — P3, M. *(after the bloomery lands; not in its scope)*
+  The bloomery's bellows is worked by the player jumping near it. Replace that with a mechanical
+  bellows (water wheel or an automated pump, see `P-19`) and automated ore/fuel feeding (`P-20`), so
+  a smelt can run unattended. Hook: the `BloomeryManager` pump input, which should take any
+  source of pumps, not only the jump count.
 - [ ] **`P-22` · Electronics / logic (redstone-ish)** — P2, L.
   Scheduled-tick logic on top of the `FluidManager` pattern: sensors, gates, moving collision
   (pistons).
@@ -218,7 +231,7 @@ single-arc player.
   Grass, leaves and spruce leaves are already climate-tinted through the `biomeTint` block field.
   Open: falling-leaf particles should sample the foliage field; flowers and water can opt into
   `biomeTint`'s `tile` form; and the biome roster itself can grow (swamp, jungle, volcanic,
-  underground biomes).
+  underground biomes; the cave biomes are tracked in `CAVE_BIOMES.md`).
   Terrain relief (highlands, ranges, massifs, lone peaks) is in `BIOMEGEN.md` §6.
 - [ ] **`P-25` · More ores + deeper strata** — P1, M.
   Tin/iron/gold/… veins placed deterministically like trees/pebbles/malachite; tiers gate tools
@@ -228,12 +241,21 @@ single-arc player.
 - [ ] **`P-27` · Second dimension + portals** — P3, XL.
   Separate seed/noise sets on the same chunk pipeline; new LOD palette. Base for `P-36`.
 - [ ] **`P-28` · Caves as destinations** — P2, M.
-  Larger caverns, underground biomes, rare crystals and hazard zones; builds on the existing
-  cave/worm/lava generation. A natural home for `P-47`'s crystal.
+  The cave biomes landed (`CAVE_BIOMES.md`, all phases done): larger caverns, frozen and desert echo
+  caves, crystal, fungal and magma-touched sub-biomes with their own atmosphere, exclusive ores
+  (amethyst, jade, cinnabar), cave mobs and biome loot. Still open: **hazard zones** (gas pockets,
+  unstable ceilings, flooding passages), and a use for the exclusive ores and `P-47`'s crystal.
+- [ ] **`P-60` · Spider dens** — P2, M.
+  An underground den the giant spiders spawn from naturally: a webbed cavern (worldgen site, like a ruin or a
+  goblin camp) with egg sacs, cobweb blocks that slow, and the **broodmother** miniboss at its heart, which never
+  spawns anywhere else. The spiders, the broodmother, their venom and silk drop already exist (`Spider`,
+  `docs/agents/realm-mobs.md` "Spiders"); the den, a use for silk and a unique broodmother drop do not.
+  *Hook:* `CaveMobManager` (a den spawner beside the cave ring; `Spider.BroodmotherEntityName` is only raised by the
+  `spawn` op today), the structure sites in `docs/agents/layers-and-structures.md`.
 - [ ] **`P-56` · Ocean & island content** — P3, M.
   Islands, shipwrecks, reefs, deep-sea POIs; makes the ocean a destination rather than a border.
   Ties `F-19`.
-  Island, archipelago and great lake *shape* is in `BIOMEGEN.md` §6; the remaining ideas are its §12.
+  Island, archipelago and great lake *shape* is in `BIOMEGEN.md` §6; the remaining ideas are its Open section.
 - [ ] **`P-57` · World events** — P2, M.
   Blood moons, raids, meteors, wandering bosses, seasonal changes; drives `F-5` and gives the
   base a reason to be defended (`P-54`).
@@ -245,16 +267,22 @@ single-arc player.
 - [ ] **`F-1` · Mobs — ambient critters** — P2, M.
   Fireflies, butterflies, birds. Could share the particle infrastructure — a cheap first step
   into entities.
+- [ ] **`F-1b` · Rideable dragonfly** — P2, L.
+  The dragonfly (`Entities/Wildlife/Dragonfly`) was modeled as a future mount: its thorax top is flat and clear
+  of the wings, and it already has `perch`, `land` and `takeoff` clips. Still open: taming or saddling, mounting
+  and dismounting, flight input, a rider pose, saves and network sync.
 - [ ] **`F-2` · Mobs — friendly / neutral (farm animals)** — P2, L.
   Cows/sheep/chickens; wandering, breeding, drops, leads. Needs `P-38`. Depends on entity AI.
 - [ ] **`F-3` · Mobs — hostiles (night / caves)** — P2, XL.
   The slime (hop AI, contact damage) and goblin (throw-then-melee raider, shared `Mob` base,
-  `MobSpawner`) landed. Still open: **light/time-keyed and cave spawns**, **voxel pathing**
-  (both currently walk/auto-jump straight at the player), more hostile kinds, and spawners
-  (`M-17`).
+  `MobSpawner`) landed, as did torch-safe ground, the night-keyed slime sizes and goblin torches,
+  and cave spawns filtered by cave biome (cave slimes, cave goblins and one mob per cave sub-biome,
+  `plans/CAVE_BIOMES.md` CB-4). Still open: **voxel pathing** (every walker still walks/auto-jumps
+  straight at the player), more hostile kinds, and spawners (`M-17`).
 - [ ] **`F-4` · Combat depth** — P2, L.
   Melee landed: punch, the two-phase obsidian-blade slice (`SliceCombo`), knockback, per-item
-  `entityDamage`, and mobs that hit back. Still open: a **bow + arrows** (animation `V-15`), a throwable
+  `entityDamage`, and mobs that hit back. Still open: a **bow + arrows** (animation `V-15`; the `arrow` item, an
+  aligned throwable, and the skeleton's arrows already exist), a throwable
   **spear** (reuses the throw animations, `V-16`), **right-click
   shield/block**, the **fireball** bridging to `P-14`, attack cooldown, and armor (`P-7`).
 - [ ] **`F-5` · Weather & day/night threat** — P1, M.
@@ -322,7 +350,7 @@ single-arc player.
   Decide whether a shaped grid is ever wanted; the current system is deliberately shapeless.
   Parked, not planned — revisit only if content demands it.
 - [ ] **`U-22` · Chat command autocomplete** — P2, S–M. Pairs `U-7`; for the quick-win `/time`,
-  `/tp`, `/give` and `/help`.
+  `/tp`, `/give`, `/locate` and `/help` (`/locate` offers `tower`).
   Tab completes in the chat input. *Hook:* the command table those commands share (each entry gains
   an argument spec). Tab on `/` completes the command name (a unique prefix completes at once,
   several cycle through the matches with Tab and Shift+Tab, shown as a suggestion row above the
@@ -333,6 +361,12 @@ single-arc player.
   completion of a prefix, the cycle order and wrap, no completion for an unknown command);
   `ChatRenderer.DrawChat` draws the row. Multiplayer: complete against the client's own content, and
   against the player list for names; the server still judges every command.
+- [ ] **`U-23` · `/locate` ruins and waystones** — P3, S–M.
+  The first cut locates battle towers only (`StructureLocator.TryFindTower`). *Hook:* a nearest-site
+  search per kind over `RuinPlacement.TryRollRuin` plus each realm's site rule and
+  `WaystonePlacement.TryFind*`. Their site verdicts are not cached and ruin cells are 128 blocks, so
+  the ring scan needs a wider cap and the tower's sorted-by-roll-distance order. Hell needs a layer
+  and the sky is island-based, and the landing must avoid the paired ruin and waystone footprints.
 
 ### 4. Visual & particles
 
@@ -378,7 +412,7 @@ single-arc player.
 
 - [ ] **`M-2` · Gameplay SFX** — P1, M.
   `SfxManager`/`SfxMixer` play per-block hit groups and pickup, with an SFX volume slider. Still
-  open: **place/step/splash/fire/UI** sounds. Note: audio is NAudio + NLayer, not Silk.NET.
+  open: **place/step/splash/fire/UI** sounds. Note: audio decodes with NAudio.Core + NLayer and plays through Silk.NET.OpenAL (`AudioOutput`).
 - [ ] **`M-25` · Mining sound pitch by hardness** — P3, S. *(reconsider before doing)*
   Pitch the block-hit sound a little lower on harder blocks so stone sounds heavier than dirt;
   one multiplier in `SfxManager`. Open question: whether per-hardness pitch beats authoring
@@ -455,9 +489,14 @@ single-arc player.
 - [ ] **`M-15` · Structure templates / schematic system** — P2, L.
   A loadable, placeable blueprint format (jigsaw or simple offsets) that `P-16`, `P-26`, `F-14`
   and `P-37` all build on. Prerequisite for all generated POIs.
+  Done: the simple-offsets format (`data/structures`, `StructureRegistry`, `StructureStamper`, four quarter turns with a
+  facing remap) and four ruin placements on it (`RuinPlacement`, see AGENTS.md "Structure templates and ruins"). Left:
+  jigsaw connectors, templates larger than 17 blocks, non-square footprints, a spawner marker (`M-17`), and placing
+  templates by a command or from a scenario op.
 - [ ] **`M-16` · Loot table depth** — P2, M.
-  Conditions (biome, luck, tool), nested tables, guaranteed/weighted pools, and dungeon-tier
-  loot; generalizes the current pools.
+  Done: nested tables (`"table"` entries, cycles refused), a seedable `LootTable.Roll(ctx, list, Random)` and
+  `RollStacks`, gear entries with a rarity range, pools limited to a world-Y band (`minY`/`maxY`), and the four
+  `ruin_*` realm tables (`INVENTORY.md`). Left: biome, luck and held-tool conditions, and guaranteed pools.
 - [ ] **`M-17` · Spawner block / entity** — P2, M.
   A placeable spawner the dungeon and structure generators can seed; keyed by light/time and
   mob kind. Needed by `P-16`, `F-3`.
@@ -477,6 +516,7 @@ single-arc player.
   `F-3`, `F-13`, `F-14`.
 
 ## Reference
+- [ ] **`M-29` Far LOD for 3D terrain.** P2, XL. Rework the far LOD to batch real blocks into groups instead of a heightmap shell, so cavern pockets, hell layers and floating sky islands show at distance (`plans/LAYERS.md` ships without it). **Hook:** `Lod/LodMeshBuilder`.
 
 ### North star
 

@@ -1,0 +1,12 @@
+{
+  // The sporeling's burst (plans/CAVE_BIOMES.md CB-4): a choking cloud that slows and saps. No HUD icon yet.
+  "name": "Spores",
+  "durationSeconds": 6,
+  "tickSeconds": 1.5,
+  "damageShare": 0.03,
+  "moveFactor": 0.75,
+  "attackFactor": 0.85,
+  "tint": [120, 200, 90],
+  "particle": "smoke",
+  "deathMessage": "choked on spores"
+}

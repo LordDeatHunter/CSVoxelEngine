@@ -1,0 +1,15 @@
+{
+  // The spell table (MG-7): right-clicking it with a staff in hand opens the spell builder,
+  // where spell parts are put together and bound to the staff's slots. Crafted from planks
+  // and a crystal block (recipes/spell_table.json). A plain block with the spellBuilder flag:
+  // no block entity and no state. It reuses the crystal top over a planks body, so it needs
+  // no tile of its own (and declares no material, the crystal tile already has one).
+  "name": "Spell Table",
+  "model": {
+    "parent": "block/cube_bottom_top",
+    "textures": { "top": "crystal_block", "bottom": "oak_planks", "side": "oak_planks" }
+  },
+  "hardness": 6,
+  "sfx": "hit_wood",
+  "spellBuilder": true
+}

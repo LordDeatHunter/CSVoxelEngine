@@ -22,7 +22,7 @@ public sealed class StatusEffectBlockTests
 {
     public StatusEffectBlockTests() => TestContent.EnsureLoaded();
 
-    private static byte Id(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Id(string name) => ContentRegistry.RequireBlock(name).Id;
 
     private sealed class Rig
     {

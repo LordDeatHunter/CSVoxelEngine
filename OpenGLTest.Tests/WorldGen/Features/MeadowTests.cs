@@ -52,4 +52,23 @@ public sealed class MeadowTests
 
         Assert.True(found > 0, "no meadow flowers found near the origin");
     }
+
+    [Fact]
+    public void NoTwoFlowersTouchNotEvenDiagonally()
+    {
+        // Negative coordinates included, where the patch floor division matters
+        var found = 0;
+        for (var x = -300; x <= 300; x++)
+        for (var z = -300; z <= 300; z++)
+        {
+            if (!FlowerGenerator.TryGetFlower(x, z)) continue;
+            found++;
+            for (var dx = -1; dx <= 1; dx++)
+            for (var dz = -1; dz <= 1; dz++)
+                if ((dx != 0 || dz != 0) && FlowerGenerator.TryGetFlower(x + dx, z + dz))
+                    Assert.Fail($"flowers at ({x}, {z}) and ({x + dx}, {z + dz}) touch");
+        }
+
+        Assert.True(found > 0, "no flowers in the sampled square");
+    }
 }

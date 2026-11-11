@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.WorldGen.Trees.Shape;
@@ -53,11 +54,13 @@ public static class TreeGenerator
             ? OasisSpecies
             : SpeciesByBiome[(int)TerrainGenerator.BiomeAt(x, z)];
 
-    internal static readonly bool[] LeafById = new bool[256];
+    // Leaves of every species, by id. Sized once at first touch (see the static constructor), so
+    // a read must go through IsLeaf unless the id is known to be loaded content.
+    internal static readonly bool[] LeafById;
 
     // Wood and leaves of every species with a canopy: what disturbs the far-LOD canopy. A
     // leafless species (cactus) has no canopy, so its wood is left out, as before.
-    private static readonly bool[] CanopyBlockById = new bool[256];
+    private static readonly bool[] CanopyBlockById;
 
     // The highest worldgen density: a column whose placement hash is at or above it can never
     // root anything, so it is rejected before any noise is read.
@@ -74,16 +77,21 @@ public static class TreeGenerator
 
     /// <summary>Leaf block the far LOD falls back to: the first leafy worldgen species' leaves (a species
     /// kept out of worldgen never sets it, so adding one leaves the far LOD unchanged).</summary>
-    public static readonly byte LeavesBlock;
+    public static readonly ushort LeavesBlock;
 
     // The widest LOD crown proxy of any leafy worldgen species: how far outside a chunk column
     // the proxy sweep looks for trunks whose crown can overhang it.
     internal static readonly int ProxyReach;
 
-    // Explicit so the tables are built the first time anything touches this class (after
-    // ContentRegistry.Load), not at whatever point beforefieldinit would allow
+    // Explicit so the tables are built the first time anything touches this class, not at
+    // whatever point beforefieldinit would allow; RequireLoaded enforces that this is after
+    // ContentRegistry.Load, so the per-id tables are sized for the loaded content
     static TreeGenerator()
     {
+        BlockTables.RequireLoaded(nameof(TreeGenerator));
+        LeafById = new bool[BlockTables.IdCount];
+        CanopyBlockById = new bool[BlockTables.IdCount];
+
         Species = TreeSpeciesRegistry.All.OrderBy(s => s.Name, StringComparer.Ordinal).ToArray();
 
         var biomes = Enum.GetValues<Biome>();
@@ -126,7 +134,7 @@ public static class TreeGenerator
     }
 
     /// <summary>Stamps every tree whose volume can intersect the chunk at (worldX0, worldY0, worldZ0) (<see cref="TreeStamper.Stamp"/>).</summary>
-    public static void Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0) =>
+    public static void Stamp(ushort[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0) =>
         TreeStamper.Stamp(blocks, ref state, worldX0, worldY0, worldZ0);
 
     /// <summary>
@@ -233,32 +241,42 @@ public static class TreeGenerator
         ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
             .Heights[((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
 
-    /// <summary>Whether a block id is the leaves of any tree species.</summary>
-    public static bool IsLeaf(byte blockId) => LeafById[blockId];
+    /// <summary>Whether a block id is the leaves of any tree species (false for an id past the
+    /// table, which a later, wider content load can produce).</summary>
+    public static bool IsLeaf(ushort blockId)
+    {
+        var table = LeafById;
+        return (uint)blockId < (uint)table.Length && table[blockId];
+    }
 
     /// <summary>Wood or leaves of a species with a canopy: the blocks whose removal disturbs the
-    /// far-LOD canopy. A leafless species' wood (cactus) is excluded because it has no canopy.</summary>
-    public static bool IsTreeBlock(byte blockId) => CanopyBlockById[blockId];
+    /// far-LOD canopy. A leafless species' wood (cactus) is excluded because it has no canopy.
+    /// False for an id past the table, as <see cref="IsLeaf"/>.</summary>
+    public static bool IsTreeBlock(ushort blockId)
+    {
+        var table = CanopyBlockById;
+        return (uint)blockId < (uint)table.Length && table[blockId];
+    }
 
     /// <summary>Highest canopy cell over the ground column (x, z), or 0 under open sky (<see cref="TreeCanopy.CanopyTop"/>).</summary>
     public static int CanopyTop(int x, int z) => TreeCanopy.CanopyTop(x, z);
 
     /// <summary>The leaf block wearing the canopy top over (x, z), air where there is none (<see cref="TreeCanopy.CanopyLeafBlock"/>).</summary>
-    public static byte CanopyLeafBlock(int x, int z) => TreeCanopy.CanopyLeafBlock(x, z);
+    public static ushort CanopyLeafBlock(int x, int z) => TreeCanopy.CanopyLeafBlock(x, z);
 
-    /// <summary>The grown canopy over (x, z) (<see cref="TreeCanopy.TryGetCanopy(int, int, out int, out byte)"/>).</summary>
-    public static bool TryGetCanopy(int x, int z, out int top, out byte leaf) =>
+    /// <summary>The grown canopy over (x, z) (<see cref="TreeCanopy.TryGetCanopy(int, int, out int, out ushort)"/>).</summary>
+    public static bool TryGetCanopy(int x, int z, out int top, out ushort leaf) =>
         TreeCanopy.TryGetCanopy(x, z, out top, out leaf);
 
-    /// <summary>The grown or proxy canopy over (x, z) (<see cref="TreeCanopy.TryGetCanopy(int, int, bool, out int, out byte)"/>).</summary>
-    public static bool TryGetCanopy(int x, int z, bool proxy, out int top, out byte leaf) =>
+    /// <summary>The grown or proxy canopy over (x, z) (<see cref="TreeCanopy.TryGetCanopy(int, int, bool, out int, out ushort)"/>).</summary>
+    public static bool TryGetCanopy(int x, int z, bool proxy, out int top, out ushort leaf) =>
         TreeCanopy.TryGetCanopy(x, z, proxy, out top, out leaf);
 
     /// <summary>Marks the canopy columns within Chebyshev <paramref name="radius"/> of (x, z) as disturbed (<see cref="TreeCanopy.PoisonCanopy"/>).</summary>
     public static void PoisonCanopy(int x, int z, int radius) => TreeCanopy.PoisonCanopy(x, z, radius);
 
     /// <summary>Records the crown a reactive growth left over ground column (x, z) for the far LOD; call after <see cref="PoisonCanopy"/> (<see cref="TreeCanopy.SetCanopyAdded"/>).</summary>
-    public static bool SetCanopyAdded(int x, int z, int top, byte leaf) => TreeCanopy.SetCanopyAdded(x, z, top, leaf);
+    public static bool SetCanopyAdded(int x, int z, int top, ushort leaf) => TreeCanopy.SetCanopyAdded(x, z, top, leaf);
 
     /// <summary>
     /// Drops the cached tree shapes, cell batches and canopy tops (real and proxy); only <see cref="WorldSeed.Apply"/> (and

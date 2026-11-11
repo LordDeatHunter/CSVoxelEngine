@@ -19,6 +19,9 @@ public sealed class RespawnPrompt
     /// <summary>Seconds the player has been dead, 0 while alive.</summary>
     public float DeadSeconds { get; private set; }
 
+    /// <summary>Whether the player is down, from the first dead frame: the fall plays, then the screen shows.</summary>
+    public bool IsDead => _dead;
+
     /// <summary>Whether the death screen is up: dead long enough for the animation to have played.</summary>
     public bool IsShowing => _dead && DeadSeconds >= DelaySeconds;
 

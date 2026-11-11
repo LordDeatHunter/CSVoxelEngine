@@ -37,6 +37,12 @@ public static class NetworkConfig
     // server rubberbands it: longer than a full jump's climb and apex (about a third of a second
     // rising), so only a hover trips it.
     public const double NetHoverGraceSeconds = 1.0;
+    // Jitter allowed on top of the jump apexes one airtime may rise (MovementRules.AirRiseBudget):
+    // the states around a landing and the client's frame-sized physics steps overshoot a little.
+    public const float NetAirRiseSlackBlocks = 0.5f;
+    // How long a queued knockback lift widens a player's airtime rise budget: long enough for the
+    // status to reach the client and the lift to play out.
+    public const double NetLiftCreditSeconds = 1.5;
     // A state arriving more than this long after the previous one (a lag spike) is judged only by
     // the speed clamp and the collision test: the rise and hover rules need a short, honest gap.
     public const double NetMaxJudgedStateGapSeconds = 0.5;
@@ -64,12 +70,14 @@ public static class NetworkConfig
     /// (<see cref="SpellConfig.CastCooldownSeconds"/>; a first guess).
     /// </summary>
     public const double NetCastSlackSeconds = 0.1;
+
+    /// <summary>How far (blocks) a player's feet must rise between two accepted states, starting from the ground,
+    /// for the server to count a jump (<c>ServerPlayer.ObserveAcceptedState</c>): above an auto-step's
+    /// half block, under what a jump rises in one state.</summary>
+    public const float NetJumpRiseBlocks = 0.2f;
     // A dead client sends a Respawn intent as soon as the server's status says it died, then again
     // this often while the status still reads dead (an earlier one refused, or lost to a race).
     public const double NetRespawnRetrySeconds = 1.0;
-    // A creative client mines one block per this many seconds while the button is held, rather than
-    // one per frame, so a held click stays inside the server's edit rate (singleplayer is unpaced).
-    public const float ClientCreativeBreakSeconds = 0.1f;
     // How long a blocking send to one client may stall the server's main thread before the
     // connection is treated as dead (NetworkStream.WriteTimeout), in milliseconds.
     public const int NetSendTimeoutMs = 5000;

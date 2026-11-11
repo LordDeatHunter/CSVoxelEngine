@@ -1,5 +1,7 @@
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Entities;
+using VoxelEngine.Items;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
@@ -128,6 +130,34 @@ public sealed class ServerPlayerStatusTests
         FallTo(unknown, chunks, farX, 8.5f, 1f + drop);
         Assert.Equal(PlayerHealth.MaxHealth, unknown.Health);
         Assert.False(unknown.StatusDirty);
+    }
+
+    [Fact]
+    public void AFeatherCharmWearerTakesNoFallDamageFromAcceptedStates()
+    {
+        var chunks = StoneFloor();
+        const float drop = 8f;
+        Assert.True(PlayerHealth.FallDamage(drop) > 0);
+
+        var control = new ServerPlayer(1, "Control", Vector3.Zero);
+        FallTo(control, chunks, 8.5f, 8.5f, 1f + drop);
+        Assert.True(control.Health < PlayerHealth.MaxHealth);
+
+        var wearer = new ServerPlayer(2, "Wearer", Vector3.Zero);
+        var feather = ItemRegistry.All.OfType<GearItem>().First(g => g.SourceName == "feather_charm");
+        Assert.True(wearer.Inventory.Add(feather.Id));
+        var instance = wearer.Inventory.GearEntries().Last(e => e.ItemId == feather.Id).InstanceId;
+        Assert.True(wearer.Inventory.Equipment.TryEquipAuto(instance));
+
+        wearer.Teleport(EyeAtFeet(8.5f, 1f + drop, 8.5f));
+        wearer.StatusDirty = false;
+        for (var feet = drop; feet >= 1f; feet -= 1f)
+        {
+            wearer.Position = EyeAtFeet(8.5f, feet, 8.5f);
+            wearer.ObserveAcceptedState(chunks, NetworkConfig.NetPlayerStateSeconds);
+        }
+        Assert.Equal(PlayerHealth.MaxHealth, wearer.Health);
+        Assert.False(wearer.StatusDirty);
     }
 
     [Fact]

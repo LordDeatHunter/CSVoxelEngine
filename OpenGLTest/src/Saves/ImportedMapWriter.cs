@@ -107,7 +107,7 @@ public static class ImportedMapWriter
                 source.Fill(chunk);
                 var snapshot = chunk.CaptureForNetwork();
                 // An absent chunk of a supplied column reads back as air, so air needs no file
-                if (snapshot.Blocks.AsSpan().IndexOfAnyExcept((byte)0) < 0)
+                if (snapshot.Storage.CountNonAir() == 0)
                     continue;
 
                 WriteChunk(mapDirectory, cx, cy, cz, snapshot);

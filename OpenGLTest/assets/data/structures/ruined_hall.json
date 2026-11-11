@@ -1,0 +1,56 @@
+{
+  "kind": "surface",
+  "weight": 2,
+  "groundLayer": 1,
+  "palette": {
+    "c": "cobblestone",
+    "b": "stone_bricks",
+    "C": "ruin_chest_surface"
+  },
+  "layers": [
+    [
+      "ccccccccc",
+      "ccccccccc",
+      "ccccccccc",
+      "ccccccccc",
+      "ccccccccc",
+      "ccccccccc",
+      "ccccccccc",
+      "ccccccccc",
+      "ccccccccc"
+    ],
+    [
+      "bbbbbbbbb",
+      "b.......b",
+      "b.......b",
+      "b.......b",
+      "b...C...b",
+      "b.......b",
+      "b.......b",
+      "b.......b",
+      "bbbb.bbbb"
+    ],
+    [
+      "bbb.bbbbb",
+      "b.......b",
+      "b.......b",
+      "........b",
+      "b.......b",
+      "b.......b",
+      "b.......b",
+      "b.......b",
+      "bbbb.b.bb"
+    ],
+    [
+      "b.b...bb.",
+      ".........",
+      ".........",
+      ".........",
+      ".........",
+      ".........",
+      ".........",
+      ".........",
+      "b.b.....b"
+    ]
+  ]
+}

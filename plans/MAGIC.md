@@ -6,13 +6,14 @@
 
 Tracks the magic system of Arc A (`TODO.md` `P-14`, which points here): mana, staffs, the station-built
 spell builder, the unlock chain and the spell rules. Design interview done (two rounds). Last updated
-2026-11-07. Everything below is a design decision, not a measurement. The first slice is the builder with
-a few parts (`MG-1`..`MG-10`, plus the `MG-4b` status effects, shipped), not a lone fireball. Work them
-in ID order.
+2026-11-07. Everything below is a design decision, not a measurement. The first slice, the builder with
+a few parts rather than a lone fireball (`MG-1`..`MG-10`, plus the `MG-4b` status effects), has shipped.
+Work the later items in ID order.
 
 `MG-1` shipped: the mana pool (`Player/PlayerMana.cs`, owned by `PlayerHealth`; tuning in
 `Config/ManaConfig.cs`) regenerates slowly, refills on respawn, is spent through `TrySpend` (free in
-creative, refused when short), grows through `SetKnownParts` (no caller yet, see `MG-8`), is saved as
+creative, refused when short), grows through `SetKnownParts` (called by `KnownSpellParts.SizeMana`
+whenever the known spell parts change or are restored, `MG-8`), is saved as
 `Mana` in `player.json` (the max is not saved), rides the end of `PlayerStatus` (protocol 11) and draws
 as a bar under the hotbar (`HudRenderer.DrawMana`). The 100 start, +10 per known part, 300 cap and
 150 s refill are first guesses.
@@ -29,7 +30,7 @@ holds one whole spell recipe: the `StaffComponent` on its `ItemStack` carries th
 (`<kind>/<name>`) per slot plus the selected slot, immutable. `StaffBinding` holds the rules: `TryBind`
 binds only a recipe that `SpellRecipe.Compile` finds valid against the staff's tags (so a tier gates its
 parts by tag), plus `Clear`, `Cycle` (wraps both ways) and `Select`; `MG-4` cycles and selects in
-play, and only binding is left without a caller (`MG-7` binds). Two staffs ship: the wooden staff (tier 1, 2 slots, `basic`; two sticks
+play, and `MG-7` binds at the spell table. Two staffs ship: the wooden staff (tier 1, 2 slots, `basic`; two sticks
 and a crystal block) and the crystal staff (tier 2, 4 slots, `basic` and `advanced`; the wooden staff,
 two crystal blocks and a copper ingot); no `advanced` part ships yet. Bindings are saved as
 `ToolData.Staff` in `player.json` by part key, re-bound on load against this run's parts (what no longer
@@ -48,9 +49,8 @@ recipe, inside `SpellConfig.CastCooldownSeconds` (less `NetworkConfig.NetCastSla
 mana; it bills exactly the compiled cost, free in creative, and a cast also draws one edit token as a
 spam cap. The effect is the `World.SpellEffect` hook, which `MG-5`'s `SpellEffects` fills. A client
 predicts only: it checks and paces, never spends and never fires the effect. The HUD shows
-`StaffSlotIndicator` (the selected slot and its parts, or empty) beside the hotbar. The gesture is a
-punch swing until `MG-10`, (the fizzle is `MG-6`). The 0.5 s cooldown and
-0.1 s slack are first guesses.
+`StaffSlotIndicator` (the selected slot and its parts, or empty) beside the hotbar. The gesture is
+`MG-10`'s cast gesture (the fizzle is `MG-6`). The 0.5 s cooldown and 0.1 s slack are first guesses.
 
 `MG-4b` shipped: status effects are data, `assets/data/effects/<name>.json`, compiled by
 `StatusEffectLoader` into `StatusEffectRegistry` (`Content/StatusEffects/`; id = file-name order, at
@@ -66,7 +66,7 @@ effect through `Status/StatusEffects.Apply(target, name, durationScale)`. Block 
 `StatusEffectBlockWriter` (drained by `MobDirector`) writes cells with every edit-path hook, capped per
 pulse and per frame. Protocol 13 ends each `EntityList` entry with an effect mask and `PlayerStatus` with
 the player's; a client mirrors them. Visuals: the `uStatusTint` mob tint, embers or steam through the
-campfire particles, HUD icons left of the hearts (`tools/generate-effect-icons.py`), and the scenario op
+campfire particles, HUD icons left of the hearts (committed 16x16 icons), and the scenario op
 `effect` (`visual-examples/status-effects.json`). First guesses: burning 6 s, 5% a second, ignites and
 thaws; frostburn 8 s, 2% every 2 s, half speed, 0.6 attack, freezes. Known gaps: effects are not saved,
 other players' effects are not shown, the player slowdown is client-trusted, blade swing durations are
@@ -90,44 +90,74 @@ the effect to the caster (the camera or the server's player, so a creative caste
 conversions around its feet. Frost hardens lava because `lava.json` now freezes to cobblestone. The
 scenario op `cast` (part keys, no staff or mana) drives `visual-examples/spells.json`. First guesses:
 speed 24, range 24 blocks, base damage 4, impact reach 1. Known gaps: bolts are not sent to clients (only
-their consequences, until `MG-10`) and not saved; a self cast never primes, lights or grows (nature + self
+their consequences; the caster's own client flies a cosmetic copy since `MG-10`) and not saved; a self cast never primes, lights or grows (nature + self
 does nothing); bolts never hit players; a frostburned body standing over lava crusts it to cobblestone.
 
 `MG-6` shipped: `Magic/CastRisk` holds the pure rules. A cast rolls its recipe's fizzle chance (`SpellCaster.FizzleRoll`, authoritative only) after the mana is billed; a fizzle still counts as a cast but fires no effect and backfires on the caster for `SpellConfig.BackfireShare` of max health scaled by the chance (at least 1, none in creative) as a `DamageSource.Magic` blow ("was killed by their own spell"); a server marks the status dirty. Both rules take a `resistance` (0..1) that gear will feed (`MG-14`); nothing sets it yet. Self-applied fire and frost already hurt the caster through the `self` shape (`MG-4b`). The 0.3 backfire share is a first guess.
+
+`MG-7` shipped: the `spell_table` block is JSON only (the `spellBuilder` flag, no block entity; four oak
+planks and a crystal block). Its right-click is claimed in the right-click chain after the other stations
+and before the staff cast (`BlockInteractions.TryOpenSpellTable`, outcome `RightClickOutcome.SpellTable`,
+no side effect, so the server's replay of the `Use` intent changes nothing); a block in hand places
+against it. The builder opens client-side only with a staff held, else a toast hint
+(`App/SpellBuilderInput`, GL-free state in `UI/SpellBuilder/`, drawn by `SpellBuilderRenderer`; E or
+Escape closes it, and so do the pause menu, the death screen and a change of the held staff). It lists the
+known parts by kind, keeps one element, one shape and one trigger with any modifiers, and shows the live
+cost, verdict, fizzle and damage and range factors from `SpellRecipe.Compile` against the staff's tags.
+BIND and CLEAR go through the `BindStaffSlot` / `ClearStaffSlot` inventory actions (protocol 14), which
+the server owns (`InventoryIntentRules` over `HeldStaff.TryBind` / `TryClear`): the client predicts and the
+`InventoryState` keeps or reverts it. The known-part seam is `Magic/KnownSpellParts.Knows` over
+`Inventory.KnowsPart` (creative knows all). Known gaps: no scrolling
+past `SpellBuilderLayout.MaxRowsPerColumn` rows a kind, no visual scenario (no op opens a UI), an item
+with `use.seconds` in hand starts its charge instead of opening the table, and station gating is `P-2`.
+
+`MG-8` shipped: an `Inventory` holds the set of known spell part keys (`<kind>/<name>`; a fresh one knows
+none), changed only through `LearnParts` and the codec's `ReplaceKnownParts` (an equal set is a no-op), and
+`KnownPartsVersion` moves on a real change. `Magic/KnownSpellParts.Learn` teaches and resizes the owner's
+pool through `SizeMana` (`PlayerMana.SetKnownParts` of the owned count, never creative's; a client passes
+no pool, since its max is mirrored from `PlayerStatus`). The set is saved by key as `KnownParts` in
+`player.json`'s inventory and rides the `InventoryState` snapshot in the same shape (protocol 15); a key
+that no longer resolves is dropped into the codec's one warning. `Player/SavedPlayerPools.Apply` (singleplayer
+and a server's players) imports the inventory and sizes the pool before the saved mana is restored, so a
+grown pool is not clamped down. Scrolls are items with `use.action: "learn_parts"` and a `teaches` list
+(`ItemLoader.ParseTeaches` checks the shape, `ValidateLearnParts` the keys once the parts load;
+`Items/LearnPartsItem`): right-click teaches and spends one, creative learns without spending, and a scroll
+that teaches nothing new is refused and kept. On a server the `Use` intent teaches the sending player, sets
+its status dirty and is answered with the inventory snapshot. Five ship, creative-catalog only
+(committed placeholder sprites): `scroll_fire_projectile` (the hint),
+`scroll_frost`, `scroll_nature`, `scroll_self` and `scroll_modifiers` (power and range).
+`Items/StarterKit` gives the hint scroll to a new store-backed survival player, a server newcomer and a
+player saved before `MG-8` (an inventory with no known-part list), never twice. The hint is shown by the
+tooltip line listing the parts a scroll teaches ("Teaches: Fire + Projectile"). Known gaps: scrolls have no
+loot or research source yet, and the builder shows no hint line of its own.
+
+`MG-9` shipped: an item with `use.action: "restore_mana"` and a `restoresMana` share in (0, 1] (`ItemLoader.ParseRestoresMana`) is a `RestoreManaItem`, the `heal` pattern: a use refills that share of the pool through `PlayerMana.TryRestore` (never past the max), spends one unit (creative none) and is refused, and kept, at a full pool; a server restores the sending player and marks the status dirty. The `mana_draught` (40 percent, a 1 s timed use; one crystal block and one cotton) is the one item; its tooltip says what it restores. There is no `P-47` shared-reagent hook yet, since nothing needs it. The 40 percent is a first guess.
+
+`MG-10` shipped: cast feedback, cosmetic only. The cast gesture is `Player/Posing/CastMotion` (pure shape
+functions of the cast clock: a quick raise of the staff, a snapping thrust forward with a small lean, a
+short recoil and an eased return, weight 0 at both ends) behind `PlayerModel.Cast`, 0.45 s;
+`LocalPlayer.CastSwing` plays it with a light view pinch, and the server rebroadcasts an accepted cast as
+`NetPlayerAction.Cast` (8, no protocol bump: the player-list action byte is read unchecked and an older
+client ignores an unknown action), which `RemotePlayer` replays. `Magic/SpellSparks` holds the shared
+sparks (the element's status tint, else `BoltDefaultColor`; the trail, the impact and the cast burst).
+`Magic/SpellFeedback` (a `World` component, never on a headless server) is the new `SpellCaster.Feedback`
+hook: for the local player's own accepted cast it plays `spell_cast` (or `spell_fizzle`) and bursts sparks
+at the bolt's launch point (gray on a fizzle), and on a client it launches a cosmetic preview bolt
+(`Magic/SpellBoltPreview`, the same `SpellProjectile` flight and stop test, never striking or writing
+anything); on a client it also flies those previews and bursts default-colored sparks where a remote player
+cast. `SpellEffects` plays `spell_impact` where a bolt lands within `ImpactSoundRangeBlocks` of the camera
+(once an update, never on a server). The three wavs come from `tools/generate-spell-sfx.py` (stdlib,
+byte-identical re-runs, `--check`). The item debugger has a CAST mode and the `player` scenario op a `cast`
+action (`visual-examples/animations-cast.json`). Known gaps: remote players' bolts are invisible; a remote
+cast gets a default-colored burst and no sound (the element is not on the wire); a client never shows a
+fizzle (the roll is the server's); the sounds are not positional (the impact is only range-gated); the
+scenario `cast` op fires a bolt with no burst or sound.
+
 ## In progress
 
 Nothing.
 
 ## Open
-
-### Slice 1 — the builder with a few parts
-
-Three elements (fire, frost, nature), two shapes (projectile, self), two modifiers (power and range), one station
-UI, one bindable staff (two tiers). In order:
-
-- [ ] **`MG-7` Builder station UI** — P1, L.
-  A crafting station (not a tab) where the player picks parts they know and binds the result to a staff
-  slot; shows cost, validity and fizzle risk live. The station is one ordinary block (e.g.
-  `spell_table`, JSON only) whose right-click opens the UI through the station click chain; it has no
-  block entity and no multiblock, since the UI only binds to the staff in hand. **Hook:** `Interaction/BlockInteractions.cs` (station
-  click chain), a new `UI/SpellBuilder/` folder, `InventoryPanelInput` for the pattern. Gating by
-  station follows `P-2`.
-- [ ] **`MG-8` Known parts and unlocks** — P1, M.
-  The player's set of known parts, saved as names (the `Inventory.Knows` pattern) and riding the
-  inventory net snapshot. Slice 1 source: scrolls only, items that teach a part (research is later and
-  gets its own station decision). Creative knows every part. A survival world starts with **one
-  scroll**: a hint scroll that teaches the parts of one handpicked example combo and shows its recipe at
-  the table. No signature presets and no pre-bound staffs: the player explores combinations. The known
-  part count sizes the mana pool: whenever it changes call `PlayerMana.SetKnownParts` (and set
-  `ServerPlayer.StatusDirty` on a server), and apply the known parts before the saved mana is restored, or a
-  saved value above the starting max is clamped down on load. **Hook:** `Inventory.cs`,
-  `InventorySaveCodec`, `InventoryNetCodec`, loot tables.
-- [ ] **`MG-9` Mana restoration items** — P1, S.
-  Items restore mana through a `use.action` (the `heal` pattern). Optional shared-reagent hook for
-  `P-47`, never required. **Hook:** `Items/HealItem.cs`, item schema.
-- [ ] **`MG-10` Cast feedback** — P2, M.
-  Cast gesture, projectile and impact particles, a few SFX; the item debugger gets a cast mode. **Hook:**
-  `Posing/ThrowPose.cs`, `Particles/`, `item-debugger` skill, `V-12`.
 
 ### Later
 
@@ -160,8 +190,10 @@ UI, one bindable staff (two tiers). In order:
   sprint and stays free). The mana pool is small with slow regen. The staff is crafted, in two tiers.
   Survival starts with one hint scroll; creative knows everything. The user runs a task-by-task
   workflow that picks its own tier, so each `MG-*` is a self-contained sitting.
+- **Decided in `MG-8`.** The hint scroll teaches fire + projectile (`scroll_fire_projectile`), a combo
+  every staff tier can bind and cast.
 - **Not wanted for now.** Element-vs-element rules, per-mob weaknesses, a live Magicka-style combo
   queue.
-- **Open questions.** Which example combo the hint scroll teaches; chain depth and mana scaling
-  (`MG-12`); which blocks a utility spell may touch (`MG-11`); what the mana item and the `P-47` reagent are; whether research is its own
+- **Open questions.** Chain depth and mana scaling
+  (`MG-12`); which blocks a utility spell may touch (`MG-11`); what the `P-47` shared reagent is; whether research is its own
   station.

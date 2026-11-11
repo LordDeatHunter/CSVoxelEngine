@@ -1,0 +1,9 @@
+{
+  "name": "Tin Ore",
+  "model": { "parent": "block/cube_all", "textures": { "all": "tin_ore" } },
+  "sfx": "hit_rock",
+  "hardness": 6,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "loot": "tin_ore"
+}

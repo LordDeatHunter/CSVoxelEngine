@@ -1,0 +1,38 @@
+{
+    // The static twin of the chest: what the inventory icon, the held block, a drop and the break particles show.
+    // In the world a chest is drawn from the Blockbench model beside this file (chest.bbmodel, see ChestModel), whose
+    // lid swings; this is that model shut, authored facing north (the latch on the north face): a 14 x 10 px body
+    // under a 14 x 4 px lid, 14 px tall in all. It is a facing block, so no face may cover a whole cell side, and it
+    // never does: both boxes are inset one pixel from the cell, and they fill the block's hitbox exactly (the world
+    // model's latch, one pixel proud of the front, is only painted here: the front tile carries it across the seam
+    // between lid and body). UVs are left to the defaults, which crop each face out of its tile. The textures are
+    // #front (the north face of both boxes), #side (the other three sides and the underside) and #top (the lid top);
+    // tools/generate-chest-textures.py cuts all three from the model's skin.
+    "textures": {
+        "particle": "#side"
+    },
+    "elements": [
+        {
+            "from": [1, 0, 1],
+            "to": [15, 10, 15],
+            "faces": {
+                "north": { "texture": "#front" },
+                "south": { "texture": "#side" },
+                "west": { "texture": "#side" },
+                "east": { "texture": "#side" },
+                "down": { "texture": "#side", "uv": [1, 6, 15, 16] }
+            }
+        },
+        {
+            "from": [1, 10, 1],
+            "to": [15, 14, 15],
+            "faces": {
+                "north": { "texture": "#front" },
+                "south": { "texture": "#side" },
+                "west": { "texture": "#side" },
+                "east": { "texture": "#side" },
+                "up": { "texture": "#top" }
+            }
+        }
+    ]
+}

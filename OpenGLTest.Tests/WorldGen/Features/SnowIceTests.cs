@@ -19,8 +19,8 @@ public sealed class SnowIceTests
 {
     public SnowIceTests() => TestContent.EnsureLoaded();
 
-    private static byte Snow => ContentRegistry.RequireBlock("snow").Id;
-    private static byte Ice => ContentRegistry.RequireBlock("ice").Id;
+    private static ushort Snow => ContentRegistry.RequireBlock("snow").Id;
+    private static ushort Ice => ContentRegistry.RequireBlock("ice").Id;
 
     private static bool TryFindColumn(Func<int, int, bool> match, out int x, out int z)
     {
@@ -206,7 +206,7 @@ public sealed class SnowIceTests
     }
 
     /// <summary>The block at sea level in the chunk holding the column (x, z).</summary>
-    internal static byte SurfaceSeaCell(int x, int z)
+    internal static ushort SurfaceSeaCell(int x, int z)
     {
         var cy = WorldGenerationConfig.SeaLevel >> Chunk.SizeShift;
         var chunk = new Chunk(null!, new Vector3(x >> Chunk.SizeShift, cy, z >> Chunk.SizeShift),
@@ -258,7 +258,7 @@ public sealed class SnowIceTests
         var deadShrub = FoliageGenerator.DeadShrubBlock;
         var chunks = new Dictionary<(int, int, int), Chunk>();
 
-        byte BlockAt(int wx, int wy, int wz)
+        ushort BlockAt(int wx, int wy, int wz)
         {
             var key = (wx >> Chunk.SizeShift, wy >> Chunk.SizeShift, wz >> Chunk.SizeShift);
             if (!chunks.TryGetValue(key, out var chunk))

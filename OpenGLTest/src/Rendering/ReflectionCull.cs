@@ -19,11 +19,13 @@ internal static class ReflectionCull
 {
     /// <summary>
     /// How far a chunk's opaque vertices can reach above <c>Chunk.WorldMax.Y</c>. A multiblock anchor
-    /// on the chunk's top layer (local y 15) bakes its 2-tall model one block into the chunk above;
-    /// every other baked model and procedural emitter stays inside its own cell. An LOD region's
-    /// <c>YMax</c> already bounds every vertex it emits, so for regions this is pure slack.
+    /// on the chunk's top layer (local y 15) bakes its whole model into the chunks above: the 2-tall
+    /// kiln one block, the 3-tall alloy furnace two; every other baked model and procedural emitter
+    /// stays inside its own cell. A bigger structure must raise this (the content test fails until
+    /// it does). An LOD region's <c>YMax</c> already bounds every vertex it emits, so for regions
+    /// this is pure slack.
     /// </summary>
-    internal const float MeshOverhangBlocks = 1f;
+    internal const float MeshOverhangBlocks = 2f;
 
     /// <summary>
     /// How far the vertex shader can lift a vertex above its meshed position, derived from

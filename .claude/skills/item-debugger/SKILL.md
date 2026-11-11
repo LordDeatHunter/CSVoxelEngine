@@ -9,7 +9,7 @@ description: Preview and debug CSVoxelEngine's player animations, held items, en
 `CellBatchMesher` meshes with the game's shader, without a world: orbit camera, a mode button per
 animation, a timeline to scrub. **For any animation, held-item or model change look here first**; use a
 `VOXEL_SCRIPT` scenario (`visual-verify` skill) only to see it in the real world with terrain, camera and
-lighting around it.
+lighting around it. Full tab, mode and `ITEM_DEBUGGER_*` reference: `docs/agents/dev-tools.md`.
 
 ## Run recipe (working directory `OpenGLTest/`, Release)
 ```
@@ -39,6 +39,8 @@ dotnet run --project ../OpenGLTest.ItemDebugger -c Release --no-build
   Goblin: `idle walk throw melee hurt death spawn`; slime (clipless, code-driven squash): `idle hop hurt
   spawn death`. Mobs are the real `Goblin`/`Slime` objects driven like a client's mirror
   (`Mob.AnimateMirror`), so the spawn pop, hit recoil, death and the goblin's `BodyEffect` show.
+  The shared chest model is listed last as `Chest` (`ITEM_DEBUGGER_SELECT=chest`): `open close wobble`, each clip
+  alone on its own clock, as a chest's lid plays it in the game.
 - **TREES**: a species grown pulse by pulse at a fixed seed (Step slider, STEP -/+, MATURE, REGROW).
 - **Timeline** (ITEMS and ENTITIES, bottom strip): Progress slider (seconds; dragging scrubs and stops the
   clock), Speed (x0..x4 in 0.1 steps, 0 pauses), LOOP ON/OFF (off = play once and hold the last frame).

@@ -8,6 +8,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Data;
 using VoxelEngine.Entities;
+using VoxelEngine.Items;
 using VoxelEngine.Juice;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Status;
@@ -51,6 +52,11 @@ public class Camera : IMobTarget
     public bool IsSneaking { get; private set; }
     /// <summary>Strokes the swimmer has started so far; moves on each one (see <c>PlayerPhysics.SwimStrokeSeconds</c>).</summary>
     public int SwimStrokeCount => _physics.SwimStrokeCount;
+    /// <summary>Jumps the body has taken so far; moves on each one (<c>PlayerPhysics.JumpCount</c>).</summary>
+    public int JumpCount => _physics.JumpCount;
+    /// <summary>Air jumps the body has taken so far (<c>PlayerPhysics.AirJumpCount</c>); never counted in
+    /// <see cref="JumpCount"/>, so a bloomery's bellows never sees them.</summary>
+    public int AirJumpCount => _physics.AirJumpCount;
     /// <summary>Current vertical FOV in degrees: the base FOV plus the eased sprint widening plus the punch
     /// pinch plus the throw charge zoom.</summary>
     public float CurrentFov => _head.CurrentFov;
@@ -132,6 +138,13 @@ public class Camera : IMobTarget
     /// a walker standing in a block with no movement speed.
     /// </summary>
     public float MovementFactor { get; private set; } = 1f;
+
+    /// <summary>The walk and swim speed multiplier from worn gear (1 = none); set once a frame by the local
+    /// player. Flight ignores it like every other speed modifier.</summary>
+    public float GearMoveFactor { get; internal set; } = 1f;
+    /// <summary>Whether worn gear grants the one free air jump per airtime (<see cref="GearAbility.AirJump"/>,
+    /// the cloud boots); set once a frame by the local player, like <see cref="GearMoveFactor"/>.</summary>
+    public bool GearAirJump { get; internal set; }
     public float GroundFriction { get; private set; } = BlockType.DefaultFriction;
     public Vector2 HorizontalVelocity => _physics.HorizontalVelocity;
 
@@ -546,8 +559,15 @@ public class Camera : IMobTarget
     /// <inheritdoc />
     Vector3 IMobTarget.Eye => Position;
 
+    /// <summary>The body's velocity, which the ring spawners lead and the despawn rule reads.</summary>
+    Vector3 IMobTarget.Velocity => new(HorizontalVelocity.X, VerticalVelocity, HorizontalVelocity.Y);
+
     /// <inheritdoc />
-    public bool IsImmune => IsCreative || IsFlying;
+    public bool IsImmune => IsCreative || IsFlying || IsDead;
+
+    /// <summary>Whether the local player is dead: set by the health pool's owner each tick. A dead player
+    /// is no target, so mobs lose interest in it from the first dead frame.</summary>
+    public bool IsDead { get; internal set; }
 
     /// <summary>The local player's status effects (its health pool's set), which the physics and the
     /// attack pace read: authoritative in singleplayer, the server's mirror on a client. Null on a
@@ -571,6 +591,13 @@ public class Camera : IMobTarget
         }
         AddKnockback(awayHorizontal, knockbackSpeed, lift);
     }
+
+    /// <summary>Restores the local player's health: the pool lives in <see cref="World"/>, which wires
+    /// <see cref="Healer"/> to it.</summary>
+    public void Heal(int amount) => Healer?.Invoke(amount);
+
+    /// <summary>What <see cref="Heal"/> calls: the world's health pool; null on a camera with none.</summary>
+    internal Action<int>? Healer { get; set; }
 
     /// <summary>The display name of the last mob whose hit landed on this camera (see
     /// <see cref="World"/>'s billing), or null.</summary>

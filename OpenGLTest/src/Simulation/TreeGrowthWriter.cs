@@ -123,7 +123,8 @@ public sealed class TreeGrowthWriter
         // would stand on should the column hold no tree
         var rootY = int.MinValue;
         var groundY = int.MinValue;
-        byte groundId = 0, groundState = 0;
+        ushort groundId = BlockType.Air;
+        byte groundState = 0;
         for (var y = top; y >= bottom; y--)
         {
             if (!chunks.TryGetCell(x, y, z, out var id, out var state))
@@ -167,7 +168,7 @@ public sealed class TreeGrowthWriter
     /// rules are worldgen placement rules and are not applied.
     /// </summary>
     private TreeGrowthResult Plant(ChunkManager chunks, TreeSpecies species, int x, int z, int groundY,
-        byte groundId, byte groundState, int yHint, int steps, int worldSeed, FluidManager? fluids,
+        ushort groundId, byte groundState, int yHint, int steps, int worldSeed, FluidManager? fluids,
         LeafDecayManager? leafDecay, LodManager? lod, Func<int, int, int, bool>? reserved)
     {
         if (groundY == int.MinValue || !IsSaplingGround(species, groundId, groundState))
@@ -188,7 +189,7 @@ public sealed class TreeGrowthWriter
 
     // A cell the ground scan stops at: anything but air, leaves, attached tree wood (a canopy or
     // another tree's branch over the column) and a cover a placement would take over
-    private static bool IsGroundCandidate(byte id, byte state) =>
+    private static bool IsGroundCandidate(ushort id, byte state) =>
         id != 0
         && !TreeGenerator.IsLeaf(id)
         && !(BlockType.IsTreeWood(id) && !WoodState.IsDetached(state))
@@ -199,7 +200,7 @@ public sealed class TreeGrowthWriter
     /// worldgen needs soil (<see cref="TreeWorldgenRules.MinSoil"/> above 0) the surface or soil
     /// block.
     /// </summary>
-    private static bool IsSaplingGround(TreeSpecies species, byte id, byte state)
+    private static bool IsSaplingGround(TreeSpecies species, ushort id, byte state)
     {
         if (!BlockType.IsSolidCell(id, state) || BlockType.IsFluid(id))
             return false;
@@ -389,11 +390,11 @@ public sealed class TreeGrowthWriter
     }
 
     // Air or a non-persistent leaf of the species: the cells a new node may take
-    private static bool IsOwnGrowable(TreeSpecies species, byte id, byte state) =>
+    private static bool IsOwnGrowable(TreeSpecies species, ushort id, byte state) =>
         id == 0 || (species.HasLeaves && id == species.LeavesId && !LeafState.IsPersistent(state));
 
     /// <summary>One raw cell write plus its bookkeeping.</summary>
-    private static void Write(ChunkManager chunks, int x, int y, int z, byte id, byte state, WriteLog log,
+    private static void Write(ChunkManager chunks, int x, int y, int z, ushort id, byte state, WriteLog log,
         bool idChanged, bool mesh)
     {
         chunks.ChunkAt(x, y, z)!.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, id, state);
@@ -443,7 +444,7 @@ public sealed class TreeGrowthWriter
     /// leaf), and the leaf block standing there: the crown the far LOD should draw over the column.
     /// </summary>
     private static bool TryFindCrownTop(ChunkManager chunks, int x, int z, int scanTop, int scanBottom,
-        out int top, out byte leaf)
+        out int top, out ushort leaf)
     {
         for (var y = scanTop; y >= scanBottom; y--)
         {

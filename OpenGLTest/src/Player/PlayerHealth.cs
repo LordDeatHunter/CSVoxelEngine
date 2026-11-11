@@ -1,5 +1,8 @@
 using System;
+using VoxelEngine.Config;
+using VoxelEngine.Items;
 using VoxelEngine.Status;
+using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Player;
 
@@ -17,14 +20,89 @@ public sealed class PlayerHealth
     /// <summary>Minimum fall height in blocks that hurts; anything shorter lands free.</summary>
     public const float FallMinBlocks = 5f;
 
-    /// <summary>Lava burns 5 HP every half second, i.e. 10 HP/s.</summary>
+    /// <summary>Lava burns 10 HP every half second, i.e. 20 HP/s.</summary>
     public const float LavaTickSeconds = 0.5f;
-    public const int LavaDamagePerTick = 5;
+    public const int LavaDamagePerTick = 10;
 
     /// <summary>How long the damage vignette takes to fade after a hit.</summary>
     public const float DamageFlashSeconds = 1.5f;
 
     public int Health { get; private set; } = MaxHealth;
+
+    private int _maxBonus;
+
+    /// <summary>What this player wears, set by <see cref="ApplyGear"/>; null until then. Armor, effect immunities and
+    /// passives read it live.</summary>
+    public Equipment? Gear { get; private set; }
+
+    /// <summary>The armor points worn right now.</summary>
+    public int Armor => Gear?.Stats.Armor ?? 0;
+
+    /// <summary>Whether worn gear makes this player immune to the named status effect.</summary>
+    public bool IsImmuneToEffect(string effectName) => Gear?.IsImmuneTo(effectName) == true;
+
+    /// <summary>Whether worn gear (the feather charm's no_fall_damage ability) negates fall damage: a
+    /// <see cref="DamageSource.Fall"/> blow then does nothing.</summary>
+    public bool NegatesFallDamage => Gear?.Has(GearAbility.NoFallDamage) == true;
+
+    /// <summary>Mob blows taken so far (after armor, above 0), a counter the mob director reads to know when to fire
+    /// the wearer's on-damaged passives.</summary>
+    public int MobBlows { get; private set; }
+
+    private int _blowsSeen;
+    private float _passiveCooldown;
+
+    /// <summary>Whether a mob blow landed since the last call (once per blow, then false): what fires the wearer's
+    /// on-damaged passives.</summary>
+    public bool ConsumeMobBlow()
+    {
+        if (_blowsSeen == MobBlows) return false;
+        _blowsSeen = MobBlows;
+        return true;
+    }
+
+    /// <summary>Whether a cooldown-gated passive (low health) may fire.</summary>
+    public bool PassiveReady => _passiveCooldown <= 0f;
+
+    /// <summary>Counts the passive cooldown down.</summary>
+    public void TickPassiveCooldown(float deltaTime) => _passiveCooldown = Math.Max(0f, _passiveCooldown - Math.Max(0f, deltaTime));
+
+    /// <summary>Starts the passive cooldown.</summary>
+    public void StartPassiveCooldown(float seconds) => _passiveCooldown = seconds;
+
+    public PlayerHealth() => Effects.ImmunityCheck = IsImmuneToEffect;
+
+    /// <summary>
+    /// Applies what worn gear changes: the health bonus, and (only where this pool is simulated, never on a
+    /// client that mirrors its server's mana) the mana bonus and regeneration, and the lung's capacity (the extra_air
+    /// ability, <see cref="GearConfig.ExtraAirFactor"/>). Armor, immunities, passives and the fall negation follow
+    /// <paramref name="equipment"/> from here on.
+    /// </summary>
+    public void ApplyGear(Equipment equipment, bool simulatesMana)
+    {
+        Gear = equipment;
+        Breath.SetMaxAir(equipment.Has(GearAbility.ExtraAir)
+            ? PlayerConfig.AirSeconds * GearConfig.ExtraAirFactor
+            : PlayerConfig.AirSeconds);
+        var stats = equipment.Stats;
+        SetMaxBonus(stats.MaxHealth);
+        if (simulatesMana)
+            Mana.SetGear(stats.MaxMana, stats.ManaRegenFactor);
+    }
+
+    /// <summary>The pool's size: <see cref="MaxHealth"/> plus what worn gear adds. The hearts scale to it.</summary>
+    public int Max => MaxHealth + _maxBonus;
+
+    /// <summary>
+    /// Sets what worn gear adds to the pool (clamped to 0..<see cref="GearConfig.MaxHealthBonusCap"/>). A smaller
+    /// pool pulls the health down with it; a larger one leaves it where it is, so putting gear on never heals.
+    /// </summary>
+    public void SetMaxBonus(int bonus)
+    {
+        _maxBonus = Math.Clamp(bonus, 0, GearConfig.MaxHealthBonusCap);
+        if (Health > Max)
+            Health = Max;
+    }
 
     /// <summary>
     /// Damage feedback strength, 1 on a hit decaying to 0. Drives the screen-corner
@@ -58,7 +136,7 @@ public sealed class PlayerHealth
     /// </summary>
     public void Restore(int health)
     {
-        Health = Math.Clamp(health, 0, MaxHealth);
+        Health = Math.Clamp(health, 0, Max);
         DamageFlash = 0f;
         _lavaTimer = 0f;
         Breath.Refill();
@@ -93,7 +171,7 @@ public sealed class PlayerHealth
         if (IsDead)
             return;
         _secondsSinceCombat += Math.Max(0f, deltaTime);
-        if (immune || Health >= MaxHealth || _secondsSinceCombat < PlayerConfig.RegenDelaySeconds)
+        if (immune || Health >= Max || _secondsSinceCombat < PlayerConfig.RegenDelaySeconds)
         {
             _regenCarry = 0f;
             return;
@@ -117,11 +195,17 @@ public sealed class PlayerHealth
     public string? LastKiller { get; private set; }
 
     /// <summary>Like <see cref="TakeDamage(int)"/>, but names what dealt the blow so the death
-    /// message can say it.</summary>
+    /// message can say it, and worn armor reduces it (<see cref="ArmorRules"/>; the source-less overload is raw).</summary>
     public void TakeDamage(int amount, DamageSource source, string? killer = null)
     {
+        if (source == DamageSource.Fall && NegatesFallDamage)
+            return;
+        // Worn armor takes points off the blow, down to its source's minimum (see ArmorRules)
+        amount = ArmorRules.Reduce(amount, Armor, source);
         if (amount <= 0)
             return;
+        if (source == DamageSource.Mob)
+            MobBlows++;
         if (source != DamageSource.None)
         {
             LastSource = source;
@@ -136,15 +220,16 @@ public sealed class PlayerHealth
     /// </summary>
     public bool Heal(int amount)
     {
-        if (amount <= 0 || Health <= 0 || Health >= MaxHealth)
+        if (amount <= 0 || Health <= 0 || Health >= Max)
             return false;
-        Health = Math.Min(MaxHealth, Health + amount);
+        Health = Math.Min(Max, Health + amount);
         return true;
     }
 
     /// <summary>Burns while <paramref name="inLava"/> and not <paramref name="immune"/>
-    /// (creative/flight). Leaving the lava (or going immune) clears the partial tick, so
-    /// re-entry never eats an instant hit.</summary>
+    /// (creative/flight), and catches the <c>burning</c> status effect so the fire rides out of the
+    /// pool. Leaving the lava (or going immune) clears the partial tick, so re-entry never eats an
+    /// instant hit; the effect stays for its own duration.</summary>
     public void UpdateLava(float deltaTime, bool inLava, bool immune)
     {
         if (immune || !inLava)
@@ -153,6 +238,7 @@ public sealed class PlayerHealth
             return;
         }
 
+        StatusEffects.Apply(this, immune: false, "burning");
         _lavaTimer += Math.Max(0f, deltaTime);
         while (_lavaTimer >= LavaTickSeconds)
         {
@@ -200,7 +286,7 @@ public sealed class PlayerHealth
             Effects.Clear();
             return;
         }
-        var damage = Effects.Tick(deltaTime, MaxHealth);
+        var damage = Effects.Tick(deltaTime, Max);
         if (damage > 0)
             TakeDamage(damage, DamageSource.Magic, Effects.LastDamageEffect?.DeathMessage);
     }
@@ -213,7 +299,7 @@ public sealed class PlayerHealth
     /// caller owns the teleport.</summary>
     public void Respawn()
     {
-        Health = MaxHealth;
+        Health = Max;
         _lavaTimer = 0f;
         Breath.Refill();
         Mana.Refill();

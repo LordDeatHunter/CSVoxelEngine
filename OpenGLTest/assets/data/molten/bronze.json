@@ -1,0 +1,7 @@
+{
+  // Molten bronze: what an alloy kiln makes of copper and tin (recipes/alloy/bronze.json). The
+  // lava tile again, tinted a warm gold between copper and tin.
+  "name": "Molten Bronze",
+  "texture": "lava_still",
+  "color": [205, 150, 60]
+}

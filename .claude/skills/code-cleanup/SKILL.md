@@ -95,7 +95,7 @@ does not map to.
 5. Only then tighten naming/structure inside the extracted class.
 
 State-bearing sims (`FluidManager`, `LeafDecayManager`, `TntManager`, stations) share invariants
-documented in `AGENTS.md` (edit-path hooks, threading); read that section before touching them
+documented in `docs/agents/architecture-and-worldgen.md` (edit-path hooks, threading); read that section before touching them
 and keep every hook call on the same path.
 
 ## Early returns / nesting rewrites
@@ -149,5 +149,5 @@ duplication / early returns slice by slice.
 ## Reporting
 
 When a cleanup run ends (or hands off), leave a note of what remains: the next agent needs the
-list of un-split god files / folders and the namespace state. `AGENTS.md`'s Layout section is
+list of un-split god files / folders and the namespace state. The `layout-*.md` docs under `docs/agents/` are
 the record of record - update the paths you moved.

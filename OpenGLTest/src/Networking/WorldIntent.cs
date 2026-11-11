@@ -34,6 +34,20 @@ public enum NetIntentKind : byte
     /// <summary>Right-click with a staff in hand casts its selected spell slot. The intent carries
     /// the slot and edits no cell.</summary>
     Cast = 8,
+
+    /// <summary>One hammer hit on the anvil cell the intent names: the server judges the hammer in hand and its own
+    /// per-anvil hit gap, and edits no cell.</summary>
+    Hammer = 9,
+
+    /// <summary>A waystone trip to the discovered waystone at the cell the intent names, from the one the player stands
+    /// at (the one it last activated): the server judges reach, discovery, the lost flag and the mana, then moves the
+    /// player there once the destination has loaded. Edits no cell.</summary>
+    Waystone = 10,
+
+    /// <summary>A pick from an anvil's recipe list: forge the recipe making <see cref="WorldIntent.Recipe"/> from the
+    /// metal stacked on the anvil cell the intent names. The server judges the hammer in hand, its own ray on the cell
+    /// and the stack; the result lands in the inventory. Edits no cell.</summary>
+    Forge = 11,
 }
 
 /// <summary>Which left-click attack an <see cref="NetIntentKind.Attack"/> intent carries (see
@@ -68,6 +82,9 @@ public enum NetAttackKind : byte
 /// <item><see cref="NetIntentKind.Attack"/>: the attack kind.</item>
 /// <item><see cref="NetIntentKind.Respawn"/>: nothing beyond the eye and aim.</item>
 /// <item><see cref="NetIntentKind.Cast"/>: the staff's spell slot (<see cref="Slot"/>).</item>
+/// <item><see cref="NetIntentKind.Hammer"/>: the anvil's cell.</item>
+/// <item><see cref="NetIntentKind.Waystone"/>: the destination waystone's cell.</item>
+/// <item><see cref="NetIntentKind.Forge"/>: the anvil's cell and the forge recipe's result id (<see cref="Recipe"/>).</item>
 /// </list>
 /// GL-free and content-free.
 /// </summary>
@@ -84,7 +101,8 @@ public readonly record struct WorldIntent(
     sbyte NormalZ = 0,
     float Charge = 0f,
     NetAttackKind Attack = NetAttackKind.Punch,
-    int Slot = 0)
+    int Slot = 0,
+    ushort Recipe = 0)
 {
     /// <summary>The cell the intent names, as a floored world position.</summary>
     public Vector3 Cell => new(X, Y, Z);
@@ -98,14 +116,15 @@ public readonly record struct WorldIntent(
 
     /// <summary>Whether the client's prediction of the intent changes its inventory, so the server
     /// answers it with an inventory snapshot.</summary>
-    public bool PredictsInventory => Kind is NetIntentKind.Place or NetIntentKind.Use or NetIntentKind.Throw;
+    public bool PredictsInventory =>
+        Kind is NetIntentKind.Place or NetIntentKind.Use or NetIntentKind.Throw or NetIntentKind.Forge;
 
     /// <summary>Whether the intent may only be sent at the edit rate
     /// (<see cref="NetworkConfig.NetEditIntentsPerSecond"/>). A cast draws one edit token too, as a
     /// spam cap; its gameplay pace is the caster's own <see cref="Magic.CastPacing"/>.</summary>
     public bool IsRateLimited =>
         Kind is NetIntentKind.BreakComplete or NetIntentKind.Place or NetIntentKind.Use or NetIntentKind.Throw
-            or NetIntentKind.Cast;
+            or NetIntentKind.Cast or NetIntentKind.Hammer or NetIntentKind.Waystone or NetIntentKind.Forge;
 
     public static WorldIntent BreakStart(Vector3 eye, Vector3 direction, Vector3 cell) =>
         new(NetIntentKind.BreakStart, eye, direction, (int)cell.X, (int)cell.Y, (int)cell.Z, HasCell: true);
@@ -133,4 +152,13 @@ public readonly record struct WorldIntent(
 
     public static WorldIntent Cast(Vector3 eye, Vector3 direction, int slot) =>
         new(NetIntentKind.Cast, eye, direction, Slot: slot);
+
+    public static WorldIntent Hammer(Vector3 eye, Vector3 direction, Vector3 cell) =>
+        new(NetIntentKind.Hammer, eye, direction, (int)cell.X, (int)cell.Y, (int)cell.Z, HasCell: true);
+
+    public static WorldIntent Waystone(Vector3 eye, Vector3 direction, (int X, int Y, int Z) destination) =>
+        new(NetIntentKind.Waystone, eye, direction, destination.X, destination.Y, destination.Z, HasCell: true);
+
+    public static WorldIntent Forge(Vector3 eye, Vector3 direction, Vector3 cell, ushort resultId) =>
+        new(NetIntentKind.Forge, eye, direction, (int)cell.X, (int)cell.Y, (int)cell.Z, HasCell: true, Recipe: resultId);
 }

@@ -31,6 +31,13 @@ public sealed class StatusEffectSet
     /// <summary>The attack pace factor: the lowest of the active effects', 1 when none slows.</summary>
     public float AttackFactor { get; private set; } = 1f;
 
+    /// <summary>
+    /// Asks whether the owner is immune to an effect by its file name (worn gear that blocks it); an immune
+    /// effect never applies. Null means no immunity. Only the authoritative side ever applies effects, so a
+    /// client's mirror needs none.
+    /// </summary>
+    public Func<string, bool>? ImmunityCheck { get; set; }
+
     /// <summary>The effect whose tick last dealt damage, for the death message; null until one has.</summary>
     public StatusEffect? LastDamageEffect { get; private set; }
 
@@ -42,6 +49,8 @@ public sealed class StatusEffectSet
     /// </summary>
     public bool Apply(StatusEffect effect, float durationScale)
     {
+        if (ImmunityCheck?.Invoke(effect.Name) == true)
+            return false;
         var duration = effect.DurationSeconds * Math.Clamp(durationScale, 0f, StatusEffectConfig.MaxDurationScale);
         if (!(duration > 0f))
             return false;

@@ -1,0 +1,8 @@
+{
+  // A heavy copper-headed stake: right-clicked on desert sand it thumps the ground and wakes the sandworm
+  // (use.action "summon"; ItemUseAction.Summon, SummonItem). Refused, and not spent, anywhere but desert sand
+  // or while a worm is alive. The sprite comes from tools/generate-sandworm-model.py.
+  "name": "Thumper",
+  "texture": "assets/textures/items/thumper.png",
+  "use": { "action": "summon", "entity": "sandworm" }
+}

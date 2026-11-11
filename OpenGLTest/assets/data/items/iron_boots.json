@@ -1,0 +1,7 @@
+{
+  // Iron Boots: placeholder gear.
+  "name": "Iron Boots",
+  "texture": "assets/textures/items/iron_boots.png",
+  "rarity": "uncommon",
+  "equip": { "slot": "feet", "armor": 3, "set": "iron", "visible": true }
+}

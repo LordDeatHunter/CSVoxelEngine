@@ -31,7 +31,7 @@ No "Done" section. Sections may be omitted only when empty and the file is a pur
 - **A finished entry is deleted, not kept.** Tick it `[x]` while you work, and remove the line in
   the same change or the next pass. `git log -- plans/<file>` is the record.
 - Before deleting, extract anything a future reader still needs to its durable home:
-  - design or invariant -> `AGENTS.md` (the section that owns the feature),
+  - design or invariant -> the `docs/agents/` file that owns the feature (index in `AGENTS.md`),
   - procedure or trap -> the relevant `.claude/skills/*/SKILL.md`,
   - a measurement, a ruled-out idea or a caveat -> the plan's own `## Reference`.
   Nothing noteworthy means plain deletion. Never leave "done, see git" prose behind.

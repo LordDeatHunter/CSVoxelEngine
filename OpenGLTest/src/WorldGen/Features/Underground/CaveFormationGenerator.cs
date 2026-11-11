@@ -19,8 +19,8 @@ public static class CaveFormationGenerator
     private const ulong StalagmiteStream = unchecked(StalactiteStream * 2);
 
     /// <summary>Blocks this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte StalactiteBlock;
-    public static readonly byte StalagmiteBlock;
+    public static readonly ushort StalactiteBlock;
+    public static readonly ushort StalagmiteBlock;
 
     static CaveFormationGenerator()
     {
@@ -50,7 +50,7 @@ public static class CaveFormationGenerator
     /// (the first solid cell below it in its column, its own cell free). Runs on a generation
     /// worker thread after the carvers and the water, so a flooded cave stays bare.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
@@ -89,7 +89,7 @@ public static class CaveFormationGenerator
         new(int.MinValue, column.MaxHeight - WorldFeatureConfig.CaveFormationMinDepth);
 
     // Its drip point: the first free cell over the column's floor below it
-    private static void StampDrip(byte[] blocks, int x, int y, int z, int worldY0)
+    private static void StampDrip(ushort[] blocks, int x, int y, int z, int worldY0)
     {
         for (var drip = y - 1; drip > worldY0; drip--)
         {

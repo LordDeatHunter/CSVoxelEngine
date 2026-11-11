@@ -1,0 +1,8 @@
+{
+  "name": "Hellrock",
+  "model": { "parent": "block/cube_all", "textures": { "all": "hellrock" } },
+  "sfx": "hit_rock",
+  "hardness": 24,
+  "requiresTool": true,
+  "tools": { "pickaxe": 3 }
+}

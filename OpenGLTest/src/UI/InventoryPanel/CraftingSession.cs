@@ -21,7 +21,7 @@ public sealed class CraftingSession
     private readonly Dictionary<int, FedEntry> _fed = new();
 
     /// <summary>What an ingredient slot holds: the picked member id plus reserved units.</summary>
-    public readonly record struct FedEntry(byte MemberId, int Count);
+    public readonly record struct FedEntry(ushort MemberId, int Count);
 
     public FedEntry FedAt(int index) => _fed.GetValueOrDefault(index);
 
@@ -55,7 +55,7 @@ public sealed class CraftingSession
     /// Picks which member a slot takes. Keeps the fed count, clamped to what is on hand.
     /// Ignored for unknown slots or ids the ingredient does not accept.
     /// </summary>
-    public void SetMember(int index, byte memberId, Inventory inventory)
+    public void SetMember(int index, ushort memberId, Inventory inventory)
     {
         if (Recipe == null || (uint)index >= (uint)Recipe.Ingredients.Length) return;
         if (!Recipe.Ingredients[index].Accepts(memberId)) return;
@@ -90,7 +90,7 @@ public sealed class CraftingSession
     /// accepting the id, holding none of another member, and still short of its need. Returns
     /// whether anything was fed.
     /// </summary>
-    public bool FeedFromInventory(byte id, Inventory inventory)
+    public bool FeedFromInventory(ushort id, Inventory inventory)
     {
         if (Recipe == null || id == 0) return false;
         for (var i = 0; i < Recipe.Ingredients.Length; i++)
@@ -199,12 +199,12 @@ public sealed class CraftingSession
         return true;
     }
 
-    private byte FirstStockedMember(CraftingRecipe.Ingredient ingredient, Inventory inventory)
+    private ushort FirstStockedMember(CraftingRecipe.Ingredient ingredient, Inventory inventory)
     {
         foreach (var id in ingredient.AcceptedIds)
             if (inventory.CountFor(id) > 0)
                 return id;
-        return ingredient.AcceptedIds.Length > 0 ? ingredient.AcceptedIds[0] : (byte)0;
+        return ingredient.AcceptedIds.Length > 0 ? ingredient.AcceptedIds[0] : (ushort)0;
     }
 
     private int OwnedFor(int index, Inventory inventory)
@@ -226,7 +226,7 @@ public sealed class CraftingSession
         return $"any {ingredient.Tag}";
     }
 
-    private int AvailableToFeed(byte member, Inventory inventory, int exceptIndex)
+    private int AvailableToFeed(ushort member, Inventory inventory, int exceptIndex)
     {
         var reservedElsewhere = 0;
         foreach (var (index, fed) in _fed)
@@ -235,9 +235,9 @@ public sealed class CraftingSession
         return Math.Max(0, inventory.CountFor(member) - reservedElsewhere);
     }
 
-    private Dictionary<byte, int> ReservedTotals()
+    private Dictionary<ushort, int> ReservedTotals()
     {
-        var totals = new Dictionary<byte, int>();
+        var totals = new Dictionary<ushort, int>();
         foreach (var (_, fed) in _fed)
         {
             if (fed.MemberId == 0 || fed.Count <= 0) continue;

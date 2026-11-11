@@ -11,8 +11,8 @@ public sealed class BubbleParticleTests
 {
     public BubbleParticleTests() => TestContent.EnsureLoaded();
 
-    private static byte WaterId => ContentRegistry.RequireBlock("water").Id;
-    private static byte StoneId => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort WaterId => ContentRegistry.RequireBlock("water").Id;
+    private static ushort StoneId => ContentRegistry.RequireBlock("stone").Id;
 
     private static (ChunkManager Chunks, Chunk Center) WaterColumn(int top = 12)
     {

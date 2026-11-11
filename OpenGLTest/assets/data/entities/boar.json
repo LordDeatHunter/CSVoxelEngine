@@ -1,0 +1,7 @@
+{
+  "name": "Boar",
+  // Neutral until hurt or crowded, then it paws the ground and charges (Boar, WildlifeConfig)
+  "hp": 30,
+  "loot": "boar",
+  "model": "assets/models/entity/boar.bbmodel"
+}

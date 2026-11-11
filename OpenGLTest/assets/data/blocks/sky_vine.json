@@ -1,0 +1,21 @@
+{
+  // A vine hanging under a sky island's underside (SkyFlora): each cell hangs from the cell above it
+  // (support "above"), the island or the vine cell over it, so mining any cell drops the rest of the
+  // vine below it, like the hell vine. Cutout, no sway, dropping nothing. Tile from
+  // committed art.
+  "name": "Sky Vine",
+  "model": { "parent": "block/cross", "textures": { "cross": "sky_vine" } },
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "support": "above",
+  "blocksSight": false,
+  "replaceableByPlacement": true,
+  "loot": "none",
+  "hitbox": { "min": [0.25, 0, 0.25], "max": [0.75, 1, 0.75] }
+}

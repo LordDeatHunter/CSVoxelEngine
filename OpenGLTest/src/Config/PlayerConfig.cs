@@ -56,6 +56,9 @@ public static class PlayerConfig
 
     // An axe's chop (SwordSwing.AxeChop) lasts the axe's hit gap, held between these (seconds)
     public const float AxeChopMinSeconds = 0.25f;
+    // A creative player holding the mine button breaks the next block only this many seconds after
+    // the last one (the press itself breaks at once), so a tap never takes the block behind it.
+    public const float CreativeBreakRepeatSeconds = 0.2f;
     public const float AxeChopMaxSeconds = 0.8f;
 
     // Break kick (BreakKick): a landed mining hit on a block harder than the min nudges the view,
@@ -80,6 +83,9 @@ public static class PlayerConfig
     // Wading (under WaterFloatShare) walks, at this share of the walk speed: a lighter slowdown than
     // swimming's, with the normal jump.
     public const float WadeSpeedFactor = 0.75f;
+    // Lava drags far harder than water: any part of the body in it scales the walk and the swim
+    // stroke to this share of their already slowed speed, so sprinting through a dip cannot carry a run.
+    public const float LavaSpeedFactor = 0.3f;
     // Floating: a body in deep water with its eye above the surface (and one that has not dived,
     // even with the eye under) settles where this share of it is under. Its vertical speed eases at
     // FloatSettleRate (per second) toward FloatBuoyancy (per second) times its height error, capped
@@ -97,10 +103,19 @@ public static class PlayerConfig
     public const float ThrowSpeed = 40f;
     public const float ThrowLifetimeSeconds = 5f;
 
+    // --- Thrown drops: a player's Q-drop or a landed throw waits this long before anyone can
+    // collect it, so the thrower does not snap it straight back up. Mined and mob drops keep the
+    // short ItemDrop grace. ---
+    public const float ThrownPickupDelaySeconds = 2f;
+
     // --- Slime block (the block "bounce" flag): a body that lands on one is thrown back up at
     // this share of its impact and bills no fall damage; below the minimum it just rests ---
     public const float SlimeBlockBounceRestitution = 0.8f;
     public const float SlimeBlockBounceMinSpeed = 5f;
+
+    // --- Sink blocks (the block "sink" flag, SinkLayer): blocks per second a player body standing
+    // in a sink block's soft top layer descends until it rests on the solid part ---
+    public const float SinkBlockSpeed = 0.6f;
 
     // --- Bandage (ItemUseAction.Heal): HP one restores, spent from the stack ---
     public const int BandageHealAmount = 20;
@@ -117,4 +132,11 @@ public static class PlayerConfig
     public const float RegenDelaySeconds = 8f;
     public const float RegenPerSecond = 1.5f;
     public const float RegenSprintFactor = 0.25f;
+
+    // --- Armor (ArmorRules): a blow keeps at least this much through any armor, by what dealt it; a source
+    // with no entry keeps GearConfig.UniversalMinDamage. Drowning and magic (burning, frostburn) ignore armor. ---
+    public const int ArmorMinDamageMob = 2;
+    public const int ArmorMinDamageFall = 3;
+    public const int ArmorMinDamageLava = 3;
+    public const int ArmorMinDamageCactus = 1;
 }

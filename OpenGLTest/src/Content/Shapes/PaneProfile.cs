@@ -11,7 +11,7 @@ namespace VoxelEngine.Content.Shapes;
 /// (<see cref="Rails"/>) each arm fills - one full-height band for a glass pane or a wall, two
 /// rails for a fence. Everything is cell-local (0..1), centered on the cell; an arm is never wider
 /// than the post. Immutable and interned by <see cref="Create"/>, so two blocks with the same
-/// dimensions share one instance, which is what <see cref="PaneShape.ConnectsTo(PaneProfile, byte, byte)"/>
+/// dimensions share one instance, which is what <see cref="PaneShape.ConnectsTo(PaneProfile, ushort, byte)"/>
 /// compares: panes of one shape join each other, a fence never reaches into a glass pane. The
 /// boxes of every arm mask are built once here. GL-free.
 /// </summary>

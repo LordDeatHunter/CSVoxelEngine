@@ -1,0 +1,9 @@
+{
+  "result": "item/cinder_sword",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/ember_shard", "count": 24 },
+    { "item": "block/basalt", "count": 30 },
+    { "item": "item/refined_vulcanite", "count": 1 }
+  ]
+}

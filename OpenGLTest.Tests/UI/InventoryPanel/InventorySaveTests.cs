@@ -18,8 +18,8 @@ public sealed class InventorySaveTests
 {
     public InventorySaveTests() => TestContent.EnsureLoaded();
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
-    private static byte Dirt => ContentRegistry.RequireBlock("dirt").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Dirt => ContentRegistry.RequireBlock("dirt").Id;
 
     private static Item ToolItem(System.Func<Item, bool> predicate) =>
         ItemRegistry.All.First(i => Inventory.CategoryOf(i.Id) == InventoryCategory.Tools && predicate(i));
@@ -27,8 +27,108 @@ public sealed class InventorySaveTests
     private static Item MiscItem() =>
         ItemRegistry.All.First(i => Inventory.CategoryOf(i.Id) == InventoryCategory.Misc);
 
-    private static int InstanceOf(Inventory inventory, byte itemId) =>
+    private static int InstanceOf(Inventory inventory, ushort itemId) =>
         inventory.ToolEntries().Last(t => t.ItemId == itemId).InstanceId;
+
+    private static string[] SortedKnownParts(Inventory inventory) =>
+        inventory.KnownParts.Order(System.StringComparer.Ordinal).ToArray();
+
+    [Fact]
+    public void KnownSpellPartsRoundTripByKey()
+    {
+        var a = Inventory.Empty();
+        a.LearnParts(SpellPartRegistry.All.Take(3).Select(p => p.Key));
+        var b = Inventory.Empty();
+        b.LearnParts(SpellPartRegistry.All.Skip(3).Select(p => p.Key));
+
+        b.Import(a.Export());
+
+        Assert.NotEmpty(a.KnownParts);
+        Assert.Equal(SortedKnownParts(a), SortedKnownParts(b));
+    }
+
+    [Fact]
+    public void AnUnknownSpellPartKeyIsDroppedAndTheRestKept()
+    {
+        var a = Inventory.Empty();
+        a.LearnParts(SpellPartRegistry.All.Take(2).Select(p => p.Key));
+        var data = a.Export();
+        data.KnownParts!.Add("element/no_such_part");
+        data.KnownParts.Add(null!);
+
+        var b = Inventory.Empty();
+        b.Import(data);
+
+        Assert.Equal(SortedKnownParts(a), SortedKnownParts(b));
+        Assert.False(b.KnowsPart("element/no_such_part"));
+    }
+
+    [Fact]
+    public void ReimportingTheSameKnownPartsDoesNotMoveTheVersion()
+    {
+        var a = Inventory.Empty();
+        a.LearnParts(SpellPartRegistry.All.Take(2).Select(p => p.Key));
+        var data = a.Export();
+        var b = Inventory.Empty();
+        b.Import(data);
+        var version = b.KnownPartsVersion;
+
+        b.Import(data);
+
+        Assert.Equal(version, b.KnownPartsVersion);
+    }
+
+    [Fact]
+    public void DiscoveredWaystonesRoundTripWithTheirNames()
+    {
+        var a = Inventory.Empty();
+        a.Waystones.Add(1, 2, 3, "Kafuziro");
+        a.Waystones.Add(-5, 300, 9, "Sky Gate");
+        var b = Inventory.Empty();
+        b.Waystones.Add(7, 7, 7, "Stale");
+
+        b.Import(a.Export());
+
+        Assert.Equal(a.Waystones.Entries, b.Waystones.Entries);
+        Assert.False(b.Waystones.Contains(7, 7, 7));
+    }
+
+    [Fact]
+    public void ASaveFromBeforeWaystonesKnowsNoneAndABrokenEntryIsDropped()
+    {
+        var a = Inventory.Empty();
+        a.Waystones.Add(1, 2, 3, "Kafuziro");
+        var data = a.Export();
+        data.Waystones!.Add(new PlayerSaveData.DiscoveredWaystoneData { Cell = [4, 5], Name = "Bad" });
+        data.Waystones.Add(new PlayerSaveData.DiscoveredWaystoneData { Cell = [4, 5, 6], Name = " \t " });
+        data.Waystones.Add(null!);
+
+        var b = Inventory.Empty();
+        b.Import(data);
+        Assert.Equal(a.Waystones.Entries, b.Waystones.Entries);
+
+        data.Waystones = null;
+        b.Import(data);
+        Assert.Equal(0, b.Waystones.Count);
+    }
+
+    [Fact]
+    public void ReimportingTheSameWaystonesDoesNotMoveTheVersion()
+    {
+        var a = Inventory.Empty();
+        a.Waystones.Add(1, 2, 3, "Kafuziro");
+        var data = a.Export();
+        var b = Inventory.Empty();
+        b.Import(data);
+        var version = b.Waystones.Version;
+
+        b.Import(data);
+        Assert.Equal(version, b.Waystones.Version);
+
+        data.Waystones![0].Name = "Renamed";
+        b.Import(data);
+        Assert.NotEqual(version, b.Waystones.Version);
+    }
 
     [Fact]
     public void ExportImportRoundTripsEveryPoolToolAndSlot()
@@ -45,8 +145,12 @@ public sealed class InventorySaveTests
         var crucibleItem = ToolItem(i => i.CrucibleCapacityMl > 0);
         Assert.True(a.Add(crucibleItem.Id));
         var crucibleInstance = InstanceOf(a, crucibleItem.Id);
-        var material = ContentRegistry.MoltenMaterials.First().Id;
-        a.GetToolStack(crucibleInstance)!.Set(new CrucibleComponent(material, 40, 60, Stone));
+        // Two metals, so every metal the vessel holds survives the trip, not just one
+        a.GetToolStack(crucibleInstance)!.Set(new CrucibleComponent(
+            [
+                new CrucibleMetal(ContentRegistry.MoltenMaterials[0].Id, 40, 60),
+                new CrucibleMetal(ContentRegistry.MoltenMaterials[1].Id, 0, 20),
+            ], Stone));
 
         var durableItem = ToolItem(i => i.MaxDurability > 2);
         Assert.True(a.Add(durableItem.Id));

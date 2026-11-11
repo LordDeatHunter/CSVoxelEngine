@@ -1,0 +1,6 @@
+{
+  // Mining grass leaves the dirt under it
+  "pools": [
+    { "rolls": 1, "entries": [ { "item": "block/dirt", "weight": 1, "count": 1 } ] }
+  ]
+}

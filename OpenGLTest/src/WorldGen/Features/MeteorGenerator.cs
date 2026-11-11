@@ -15,7 +15,7 @@ namespace VoxelEngine.WorldGen.Features;
 public static class MeteorGenerator
 {
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte ObsidianBlock;
+    public static readonly ushort ObsidianBlock;
 
     static MeteorGenerator() => ObsidianBlock = ContentRegistry.RequireBlock("obsidian").Id;
 
@@ -45,7 +45,7 @@ public static class MeteorGenerator
     /// and fluids are never cut, and the chunk's border clips the bowl. Runs on a generation
     /// worker thread after the trees.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         var reach = WorldFeatureConfig.MeteorMaxRadius;
         var shift = WorldFeatureConfig.MeteorCellShift;

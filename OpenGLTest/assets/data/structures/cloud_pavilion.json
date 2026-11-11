@@ -1,0 +1,38 @@
+{
+  "kind": "sky",
+  "weight": 2,
+  "groundLayer": 0,
+  "palette": {
+    "b": "stone_bricks",
+    "C": "ruin_chest_sky"
+  },
+  "layers": [
+    [
+      "bbbbbbb",
+      "b.....b",
+      "b.....b",
+      "b..C..b",
+      "b.....b",
+      "b.....b",
+      "bbb.bbb"
+    ],
+    [
+      "b.....b",
+      "       ",
+      "       ",
+      "       ",
+      "       ",
+      "       ",
+      "b.....b"
+    ],
+    [
+      "b.....b",
+      "       ",
+      "       ",
+      "       ",
+      "       ",
+      "       ",
+      "b.....b"
+    ]
+  ]
+}

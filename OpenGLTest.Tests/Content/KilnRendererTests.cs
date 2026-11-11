@@ -21,21 +21,27 @@ public sealed class KilnRendererTests
 
     private const float Epsilon = 1e-4f;
 
+    /// <summary>Every kiln anchor block: the plain kiln and the alloy furnace, each drawn by its
+    /// own <see cref="KilnLayout"/>.</summary>
+    public static TheoryData<string> KilnAnchors => new() { "mud_brick_kiln", "alloy_furnace" };
+
+    private static KilnProfile ProfileOf(string anchor) => ContentRegistry.RequireBlock(anchor).Kiln!;
+
     /// <summary>
     /// The kiln opening's footprint in world axes once the volume is turned onto
     /// <paramref name="facing"/>: the four corners of the local opening box rotated the way the
     /// render pass rotates every prop it puts inside it.
     /// </summary>
-    private static (float MinX, float MaxX, float MinZ, float MaxZ) OpeningFootprint(int facing)
+    private static (float MinX, float MaxX, float MinZ, float MaxZ) OpeningFootprint(KilnLayout layout, int facing)
     {
         var minX = float.MaxValue;
         var maxX = float.MinValue;
         var minZ = float.MaxValue;
         var maxZ = float.MinValue;
-        foreach (var x in new[] { KilnRenderer.OpeningMinX, KilnRenderer.OpeningMaxX })
-        foreach (var z in new[] { 0f, KilnRenderer.OpeningDepthZ })
+        foreach (var x in new[] { layout.OpeningMinX, layout.OpeningMaxX })
+        foreach (var z in new[] { 0f, layout.OpeningDepthZ })
         {
-            var corner = MultiblockShape.RotatePoint(new Vector3(x, KilnRenderer.OpeningFloorY, z), facing);
+            var corner = MultiblockShape.RotatePoint(new Vector3(x, layout.OpeningFloorY, z), facing, layout.VolumeSize);
             minX = MathF.Min(minX, corner.X);
             maxX = MathF.Max(maxX, corner.X);
             minZ = MathF.Min(minZ, corner.Z);
@@ -50,41 +56,53 @@ public sealed class KilnRendererTests
     /// standing outside the opening would clip into the brickwork, and a flame in front of the
     /// crucible would burn through the bowl instead of under it.
     /// </summary>
-    [Fact]
-    public void CrucibleAndFuelSitInsideTheOpeningAndTheFlameStandsBehindTheBowl()
+    [Theory]
+    [MemberData(nameof(KilnAnchors))]
+    public void CrucibleAndFuelSitInsideTheOpeningAndTheFlameStandsBehindTheBowl(string anchor)
     {
+        var profile = ProfileOf(anchor);
+        var layout = profile.Layout;
+        // The layout is the one drawn over this anchor's own volume
+        Assert.Equal(ContentRegistry.RequireBlock(anchor).MultiblockSize, layout.VolumeSize);
+
         // The bowl's rim has to clear the lintel whatever the facing
-        Assert.True(KilnRenderer.OpeningFloorY + KilnRenderer.CrucibleTopY < KilnRenderer.OpeningCeilingY);
+        Assert.True(layout.OpeningFloorY + KilnRenderer.CrucibleTopY < layout.OpeningCeilingY);
 
         // The flame burns behind the bowl's back wall, and the fuel sits behind the flame
-        Assert.True(KilnRenderer.FireLocal.Z >= KilnRenderer.CrucibleLocal.Z + KilnRenderer.CrucibleOuterHalf);
-        Assert.True(KilnRenderer.FuelLocal.Z > KilnRenderer.FireLocal.Z);
+        Assert.True(layout.FireLocal.Z >= layout.CrucibleLocal.Z + KilnRenderer.CrucibleOuterHalf);
+        Assert.True(layout.FuelLocal.Z > layout.FireLocal.Z);
 
         // The whole drawn fuel row - every unit's full width, not just the row's center - has to
         // fit between the piers and clear the hearth's back wall, and no two units may share a
         // plane
         Assert.True(KilnRenderer.FuelSpacing >= KilnRenderer.FuelSize);
-        var halfRow = (KilnManager.MaxFuel - 1) * 0.5f * KilnRenderer.FuelSpacing
+        var halfRow = (profile.FuelCap - 1) * 0.5f * KilnRenderer.FuelSpacing
                     + KilnRenderer.FuelSize * 0.5f;
-        Assert.True(KilnRenderer.FuelLocal.X - halfRow >= KilnRenderer.OpeningMinX);
-        Assert.True(KilnRenderer.FuelLocal.X + halfRow <= KilnRenderer.OpeningMaxX);
-        Assert.True(KilnRenderer.FuelLocal.Z + KilnRenderer.FuelSize * 0.5f <= KilnRenderer.OpeningDepthZ);
-        Assert.True(KilnRenderer.FuelLocal.Z - KilnRenderer.FuelSize * 0.5f >= 0f);
+        Assert.True(layout.FuelLocal.X - halfRow >= layout.OpeningMinX);
+        Assert.True(layout.FuelLocal.X + halfRow <= layout.OpeningMaxX);
+        Assert.True(layout.FuelLocal.Z + KilnRenderer.FuelSize * 0.5f <= layout.OpeningDepthZ);
+        Assert.True(layout.FuelLocal.Z - KilnRenderer.FuelSize * 0.5f >= 0f);
 
         for (var facing = 0; facing < 4; facing++)
         {
             // The opening box, rotated onto this facing: an axis-aligned footprint either way
-            var (minX, maxX, minZ, maxZ) = OpeningFootprint(facing);
+            var (minX, maxX, minZ, maxZ) = OpeningFootprint(layout, facing);
 
-            var bowl = KilnRenderer.ToWorld(Vector3.Zero, facing, KilnRenderer.CrucibleLocal);
-            Assert.Equal(KilnRenderer.OpeningFloorY, bowl.Y, precision: 4);
+            var bowl = layout.ToWorld(Vector3.Zero, facing, layout.CrucibleLocal);
+            Assert.Equal(layout.OpeningFloorY, bowl.Y, precision: 4);
             Assert.InRange(bowl.X - KilnRenderer.CrucibleOuterHalf, minX - Epsilon, maxX + Epsilon);
             Assert.InRange(bowl.X + KilnRenderer.CrucibleOuterHalf, minX - Epsilon, maxX + Epsilon);
             Assert.InRange(bowl.Z - KilnRenderer.CrucibleOuterHalf, minZ - Epsilon, maxZ + Epsilon);
             Assert.InRange(bowl.Z + KilnRenderer.CrucibleOuterHalf, minZ - Epsilon, maxZ + Epsilon);
 
-            var fuel = KilnRenderer.ToWorld(Vector3.Zero, facing, KilnRenderer.FuelLocal);
-            Assert.Equal(KilnRenderer.OpeningFloorY, fuel.Y, precision: 4);
+            var fuel = layout.ToWorld(Vector3.Zero, facing, layout.FuelLocal);
+            Assert.Equal(layout.OpeningFloorY, fuel.Y, precision: 4);
+
+            // The flame burns inside the opening too, so its light and embers come out of it
+            var fire = layout.ToWorld(Vector3.Zero, facing, layout.FireLocal);
+            Assert.InRange(fire.X, minX - Epsilon, maxX + Epsilon);
+            Assert.InRange(fire.Z, minZ - Epsilon, maxZ + Epsilon);
+            Assert.InRange(fire.Y, layout.OpeningFloorY, layout.OpeningCeilingY);
             Assert.InRange(fuel.X, minX - Epsilon, maxX + Epsilon);
             Assert.InRange(fuel.Z, minZ - Epsilon, maxZ + Epsilon);
         }
@@ -128,8 +146,9 @@ public sealed class KilnRendererTests
                   > SpritePose.RestingLift(KilnRenderer.FuelSize));
 
         // A lump lying on the hearth floor still sits below the flame burning over it
-        Assert.True(SpritePose.RestingLift(KilnRenderer.FuelSize)
-                  < KilnRenderer.FireLocal.Y - KilnRenderer.OpeningFloorY);
+        foreach (var layout in KilnLayout.All)
+            Assert.True(SpritePose.RestingLift(KilnRenderer.FuelSize)
+                      < layout.FireLocal.Y - layout.OpeningFloorY);
     }
 
     /// <summary>
@@ -215,18 +234,22 @@ public sealed class KilnRendererTests
     public void PendingLumpHoversOverTheBowlInsideTheOpeningAndShrinksOnlyAsItsLastUnitMelts()
     {
         // It sits over the bowl's rim, and even at full size it clears the lintel
-        Assert.True(KilnRenderer.PendingLocal.Y >= KilnRenderer.OpeningFloorY + KilnRenderer.CrucibleTopY);
-        Assert.True(KilnRenderer.PendingLocal.Y + KilnRenderer.PendingSize <= KilnRenderer.OpeningCeilingY);
+        foreach (var layout in KilnLayout.All)
+        {
+            Assert.True(layout.PendingLocal.Y >= layout.OpeningFloorY + KilnRenderer.CrucibleTopY);
+            Assert.True(layout.PendingLocal.Y + KilnRenderer.PendingSize <= layout.OpeningCeilingY);
+        }
 
         // Wider than the bowl's mouth, so it reads as resting across it rather than fallen in,
         // and no wider than the bowl itself
         Assert.True(KilnRenderer.PendingSize > KilnRenderer.CrucibleInnerMax - KilnRenderer.CrucibleInnerMin);
         Assert.True(KilnRenderer.PendingSize <= 2f * KilnRenderer.CrucibleOuterHalf);
 
+        foreach (var layout in KilnLayout.All)
         for (var facing = 0; facing < 4; facing++)
         {
-            var (minX, maxX, minZ, maxZ) = OpeningFootprint(facing);
-            var lump = KilnRenderer.ToWorld(Vector3.Zero, facing, KilnRenderer.PendingLocal);
+            var (minX, maxX, minZ, maxZ) = OpeningFootprint(layout, facing);
+            var lump = layout.ToWorld(Vector3.Zero, facing, layout.PendingLocal);
             var half = KilnRenderer.PendingSize * 0.5f;
             Assert.InRange(lump.X - half, minX - Epsilon, maxX + Epsilon);
             Assert.InRange(lump.X + half, minX - Epsilon, maxX + Epsilon);
@@ -234,27 +257,38 @@ public sealed class KilnRendererTests
             Assert.InRange(lump.Z + half, minZ - Epsilon, maxZ + Epsilon);
         }
 
-        // The size curve: nothing left means nothing drawn, a whole unit (or several) is a whole
-        // lump, and in between it shrinks strictly with what is still solid
+        // The stack: nothing left draws nothing; otherwise the drawn volume equals the pending
+        // units, only the top lump is ever partial, and as the charge melts the volume falls
+        // without a jump (the lump count only drops once the top one has shrunk to nothing)
         const int unit = 100;
-        Assert.Equal(0f, KilnRenderer.PendingScale01(0f, unit), precision: 5);
-        Assert.Equal(1f, KilnRenderer.PendingScale01(unit, unit), precision: 5);
-        Assert.Equal(1f, KilnRenderer.PendingScale01(3 * unit, unit), precision: 5);
+        Assert.Equal(0, KilnRenderer.PendingStack(0f, unit).Count);
 
-        var previous = KilnRenderer.PendingScale01(0f, unit);
-        for (var step = 1; step <= 10; step++)
+        var previousVolume = float.MaxValue;
+        var previousCount = int.MaxValue;
+        for (var ml = 4 * unit; ml > 0; ml -= 5)
         {
-            var scale = KilnRenderer.PendingScale01(unit * (step / 10f), unit);
-            Assert.True(scale > previous);
-            Assert.InRange(scale, 0f, 1f);
-            previous = scale;
+            var (count, lastScale) = KilnRenderer.PendingStack(ml, unit);
+            Assert.InRange(lastScale, 0f, 1f);
+            Assert.Equal(ml / (float)unit, count - 1 + lastScale, precision: 4);
+
+            var volume = count - 1 + lastScale;
+            Assert.True(volume < previousVolume);
+            Assert.True(count <= previousCount);
+            previousVolume = volume;
+            previousCount = count;
         }
 
-        // A charge with no recorded unit size still draws a finite lump rather than dividing by
+        // Several units waiting still show every unit but the melting one at full size
+        var (many, top) = KilnRenderer.PendingStack(3.5f * unit, unit);
+        Assert.True(many > 1);
+        Assert.True(top < 1f);
+
+        // A charge with no recorded unit size still draws one finite lump rather than dividing by
         // zero, and still disappears once nothing is pending
-        Assert.InRange(KilnRenderer.PendingScale01(50f, 0), 0f, 1f);
-        Assert.True(KilnRenderer.PendingScale01(50f, 0) > 0f);
-        Assert.Equal(0f, KilnRenderer.PendingScale01(0f, 0), precision: 5);
+        var (fallbackCount, fallbackScale) = KilnRenderer.PendingStack(50f, 0);
+        Assert.True(fallbackCount > 0);
+        Assert.InRange(fallbackScale, 0.01f, 1f);
+        Assert.Equal(0, KilnRenderer.PendingStack(0f, 0).Count);
     }
 
     /// <summary>

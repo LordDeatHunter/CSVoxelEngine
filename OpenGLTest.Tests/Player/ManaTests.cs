@@ -122,8 +122,8 @@ public sealed class ManaTests
 
         mirror.SetNet(mirror.Max + 50, mirror.Max);
         Assert.Equal(mirror.Max, mirror.Current);
-        mirror.SetNet(10, ManaConfig.MaxCap + 1000);
-        Assert.Equal(ManaConfig.MaxCap, mirror.Max);
+        mirror.SetNet(10, PlayerMana.WireMaxCap + 1000);
+        Assert.Equal(PlayerMana.WireMaxCap, mirror.Max);
         mirror.SetNet(10, 0);
         Assert.Equal(1, mirror.Max);
         Assert.Equal(1f, mirror.Current);
@@ -142,6 +142,33 @@ public sealed class ManaTests
         mana.Restore(0f);
         mana.Restore(float.NaN);
         Assert.Equal(mana.Max, mana.Current);
+    }
+
+    [Fact]
+    public void ADrainEmptiesThePoolWhichThenRefillsAsUsual()
+    {
+        var mana = new PlayerMana();
+        mana.Drain();
+        Assert.Equal(0f, mana.Current);
+        Assert.False(mana.MoreThanHalf);
+
+        mana.Regen(1f);
+        Assert.True(mana.Current > 0f);
+    }
+
+    [Fact]
+    public void MoreThanHalfIsStrictlyAboveHalfInWholeUnits()
+    {
+        var mana = new PlayerMana();
+        Assert.True(mana.MoreThanHalf);
+
+        // Exactly half is not enough, and neither is a fraction of a unit past it
+        mana.Restore(mana.Max / 2);
+        Assert.False(mana.MoreThanHalf);
+        mana.Restore(mana.Max / 2 + 0.9f);
+        Assert.False(mana.MoreThanHalf);
+        mana.Restore(mana.Max / 2 + 1);
+        Assert.True(mana.MoreThanHalf);
     }
 
     [Fact]

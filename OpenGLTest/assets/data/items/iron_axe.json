@@ -1,0 +1,8 @@
+{
+  "name": "Iron Axe",
+  "texture": "assets/textures/items/iron_axe.png",
+  "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.4 },
+  "blockDamage": 3.0,
+  "entityDamage": 6.5,
+  "tool": { "power": 3.0, "hitDelayMs": 225 }
+}

@@ -60,10 +60,19 @@ public static class ParticleConfig
     public const float FireEmberSize = 0.09f;
     public const float FireSmokeSize = 0.22f;
     public const float FireSmokeGrow = 0.12f;
-    public const int FireParticleMax = 512;
+    public const int FireParticleMax = 1536;
     public const float FireEmberPerSecond = 36f;
     public const float FireSmokePerSecond = 8f;
     public const float FireParticleRadius = 48f;
+    /// <summary>Flame tongues per second off each lit cell: soft additive teardrops that rise, shrink and cool from white-yellow to deep red.</summary>
+    public const float FireFlamePerSecond = 34f;
+    public const float FireFlameLifetime = 0.75f;
+    public const float FireFlameRise = 1.05f;
+    public const float FireFlameSize = 0.36f;
+    /// <summary>How much narrower than tall a flame tongue is drawn (its quad is this share as wide as it is high).</summary>
+    public const float FireFlameWidthShare = 0.7f;
+    /// <summary>Share of a cell's spawn scatter a flame's base spreads over; the flame hugs the middle of the fire.</summary>
+    public const float FireFlameSpreadShare = 0.8f;
 
     // --- Lava embers and smoke (a second FireParticleSystem instance in World) ---
     // Exposed lava cells ("hot fluid vents", recorded per chunk by the mesher) emit sparse
@@ -117,23 +126,45 @@ public static class ParticleConfig
     public const float SwimStrokeBubbleForward = 0.4f;
     public const float SwimStrokeBubbleSpread = 0.15f;
 
-    // --- Water ripple rings (RippleSystem + RippleRenderer, rule WaterRipple) ---
-    // A flat ring spreads over the water top wherever a body crosses the surface (the splash
-    // crossings of WaterSplash); a harder crossing (strength 0..1) spreads wider, slower and longer.
+    // --- Water ripples (RippleSystem, rule WaterRipple, wave RippleWave, upload RippleField) ---
+    // A wave packet spreads over the water top wherever a body crosses the surface (the splash
+    // crossings of WaterSplash); a harder crossing (strength 0..1) spreads wider, longer and steeper.
+    // Nothing is drawn for it: the water shader tilts its own normal by the packet's slope, so the
+    // reflection, the refraction and the sun glints bend with the waves.
     public const int RippleMax = 48;
-    public const float RippleMinRadius = 0.7f;
-    public const float RippleMaxRadius = 2.4f;
-    public const float RippleMinSeconds = 0.9f;
-    public const float RippleMaxSeconds = 1.7f;
-    public const float RippleAlpha = 0.9f;
-    /// <summary>Lift over the water top, so the wave train never z-fights the surface it lies on.</summary>
-    public const float RippleLift = 0.03f;
-    /// <summary>Distance in blocks between two crests of the train behind the leading edge.</summary>
-    public const float RippleWavelength = 0.32f;
-    /// <summary>How many wavelengths of train trail the leading edge before it dies away.</summary>
-    public const float RippleTrainWaves = 3.2f;
-    /// <summary>The quad reaches this far past the final radius, so the last crest is never clipped.</summary>
-    public const float RippleQuadMargin = 1.12f;
+    /// <summary>Ripples the water shader takes a frame (its uniform arrays); past it the nearest win.</summary>
+    public const int RippleShaded = 16;
+    public const float RippleMinRadius = 1.6f;
+    public const float RippleMaxRadius = 5.5f;
+    public const float RippleMinSeconds = 1.8f;
+    public const float RippleMaxSeconds = 3.4f;
+    /// <summary>Share of the spread that runs at a constant speed; the rest eases out, so a ring keeps
+    /// moving for its whole life and only settles a little at the end.</summary>
+    public const float RippleSteadyShare = 0.7f;
+    /// <summary>Peak surface slope (rise over run) of the packet for the gentlest and the hardest crossing,
+    /// before the spread and the life thin it.</summary>
+    public const float RippleMinSlope = 0.4f;
+    public const float RippleMaxSlope = 1.1f;
+    /// <summary>The packet keeps its full slope up to this radius in blocks, then thins with the square root
+    /// of the spread (the same energy over a longer circle).</summary>
+    public const float RippleFullSlopeRadius = 1f;
+    /// <summary>Distance in blocks between two crests at the leading edge, for a player-sized body.</summary>
+    public const float RippleWavelength = 0.5f;
+    /// <summary>How many wavelengths of train trail the leading edge before the water is calm again.</summary>
+    public const float RippleTrainWaves = 3.5f;
+    /// <summary>Wavelengths ahead of the leading edge where the first swell starts to rise, and behind it
+    /// where the packet reaches full height.</summary>
+    public const float RippleLeadWaves = 0.3f;
+    public const float RippleRiseWaves = 0.5f;
+    /// <summary>How much shorter the waves get toward the back of the train (long waves outrun short ones):
+    /// the wavenumber at the tail is 1 + twice this times the one at the edge.</summary>
+    public const float RippleChirp = 0.35f;
+    /// <summary>Crests a second that run forward through the packet and die at its leading edge, so the
+    /// train is moving water rather than a fixed pattern growing.</summary>
+    public const float RippleCrestRate = 1.5f;
+    /// <summary>Water whose surface stands farther than this many blocks from the crossing's takes none of
+    /// its ripple, so a ring never climbs a waterfall or a ledge.</summary>
+    public const float RippleLevelTolerance = 0.5f;
 
     // Steam: puffs a second over every vent in range, the reach it gathers within and the cap
     public const float SpringSteamPerSecond = 0.6f;
@@ -206,4 +237,32 @@ public static class ParticleConfig
 
     /// <summary>Trail color of a blade item whose JSON names no <c>trail</c> color (sRGB).</summary>
     public static readonly Rgba SliceTrailDefaultColor = new(220, 220, 255);
+
+    // --- Cave biome motes (AmbientEffects.UpdateCaveMotes, CaveClimate.Motes) ---
+    /// <summary>Radius around the eye, in blocks, inside which cave motes appear.</summary>
+    public const float CaveMoteRadius = 10f;
+
+    /// <summary>Most cave motes spawned in one frame, however long the frame was.</summary>
+    public const int CaveMoteMaxPerFrame = 4;
+
+    /// <summary>Random points tried per mote before giving it up (a point inside rock is refused).</summary>
+    public const int CaveMoteSpawnTries = 3;
+
+    /// <summary>Scatter of one cave mote around its spawn point, in blocks.</summary>
+    public const float CaveMoteSpread = 0.6f;
+
+    /// <summary>Cave motes per second in a frozen echo cave (cold steam glints).</summary>
+    public const float CaveMoteFrozenEchoPerSecond = 3f;
+
+    /// <summary>Cave motes per second in a desert echo cave (drifting dust).</summary>
+    public const float CaveMoteDesertEchoPerSecond = 2f;
+
+    /// <summary>Cave motes per second in a crystal cave (glinting sparks).</summary>
+    public const float CaveMoteCrystalPerSecond = 4f;
+
+    /// <summary>Cave motes per second in a fungal cave (spores).</summary>
+    public const float CaveMoteFungalPerSecond = 5f;
+
+    /// <summary>Cave motes per second in the magma deep (embers).</summary>
+    public const float CaveMoteMagmaDeepPerSecond = 6f;
 }

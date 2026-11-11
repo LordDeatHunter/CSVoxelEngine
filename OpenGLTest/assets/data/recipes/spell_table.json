@@ -1,0 +1,9 @@
+{
+  // The spell table: four planks for the body and a crystal block for the top.
+  "result": "block/spell_table",
+  "count": 1,
+  "ingredients": [
+    { "item": "block/oak_planks", "count": 4 },
+    { "item": "block/crystal_block", "count": 1 }
+  ]
+}

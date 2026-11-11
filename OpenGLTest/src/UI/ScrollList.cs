@@ -40,6 +40,18 @@ public static class ScrollList
     }
 
     /// <summary>
+    /// The offset nearest <paramref name="offset"/> at which <paramref name="row"/> is wholly inside a viewport
+    /// <paramref name="viewHeight"/> tall (unchanged when it already is). Not clamped to the content.
+    /// </summary>
+    public static float OffsetToReveal(int row, float offset, float rowHeight, float viewHeight)
+    {
+        var top = row * rowHeight;
+        if (top < offset) return top;
+        var bottomOffset = top + rowHeight - viewHeight;
+        return bottomOffset > offset ? bottomOffset : offset;
+    }
+
+    /// <summary>
     /// The rows at least partly inside the viewport, as a half-open range; empty for no rows.
     /// </summary>
     public static (int First, int EndExclusive) VisibleRange(float offset, float rowHeight, int rowCount, float viewHeight)

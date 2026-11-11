@@ -63,6 +63,9 @@ public class PlayerModel
     // exact release pose through a follow-through, then settles slowly back to rest —
     // one direction change, which reads as follow-through rather than a bounce.
     public const float ThrowDuration = 0.55f;
+    // A staff cast (cosmetic): the right arm raises the staff over the head-front, thrusts it forward with
+    // a small lean, recoils a little and eases back to rest (CastMotion).
+    public const float CastDuration = 0.45f;
     // First-person framing: straight-hanging arms sit ~66 degrees below the view center,
     // invisible until you pitch well down, and hide behind the chest when you do. Resting
     // them slightly forward with bent elbows and a touch of inward yaw parks the hands in
@@ -102,6 +105,7 @@ public class PlayerModel
     private readonly SwingHitStop _sliceStop = new();
     private readonly SwingHitStop _swordStop = new();
     private float _throwT = 1f;
+    private float _castT = 1f;
     private float? _throwCharge01;
     private float? _useCharge01;
     private float _throwReleaseCharge;
@@ -251,6 +255,12 @@ public class PlayerModel
 
     /// <summary>Progress of the active throw swing: 0 at release, 1 when it has finished.</summary>
     public float ThrowProgress => _throwT;
+
+    /// <summary>Whether a staff cast's gesture is currently playing.</summary>
+    public bool IsCasting => _castT < 1f;
+
+    /// <summary>Progress of the cast gesture: 0 as it starts, 1 when it has finished (also with none playing).</summary>
+    public float CastProgress => _castT;
 
     /// <summary>Charge the arm is cocked to, or null when no throw is being aimed.</summary>
     public float? ThrowCharge => _throwCharge01;
@@ -501,6 +511,9 @@ public class PlayerModel
         if (_throwT < 1f)
             _throwT = Math.Min(1f, _throwT + deltaTime / ThrowDuration);
 
+        if (_castT < 1f)
+            _castT = Math.Min(1f, _castT + deltaTime / CastDuration);
+
         if (_bowReleaseT < 1f)
             _bowReleaseT = Math.Min(1f, _bowReleaseT + deltaTime / BowPose.ReleaseSeconds);
     }
@@ -554,6 +567,9 @@ public class PlayerModel
         StartSword(SwordSwing.AxeChop);
         _swordSeconds = MathF.Max(seconds, 0.05f);
     }
+
+    /// <summary>Starts the staff cast's gesture (<see cref="CastMotion"/>): the staff raised and thrust forward. Cosmetic.</summary>
+    public void Cast() => _castT = 0f;
 
     public void StartThrowCharge() => _throwCharge01 = 0f;
 

@@ -116,6 +116,49 @@ public sealed class EntityAnimatorTests
     }
 
     [Fact]
+    public void AGaitChangeFadesFromTheOldMovingClipToTheNewOne()
+    {
+        var animator = new EntityAnimator(
+            [ConstantPositionClip(EntityAnimator.IdleClip, "Torso", 0f), ConstantPositionClip(EntityAnimator.WalkClip, "Torso", 1f),
+                ConstantPositionClip("run", "Torso", 3f)],
+            RefSpeed);
+        Run(animator, 2f, RefSpeed);
+        var walking = animator.LocalTransform("Torso").Translation.Y;
+
+        // The switch itself moves nothing: the pose leaves the walk gradually and settles on the run
+        animator.SetGait(EntityAnimator.IdleClip, "run", RefSpeed * 3f);
+        Assert.Equal(walking, animator.LocalTransform("Torso").Translation.Y, 1e-4f);
+        Run(animator, EntityAnimator.GaitBlendSeconds * 0.5f, RefSpeed * 3f);
+        var halfway = animator.LocalTransform("Torso").Translation.Y;
+        Assert.True(halfway > walking + 0.1f && halfway < 2.9f, $"halfway through the fade the pose was {halfway}");
+        Run(animator, EntityAnimator.GaitBlendSeconds, RefSpeed * 3f);
+        Assert.Equal(3f, animator.LocalTransform("Torso").Translation.Y, 1e-3f);
+
+        // Naming the gait already in use restarts nothing, and standing still returns to the idle clip
+        animator.SetGait(EntityAnimator.IdleClip, "run", RefSpeed * 3f);
+        Assert.Equal(3f, animator.LocalTransform("Torso").Translation.Y, 1e-3f);
+        Run(animator, 2f, 0f);
+        Assert.True(animator.LocalTransform("Torso").Translation.Y < 0.05f);
+    }
+
+    [Fact]
+    public void ACutActionBlendsOutEarlyWithoutFiringTheEventsItSkipped()
+    {
+        AnimationClip[] clips = [IdleRampClip(), SwingClip("swing", new AnimationClip.Event(0.9f, "late"))];
+        var animator = new EntityAnimator(clips, RefSpeed);
+        Assert.True(animator.Play("swing"));
+        Run(animator, 0.2f, 0f);
+        Assert.True(animator.IsActionPlaying);
+
+        animator.CutAction();
+        Run(animator, EntityAnimator.ActionBlendSeconds + 2f * Dt, 0f);
+
+        Assert.False(animator.IsActionPlaying);
+        Assert.False(animator.ConsumeEvent("late"));
+        Assert.True(SameRotation(Quaternion.Identity, animator.LocalTransform("ArmR").Rotation, 1e-3f));
+    }
+
+    [Fact]
     public void ActionOverridesOnlyTheBonesItKeysAndReturnsToLocomotion()
     {
         AnimationClip[] clips = [IdleRampClip(), SwingClip("swing")];

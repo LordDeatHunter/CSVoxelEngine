@@ -34,6 +34,11 @@ public static class LedgeProbe
         return maxScan + 1;
     }
 
+    /// <summary>The height of the top of the first ground <see cref="DropBelow"/> finds under
+    /// <paramref name="feetY"/>; with none in <paramref name="maxScan"/> cells, just under the scanned span.</summary>
+    public static float GroundBelow(ChunkManager chunks, float x, float feetY, float z, int maxScan) =>
+        MathUtils.FloorToInt(feetY - 0.01f) + 1 - DropBelow(chunks, x, feetY, z, maxScan);
+
     /// <summary>Whether a target whose feet are at <paramref name="targetFeetY"/> stands below a mob whose
     /// feet are at <paramref name="feetY"/>: lower by more than a ledge's worth.</summary>
     public static bool TargetBelow(float feetY, float targetFeetY) =>

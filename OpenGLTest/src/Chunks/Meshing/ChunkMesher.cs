@@ -43,7 +43,7 @@ internal static class ChunkMesher
     /// <see cref="EmitGreedyRun"/>), and the UVs run 0..W / 0..H in tile units so the sampler's
     /// REPEAT tiles the texture per cell.
     /// </summary>
-    internal static void EmitGreedyFaces(MeshScratch scratch, byte[] padded, byte[] paddedState,
+    internal static void EmitGreedyFaces(MeshScratch scratch, ushort[] padded, byte[] paddedState,
         int chunkBaseY, byte[] sunLight, byte[] blockLight,
         List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         MeshBufferPool pool, ref List<Vertex>? tVertices, ref List<ushort>? tIndices,
@@ -169,17 +169,14 @@ internal static class ChunkMesher
                         tint |= (ulong)(code >> 12) << (10 * j);
                     }
 
-                    // Key: id 0-7, AO 8-15, 16-23 unused, submerged 24, and for a submerged
-                    // face its 7-bit water surface code in 25-31. Bit 31 can make the key
-                    // negative; that is safe because the slot hash reads it as (uint)key and an
-                    // empty slot is table entry 0, never a key value. The light travels in a
-                    // parallel 48-bit key: four 12-bit SmoothCornerLight codes, corner j at 12j,
-                    // and the color in a second parallel 40-bit key: the four 10-bit LightTint
-                    // codes, corner j at 10j (all zero wherever the lamp light is default-colored).
-                    var key = id | ao << 8;
+                    // Key layout: see GreedyKey. The light travels in a parallel 48-bit key: four
+                    // 12-bit SmoothCornerLight codes, corner j at 12j, and the color in a second
+                    // parallel 40-bit key: the four 10-bit LightTint codes, corner j at 10j (all
+                    // zero wherever the lamp light is default-colored).
+                    var key = GreedyKey.Pack(id, ao);
                     if (BlockType.IsFluid(neighbor))
-                        key |= 1 << 24 | WaterSurfaceCodes.SubmergedSurfaceCode(padded, paddedState, pIdx + faceDelta,
-                            chunkBaseY, columns) << 25;
+                        key = GreedyKey.WithSurface(key, WaterSurfaceCodes.SubmergedSurfaceCode(padded, paddedState,
+                            pIdx + faceDelta, chunkBaseY, columns));
 
                     // Find or open the key's plane
                     var h = ((ulong)(uint)key ^ light * 0x9E3779B97F4A7C15UL ^ tint * 0xC2B2AE3D27D4EB4FUL)
@@ -216,7 +213,7 @@ internal static class ChunkMesher
                     var key = planeKeys[plane];
                     var light = planeLightKeys[plane];
                     var tint = planeTintKeys[plane];
-                    var type = BlockType.ById[key & 0xFF]!;
+                    var type = BlockType.ById[GreedyKey.IdOf(key)]!;
                     var rows = planeRows.AsSpan(plane * Size, Size);
                     if (type.Translucent)
                     {
@@ -250,7 +247,7 @@ internal static class ChunkMesher
         BlockType type,
         Span<ushort> rows, List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset, in BiomeTintFields fields)
     {
-        var ao = (key >> 8) & 0xFF;
+        var ao = GreedyKey.AoOf(key);
         // Per-corner code: AO in bits 0-1, the 12-bit smooth light code in 2-13, the 10-bit
         // tint code in 14-23
         Span<int> code = stackalloc int[4];
@@ -263,9 +260,9 @@ internal static class ChunkMesher
         var alongCol = yFace ? code[0] == code[1] && code[3] == code[2] : code[0] == code[3] && code[1] == code[2];
         var alongRow = yFace ? code[0] == code[3] && code[1] == code[2] : code[0] == code[1] && code[3] == code[2];
 
-        var submerged = ((key >> 24) & 1) != 0;
+        var submerged = GreedyKey.IsSubmerged(key);
         var waterSurface = submerged
-            ? Vertex.EncodeWaterSurface(WaterSurfaceCodes.DecodeSurfaceCode(chunkBaseY, (key >> 25) & 127))
+            ? Vertex.EncodeWaterSurface(WaterSurfaceCodes.DecodeSurfaceCode(chunkBaseY, GreedyKey.SurfaceCodeOf(key)))
             : (ushort)0;
         var layer = type.FaceTiles[f];
         var sway = type.Sway ? 1f : 0f;

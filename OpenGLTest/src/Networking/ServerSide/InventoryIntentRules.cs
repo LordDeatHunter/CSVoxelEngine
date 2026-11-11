@@ -1,5 +1,6 @@
 using System;
 using VoxelEngine.Content;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Magic;
 using VoxelEngine.UI.InventoryPanel;
@@ -17,11 +18,18 @@ namespace VoxelEngine.Networking.ServerSide;
 /// <item>Equip only points a slot at what the player owns: a stackable with a pool count, or a live
 /// tool instance. Equipping what the slot already shows clears it (the panel's toggle), which needs
 /// no ownership.</item>
-/// <item>Craft runs <see cref="Inventory.TryCraft(CraftingRecipe, int, Func{int, CraftingRecipe.Ingredient, byte})"/>
+/// <item>Craft runs <see cref="Inventory.TryCraft(CraftingRecipe, int, Func{int, CraftingRecipe.Ingredient, ushort})"/>
 /// with exactly the fed members, so it consumes from this inventory only and nothing when it fails.</item>
-/// <item>Creative grants and clears need the player's server-owned creative flag.</item>
-/// <item>Pick-block only selects or equips what the player owns (<see cref="Inventory.PickBlock"/>).</item>
+/// <item>Creative grants and clears need the player's server-owned creative flag; a grant never lands on the hotbar
+/// by itself, as on the client (<see cref="Inventory.Add"/>).</item>
+/// <item>Pick-block only selects or equips what the player owns, or any block for a creative player (<see cref="Inventory.PickBlock"/>).</item>
 /// <item>A staff slot selection needs a staff in hand and a slot it has (<see cref="HeldStaff.TrySelect"/>).</item>
+/// <item>A staff bind needs a staff in hand, keys that resolve, parts the player knows
+/// (<see cref="KnownSpellParts"/>; creative knows every part) and a recipe valid against the staff's
+/// tags (<see cref="HeldStaff.TryBind"/>).</item>
+/// <item>A staff clear needs a staff in hand and a bound slot (<see cref="HeldStaff.TryClear"/>).</item>
+/// <item>Wearing gear needs an owned gear instance and an equipment slot of its kind
+/// (<see cref="Equipment.TryEquip"/>); taking it off needs a worn slot.</item>
 /// </list>
 /// </summary>
 public static class InventoryIntentRules
@@ -48,16 +56,29 @@ public static class InventoryIntentRules
 
             case NetInventoryAction.CreativeGrant:
                 return creative && IsId(intent.Id) && intent.Count > 0
-                    && inventory.Add((byte)intent.Id, intent.Count);
+                    && inventory.Add((ushort)intent.Id, intent.Count, autoEquip: false);
 
             case NetInventoryAction.CreativeClear:
-                return creative && IsId(intent.Id) && inventory.RemoveAll((byte)intent.Id);
+                return creative && IsId(intent.Id) && inventory.RemoveAll((ushort)intent.Id);
 
             case NetInventoryAction.PickBlock:
-                return IsId(intent.Id) && inventory.PickBlock((byte)intent.Id);
+                return IsId(intent.Id) && inventory.PickBlock((ushort)intent.Id, creative);
 
             case NetInventoryAction.SelectStaffSlot:
                 return HeldStaff.TrySelect(inventory, intent.Slot);
+
+            case NetInventoryAction.BindStaffSlot:
+                return intent.Parts is { } parts && HeldStaff.TryBind(inventory, intent.Slot, parts, creative);
+
+            case NetInventoryAction.ClearStaffSlot:
+                return HeldStaff.TryClear(inventory, intent.Slot);
+
+            // Only an owned gear instance, in an equipment slot of its own kind (Equipment.TryEquip)
+            case NetInventoryAction.EquipGear:
+                return inventory.Equipment.TryEquip(intent.Slot, intent.Id);
+
+            case NetInventoryAction.UnequipGear:
+                return inventory.Equipment.Unequip(intent.Slot);
 
             default:
                 return false;
@@ -90,7 +111,7 @@ public static class InventoryIntentRules
         }
 
         if (!IsId(intent.Id)) return false;
-        var id = (byte)intent.Id;
+        var id = (ushort)intent.Id;
         var shown = !slot.IsTool && slot.Id == id;
         if (!shown)
         {
@@ -117,5 +138,5 @@ public static class InventoryIntentRules
 
     private static bool IsSlot(int slot) => slot >= 0 && slot < Inventory.SlotCount;
 
-    private static bool IsId(int id) => id is > 0 and <= byte.MaxValue;
+    private static bool IsId(int id) => BlockTables.IsAssignedId(id);
 }

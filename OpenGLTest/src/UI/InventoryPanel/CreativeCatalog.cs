@@ -13,7 +13,7 @@ namespace VoxelEngine.UI.InventoryPanel;
 public static class CreativeCatalog
 {
     /// <summary>One catalog row: the id to grant, its display name and how many the player owns.</summary>
-    public readonly record struct CatalogEntry(byte Id, string Name, int Count);
+    public readonly record struct CatalogEntry(ushort Id, string Name, int Count);
 
     /// <summary>
     /// Every item whose pool is <paramref name="category"/>, name-sorted, with the player's

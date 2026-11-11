@@ -43,7 +43,7 @@ internal sealed class BlockPlacer
     private bool IsPlaying => _world.IsPlaying;
     private Camera Camera => _world.Camera;
     private IReadOnlyList<ServerPlayer> ServerPlayers => _world.ServerPlayers;
-    private Action<int, int, int, byte, byte>? BlockEdited => _world.BlockEdited;
+    private Action<int, int, int, ushort, byte>? BlockEdited => _world.BlockEdited;
     private BlockEditor Edits => _world.Edits;
     private LocalPlayer LocalPlayer => _world.LocalPlayer;
     private LeftClickAction LeftClick => _world.LeftClick;
@@ -69,7 +69,7 @@ internal sealed class BlockPlacer
     internal Vector3 PlacePopPosition => _placePopPosition;
 
     /// <summary>The block the last placement put down, which its pop draws.</summary>
-    internal byte PlacePopId => _placePopId;
+    internal ushort PlacePopId => _placePopId;
 
     /// <summary>The hit cell the last raycast placement went against.</summary>
     internal Vector3 LastPlaceHit => _lastPlaceHit;
@@ -84,7 +84,7 @@ internal sealed class BlockPlacer
 
     private float _placePopElapsed = PlacePopSeconds;
     private Vector3 _placePopPosition;
-    private byte _placePopId;
+    private ushort _placePopId;
 
     // The hit cell and face the last raycast placement went against, which a client's placement
     // intent names so the server places against the same face
@@ -143,7 +143,7 @@ internal sealed class BlockPlacer
     /// block's id (0 when nothing is targeted), which a multiplayer client forwards as its
     /// <see cref="NetInventoryAction.PickBlock"/> intent.
     /// </summary>
-    internal bool TryPickTargetedBlock(Inventory inventory, out byte pickedId)
+    internal bool TryPickTargetedBlock(Inventory inventory, out ushort pickedId)
     {
         pickedId = 0;
         if (!IsPlaying) return false;
@@ -152,12 +152,12 @@ internal sealed class BlockPlacer
         var id = BlockType.PickId(Edits.BlockIdAt(LeftClick.SelectedBlockPosition));
         if (id == 0) return false;
         pickedId = id;
-        return inventory.PickBlock(id);
+        return inventory.PickBlock(id, Camera.IsCreative);
     }
 
     /// <summary>Places a block against the face <paramref name="player"/> targets, recording the
     /// hit (the face a client's placement intent names).</summary>
-    private bool TryPlaceBlockFromRaycast(float maxDistance, byte blockId, PlayerContext player)
+    private bool TryPlaceBlockFromRaycast(float maxDistance, ushort blockId, PlayerContext player)
     {
         if (!IsPlaying) return false;
         if (blockId == 0) return false;
@@ -175,7 +175,7 @@ internal sealed class BlockPlacer
     /// normal <paramref name="hitNormal"/> (see <see cref="PlaceBlockAtFace"/> for the rules), then
     /// lets sand placed into thin air fall. Spends nothing.
     /// </summary>
-    private bool PlaceAgainstFace(Vector3 hitPos, Vector3 hitNormal, byte blockId, PlayerContext player)
+    private bool PlaceAgainstFace(Vector3 hitPos, Vector3 hitNormal, ushort blockId, PlayerContext player)
     {
         if (!PlaceBlockAtFace(hitPos, hitNormal, blockId, state: 0, player.ViewDirection, out var placePos)) return false;
 
@@ -196,7 +196,7 @@ internal sealed class BlockPlacer
     /// headless server never raises it; only a solid block puffs (a torch or a flower sets down
     /// quietly).
     /// </summary>
-    private void PuffPlaced(Vector3 placedCell, Vector3 hitNormal, byte blockId)
+    private void PuffPlaced(Vector3 placedCell, Vector3 hitNormal, ushort blockId)
     {
         if (_serverMode || !BlockType.IsSolid(blockId)) return;
         var contact = placedCell + new Vector3(0.5f) - hitNormal * 0.5f;
@@ -231,7 +231,7 @@ internal sealed class BlockPlacer
     /// takes its facing from it (stairs, <see cref="Placement.LookFacing"/>).
     /// Returns whether one was placed, without spending anything.
     /// </summary>
-    internal bool PlaceBlockAtFace(Vector3 hitPos, Vector3 hitNormal, byte blockId, byte state,
+    internal bool PlaceBlockAtFace(Vector3 hitPos, Vector3 hitNormal, ushort blockId, byte state,
         Vector3 viewDirection, out Vector3 placedCell)
     {
         placedCell = Placement.TargetCell(hitPos, hitNormal, Edits.BlockIdAt(hitPos),
@@ -259,10 +259,11 @@ internal sealed class BlockPlacer
         if (BlockType.IsSolid(blockId) && BodyBlocksPlacement(placePos))
             return false;
         // Fragile blocks need something solid holding them up (the ground, or the wall a wall
-        // torch hangs on): a flower planted into mid-air would hover until anything remeshed it,
-        // so the placement fails and the caller keeps its item
+        // torch hangs on), a torch a full block face: a flower planted into mid-air would hover
+        // until anything remeshed it, so the placement fails and the caller keeps its item
         if (BlockSupport.TryGetSupportCell(blockId, state, placePos, out var support)
-            && !BlockType.IsSolid(Edits.BlockIdAt(support)))
+            && !BlockSupport.CanHold(blockId, Edits.BlockIdAt(support),
+                _chunkManager.GetStateGlobal((int)support.X, (int)support.Y, (int)support.Z)))
             return false;
 
         // A placed log is building material, not part of a tree: it is a plain full cube that
@@ -306,7 +307,7 @@ internal sealed class BlockPlacer
     /// <summary>Whether a door's upper half <paramref name="upperId"/> may go into
     /// <paramref name="cell"/>: loaded, holding nothing a placement may not take over, no live
     /// falling cube in it and no player's body in the way.</summary>
-    private bool CanPlaceUpperHalf(Vector3 cell, byte upperId)
+    private bool CanPlaceUpperHalf(Vector3 cell, ushort upperId)
     {
         int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
         if (!_chunkManager.TryGetCell(x, y, z, out var id, out var state) || !Placement.CanOccupy(id, state))
@@ -317,7 +318,7 @@ internal sealed class BlockPlacer
 
     /// <summary>Writes a door's upper half over its just-placed lower half, with the same state
     /// byte, and runs the placement hooks for it.</summary>
-    private void PlaceUpperHalf(Vector3 cell, byte upperId, byte state)
+    private void PlaceUpperHalf(Vector3 cell, ushort upperId, byte state)
     {
         int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
         if (_chunkManager.ChunkAt(x, y, z) is not { } chunk || !chunk.PlaceBlockAt(cell, upperId, _chunkManager, state))

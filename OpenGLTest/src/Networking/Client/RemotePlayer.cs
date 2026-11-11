@@ -7,15 +7,16 @@ namespace VoxelEngine.Networking.Client;
 
 /// <summary>One player position from a server <c>PlayerList</c> broadcast, with the cosmetic state
 /// that poses their model: the movement <paramref name="Flags"/> and the last swing
-/// (<paramref name="Action"/>, counted by <paramref name="ActionSeq"/> so a repeat is noticed).</summary>
+/// (<paramref name="Action"/>, counted by <paramref name="ActionSeq"/> so a repeat is noticed) and the armor they wear.</summary>
 public readonly record struct RemotePlayerSnapshot(int Id, string Name, Vector3 Eye, float Yaw, float Pitch,
-    NetPlayerFlags Flags = NetPlayerFlags.None, NetPlayerAction Action = NetPlayerAction.None, byte ActionSeq = 0);
+    NetPlayerFlags Flags = NetPlayerFlags.None, NetPlayerAction Action = NetPlayerAction.None, byte ActionSeq = 0,
+    ArmorLook? Armor = null);
 
 /// <summary>
 /// A player connected to the same server, as the client sees them: a target pose from the last
 /// broadcast (smoothed toward between broadcasts) and a <see cref="PlayerModel"/> posed from what
 /// the broadcast says they are doing: the walk cycle runs off the distance actually traveled, and
-/// the sprint, jump, crouch and swim poses and their swings (punch, slice, sword, throw) come from the
+/// the sprint, jump, crouch and swim poses and their swings (punch, slice, sword, throw, a staff cast) come from the
 /// flags and the action counter. GL-free.
 /// </summary>
 public sealed class RemotePlayer
@@ -32,6 +33,7 @@ public sealed class RemotePlayer
     private bool _hasPrev;
     private bool _hasAction;
     private byte _lastActionSeq;
+    private bool _castPending;
     private float _prevY;
 
     public RemotePlayer(int id, string name, PlayerRig rig)
@@ -46,6 +48,9 @@ public sealed class RemotePlayer
 
     public string Name { get; set; }
 
+    /// <summary>The armor this player wears, from the newest broadcast.</summary>
+    public ArmorLook Armor { get; private set; } = ArmorLook.None;
+
     public Vector3 Eye { get; private set; }
 
     public float Yaw { get; private set; }
@@ -57,8 +62,10 @@ public sealed class RemotePlayer
 
     /// <summary>Adopts the latest broadcast pose; the first one snaps, later ones smooth.</summary>
     public void SetTarget(Vector3 eye, float yaw, float pitch,
-        NetPlayerFlags flags = NetPlayerFlags.None, NetPlayerAction action = NetPlayerAction.None, byte actionSeq = 0)
+        NetPlayerFlags flags = NetPlayerFlags.None, NetPlayerAction action = NetPlayerAction.None, byte actionSeq = 0,
+        ArmorLook? armor = null)
     {
+        Armor = armor ?? ArmorLook.None;
         if (!_hasTarget)
         {
             Eye = eye;
@@ -94,7 +101,19 @@ public sealed class RemotePlayer
             case NetPlayerAction.SwordBackCut: Model.StartSword(SwordSwing.BackCut); break;
             case NetPlayerAction.SwordChop: Model.StartSword(SwordSwing.Chop); break;
             case NetPlayerAction.Throw: Model.ReleaseThrow(1f); break;
+            case NetPlayerAction.Cast:
+                Model.Cast();
+                _castPending = true;
+                break;
         }
+    }
+
+    /// <summary>True once after the broadcast showed a new cast (the client's cast burst reads it), false otherwise.</summary>
+    public bool TakeCast()
+    {
+        var pending = _castPending;
+        _castPending = false;
+        return pending;
     }
 
     /// <summary>Eases the pose toward the target and drives the model from the distance moved and the flags.</summary>

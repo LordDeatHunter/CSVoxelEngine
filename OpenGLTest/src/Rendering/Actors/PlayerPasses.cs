@@ -8,6 +8,7 @@ using VoxelEngine.Graphics;
 using VoxelEngine.Items;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Particles;
+using VoxelEngine.Config;
 using VoxelEngine.Player;
 
 namespace VoxelEngine.Rendering.Actors;
@@ -25,7 +26,17 @@ internal sealed class PlayerPasses : IDisposable
     private readonly RenderManager _owner;
 
     private uint _playerPaletteTex;
+    private uint _whiteTex;
     private Dictionary<string, Mesh> _playerMeshes = new();
+
+    // Armor shells, built on first use per (part, piece): the part's cuboids grown a little and tinted by the piece
+    private readonly Dictionary<(string Part, ushort Piece), Mesh> _armorMeshes = new();
+
+    /// <summary>How far an armor shell stands off the body, in blocks (a mob's shells too, <see cref="MobPasses"/>).</summary>
+    internal const float ArmorInflate = 0.03f;
+
+    /// <summary>The armor the local player wears, set once a frame by the world renderer; the mirror pass reads it too.</summary>
+    internal ArmorLook LocalArmor { get; set; } = ArmorLook.None;
 
     /// <summary>Blockbench project behind the player model; a missing or broken file falls back to built-in Steve.</summary>
     internal const string PlayerModelPath = "assets/models/player/player.bbmodel";
@@ -35,6 +46,9 @@ internal sealed class PlayerPasses : IDisposable
 
     // Live views of the palette and the part meshes, for the shadow pass.
     internal uint PlayerPaletteTex => _playerPaletteTex;
+
+    /// <summary>The 1x1 white texture an armor shell samples, so its vertex color alone tints it (a mob's shells too).</summary>
+    internal uint WhiteTexture => _whiteTex;
     internal Dictionary<string, Mesh> PlayerMeshes => _playerMeshes;
 
     private TextureUnits Units => _owner.Units;
@@ -54,6 +68,30 @@ internal sealed class PlayerPasses : IDisposable
         _playerPaletteTex = TextureLoader.Upload(gl, PlayerRig.TexturePixels,
             PlayerRig.TextureWidth, PlayerRig.TextureHeight, srgb: true);
         _playerMeshes = PlayerRig.BuildMeshes(gl, PlayerRig);
+        _whiteTex = TextureLoader.Upload(gl, [255, 255, 255, 255], 1, 1, srgb: true);
+    }
+
+    /// <summary>Draws one body part's mesh and then, when <paramref name="armor"/> covers it, the armor shell over it with the same
+    /// uniforms already set. Puts the skin texture back after a shell.</summary>
+    private void DrawPart(string part, ArmorLook armor)
+    {
+        _playerMeshes[part].Render();
+        if (armor.IsNone) return;
+
+        for (var slot = 0; slot < GearConfig.ArmorSlotCount; slot++)
+        {
+            var piece = armor.PieceAt(slot);
+            if (piece == 0 || Array.IndexOf(ArmorLook.PartsOf(slot), part) < 0) continue;
+            if (!_armorMeshes.TryGetValue((part, piece), out var shell))
+            {
+                if (!PlayerRig.Parts.TryGetValue(part, out var rigPart)) return;
+                shell = PlayerRig.BuildArmorMesh(_gl, rigPart, ArmorInflate, ArmorLook.ColorOf(piece));
+                _armorMeshes[(part, piece)] = shell;
+            }
+            Units.BindUnit(0, TextureTarget.Texture2DArray, _whiteTex);
+            shell.Render();
+            Units.BindUnit(0, TextureTarget.Texture2DArray, _playerPaletteTex);
+        }
     }
 
     /// <summary>
@@ -80,12 +118,12 @@ internal sealed class PlayerPasses : IDisposable
             {
                 var model = remote.Model.GetPartMatrix(part, remote.Eye, remote.Yaw, remote.Pitch);
                 _owner.SetDrawUniforms(model, model * viewProj, 1f, light);
-                _playerMeshes[part].Render();
+                DrawPart(part, remote.Armor);
             }
 
             var head = remote.Model.GetPartMatrix("Head", remote.Eye, remote.Yaw, remote.Pitch);
             _owner.SetDrawUniforms(head, head * viewProj, 1f, light);
-            _playerMeshes["Head"].Render();
+            DrawPart("Head", remote.Armor);
 
             DrawRemoteBlade(remote, viewProj, light);
         }
@@ -134,6 +172,7 @@ internal sealed class PlayerPasses : IDisposable
 
         Units.BindUnit(0, TextureTarget.Texture2DArray, _playerPaletteTex);
 
+        var armor = LocalArmor;
         var blend = fullBody ? 1f : camera.ShoulderBlend;
         var bodyYaw = camera.PlayerYaw;
         // One sample for the whole body: every part is lit alike, so no seam opens between them
@@ -145,7 +184,7 @@ internal sealed class PlayerPasses : IDisposable
                 var model = player.GetPartMatrix(part, camera.Position, bodyYaw, camera.Pitch,
                     PlayerModel.FirstPersonBodyBack);
                 _owner.SetDrawUniforms(model, model * viewProj, 1f, light);
-                _playerMeshes[part].Render();
+                DrawPart(part, armor);
             }
         }
         else if (blend >= 1f)
@@ -154,11 +193,11 @@ internal sealed class PlayerPasses : IDisposable
             {
                 var model = player.GetPartMatrix(part, camera.Position, bodyYaw, camera.Pitch);
                 _owner.SetDrawUniforms(model, model * viewProj, 1f, light);
-                _playerMeshes[part].Render();
+                DrawPart(part, armor);
             }
             var head = player.GetPartMatrix("Head", camera.Position, bodyYaw, camera.Pitch);
             _owner.SetDrawUniforms(head, head * viewProj, 1f, light);
-            _playerMeshes["Head"].Render();
+            DrawPart("Head", armor);
         }
         else
         {
@@ -167,12 +206,12 @@ internal sealed class PlayerPasses : IDisposable
             {
                 var model = player.GetPartMatrix(part, camera.Position, bodyYaw, camera.Pitch, back);
                 _owner.SetDrawUniforms(model, model * viewProj, 1f, light);
-                _playerMeshes[part].Render();
+                DrawPart(part, armor);
             }
             _gl.DepthMask(false);
             var head = player.GetPartMatrix("Head", camera.Position, bodyYaw, camera.Pitch);
             _owner.SetDrawUniforms(head, head * viewProj, blend, light);
-            _playerMeshes["Head"].Render();
+            DrawPart("Head", armor);
             _gl.DepthMask(true);
         }
 
@@ -187,7 +226,7 @@ internal sealed class PlayerPasses : IDisposable
     /// sprite's matrix are <see cref="HeldItemPose"/>'s, shared with the slice trail and the item
     /// debugger.
     /// </summary>
-    internal void RenderHeldItem(Camera camera, PlayerModel player, byte selectedId, bool hasHeld,
+    internal void RenderHeldItem(Camera camera, PlayerModel player, ushort selectedId, bool hasHeld,
         float timeSeconds, float headingDegrees)
     {
         if (camera == null || player == null || selectedId == 0 || !hasHeld) return;

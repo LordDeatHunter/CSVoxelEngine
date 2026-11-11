@@ -9,10 +9,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
-using VoxelEngine.Config;
 using VoxelEngine.Player;
 using VoxelEngine.Server;
 using VoxelEngine.UI.Hud;
+using VoxelEngine.WorldGen.Caves;
 using Xunit;
 
 namespace VoxelEngine.Tests.Networking;
@@ -55,6 +55,7 @@ public sealed class NetFramingTests
             using var hello = new PacketWriter(NetMessage.ServerHello);
             hello.Write(NetFraming.ProtocolVersion).Write(1).Write("Slow reader")
                 .Write(1).Write(0.0).Write(Vector3.Zero);
+            WireIds.WriteTables(hello);
             NetFraming.WriteFrame(stream, hello.ToArray());
             return peer; // Keep the peer open but never read client payloads.
         });
@@ -227,11 +228,11 @@ public sealed class NetworkProtocolTests
         var dead = new PlayerStatusData(NetPlayerFlags.None, 0, Dead: true, Vector3.Zero, 0f);
         Assert.Equal(dead, RoundTrip(dead));
 
-        // A health outside the pool is clamped into it, and mode bits the protocol does not define
+        // A health past the biggest pool gear can make is clamped into it, and mode bits the protocol does not define
         // are dropped rather than handed to the camera
-        var overfull = RoundTrip(new PlayerStatusData((NetPlayerFlags)0xFF, PlayerHealth.MaxHealth + 50, false,
+        var overfull = RoundTrip(new PlayerStatusData((NetPlayerFlags)0xFF, PlayerHealth.MaxHealth + GearConfig.MaxHealthBonusCap + 50, false,
             Vector3.Zero, 0f));
-        Assert.Equal(PlayerHealth.MaxHealth, overfull.Health);
+        Assert.Equal(PlayerHealth.MaxHealth + GearConfig.MaxHealthBonusCap, overfull.Health);
         Assert.Equal(NetPlayerFlags.Creative | NetPlayerFlags.Flying, overfull.Modes);
         Assert.Equal(0, RoundTrip(dead with { Health = -10 }).Health);
 
@@ -239,16 +240,25 @@ public sealed class NetworkProtocolTests
         Assert.Equal(7, RoundTrip(hurt with { Air = 7 }).Air);
         Assert.Equal(VoxelEngine.Player.Breath.NetSteps, RoundTrip(hurt with { Air = 250 }).Air);
 
-        // The mana and its max ride along; the max is clamped to 1..MaxCap and the mana into it
+        // The mana and its max ride along; the max is clamped to 1..WireMaxCap and the mana into it
         var casting = hurt with { Mana = 12, MaxMana = ManaConfig.StartMax + ManaConfig.MaxPerKnownPart };
         Assert.Equal(casting, RoundTrip(casting));
         var overflowing = RoundTrip(hurt with { Mana = 5000, MaxMana = 50 });
         Assert.Equal(50, overflowing.Mana);
         Assert.Equal(50, overflowing.MaxMana);
-        Assert.Equal(ManaConfig.MaxCap, RoundTrip(hurt with { MaxMana = int.MaxValue }).MaxMana);
+        Assert.Equal(PlayerMana.WireMaxCap, RoundTrip(hurt with { MaxMana = int.MaxValue }).MaxMana);
         var negative = RoundTrip(hurt with { Mana = -3, MaxMana = 0 });
         Assert.Equal(0, negative.Mana);
         Assert.Equal(1, negative.MaxMana);
+
+        // The eye's cave biome rides along; a status built without one reads back plain, and an undefined byte reads
+        // as plain rather than a value no rule knows
+        foreach (var biome in Enum.GetValues<CaveBiome>())
+            Assert.Equal(biome, RoundTrip(hurt with { CaveBiome = biome }).CaveBiome);
+        Assert.Equal(CaveBiome.Plain, RoundTrip(hurt).CaveBiome);
+        var undefined = RoundTrip(hurt with { CaveBiome = (CaveBiome)250 }).CaveBiome;
+        Assert.True(Enum.IsDefined(undefined));
+        Assert.Equal(CaveBiome.Plain, undefined);
 
         // A correction: the sequence id the client acks, then the eye it snaps to
         var eye = new Vector3(12.5f, 70.62f, -8.5f);
@@ -319,6 +329,50 @@ public sealed class NetworkProtocolTests
         for (var turns = 0; turns < 4; turns++)
             Assert.Equal(turns, NetEntity.TurnsFromYaw(NetEntity.YawFromTurns(turns)));
     }
+
+    [Fact]
+    public void UInt16RoundTripsAndConsumesExactlyTwoBytes()
+    {
+        // Values on both sides of the byte boundary: a reader that took one byte, or three, would misread the sentinel
+        ushort[] values = [0, 0x00FF, 0x0100, ushort.MaxValue];
+        const int sentinel = 0x5EED_1234;
+        using var writer = new PacketWriter(NetMessage.KeepAlive);
+        foreach (var value in values)
+            writer.Write(value).Write(sentinel);
+        var payload = writer.ToArray();
+        Assert.Equal(1 + values.Length * (sizeof(ushort) + sizeof(int)), payload.Length);
+
+        using var reader = new PacketReader(payload);
+        Assert.Equal(NetMessage.KeepAlive, reader.Message);
+        foreach (var value in values)
+        {
+            Assert.Equal(value, reader.ReadUInt16());
+            Assert.Equal(sentinel, reader.ReadInt());
+        }
+        Assert.Throws<EndOfStreamException>(() => reader.ReadByte());
+    }
+
+    [Fact]
+    public void ABlockOrItemIdRoundTripsAtItsExtremes()
+    {
+        // An id takes exactly the width of the id type on the wire, so the field after it reads back intact
+        ushort[] ids = [BlockType.Air, ushort.MaxValue];
+        const int sentinel = 0x5EED_1234;
+        using var writer = new PacketWriter(NetMessage.KeepAlive);
+        foreach (var id in ids)
+            writer.WriteId(id).Write(sentinel);
+        var payload = writer.ToArray();
+        Assert.Equal(1 + ids.Length * (sizeof(ushort) + sizeof(int)), payload.Length);
+
+        using var reader = new PacketReader(payload);
+        Assert.Equal(NetMessage.KeepAlive, reader.Message);
+        foreach (var id in ids)
+        {
+            Assert.Equal(id, reader.ReadId());
+            Assert.Equal(sentinel, reader.ReadInt());
+        }
+        Assert.Throws<EndOfStreamException>(() => reader.ReadByte());
+    }
 }
 
 /// <summary>
@@ -382,11 +436,13 @@ public sealed class NetworkLoopbackTests : IDisposable
                 using var reader = new PacketReader(payload);
                 if (reader.Message != NetMessage.ChatMessage)
                     continue;
-                var kind = (ChatKind)reader.ReadByte();
-                var sender = reader.ReadString();
-                var text = reader.ReadString();
-                if (kind == ChatKind.Player && sender == "Tester" && text == "hello")
+                var message = ChatMessageCodec.Read(reader);
+                if (message is { Kind: ChatKind.Player, Sender: "Tester", Text: "hello" })
+                {
+                    // A plain line carries no link
+                    Assert.Null(message.Link);
                     seen = true;
+                }
             }
             Thread.Sleep(5);
         }

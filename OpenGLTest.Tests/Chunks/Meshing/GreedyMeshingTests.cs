@@ -22,7 +22,7 @@ public sealed class GreedyMeshingTests
 {
     public GreedyMeshingTests() => TestContent.EnsureLoaded();
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     // ---------------------------------------------------------------- eligibility
 
@@ -412,7 +412,7 @@ public sealed class GreedyMeshingTests
         return (cells, raw);
     }
 
-    private static void FillRandom(Chunk chunk, Random rng, byte[] palette, byte water)
+    private static void FillRandom(Chunk chunk, Random rng, ushort[] palette, ushort water)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var y = 0; y < Chunk.Size; y++)
@@ -440,7 +440,7 @@ public sealed class GreedyMeshingTests
         var centerPosition = new Vector3(0, chunkY, 0);
         var (manager, center) = MeshTestWorld.WalledArea(centerPosition);
         var water = Block("water");
-        byte[] palette =
+        ushort[] palette =
         [
             0, 0, 0, 0, 0, 0, 0, 0,
             Block("stone"), Block("stone"), Block("dirt"), Block("grass"), Block("oak_log"),

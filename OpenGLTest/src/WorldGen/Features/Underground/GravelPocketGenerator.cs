@@ -20,10 +20,10 @@ public static class GravelPocketGenerator
     private static FastNoiseLite PocketNoise;
 
     /// <summary>Blocks this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte GravelBlock;
-    public static readonly byte SandBlock;
+    public static readonly ushort GravelBlock;
+    public static readonly ushort SandBlock;
 
-    private static readonly byte StoneBlock;
+    private static readonly ushort StoneBlock;
 
     static GravelPocketGenerator()
     {
@@ -56,7 +56,7 @@ public static class GravelPocketGenerator
     /// same world always has the same pockets wherever a chunk is generated. A chunk lying wholly
     /// above every column's burial band is skipped outright.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         // Every cell's y is at least worldY0, so none can be buried deep enough
         if (worldY0 > column.MaxHeight - WorldFeatureConfig.GravelPocketMinBurial) return;
@@ -70,12 +70,16 @@ public static class GravelPocketGenerator
     /// </summary>
     private readonly struct PocketRule(int[] heights, int worldY0) : IOreLatticeRule
     {
-        public bool IsHost(byte block, int localX, int localY, int localZ) =>
+        public bool IsHost(ushort block, int localX, int localY, int localZ) =>
             block == StoneBlock
             && worldY0 + localY <= heights[(localX << Chunk.SizeShift) | localZ] - WorldFeatureConfig.GravelPocketMinBurial;
 
-        public byte Replacement(int worldX, int worldY, int worldZ) =>
+        public ushort Replacement(int worldX, int worldY, int worldZ) =>
             UnitHash(worldX, worldY, worldZ) < WorldFeatureConfig.GravelPocketSandShare ? SandBlock : GravelBlock;
+
+        public float ThresholdShift(int localX, int localY, int localZ) => 0f;
+
+        public float MinThresholdShift => 0f;
     }
 
     private static float UnitHash(int x, int y, int z)

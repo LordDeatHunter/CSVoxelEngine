@@ -21,4 +21,20 @@ public static class AudioConfig
     public const float AmbienceStartupFadeSeconds = 8f;
     // Peak volume of one-shot gameplay sfx (block hits, pickups) mixed by SfxManager
     public const float SfxVolume = 0.7f;
+
+    // --- Output ---
+    // Each output streams through this many OpenAL buffers of this many sample frames (1024 is
+    // ~23 ms at 44.1 kHz), so a new one-shot is heard within about count * frames of queue; fewer
+    // or shorter buffers cut that delay but stutter sooner when the audio thread is starved.
+    public const int OutputBufferCount = 6;
+    public const int OutputBufferFrames = 1024;
+    // How often the audio thread checks for played buffers to refill
+    public const int OutputPollMilliseconds = 5;
+
+    // --- Skeleton rattle ---
+    // A skeleton within this many blocks of the camera can be heard rattling
+    public const float SkeletonRattleRangeBlocks = 24f;
+    // Seconds between rattles are drawn uniformly from this range; kept long so it stays an occasional accent
+    public const float SkeletonRattleMinSeconds = 12f;
+    public const float SkeletonRattleMaxSeconds = 35f;
 }

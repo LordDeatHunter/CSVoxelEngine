@@ -24,8 +24,8 @@ public sealed class TorchTests : IDisposable
 {
     private const int FloorY = 4;
 
-    private readonly byte _torch;
-    private readonly byte _stone;
+    private readonly ushort _torch;
+    private readonly ushort _stone;
     private SupportTestWorld? _world;
 
     public TorchTests()
@@ -192,8 +192,8 @@ public sealed class TorchTests : IDisposable
         {
             if (type.WallBlockId == 0) continue;
             pairs++;
-            var floorLoot = new List<byte>();
-            var wallLoot = new List<byte>();
+            var floorLoot = new List<ushort>();
+            var wallLoot = new List<ushort>();
             DropManager.RollLoot(type.Id, new LootContext(0, 0, 0), floorLoot);
             DropManager.RollLoot(type.WallBlockId, new LootContext(0, 0, 0), wallLoot);
             Assert.Equal(floorLoot, wallLoot);
@@ -278,8 +278,8 @@ public sealed class TorchTests : IDisposable
         var wallTorch = BlockType.ById[_torch]!.WallBlockId;
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var origin = center.Position * Chunk.Size;
-        void Set(int x, int y, int z, byte id, byte state = 0) => center.SetBlockRaw(x, y, z, id, state);
-        byte At(int x, int y, int z) => manager.GetBlockGlobal((int)origin.X + x, (int)origin.Y + y, (int)origin.Z + z);
+        void Set(int x, int y, int z, ushort id, byte state = 0) => center.SetBlockRaw(x, y, z, id, state);
+        ushort At(int x, int y, int z) => manager.GetBlockGlobal((int)origin.X + x, (int)origin.Y + y, (int)origin.Z + z);
 
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
@@ -361,5 +361,33 @@ public sealed class TorchTests : IDisposable
         Assert.True(_world.Place(_torch, new Vector3(x, ground, z), Vector3.UnitY));
         Assert.False(_world.Place(_torch, new Vector3(x, ground + 1, z), Vector3.UnitX));
         Assert.Equal(BlockType.Air, _world.IdAt(x + 1, ground + 1, z));
+    }
+
+    [Fact]
+    public void ATorchMountsOnlyOnAFullBlockFace()
+    {
+        _world = new SupportTestWorld();
+        var log = ContentRegistry.RequireBlock("oak_log").Id;
+        var waystone = ContentRegistry.RequireBlock("waystone_surface").Id;
+        var ground = _world.Top;
+        var (x, z) = (6, 6);
+        _world.Load(x, ground + 2, z);
+
+        // A thin branch and a waystone are solid but no full face: neither holds a torch, on top or on a side
+        _world.Set(x, ground + 1, z, log, WoodState.Encode(WoodState.FullCube - 8, WoodState.ParentDetached, false));
+        _world.Set(x + 4, ground + 1, z, waystone, 0);
+        foreach (var cellX in new[] { x, x + 4 })
+        {
+            Assert.False(_world.Place(_torch, new Vector3(cellX, ground + 1, z), Vector3.UnitY));
+            Assert.False(_world.Place(_torch, new Vector3(cellX, ground + 1, z), -Vector3.UnitZ));
+            Assert.Equal(BlockType.Air, _world.IdAt(cellX, ground + 2, z));
+            Assert.Equal(BlockType.Air, _world.IdAt(cellX, ground + 1, z - 1));
+        }
+
+        // The same log at full thickness, and the stone ground, are full faces
+        _world.Set(x, ground + 1, z, log, WoodState.Detached);
+        Assert.True(_world.Place(_torch, new Vector3(x, ground + 1, z), Vector3.UnitY));
+        Assert.True(_world.Place(_torch, new Vector3(x, ground + 1, z), -Vector3.UnitZ));
+        Assert.True(_world.Place(_torch, new Vector3(x + 2, ground, z), Vector3.UnitY));
     }
 }

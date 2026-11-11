@@ -1,0 +1,5 @@
+{
+  // The dire boar's tusk, a trophy every one of them drops; nothing consumes it yet. The sprite is placeholder art.
+  "name": "Dire Tusk",
+  "texture": "assets/textures/items/dire_tusk.png"
+}

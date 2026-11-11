@@ -11,7 +11,7 @@ namespace VoxelEngine.Chunks.Meshing;
 
 /// <summary>
 /// Emits a <see cref="BlockRenderer.Pane"/> cell from the padded snapshot: the center post plus an
-/// arm toward every neighbor <see cref="PaneShape.ConnectsTo(PaneProfile, byte, byte)"/> reaches,
+/// arm toward every neighbor <see cref="PaneShape.ConnectsTo(PaneProfile, ushort, byte)"/> reaches,
 /// exactly the boxes <see cref="PaneProfile.Boxes"/> hands the raycast and collision, in the
 /// block's own <see cref="PaneProfile"/> (post and arm widths, and the rails an arm fills). An arm
 /// reaches the cell edge and carries no end cap, and the post drops its side where an arm covering
@@ -31,9 +31,9 @@ internal static class PaneEmitter
     /// <summary>The arm mask of the pane at padded index <paramref name="idx"/>, in its own shape,
     /// read from its four horizontal neighbors, which must lie inside the 18^3 snapshot: the
     /// meshed cell itself or the cell right above or below it.</summary>
-    internal static int MaskInSnapshot(byte[] padded, byte[] paddedState, int idx)
+    internal static int MaskInSnapshot(ushort[] padded, byte[] paddedState, int idx)
     {
-        Span<byte> ids = stackalloc byte[PaneShape.Directions];
+        Span<ushort> ids = stackalloc ushort[PaneShape.Directions];
         Span<byte> states = stackalloc byte[PaneShape.Directions];
         for (var dir = 0; dir < PaneShape.Directions; dir++)
         {
@@ -50,7 +50,7 @@ internal static class PaneEmitter
     /// same-block pane fused with this one (the block's <see cref="BlockType.CullSelf"/>), none
     /// otherwise.
     /// </summary>
-    private static int HiddenCaps(byte[] padded, byte[] paddedState, int pIdx, BlockType type, int face)
+    private static int HiddenCaps(ushort[] padded, byte[] paddedState, int pIdx, BlockType type, int face)
     {
         var nbIdx = pIdx + FaceNeighborDelta[face];
         var nb = padded[nbIdx];
@@ -60,7 +60,7 @@ internal static class PaneEmitter
     }
 
     internal static void EmitPane(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        ushort[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos)
     {
         var profile = type.Pane ?? PaneProfile.Default;

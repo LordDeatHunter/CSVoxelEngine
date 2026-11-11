@@ -53,7 +53,7 @@ public sealed class WorldSourceTests : IDisposable
             Directory.Delete(_world, recursive: true);
     }
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     // A plateau over chunk columns [min, max] x [min, max], PlateauLift above worldgen's tallest
     // column there.
@@ -82,7 +82,7 @@ public sealed class WorldSourceTests : IDisposable
     }
 
     // Every cell at or below the plateau top is the plateau block and every cell above it air.
-    private static void AssertPlateau(Chunk chunk, FlatWorldSource source, byte block)
+    private static void AssertPlateau(Chunk chunk, FlatWorldSource source, ushort block)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var y = 0; y < Chunk.Size; y++)

@@ -16,8 +16,8 @@ public class FluidSurfaceTests
     private const int X = 8;
     private const int Z = 8;
 
-    private readonly byte _water;
-    private readonly byte _stone;
+    private readonly ushort _water;
+    private readonly ushort _stone;
 
     public FluidSurfaceTests()
     {

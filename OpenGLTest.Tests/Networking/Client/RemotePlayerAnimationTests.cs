@@ -76,6 +76,35 @@ public sealed class RemotePlayerAnimationTests
     }
 
     [Fact]
+    public void ABroadcastCastPlaysTheGestureAndHandsOutOneBurst()
+    {
+        var remote = NewRemote();
+        var eye = new Vector3(0f, 1.62f, 0f);
+        Assert.False(remote.TakeCast());
+
+        remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Cast, 1);
+        Assert.True(remote.Model.IsCasting);
+        Assert.True(remote.TakeCast());
+        Assert.False(remote.TakeCast());
+
+        // The same counter again is the same broadcast: no second gesture and no second burst
+        for (var i = 0; i < 60; i++) remote.Update(Dt);
+        remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Cast, 1);
+        Assert.False(remote.Model.IsCasting);
+        Assert.False(remote.TakeCast());
+    }
+
+    [Fact]
+    public void AFirstSightingOfACastReplaysNothing()
+    {
+        var remote = new RemotePlayer(3, "Mage", PlayerRig.BuiltIn());
+        remote.SetTarget(new Vector3(0f, 1.62f, 0f), -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Cast, 4);
+
+        Assert.False(remote.Model.IsCasting);
+        Assert.False(remote.TakeCast());
+    }
+
+    [Fact]
     public void AFirstSightingOnlyRecordsTheCounterInsteadOfSwinging()
     {
         var remote = new RemotePlayer(2, "Late", PlayerRig.BuiltIn());

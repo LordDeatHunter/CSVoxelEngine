@@ -37,8 +37,8 @@ public sealed class CampfireManager
 
     public sealed class CookSlot
     {
-        public byte InputId;
-        public byte OutputId;
+        public ushort InputId;
+        public ushort OutputId;
         public int OutputCount;
         public float TimeLeft;
         public float TotalTime;
@@ -50,7 +50,7 @@ public sealed class CampfireManager
     private readonly List<(int X, int Y, int Z)> _scratch = new();
     private readonly List<(int X, int Y, int Z)> _stale = new();
     private readonly List<Vector3> _cells = new();
-    private readonly List<byte> _collected = new();
+    private readonly List<ushort> _collected = new();
 
     public int LitCount => _lit.Count;
 
@@ -61,11 +61,15 @@ public sealed class CampfireManager
 
     public bool IsLit(int x, int y, int z) => _lit.ContainsKey((x, y, z));
 
-    public bool Ignite(int x, int y, int z)
+    public bool Ignite(int x, int y, int z) => Ignite(x, y, z, BurnSeconds);
+
+    /// <summary>Lights the pile with its first branch burning <paramref name="firstBranchSeconds"/> (a goblin camp's
+    /// fire lasts the night); the rest burn <see cref="BurnSeconds"/> each. False when it already burns.</summary>
+    public bool Ignite(int x, int y, int z, float firstBranchSeconds)
     {
         var key = (x, y, z);
         if (_lit.ContainsKey(key)) return false;
-        _lit[key] = BurnSeconds;
+        _lit[key] = firstBranchSeconds;
         RefreshCells();
         return true;
     }
@@ -84,7 +88,7 @@ public sealed class CampfireManager
     public IReadOnlyList<CookSlot>? CookingAt(int x, int y, int z) =>
         _cooking.TryGetValue((x, y, z), out var slots) ? slots : null;
 
-    public bool TryPlaceFood(int x, int y, int z, byte inputId)
+    public bool TryPlaceFood(int x, int y, int z, ushort inputId)
     {
         if (!IsLit(x, y, z)) return false;
         var recipe = ContentRegistry.CookRecipeForInput(inputId);
@@ -108,7 +112,7 @@ public sealed class CampfireManager
         return true;
     }
 
-    public IReadOnlyList<byte> CollectFinished(int x, int y, int z)
+    public IReadOnlyList<ushort> CollectFinished(int x, int y, int z)
     {
         _collected.Clear();
         if (!_cooking.TryGetValue((x, y, z), out var slots)) return _collected;
@@ -124,7 +128,7 @@ public sealed class CampfireManager
         return _collected;
     }
 
-    public IEnumerable<(Vector3 Cell, int Slot, byte ItemId, bool Done, float Progress)> CookingView()
+    public IEnumerable<(Vector3 Cell, int Slot, ushort ItemId, bool Done, float Progress)> CookingView()
     {
         foreach (var (key, slots) in _cooking)
         {
@@ -360,8 +364,8 @@ public sealed class CampfireManager
             writer.Write((byte)slots.Count);
             foreach (var slot in slots)
             {
-                writer.Write(slot.InputId);
-                writer.Write(slot.OutputId);
+                writer.WriteId(slot.InputId);
+                writer.WriteId(slot.OutputId);
                 writer.Write((byte)Math.Clamp(slot.OutputCount, 0, byte.MaxValue));
                 writer.Write(slot.TimeLeft);
                 writer.Write(slot.TotalTime);
@@ -395,8 +399,8 @@ public sealed class CampfireManager
             {
                 slots.Add(new CookSlot
                 {
-                    InputId = reader.ReadByte(),
-                    OutputId = reader.ReadByte(),
+                    InputId = BlockTables.RequireAssigned(reader.ReadId()),
+                    OutputId = BlockTables.RequireAssigned(reader.ReadId()),
                     OutputCount = reader.ReadByte(),
                     TimeLeft = StationNetCodec.ReadFinite(reader),
                     TotalTime = StationNetCodec.ReadFinite(reader),

@@ -38,7 +38,7 @@ public sealed class GoblinPackSpawnTests
         for (var cycle = 0; cycle < 40 && goblins.LivingCount < MobConfig.MobNaturalCap; cycle++)
         {
             var before = goblins.Goblins.ToArray();
-            goblins.Update(MobConfig.GoblinSpawnIntervalSeconds + 0.01f, chunks, drops, camera);
+            goblins.Update(MobConfig.GoblinSpawnIntervalSeconds + 0.01f, chunks, drops, camera, night: 1f);
             var fresh = goblins.Goblins.Where(g => !before.Contains(g)).ToList();
             if (fresh.Count == 0) continue;
             cycles++;

@@ -34,19 +34,19 @@ public sealed class ChunkSaveStoreTests : IDisposable
     {
         var fill = ContentRegistry.RequireBlock(fillBlock).Id;
         var random = new Random(seed);
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         var state = new byte[Chunk.BlockCount];
         for (var i = 0; i < blocks.Length; i++)
         {
-            blocks[i] = random.Next(3) == 0 ? fill : (byte)0;
+            blocks[i] = random.Next(3) == 0 ? fill : BlockType.Air;
             state[i] = (byte)random.Next(4);
         }
-        return new ChunkSnapshot(blocks, state, [3, 17, 4095]);
+        return new ChunkSnapshot(blocks, state, playerPlaced: [3, 17, 4095]);
     }
 
     private static void AssertSameData(ChunkSnapshot expected, ChunkSnapshot actual)
     {
-        Assert.Equal(expected.Blocks, actual.Blocks);
+        Assert.Equal(expected.Storage.ToDense(), actual.Storage.ToDense());
         Assert.Equal(expected.State, actual.State);
         Assert.Equal(expected.PlayerPlaced, actual.PlayerPlaced);
     }
@@ -129,7 +129,7 @@ public sealed class ChunkSaveStoreTests : IDisposable
         {
             Assert.True(reopened.TryLoad(key, out var fromDisk));
             AssertSameData(newer, fromDisk);
-            Assert.NotEqual(older.Blocks, fromDisk.Blocks);
+            Assert.NotEqual(older.Storage.ToDense(), fromDisk.Storage.ToDense());
         }
         finally
         {
@@ -431,6 +431,47 @@ public sealed class ChunkSaveStoreTests : IDisposable
             Assert.Equal(garbage, File.ReadAllBytes(path + ".bad"));
             Assert.True(store.TryLoad(key, out var written));
             AssertSameData(fresh, written);
+        }
+        finally
+        {
+            store.Shutdown(ShutdownTimeout);
+        }
+    }
+
+    /// <summary>
+    /// A chunk file from an older format version (a world saved by an older build) is not misread:
+    /// the chunk regenerates for the session, and the old file is set aside as .bad, untouched,
+    /// before the first write of the chunk replaces it.
+    /// </summary>
+    [Fact]
+    public void AnOlderVersionChunkFileRegeneratesAndIsSetAside()
+    {
+        var key = ChunkKey.Pack(6, 0, -6);
+        var path = Path.Combine(ChunksDir, WorldStore.ChunkFileName(6, 0, -6));
+        Directory.CreateDirectory(ChunksDir);
+        byte[] older;
+        using (var encoded = new MemoryStream())
+        {
+            ChunkSaveCodec.Write(encoded, Snapshot("stone", seed: 5), static id => BlockType.ById[id]?.Name);
+            older = encoded.ToArray();
+        }
+        // The version byte follows the four magic bytes
+        older[4] = ChunkSaveCodec.Version - 1;
+        File.WriteAllBytes(path, older);
+
+        var store = new ChunkSaveStore(_world);
+        try
+        {
+            Assert.True(store.IsIndexed(key));
+            Assert.False(store.TryLoad(key, out _));
+
+            var regenerated = Snapshot("dirt", seed: 6);
+            store.Enqueue(key, regenerated);
+            ShutdownOrFail(store);
+
+            Assert.Equal(older, File.ReadAllBytes(path + ".bad"));
+            Assert.True(store.TryLoad(key, out var written));
+            AssertSameData(regenerated, written);
         }
         finally
         {

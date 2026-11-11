@@ -1,12 +1,10 @@
 // TODO: placeholder art — reuses the primitive axe sprite until the converter gets its own texture.
 {
-  // Right-clicking a 2x2x2 cube of mud bricks turns it into a mud brick kiln, opening toward
-  // the player. Endless: the converter spends nothing and never morphs.
+  // Right-clicking a hand-built cube of a structure's source block presses it into that
+  // structure, opening toward the player: 2x2x2 mud bricks into a mud brick kiln, 3x3x3 alloy
+  // bricks into an alloy furnace. It names no structure: any multiblock built from the clicked
+  // cube's block qualifies. Endless: the converter spends nothing and never morphs.
   "name": "Multiblock Converter",
   "texture": "assets/textures/items/multiblock_converter.png",
-  "use": {
-    "action": "convert_multiblock",
-    "block": "block/mud_bricks",
-    "result": "block/mud_brick_kiln"
-  }
+  "use": { "action": "convert_multiblock" }
 }

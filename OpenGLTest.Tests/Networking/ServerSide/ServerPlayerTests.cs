@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Numerics;
 using VoxelEngine.Interaction;
+using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
@@ -34,15 +35,34 @@ public sealed class ServerPlayerTests : IDisposable
         }
     }
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
 
     [Fact]
-    public void APlayerComesBackWithItsInventoryAndPose()
+    public void ANewcomerGetsTheHintScrollAndAReturningPlayerDoesNot()
+    {
+        var newcomer = new ServerPlayer(1, "Alice", Vector3.Zero);
+        Assert.False(newcomer.Restore(null, allowCreative: false));
+        var scroll = Assert.IsType<LearnPartsItem>(newcomer.Inventory.HeldItem);
+        Assert.Equal(1, newcomer.Inventory.CountFor(scroll.Id));
+
+        // The scroll read: its parts are known and the scroll is gone, so the save holds neither scroll
+        newcomer.Inventory.LearnParts(scroll.Teaches);
+        newcomer.Inventory.ConsumeSelected();
+        var back = new ServerPlayer(2, "Alice", Vector3.Zero);
+        back.Restore(newcomer.Capture(), allowCreative: false);
+
+        Assert.Equal(0, back.Inventory.CountFor(scroll.Id));
+        Assert.All(scroll.Teaches, k => Assert.True(back.Inventory.KnowsPart(k)));
+    }
+
+    [Fact]
+    public void APlayerComesBackWithItsInventoryPoseAndDiscoveredWaystones()
     {
         var store = new ChunkSaveStore(_dir);
         var player = new ServerPlayer(1, "Alice", new Vector3(10.5f, 70f, -3.25f)) { Yaw = 30f, Pitch = -12f };
         player.Inventory.Add(Stone, 7);
         player.Inventory.Select(4);
+        player.Inventory.Waystones.Add(400, 11, -2, "Kafuziro");
         ServerPlayerSaves.Save(store, player);
         Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
 
@@ -57,11 +77,13 @@ public sealed class ServerPlayerTests : IDisposable
             Assert.Equal(player.Pitch, back.Pitch);
             Assert.Equal(player.Inventory.CountFor(Stone), back.Inventory.CountFor(Stone));
             Assert.Equal(player.Inventory.SelectedIndex, back.Inventory.SelectedIndex);
+            Assert.Equal(player.Inventory.Waystones.Entries, back.Inventory.Waystones.Entries);
 
             // Somebody else's name loads nothing of Alice's
             var stranger = new ServerPlayer(10, "Bob", Vector3.Zero);
             Assert.False(stranger.Restore(ServerPlayerSaves.Load(reopened, "Bob"), allowCreative: false));
             Assert.Equal(0, stranger.Inventory.CountFor(Stone));
+            Assert.Equal(0, stranger.Inventory.Waystones.Count);
         }
         finally
         {

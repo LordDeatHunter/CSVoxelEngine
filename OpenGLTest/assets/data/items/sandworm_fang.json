@@ -1,0 +1,5 @@
+{
+  "name": "Sandworm Fang",
+  // A curved fang torn from the sandworm, the boss's signature drop
+  "texture": "assets/textures/items/sandworm_fang.png"
+}

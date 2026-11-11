@@ -1,6 +1,9 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Numerics;
 using Silk.NET.Input;
+using VoxelEngine.Items;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.VisualTest;
 using Xunit;
@@ -116,6 +119,58 @@ public sealed class VisualScenarioTests
     }
 
     [Fact]
+    public void ATowerClearStepParsesItsFloor()
+    {
+        var scenario = VisualScenario.Parse(
+            """{ "steps": [{ "op": "towerclear", "floor": 2 }, { "op": "TowerClear" }] }""", "tower");
+        Assert.Equal("towerclear", scenario.Steps[0].Op);
+        Assert.Equal(2, scenario.Steps[0].Floor);
+        // An absent floor is the ground floor
+        Assert.Equal("towerclear", scenario.Steps[1].Op);
+        Assert.Equal(0, scenario.Steps[1].Floor);
+    }
+
+    [Fact]
+    public void AnAltarStepParsesItsCell()
+    {
+        var scenario = VisualScenario.Parse(
+            """{ "steps": [{ "op": "altar", "pos": [2920, 46, -1411] }, { "op": "Altar", "pos": [1, 2, 3] }] }""", "altar");
+        Assert.Equal("altar", scenario.Steps[0].Op);
+        Assert.Equal(new Vector3(2920, 46, -1411), scenario.Steps[0].Pos);
+        Assert.Equal("altar", scenario.Steps[1].Op);
+        Assert.Equal(new Vector3(1, 2, 3), scenario.Steps[1].Pos);
+    }
+
+    [Fact]
+    public void AGoblinCampStepParsesItsColumnAndRefusesAnyOtherShape()
+    {
+        var scenario = VisualScenario.Parse("""{ "steps": [{ "op": "goblincamp", "pos": [-44, 50] }] }""", "camp");
+        Assert.Equal("goblincamp", scenario.Steps[0].Op);
+        Assert.Equal(new Vector3(-44, 0, 50), scenario.Steps[0].Pos);
+        Assert.Throws<InvalidOperationException>(() =>
+            VisualScenario.Parse("""{ "steps": [{ "op": "goblincamp", "pos": [1, 2, 3] }] }""", "camp"));
+    }
+
+    [Fact]
+    public void ATowerDefeatStepParses()
+    {
+        var scenario = VisualScenario.Parse(
+            """{ "steps": [{ "op": "towerdefeat" }, { "op": "TowerDefeat" }] }""", "defeat");
+        Assert.Equal("towerdefeat", scenario.Steps[0].Op);
+        Assert.Equal("towerdefeat", scenario.Steps[1].Op);
+    }
+
+    [Theory]
+    [InlineData("""{ "steps": [{ "op": "altar" }] }""")]
+    [InlineData("""{ "steps": [{ "op": "altar", "pos": [1, 2] }] }""")]
+    public void AnAltarStepWithoutAnExactCellIsRefused(string json)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(json, "bad"));
+        Assert.Contains("(altar)", ex.Message);
+        Assert.Contains("'pos'", ex.Message);
+    }
+
+    [Fact]
     public void SpawnCarriesAnOptionalSizeThatDefaultsToTheSmallest()
     {
         var scenario = VisualScenario.Parse(
@@ -134,6 +189,26 @@ public sealed class VisualScenarioTests
         var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(json, "bad"));
         Assert.Contains("'size'", ex.Message);
         Assert.Contains("(spawn)", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("""{ "op": "spawn", "entity": "skeleton", "pos": [1, 2], "tier": 5 }""", 5)]
+    [InlineData("""{ "op": "spawn", "entity": "skeleton", "pos": [1, 2, 3], "tier": 4 }""", 4)]
+    [InlineData("""{ "op": "spawn", "entity": "skeleton", "pos": [1, 2, 3] }""", 0)]
+    [InlineData("""{ "op": "spawn", "entity": "skeleton", "pos": [1, 2] }""", 0)]
+    public void ASpawnStepReadsAnOptionalTierAndRefusesANegativeOne(string step, int tier)
+    {
+        var scenario = VisualScenario.Parse($$"""{ "steps": [{{step}}] }""", "tiers");
+        Assert.Equal(tier, scenario.Steps[0].Tier);
+
+        // The same step with a negative, fractional or non-numeric tier is refused, naming the field
+        foreach (var bad in new[] { "-1", "1.5", "\"high\"" })
+        {
+            var json = $$"""{ "steps": [{ "op": "spawn", "entity": "skeleton", "pos": [1, 2], "tier": {{bad}} }] }""";
+            var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(json, "bad"));
+            Assert.Contains("'tier'", ex.Message);
+            Assert.Contains("(spawn)", ex.Message);
+        }
     }
 
     [Fact]
@@ -286,10 +361,24 @@ public sealed class VisualScenarioTests
     [InlineData("""{ "steps": [{ "op": "walk", "seconds": 1, "keys": ["Ww"] }] }""", "Ww")]
     [InlineData("""{ "steps": [{ }] }""", "'op'")]
     [InlineData("""{ "steps": [{ "op": "give" }] }""", "block")]
+    [InlineData("""{ "steps": [{ "op": "give", "block": "stone", "rarity": "mythic" }] }""", "rarity")]
     public void BadStepsThrowNamingTheProblem(string json, string fragment)
     {
         var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(json, "bad"));
         Assert.Contains(fragment, ex.Message);
+    }
+
+    [Fact]
+    public void AGiveCanRollGearAtARarity()
+    {
+        var scenario = VisualScenario.Parse("""
+            { "steps": [
+              { "op": "give", "block": "item/bronze_cap", "rarity": "Epic" },
+              { "op": "give", "block": "item/bronze_cap" },
+            ] }
+            """, "tour");
+        Assert.Equal(Rarity.Epic, scenario.Steps[0].Rarity);
+        Assert.Null(scenario.Steps[1].Rarity);
     }
 
     [Fact]
@@ -301,17 +390,20 @@ public sealed class VisualScenarioTests
     }
 
     [Fact]
-    public void TheIcebergScenarioParses()
+    public void EveryShippedScenarioLoadsAndShootsSomething()
     {
         // visual-examples/ is not copied to the build output: it sits in the game project
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "icebergs.json")))
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples")))
             dir = dir.Parent;
         Assert.NotNull(dir);
-        var scenario = VisualScenario.Load(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "icebergs.json"));
-
-        Assert.Contains(scenario.Steps, step => step.Op == "spawn" && step.Entity == "iceberg");
-        Assert.Contains(scenario.Steps, step => step.Op == "screenshot");
+        var files = Directory.GetFiles(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples"), "*.json");
+        Assert.NotEmpty(files);
+        foreach (var file in files)
+        {
+            var scenario = VisualScenario.Load(file);
+            Assert.True(scenario.Steps.Any(step => step.Op == "screenshot"), $"{file} takes no screenshot");
+        }
     }
 
     [Fact]
@@ -340,16 +432,32 @@ public sealed class VisualScenarioTests
     }
 
     [Fact]
-    public void TheSpellsScenarioLoads()
+    public void AWaystoneStepParsesItsActionAndWhatThatActionNeeds()
     {
-        // visual-examples/ is not copied to the build output: it sits in the game project
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "spells.json")))
-            dir = dir.Parent;
-        Assert.NotNull(dir);
-        var scenario = VisualScenario.Load(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "spells.json"));
+        var scenario = VisualScenario.Parse("""
+            { "steps": [
+              { "op": "waystone", "action": "open", "pos": [4, 11, -2] },
+              { "op": "waystone", "action": "type", "text": "Home" },
+              { "op": "waystone", "action": "teleport", "row": 2 },
+              { "op": "waystone", "action": "confirm" },
+            ] }
+            """, "tour");
+        Assert.Equal(["open", "type", "teleport", "confirm"], scenario.Steps.Select(s => s.Action));
+        Assert.Equal(new System.Numerics.Vector3(4, 11, -2), scenario.Steps[0].Pos);
+        Assert.Equal("Home", scenario.Steps[1].Text);
+        Assert.Equal(2, scenario.Steps[2].Row);
+    }
 
-        Assert.Contains(scenario.Steps, step => step.Op == "cast" && step.Parts.Length > 0);
-        Assert.Contains(scenario.Steps, step => step.Op == "screenshot");
+    [Theory]
+    [InlineData("""{ "op": "waystone" }""")]
+    [InlineData("""{ "op": "waystone", "action": "fly" }""")]
+    [InlineData("""{ "op": "waystone", "action": "open" }""")]
+    [InlineData("""{ "op": "waystone", "action": "type" }""")]
+    [InlineData("""{ "op": "waystone", "action": "teleport", "row": 0 }""")]
+    public void AWaystoneStepMissingWhatItsActionNeedsIsRefused(string step)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            VisualScenario.Parse($$"""{ "steps": [{{step}}] }""", "bad"));
+        Assert.Contains("waystone", ex.Message);
     }
 }

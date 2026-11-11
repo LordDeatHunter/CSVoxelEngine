@@ -15,7 +15,7 @@ namespace VoxelEngine.ItemDebugger;
 /// <see cref="PlayerModel"/> is showing and the synthetic inputs that drive it, so every pose the game
 /// can put the player in can be looked at without a world. The modes are data (<see cref="AllModes"/>):
 /// <b>continuous</b> poses (idle, walk, run, sneak, a jump loop, swimming) feed the model the speed and
-/// state the game would, and <b>one-shots</b> (punch, slice, the sword's cut, back cut and chop, throw, hurt, equip, landing, death) fire
+/// state the game would, and <b>one-shots</b> (punch, slice, the sword's cut, back cut and chop, throw, a staff cast, hurt, equip, landing, death) fire
 /// the model's own trigger, wait for it to finish, rest <see cref="RestBetweenPlays"/> and fire again,
 /// so a swing can be watched repeatedly. Nothing here is a second implementation of an animation: it only
 /// calls <see cref="PlayerModel.Update"/> and the triggers the world calls, with the same inputs.
@@ -44,6 +44,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public const string Throw = "throw";
     public const string Use = "use";
     public const string Bow = "bow";
+    public const string Cast = "cast";
     public const string Hurt = "hurt";
     public const string Equip = "equip";
     public const string Death = "death";
@@ -52,7 +53,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public static readonly IReadOnlyList<string> AllModes =
     [
         Idle, Walk, Run, Sneak, Jump, SprintJump, Land, Swim, SwimIdle, Surface, Fly,
-        Punch, HeavyPunch, Slice, SliceBack, Cut, BackCut, Chop, Axe, Throw, Use, Bow, Hurt, Equip, Death,
+        Punch, HeavyPunch, Slice, SliceBack, Cut, BackCut, Chop, Axe, Throw, Use, Bow, Cast, Hurt, Equip, Death,
     ];
 
     /// <summary>Seconds a one-shot rests between the end of one play and the next.</summary>
@@ -152,6 +153,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
         Throw => ThrowChargeSeconds + ThrowHoldSeconds + PlayerModel.ThrowDuration + 0.1f,
         Use => UseChargeSeconds + UseHoldSeconds + 0.4f,
         Bow => UseChargeSeconds + BowHoldSeconds + BowPose.ReleaseSeconds + 0.5f,
+        Cast => PlayerModel.CastDuration + 0.1f,
         Hurt => 1f,
         Equip => 1.2f,
         Death => DeathFallSeconds + DeathHoldSeconds,
@@ -175,7 +177,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public float Elapsed => _clock;
 
     /// <summary>True for the modes that replay a swing or reaction (everything after the swim poses).</summary>
-    public bool IsOneShot => Mode is Punch or HeavyPunch or Slice or SliceBack or Cut or BackCut or Chop or Axe or Throw or Hurt or Equip or Death or Land;
+    public bool IsOneShot => Mode is Punch or HeavyPunch or Slice or SliceBack or Cut or BackCut or Chop or Axe or Throw or Cast or Hurt or Equip or Death or Land;
 
     /// <summary>Switches to <paramref name="mode"/> (any case); false when there is no such mode.</summary>
     public bool SetMode(string mode)
@@ -257,6 +259,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
             case BackCut:
             case Chop:
             case Axe:
+            case Cast:
             case Hurt:
             case Equip:
                 OneShot(deltaTime);
@@ -389,6 +392,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
         Punch or HeavyPunch => _model.MineT < 1f,
         Slice or SliceBack => _model.IsSlicing,
         Cut or BackCut or Chop or Axe => _model.IsSwordSwinging,
+        Cast => _model.IsCasting,
         Hurt => MathF.Abs(_model.Flinch) > 0.02f,
         Equip => MathF.Abs(_model.EquipLowering) > 0.02f,
         _ => false,
@@ -406,6 +410,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
             case BackCut: _model.StartSword(SwordSwing.BackCut); break;
             case Chop: _model.StartSword(SwordSwing.Chop); break;
             case Axe: _model.StartAxeChop(PlayerModel.SwordDuration(SwordSwing.AxeChop)); break;
+            case Cast: _model.Cast(); break;
             case Hurt: _model.Hurt(1f); break;
             case Equip: _model.NotifyEquip(); break;
         }

@@ -8,11 +8,19 @@ using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Chunks.Streaming;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
+using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
+using VoxelEngine.Entities.Sandworms;
+using VoxelEngine.Entities.SkyMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 using VoxelEngine.Lod;
@@ -21,17 +29,25 @@ using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
+using VoxelEngine.Particles.Collapse;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Caves;
+using VoxelEngine.Simulation.Chests;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.LeafDecay;
+using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.Tower;
+using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.Status;
+using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine;
@@ -43,6 +59,7 @@ namespace VoxelEngine;
 /// <see cref="LocalPlayer"/>, <see cref="Strikes"/>, <see cref="Ambient"/>, <see cref="Edits"/>,
 /// <see cref="LeftClick"/>, <see cref="Placer"/>, <see cref="Throws"/>,
 /// <see cref="Interactions"/>, <see cref="ItemUse"/>, <see cref="RightClick"/>, <see cref="Caster"/>,
+/// <see cref="Spells"/>, <see cref="Feedback"/>,
 /// <see cref="ClientMirror"/>, <see cref="Persistence"/>, <see cref="Pickup"/>,
 /// <see cref="Director"/> and <see cref="Renderer"/>. It runs the frame (<see cref="Update"/>, which hands a multiplayer
 /// client to <see cref="UpdateClient"/> and a loading world to <see cref="UpdateLoading"/>) and
@@ -65,6 +82,13 @@ public class World
     private readonly SlimeManager? _slimes;
     private readonly IcebergManager? _icebergs;
     private readonly GoblinManager? _goblins;
+    private readonly HellMobManager? _hellMobs;
+    private readonly SkyMobManager? _skyMobs;
+    private readonly WildlifeManager? _wildlife;
+    private readonly CaveMobManager? _caveMobs;
+    private readonly SkeletonManager? _skeletons;
+    private readonly SkeletonKingManager? _kings;
+    private readonly SandwormManager? _sandworms;
     private readonly SaplingManager _saplings = new();
     // The sapling clock's grow callback, built once: a method group allocates a delegate each time it is converted
     private Func<string, int, int, int, int, TreeGrowthResult>? _growTree;
@@ -78,7 +102,12 @@ public class World
     private readonly GroundDust _dust = new();
     private readonly CampfireManager _campfires = new();
     private readonly QuernManager _querns = new();
+    private readonly ChestManager _chests = new();
+    private readonly WaystoneManager _waystones = new();
     private readonly KilnManager _kilns = new();
+    private readonly SmithingStations _smithing = new();
+    private readonly TowerManager _towers;
+    private int _lastJumpCount;
     private readonly CastingManager _casting = new();
     private readonly FireParticleSystem _fire = new();
     // Embers and smoke over exposed lava: a separately tuned instance so a lava lake never
@@ -142,8 +171,21 @@ public class World
     /// <summary>What a landed hit does to a mob: damage, shove, sparks and the floating number.</summary>
     internal MobStrikes Strikes { get; }
 
+    /// <summary>The bone fragments a landed hit sprays (the bone-breaker blade's own and the bone charm's).</summary>
+    internal BoneShrapnel Shrapnel { get; }
+
     /// <summary>The ambient cosmetic effects: steam, lava embers, torch flames, bubbles, splashes, blast shake.</summary>
     internal AmbientEffects Ambient { get; }
+
+    /// <summary>The sandworm's cosmetic show: thump rumble, surfacing sand, breach boom, dash dust and the
+    /// earthquake (never built on a headless server).</summary>
+    internal SandwormEffects? WormEffects { get; }
+
+    /// <summary>A defeated tower's collapse show: rubble chips, thrown blocks and the rumble (never built on a headless
+    /// server).</summary>
+    internal TowerCollapseEffects? CollapseEffects { get; }
+
+    internal FloorConqueredEffects? ConqueredEffects { get; }
 
     /// <summary>The block edit paths: breaking, felling, multiblocks, tall blocks, toppling trees, edit reports.</summary>
     internal BlockEditor Edits { get; }
@@ -171,6 +213,12 @@ public class World
 
     /// <summary>What accepted casts do: the spell bolts in flight and the element impacts; null on a client.</summary>
     internal SpellEffects? Spells { get; }
+
+    /// <summary>The cosmetic side of casts (the cast burst and sounds, a client's preview bolts); null on a headless server.</summary>
+    internal SpellFeedback? Feedback { get; }
+
+    // The skeletons' ambient rattle; null without audio or on a headless server
+    private readonly SkeletonRattle? _skeletonRattle;
 
     /// <summary>The multiplayer client's mirror of its server: cell changes, entities, stations, health, remote players.</summary>
     internal ClientMirror ClientMirror { get; }
@@ -240,8 +288,15 @@ public class World
     /// <summary>Current HP, 0-100, drawn as 10 hearts in the HUD.</summary>
     public int Health => _health.Health;
 
+    /// <summary>The cave biome at the local player's eye (CB-3), which the frame lighting eases its cave
+    /// atmosphere toward: computed in singleplayer, mirrored from the server on a client.</summary>
+    internal CaveBiome EyeCaveBiome => LocalPlayer.EyeCaveBiome;
+
     /// <summary>The air under water as a share of a full lung, 0..1; the HUD's bubbles.</summary>
     public float AirShare => _health.Breath.Fraction;
+
+    /// <summary>The local player's mana pool (what a waystone trip needs over half of).</summary>
+    public PlayerMana Mana => _health.Mana;
 
     /// <summary>The HUD toast line (the day change, a first pickup, a full inventory), drawn while
     /// its alpha is above zero.</summary>
@@ -255,7 +310,7 @@ public class World
     /// Credits <paramref name="count"/> of an item to this world's inventory (the creative grants
     /// and the /give command), toasting a first find like a pickup does.
     /// </summary>
-    public void CreditItem(byte id, int count)
+    public void CreditItem(ushort id, int count)
     {
         var known = Inventory.Knows(id);
         if (Inventory.Add(id, count) && !known)
@@ -295,6 +350,30 @@ public class World
 
     /// <summary>Live goblins, feeding the entity, shadow and mirror passes.</summary>
     public IReadOnlyList<Goblin> Goblins => _goblins?.Goblins ?? [];
+
+    /// <summary>Live hell mobs (brutes and casters), feeding the entity and shadow passes.</summary>
+    public IReadOnlyList<HellMob> HellMobs => _hellMobs?.Mobs ?? [];
+
+    /// <summary>Live sky mobs (galeraptors and cloud golems), feeding the entity and shadow passes.</summary>
+    public IReadOnlyList<SkyMob> SkyMobs => _skyMobs?.Mobs ?? [];
+
+    /// <summary>Live animals of the wild (deer and boars), feeding the entity and shadow passes.</summary>
+    public IReadOnlyList<Animal> Wildlife => _wildlife?.Mobs ?? [];
+
+    /// <summary>Live cave mobs (shardlings, sporelings and magmaborn), feeding the entity and shadow passes.</summary>
+    public IReadOnlyList<CaveMob> CaveMobs => _caveMobs?.Mobs ?? [];
+
+    /// <summary>Live tower skeletons, feeding the entity and shadow passes.</summary>
+    public IReadOnlyList<Skeleton> Skeletons => _skeletons?.Mobs ?? [];
+
+    /// <summary>Live Skeleton Kings (the battle towers' bosses), feeding the entity and shadow passes.</summary>
+    public IReadOnlyList<SkeletonKing> SkeletonKings => _kings?.Mobs ?? [];
+
+    /// <summary>The Skeleton King manager, or null without its content (the tests' and the altar's seam).</summary>
+    internal SkeletonKingManager? SkeletonKingManager => _kings;
+
+    /// <summary>The live sandworm boss, if any (plus one playing its death), feeding the entity and shadow passes.</summary>
+    public IReadOnlyList<Sandworm> Sandworms => _sandworms?.Worms ?? [];
 
     /// <summary>Live icebergs (a client's mirrors of the server's); public for the server's broadcast.</summary>
     public IReadOnlyList<Iceberg> Icebergs => _icebergs?.Icebergs ?? [];
@@ -372,10 +451,15 @@ public class World
             // A server's camera is nobody, so no effect may land on it; a client's carries the mirror
             if (!serverMode)
                 Camera.Effects = _health.Effects;
+                Camera.Healer = amount => _health.Heal(amount);
             LocalPlayer = new LocalPlayer(this, _health, _dust, _debris, _mobs, serverMode, clientMode);
             var savedPlayer = PlayerSaveCodec.TryParse(saveStore?.ReadFile(PlayerSaveCodec.FileName));
             if (savedPlayer != null)
                 LocalPlayer.ApplySavedPlayer(savedPlayer);
+            // A new store-backed survival player starts with the hint scroll; storeless scenario and
+            // test worlds, the server camera and clients never do
+            if (saveStore != null && !serverMode && !clientMode && StarterKit.NeededBy(savedPlayer))
+                StarterKit.GiveTo(Inventory);
             EntitySaveData? savedEntities = null;
             StationSaveData? savedStations = null;
             if (saveStore != null)
@@ -424,42 +508,91 @@ public class World
                 _slimes = new SlimeManager(slimeType, _mobCaps);
             if (EntityRegistry.TryGet("goblin") is { } goblinType)
                 _goblins = new GoblinManager(goblinType, _mobCaps);
+            var bruteType = EntityRegistry.TryGet(Hellbrute.EntityName);
+            var casterType = EntityRegistry.TryGet(Cinderwitch.EntityName);
+            if (bruteType != null || casterType != null)
+                _hellMobs = new HellMobManager(bruteType, casterType, _mobCaps);
+            var flyerType = EntityRegistry.TryGet(Galeraptor.EntityName);
+            var golemType = EntityRegistry.TryGet(Cloudgolem.EntityName);
+            if (flyerType != null || golemType != null)
+                _skyMobs = new SkyMobManager(flyerType, golemType, _mobCaps);
+            var animalTypes = new List<EntityType>();
+            foreach (var name in WildlifeSpecies.Names)
+                if (EntityRegistry.TryGet(name) is { } animalType) animalTypes.Add(animalType);
+            if (animalTypes.Count > 0)
+                _wildlife = new WildlifeManager(animalTypes, _mobCaps);
+            var shardlingType = EntityRegistry.TryGet(Shardling.EntityName);
+            var sporelingType = EntityRegistry.TryGet(Sporeling.EntityName);
+            var magmabornType = EntityRegistry.TryGet(Magmaborn.EntityName);
+            var spiderType = EntityRegistry.TryGet(Spider.EntityName);
+            var broodmotherType = EntityRegistry.TryGet(Spider.BroodmotherEntityName);
+            var scorpionType = EntityRegistry.TryGet(Scorpion.EntityName);
+            if (shardlingType != null || sporelingType != null || magmabornType != null || spiderType != null
+                || broodmotherType != null || scorpionType != null)
+                _caveMobs = new CaveMobManager(shardlingType, sporelingType, magmabornType, _mobCaps, spiderType,
+                    broodmotherType, scorpionType);
+            if (EntityRegistry.TryGet(Skeleton.EntityName) is { } skeletonType)
+                _skeletons = new SkeletonManager(skeletonType, _mobCaps, EntityRegistry.TryGet(Skeleton.WarriorEntityName));
+            if (EntityRegistry.TryGet(SkeletonKing.EntityName) is { } kingType)
+                _kings = new SkeletonKingManager(kingType, _mobCaps);
+            if (EntityRegistry.TryGet(Sandworm.EntityName) is { } wormType)
+                _sandworms = new SandwormManager(wormType, _mobCaps);
             if (EntityRegistry.TryGet("iceberg") is { } icebergType)
                 _icebergs = new IcebergManager(icebergType);
             Camera.BodySolids = _icebergs;
             // The per-job components: each only stores its references here and reads this world lazily
-            Strikes = new MobStrikes(this, _debris, serverMode);
+            Strikes = new MobStrikes(this, _debris, sfx, serverMode);
+            ChestLids.LidStarted += opening => sfx?.Play(opening ? SfxLibrary.ChestOpenGroup : SfxLibrary.ChestCloseGroup);
+            Shrapnel = new BoneShrapnel(this, _chunkManager, _debris, serverMode);
             Ambient = new AmbientEffects(this, _chunkManager, _fire, _torchFire, _bubbles, _debris, _dropManager,
                 _falling, _tntManager, _mobs, _projectiles, serverMode, _campfires, _kilns, _goblins);
+            if (!serverMode)
+                WormEffects = new SandwormEffects(Camera, _debris, _chunkManager);
             Edits = new BlockEditor(this, _chunkManager, _debris, _dropManager, _campfires, _querns, _kilns, _casting,
                 _fluidManager, _leafDecay, _lodManager, _leaves, _falling, _toppling, clientMode, serverMode);
-            LeftClick = new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, sfx, clientMode);
+            // Built before the persistence, whose constructor restores the stations (towers included)
+            _towers = new TowerManager(clientMode ? null : new TowerBlockWriter(_chunkManager, _fluidManager, _leafDecay,
+                _falling, _lodManager, Edits.NotifyLodEdit, Edits.PopUnsupportedAt,
+                spillChest: (x, y, z, profile, state) => _chests.NotifyBlockRemoved(x, y, z, profile, state, _dropManager),
+                replaced: (x, y, z, before, after) => CollapseEffects?.OnCellChanged(x, y, z, before, after)));
+            if (!serverMode)
+                CollapseEffects = new TowerCollapseEffects(Camera, _debris, _chunkManager, _towers);
+            if (!serverMode)
+                ConqueredEffects = new FloorConqueredEffects(Camera, _fire, _towers, sfx);
+            LeftClick =new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, sfx, clientMode);
             Placer = new BlockPlacer(this, _chunkManager, _falling, _icebergs, _querns, _fluidManager, _leafDecay,
                 _lodManager, _debris, clientMode, serverMode);
-            Throws = new ThrowAction(this, _chunkManager, _dropManager, _goblins, _mobs, _projectiles, clientMode);
+            Throws = new ThrowAction(this, _chunkManager, _dropManager, _goblins, _hellMobs, _caveMobs, _skeletons, _kings, _mobs,
+                _projectiles, clientMode);
             Interactions = new BlockInteractions(this, _chunkManager, _dropManager, _campfires, _querns, _kilns,
                 _casting, _fluidManager, _leafDecay);
             ItemUse = new WorldItemUse(this, _chunkManager, _dropManager, _fluidManager, _leafDecay, _falling,
                 _lodManager, _tntManager, _campfires, _kilns, _health, _hotbarPops, _debris, clientMode, serverMode);
             RightClick = new RightClickAction(this, clientMode);
             Caster = new SpellCaster(this, clientMode);
-            ClientMirror = new ClientMirror(this, _chunkManager, _dropManager, _tntManager, _falling, _slimes, _goblins,
-                _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
-            Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _icebergs,
-                _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
+            ClientMirror = new ClientMirror(this, _chunkManager, _dropManager, _tntManager, _falling, _slimes, _goblins, _hellMobs,
+                _skyMobs, _wildlife, _caveMobs, _skeletons, _kings, _sandworms, _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
+            Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _wildlife, _caveMobs, _skeletons,
+                _kings, _sandworms, _icebergs, _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
             Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, sfx, serverMode, clientMode);
+            WaystoneTravel = new WaystoneTravel(Camera, LocalPlayer, _chunkManager);
             // Status effects convert cells only where the world is authoritative: a client's effects
             // are mirrors, and the server's writes reach it through the journal
             var statusBlocks = clientMode
                 ? null
                 : new StatusEffectBlockWriter(_chunkManager, _fluidManager, _leafDecay, _falling, _lodManager,
                     Edits.NotifyLodEdit);
-            Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _icebergs, _debris, _health,
-                _mobs, serverMode, clientMode, statusBlocks);
+            Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _caveMobs, _skeletons, _kings, _sandworms,
+                _icebergs, _debris, serverMode ? null : _fire, _health, _mobs, serverMode, clientMode, statusBlocks, _campfires,
+                _mobCaps, _wildlife);
             Spells = statusBlocks == null
                 ? null
-                : new SpellEffects(this, _chunkManager, statusBlocks, ItemUse, _debris, serverMode);
+                : new SpellEffects(this, _chunkManager, statusBlocks, ItemUse, _debris, sfx, serverMode);
             if (Spells != null) Caster.Effect = Spells.Cast;
+            Feedback = serverMode ? null : new SpellFeedback(this, _chunkManager, _debris, sfx, clientMode);
+            if (Feedback != null) Caster.Feedback = Feedback.OnCast;
+            if (sfx != null && !serverMode)
+                _skeletonRattle = new SkeletonRattle(sfx.Play, Random.Shared);
             Renderer = new WorldRenderer(this, _window, _chunkManager, _lodManager, _dropManager, _tntManager, _falling,
                 _goblins, _campfires, _querns, _kilns, _casting, _toppling, _projectiles, _remotePlayers, _debris,
                 _leaves, _fire, _lavaFire, _torchFire, _bubbles, _sliceTrails, _health, _hotbarName, _hotbarPops);
@@ -518,8 +651,17 @@ public class World
 
     /// <summary>Spawns one mob of the named kind with its feet at <paramref name="feet"/>, the scenario
     /// <c>spawn</c> op (see <see cref="MobDirector.SpawnEntity"/>).</summary>
-    public bool SpawnEntity(string name, Vector3 feet, int size = SlimeSize.Min) =>
-        Director.SpawnEntity(name, feet, size);
+    public bool SpawnEntity(string name, Vector3 feet, int size = SlimeSize.Min, int tier = 0) =>
+        Director.SpawnEntity(name, feet, size, tier);
+
+    /// <summary>Whether the boss <paramref name="entity"/> could be woken at the solid <paramref name="cell"/>
+    /// now: the world is playing and the thumper's rule holds (desert sand, none alive). A client judges the
+    /// same rule to predict the server's answer.</summary>
+    public bool CanSummonBoss(string entity, Vector3 cell) => IsPlaying && Director.CanSummonBoss(entity, cell);
+
+    /// <summary>Wakes the boss <paramref name="entity"/> at the solid <paramref name="cell"/> when
+    /// <see cref="CanSummonBoss"/> allows; the thumper's entry point, authoritative worlds only.</summary>
+    public bool TrySummonBoss(string entity, Vector3 cell) => IsPlaying && Director.SummonBoss(entity, cell);
 
     /// <summary>
     /// The terrain height of the column at (<paramref name="x"/>, <paramref name="z"/>) from the
@@ -654,7 +796,7 @@ public class World
     /// answer to it from an older message (<see cref="ClientPrediction"/>). Null in singleplayer
     /// and on the server.
     /// </summary>
-    public Action<int, int, int, byte, byte>? BlockEdited { get; set; }
+    public Action<int, int, int, ushort, byte>? BlockEdited { get; set; }
 
     /// <summary>
     /// Raised on a multiplayer client for every action the server has to replay: a mining start or
@@ -684,8 +826,15 @@ public class World
 
     /// <summary>Breaks the block in <paramref name="cell"/> for <paramref name="player"/> with every
     /// consequence a local break has (see <see cref="BlockEditor.BreakBlockFor"/>); public for the
-    /// dedicated server.</summary>
-    public bool BreakBlockFor(PlayerContext player, Vector3 cell) => Edits.BreakBlockFor(player, cell);
+    /// dedicated server. A finished mine also discovers the block for the player (<see cref="Inventory.MarkKnown"/>),
+    /// and a server resends the snapshot that carries it.</summary>
+    public bool BreakBlockFor(PlayerContext player, Vector3 cell)
+    {
+        var id = Edits.BlockIdAt(cell);
+        if (!Edits.BreakBlockFor(player, cell)) return false;
+        if (player.Inventory.MarkKnown(id)) FlagInventoryChanged(player);
+        return true;
+    }
 
     /// <summary>Places <paramref name="player"/>'s selected block against a face it can see (see
     /// <see cref="BlockPlacer.TryPlaceSelectedBlockAt"/>); public for the dedicated server.</summary>
@@ -736,12 +885,138 @@ public class World
 
     /// <summary>Whether any station block entity (campfire, quern, kiln, cast mold) is tracked,
     /// so a server with none sends no station snapshots.</summary>
-    public bool HasStations => StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting);
+    /// <summary>The chests that hold state (a block entity registry; authoritative worlds only, a client keeps
+    /// only what the server sends the chest it has open).</summary>
+    public ChestManager Chests => _chests;
+
+    /// <summary>The chest panel's UI state: which chest is open and what it shows (see <see cref="ChestView"/>).</summary>
+    public ChestView ChestPanel { get; } = new();
+
+    /// <summary>Which chests stand open and what their lids are playing: open while a chest has a viewer (this
+    /// player's panel, or a server's players), shut when the last one leaves.</summary>
+    public ChestLids ChestLids { get; } = new(ChestModel.Open, ChestModel.Close, ChestModel.Wobble);
+
+    /// <summary>The waystone registry (names, first discoverers, lost flags); authoritative worlds only.</summary>
+    public WaystoneManager Waystones => _waystones;
+
+    /// <summary>
+    /// <paramref name="player"/> activates the waystone at <paramref name="cell"/> (see
+    /// <see cref="WaystoneManager.DiscoverFor"/>); on a server a waystone new to that player flags its inventory
+    /// snapshot for resending. Null on a client, for an unloaded cell or a cell holding no waystone.
+    /// </summary>
+    public WaystoneDiscovery? DiscoverWaystoneFor(PlayerContext player, Vector3 cell)
+    {
+        if (_clientMode) return null;
+        var found = _waystones.DiscoverFor(_chunkManager, player, (int)cell.X, (int)cell.Y, (int)cell.Z);
+        if (found is { NewToPlayer: true }) FlagInventoryChanged(player);
+        return found;
+    }
+
+    /// <summary><paramref name="player"/> renames the waystone at <paramref name="cell"/>, which only its first
+    /// discoverer may (see <see cref="WaystoneManager.TryRenameFor"/>); on a server the renamer's snapshot is resent.</summary>
+    public bool RenameWaystoneFor(PlayerContext player, Vector3 cell, string? name)
+    {
+        if (_clientMode || !_waystones.TryRenameFor(player, (int)cell.X, (int)cell.Y, (int)cell.Z, name)) return false;
+        FlagInventoryChanged(player);
+        return true;
+    }
+
+    /// <summary>The cell of the waystone the newest right-click claim named (<see cref="RightClickOutcome.Waystone"/>);
+    /// the dedicated server discovers it for the player whose Use it replayed.</summary>
+    public Vector3 LastWaystoneCell => RightClick.LastWaystoneCell;
+
+    /// <summary>The local player's waystone trip, held until its destination loads (see <see cref="WaystoneTravel"/>);
+    /// on a client, the hold on the spot the server landed it on.</summary>
+    internal WaystoneTravel WaystoneTravel { get; }
+
+    /// <summary>
+    /// The local player, standing at the waystone at <paramref name="from"/>, travels to the one at <paramref name="to"/>
+    /// (<see cref="WaystoneTeleport"/>: discovered, not lost, mana strictly over half unless creative or flying, which the
+    /// trip drains). On <see cref="WaystoneTeleportVerdict.Teleport"/> the trip starts (<see cref="WaystoneTravel"/>); a
+    /// refusal changes nothing. Singleplayer only: a client or a server refuses (<see cref="WaystoneTeleportVerdict.NotAtWaystone"/>),
+    /// a server's players travel through their own intent.
+    /// </summary>
+    public WaystoneTeleportVerdict TeleportViaWaystone(Vector3 from, Vector3 to)
+    {
+        var fromCell = ((int)from.X, (int)from.Y, (int)from.Z);
+        var toCell = ((int)to.X, (int)to.Y, (int)to.Z);
+        if (_clientMode || _serverMode || !IsPlaying
+            || !WaystoneTeleport.IsAtWaystone(_chunkManager, Camera.Position, fromCell, InteractionReach))
+            return WaystoneTeleportVerdict.NotAtWaystone;
+        var verdict = WaystoneTeleport.TryPay(Inventory.Waystones, _waystones.Peek(toCell.Item1, toCell.Item2, toCell.Item3),
+            fromCell, toCell, WaystoneTeleport.IsFree(Camera.IsCreative, Camera.IsFlying), _health.Mana);
+        if (verdict == WaystoneTeleportVerdict.Teleport)
+            WaystoneTravel.Begin(toCell);
+        return verdict;
+    }
+
+    // A server resends a player's inventory snapshot once its discovered list changed
+    private void FlagInventoryChanged(PlayerContext player)
+    {
+        if (!_serverMode) return;
+        foreach (var connected in ServerPlayers)
+            if (connected.Context == player)
+                connected.InventoryChanged = true;
+    }
+
+    /// <summary>The bloomeries and anvils (iron works); authoritative worlds tick them, a client's are mirrors.</summary>
+    public SmithingStations Smithing => _smithing;
+
+    /// <summary>Whether this world is a multiplayer client's mirror (the server decides outcomes).</summary>
+    internal bool IsClientMode => _clientMode;
+
+    /// <summary>One bellows pump from a body at <paramref name="position"/> (a jump): heats every lit bloomery in
+    /// range. The server calls it for each player's jump; singleplayer calls it itself. A client never does.</summary>
+    public bool PumpBellows(Vector3 position) => !_clientMode && _smithing.Bloomeries.Pump(position);
+
+    /// <summary>One hammer hit on the anvil at <paramref name="cell"/> (the server replaying a
+    /// <see cref="NetIntentKind.Hammer"/> intent): the hit counts when a piece lies on it and its gap has run down to
+    /// within <paramref name="slackSeconds"/>; the hammer's own pace is <paramref name="gapSeconds"/>. A finished
+    /// piece drops its result and slag on top of the anvil.</summary>
+    public AnvilHit HammerFor(Vector3 cell, float gapSeconds, float slackSeconds) =>
+        Interactions.HammerAnvil(cell, gapSeconds, slackSeconds);
+
+    /// <summary>The battle towers' floor locks (piles and doors); authoritative worlds tick them, a client's are
+    /// display-only mirrors.</summary>
+    public TowerManager Towers => _towers;
+
+    /// <summary>Clears floor <paramref name="floor"/> of the tower around <paramref name="near"/> at once (the
+    /// scenario op): its piles deplete and its tagged skeletons die. Never on a client.</summary>
+    public bool ClearTowerFloor(Vector3 near, int floor) => !_clientMode && _towers.ClearFloor(near, floor, Skeletons);
+
+    /// <summary>Marks the Skeleton King of the tower around <paramref name="near"/> killed (the <c>towerdefeat</c>
+    /// scenario op), so the tower collapses like after a real kill. Never on a client.</summary>
+    public bool DefeatTower(Vector3 near) => !_clientMode && _towers.DefeatAt(near);
+
+    /// <summary>
+    /// A click on the tower altar at <paramref name="cell"/>: the authoritative world (singleplayer, or a server
+    /// replaying a client's Use intent) begins the ritual when every floor is open (<see cref="TowerManager.BeginRitual"/>,
+    /// idempotent); a client only judges it from its mirror (<see cref="TowerManager.JudgeAltar"/>), a prediction for its
+    /// toast. <see cref="AltarVerdict.NoTower"/> while the world is not playing.
+    /// </summary>
+    public AltarVerdict UseAltar(Vector3 cell)
+    {
+        if (!IsPlaying) return AltarVerdict.NoTower;
+        int x = MathUtils.FloorToInt(cell.X), y = MathUtils.FloorToInt(cell.Y), z = MathUtils.FloorToInt(cell.Z);
+        return _clientMode ? _towers.JudgeAltar(x, y, z) : _towers.BeginRitual(x, y, z);
+    }
+
+    /// <summary>The cell of the altar the newest right-click claim named (<see cref="RightClickOutcome.Altar"/>).</summary>
+    public Vector3 LastAltarCell => RightClick.LastAltarCell;
+
+    public bool HasStations =>
+        StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting) || _smithing.HasAny || _towers.HasAny
+        || ChestLids.HasViewed;
 
     /// <summary>Writes every station block entity for the server's broadcast
     /// (<see cref="NetMessage.StationState"/>).</summary>
-    public void WriteStations(PacketWriter writer) =>
+    public void WriteStations(PacketWriter writer)
+    {
         StationNetCodec.Write(writer, _campfires, _querns, _kilns, _casting);
+        _smithing.WriteNet(writer);
+        _towers.WriteNet(writer);
+        ChestLids.WriteNet(writer);
+    }
 
     /// <summary>
     /// One multiplayer-client frame: no local simulation, only the camera (and only once the chunk
@@ -754,6 +1029,9 @@ public class World
         UpdateFocus();
         _chunkManager.Update(Focus.Chunks);
         _lodManager.Update(_chunkManager);
+        LocalPlayer.ApplyGear(simulatesMana: false);
+        // A waystone trip the server landed stays put until this side's chunks there are in
+        WaystoneTravel.Update(deltaTime);
 
         var feet = Camera.Position - new Vector3(0f, Camera.EyeHeight, 0f);
         if (_chunkManager.ChunkAt(MathUtils.FloorToInt(feet.X), MathUtils.FloorToInt(feet.Y),
@@ -781,11 +1059,24 @@ public class World
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager, windTime: LightingTime);
         _debris.Update((float)deltaTime, _chunkManager);
         _querns.Animate((float)deltaTime);
+        ChestLids.Update((float)deltaTime, ChestPanel.OpenCell);
         _slimes?.AnimateMirrors((float)deltaTime, _debris);
         _goblins?.AnimateMirrors((float)deltaTime, _debris, _chunkManager, DayCycle.NightFactor(LightingTime));
+        _hellMobs?.AnimateMirrors((float)deltaTime, _debris);
+        _skyMobs?.AnimateMirrors((float)deltaTime, _debris);
+        _wildlife?.AnimateMirrors((float)deltaTime, _debris);
+        _caveMobs?.AnimateMirrors((float)deltaTime, _debris);
+        _skeletons?.AnimateMirrors((float)deltaTime, _debris);
+        _kings?.AnimateMirrors((float)deltaTime, _debris);
+        _sandworms?.AnimateMirrors((float)deltaTime, _chunkManager);
         _tntManager.AnimateMirrors((float)deltaTime);
         Director.AnimateIcebergMirrors(deltaTime);
         Ambient.UpdateStatusParticles((float)deltaTime);
+        Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
+        Ambient.UpdateKingEffects((float)deltaTime);
+        WormEffects?.Update((float)deltaTime, Sandworms);
+        CollapseEffects?.Update((float)deltaTime);
+        ConqueredEffects?.Update((float)deltaTime);
         Ambient.GatherStationFires();
         Ambient.AddGoblinTorches();
         _fire.Update((float)deltaTime, Ambient.FireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
@@ -794,6 +1085,8 @@ public class World
         Throws.UpdateThrown((float)deltaTime);
         Throws.RefreshProjectiles();
         Ambient.UpdateSplashes((float)deltaTime);
+        Feedback?.Update((float)deltaTime, _remotePlayers);
+        _skeletonRattle?.Tick((float)deltaTime, Skeletons, Camera.Position);
         FrameProfiler.End(ProfileSection.Entities);
 
         _hotbarPops.Update(Inventory, (float)deltaTime);
@@ -842,6 +1135,8 @@ public class World
 
         FrameProfiler.Begin(ProfileSection.Player);
         LocalPlayer.EnsureSpawnSettled(_chunkManager);
+        // A waystone traveler stays over its destination until it has loaded
+        WaystoneTravel.Update(deltaTime);
         FrameProfiler.End(ProfileSection.Player);
 
         FrameProfiler.Begin(ProfileSection.Camera);
@@ -896,7 +1191,18 @@ public class World
         _debris.Update((float)deltaTime, _chunkManager);
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
+        _chests.Update(_chunkManager, _dropManager);
+        ChestLids.Update((float)deltaTime, ChestPanel.OpenCell);
+        _waystones.Update(_chunkManager);
         _kilns.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
+        _smithing.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
+        // Every jump of the local body works a bellows (a server pumps per player instead, see PumpBellows)
+        if (Camera.JumpCount != _lastJumpCount)
+        {
+            _lastJumpCount = Camera.JumpCount;
+            if (!_serverMode)
+                _smithing.Bloomeries.Pump(Camera.Position);
+        }
         // A pour bound to a connected player (its PlayerContext) drains that player's crucible; the
         // world's own inventory and camera stand for the local player
         _casting.Update((float)deltaTime, _chunkManager, _dropManager, Inventory,
@@ -923,21 +1229,31 @@ public class World
         // updates and the damage they deal (MobDirector)
         Director.UpdateIcebergs(deltaTime);
         Director.Update(deltaTime);
+        _skeletonRattle?.Tick((float)deltaTime, Skeletons, Camera.Position);
 
         // After every mob manager and before the thrown items, so a mob killed or despawned
         // this frame is never hit by a projectile or drawn a healthbar.
         Director.RefreshMobs();
+        MobSeparation.Separate(_mobs, _chunkManager);
         // A mob that landed this frame kicks up its dust and an affected mob sheds its effects'
         // particles; a server spawns no particles
         if (!_serverMode)
         {
             _dust.TakeMobLandings(_mobs, _chunkManager, _debris);
             Ambient.UpdateStatusParticles((float)deltaTime);
+            Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
+            Ambient.UpdateKingEffects((float)deltaTime);
+            WormEffects?.Update((float)deltaTime, Sandworms);
+            CollapseEffects?.Update((float)deltaTime);
+            ConqueredEffects?.Update((float)deltaTime);
         }
 
         Edits.UpdateToppling((float)deltaTime);
         Throws.UpdateThrown((float)deltaTime);
+        // The hit's fragments fly and bill what they touch before the draw list is rebuilt below
+        Shrapnel.Update((float)deltaTime);
         Throws.RefreshProjectiles();
+        Shrapnel.AppendTo(_projectiles);
         Spells?.Update((float)deltaTime);
         Ambient.UpdateSplashes((float)deltaTime);
         // Remote player poses ease toward the last broadcast and drive their own walk cycles.

@@ -1,0 +1,10 @@
+{
+  // Ruins: run with VOXEL_SCRIPT=visual-examples/ruins.json VOXEL_TIME=147 from OpenGLTest/ (default seed). Frames the surface
+  // ruined hall at (-1264, 1318) from above its taiga canopy. Shots land in visual/ruins/.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-1264, 48, 1332], "yaw": -90, "pitch": -50 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "screenshot", "name": "hall", "hideHud": true }
+  ]
+}

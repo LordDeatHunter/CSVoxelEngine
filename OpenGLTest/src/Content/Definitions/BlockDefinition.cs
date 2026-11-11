@@ -7,6 +7,7 @@ using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Entities;
 using VoxelEngine.Interaction;
 using VoxelEngine.Particles;
+using VoxelEngine.Player;
 using VoxelEngine.WorldGen.Features;
 
 namespace VoxelEngine.Content.Definitions;
@@ -97,6 +98,22 @@ public sealed class BlockDefinition
     /// </summary>
     public bool? Bounce { get; set; }
 
+    /// <summary>
+    /// Whether a body landing on the block takes no fall damage (a cloud block), with no spring
+    /// back up. Default false; only read for the block under a landing body's feet. Illegal on a
+    /// fluid.
+    /// </summary>
+    public bool? SoftLanding { get; set; }
+
+    /// <summary>
+    /// The share of the cell's height, 0..<see cref="SinkLayer.MaxSink"/>, a player body sinks
+    /// into slowly: the block collides with the player body only below its top <c>sink</c> share,
+    /// and a body standing in that soft layer descends at <see cref="PlayerConfig.SinkBlockSpeed"/>
+    /// until it rests on the solid part. Default 0 (a plain collider). Only on a solid,
+    /// full-cell collider that is not a fluid, a stack, tree wood or a bounce block.
+    /// </summary>
+    public float? Sink { get; set; }
+
     public bool? Occludes { get; set; }
     public bool? CullSelf { get; set; }
     public bool? CastsAO { get; set; }
@@ -118,8 +135,8 @@ public sealed class BlockDefinition
     /// <see cref="BiomeTint"/>: a cross-shaped plant has no cube faces to map per face, so it
     /// names the one palette and the mesher multiplies each of its model quads by the
     /// <see cref="VoxelEngine.Effects.Climate.BiomeTint"/> field. Only legal on a non-full-cube
-    /// <c>model</c>-renderer block, and the model must wear a gray textureless tile (see
-    /// <c>tools/generate-leaf-textureless.ps1</c>), since the tint multiplies the texel.
+    /// <c>model</c>-renderer block, and the model must wear a gray textureless tile, since the tint
+    /// multiplies the texel.
     /// </summary>
     public string? ModelTint { get; set; }
 
@@ -141,6 +158,13 @@ public sealed class BlockDefinition
     /// <c>needsSupport</c>, and <c>"attached"</c> also needs <c>facing</c>.
     /// </summary>
     public string? Support { get; set; }
+
+    /// <summary>
+    /// Whether a <see cref="NeedsSupport"/> block is only held up by a full block face: a solid block whose model fills
+    /// its cell, or tree wood at full thickness. A torch never mounts on a branch, a waystone, stairs or a slab. Only
+    /// legal with <c>needsSupport</c>.
+    /// </summary>
+    public bool? SupportFullFace { get; set; }
 
     /// <summary>
     /// <c>"horizontal"</c> marks a block whose state byte's low two bits are a horizontal facing
@@ -214,6 +238,16 @@ public sealed class BlockDefinition
     /// no loot. Default false; never on a fluid or a multiblock cell.</summary>
     public bool? Flammable { get; set; }
 
+    /// <summary>Whether the block is never removed by any gameplay path (mining, creative,
+    /// blasts, fluids, buckets, status effects, spells); only the collapse writer
+    /// (<c>Chunk.CollapseWriteAt</c>) may replace it. Default false; never on a fluid.</summary>
+    public bool? Unbreakable { get; set; }
+
+    /// <summary>Whether the block hides the sky from every cell under it inside a chunk's light
+    /// volume: the battle tower's interior darkness (see <c>ChunkLighting.ComputeLight</c>).
+    /// Default false; only on a solid, opaque, plain model block that does not pass light.</summary>
+    public bool? CoversSky { get; set; }
+
     /// <summary>The solid block a source of this fluid becomes under a freezing status effect
     /// (water's <c>"ice"</c>). Only on a fluid; omitted means it never freezes.</summary>
     public string? FreezesTo { get; set; }
@@ -256,9 +290,76 @@ public sealed class BlockDefinition
     public PaneDefinition? Pane { get; set; }
 
     /// <summary>Marks a multiblock anchor as a kiln, which is what gives it fuel, ignition and
-    /// the integrity sweep of the kiln manager. Only legal on the <c>"multiblock"</c>
-    /// renderer.</summary>
-    public bool? Kiln { get; set; }
+    /// the integrity sweep of the kiln manager, and tunes it. Only legal on the
+    /// <c>"multiblock"</c> renderer.</summary>
+    public KilnDefinition? Kiln { get; set; }
+
+    /// <summary>Marks a multiblock anchor as a bloomery (a solid-state iron smelter: ore and fuel in, a bloom
+    /// out) and sizes its shaft. Only legal on the <c>"multiblock"</c> renderer, and never together with
+    /// <see cref="Kiln"/>.</summary>
+    public BloomeryDefinition? Bloomery { get; set; }
+
+    /// <summary>Marks the block as an anvil: a bloom laid on it is hammered into wrought iron. Not legal on a
+    /// multiblock.</summary>
+    public AnvilDefinition? Anvil { get; set; }
+
+    /// <summary>
+    /// Marks <c>texture</c> as a spritesheet of animation frames (the lava). The atlas slices each frame into its
+    /// own layer and the fluid shader cycles through them at <c>fps</c>; see <see cref="VoxelEngine.Content.TextureSheet"/>.
+    /// </summary>
+    public SpritesheetDefinition? Spritesheet { get; set; }
+
+    /// <summary>The <c>spritesheet</c> object: the texture and its grid, the frame count and the playback rate.</summary>
+    public sealed class SpritesheetDefinition
+    {
+        /// <summary>The block texture file name, without extension, under <c>assets/textures/blocks</c>.</summary>
+        public string? Texture { get; set; }
+
+        /// <summary>Cells across the texture.</summary>
+        public int? Cols { get; set; }
+
+        /// <summary>Cells down the texture.</summary>
+        public int? Rows { get; set; }
+
+        /// <summary>Frames used, from the top-left cell; defaults to the whole grid.</summary>
+        public int? Frames { get; set; }
+
+        /// <summary>Frames per second; defaults to 8.</summary>
+        public float? Fps { get; set; }
+    }
+
+    /// <summary>Marks the block as a chest: a right-click opens it and it holds `slots` stacks, kept by the chest
+    /// manager (a block entity). `loot` names the loot table a never-opened one rolls at first open or break (a ruin
+    /// chest); a crafted chest names none. `skin` names the texture the shared chest model wears in the world. Only
+    /// legal on the `model` renderer.</summary>
+    public ChestDefinition? Chest { get; set; }
+
+    /// <summary>The <c>chest</c> object.</summary>
+    public sealed class ChestDefinition
+    {
+        /// <summary>Slots, 1..<see cref="ChestConfig.MaxSlots"/>.</summary>
+        public int? Slots { get; set; }
+
+        /// <summary>The skin the shared chest model wears in the world: the name of a PNG under
+        /// <c>assets/textures/chests</c>, laid out like the model's own texture. Required.</summary>
+        public string? Skin { get; set; }
+
+        /// <summary>The loot table a never-opened chest rolls; omitted for an ordinary chest.</summary>
+        public string? Loot { get; set; }
+
+        /// <summary>The loot tables of a tiered chest, by tier: worldgen carries the tier in the cell's state bits
+        /// 2-7, and the last entry is used for any higher tier. Exclusive with <see cref="Loot"/>.</summary>
+        public string[]? Tiers { get; set; }
+    }
+
+    /// <summary>Marks the block as a spell builder station: a right-click opens the spell
+    /// builder UI client-side. No block entity. Legal on any block.</summary>
+    public bool? SpellBuilder { get; set; }
+
+    /// <summary>Marks the block as a waystone: a right-click discovers it, and from a discovered one a player
+    /// teleports to the others. Its name and first discoverer live in the world's waystone registry, created on
+    /// first use, so the block itself keeps no state. Legal on any block.</summary>
+    public bool? Waystone { get; set; }
 
     /// <summary>
     /// How many units of this block stack in one cell, candle-style (pebble piles hold up to
@@ -331,18 +432,23 @@ public sealed class BlockDefinition
     }
 
     /// <summary>
-    /// The two other blocks a multiblock anchor is tied to: the invisible cells that fill the
-    /// rest of its 2x2x2 volume, and the plain block the structure is built from and reverts to.
+    /// The two other blocks a multiblock anchor is tied to (the invisible cells that fill the
+    /// rest of its volume, and the plain block the structure is built from and reverts to) and
+    /// the volume's edge length.
     /// </summary>
     public sealed class MultiblockDefinition
     {
-        /// <summary>Block filling the seven non-anchor cells; must use the
+        /// <summary>Block filling the non-anchor cells; must use the
         /// <c>"multiblock_part"</c> renderer.</summary>
         public string? Part { get; set; }
 
-        /// <summary>Plain block the 2x2x2 volume is built from, and what each cell turns back
+        /// <summary>Plain block the volume is built from, and what each cell turns back
         /// into when the structure is broken, e.g. <c>"block/mud_bricks"</c>.</summary>
         public string? Source { get; set; }
+
+        /// <summary>Edge length of the cubic volume in cells, 2..4; default 2 (the kiln). The
+        /// model is authored in 0..16 * size model units.</summary>
+        public int? Size { get; set; }
     }
 
     /// <summary>The <c>"open"</c> object: what an openable block looks like and is hit as while
@@ -355,6 +461,58 @@ public sealed class BlockDefinition
         /// <summary>The open selection (and, with <c>collidesByHitbox</c>, collision) boxes, in the
         /// same schema as the block's <c>hitbox</c>, facing north.</summary>
         public JsonElement Hitbox { get; set; }
+    }
+
+    /// <summary>
+    /// The <c>"kiln"</c> object of a kiln anchor: <c>{"fuelCap": 8, "meltSpeed": 1.5}</c>. Every
+    /// field is optional; <c>{}</c> is the plain kiln (fuel cap 4, speed 1, no alloying).
+    /// </summary>
+    public sealed class KilnDefinition
+    {
+        /// <summary>Units of fuel the hearth holds, 1..64. Default 4.</summary>
+        public int? FuelCap { get; set; }
+
+        /// <summary>Multiplier on the melt pace, above 0 and at most 8. Default 1.</summary>
+        public float? MeltSpeed { get; set; }
+
+        /// <summary>Whether the kiln may hold two metals and alloy them. Default false.</summary>
+        public bool? CanAlloy { get; set; }
+    }
+
+    /// <summary>The <c>"bloomery"</c> object of a bloomery anchor: <c>{"oreCap": 4, "fuelCap": 4}</c>, both
+    /// optional (<c>{}</c> is the plain bloomery).</summary>
+    public sealed class BloomeryDefinition
+    {
+        /// <summary>Units of crushed ore the shaft holds, 1..64. Default 4.</summary>
+        public int? OreCap { get; set; }
+
+        /// <summary>Units of fuel the shaft holds, 1..64. Default 4.</summary>
+        public int? FuelCap { get; set; }
+
+        /// <summary>The item the shaft smelts (a name like <c>item/crushed_iron</c>). Required.</summary>
+        public string? Ore { get; set; }
+
+        /// <summary>The item a well-smelted unit becomes. Required.</summary>
+        public string? Bloom { get; set; }
+
+        /// <summary>The item an overheated unit burns to. Required.</summary>
+        public string? Slag { get; set; }
+    }
+
+    /// <summary>The <c>"anvil"</c> object: <c>{"hits": 3, "input": ..., "result": ..., "slag": ...}</c>.</summary>
+    public sealed class AnvilDefinition
+    {
+        /// <summary>Hammer hits the input takes, 1..32. Default 3.</summary>
+        public int? Hits { get; set; }
+
+        /// <summary>The item laid on the anvil. Required.</summary>
+        public string? Input { get; set; }
+
+        /// <summary>What the hits make of it. Required.</summary>
+        public string? Result { get; set; }
+
+        /// <summary>What the hits squeeze out of it. Required.</summary>
+        public string? Slag { get; set; }
     }
 
     /// <summary>

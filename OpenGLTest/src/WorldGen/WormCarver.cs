@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.WorldGen;
 
@@ -11,7 +12,10 @@ namespace VoxelEngine.WorldGen;
 /// XZ cells and each cell deterministically spawns its worms from a hash of its coordinates, so
 /// any chunk can rebuild the exact worm set of every nearby cell and carve the part that crosses
 /// it. Worm paths are cached per cell (like the column cache) because a vertical stack of chunks
-/// and all their neighbors ask for the same cells.
+/// and all their neighbors ask for the same cells. A node's radius is multiplied by the
+/// <see cref="CaveShape.WormRadiusFactor"/> of the cave biome at its center (plans/CAVE_BIOMES.md
+/// CB-2), a pure function of the position that draws nothing from the walk's random stream, so the
+/// walk and every node above the cave sub-band are unchanged.
 /// </summary>
 public static class WormCarver
 {
@@ -21,7 +25,8 @@ public static class WormCarver
 
     private static readonly Worm[] NoWorms = [];
 
-    // Cell worms are a pure deterministic function of (cellX, cellZ) and the world seed, and a
+    // Cell worms are a pure deterministic function of (cellX, cellZ) and the world seed (the node radius
+    // factor reads CaveBiomes.At, itself pure in position and seed, and WorldSeed.Apply resets both), and a
     // Worm[] -- along with every CaveNode inside it -- is written once in BuildCell and never
     // mutated after publication. That is what lets this share Chunk.ColumnCache's GenerationalCache
     // and its numbered invariants: an eviction, a race or a duplicate entry can only ever cost a
@@ -52,7 +57,7 @@ public static class WormCarver
     /// Carves every worm from the cells within reach through this chunk. Only <paramref name="blocks"/>
     /// is written; neighboring chunks carve their own share of the same worms.
     /// </summary>
-    public static void Carve(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Carve(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         var chunkMin = new Vector3(worldX0, worldY0, worldZ0);
         var chunkMax = chunkMin + new Vector3(Chunk.Size);
@@ -74,7 +79,7 @@ public static class WormCarver
     }
 
     // Clears the blocks inside one node's (slightly flattened) sphere that lie in this chunk
-    private static void CarveNode(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0, CaveNode node)
+    private static void CarveNode(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0, CaveNode node)
     {
         var r = node.Radius;
         var ry = r * WorldGenerationConfig.WormVerticalSquash;
@@ -151,7 +156,7 @@ public static class WormCarver
 
             var nodes = new List<CaveNode>(WorldGenerationConfig.WormMaxLength + 8);
             var start = new Vector3(startX, startY, startZ);
-            nodes.Add(new CaveNode(start, WorldGenerationConfig.WormRoomRadius));
+            nodes.Add(new CaveNode(start, WorldGenerationConfig.WormRoomRadius * RadiusFactorAt(start)));
 
             var length = rng.NextInt(WorldGenerationConfig.WormMinLength, WorldGenerationConfig.WormMaxLength + 1);
             var yaw = rng.NextFloat() * MathF.Tau;
@@ -191,7 +196,8 @@ public static class WormCarver
                 && pos.Y + radius > SurfaceHeight(pos.X, pos.Z) - WorldGenerationConfig.WormSurfaceMargin)
                 pitch -= 0.1f;
 
-            nodes.Add(new CaveNode(pos, radius));
+            // The unscaled radius keeps steering the walk, so the draws and the path stay as they were
+            nodes.Add(new CaveNode(pos, radius * RadiusFactorAt(pos)));
 
             // Occasional side passage; branches share the cap and cannot branch again
             if (allowBranch && step > 0 && step % 20 == 0 && rng.NextFloat() < WorldGenerationConfig.WormBranchChance)
@@ -200,6 +206,25 @@ public static class WormCarver
                 Walk(rng, nodes, origin, pos, branchYaw, pitch, (length - step) / 2, allowBranch: false);
             }
         }
+    }
+
+    /// <summary>
+    /// What a worm node centered at <paramref name="center"/> has its radius multiplied by: the
+    /// <see cref="CaveShape.WormRadiusFactor"/> of the cave biome of the cell holding the center. Exactly
+    /// 1 above <see cref="CaveBiomes.SubBandTopY"/> without reading a column or a noise (an inlined
+    /// constant, so not even the cave biomes' static constructor runs), since only the sub-band biomes
+    /// change the shape. A pure function of the position and the seed.
+    /// </summary>
+    internal static float RadiusFactorAt(Vector3 center)
+    {
+        var by = MathUtils.FloorToInt(center.Y);
+        if (by > CaveBiomes.SubBandTopY) return 1f;
+
+        var bx = MathUtils.FloorToInt(center.X);
+        var bz = MathUtils.FloorToInt(center.Z);
+        var column = ColumnCache.Get(VoxelCoords.WorldToChunk(bx), VoxelCoords.WorldToChunk(bz));
+        var i = VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(bx), VoxelCoords.WorldToLocal(bz));
+        return CaveShape.WormRadiusFactor(CaveBiomes.At(bx, by, bz, column.Biomes[i], column.Heights[i]));
     }
 
     private static Worm MakeWorm(List<CaveNode> nodes)

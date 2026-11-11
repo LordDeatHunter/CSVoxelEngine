@@ -1,0 +1,11 @@
+{
+  // A teaching scroll: right-click to learn the power and range modifiers, spending one scroll
+  // (refused and kept when every part is already known). No recipe or loot yet: creative
+  // catalog only.
+  //
+  // TODO: placeholder art.
+  "name": "Scroll of Modifiers",
+  "texture": "assets/textures/items/scroll_modifiers.png",
+  "use": { "action": "learn_parts" },
+  "teaches": ["modifier/power", "modifier/range"]
+}

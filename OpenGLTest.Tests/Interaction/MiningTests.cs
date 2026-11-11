@@ -12,7 +12,7 @@ public sealed class MiningTests
 
     private static Item ItemOf(string name) => ContentRegistry.RequireItem(name);
 
-    private static byte BlockOf(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort BlockOf(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
     public void ToolPaceAndPowerComeFromTheItemWithBaselineFallback()
@@ -113,9 +113,107 @@ public sealed class MiningTests
         Assert.False(Mining.CanMine(hematite, null));
 
         // The gate only tightens: whatever mines hematite also mines malachite.
-        Item?[] held = [primitive, copper, ItemOf("primitive_axe"), ItemOf("copper_axe"), null];
+        Item?[] held =
+        [
+            primitive, copper, ItemOf("bronze_pickaxe"), ItemOf("primitive_axe"), ItemOf("copper_axe"),
+            ItemOf("bronze_axe"), null,
+        ];
         foreach (var item in held.Where(item => Mining.CanMine(hematite, item)))
             Assert.True(Mining.CanMine(malachite, item));
+    }
+
+    [Fact]
+    public void TinSitsBetweenThePrimitiveAndCopperToolsAndMinesItsOwnOre()
+    {
+        var tinOre = BlockOf("tin_ore");
+        var primitive = ItemOf("primitive_pickaxe");
+        var tin = ItemOf("tin_pickaxe");
+        var copper = ItemOf("copper_pickaxe");
+
+        Assert.True(Mining.CanMine(tinOre, primitive));
+        Assert.True(primitive.ToolPower < tin.ToolPower && tin.ToolPower < copper.ToolPower);
+        Assert.True(ItemOf("tin_sword").EntityDamage < ItemOf("copper_sword").EntityDamage);
+        Assert.True(ItemOf("copper_sword").EntityDamage < ItemOf("iron_sword").EntityDamage);
+        Assert.False(Mining.CanMine(BlockOf("hematite_ore"), tin));
+    }
+
+    [Fact]
+    public void BronzeOutranksCopperAndMinesWhatCopperMines()
+    {
+        var copper = ItemOf("copper_pickaxe");
+        var bronze = ItemOf("bronze_pickaxe");
+
+        Assert.True(bronze.ToolPower > copper.ToolPower);
+        Assert.True(Mining.BlockDamage(bronze) > Mining.BlockDamage(copper));
+        Assert.True(ItemOf("bronze_sword").EntityDamage > ItemOf("copper_sword").EntityDamage);
+        Assert.True(ItemOf("bronze_axe").ToolPower > ItemOf("copper_axe").ToolPower);
+
+        // A higher tier only widens the gate: every ore copper opens, bronze opens too.
+        foreach (var ore in new[] { "malachite_ore", "tin_ore", "hematite_ore" })
+        {
+            var block = BlockOf(ore);
+            if (Mining.CanMine(block, copper))
+                Assert.True(Mining.CanMine(block, bronze));
+        }
+    }
+
+    [Fact]
+    public void TheCaveOresGateByTheirDepth()
+    {
+        // Crystal and fungal sit above the magma-touched deep: copper opens them, the deep's cinnabar waits for iron.
+        foreach (var ore in new[] { "amethyst_ore", "jade_ore" })
+        {
+            Assert.False(Mining.CanMine(BlockOf(ore), ItemOf("tin_pickaxe")), ore);
+            Assert.True(Mining.CanMine(BlockOf(ore), ItemOf("copper_pickaxe")), ore);
+        }
+
+        var cinnabar = BlockOf("cinnabar_ore");
+        Assert.False(Mining.CanMine(cinnabar, ItemOf("bronze_pickaxe")));
+        Assert.True(Mining.CanMine(cinnabar, ItemOf("iron_pickaxe")));
+        Assert.False(Mining.CanMine(cinnabar, null));
+    }
+
+    [Fact]
+    public void IronOutranksBronzeAndMinesEverythingBronzeMines()
+    {
+        var bronze = ItemOf("bronze_pickaxe");
+        var iron = ItemOf("iron_pickaxe");
+
+        Assert.True(iron.ToolPower > bronze.ToolPower);
+        Assert.True(Mining.BlockDamage(iron) > Mining.BlockDamage(bronze));
+        Assert.True(iron.EntityDamage > bronze.EntityDamage);
+
+        // The top tier only widens the gate, over every block, not just the ores
+        foreach (var block in BlockType.Types.Values.Where(block => Mining.CanMine(block.Id, bronze)))
+            Assert.True(Mining.CanMine(block.Id, iron), block.Name);
+    }
+
+    [Fact]
+    public void VulcaniteOutranksIronAndMinesEverythingIronMines()
+    {
+        var iron = ItemOf("iron_pickaxe");
+        var vulcanite = ItemOf("vulcanite_pickaxe");
+
+        Assert.True(vulcanite.ToolPower > iron.ToolPower);
+        Assert.True(Mining.BlockDamage(vulcanite) > Mining.BlockDamage(iron));
+        Assert.True(vulcanite.EntityDamage > iron.EntityDamage);
+        Assert.True(ItemOf("vulcanite_axe").ToolPower > ItemOf("iron_axe").ToolPower);
+        Assert.True(ItemOf("bleeding_edge").EntityDamage > ItemOf("iron_sword").EntityDamage);
+
+        // The tier above iron only widens the gate, over every block
+        foreach (var block in BlockType.Types.Values.Where(block => Mining.CanMine(block.Id, iron)))
+            Assert.True(Mining.CanMine(block.Id, vulcanite), block.Name);
+    }
+
+    [Fact]
+    public void VulcaniteOreNeedsTheIronPickaxeAndOutlastsTheBasaltItVeins()
+    {
+        var ore = ContentRegistry.RequireBlock("vulcanite_ore");
+        Assert.False(Mining.CanMine(ore.Id, ItemOf("bronze_pickaxe")));
+        Assert.True(Mining.CanMine(ore.Id, ItemOf("iron_pickaxe")));
+        Assert.True(Mining.CanMine(ore.Id, ItemOf("vulcanite_pickaxe")));
+        Assert.False(Mining.CanMine(ore.Id, null));
+        Assert.True(ore.Hardness > ContentRegistry.RequireBlock("basalt").Hardness);
     }
 
     [Fact]

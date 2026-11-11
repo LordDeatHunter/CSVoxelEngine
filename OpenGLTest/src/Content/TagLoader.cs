@@ -16,7 +16,7 @@ internal static class TagLoader
         foreach (var (name, path) in ContentFiles.JsonFilesIn(folder))
         {
             var definition = ContentFiles.ReadJson<TagDefinition>(path);
-            var members = new HashSet<byte>();
+            var members = new HashSet<ushort>();
             foreach (var entry in definition.Blocks ?? [])
             {
                 var id = ResolveTagMember(entry, path);
@@ -44,7 +44,7 @@ internal static class TagLoader
         }
     }
 
-    private static byte ResolveTagMember(string name, string path)
+    private static ushort ResolveTagMember(string name, string path)
     {
         var bare = name.StartsWith("block/", StringComparison.Ordinal) ? name["block/".Length..]
             : name.StartsWith("item/", StringComparison.Ordinal) ? name["item/".Length..]

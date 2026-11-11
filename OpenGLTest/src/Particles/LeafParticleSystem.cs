@@ -15,7 +15,7 @@ public class LeafParticleSystem
 {
     private readonly ParticleRing<LeafParticle> _particles = new(ParticleConfig.LeafParticleMax);
     private float _spawnDebt;
-    private byte _leavesId;
+    private ushort _leavesId;
     private bool _leavesResolved;
 
     public IReadOnlyList<LeafParticle> Particles => _particles;
@@ -151,7 +151,7 @@ public class LeafParticleSystem
         _particles.Add(new LeafParticle(position, toss, random: rng));
     }
 
-    private bool TryLeavesId(out byte leavesId)
+    private bool TryLeavesId(out ushort leavesId)
     {
         if (!_leavesResolved)
         {

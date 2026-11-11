@@ -39,7 +39,7 @@ public sealed class SaveNamesTests
     {
         // Blocks and items may share a file name; the prefix keeps every name apart, so no
         // block name and no item name are ever equal, and each resolves to its own id
-        var names = new Dictionary<string, byte>();
+        var names = new Dictionary<string, ushort>();
         foreach (var block in BlockType.Types.Values)
         {
             var name = SaveNames.NameOf(block.Id);

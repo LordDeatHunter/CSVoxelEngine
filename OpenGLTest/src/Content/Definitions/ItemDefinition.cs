@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Items;
 using VoxelEngine.UI.InventoryPanel;
@@ -45,6 +46,13 @@ public sealed class ItemDefinition
     public bool ThrowAligned { get; set; }
 
     /// <summary>
+    /// A block whose small cube a throw of this item draws in place of the item's sprite (a flint or obsidian shard
+    /// flies as the same stone cube it rests as on the ground), named like <c>use.block</c>, e.g. <c>block/pebble</c>.
+    /// Needs <see cref="ThrowDamage"/>.
+    /// </summary>
+    public string? ThrowBlock { get; set; }
+
+    /// <summary>
     /// Attack behavior the left-click drives: <c>punch</c> (default), <c>slice</c> or <c>sword</c>. See
     /// <see cref="AttackPattern"/>.
     /// </summary>
@@ -61,6 +69,27 @@ public sealed class ItemDefinition
     {
         /// <summary>sRGB <c>[r, g, b]</c>, 0..255 each.</summary>
         public int[]? Color { get; set; }
+    }
+
+    /// <summary>
+    /// Optional bone shrapnel: a landed hit with this blade sprays <c>count</c> fragments that each deal
+    /// <c>damage</c> to any other enemy they touch. Only legal on a <c>slice</c> or <c>sword</c> item.
+    /// </summary>
+    public ShrapnelDefinition? Shrapnel { get; set; }
+
+    /// <summary>Optional status effect a landed hit with this blade puts on the enemy: the same shape as a gear
+    /// passive (<c>trigger</c> <c>on_hit</c>, <c>effect</c>, <c>chance</c>, <c>scale</c>). Only legal on a <c>slice</c> or
+    /// <c>sword</c> item.</summary>
+    public PassiveDefinition? OnHit { get; set; }
+
+    /// <summary>The <c>shrapnel</c> object: how many bone fragments a hit sprays and how hard each hits.</summary>
+    public sealed class ShrapnelDefinition
+    {
+        /// <summary>Fragments per landed hit, 1..32.</summary>
+        public int? Count { get; set; }
+
+        /// <summary>Damage each fragment deals, 1..100.</summary>
+        public int? Damage { get; set; }
     }
 
     /// <summary>
@@ -121,6 +150,82 @@ public sealed class ItemDefinition
         /// <summary>The spell part tags it allows; a part passes when any of its tags is listed.</summary>
         public string[]? Tags { get; set; }
     }
+
+    /// <summary>Rarity name (<c>common</c> to <c>legendary</c>); omitted means common.</summary>
+    public string? Rarity { get; set; }
+
+    /// <summary>
+    /// Marks the item as wearable gear: which slot it fits and what it changes. A piece of gear stores in the Gear
+    /// pool one instance at a time (its rolled modifiers ride on its stack). Omitted for everything else.
+    /// </summary>
+    public EquipDefinition? Equip { get; set; }
+
+    /// <summary>The <c>equip</c> object.</summary>
+    public sealed class EquipDefinition
+    {
+        /// <summary>The slot kind: head, chest, legs, feet, gloves or accessory.</summary>
+        public string? Slot { get; set; }
+
+        /// <summary>Armor points, a shorthand for a flat <c>armor</c> modifier; 0 or more.</summary>
+        public int? Armor { get; set; }
+
+        /// <summary>Fixed stat changes by stat name (maxHealth, maxMana, manaRegen, moveSpeed, miningSpeed,
+        /// attackSpeed, attackDamage, undeadDamage, armor).</summary>
+        public Dictionary<string, float>? Modifiers { get; set; }
+
+        /// <summary>The armor set this piece belongs to (the file name of an <c>assets/data/sets</c> entry).</summary>
+        public string? Set { get; set; }
+
+        /// <summary>Whether the piece is drawn on the player's body.</summary>
+        public bool? Visible { get; set; }
+
+        /// <summary>Status effect names this piece makes the wearer immune to.</summary>
+        public string[]? Immune { get; set; }
+
+        /// <summary>Passive triggers this piece carries.</summary>
+        public PassiveDefinition[]? Passives { get; set; }
+
+        /// <summary>Ability names this piece grants its wearer: air_jump, no_fall_damage, extra_air or magnet.</summary>
+        public string[]? Abilities { get; set; }
+    }
+
+    /// <summary>One passive trigger of a piece of gear: when it fires and what it does.</summary>
+    public sealed class PassiveDefinition
+    {
+        /// <summary>When it fires: <c>on_hit</c>, <c>on_damaged</c> or <c>low_health</c>.</summary>
+        public string? Trigger { get; set; }
+
+        /// <summary>The status effect it applies (to the struck mob on a hit, to the wearer otherwise).</summary>
+        public string? Effect { get; set; }
+
+        /// <summary>The chance per trigger, 0..1 (default 1).</summary>
+        public float? Chance { get; set; }
+
+        /// <summary>The effect duration scale (default 1).</summary>
+        public float? Scale { get; set; }
+
+        /// <summary>For <c>low_health</c>: the health share under which it applies (default 0.3).</summary>
+        public float? Below { get; set; }
+    }
+
+    /// <summary>
+    /// The spell part keys (<c>&lt;kind&gt;/&lt;name&gt;</c>) a scroll teaches; required with, and only legal
+    /// with, <c>use.action: "learn_parts"</c>. Its shape is checked at parse time and every key against the
+    /// loaded spell parts once they exist.
+    /// </summary>
+    public string[]? Teaches { get; set; }
+
+    /// <summary>
+    /// The share of the mana pool one use restores, in (0, 1]; required by, and only legal with,
+    /// <c>use.action: "restore_mana"</c>.
+    /// </summary>
+    public float? RestoresMana { get; set; }
+
+    /// <summary>
+    /// The health one use restores, 1 or more; only legal with <c>use.action: "heal"</c>, where leaving it
+    /// out heals the bandage's amount (<c>PlayerConfig.BandageHealAmount</c>).
+    /// </summary>
+    public int? Heals { get; set; }
 
     /// <summary>
     /// Optional <c>block/&lt;name&gt;</c> model under <c>assets/models</c>, baked into
@@ -205,9 +310,9 @@ public sealed class ItemDefinition
         /// <c>ignite_campfire</c> or <c>convert_multiblock</c>.</summary>
         public string? Action { get; set; }
 
-        /// <summary>Item the use swaps this one for, e.g. <c>item/water_bucket</c>. For
-        /// <c>convert_multiblock</c> it is the multiblock <em>anchor block</em> the volume
-        /// becomes instead, e.g. <c>block/mud_brick_kiln</c>.</summary>
+        /// <summary>Item the use swaps this one for, e.g. <c>item/water_bucket</c>. A
+        /// <c>convert_multiblock</c> converter names none: it presses whichever multiblock the
+        /// clicked cube is the source of.</summary>
         public string? Result { get; set; }
 
         /// <summary>Fluid block the action picks up or places, e.g. <c>block/water</c>.</summary>
@@ -217,9 +322,7 @@ public sealed class ItemDefinition
         /// Stackable block a <c>place_stack</c> action builds up, e.g. <c>block/pebble</c>
         /// for flint. Right-clicking the block adds one unit, right-clicking anything else
         /// grounds a fresh pile of one. For <c>ignite_campfire</c> it names the firepit
-        /// block (a max-count branch pile) the spark can light, and for
-        /// <c>convert_multiblock</c> the <em>source block</em> the 2x2x2 volume must be
-        /// built from, e.g. <c>block/mud_bricks</c>.
+        /// block (a max-count branch pile) the spark can light.
         /// </summary>
         public string? Block { get; set; }
 
@@ -243,5 +346,11 @@ public sealed class ItemDefinition
         /// under <c>assets/data/trees/</c>, checked when the use runs.
         /// </summary>
         public string? Tree { get; set; }
+
+        /// <summary>
+        /// The entity a <c>summon</c> use wakes (the thumper wakes the sandworm): the entity file name under
+        /// <c>assets/data/entities/</c>, checked when the use runs.
+        /// </summary>
+        public string? Entity { get; set; }
     }
 }

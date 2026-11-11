@@ -15,7 +15,7 @@ public sealed class FallingBlockTests
     public FallingBlockTests() => TestContent.EnsureLoaded();
 
     private static (ChunkManager Chunks, LodManager Lod, FluidManager Fluids, DropManager Drops,
-        FallingBlockManager Falling, byte Stone, byte Sand) Setup()
+        FallingBlockManager Falling, ushort Stone, ushort Sand) Setup()
     {
         var chunks = new ChunkManager(null!);
         chunks.Chunks[Vector3.Zero] = new Chunk(null!, Vector3.Zero, generateBlockData: false);

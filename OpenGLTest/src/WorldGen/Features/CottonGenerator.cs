@@ -27,9 +27,9 @@ public static class CottonGenerator
         ClumpSalt);
 
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte CottonBlock;
+    public static readonly ushort CottonBlock;
 
-    private static readonly byte GrassBlock;
+    private static readonly ushort GrassBlock;
 
     // Cached so a membership test never allocates a delegate
     private static readonly Func<int, int, bool> ClimateGate = IsCottonClimate;
@@ -60,7 +60,7 @@ public static class CottonGenerator
     /// generation worker thread after the trees and pebbles, so it never displaces either, and before
     /// the flowers and foliage, so their scatter cannot eat into a clump.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

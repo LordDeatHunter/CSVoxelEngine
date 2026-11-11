@@ -115,6 +115,45 @@ public sealed class MathUtilsExtensionsTests
     }
 
     [Fact]
+    public void ASweepRunsOnceAPeriodThenRests()
+    {
+        const float period = 2.5f;
+        const float share = 0.4f;
+        Assert.Null(MathUtils.Sweep(1f, 0f, share));
+        Assert.Null(MathUtils.Sweep(1f, -period, share));
+        Assert.Null(MathUtils.Sweep(1f, period, 0f));
+        Assert.Null(MathUtils.Sweep(1f, period, -share));
+
+        Assert.Equal(0f, MathUtils.Sweep(0f, period, share)!.Value);
+
+        // Across the active window the progress only grows, ending at (nearly) the full sweep.
+        var active = period * share;
+        var previous = 0f;
+        for (var i = 0; i < 64; i++)
+        {
+            var t = active * i / 64f;
+            var progress = MathUtils.Sweep(t, period, share);
+            Assert.NotNull(progress);
+            Assert.True(progress >= previous, $"the sweep fell back at t={t}");
+            previous = progress.Value;
+        }
+        Assert.True(previous > 0.99f, "the sweep should end at its full progress");
+
+        // It rests for the rest of the period.
+        for (var t = active + 0.01f; t < period - 0.01f; t += 0.05f)
+            Assert.Null(MathUtils.Sweep(t, period, share));
+
+        // And repeats every period: a point inside the active window and one inside the rest.
+        foreach (var t in new[] { active * 0.25f, active * 0.5f, active * 0.75f, (active + period) * 0.5f })
+        {
+            var now = MathUtils.Sweep(t, period, share);
+            var later = MathUtils.Sweep(t + period, period, share);
+            Assert.Equal(now.HasValue, later.HasValue);
+            if (now.HasValue) Assert.Equal(now.Value, later!.Value, precision: 4);
+        }
+    }
+
+    [Fact]
     public void BackPulseRisesToOneAndLandsExactlyOnZero()
     {
         const float peak = 0.3f;

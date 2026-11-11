@@ -14,13 +14,15 @@ public sealed class ThrownProjectile
     /// (<see cref="BodyMotion.Gravity"/>), which the goblin aim solver uses too.</summary>
     public const float Gravity = BodyMotion.Gravity;
 
-    public byte ItemId { get; }
+    public ushort ItemId { get; }
     public Vector3 Position { get; private set; }
     /// <summary>Where the projectile was launched from: a mob it hits is shoved away from here.</summary>
     public Vector3 Origin { get; }
     public float BaseDamage { get; }
     public float Charge01 { get; }
     private Vector3 _velocity;
+    private readonly float _gravityScale;
+    private readonly float _lifeSeconds;
     private float _age;
 
     /// <summary>The projectile's velocity in blocks per second.</summary>
@@ -60,11 +62,18 @@ public sealed class ThrownProjectile
     /// (<see cref="WaterSplash.Track"/>).</summary>
     internal WaterSplashTracker Splash { get; } = new();
 
-    public float Spin => _age * 9f;
-    public float Scale => ItemDrop.Size * (ItemRegistry.IsItem(ItemId) ? 1.5f : 1f);
-    public bool IsExpired => _age >= PlayerConfig.ThrowLifetimeSeconds;
+    /// <summary>The id the projectile is drawn as: the block cube its item names (<see cref="Item.ThrowBlockId"/>), else
+    /// the item itself (a sprite) or the block it is.</summary>
+    public ushort RenderId => ItemRegistry.TryGet(ItemId) is { ThrowBlockId: not 0 } item ? item.ThrowBlockId : ItemId;
 
-    public ThrownProjectile(byte itemId, Vector3 position, Vector3 velocity, float baseDamage, float charge01)
+    public float Spin => _age * 9f;
+    public float Scale => ItemDrop.Size * (ItemRegistry.IsItem(RenderId) ? 1.5f : 1f);
+    public bool IsExpired => _age >= _lifeSeconds;
+
+    /// <summary>A projectile that falls under <paramref name="gravityScale"/> of <see cref="Gravity"/> (bone shrapnel
+    /// spreads sideways) and is spent after <paramref name="lifeSeconds"/>, a throw's by default.</summary>
+    public ThrownProjectile(ushort itemId, Vector3 position, Vector3 velocity, float baseDamage, float charge01,
+        float gravityScale = 1f, float lifeSeconds = PlayerConfig.ThrowLifetimeSeconds)
     {
         ItemId = itemId;
         Position = position;
@@ -72,6 +81,8 @@ public sealed class ThrownProjectile
         _velocity = velocity;
         BaseDamage = baseDamage;
         Charge01 = MathUtils.Clamp01(charge01);
+        _gravityScale = MathF.Max(0f, gravityScale);
+        _lifeSeconds = lifeSeconds;
     }
 
     public static float ChargeFactor(float charge01) =>
@@ -96,7 +107,7 @@ public sealed class ThrownProjectile
         _age += Math.Max(0f, deltaTime);
         if (IsExpired) return false;
 
-        _velocity.Y = BodyMotion.Fall(_velocity.Y, deltaTime);
+        _velocity.Y = BodyMotion.Fall(_velocity.Y, deltaTime * _gravityScale);
         var movement = _velocity * deltaTime;
         var half = new Vector3(HalfExtent);
         var next = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);
@@ -122,10 +133,7 @@ public sealed class ThrownProjectile
         {
             var mob = mobs[i];
             if (mob.IsDead || mob == ignore) continue;
-            var d = position - mob.Position;
-            var reachXz = halfExtent + mob.BodyHalfExtent + 0.05f;
-            var reachY = halfExtent + mob.BodyHalfHeight + 0.05f;
-            if (MathF.Abs(d.X) <= reachXz && MathF.Abs(d.Z) <= reachXz && MathF.Abs(d.Y) <= reachY)
+            if (mob.OverlapsBox(position, halfExtent))
                 return mob;
         }
         return null;

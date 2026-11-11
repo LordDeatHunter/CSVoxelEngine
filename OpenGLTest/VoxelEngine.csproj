@@ -29,9 +29,12 @@
         <PackageReference Include="StbImageSharp" Version="2.30.15" />
         <PackageReference Include="StbImageWriteSharp" Version="1.16.7" />
         <PackageReference Include="StbTrueTypeSharp" Version="1.26.13" />
-        <PackageReference Include="NAudio" Version="2.*" />
-        <PackageReference Include="NAudio.WinMM" Version="2.*" />
+        <!-- Audio: NAudio.Core and NLayer decode (managed, every OS); OpenAL Soft plays
+             (its native package ships the Windows, Linux and macOS libraries). -->
+        <PackageReference Include="NAudio.Core" Version="2.*" />
         <PackageReference Include="NLayer.NAudioSupport" Version="1.*" />
+        <PackageReference Include="Silk.NET.OpenAL" Version="2.*" />
+        <PackageReference Include="Silk.NET.OpenAL.Soft.Native" Version="1.*" />
     </ItemGroup>
     <ItemGroup>
         <None Update="assets\shaders\**\*.glsl">

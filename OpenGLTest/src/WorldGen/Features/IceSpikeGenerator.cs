@@ -18,7 +18,7 @@ public static class IceSpikeGenerator
     /// thread after the sea and before the snow, so a spike keeps its own cell and the snow pass
     /// fills only the air around it.
     /// </summary>
-    public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, int worldX0, int worldY0, int worldZ0)
     {
         // The caller gates this on SnowAndIceEnabled, so the body has no toggle of its own.
         const int R = WorldGenerationConfig.IceSpikeReachBlocks;

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.UI.InventoryPanel;
@@ -7,6 +9,9 @@ public enum InventoryFocus
 {
     None,
     Search,
+
+    /// <summary>The chest panel's search field.</summary>
+    ChestSearch,
 }
 
 /// <summary>
@@ -25,11 +30,29 @@ public sealed class InventoryView
     /// <summary>The panel's dropdown search field; an empty query shows the tab's own list.</summary>
     public SearchFieldState Search { get; } = new();
 
+    /// <summary>What the search lists: items and recipes (the default), or only one of them. Kept while the panel
+    /// closes; a new world starts back at <c>All</c>.</summary>
+    public SearchScope SearchScope { get; private set; }
+
+    /// <summary>Steps <see cref="SearchScope"/> to the next scope, wrapping back to the first (the cycle button).
+    /// The results list starts again at its top.</summary>
+    public void CycleSearchScope()
+    {
+        SearchScope = (SearchScope)(((int)SearchScope + 1) % Enum.GetValues<SearchScope>().Length);
+        Search.Highlight = -1;
+        Search.ScrollOffset = 0f;
+    }
+
+    /// <summary>This frame's search results for the field's query in the current <see cref="SearchScope"/>; the
+    /// draw, the clicks, the keys and the wheel all read the list through here, so they always agree.</summary>
+    public IReadOnlyList<SearchHit> SearchHits(Inventory inventory, bool creative) =>
+        InventorySearch.Search(Search.Query, inventory, creative, SearchScope);
+
     /// <summary>Which text field keys go to; clicking the box focuses it, clicking elsewhere clears it.</summary>
     public InventoryFocus Focus { get; set; }
 
     /// <summary>Picked stackable id for the blocks/misc tabs, or 0 for none.</summary>
-    public byte SelectedId { get; set; }
+    public ushort SelectedId { get; set; }
 
     /// <summary>Picked tool instance for the tools tab, or 0 for none.</summary>
     public int SelectedToolInstance { get; set; }
@@ -41,9 +64,9 @@ public sealed class InventoryView
     /// </summary>
     public CraftingSession Craft { get; } = new();
 
-    // One scroll offset per tab, indexed by (int)InventoryCategory, which is 0..3 contiguous
-    // (Inventory.cs). If a tab is added, size this from Enum.GetValues instead.
-    private readonly float[] _scroll = new float[4];
+    // One scroll offset per tab, indexed by (int)InventoryCategory, which is contiguous from 0
+    // (InventoryCategory.cs), so it is sized from the enum.
+    private readonly float[] _scroll = new float[Enum.GetValues<InventoryCategory>().Length];
 
     /// <summary>
     /// Canvas pixels the active tab's list is scrolled by. The input handlers clamp on write,
@@ -78,6 +101,32 @@ public sealed class InventoryView
     /// </summary>
     public int ThumbDragRowCount { get; set; }
 
+    /// <summary>A left press on a listed row that may lift into a drag onto a slot; null while none.</summary>
+    public RowDrag? Drag { get; set; }
+
+    /// <summary>The pointer in canvas units, set once a frame before the panel draws; null when there is none.
+    /// Read only for hover looks, never for hit-testing a click.</summary>
+    public System.Numerics.Vector2? HoverCanvas { get; set; }
+
+    /// <summary>Eased tab position (fractional index of <see cref="InventoryPanelLayout.Tabs"/>) the active-tab
+    /// underline sits at.</summary>
+    public float TabIndicator { get; private set; }
+
+    private float _motionTime = float.NaN;
+
+    /// <summary>Steps the panel's eased looks toward the current tab by the time since the last call.</summary>
+    public void StepMotion(float timeSeconds)
+    {
+        var first = float.IsNaN(_motionTime);
+        var dt = first ? 0f : Math.Clamp(timeSeconds - _motionTime, 0f, 0.1f);
+        _motionTime = timeSeconds;
+        var target = Array.IndexOf(InventoryPanelLayout.Tabs, Tab);
+        TabIndicator = first ? target : MathUtils.Damp(TabIndicator, target, TabIndicatorRate, dt);
+    }
+
+    /// <summary>How fast the tab underline catches up with the picked tab (per second, see <see cref="MathUtils.Damp"/>).</summary>
+    public const float TabIndicatorRate = 18f;
+
     /// <summary>Drops the selection picks; the per-tab scroll offsets are kept.</summary>
     public void ClearSelection()
     {
@@ -106,11 +155,15 @@ public sealed class InventoryView
     {
         IsOpen = false;
         Transition.Reset();
+        HoverCanvas = null;
+        _motionTime = float.NaN;
         ClearSelection();
         ClearInput();
+        SearchScope = SearchScope.All;
         Craft.Clear();
         EndThumbDrag();
         ThumbDragRowCount = 0;
+        Drag = null;
         CraftScrollOffset = 0f;
         for (var i = 0; i < _scroll.Length; i++)
             _scroll[i] = 0f;

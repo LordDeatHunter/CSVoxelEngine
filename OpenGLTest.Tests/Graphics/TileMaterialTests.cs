@@ -25,15 +25,16 @@ public sealed class TileMaterialTests
     [Fact]
     public void OnlyTheOresAndTheGeodesCrystalAreReflective()
     {
-        // The geode's crystal block is shiny on purpose (its own `material`); everything else
-        // that reflects is an ore
+        // The geode's crystal block and obsidian are shiny on purpose (their own `material`);
+        // everything else that reflects is an ore
         var reflective = BlockType.Types.Values
             .Where(t => t.Material is { } m && m.IsReflective)
             .Select(t => t.Name)
-            .OrderBy(n => n, System.StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal([Coal, Crystal, Malachite, Obsidian], reflective);
+        foreach (var name in reflective)
+            Assert.True(name.EndsWith("_ore") || name is Crystal or Obsidian, $"{name} reflects but is no ore");
+        Assert.Subset(reflective.ToHashSet(), new[] { Coal, Crystal, Malachite, Obsidian }.ToHashSet());
     }
 
     [Fact]

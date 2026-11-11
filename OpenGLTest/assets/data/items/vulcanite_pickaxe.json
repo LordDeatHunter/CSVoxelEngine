@@ -1,0 +1,9 @@
+{
+  // The tier above iron: mines everything the iron pickaxe mines (MiningTests).
+  "name": "Vulcanite Pickaxe",
+  "texture": "assets/textures/items/vulcanite_pickaxe.png",
+  "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.4 },
+  "blockDamage": 4.0,
+  "entityDamage": 7.5,
+  "tool": { "power": 4.0, "hitDelayMs": 200 }
+}

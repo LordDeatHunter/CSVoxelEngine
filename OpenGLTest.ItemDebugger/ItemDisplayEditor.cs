@@ -14,7 +14,7 @@ namespace VoxelEngine.ItemDebugger;
 /// </summary>
 public sealed class ItemDisplayEditor
 {
-    public byte SelectedId { get; private set; }
+    public ushort SelectedId { get; private set; }
 
     public Vector3 Rotation { get; set; }
     public Vector3 Translation { get; set; }
@@ -36,7 +36,7 @@ public sealed class ItemDisplayEditor
 
     public bool CanSave => SourcePath is { } path && File.Exists(path);
 
-    public void Select(byte id)
+    public void Select(ushort id)
     {
         SelectedId = id;
         ReloadDisplay();

@@ -1,0 +1,55 @@
+{
+  // A stone anvil authored facing any way (symmetric): base, waist, top with a horn. Boxes are all narrower than the cell,
+  // so no face covers a whole cell side. The hitbox is a single box over the base and the top (see blocks/anvil.json).
+  "textures": { "t": "anvil", "particle": "#t" },
+  "elements": [
+    {
+      "from": [2, 0, 2],
+      "to": [14, 3, 14],
+      "faces": {
+        "down": { "texture": "#t", "cullface": "down" },
+        "up": { "texture": "#t" },
+        "north": { "texture": "#t" },
+        "south": { "texture": "#t" },
+        "west": { "texture": "#t" },
+        "east": { "texture": "#t" }
+      }
+    },
+    {
+      "from": [5, 3, 4],
+      "to": [11, 9, 12],
+      "faces": {
+        "down": { "texture": "#t" },
+        "up": { "texture": "#t" },
+        "north": { "texture": "#t" },
+        "south": { "texture": "#t" },
+        "west": { "texture": "#t" },
+        "east": { "texture": "#t" }
+      }
+    },
+    {
+      "from": [1, 9, 3],
+      "to": [15, 15, 13],
+      "faces": {
+        "down": { "texture": "#t" },
+        "up": { "texture": "#t" },
+        "north": { "texture": "#t" },
+        "south": { "texture": "#t" },
+        "west": { "texture": "#t" },
+        "east": { "texture": "#t" }
+      }
+    },
+    {
+      "from": [0, 9, 5],
+      "to": [1, 13, 11],
+      "faces": {
+        "down": { "texture": "#t" },
+        "up": { "texture": "#t" },
+        "north": { "texture": "#t" },
+        "south": { "texture": "#t" },
+        "west": { "texture": "#t" },
+        "east": { "texture": "#t" }
+      }
+    }
+  ]
+}

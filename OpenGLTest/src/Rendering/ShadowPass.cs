@@ -6,12 +6,14 @@ using VoxelEngine.Data;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.Icebergs;
+using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Lod;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering.Actors;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Chests;
 using VoxelEngine.UI;
 
 namespace VoxelEngine.Rendering;
@@ -66,7 +68,7 @@ internal sealed class ShadowPass
     /// <summary>
     /// Depth-only passes that fill both shadow cascades. The near pass renders every caster
     /// inside the near light box: opaque chunk meshes, primed TNT, falling blocks, slimes,
-    /// goblins (<paramref name="goblins"/>), icebergs (<paramref name="icebergs"/>, each on its own skin), toppling trees and the player. The far pass then renders only the opaque chunk casters
+    /// goblins (<paramref name="goblins"/>), icebergs (<paramref name="icebergs"/>, each on its own skin), the chests (<paramref name="chestChunks"/>, posed by <paramref name="chestLids"/>), toppling trees and the player. The far pass then renders only the opaque chunk casters
     /// inside the far box - entities are sub-texel at that range - plus every non-buried LOD
     /// region (<paramref name="lodRegions"/>) it holds, drawn with opaque foliage so the LOD
     /// ring is shadowed by its own hills and canopy out to the far box. Both run first each frame,
@@ -94,7 +96,11 @@ internal sealed class ShadowPass
         IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees,
         PlayerModel? player = null, IReadOnlyList<Slime>? slimes = null,
         IReadOnlyList<LodRegion>? lodRegions = null, IReadOnlyList<Goblin>? goblins = null,
-        IReadOnlyList<Iceberg>? icebergs = null)
+        IReadOnlyList<Iceberg>? icebergs = null, IReadOnlyList<RiggedMob>? hellMobs = null,
+        IReadOnlyList<RiggedMob>? skyMobs = null, IReadOnlyList<Sandworm>? sandworms = null,
+        IReadOnlyList<RiggedMob>? skeletons = null, IReadOnlyList<RiggedMob>? skeletonKings = null,
+        IReadOnlyList<RiggedMob>? caveMobs = null, IReadOnlyList<RiggedMob>? wildlife = null,
+        IReadOnlyList<Chunk>? chestChunks = null, ChestLids? chestLids = null)
     {
         // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
         // still sample this map even though the world diffuse has stopped using it.
@@ -174,40 +180,44 @@ internal sealed class ShadowPass
             }
         }
 
-        if (goblins != null && goblins.Count > 0 && Mobs.GoblinMeshes != null && Mobs.GoblinRig != null
-            && Mobs.GoblinPartNames != null)
+        if (goblins != null && goblins.Count > 0 && Mobs.GoblinRig is { } goblinRig)
         {
             // The goblin skin on unit 0, like the player casters: cutout texels would otherwise
             // be alpha-tested against the atlas.
-            Units.BindUnit(0, TextureTarget.Texture2DArray, Mobs.GoblinTexture);
+            Units.BindUnit(0, TextureTarget.Texture2DArray, goblinRig.Texture);
             foreach (var goblin in goblins)
             {
-                var feet = MobPasses.GoblinFeet(goblin);
-                for (var i = 0; i < Mobs.GoblinMeshes.Length; i++)
-                {
-                    var model = goblin.Animation.GetPartMatrix(Mobs.GoblinPartNames[i], Mobs.GoblinRig, feet, goblin.Facing);
-                    _owner.ShadowShader.SetUniform("uModel", model);
-                    _owner.ShadowShader.SetUniform("uLightMVP", model * _owner.NearShadow.ViewProj);
-                    Mobs.GoblinMeshes[i].Render();
-                }
+                DrawRigCaster(goblin, goblinRig);
 
                 // The flint in the hand casts too, on its own texture.
                 if (goblin.Ammo > 0 && _owner.ItemMeshes.TryGet(Mobs.FlintId, out var stone, out var stoneTexture))
                 {
                     Units.BindUnit(0, TextureTarget.Texture2DArray, stoneTexture);
                     var held = Matrix4x4.CreateScale(Goblin.HeldStoneScale)
-                               * goblin.Animation.HandAnchor(Goblin.HandPart, Mobs.GoblinRig, feet, goblin.Facing);
+                               * goblin.Animation.HandAnchor(Goblin.HandPart, goblinRig.Rig, goblin.Feet, goblin.Facing);
                     _owner.ShadowShader.SetUniform("uModel", held);
                     _owner.ShadowShader.SetUniform("uLightMVP", held * _owner.NearShadow.ViewProj);
                     stone.Render();
-                    Units.BindUnit(0, TextureTarget.Texture2DArray, Mobs.GoblinTexture);
+                    Units.BindUnit(0, TextureTarget.Texture2DArray, goblinRig.Texture);
                 }
             }
             Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
         }
 
+        DrawRealmCasters(hellMobs);
+        DrawRealmCasters(skyMobs);
+        DrawRealmCasters(skeletons);
+        DrawRealmCasters(skeletonKings);
+        DrawRealmCasters(caveMobs);
+        DrawRealmCasters(wildlife);
+        DrawSandwormCasters(sandworms);
+
         if (icebergs != null)
             DrawIcebergCasters(icebergs, frustum);
+
+        // The chests are no part of the chunk casters above: they are drawn from the chest model, lids as they stand
+        if (chestChunks != null && chestLids != null && chestChunks.Count > 0)
+            _owner.Chests.DrawCasters(chestChunks, chestLids, frustum, _owner.NearShadow.ViewProj);
 
         foreach (var tree in trees)
         {
@@ -303,6 +313,59 @@ internal sealed class ShadowPass
             _owner.ChunkDraws.Draw(_owner.LodGeometry.Vao, _owner.ChunkShadowShader, _locChunkShadowDrawBase);
             _owner.ChunkShadowShader.SetUniform(_locChunkShadowOpaque, 0);
         }
+    }
+
+    // One realm's mobs (hell's or the sky's) into the near cascade, each on its own kind's skin; the atlas
+    // goes back on unit 0 after them
+    private void DrawRealmCasters(IReadOnlyList<RiggedMob>? mobs)
+    {
+        if (mobs == null || mobs.Count == 0) return;
+        foreach (var mob in mobs)
+        {
+            if (Mobs.RealmRigOf(mob.Type) is not { } rig) continue;
+            Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
+            DrawRigCaster(mob, rig);
+        }
+        Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
+    }
+
+    // The sandworm segments into the near cascade, on the worm own skin; the atlas goes back on unit 0 after them
+    private void DrawSandwormCasters(IReadOnlyList<Sandworm>? worms)
+    {
+        if (worms == null || worms.Count == 0 || Mobs.SandwormRig is not { } rig) return;
+        Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
+        foreach (var worm in worms)
+        {
+            foreach (var (model, mesh, _) in Mobs.GatherSandwormParts(worm))
+            {
+                _owner.ShadowShader.SetUniform("uModel", model);
+                _owner.ShadowShader.SetUniform("uLightMVP", model * _owner.NearShadow.ViewProj);
+                rig.Meshes[mesh].Render();
+            }
+        }
+        Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
+    }
+
+    // Every part of one rigged mob into the near cascade, then the item its kind holds on its own sprite texture
+    // (the cutout is alpha-tested); its skin is already bound on unit 0 and is bound again after the item
+    private void DrawRigCaster(RiggedMob mob, RigMeshes rig)
+    {
+        for (var i = 0; i < rig.Meshes.Length; i++)
+        {
+            var model = rig.PartMatrix(mob, i);
+            _owner.ShadowShader.SetUniform("uModel", model);
+            _owner.ShadowShader.SetUniform("uLightMVP", model * _owner.NearShadow.ViewProj);
+            rig.Meshes[i].Render();
+        }
+
+        var type = mob.Type;
+        if (type.HeldItemId == 0 || !_owner.ItemMeshes.TryGet(type.HeldItemId, out var held, out var texture)) return;
+        Units.BindUnit(0, TextureTarget.Texture2DArray, texture);
+        var heldModel = type.HeldMatrix(mob.Animation, rig.Rig, mob.Feet, mob.Facing);
+        _owner.ShadowShader.SetUniform("uModel", heldModel);
+        _owner.ShadowShader.SetUniform("uLightMVP", heldModel * _owner.NearShadow.ViewProj);
+        held.Render();
+        Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
     }
 
     // The bergs inside the near light box, each on its own skin like the goblin casters (its texels

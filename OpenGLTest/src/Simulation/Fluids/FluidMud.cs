@@ -12,9 +12,9 @@ internal sealed class FluidMud
     // Dirt-to-mud ids, resolved once content is loaded. Every ticked fluid cell checks
     // its dirt neighbors against the mud condition right away, so settled water still
     // converts dirt the moment an edit schedules it, with no timers to keep.
-    private byte _dirtId;
-    private byte _mudId;
-    private byte _waterId;
+    private ushort _dirtId;
+    private ushort _mudId;
+    private ushort _waterId;
     private bool _mudIdsResolved;
 
     internal FluidMud(FluidCells cells, FluidSchedule schedule)
@@ -29,7 +29,7 @@ internal sealed class FluidMud
     /// so drying out needs no handling — mud simply stays mud. Conversions write through
     /// <see cref="FluidCells.Write"/> like any fluid edit, so their remeshes join the tick's batch.
     /// </summary>
-    internal void TryConvertMudAround(int x, int y, int z, byte fluid)
+    internal void TryConvertMudAround(int x, int y, int z, ushort fluid)
     {
         if (!MudIds(out var dirt, out var mud, out var water)) return;
         if (fluid != water) return;
@@ -54,7 +54,7 @@ internal sealed class FluidMud
     /// Whether a dirt cell counts as submerged: a water cell directly above it, and enough
     /// water across the whole 26-neighborhood. Unloaded neighbors read as absent.
     /// </summary>
-    private bool IsMudWet(int x, int y, int z, byte water)
+    private bool IsMudWet(int x, int y, int z, ushort water)
     {
         if (!_cells.TryGetCell(x, y + 1, z, out var above, out _) || above != water) return false;
 
@@ -73,7 +73,7 @@ internal sealed class FluidMud
     }
 
     /// <summary>Dirt, mud and water ids, resolved once content is loaded.</summary>
-    private bool MudIds(out byte dirt, out byte mud, out byte water)
+    private bool MudIds(out ushort dirt, out ushort mud, out ushort water)
     {
         if (!_mudIdsResolved)
         {

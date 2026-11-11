@@ -124,7 +124,7 @@ internal static class ModelBakeSteps
 
     /// <summary>
     /// Checks that a multiblock anchor's model can actually be drawn as a structure: it must stay
-    /// inside its 2x2x2 volume, cull against nothing (a cullface tests the anchor's world
+    /// inside its volume (0..16 * <see cref="BlockType.MultiblockSize"/> model units), cull against nothing (a cullface tests the anchor's world
     /// neighbor, which is the structure's own part cell) and carry no full-cell face (the
     /// per-corner AO path indexes its neighbor deltas by <see cref="Chunk.CubeFaces"/> corner
     /// order, which rotation breaks, so a multiblock shades flat on every facing).
@@ -132,6 +132,7 @@ internal static class ModelBakeSteps
     internal static void ValidateMultiblockBake(BlockType type, BakedModel baked)
     {
         const float slack = 1e-4f;
+        var size = type.MultiblockSize;
         foreach (var quad in baked.Quads)
         {
             if (quad.CullFace >= 0)
@@ -141,11 +142,11 @@ internal static class ModelBakeSteps
                 throw new InvalidOperationException(
                     $"The model of multiblock '{type.Name}' has a face covering a whole cell face; a multiblock must shade flat on every facing, so no face may sit on a cell plane spanning the full cell.");
             foreach (var position in quad.Positions)
-                if (position.X < -slack || position.X > MultiblockShape.Size + slack ||
-                    position.Y < -slack || position.Y > MultiblockShape.Size + slack ||
-                    position.Z < -slack || position.Z > MultiblockShape.Size + slack)
+                if (position.X < -slack || position.X > size + slack ||
+                    position.Y < -slack || position.Y > size + slack ||
+                    position.Z < -slack || position.Z > size + slack)
                     throw new InvalidOperationException(
-                        $"The model of multiblock '{type.Name}' has a corner at {position}, outside its {MultiblockShape.Size}x{MultiblockShape.Size}x{MultiblockShape.Size} volume (0..{MultiblockShape.Size * 16} in model units).");
+                        $"The model of multiblock '{type.Name}' has a corner at {position}, outside its {size}x{size}x{size} volume (0..{size * 16} in model units).");
         }
     }
 
@@ -216,5 +217,5 @@ internal static class ModelBakeSteps
                 throw new InvalidOperationException(
                     $"Built-in model '{parent}' does not bake to plain cube faces the greedy mesher can merge.");
         }
-    }
+    }
 }

@@ -73,7 +73,7 @@ public sealed class WorldgenStageTimerTests
             var plain = Generate(positions[i], null);
             var timed = Generate(positions[i], new WorldgenStageTimer());
 
-            Assert.True(plain.Blocks.SequenceEqual(timed.Blocks), $"blocks differ at {positions[i]}");
+            Assert.True(plain.Storage.ToDense().SequenceEqual(timed.Storage.ToDense()), $"blocks differ at {positions[i]}");
             Assert.True(SameOrBothNull(plain.StateArray, timed.StateArray), $"state differs at {positions[i]}");
             Assert.Equal(plain.SolidCount, timed.SolidCount);
             Assert.Equal(plain.SurfaceMinY, timed.SurfaceMinY);
@@ -83,7 +83,7 @@ public sealed class WorldgenStageTimerTests
 
             anySolid |= plain.SolidCount > 0;
             if (i == 2)
-                seaFloorFlooded = plain.Blocks.Any(b => b == water || b == ice);
+                seaFloorFlooded = plain.Storage.ToDense().Any(b => b == water || b == ice);
         }
 
         Assert.True(anySolid, "no fixed chunk generated any solid block");

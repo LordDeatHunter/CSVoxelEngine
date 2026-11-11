@@ -1,0 +1,10 @@
+{
+  // A crystal-blue draught that restores a share of the mana pool (use.action "restore_mana";
+  // ItemUseAction.RestoreMana, RestoreManaItem): refused at a full pool so it is never wasted, spent one
+  // per use otherwise. Crafted from a crystal block and cotton (recipes/mana_draught.json). The sprite is
+  // committed placeholder art.
+  "name": "Mana Draught",
+  "texture": "assets/textures/items/mana_draught.png",
+  "use": { "action": "restore_mana", "seconds": 1.0 },
+  "restoresMana": 0.4
+}

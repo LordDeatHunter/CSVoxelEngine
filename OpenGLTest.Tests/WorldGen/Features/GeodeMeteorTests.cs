@@ -41,7 +41,7 @@ public sealed class GeodeMeteorTests
         var worldY0 = centerY & ~Chunk.SizeMask;
         var worldZ0 = centerZ & ~Chunk.SizeMask;
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         for (var i = 0; i < blocks.Length; i++) blocks[i] = stone;
 
         GeodeGenerator.Stamp(blocks, worldX0, worldY0, worldZ0);
@@ -84,7 +84,7 @@ public sealed class GeodeMeteorTests
             new float[heights.Length]);
 
         // A chunk based at y=16: stone up to the surface at y=20, air above
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
         for (var y = 0; y <= 4; y++)

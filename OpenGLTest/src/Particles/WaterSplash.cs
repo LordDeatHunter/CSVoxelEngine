@@ -54,7 +54,7 @@ public static class WaterSplash
         if (!tracker.Step(wet, bottom.Y, deltaTime, out var speed)) return 0;
         if (!TryWaterTop(chunks, x, y, z, out var top)) return 0;
 
-        // A ring spreads for every crossing the tracker reports, however gentle: a drop landing too
+        // A ripple spreads for every crossing the tracker reports, however gentle: a drop landing too
         // softly to throw droplets still dimples the surface
         ripples?.Spawn(new Vector3(bottom.X, top, bottom.Z), Strength(speed), RippleScale(scale));
 

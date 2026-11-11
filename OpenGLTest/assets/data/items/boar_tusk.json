@@ -1,0 +1,5 @@
+{
+  // A boar's tusk: it splits into bone (recipes/bone_from_boar_tusk.json). The sprite is placeholder art.
+  "name": "Boar Tusk",
+  "texture": "assets/textures/items/boar_tusk.png"
+}

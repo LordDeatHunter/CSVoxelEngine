@@ -59,7 +59,7 @@ public sealed class WorldSourceLodTests : IDisposable
 
     private static int RegionChunkSpan => Spec.RegionBlocks / Chunk.Size;
 
-    private static BlockType BlockOf(byte id) => BlockType.ById[id]!;
+    private static BlockType BlockOf(ushort id) => BlockType.ById[id]!;
 
     private static BiomeTintFaces GrassTint =>
         BlockOf(TerrainGenerator.SurfaceBlock).BiomeTint

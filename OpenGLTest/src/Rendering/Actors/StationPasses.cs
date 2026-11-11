@@ -13,6 +13,7 @@ using VoxelEngine.Graphics;
 using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.UI;
 
 namespace VoxelEngine.Rendering.Actors;
@@ -48,7 +49,7 @@ internal sealed class StationPasses : IDisposable
     /// an item's own sprite texture, or the world atlas - a no-op while that is already bound,
     /// so a run of block results never rebinds. Null when the id has no mesh.
     /// </summary>
-    private Mesh? BindStationMesh(byte id, ref bool atlasBound)
+    private Mesh? BindStationMesh(ushort id, ref bool atlasBound)
     {
         if (ItemRegistry.IsItem(id))
         {
@@ -203,7 +204,8 @@ internal sealed class StationPasses : IDisposable
     /// <see cref="KilnManager.DisplayMoltenMl"/>, which carries the fraction of the melt tick in
     /// flight, so the surface rises smoothly instead of stepping once per chunk melted; the lump
     /// is its complement (<see cref="KilnManager.DisplayPendingMl"/> through
-    /// <see cref="KilnRenderer.PendingScale01"/>), so what the pool gains the lump loses.
+    /// <see cref="KilnRenderer.PendingStack"/>), so what the pool gains the top lump loses. The pool
+    /// holds every molten metal together, tinted as <see cref="KilnManager.PoolMaterial"/>.
     /// </summary>
     internal void RenderKilns(Camera camera, KilnManager kilns)
     {
@@ -218,22 +220,22 @@ internal sealed class StationPasses : IDisposable
         foreach (var (anchor, facing, state) in kilns.KilnView())
         {
             BindAtlas(ref atlasBound);
+            var layout = state.Profile.Layout;
 
-            // One sample per kiln, half a block outside its opening: every cell inside the
-            // structure is solid brickwork, so the light the hearth sees is the light at its mouth.
-            var light = _owner.LightAt(KilnRenderer.ToWorld(anchor, facing, new Vector3(1f, 0.5f, -0.5f)));
+            // One sample per kiln, at its mouth (KilnLayout.MouthLocal)
+            var light = _owner.LightAt(layout.ToWorld(anchor, facing, layout.MouthLocal));
 
             if (state.HasCrucible)
             {
                 // CreateBlockModel centers a cell's model on the origin, so lift by half a block
                 // to put the bowl's floor back on the hearth. The bowl is symmetric: no yaw.
-                var bowl = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.CrucibleLocal);
+                var bowl = layout.ToWorld(anchor, facing, layout.CrucibleLocal);
                 var model = Matrix4x4.CreateTranslation(bowl + new Vector3(0f, 0.5f, 0f));
                 _owner.SetDrawUniforms(model, model * viewProj, 1f, light);
                 _crucibleMesh.Render();
 
                 var ml = KilnManager.DisplayMoltenMl(state);
-                if (ml > 0f && ContentRegistry.MoltenMaterialById(state.Contents.MaterialId) is { } material)
+                if (ml > 0f && ContentRegistry.MoltenMaterialById(KilnManager.PoolMaterial(state)) is { } material)
                 {
                     var liquid = Matrix4x4.CreateScale(KilnRenderer.CrucibleInnerMax - KilnRenderer.CrucibleInnerMin)
                                 * Matrix4x4.CreateTranslation(bowl + new Vector3(0f,
@@ -248,16 +250,32 @@ internal sealed class StationPasses : IDisposable
                 if (pendingMl > 0f && inputId != 0
                     && BindStationMesh(inputId, ref atlasBound) is { } lump)
                 {
-                    // One piece of the last thing charged in, resting over the rim and facing
-                    // the opening; it shrinks as its last unit melts into the pool below
-                    var size = KilnRenderer.PendingSize
-                             * KilnRenderer.PendingScale01(pendingMl, KilnManager.PendingUnitMl(state));
-                    var foot = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.PendingLocal);
-                    var placed = Matrix4x4.CreateScale(size)
-                                * Matrix4x4.CreateRotationY(KilnRenderer.OpeningYaw(facing))
-                                * Matrix4x4.CreateTranslation(foot + new Vector3(0f, size * 0.5f, 0f));
-                    _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
-                    lump.Render();
+                    // One piece per unit of the last thing charged in, stacked over the rim and
+                    // facing the opening; only the top one, the unit melting, shrinks into the
+                    // pool below
+                    var (count, lastScale) = KilnRenderer.PendingStack(pendingMl, KilnManager.PendingUnitMl(state));
+                    var drawn = Math.Min(count, KilnRenderer.MaxPendingLumps);
+                    var foot = layout.ToWorld(anchor, facing, layout.PendingLocal);
+                    var lumpYaw = KilnRenderer.OpeningYaw(facing);
+                    var rise = 0f;
+                    var flat = ItemRegistry.IsItem(inputId);
+                    for (var i = 0; i < drawn; i++)
+                    {
+                        var size = KilnRenderer.PendingSize * (i == drawn - 1 ? lastScale : 1f);
+                        // Item sprites lie flat, face-up, in a tight pile; blocks stay cubes stacked on each other
+                        var placed = flat
+                            ? Matrix4x4.CreateScale(size)
+                                * SpritePose.LyingFaceUp(lumpYaw + i * 0.35f)
+                                * Matrix4x4.CreateTranslation(foot + new Vector3(0f, rise + SpritePose.RestingLift(size), 0f))
+                            : Matrix4x4.CreateScale(size)
+                                * Matrix4x4.CreateRotationY(lumpYaw + i * 0.6f)
+                                * Matrix4x4.CreateTranslation(foot + new Vector3(0f, rise + size * 0.5f, 0f));
+                        _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
+                        lump.Render();
+                        rise += flat
+                            ? SpritePose.HalfThickness(size, SpritePose.ItemSpriteFrame) * 2f + SpritePose.RestingClearance
+                            : size * KilnRenderer.PendingStackStep;
+                    }
                 }
             }
 
@@ -277,7 +295,7 @@ internal sealed class StationPasses : IDisposable
             var lift = fuelIsItem
                 ? SpritePose.RestingLift(KilnRenderer.FuelSize)
                 : KilnRenderer.FuelSize * 0.5f;
-            var basePos = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.FuelLocal)
+            var basePos = layout.ToWorld(anchor, facing, layout.FuelLocal)
                         + new Vector3(0f, lift, 0f);
             for (var i = 0; i < state.Fuel; i++)
             {
@@ -288,6 +306,109 @@ internal sealed class StationPasses : IDisposable
                 _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
                 fuelMesh.Render();
             }
+        }
+    }
+
+    // Smithing props: a bloomery's loaded ore and fuel lie in two rows on its hearth, its finished blooms and slag
+    // in the ore row; a bloom on an anvil lies face-up on the top and shrinks as the hammer works it, and a metal stack
+    // piles up there piece by piece
+    private const float SmithingPieceSize = KilnRenderer.FuelSize;
+    private const float OreRowBackShift = 0.27f;
+    private const float AnvilTopY = 15f / 16f;
+    private const float AnvilPieceSize = 0.36f;
+    private const float AnvilPieceShrinkPerHit = 0.12f;
+    // Radians each piece of an anvil's metal stack turns against the one below, so the pile reads as separate pieces
+    private const float AnvilStackTwist = 0.18f;
+
+    /// <summary>
+    /// Draws the iron works' props: the ore and fuel standing in each bloomery's shaft (and, once a run is done, its
+    /// blooms and slag, in the ore row), and the bloom lying on each anvil, smaller with every hammer hit, or the metal
+    /// stacked on it, one piece per unit. Nothing
+    /// is drawn for the anvil or the shaft themselves: they are the block's own model.
+    /// </summary>
+    internal void RenderSmithing(Camera camera, SmithingStations smithing)
+    {
+        if (camera == null || smithing == null || !smithing.HasAny) return;
+
+        _owner.WorldShader.Use();
+        _owner.BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+        var atlasBound = true;
+        var layout = KilnLayout.Kiln;
+
+        foreach (var (anchor, facing, state) in smithing.Bloomeries.View())
+        {
+            var light = _owner.LightAt(layout.ToWorld(anchor, facing, layout.MouthLocal));
+            var yaw = KilnRenderer.OpeningYaw(facing);
+            var along = MultiblockShape.RotateDirection(Vector3.UnitX, facing);
+            var back = MultiblockShape.RotateDirection(Vector3.UnitZ, facing);
+            var rowBase = layout.ToWorld(anchor, facing, layout.FuelLocal);
+
+            DrawRow(state.FuelItemId, state.Fuel, rowBase, along, yaw, light, viewProj, ref atlasBound);
+            var oreRow = rowBase - back * OreRowBackShift;
+            DrawRow(state.Profile.OreId, state.Ore, oreRow, along, yaw, light, viewProj, ref atlasBound);
+            // The output waits where the ore stood, blooms first
+            DrawRow(state.Profile.BloomId, state.Blooms, oreRow, along, yaw, light, viewProj, ref atlasBound);
+            DrawRow(state.Profile.SlagId, state.Slag, oreRow - back * 0.1f, along, yaw, light, viewProj, ref atlasBound);
+        }
+
+        foreach (var (cell, state) in smithing.Anvils.View())
+        {
+            if (state.MetalCount > 0)
+            {
+                DrawAnvilStack(cell, state.MetalId, state.MetalCount, viewProj, ref atlasBound);
+                continue;
+            }
+            if (!state.HasPiece || BindStationMesh(state.Profile.InputId, ref atlasBound) is not { } piece) continue;
+
+            var fraction = MathF.Max(0.3f, 1f - state.Hits * AnvilPieceShrinkPerHit);
+            var size = AnvilPieceSize * fraction;
+            var placed = Matrix4x4.CreateScale(size)
+                         * SpritePose.LyingFaceUp(0f)
+                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, AnvilTopY + SpritePose.RestingLift(size), 0.5f));
+            _owner.SetDrawUniforms(placed, placed * viewProj, 1f, _owner.LightAt(cell + new Vector3(0.5f, 1.2f, 0.5f)));
+            piece.Render();
+        }
+    }
+
+    // A metal stack on an anvil: one face-up piece per unit, each resting on the one below and turned a little against
+    // it, so the pile grows with every piece laid on
+    private void DrawAnvilStack(Vector3 cell, ushort metalId, int count, Matrix4x4 viewProj, ref bool atlasBound)
+    {
+        if (BindStationMesh(metalId, ref atlasBound) is not { } mesh) return;
+
+        var light = _owner.LightAt(cell + new Vector3(0.5f, 1.2f, 0.5f));
+        var lift = SpritePose.RestingLift(AnvilPieceSize);
+        var step = SpritePose.HalfThickness(AnvilPieceSize, SpritePose.ItemSpriteFrame) * 2f + SpritePose.RestingClearance;
+        for (var i = 0; i < count; i++)
+        {
+            var yaw = (i % 2 == 0 ? 1f : -1f) * AnvilStackTwist * (i % 3);
+            var placed = Matrix4x4.CreateScale(AnvilPieceSize)
+                         * SpritePose.LyingFaceUp(yaw)
+                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, AnvilTopY + lift + i * step, 0.5f));
+            _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
+            mesh.Render();
+        }
+    }
+
+    // One row of up to `count` flat pieces of item `id`, centered on `center` and spread along `along`
+    private void DrawRow(ushort id, int count, Vector3 center, Vector3 along, float yaw, EntityLightSample light,
+        Matrix4x4 viewProj, ref bool atlasBound)
+    {
+        if (count <= 0 || id == 0 || BindStationMesh(id, ref atlasBound) is not { } mesh) return;
+
+        var isItem = ItemRegistry.IsItem(id);
+        var orient = isItem ? SpritePose.LyingFaceUp(yaw) : Matrix4x4.CreateRotationY(yaw);
+        var lift = isItem ? SpritePose.RestingLift(SmithingPieceSize) : SmithingPieceSize * 0.5f;
+        for (var i = 0; i < count; i++)
+        {
+            var placed = Matrix4x4.CreateScale(SmithingPieceSize)
+                         * orient
+                         * Matrix4x4.CreateTranslation(center + new Vector3(0f, lift, 0f)
+                             + along * ((i - (count - 1) * 0.5f) * KilnRenderer.FuelSpacing));
+            _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
+            mesh.Render();
         }
     }
 

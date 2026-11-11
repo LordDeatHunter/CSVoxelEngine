@@ -16,10 +16,10 @@ public sealed class TreeSpecies
     public required string Name { get; init; }
 
     /// <summary>The wood block id.</summary>
-    public required byte WoodId { get; init; }
+    public required ushort WoodId { get; init; }
 
     /// <summary>The leaves block id, 0 for a leafless species.</summary>
-    public required byte LeavesId { get; init; }
+    public required ushort LeavesId { get; init; }
 
     /// <summary>Whether the species grows leaves; the leaf fields below are meaningful only then.</summary>
     public bool HasLeaves => LeavesId != 0;

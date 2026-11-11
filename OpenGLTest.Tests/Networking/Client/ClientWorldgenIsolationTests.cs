@@ -184,7 +184,7 @@ public sealed class ClientWorldgenIsolationTests
         }
     }
 
-    private static byte CellAt(ChunkManager manager, Vector3 cell)
+    private static ushort CellAt(ChunkManager manager, Vector3 cell)
     {
         Assert.True(manager.TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out _), $"{cell} is not loaded");
         return id;

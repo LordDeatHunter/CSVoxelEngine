@@ -1,0 +1,35 @@
+{
+  // Giant scorpion check: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/scorpions.json
+  // Shots land in visual/scorpions/. The camera hovers (creative flight, so it is immune and the scorpion still
+  // chases it) over the deep desert of biome-grade.json at (256, 0), ground 9. A scorpion spawned six blocks
+  // ahead walks up over the sand on its solved legs, stings first (the tail over its head), then pinches.
+  // The [x, z] form of `spawn` snaps onto the surface.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [256.5, 12.2, 0.5], "yaw": -90, "pitch": -25 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "spawn", "entity": "scorpion", "pos": [256.5, -5.5] },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "spawned", "hideHud": true },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "walk", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "look", "yaw": -90, "pitch": -50 },
+    { "op": "screenshot", "name": "close", "hideHud": true },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "wait", "seconds": 0.35 },
+    { "op": "screenshot", "name": "attack_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "attack_b", "hideHud": true },
+    { "op": "wait", "seconds": 0.9 },
+    { "op": "screenshot", "name": "attack_c", "hideHud": true },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "attack_d", "hideHud": true },
+    { "op": "damage", "amount": 999 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "death", "hideHud": true }
+  ]
+}

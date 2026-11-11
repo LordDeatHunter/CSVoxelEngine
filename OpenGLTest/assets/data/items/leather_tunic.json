@@ -1,0 +1,8 @@
+{
+  // Leather Tunic: placeholder gear. Wearable in the chest slot; its
+  // fixed stats are the equip object, and a piece found in loot may also roll modifiers on its stack.
+  "name": "Leather Tunic",
+  "texture": "assets/textures/items/leather_tunic.png",
+  "rarity": "common",
+  "equip": { "slot": "chest", "armor": 2, "set": "leather", "visible": true }
+}

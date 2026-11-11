@@ -1,0 +1,8 @@
+{
+  "result": "item/bone_charm",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/bone", "count": 5 },
+    { "item": "item/vine", "count": 2 }
+  ]
+}

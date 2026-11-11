@@ -1,0 +1,24 @@
+{
+  // The upper half of the Deep Waystone (waystone_underground.json names it as its upperHalf): the top of the rune-carved shaft,
+  // its cap and point. Never held and dropping nothing of its own: breaking either half takes the other down and rolls
+  // the lower half's loot once. Not a waystone itself: a right-click on it opens the waystone below it, and the
+  // registry keys the waystone by the lower half's cell. Its runes glow like the lower half's.
+  "name": "Deep Waystone",
+  "model": { "parent": "block/waystone_upper", "textures": { "stone": "waystone_underground_stone", "runes": "waystone_underground_runes_upper" } },
+  "hardness": 30,
+  "sfx": "hit_rock",
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "light": { "emission": 6 },
+  "castsAO": false,
+  "hasItem": false,
+  "loot": "none",
+  "collidesByHitbox": true,
+  // The model's own boxes (block/waystone_upper): the shaft, the cap, the tip and its point
+  "hitbox": [
+    { "min": [0.3125, 0, 0.3125], "max": [0.6875, 0.625, 0.6875] },
+    { "min": [0.25, 0.625, 0.25], "max": [0.75, 0.75, 0.75] },
+    { "min": [0.375, 0.75, 0.375], "max": [0.625, 0.875, 0.625] },
+    { "min": [0.4375, 0.875, 0.4375], "max": [0.5625, 1, 0.5625] }
+  ]
+}

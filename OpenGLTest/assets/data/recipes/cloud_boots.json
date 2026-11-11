@@ -1,0 +1,8 @@
+{
+  "result": "item/cloud_boots",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/iron_boots", "count": 1 },
+    { "item": "item/cloud_shard", "count": 4 }
+  ]
+}

@@ -113,6 +113,58 @@ public sealed class ChatViewTests
     }
 
     [Fact]
+    public void ALinkThatDoesNotFitItsTextIsDropped()
+    {
+        const string text = "Nearest at [1, 2, 3]";
+        var chat = new ChatView();
+        ChatLink[] misfits =
+        [
+            new(text.Length, 1, "/tp 1 2 3"),
+            new(3, 0, "/tp 1 2 3"),
+            new(-1, 4, "/tp 1 2 3"),
+            new(0, text.Length + 1, "/tp 1 2 3"),
+            new(3, 4, ""),
+            new(3, 4, new string('a', ChatView.MaxInputLength + 1)),
+        ];
+        foreach (var misfit in misfits)
+        {
+            chat.AddSystem(text, misfit);
+            Assert.Null(chat.Messages[^1].Link);
+        }
+
+        var fitting = new ChatLink(11, 9, "/tp 1 2 3");
+        chat.AddMessage(ChatKind.Player, "Alice", text, fitting);
+        Assert.Equal(fitting, chat.Messages[^1].Link);
+    }
+
+    [Fact]
+    public void SuggestPrefillsTheInputWithoutSendingIt()
+    {
+        const string command = "/tp 10.5 64 -3.5";
+        var chat = new ChatView();
+        chat.Open();
+        chat.Type('a');
+        chat.Submit();
+        chat.AddSystem("Nearest at [1, 2, 3]", new ChatLink(11, 9, command));
+        var count = chat.Messages.Count;
+
+        chat.Suggest(command);
+
+        Assert.True(chat.IsOpen);
+        Assert.Equal(command, chat.Input.Text);
+        Assert.Equal(count, chat.Messages.Count);
+
+        // The suggestion is not in the history: Up recalls the line sent before it, Down comes back to a new line
+        chat.HistoryUp();
+        Assert.Equal("a", chat.Input.Text);
+        chat.HistoryDown();
+        Assert.True(chat.Input.IsEmpty);
+
+        chat.Suggest(command);
+        Assert.Equal(command, chat.Submit());
+    }
+
+    [Fact]
     public void ResetClosesAndForgetsTheLogAndHistory()
     {
         var chat = new ChatView();

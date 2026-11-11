@@ -22,7 +22,7 @@ public sealed class LandingDustTests
 
     private const float Dt = 1f / 60f;
 
-    private static byte Id(string block) => ContentRegistry.RequireBlock(block).Id;
+    private static ushort Id(string block) => ContentRegistry.RequireBlock(block).Id;
 
     // Feet of a body standing on MobTestWorld.Floor's y = 0 layer.
     private static readonly Vector3 FloorFeet = new(8.5f, 1f, 8.5f);

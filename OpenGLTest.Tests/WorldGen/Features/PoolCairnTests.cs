@@ -51,7 +51,7 @@ public sealed class PoolCairnTests
 
         var worldX0 = worldX & ~Chunk.SizeMask;
         var worldZ0 = worldZ & ~Chunk.SizeMask;
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
             blocks[Chunk.Idx(x, 1, z)] = stone;
@@ -87,7 +87,7 @@ public sealed class PoolCairnTests
         var pebble = CairnGenerator.PebbleBlock;
         var stone = ContentRegistry.RequireBlock("stone").Id;
 
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         // The chunk holding the ground at y=50, and a stone in the hat's cell so it is left alone
         blocks[Chunk.Idx(3, 2, 4)] = stone;
         blocks[Chunk.Idx(3, 6, 4)] = stone;

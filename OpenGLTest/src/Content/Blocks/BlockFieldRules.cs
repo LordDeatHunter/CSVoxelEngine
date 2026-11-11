@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Shapes;
+using VoxelEngine.Player;
 
 namespace VoxelEngine.Content.Blocks;
 
@@ -12,12 +13,16 @@ internal readonly record struct FlowTuning(int TickDivisor, int Range);
 /// <summary>A block's stack limits: <c>stackMax</c> (0 = not a stack) and the count at which it turns solid.</summary>
 internal readonly record struct StackLimits(int StackMax, int StackSolidAt);
 
-/// <summary>The support flags of a block: whether it pops without a holder and whether a flow may wash it away.</summary>
-internal readonly record struct SupportRules(bool NeedsSupport, bool FlowResistant);
+/// <summary>The support flags of a block: whether it pops without a holder, whether a flow may wash it away and whether
+/// only a full block face holds it.</summary>
+internal readonly record struct SupportRules(bool NeedsSupport, bool FlowResistant, bool FullFace);
 
 /// <summary>How a body moves over and through a block: speed, grip, pebbles, footfall dust and contact damage.</summary>
 internal readonly record struct GroundTraits(
     float MovementSpeed, float Friction, float PebbleWeight, bool FootstepDust, float ContactDamage);
+
+/// <summary>How the player body meets a block's top: the soft layer it sinks into and whether a landing on it is free.</summary>
+internal readonly record struct BodySurface(float Sink, bool SoftLanding);
 
 /// <summary>
 /// The plain per-field rules of a block JSON that <see cref="BlockLoader"/> applies: each method
@@ -58,8 +63,8 @@ internal static class BlockFieldRules
     }
 
     /// <summary>
-    /// A multiblock is a structure built out of eight cells: the anchor names the part that fills
-    /// the other seven and the plain block it is built from and reverts to, and only an anchor can
+    /// A multiblock is a structure built out of a cube of cells: the anchor names the part that fills
+    /// the others and the plain block it is built from and reverts to, and only an anchor can
     /// be a kiln. Both halves are ordinary solid full cells to everything but the mesher, so the
     /// anchor's surface really does cover its neighbors - which cutout, translucent and fluid would
     /// all break.
@@ -70,9 +75,15 @@ internal static class BlockFieldRules
         if ((renderer == BlockRenderer.Multiblock) != (definition.Multiblock != null))
             throw new InvalidOperationException(
                 $"Block '{path}' {(definition.Multiblock != null ? "declares multiblock.* without renderer: \"multiblock\"" : "uses renderer \"multiblock\" without a multiblock object naming its part and source")}.");
-        if ((definition.Kiln ?? false) && renderer != BlockRenderer.Multiblock)
+        if (definition.Kiln != null && renderer != BlockRenderer.Multiblock)
             throw new InvalidOperationException(
-                $"Block '{path}' sets kiln: true without renderer \"multiblock\"; only a multiblock anchor can be a kiln.");
+                $"Block '{path}' declares a kiln object without renderer \"multiblock\"; only a multiblock anchor can be a kiln.");
+        if (definition.Bloomery != null && renderer != BlockRenderer.Multiblock)
+            throw new InvalidOperationException(
+                $"Block '{path}' declares a bloomery object without renderer \"multiblock\"; only a multiblock anchor can be a bloomery.");
+        if (definition.Bloomery != null && definition.Kiln != null)
+            throw new InvalidOperationException(
+                $"Block '{path}' declares both a kiln and a bloomery object; a structure is one or the other.");
         if (!isMultiblock) return;
 
         if (definition.HasItem ?? true)
@@ -107,6 +118,54 @@ internal static class BlockFieldRules
         if (definition.MeltsTo != null && fluid)
             throw new InvalidOperationException(
                 $"Block '{path}' sets meltsTo on a fluid; only a solid block melts into a fluid.");
+    }
+
+    /// <summary>
+    /// The <c>unbreakable</c> flag. Every field refused here would hand the cell to a raw-write
+    /// path the unbreakable guards do not cover: the fluid tick (fluid), toppling (falls), support
+    /// and flow pops (needsSupport), placement takeover (replaceableByPlacement), burning and
+    /// thawing (flammable, meltsTo), felling, decay and growth (tree wood), multiblock convert and
+    /// revert (multiblock renderers), tall-block removal (upperHalf) and priming (prime_tnt).
+    /// </summary>
+    internal static void ValidateUnbreakable(BlockDefinition definition, BlockRenderer renderer, string path)
+    {
+        if (!(definition.Unbreakable ?? false)) return;
+
+        string? field = null;
+        if (definition.Fluid ?? false) field = "fluid (a fluid cannot be unbreakable)";
+        else if (definition.Falls ?? false) field = "falls";
+        else if (definition.NeedsSupport ?? false) field = "needsSupport";
+        else if (definition.ReplaceableByPlacement ?? false) field = "replaceableByPlacement";
+        else if (definition.Flammable ?? false) field = "flammable";
+        else if (definition.MeltsTo != null) field = "meltsTo";
+        else if (renderer is BlockRenderer.TreeWood or BlockRenderer.Multiblock or BlockRenderer.MultiblockPart)
+            field = $"renderer \"{definition.Renderer}\"";
+        else if (definition.UpperHalf != null) field = "upperHalf";
+        else if (definition.OnBreak == "prime_tnt") field = "onBreak \"prime_tnt\"";
+        if (field != null)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets unbreakable with {field}; that path would remove the block anyway.");
+    }
+
+    /// <summary>
+    /// The <c>coversSky</c> flag. A covering block stops the sun seeds of every cell under it in a
+    /// light volume, so it must be an opaque, plain full cell: anything that passes light or is
+    /// drawn see-through would leave the cells under it visibly lit by the sky it claims to hide.
+    /// </summary>
+    internal static void ValidateCoversSky(BlockDefinition definition, BlockRenderer renderer, string path)
+    {
+        if (!(definition.CoversSky ?? false)) return;
+
+        string? field = null;
+        if (definition.Fluid ?? false) field = "fluid";
+        else if (definition.Cutout ?? false) field = "cutout";
+        else if (definition.Translucent ?? false) field = "translucent";
+        else if (!(definition.Solid ?? true)) field = "solid: false";
+        else if (definition.Light?.Passes == true) field = "light.passes: true";
+        else if (renderer != BlockRenderer.Model) field = $"renderer \"{definition.Renderer}\"";
+        if (field != null)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets coversSky with {field}; only an opaque, plain full cell can shade the cells under it.");
     }
 
     /// <summary>What mining the block does: roll its loot, or prime TNT.</summary>
@@ -185,7 +244,7 @@ internal static class BlockFieldRules
         return new StackLimits(stackMax, stackSolidAt);
     }
 
-    /// <summary>The <c>needsSupport</c> / <c>flowResistant</c> pair. A fluid is never support-fragile (it is what pops those blocks).</summary>
+    /// <summary>The <c>needsSupport</c> / <c>flowResistant</c> / <c>supportFullFace</c> flags. A fluid is never support-fragile (it is what pops those blocks).</summary>
     internal static SupportRules ParseSupport(BlockDefinition definition, bool fluid, bool falls, string path)
     {
         var needsSupport = !fluid && (definition.NeedsSupport ?? false);
@@ -196,7 +255,11 @@ internal static class BlockFieldRules
         if (flowResistant && !needsSupport)
             throw new InvalidOperationException(
                 $"Block '{path}' sets flowResistant without needsSupport: only a fragile block has a wash-away rule to opt out of.");
-        return new SupportRules(needsSupport, flowResistant);
+        var fullFace = definition.SupportFullFace ?? false;
+        if (fullFace && !needsSupport)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets supportFullFace without needsSupport: only a fragile block has a holder to be picky about.");
+        return new SupportRules(needsSupport, flowResistant, fullFace);
     }
 
     /// <summary>State-dependent solidity (<c>stackSolidAt</c>) needs a non-solid block to switch on.</summary>
@@ -255,6 +318,31 @@ internal static class BlockFieldRules
                 $"Block '{path}' has contactDamage {definition.ContactDamage}; expected 0..100.");
 
         return new GroundTraits(movementSpeed, friction, pebbleWeight, footstepDust, contactDamage);
+    }
+
+    /// <summary>
+    /// The <c>softLanding</c> and <c>sink</c> flags. A sink layer is cut off the top of a plain
+    /// full-cell collider, so it is refused on anything that collides by another shape or not at
+    /// all (a fluid, a non-solid or pass-through block, a stack, tree wood, a hitbox collider), and
+    /// on a bounce block, whose spring would fight the slow sink.
+    /// </summary>
+    internal static BodySurface ParseBodySurface(BlockDefinition definition, BlockRenderer renderer, bool fluid,
+        bool solid, float movementSpeed, bool collidesByHitbox, int stackMax, string path)
+    {
+        if (fluid && definition.SoftLanding == true)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets softLanding on a fluid: a body never lands on a fluid.");
+
+        var sink = definition.Sink ?? 0f;
+        if (!float.IsFinite(sink) || sink < 0f || sink > SinkLayer.MaxSink)
+            throw new InvalidOperationException(
+                $"Block '{path}' has sink {definition.Sink}; expected 0..{SinkLayer.MaxSink}.");
+        if (sink > 0f && (fluid || !solid || movementSpeed > 0f || collidesByHitbox || stackMax > 0
+                          || renderer == BlockRenderer.TreeWood || definition.Bounce == true))
+            throw new InvalidOperationException(
+                $"Block '{path}' sets sink but is not a plain solid full-cell collider (a fluid, non-solid, pass-through, stack, tree wood, hitbox collider or bounce block); the soft layer is cut off the top of a whole solid cell.");
+
+        return new BodySurface(sink, definition.SoftLanding ?? false);
     }
 
     /// <summary>The block's <c>hardness</c>, 0 or more.</summary>
