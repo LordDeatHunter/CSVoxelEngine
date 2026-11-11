@@ -15,7 +15,7 @@ namespace VoxelEngine.WorldGen;
 ///
 /// <para>The cache is <c>generations</c> disjoint dictionaries, index 0 newest. A read probes them
 /// newest-first; a miss computes the value and inserts it into the newest; when the newest map has
-/// taken <c>capacity / generations</c> successful inserts the whole array rotates - a fresh empty
+/// reserved <c>capacity / generations</c> insert slots the whole array rotates - a fresh empty
 /// map is pushed on the front and the oldest is dropped. Wholesale clearing requires quiescent
 /// readers (point 11).</para>
 ///
@@ -34,23 +34,23 @@ namespace VoxelEngine.WorldGen;
 /// <para><b>3. The generation array is published as one immutable node.</b> <c>Generation</c>
 /// holds a readonly array, fully built before it is swapped in by
 /// <c>Interlocked.CompareExchange</c> (a full fence). <see cref="GetOrAdd"/> takes exactly one
-/// <c>Volatile.Read</c> of <c>_current</c> and uses that snapshot for the whole call, so no reader
-/// can observe a half-rotated set - the same protocol as <c>ChunkScanFrontier</c>'s node (C3) and
-/// <c>LodRegionClaims</c>'s TryAdd-gated claim (C5).</para>
+/// <c>Volatile.Read</c> of <c>_current</c> for probing, so no reader can observe a half-rotated set.
+/// Insertion may refresh that snapshot if its newest map has no free slot (point 5).</para>
 ///
-/// <para><b>4. An insert racing a rotation is dropped one generation early.</b> A caller whose
-/// snapshot was taken before a rotation inserts into what is now <c>Maps[1]</c>. That entry is
-/// perfectly usable - it is found by every subsequent probe - it just ages out one rotation sooner
-/// than it otherwise would. Cost, never correctness. The same race can push a demoted map one entry
-/// past its nominal tenancy, which is the bounded slack named in point 7a.</para>
+/// <para><b>4. Every insert reserves a slot before publishing.</b> A map's counter includes both
+/// successful entries and pending inserts. Admission uses a CAS that cannot exceed
+/// <c>_generationEntries</c>; a duplicate or throwing insert returns its slot. An insert racing a
+/// rotation may finish in a demoted or detached map, but still owns a slot in that map. It can age
+/// out early, never overfill the map. Factories run before reserving, so a slow factory holds no
+/// slot and retries admission in a newer snapshot if its original map has filled.</para>
 ///
-/// <para><b>5. Exactly one thread per generation triggers a rotation.</b> <c>Insert</c> tests
-/// <c>Interlocked.Increment(ref gen.Writes) == _generationEntries</c> - <c>==</c>, not <c>&gt;=</c>,
-/// so of the many threads that push a generation's counter past the cap exactly one sees the
-/// equality and calls <c>Rotate</c>. A losing CAS inside <c>Rotate</c> means somebody else
-/// already rotated this node; the fresh array is simply discarded and nothing is retried, so this
-/// type cannot spin. A thread still holding a stale node whose counter crosses the cap again costs
-/// at most one wasted allocation.</para>
+/// <para><b>5. Any caller can help a full generation rotate.</b> The caller taking the last slot
+/// rotates after a successful insert. Another caller finding all slots occupied can also rotate
+/// before retrying admission in the current node. Only one rotation CAS for a given node can win;
+/// losers discard their candidate. If pending inserts later turn out to be duplicates or throw,
+/// the rotated map can be underfull. Sequentially, only successful inserts spend the budget.
+/// Admission retries only after a competing CAS or a full generation; it does not wait for a
+/// particular caller. This is not a wait-free bound on an individual call under contention.</para>
 ///
 /// <para><b>6. A promoted key exists in two maps at once.</b> Promotion inserts into the newest map
 /// without removing from the oldest. That is benign: the value is one shared instance, so the
@@ -58,23 +58,23 @@ namespace VoxelEngine.WorldGen;
 /// rotates out. Removing it instead would mean a write to a second map on the same path, which is
 /// precisely the contention this type exists to avoid.</para>
 ///
-/// <para><b>7a. Memory ceiling - unconditional in the promotion rate.</b> Each map accepts exactly
-/// <c>_generationEntries</c> successful inserts during its tenure as <c>Maps[0]</c> and never
-/// another one afterwards, because every insert goes through <c>Maps[0]</c> of the caller's
-/// snapshot. Promotions are counted in that budget deliberately. So the entries across all
-/// <c>generations</c> maps are bounded by <c>generations * (capacity / generations) &lt;= capacity</c>
-/// at all times, however hot or cold the workload is. The only slack is point 4's race: at most one
-/// extra entry per thread in flight through a rotation, which is bounded by the thread count and not
-/// by the workload. This is the claim the cache's memory sizing rests on.</para>
+/// <para><b>7a. Residency ceiling - unconditional in the promotion rate and scheduler.</b>
+/// Every dictionary has at most <c>_generationEntries</c> entries, even while rotation allocation
+/// or publication is delayed and even after demotion. Promotions reserve the same slots as misses.
+/// Therefore any generation snapshot contains at most
+/// <c>generations * (capacity / generations) &lt;= capacity</c> dictionary entries, including
+/// promotion duplicates, with no per-thread overshoot allowance. This is a bound on resident
+/// entries, not total managed bytes: in-flight callers can retain detached snapshots and losing
+/// rotation candidates until they return, and garbage collection can reclaim them later. Each
+/// caller retains a bounded number of maps/arrays; there is no chain of past generations.</para>
 ///
 /// <para><b>7b. Retention - conditional, and weaker than a fixed floor.</b> An entry read at least
-/// once while it sits in the OLDEST generation is carried forward into the newest and survives the
-/// rotation that would have dropped it; an entry never read there is dropped when that generation
-/// rotates out. Distinct-key residency is therefore strictly BELOW
-/// <c>capacity * (generations - 1) / generations</c> whenever promotions occur, because a promotion
-/// consumes an insert slot and briefly occupies two dictionary nodes for one key. Do not restate
-/// this as a flat <c>capacity * (G-1)/G</c> retention floor: that is false under any workload with
-/// revisits, which is the real workload.</para>
+/// once while it sits in the OLDEST generation is carried forward into the insertion snapshot's
+/// newest map (or a newer node if full) and survives the rotation that would have dropped it,
+/// subject to point 4's concurrent aging; an entry never read there is dropped when that generation
+/// rotates out. Promotions consume insert slots and briefly occupy two dictionary nodes for one
+/// key, so distinct-key residency can fall below <c>capacity * (generations - 1) / generations</c>.
+/// That expression is not a retention floor under workloads with revisits.</para>
 ///
 /// <para><b>8. No locks, and no <c>Count</c> on any live path.</b> Every path here is
 /// <c>ConcurrentDictionary</c> probes plus <c>Interlocked</c>, per AGENTS.md's lock-free-shared-state
@@ -109,18 +109,21 @@ public sealed class GenerationalCache<TKey, TValue> where TKey : notnull
 {
     /// <summary>
     /// One immutable snapshot of the generation array plus that generation's insert budget. Swapped
-    /// as a unit (point 3) so no reader ever sees a half-rotated set. <see cref="Writes"/> is a field
-    /// and not a property because it is only ever touched through <c>Interlocked</c>.
+    /// as a unit (point 3) so no reader ever sees a half-rotated set. <see cref="Slots"/> counts
+    /// published entries plus in-flight reservations in Maps[0], always within the map's budget.
     /// </summary>
     private sealed class Generation(ConcurrentDictionary<TKey, TValue>[] maps)
     {
         internal readonly ConcurrentDictionary<TKey, TValue>[] Maps = maps;
-        internal int Writes;
+        internal int Slots;
     }
 
     private readonly int _capacity;
     private readonly int _generations;
     private readonly int _generationEntries;
+
+    /// <summary>Per-instance scheduling seam for bounded rotation-race tests.</summary>
+    internal Action? BeforeRotateForTests { get; set; }
 
     private Generation _current;
     private long _misses;
@@ -150,8 +153,8 @@ public sealed class GenerationalCache<TKey, TValue> where TKey : notnull
     }
 
     /// <summary>
-    /// Pre-sized so that filling a generation to its budget never trips
-    /// <c>ConcurrentDictionary</c>'s own growth, which takes every lock in the table.
+    /// Pre-sized for the generation budget rather than starting small and relying on
+    /// <c>ConcurrentDictionary</c>'s growth, which can take every lock in the table.
     /// </summary>
     private ConcurrentDictionary<TKey, TValue> NewMap() =>
         new(Environment.ProcessorCount, _generationEntries);
@@ -164,7 +167,7 @@ public sealed class GenerationalCache<TKey, TValue> where TKey : notnull
     /// </summary>
     public TValue GetOrAdd(TKey key, Func<TKey, TValue> factory)
     {
-        // ONE read of the node, used for the whole call (point 3).
+        // ONE snapshot for probing; insertion refreshes it only if admission finds a full map.
         var generation = Volatile.Read(ref _current);
         var maps = generation.Maps;
 
@@ -196,25 +199,54 @@ public sealed class GenerationalCache<TKey, TValue> where TKey : notnull
     }
 
     /// <summary>
-    /// Adds to the newest map of the caller's snapshot and spends one of that generation's insert
-    /// slots. <c>==</c> rather than <c>&gt;=</c> is load-bearing: it makes exactly one thread per
-    /// generation the one that rotates (point 5).
+    /// Reserves space before publishing an entry. A full snapshot is rotated (or was already
+    /// rotated by a peer), then admission retries against the current node. Duplicate inserts and
+    /// exceptions return their reservation. No caller waits for another caller to finish inserting
+    /// or allocating a rotation.
     /// </summary>
     private void Insert(Generation generation, TKey key, TValue value)
     {
-        if (!generation.Maps[0].TryAdd(key, value)) return;
+        while (true)
+        {
+            var slots = Volatile.Read(ref generation.Slots);
+            if (slots == _generationEntries)
+            {
+                Rotate(generation);
+                generation = Volatile.Read(ref _current);
+                continue;
+            }
 
-        if (Interlocked.Increment(ref generation.Writes) == _generationEntries)
-            Rotate(generation);
+            // A failed CAS means another insert made progress. Never publish without a slot,
+            // even if the thread that filled the generation is paused before its rotation CAS.
+            if (Interlocked.CompareExchange(ref generation.Slots, slots + 1, slots) != slots)
+                continue;
+
+            var added = false;
+            try
+            {
+                added = generation.Maps[0].TryAdd(key, value);
+            }
+            finally
+            {
+                if (!added) Interlocked.Decrement(ref generation.Slots);
+            }
+
+            if (added && slots + 1 == _generationEntries)
+                Rotate(generation);
+            return;
+        }
     }
 
     /// <summary>
     /// Pushes a fresh empty map onto the front and drops the oldest, publishing the new array as one
-    /// node. A lost CAS means somebody else already rotated this node: the fresh array is discarded
-    /// and nothing is retried (point 5).
+    /// node. Peers may help a full generation rotate. A lost CAS discards this candidate; the
+    /// caller retries admission against the current node if it still needs to insert (point 5).
     /// </summary>
     private void Rotate(Generation observed)
     {
+        if (!ReferenceEquals(Volatile.Read(ref _current), observed)) return;
+
+        BeforeRotateForTests?.Invoke();
         var previous = observed.Maps;
         var maps = new ConcurrentDictionary<TKey, TValue>[previous.Length];
         maps[0] = NewMap();
@@ -227,7 +259,7 @@ public sealed class GenerationalCache<TKey, TValue> where TKey : notnull
 
     /// <summary>
     /// Drops every generation by publishing a fresh, empty node (point 11). A <c>Rotate</c> racing on
-    /// the old node loses its CAS and discards its array (point 5), so nothing is retried. The
+    /// the old node loses its CAS and discards its array (point 5). The
     /// diagnostics counters are not reset: they stay monotone. The caller must ensure no reader
     /// can access this cache while it runs.
     /// </summary>
@@ -244,7 +276,7 @@ public sealed class GenerationalCache<TKey, TValue> where TKey : notnull
     public long Misses => Interlocked.Read(ref _misses);
 
     /// <summary>Hits in the oldest generation, each of which cost one shared write. This is the one
-    /// cost this policy adds over a plain probe; measured, not assumed. Diagnostics only.</summary>
+    /// cost this policy adds over a plain probe. Diagnostics only.</summary>
     public long Promotions => Interlocked.Read(ref _promotions);
 
     /// <summary>Completed rotations, i.e. generations aged out. Diagnostics only.</summary>
