@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.CaveMobs;
@@ -123,11 +124,58 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(remaining, Assert.Single(ReadEntitiesFile()!.Drops!, d => d.Instance != null).Instance!.Lantern!.Remaining);
     }
 
-    private World NewWorld(ChunkSaveStore? store)
+    private World NewWorld(ChunkSaveStore? store, bool clientMode = false)
     {
-        var world = new World(null!, null!, null!, null!, null!, null!, null, store);
+        var world = new World(null!, null!, null!, null!, null!, null!, null, store,
+            clientMode: clientMode);
         _worlds.Add(world);
         return world;
+    }
+
+    private const int CacheProbeX = 123456;
+    private const int CacheProbeZ = -654321;
+
+    // Keep the original ColumnData out of the test method's JIT locals. The array copies are an
+    // output oracle, not a reference to the cache entry we expect the final world to release.
+    private sealed record ColumnSnapshot(int[] Heights, byte[] DirtDepth, float[] EntranceWeight,
+        float[] CaveIntensity, Biome[] Biomes, int[] Bed, int[] WaterLevel, bool[] Oasis,
+        int MinHeight, int MaxHeight, int MaxWaterLevel, float CornerWarmth, float CornerWetness)
+    {
+        public static ColumnSnapshot From(ColumnData c) => new(c.Heights.ToArray(), c.DirtDepth.ToArray(),
+            c.EntranceWeight.ToArray(), c.CaveIntensity.ToArray(), c.Biomes.ToArray(), c.Bed.ToArray(),
+            c.WaterLevel.ToArray(), c.Oasis.ToArray(), c.MinHeight, c.MaxHeight, c.MaxWaterLevel,
+            c.CornerWarmth, c.CornerWetness);
+
+        public void AssertMatches(ColumnData c)
+        {
+            Assert.True(Heights.SequenceEqual(c.Heights));
+            Assert.True(DirtDepth.SequenceEqual(c.DirtDepth));
+            Assert.True(EntranceWeight.SequenceEqual(c.EntranceWeight));
+            Assert.True(CaveIntensity.SequenceEqual(c.CaveIntensity));
+            Assert.True(Biomes.SequenceEqual(c.Biomes));
+            Assert.True(Bed.SequenceEqual(c.Bed));
+            Assert.True(WaterLevel.SequenceEqual(c.WaterLevel));
+            Assert.True(Oasis.SequenceEqual(c.Oasis));
+            Assert.Equal(MinHeight, c.MinHeight);
+            Assert.Equal(MaxHeight, c.MaxHeight);
+            Assert.Equal(MaxWaterLevel, c.MaxWaterLevel);
+            Assert.Equal(CornerWarmth, c.CornerWarmth);
+            Assert.Equal(CornerWetness, c.CornerWetness);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (WeakReference<ColumnData> Weak, ColumnSnapshot Snapshot) CacheProbe()
+    {
+        var column = ColumnCache.Get(CacheProbeX, CacheProbeZ);
+        return (new WeakReference<ColumnData>(column), ColumnSnapshot.From(column));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void AssertProbeStillCached(WeakReference<ColumnData> weak)
+    {
+        Assert.True(weak.TryGetTarget(out var original));
+        Assert.Same(original, ColumnCache.Get(CacheProbeX, CacheProbeZ));
     }
 
     /// <summary>Updates <paramref name="world"/> with measured wall deltas (clamped to 0.1 s)
@@ -203,6 +251,41 @@ public sealed class WorldLifecycleTests : IDisposable
         // Idempotent: the second call reports the first result and changes nothing
         Assert.Equal(result, world.SaveAndDispose());
         Assert.False(WorldSeed.WorldIsLive);
+    }
+
+    [Fact]
+    public void FinalQuietWorldReleasesColumnValuesWhileAnotherWorldKeepsThem()
+    {
+        // Client Worlds also own the process seed. Neither generates columns in the background,
+        // so the far-away probe cannot be evicted during this ownership check.
+        var first = NewWorld(null, clientMode: true);
+        var last = NewWorld(null, clientMode: true);
+        var (weak, snapshot) = CacheProbe();
+
+        Assert.True(first.SaveAndDispose());
+        Assert.True(WorldSeed.WorldIsLive);
+        AssertProbeStillCached(weak);
+        Assert.True(first.SaveAndDispose()); // An ended owner must not release the live owner's cache.
+        Assert.True(WorldSeed.WorldIsLive);
+        AssertProbeStillCached(weak);
+
+        Assert.True(last.SaveAndDispose());
+        Assert.False(WorldSeed.WorldIsLive);
+        GC.Collect(); // Test-only root check; production does not force a collection.
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        Assert.False(weak.TryGetTarget(out _), "the final world left ColumnData rooted by ColumnCache");
+
+        var recomputed = ColumnCache.Get(CacheProbeX, CacheProbeZ);
+        snapshot.AssertMatches(recomputed);
+        Assert.True(last.SaveAndDispose()); // Repeated disposal must not clear a new entry.
+        Assert.Same(recomputed, ColumnCache.Get(CacheProbeX, CacheProbeZ));
+
+        // A menu-launched next world applies even the same seed before construction.
+        WorldSeed.Apply(WorldSeed.Value);
+        var reopened = NewWorld(null, clientMode: true);
+        snapshot.AssertMatches(ColumnCache.Get(CacheProbeX, CacheProbeZ));
+        Assert.True(reopened.SaveAndDispose());
     }
 
     [Fact]
