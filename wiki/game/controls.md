@@ -11,7 +11,7 @@
 | Place / use | Right click |
 | Hotbar | `1`–`0`, or the mouse wheel |
 | Inventory | `E` |
-| Chat | `T` |
+| Chat | `Enter` |
 | Creative mode | `C` (double-tap `Space` to fly) |
 | Pause menu | `Esc` |
 | Debug overlay | `X` |

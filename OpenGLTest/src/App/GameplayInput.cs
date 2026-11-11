@@ -38,7 +38,8 @@ internal sealed class GameplayInput
     private bool rightWasDown;
     private bool middleWasPressed;
     private bool eWasPressed;
-    private bool tWasPressed;
+    private bool enterWasPressed;
+    private bool chatWasOpen;
     private bool slashWasPressed;
     private bool escWasPressed;
     private bool deathScreenWasUp;
@@ -185,13 +186,16 @@ internal sealed class GameplayInput
             SyncDeathScreen(w, deathUp);
         }
 
-        // T opens the chat: only from a clean play state, so it is never a hotkey while a panel,
-        // the pause menu or the chat itself already owns the keyboard.
-        var tPressed = inputManager.Keyboard?.IsKeyPressed(Key.T) == true;
-        if (tPressed && !tWasPressed && !chatView.IsOpen && !pauseMenuView.IsOpen
+        // Enter opens the chat: only from a clean play state, so it is never a hotkey while a panel,
+        // the pause menu or the chat itself already owns the keyboard. The chat must also have been
+        // closed on the previous frame, or the Enter that just sent a line would reopen it at once.
+        var enterPressed = inputManager.Keyboard?.IsKeyPressed(Key.Enter) == true
+            || inputManager.Keyboard?.IsKeyPressed(Key.KeypadEnter) == true;
+        if (enterPressed && !enterWasPressed && !chatWasOpen && !chatView.IsOpen && !pauseMenuView.IsOpen
             && !PanelOpen && !deathUp)
             chatView.Open();
-        tWasPressed = tPressed;
+        enterWasPressed = enterPressed;
+        chatWasOpen = chatView.IsOpen;
 
         // "/" opens the chat with the slash already typed, ready for a command
         var slashPressed = inputManager.Keyboard?.IsKeyPressed(Key.Slash) == true;
@@ -256,7 +260,7 @@ internal sealed class GameplayInput
         }
         escWasPressed = escPressed;
 
-        // Every chat open (T, '/') and close (Enter in the event pump, ESC, the death sync) of the frame has happened by
+        // Every chat open (Enter, '/') and close (Enter in the event pump, ESC, the death sync) of the frame has happened by
         // now, and a panel that opens later in the frame sets its own cursor
         SyncChatCursor(w);
 
