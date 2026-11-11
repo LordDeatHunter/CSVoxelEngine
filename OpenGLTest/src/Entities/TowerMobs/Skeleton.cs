@@ -53,8 +53,7 @@ public sealed class Skeleton : RealmMob
 
     private float _meleeCooldown;
     private float _shotCooldown = MobConfig.SkeletonFirstShotDelaySeconds;
-    private Vector3 _aimTarget;
-    private Vector3 _aimVelocity;
+    private readonly AimTracker _aim = new();
     private readonly VantageSeeker _vantage = new();
 
     /// <param name="type">The skeleton kind, with its model and clips.</param>
@@ -189,6 +188,7 @@ public sealed class Skeleton : RealmMob
         _meleeCooldown = MathF.Max(0f, _meleeCooldown - scaledDelta);
         _shotCooldown = MathF.Max(0f, _shotCooldown - scaledDelta);
         _vantage.Tick(scaledDelta);
+        _aim.Track(scaledDelta, Animation.IsActionPlaying);
     }
 
     /// <inheritdoc />
@@ -224,8 +224,7 @@ public sealed class Skeleton : RealmMob
         _vantage.Clear();
         if (!IsGrounded || _shotCooldown > 0f) return Vector3.Zero;
 
-        _aimTarget = chest;
-        _aimVelocity = target.Velocity;
+        _aim.Lock(target, chunks);
         StartAttack(ShotVariant);
         var jitter = (Random.Shared.NextSingle() - 0.5f) * 2f * MobConfig.SkeletonShotCooldownJitter;
         _shotCooldown = MobConfig.SkeletonShotCooldownSeconds + jitter;
@@ -238,8 +237,8 @@ public sealed class Skeleton : RealmMob
 
     /// <summary>
     /// True once per shot, at the shoot clip's release event: where the arrow leaves the bow and the launch
-    /// velocity that carries it onto the chest the shot was aimed at (GoblinAim's low arc, a maximum-range toss
-    /// toward it when out of reach).
+    /// velocity that carries it onto the chest of the target where the arrow will meet it
+    /// (<see cref="AimTracker"/>; a maximum-range toss toward it when out of reach).
     /// </summary>
     public bool TryTakeShotRelease(out Vector3 origin, out Vector3 velocity)
     {
@@ -248,8 +247,7 @@ public sealed class Skeleton : RealmMob
         if (!Animation.ConsumeEvent(ReleaseEvent)) return false;
 
         origin = ShotOrigin;
-        GoblinAim.TryLeadVelocity(origin, _aimTarget, _aimVelocity, MobConfig.SkeletonArrowSpeed,
-            ThrownProjectile.Gravity, MobConfig.RangedWindupLeadSeconds, out velocity);
+        _aim.Solve(origin, MobConfig.SkeletonArrowSpeed, ThrownProjectile.Gravity, out velocity);
         return true;
     }
 }

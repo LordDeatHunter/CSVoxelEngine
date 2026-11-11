@@ -63,8 +63,7 @@ public sealed class Goblin : RiggedMob
     private float _meleeCooldown;
     private float _losRetry;
     private bool _losBlocked;
-    private Vector3 _aimTarget;
-    private Vector3 _aimVelocity;
+    private readonly AimTracker _aim = new();
     // Which way the goblin sidesteps a charged throw aimed at it: fixed per goblin at spawn from
     // its cell, so the same goblin always breaks the same way instead of jittering
     private readonly float _dodgeSide;
@@ -226,6 +225,7 @@ public sealed class Goblin : RiggedMob
         _throwCooldown = MathF.Max(0f, _throwCooldown - deltaTime * AttackFactor);
         _meleeCooldown = MathF.Max(0f, _meleeCooldown - deltaTime * AttackFactor);
         _losRetry = MathF.Max(0f, _losRetry - deltaTime);
+        _aim.Track(deltaTime, Animation.IsActionPlaying);
         _noticePipElapsed = MathF.Min(MobConfig.GoblinNoticePipSeconds,
             _noticePipElapsed + deltaTime);
 
@@ -292,8 +292,7 @@ public sealed class Goblin : RiggedMob
                 if (!BlockRaycaster.SegmentHitsBlock(ThrowOrigin, chest, chunks))
                 {
                     _losBlocked = false;
-                    _aimTarget = chest;
-                    _aimVelocity = player.Velocity;
+                    _aim.Lock(player, chunks);
                     _thrownOnce = true;
                     Animation.Play(ThrowClip);
                     _throwCooldown = MobConfig.GoblinThrowCooldownSeconds
@@ -323,7 +322,8 @@ public sealed class Goblin : RiggedMob
     /// <summary>
     /// True once per throw, at the throw clip's release event while stones remain: spends one
     /// stone and returns where it leaves the hand and the launch velocity that lobs it onto the
-    /// chest the throw was aimed at (a maximum-range toss toward it when out of reach).
+    /// chest of the player where the stone will meet them (<see cref="AimTracker"/>; a maximum-range
+    /// toss toward it when out of reach).
     /// </summary>
     public bool TryTakeThrowRelease(out Vector3 origin, out Vector3 velocity)
     {
@@ -333,8 +333,7 @@ public sealed class Goblin : RiggedMob
 
         origin = ThrowOrigin;
         // The bool is ignored: an out-of-range player still gets the fallback toss.
-        GoblinAim.TryLeadVelocity(origin, _aimTarget, _aimVelocity, MobConfig.GoblinStoneSpeed,
-            ThrownProjectile.Gravity, MobConfig.RangedWindupLeadSeconds, out velocity);
+        _aim.Solve(origin, MobConfig.GoblinStoneSpeed, ThrownProjectile.Gravity, out velocity);
         Ammo--;
         return true;
     }

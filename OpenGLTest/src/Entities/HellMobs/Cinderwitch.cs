@@ -30,8 +30,7 @@ public sealed class Cinderwitch : HellMob
     public const string ReleaseEvent = "release";
 
     private float _castCooldown = MobConfig.HellCasterFirstCastDelaySeconds;
-    private Vector3 _aimTarget;
-    private Vector3 _aimVelocity;
+    private readonly AimTracker _aim = new();
 
     public Cinderwitch(EntityType type, Vector3 position, bool spawnIn = true)
         : base(type, position, MobConfig.HellCasterWalkSpeed, spawnIn)
@@ -62,8 +61,11 @@ public sealed class Cinderwitch : HellMob
         EntityContract.RequireHumanoid(type, "Cinderwitch", CastClip, ReleaseEvent);
 
     /// <inheritdoc />
-    protected override void TickCooldowns(float scaledDelta) =>
+    protected override void TickCooldowns(float scaledDelta)
+    {
         _castCooldown = MathF.Max(0f, _castCooldown - scaledDelta);
+        _aim.Track(scaledDelta, Animation.IsActionPlaying);
+    }
 
     /// <inheritdoc />
     protected override Vector3 Decide(float dist, Vector3 toward, ChunkManager chunks, IMobTarget target)
@@ -73,8 +75,7 @@ public sealed class Cinderwitch : HellMob
         if (dist <= MobConfig.HellCasterMaxRange && IsGrounded && _castCooldown <= 0f
             && SeesTarget(CastOrigin, target, chunks))
         {
-            _aimTarget = ChestOf(target.Eye);
-            _aimVelocity = target.Velocity;
+            _aim.Lock(target, chunks);
             StartAttack();
             var jitter = (Random.Shared.NextSingle() - 0.5f) * 2f * MobConfig.HellCasterCooldownJitter;
             _castCooldown = LayerDifficulty.Cooldown(MobConfig.HellCasterCooldownSeconds + jitter, Layer);
@@ -90,8 +91,8 @@ public sealed class Cinderwitch : HellMob
 
     /// <summary>
     /// True once per cast, at the cast clip's release event: where the bolt leaves the hand and the
-    /// launch velocity that lobs it onto the chest the cast was aimed at (GoblinAim's low arc, a
-    /// maximum-range toss toward it when out of reach).
+    /// launch velocity that lobs it onto the chest of the target where the bolt will meet it
+    /// (<see cref="AimTracker"/>; a maximum-range toss toward it when out of reach).
     /// </summary>
     public bool TryTakeCastRelease(out Vector3 origin, out Vector3 velocity)
     {
@@ -100,8 +101,7 @@ public sealed class Cinderwitch : HellMob
         if (!Animation.ConsumeEvent(ReleaseEvent)) return false;
 
         origin = CastOrigin;
-        GoblinAim.TryLeadVelocity(origin, _aimTarget, _aimVelocity, MobConfig.HellBoltSpeed,
-            ThrownProjectile.Gravity, MobConfig.RangedWindupLeadSeconds, out velocity);
+        _aim.Solve(origin, MobConfig.HellBoltSpeed, ThrownProjectile.Gravity, out velocity);
         return true;
     }
 }

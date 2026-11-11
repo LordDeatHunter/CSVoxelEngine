@@ -446,7 +446,9 @@ OpenGLTest/
       Goblins/                 # the goblin: the mob, its stone aim and its torch roll
         Goblin.cs              # the goblin: body physics, throw-then-melee AI, clip/event contract
                                #   (ValidateContent), animation-driven release/impact events
-        GoblinAim.cs           # GL-free low-arc ballistic solver for the thrown stones
+        GoblinAim.cs           # GL-free low-arc ballistic solver for the thrown stones, and its lead solve
+        AimTracker.cs          # a ranged mob's eye on its target through the wind-up: smoothed velocity, the
+                               #   ground under it, the led launch velocity at the release (every ranged mob)
         GoblinTorches.cs       # GL-free torch roll for a goblin spawn (night, depth, one uniform roll)
       HellMobs/                # hell's mobs (see "Hell mobs"): the shared base, the two kinds, the layer difficulty
         HellMob.cs             # abstract hell mob (a RealmMob): the layer it spawned in and its layer-scaled pool

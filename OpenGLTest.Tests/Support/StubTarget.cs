@@ -10,6 +10,9 @@ namespace VoxelEngine.Tests.Support;
 internal sealed class StubTarget(Vector3 eye) : IMobTarget
 {
     public Vector3 Eye { get; set; } = eye;
+
+    /// <summary>The velocity the target reports; at rest unless a test sets it.</summary>
+    public Vector3 Velocity { get; set; }
     public bool IsImmune => IsFlying || IsDead;
     public bool IsFlying { get; set; }
     public bool IsDead { get; set; }

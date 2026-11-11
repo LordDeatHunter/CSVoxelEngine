@@ -271,9 +271,14 @@ public static class MobConfig
     // to spare.
     public const float GoblinStoneSpeed = 20f;
 
-    /// <summary>Seconds between a ranged mob locking its aim and the projectile leaving the hand (the clip's
-    /// wind-up); the lead adds it to the flight time so the shot meets a moving player.</summary>
-    public const float RangedWindupLeadSeconds = 0.35f;
+    /// <summary>Seconds a ranged mob averages its target's horizontal velocity over while it winds up
+    /// (AimTracker): short enough to follow a turn before the release, long enough that a player jiggling
+    /// left and right is not led at all.</summary>
+    public const float RangedAimSmoothingSeconds = 0.15f;
+
+    /// <summary>Blocks under an airborne target the aim looks for the ground it lands on; a longer fall is led
+    /// only this far down.</summary>
+    public const int RangedAimFloorScanBlocks = 8;
 
     public const int GoblinStoneDamage = 8;
     public const float GoblinStoneKnockbackSpeed = 3f;

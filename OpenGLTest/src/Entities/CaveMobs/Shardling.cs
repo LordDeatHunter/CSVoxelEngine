@@ -28,8 +28,7 @@ public sealed class Shardling : CaveMob
     public const string ReleaseEvent = "release";
 
     private float _castCooldown = MobConfig.CaveShardlingFirstCastDelaySeconds;
-    private Vector3 _aimTarget;
-    private Vector3 _aimVelocity;
+    private readonly AimTracker _aim = new();
 
     public Shardling(EntityType type, Vector3 position, int tier, bool spawnIn = true)
         : base(type, position, tier, MobConfig.CaveShardlingWalkSpeed, spawnIn)
@@ -60,8 +59,11 @@ public sealed class Shardling : CaveMob
         EntityContract.RequireHumanoid(type, "Shardling", ThrowClip, ReleaseEvent);
 
     /// <inheritdoc />
-    protected override void TickCooldowns(float scaledDelta) =>
+    protected override void TickCooldowns(float scaledDelta)
+    {
         _castCooldown = MathF.Max(0f, _castCooldown - scaledDelta);
+        _aim.Track(scaledDelta, Animation.IsActionPlaying);
+    }
 
     /// <inheritdoc />
     protected override Vector3 Decide(float dist, Vector3 toward, ChunkManager chunks, IMobTarget target)
@@ -70,8 +72,7 @@ public sealed class Shardling : CaveMob
         if (dist <= MobConfig.CaveShardlingMaxRange && IsGrounded && _castCooldown <= 0f
             && SeesTarget(ShotOrigin, target, chunks))
         {
-            _aimTarget = ChestOf(target.Eye);
-            _aimVelocity = target.Velocity;
+            _aim.Lock(target, chunks);
             StartAttack();
             var jitter = (Random.Shared.NextSingle() - 0.5f) * 2f * MobConfig.CaveShardlingCooldownJitter;
             _castCooldown = MobConfig.CaveShardlingCooldownSeconds + jitter;
@@ -87,7 +88,8 @@ public sealed class Shardling : CaveMob
 
     /// <summary>
     /// True once per cast, at the cast clip's release event: where the shard leaves the hand and the launch velocity
-    /// that lobs it onto the chest the cast was aimed at (GoblinAim's low arc, a maximum-range toss when out of reach).
+    /// that lobs it onto the chest of the target where the shard will meet it (<see cref="AimTracker"/>; a
+    /// maximum-range toss when out of reach).
     /// </summary>
     public bool TryTakeShotRelease(out Vector3 origin, out Vector3 velocity)
     {
@@ -96,8 +98,7 @@ public sealed class Shardling : CaveMob
         if (!Animation.ConsumeEvent(ReleaseEvent)) return false;
 
         origin = ShotOrigin;
-        GoblinAim.TryLeadVelocity(origin, _aimTarget, _aimVelocity, MobConfig.CaveShardSpeed,
-            ThrownProjectile.Gravity, MobConfig.RangedWindupLeadSeconds, out velocity);
+        _aim.Solve(origin, MobConfig.CaveShardSpeed, ThrownProjectile.Gravity, out velocity);
         return true;
     }
 }

@@ -228,6 +228,17 @@ throw band must stay inside it, with margin for a chest-height target and the se
 throws fall short. An out-of-range target still gets a 45-degree maximum-range toss toward it. Every
 goblin number lives under `MobConfig.Goblin*`.
 
+**Leading a moving target.** Every ranged mob (goblin, skeleton archer, cinderwitch, shardling) owns an
+**`AimTracker`**: `Lock(target, chunks)` when the attack clip starts, `Track` every frame of the wind-up
+(from `TickCooldowns`, or the goblin's `Update`), `Solve` at the release event. The shot is therefore aimed
+from where the target is and how it moves *at the release*, never from the wind-up's first frame. The
+horizontal velocity is averaged over `RangedAimSmoothingSeconds`, so a steady runner is led in full and a
+player jiggling left and right is shot where they stand. `GoblinAim.TryLeadVelocity` iterates flight time
+against aim point (the flight is measured to the led point), and an airborne target (a jump, a fall) follows
+the player's parabola down to the ground the tracker probed under it (`LedgeProbe.GroundBelow`, at most
+`RangedAimFloorScanBlocks` down); a flyer's vertical speed is not led. The Skeleton King's volley is not led.
+`AimLeadTests` holds the rules.
+
 A goblin's life has more rules than its AI. **Flee**: below `GoblinFleeHealthShare` (a quarter) of
 its pool it turns and runs from the player at `GoblinFleeSpeedFactor` of its walk, never throwing or
 swinging (`Goblin.IsFleeing`, `GoblinFleeTests`). **Scavenge**: a live goblin with ammo room joins
