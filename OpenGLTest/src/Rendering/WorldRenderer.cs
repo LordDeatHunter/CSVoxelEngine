@@ -332,7 +332,7 @@ internal sealed class WorldRenderer
         // The UI draws after this, straight onto that gamma framebuffer.
         FrameProfiler.Begin(ProfileSection.PostPass);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.PostPass);
-        renderManager.Screen.RenderPostProcess(_health.DamageFlash);
+        renderManager.Screen.RenderPostProcess(_health.DamageFlash, _world.ConqueredEffects?.Shockwaves);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.PostPass);
         FrameProfiler.End(ProfileSection.PostPass);
     }

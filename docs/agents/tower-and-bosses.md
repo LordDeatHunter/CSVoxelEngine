@@ -327,8 +327,10 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
   before BT-8) starts a fresh collapse. No wire change: clients see the ruin through the `BlockChanges` journal (protocol
   stays 27). **Floor conquered**: when a floor's door opens (never the roof boss), `TowerManager.FloorConquered` (raised by the
   tick, and on a client when a snapshot shows a mirrored tower's door newly open) makes `Particles/FloorConqueredEffects` play the
-  `floor_clear` sfx (camera within `JuiceConfig.FloorConqueredSoundRangeBlocks`) and pulse rings of `FireParticleKind.Pulse` motes
-  out of the floor's center (`FireParticleSystem.PulseRing`, `JuiceConfig.FloorConquered*`). **The show** (`Particles/Collapse/TowerCollapseEffects`, cosmetic, tuning in `JuiceConfig.TowerCollapse*` and
+  `floor_clear` sfx (camera within `JuiceConfig.FloorConqueredSoundRangeBlocks`) and sweep three cylinders of
+  `FireParticleKind.Pulse` motes out of the floor's axis across its whole height to the wall (`FireParticleSystem.PulseCylinder`;
+  the reach is `FloorConqueredEffects.InteriorRadius`, `JuiceConfig.FloorConquered*`), each riding an `Effects/Post/Shockwave`
+  that `post-fragment.glsl` bends the screen with (it rebuilds each pixel's world position from the scene depth on unit 1). **The show** (`Particles/Collapse/TowerCollapseEffects`, cosmetic, tuning in `JuiceConfig.TowerCollapse*` and
   `TowerDebris*`, never built on a server): every cell going from an unbreakable block to anything else
   (`TowerCollapseEffects.ShowsCollapse`: only the tower's writer can do that, so a player's edit never plays it; a
   translucent one, the dome's forcefield, has no rubble and just winks out) inside a

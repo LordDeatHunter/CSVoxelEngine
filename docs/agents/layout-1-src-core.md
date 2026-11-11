@@ -365,6 +365,7 @@ OpenGLTest/
         SunDazzle.cs           # GL-free twin of the sun dazzle: its strength (facing, disc, wet), disc radius, visibility ease and glow
         Tonemap.cs             # the C# twin of post-fragment.glsl's tonemap, used only
                                #   by tests: exposure, then a per-channel clamp to 0..1
+        Shockwave.cs           # one expanding cylindrical shell the post pass bends the screen with (a conquered tower floor's pulse)
         UnderwaterWobble.cs    # GL-free twin of the post pass's underwater screen sway: the offset and its wrapped clock
       Sky/                     # sun, moon, stars, aurora, glare, silver lining, wind and the day cycle
         Aurora.cs              # GL-free twin of the aurora's fade (eye coldness x star visibility) and its wrapped noise drift

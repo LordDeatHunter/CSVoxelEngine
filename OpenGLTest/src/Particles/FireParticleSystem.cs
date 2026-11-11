@@ -135,22 +135,29 @@ public sealed class FireParticleSystem
     }
 
     /// <summary>
-    /// One ring of <paramref name="count"/> <see cref="FireParticleKind.Pulse"/> motes leaving
-    /// <paramref name="center"/> flat in every direction at <paramref name="speed"/> blocks per second, evenly spaced
-    /// around the circle from a random start so successive rings do not line up. Evicts the oldest particles past
-    /// the cap like any spawn.
+    /// One cylinder of <see cref="FireParticleKind.Pulse"/> motes leaving the vertical axis through
+    /// <paramref name="center"/> flat in every direction at <paramref name="speed"/> blocks per second: a stack of layers
+    /// <paramref name="layerSpacing"/> apart from <paramref name="bottomY"/> to <paramref name="topY"/>, each of
+    /// <paramref name="perLayer"/> motes evenly spaced around the circle from its own random start, so the shell covers
+    /// the whole height and its layers do not line up. Evicts the oldest particles past the cap like any spawn.
     /// </summary>
-    public void PulseRing(Vector3 center, int count, float speed, float lifetime, float size, Random? random = null)
+    public void PulseCylinder(Vector3 center, float bottomY, float topY, int perLayer, float layerSpacing, float speed,
+        float lifetime, float size, Random? random = null)
     {
         var rng = random ?? Random.Shared;
-        var start = rng.NextSingle() * MathF.Tau;
-        for (var i = 0; i < count; i++)
+        var layers = Math.Max(1, (int)MathF.Ceiling((topY - bottomY) / layerSpacing));
+        for (var layer = 0; layer < layers; layer++)
         {
-            if (_particles.Count >= _maxParticles)
-                _particles.RemoveAt(0);
-            var angle = start + MathF.Tau * i / count;
-            var velocity = new Vector3(MathF.Cos(angle) * speed, 0f, MathF.Sin(angle) * speed);
-            _particles.Add(new FireParticle(center, velocity, lifetime, size));
+            var y = bottomY + (topY - bottomY) * (layer + 0.5f) / layers;
+            var start = rng.NextSingle() * MathF.Tau;
+            for (var i = 0; i < perLayer; i++)
+            {
+                if (_particles.Count >= _maxParticles)
+                    _particles.RemoveAt(0);
+                var angle = start + MathF.Tau * i / perLayer;
+                var velocity = new Vector3(MathF.Cos(angle) * speed, 0f, MathF.Sin(angle) * speed);
+                _particles.Add(new FireParticle(new Vector3(center.X, y, center.Z), velocity, lifetime, size));
+            }
         }
     }
 

@@ -254,18 +254,22 @@ public static class JuiceConfig
     public const float SparkSize = 0.12f;
 
     // --- Conquered battle-tower floor (FloorConqueredEffects): when a floor's last skeleton falls and its door
-    // opens, glowing motes pulse outward from the middle of the floor in PulseCount rings, one every
-    // PulseIntervalSeconds, each ring MoteCount motes flung flat at MoteSpeed that fade over MoteLifetime
-    // seconds; the jingle plays when the camera is within SoundRangeBlocks. Cosmetic: singleplayer and a
-    // client (from the door bit of the tower snapshot), never a server. ---
+    // opens, PulseCount cylinders of glowing motes, one every PulseIntervalSeconds, sweep out from the floor's
+    // axis across its whole height, a layer every MoteLayerSpacing blocks of MotesPerLayer motes flung flat at
+    // MoteSpeed until they reach the wall (the floor's interior radius), while a shockwave rides each shell
+    // and bends the screen (post-fragment.glsl, Shockwave): a lens of half ShockwaveHalfThickness blocks
+    // that pushes the picture ShockwavePushBlocks along the way out. The jingle plays when the camera is within
+    // SoundRangeBlocks. Cosmetic: singleplayer and a client (from the door bit of the tower snapshot), never a
+    // server. ---
     public const int FloorConqueredPulseCount = 3;
-    public const float FloorConqueredPulseIntervalSeconds = 0.4f;
-    public const int FloorConqueredMoteCount = 48;
-    public const float FloorConqueredMoteSpeed = 5f;
-    public const float FloorConqueredMoteLifetime = 1.4f;
-    public const float FloorConqueredMoteSize = 0.16f;
-    // Blocks above the floor's slab the pulse starts at
-    public const float FloorConqueredRiseBlocks = 1.2f;
+    public const float FloorConqueredPulseIntervalSeconds = 0.45f;
+    public const int FloorConqueredMotesPerLayer = 72;
+    public const float FloorConqueredMoteLayerSpacing = 1.5f;
+    public const float FloorConqueredMoteSpeed = 6f;
+    public const float FloorConqueredMoteSize = 0.26f;
+    public const float FloorConqueredShockwaveHalfThickness = 1.4f;
+    public const float FloorConqueredShockwavePushBlocks = 1.2f;
+    public const float FloorConqueredShockwaveRangeBlocks = 96f;
     public const float FloorConqueredSoundRangeBlocks = 48f;
 
     // --- Low-health vignette (LowHealthVignette, vignette-fragment.glsl) ---

@@ -60,7 +60,7 @@ public static class ParticleConfig
     public const float FireEmberSize = 0.09f;
     public const float FireSmokeSize = 0.22f;
     public const float FireSmokeGrow = 0.12f;
-    public const int FireParticleMax = 512;
+    public const int FireParticleMax = 1536;
     public const float FireEmberPerSecond = 36f;
     public const float FireSmokePerSecond = 8f;
     public const float FireParticleRadius = 48f;

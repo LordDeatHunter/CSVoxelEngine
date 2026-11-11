@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using VoxelEngine.Effects.Post;
@@ -60,12 +61,18 @@ internal sealed class ScreenPasses : IDisposable
     /// <paramref name="damageFlash"/> is the player's damage flash (<see cref="PlayerHealth.DamageFlash"/>),
     /// which drives the damage chromatic fringe.
     /// </summary>
-    internal void RenderPostProcess(float damageFlash = 0f)
+    internal void RenderPostProcess(float damageFlash = 0f, IReadOnlyList<Shockwave>? shockwaves = null)
     {
         if (_post == null || Targets.HdrFbo == 0) return;
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         _gl.Viewport(Targets.ViewportSize);
         Units.BindUnit(0, TextureTarget.Texture2D, Targets.HdrColorTex);
+        var bent = shockwaves is { Count: > 0 };
+        if (bent)
+        {
+            // The shells read the scene depth to find the world position each pixel shows
+            Units.BindUnit(1, TextureTarget.Texture2D, Targets.HdrDepthTex);
+        }
         Units.ActiveUnit(0);
         // The eye adaptation (FrameLighting.SetLighting) scales the exposure up in the dark; the
         // biome grade tints the finished image faintly warm over the desert and cool over the snow;
@@ -74,8 +81,9 @@ internal sealed class ScreenPasses : IDisposable
         // (UnderwaterWobble)
         _post.Render(Targets.ViewportSize, new PostEffects(LightingConfig.TonemapExposure * Lighting.EyeExposure, Lighting.Grade,
             DamageFringe.Strength(damageFlash), Lighting.EyeInLava ? 0f : MathUtils.SmoothStep(Lighting.UnderwaterT),
-            UnderwaterWobble.WrapTime(Lighting.TimeD)));
+            UnderwaterWobble.WrapTime(Lighting.TimeD), shockwaves), Lighting.SceneViewProj, Lighting.InvViewProj);
         Units.BindUnit(0, TextureTarget.Texture2D, 0);
+        if (bent) Units.BindUnit(1, TextureTarget.Texture2D, 0);
     }
 
     /// <summary>
