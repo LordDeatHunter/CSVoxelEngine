@@ -611,6 +611,67 @@ public sealed class WorldLifecycleTests : IDisposable
     }
 
     [Fact]
+    public void APendingLanternSurvivesRestoreTimeoutWithoutRepeatedDiscardWarningsAndRestoresOnce()
+    {
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+        var lantern = ContentRegistry.RequireBlock("lantern").Id;
+        var coal = ContentRegistry.RequireItem("coal").Id;
+        var inventory = Inventory.Empty();
+        inventory.Add(lantern); inventory.PickBlock(lantern); inventory.Add(coal, 2);
+        var fuel = LanternState.Held(inventory)!;
+        fuel.Move(inventory, ChestMove.DepositStack(coal, 2)); fuel.Advance(.5f);
+        var far = new Vector3(100000f, High, 0f);
+        WriteEntitiesFile(new EntitySaveData
+        {
+            Drops =
+            [
+                new() { Item = SaveNames.NameOf(lantern), Position = [far.X, far.Y, far.Z],
+                    Instance = InventorySaveCodec.ExportInstance(inventory.Tools.Single(), []) },
+                new() { Item = SaveNames.NameOf(TerrainGenerator.RockBlock), Position = [far.X, far.Y, far.Z] },
+            ],
+        });
+        var first = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(first, () => first.IsPlaying, LoadWallSeconds));
+        Assert.Null(first.GetChunkManager().ChunkAt((int)far.X, (int)far.Y, (int)far.Z));
+        var original = Console.Out;
+        using var text = new StringWriter();
+        var capture = TextWriter.Synchronized(text);
+        string report;
+        try
+        {
+            Console.SetOut(capture);
+            first.Persistence.RestorePendingEntities(SaveConfig.EntityRestoreTimeoutSeconds + 1);
+            for (var i = 0; i < 5; i++) first.Persistence.RestorePendingEntities(1);
+            const string marker = "lantern timeout log drained";
+            Log.WriteLine(marker);
+            Assert.True(SpinWait.SpinUntil(() =>
+            {
+                lock (capture) return text.ToString().Contains(marker, StringComparison.Ordinal);
+            }, TimeSpan.FromSeconds(5)));
+            lock (capture) report = text.ToString();
+        }
+        finally { Console.SetOut(original); }
+        Assert.Single(report.Split('\n'), line => line.Contains("Entity save: discarded", StringComparison.Ordinal));
+        Assert.Contains("1 drop(s)", report);
+        Assert.Empty(first.Drops);
+        Assert.True(first.SaveAndDispose());
+        var pending = Assert.Single(ReadEntitiesFile()!.Drops!);
+        Assert.Equal(fuel.Remaining, pending.Instance!.Lantern!.Remaining);
+        Assert.Equal(1, pending.Instance.Lantern.Storage!.Slots!.Single().Count);
+
+        // Stream the retained drop's chunk in a fresh session, out of pickup range.
+        WritePlayerFile(new PlayerSaveData { Position = [far.X + 10f, High, far.Z] });
+        var second = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(second, () => second.IsPlaying && second.Drops.Any(d => d.Instance != null), LoadWallSeconds));
+        for (var i = 0; i < 5; i++) second.Persistence.RestorePendingEntities(1);
+        var restored = Assert.Single(second.Drops);
+        Assert.Equal(fuel.Remaining, LanternState.Of(restored.Instance)!.Remaining);
+        Assert.Equal(1, LanternState.Of(restored.Instance)!.Storage.CountOf(coal));
+        Assert.True(second.SaveAndDispose());
+        Assert.Equal(fuel.Remaining, Assert.Single(ReadEntitiesFile()!.Drops!).Instance!.Lantern!.Remaining);
+    }
+
+    [Fact]
     public void AFarSavedDropWaitsForItsChunk()
     {
         var rock = SaveNames.NameOf(TerrainGenerator.RockBlock);

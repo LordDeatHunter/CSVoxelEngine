@@ -136,7 +136,7 @@ internal sealed class WorldPersistence
     private readonly PlayerSaveData? _hostedPlayer;
 
     // Saved mobs and drops (entities.json) not spawned yet: each waits for its chunk to load,
-    // and the lot is discarded after EntityRestoreTimeoutSeconds of play (RestorePendingEntities)
+    // and ordinary entries expire after EntityRestoreTimeoutSeconds; owned instance drops keep waiting
     private readonly List<EntitySaveData.MobData> _pendingMobs = [];
     private readonly List<EntitySaveData.DropData> _pendingDrops = [];
     private readonly List<EntitySaveData.IcebergData> _pendingIcebergs = [];
@@ -169,7 +169,8 @@ internal sealed class WorldPersistence
     /// and loses nothing, since pending entries are re-saved. An unknown entity kind or item name, or a record with no
     /// position, is dropped with one warning per pass. After
     /// <see cref="SaveConfig.EntityRestoreTimeoutSeconds"/> of play whatever is still
-    /// pending is discarded. Main thread, Playing only; nothing pending costs one check.
+    /// pending is discarded except owned instance drops, which keep waiting and are re-saved.
+    /// Main thread, Playing only; nothing pending costs one check.
     /// </summary>
     internal void RestorePendingEntities(double deltaTime)
     {
@@ -236,12 +237,13 @@ internal sealed class WorldPersistence
         if (!(_entityRestoreTimer >= SaveConfig.EntityRestoreTimeoutSeconds)
             || (_pendingMobs.Count <= 0 && _pendingDrops.Count <= 0 && _pendingIcebergs.Count <= 0)) return;
 
-        Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s), {_pendingDrops.Count} drop(s) and {_pendingIcebergs.Count} iceberg(s) whose chunks never loaded or that a full cap kept out");
+        var discardedDrops = _pendingDrops.RemoveAll(drop => drop.Instance == null);
+        if (_pendingMobs.Count == 0 && discardedDrops == 0 && _pendingIcebergs.Count == 0) return;
+        Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s), {discardedDrops} drop(s) and {_pendingIcebergs.Count} iceberg(s) whose chunks never loaded or that a full cap kept out");
         foreach (var mob in _pendingMobs)
             if (TowerFloorOf(mob) is { } floor)
                 _discardedTowerSkeletons.Add(floor);
         _pendingMobs.Clear();
-        _pendingDrops.RemoveAll(drop => drop.Instance == null);
         _pendingIcebergs.Clear();
     }
 

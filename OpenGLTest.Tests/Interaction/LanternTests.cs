@@ -295,6 +295,11 @@ public sealed class LanternTests : IDisposable
         {
             Tools = [new() { Name = "block/lantern", InstanceId = 1, Lantern = new LanternData { Version = 99 } }],
         }));
+        foreach (var name in new[] { "item/missing-lantern", "item/coal" })
+            Assert.Throws<System.IO.InvalidDataException>(() => Inventory.Import(new PlayerSaveData.InventoryData
+            {
+                Tools = [new() { Name = name, InstanceId = 1, Lantern = new LanternData() }],
+            }));
         Assert.Equal(2, Inventory.CountFor(Coal));
         var fuel = Fuel(AcquireLantern(), Coal, 2);
         var data = LanternCodec.Export(fuel); data.Cell = [100000, 100000, 100000]; data.Block = "block/lantern";

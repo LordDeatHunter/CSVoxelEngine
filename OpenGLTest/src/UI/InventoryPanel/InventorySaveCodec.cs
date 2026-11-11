@@ -120,14 +120,15 @@ public static class InventorySaveCodec
 
     /// <summary>
     /// Rebuilds one instance from its saved form as instance <paramref name="instanceId"/>: the item must still exist
-    /// and be tool-like (a Tools, Misc or Gear item, never a block), and every component is restored through the same
+    /// and be tool-like (a Tools, Misc or Gear item, including lantern blocks), and every component is restored through the same
     /// rules a player save uses. Null, with the reason in <paramref name="dropped"/>, when it cannot be restored.
     /// </summary>
     internal static ItemStack? ImportInstance(int instanceId, PlayerSaveData.ToolData tool, List<string> dropped)
     {
         // Any pure item may be a tool instance, not just a Tools-category one: the spawn stock puts the
         // copper pickaxe and axe (no durability, no use action, so their StorageCategory is Misc) straight into the
-        // tools pool, and a save must bring them back. Blocks never are.
+        // tools pool, and a save must bring them back. Lantern blocks also own instances.
+        var lantern = ImportLantern(tool);
         if (!SaveNames.TryResolve(tool.Name, out var id)
             || ItemRegistry.TryGet(id) is not { } item
             || Inventory.CategoryOf(id) is not (InventoryCategory.Tools or InventoryCategory.Misc
@@ -138,8 +139,7 @@ public static class InventorySaveCodec
         }
 
         var stack = new ItemStack(instanceId, item);
-        if (LanternState.IsLantern(id) && tool.Lantern is { } lantern)
-            stack.Set(new LanternComponent(LanternCodec.Import(lantern)));
+        if (lantern != null) stack.Set(new LanternComponent(lantern));
         if (item.MaxDurability > 0 && tool.UsesLeft is { } usesLeft)
             stack.Set(new DurabilityComponent(Math.Clamp(usesLeft, 0, item.MaxDurability),
                 item.MaxDurability));
@@ -157,6 +157,15 @@ public static class InventorySaveCodec
         return stack;
     }
 
+    // Validate the component owner before a generic missing-item path could discard a complete lantern payload.
+    private static LanternState? ImportLantern(PlayerSaveData.ToolData tool)
+    {
+        if (tool.Lantern == null) return null;
+        if (!SaveNames.TryResolve(tool.Name, out var id) || !LanternState.IsLantern(id))
+            throw new System.IO.InvalidDataException("Lantern metadata requires a known lantern item");
+        return LanternCodec.Import(tool.Lantern);
+    }
+
     // The obtained set as save names, for Export
     private static List<string> ExportKnown(Inventory inventory)
     {
@@ -171,7 +180,7 @@ public static class InventorySaveCodec
     {
         if (data.Tools != null)
             foreach (var tool in data.Tools)
-                if (tool?.Lantern is { } lantern) LanternCodec.Import(lantern);
+                if (tool != null) ImportLantern(tool);
         inventory.Blocks.Clear();
         inventory.Misc.Clear();
         inventory.Tools.Clear();
