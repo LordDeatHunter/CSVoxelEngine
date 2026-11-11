@@ -365,7 +365,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int CaveFluidCellShift = 6;
     public const int CaveFluidSiteMargin = 16;
 
-    // Contained lava bowls: one candidate chunk per 64-cube, only where it meets a dry cave.
+    // Lava pits: one candidate chunk per 64-cube, cut only into intact dry cave floors.
     public const int CaveLavaLakeCellShift = 6;
     public const int CaveLavaLakeMinRadius = 3;
     public const int CaveLavaLakeMaxRadius = 6;

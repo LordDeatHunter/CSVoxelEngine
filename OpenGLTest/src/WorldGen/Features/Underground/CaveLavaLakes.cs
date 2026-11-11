@@ -1,11 +1,10 @@
-using System;
 using VoxelEngine.Chunks;
 
 namespace VoxelEngine.WorldGen.Features.Underground;
 
-/// <summary>Small prefilled lava bowls with a solid bottom and rim. Every site fits one chunk,
-/// so acceptance sees the entire basin without cross-chunk reads or writes. Only a site meeting
-/// existing dry cave air opens a lake; deeper sites win the occurrence roll more often.</summary>
+/// <summary>Small lava pits cut into existing dry cave floors. Every site fits one chunk,
+/// so acceptance sees the entire basin without cross-chunk reads or writes. Only a site with
+/// existing rock containing its bottom and sides opens a lake; deeper sites win the occurrence roll more often.</summary>
 internal static class CaveLavaLakes
 {
     private const int Shift = WorldGenerationConfig.CaveLavaLakeCellShift;
@@ -14,7 +13,7 @@ internal static class CaveLavaLakes
         WorldGenerationConfig.CaveLavaLakeChanceDeep, MathUtils.SmoothStep(WorldGenerationConfig.LavaMaxY,
             WorldGenerationConfig.BarrierTopY, y));
 
-    /// <summary>The candidate's local level, radius and depth, when this is its chosen chunk.</summary>
+    /// <summary>The candidate's preferred local level, maximum radius and depth, when this is its chosen chunk.</summary>
     internal static bool TrySite(int x0, int y0, int z0, out int level, out int radius, out int depth)
     {
         var cx = x0 >> Shift;
@@ -37,38 +36,78 @@ internal static class CaveLavaLakes
 
     internal static void Stamp(ushort[] blocks, ColumnData column, int x0, int y0, int z0)
     {
-        if (!TrySite(x0, y0, z0, out var level, out var radius, out var depth)) return;
-        const int center = Chunk.Size / 2;
-        if (blocks[Chunk.Idx(center, level + 1, center)] != BlockType.Air) return;
-        var rim = radius + 1;
-        // Check the entire footprint before writing. Surface water, near-surface terrain and
-        // any fluid contact reject the site rather than creating a mixing waterfall.
-        for (var x = center - rim; x <= center + rim; x++)
-        for (var z = center - rim; z <= center + rim; z++)
+        if (!TrySite(x0, y0, z0, out var preferred, out var radius, out var depth)) return;
+        // Search actual floors rather than building at the hashed height in cave air. The whole
+        // search stays in this chunk; its verdict cannot depend on loaded neighbors or query order.
+        var min = depth + 1;
+        var max = Chunk.Size - WorldGenerationConfig.CaveLavaLakeAirHeight - 1;
+        for (var offset = 0; offset <= max - min; offset++)
         {
-            if (y0 + level + WorldGenerationConfig.CaveLavaLakeAirHeight > column.Heights[VoxelCoords.ColumnIndex(x, z)] - WorldGenerationConfig.CaveLavaLakeBurial)
-                return;
-            for (var y = level - depth - 1; y <= level + WorldGenerationConfig.CaveLavaLakeAirHeight; y++)
-                if (BlockType.IsFluid(blocks[Chunk.Idx(x, y, z)])) return;
+            var level = min + (preferred - min + offset) % (max - min + 1);
+            if (TryFloorAtLevel(blocks, column, y0, level, radius, depth)) return;
         }
+    }
 
-        for (var x = center - rim; x <= center + rim; x++)
-        for (var z = center - rim; z <= center + rim; z++)
+    private static bool TryFloorAtLevel(ushort[] blocks, ColumnData column, int y0, int level, int radius, int depth)
+    {
+        for (var r = radius; r >= WorldGenerationConfig.CaveLavaLakeMinRadius; r--)
         {
-            var dx = x - center;
-            var dz = z - center;
-            var distance = dx * dx + dz * dz;
-            if (distance > rim * rim) continue;
-            var inside = distance <= radius * radius;
-            var bottom = level - depth + (int)(distance / (float)(radius * radius) * (depth - 1));
-            for (var y = level - depth - 1; y <= level + WorldGenerationConfig.CaveLavaLakeAirHeight; y++)
+            var rim = r + 1;
+            var width = Chunk.Size - 2 * rim;
+            for (var dx = 0; dx < width; dx++)
+            for (var dz = 0; dz < width; dz++)
             {
-                var i = Chunk.Idx(x, y, z);
-                if (y <= level)
-                    blocks[i] = inside && y > bottom ? LavaGenerator.LavaBlock : TerrainGenerator.RockBlock;
-                else if (inside)
-                    blocks[i] = BlockType.Air;
+                var x = rim + (Chunk.Size / 2 - rim + dx) % width;
+                var z = rim + (Chunk.Size / 2 - rim + dz) % width;
+                if (!FitsFloor(blocks, column, y0, level, x, z, r, depth)) continue;
+                CarvePit(blocks, level, x, z, r, depth);
+                return true;
             }
+        }
+        return false;
+    }
+
+    private static bool FitsFloor(ushort[] blocks, ColumnData column, int y0, int level, int centerX, int centerZ, int radius, int depth)
+    {
+        if (y0 + level > WorldGenerationConfig.LavaMaxY
+            || y0 + level - depth - 1 <= WorldGenerationConfig.BarrierTopY) return false;
+        var rim = radius + 1;
+        var top = level + WorldGenerationConfig.CaveLavaLakeAirHeight;
+        for (var x = centerX - rim; x <= centerX + rim; x++)
+        for (var z = centerZ - rim; z <= centerZ + rim; z++)
+        {
+            var distance = (x - centerX) * (x - centerX) + (z - centerZ) * (z - centerZ);
+            if (distance > rim * rim) continue;
+            if (y0 + top > column.Heights[VoxelCoords.ColumnIndex(x, z)] - WorldGenerationConfig.CaveLavaLakeBurial)
+                return false;
+            // A conservative intact rock slab provides all walls and the bottom. Air gaps,
+            // fluids and non-solid scenery reject; nothing is repaired by adding rock.
+            for (var y = level - depth - 1; y <= level; y++)
+            {
+                var id = blocks[Chunk.Idx(x, y, z)];
+                if (!BlockType.IsSolid(id) || !BlockType.Occludes(id) || BlockType.IsFluid(id)) return false;
+            }
+            for (var y = level + 1; y <= top; y++)
+                if (BlockType.IsFluid(blocks[Chunk.Idx(x, y, z)])) return false;
+            // The floor may have small humps, but every pool column must open into dry cave
+            // air above them. Clearing those humps only removes existing floor material.
+            if (distance <= radius * radius && blocks[Chunk.Idx(x, top, z)] != BlockType.Air) return false;
+        }
+        return true;
+    }
+
+    private static void CarvePit(ushort[] blocks, int level, int centerX, int centerZ, int radius, int depth)
+    {
+        for (var x = centerX - radius; x <= centerX + radius; x++)
+        for (var z = centerZ - radius; z <= centerZ + radius; z++)
+        {
+            var distance = (x - centerX) * (x - centerX) + (z - centerZ) * (z - centerZ);
+            if (distance > radius * radius) continue;
+            var bottom = level - depth + (int)(distance / (float)(radius * radius) * (depth - 1));
+            for (var y = bottom + 1; y <= level; y++)
+                blocks[Chunk.Idx(x, y, z)] = LavaGenerator.LavaBlock;
+            for (var y = level + 1; y <= level + WorldGenerationConfig.CaveLavaLakeAirHeight; y++)
+                blocks[Chunk.Idx(x, y, z)] = BlockType.Air;
         }
     }
 }
