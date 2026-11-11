@@ -190,6 +190,7 @@ public sealed class CaveBiomeTests
 
     [Theory]
     [InlineData(Biome.Frozen, CaveBiome.FrozenEcho)]
+    [InlineData(Biome.Desert, CaveBiome.DesertEcho)]
     public void ExpandedEchoDressesUncarvedRockBelowTheOldBand(Biome surface, CaveBiome expected)
     {
         var (cx, cz) = FindColumn(surface, 0xC4FE_0100UL + (ulong)surface);
@@ -238,7 +239,7 @@ public sealed class CaveBiomeTests
                 Assert.True(y > Math.Min(WorldGenerationConfig.CaveEchoVolumeBottomY,
                     WorldGenerationConfig.CaveEchoBottomY - WorldGenerationConfig.CaveEchoDriftBlocks), at);
                 Assert.True(height - y >= WorldGenerationConfig.CaveEchoCoverBlocks, at);
-                if (cave == CaveBiome.DesertEcho) Assert.Equal(Biome.Desert, surface);
+                // Expanded 3D echoes can extend under a different surface biome.
             }
 
             if (cave is CaveBiome.Crystal or CaveBiome.Fungal or CaveBiome.MagmaDeep)
@@ -270,7 +271,7 @@ public sealed class CaveBiomeTests
             for (var y = height; y > WorldGenerationConfig.BarrierTopY; y--)
             {
                 var cave = CaveBiomes.At(x, y, z, Biome.Frozen, height);
-                if (cave == CaveBiome.FrozenEcho) wasEcho = true;
+                if (cave is CaveBiome.FrozenEcho or CaveBiome.DesertEcho) wasEcho = true;
                 else if (wasEcho && echoBottom is null) echoBottom = y;
                 if (cave == CaveBiome.MagmaDeep)
                 {

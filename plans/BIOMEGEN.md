@@ -1256,3 +1256,5 @@ costs of each phase are in `CAVE_BIOMES.md` (Reference); the mobs and chests are
 ---------------------------------------------------------------------------------------------------
 
 Issue #10 expands frozen echo materials with bounded 3D ellipsoid sites (`CaveEchoVolumes`, hash salt 0x5E80; no new noise). This deliberately changes newly generated underground material; modified chunk snapshots and the world format are unchanged.
+
+Issue #10 sandstone now shares the frozen 3D echo volumes and seed-aware site cache; no new surface biome, content id, noise or save version.

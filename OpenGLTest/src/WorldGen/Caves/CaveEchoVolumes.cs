@@ -3,7 +3,7 @@ using VoxelEngine.Chunks;
 
 namespace VoxelEngine.WorldGen.Caves;
 
-/// <summary>Overlapping ellipsoids seeded by frozen surface columns, extending the echo material
+/// <summary>Overlapping ellipsoids seeded by frozen and desert surface columns, extending the echo material
 /// through solid rock in three dimensions. Sites depend only on position and seed; no chunk reads
 /// or writes cross a seam. The point probe and chunk map share the exact containment rule.</summary>
 internal static class CaveEchoVolumes
@@ -24,7 +24,12 @@ internal static class CaveEchoVolumes
         var z = key.Z * Cell + Cell / 4 + (int)(SplitMix64.Mix(hash + 2) % (Cell / 2));
         if (y + Vertical <= WorldGenerationConfig.CaveEchoVolumeBottomY)
             return new Site(x, y, z, CaveBiome.Plain);
-        var biome = TerrainGenerator.BiomeAt(x, z) == Biome.Frozen ? CaveBiome.FrozenEcho : CaveBiome.Plain;
+        var biome = TerrainGenerator.BiomeAt(x, z) switch
+        {
+            Biome.Frozen => CaveBiome.FrozenEcho,
+            Biome.Desert => CaveBiome.DesertEcho,
+            _ => CaveBiome.Plain,
+        };
         return new Site(x, y, z, biome);
     }
 
@@ -64,9 +69,9 @@ internal static class CaveEchoVolumes
         if (y0 + Chunk.SizeMask <= WorldGenerationConfig.CaveEchoVolumeBottomY
             || y0 > column.MaxHeight - WorldGenerationConfig.CaveEchoCoverBlocks)
             return map.Present != 1 << (int)CaveBiome.Plain;
-        for (var cx = Low(x0, Radius); cx <= High(x0 + Chunk.SizeMask, Radius); cx++)
-        for (var cy = Low(y0, Vertical); cy <= High(y0 + Chunk.SizeMask, Vertical); cy++)
-        for (var cz = Low(z0, Radius); cz <= High(z0 + Chunk.SizeMask, Radius); cz++)
+        for (var cx = High(x0 + Chunk.SizeMask, Radius); cx >= Low(x0, Radius); cx--)
+        for (var cy = High(y0 + Chunk.SizeMask, Vertical); cy >= Low(y0, Vertical); cy--)
+        for (var cz = High(z0 + Chunk.SizeMask, Radius); cz >= Low(z0, Radius); cz--)
         {
             var site = Get(cx, cy, cz);
             if (site.Biome == CaveBiome.Plain) continue;
