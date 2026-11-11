@@ -7,6 +7,7 @@ using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Features.Underground;
 using Xunit;
 using Xunit.Abstractions;
@@ -112,6 +113,52 @@ public sealed class CaveRevampSceneTests(ITestOutputHelper output)
         for (var tick = 0; tick < 32; tick++) fluids.Update(SimulationConfig.FluidTickSeconds, manager, drops);
         Assert.Equal(original, lake.Storage.ToDense());
         Assert.False(lake.ModifiedSinceSave);
+    }
+
+    [Fact]
+    public void DesertHasDistinctWideGeneratedPocketInteriors()
+    {
+        TestContent.EnsureLoaded();
+        var found = 0;
+        for (var cx = -8; cx <= 16; cx++)
+        for (var cz = -8; cz <= 16; cz++)
+        for (var cy = -3; cy <= -2; cy++)
+        {
+            if (!TryWideInterior(cx, cy, cz, out var eye)) continue;
+            output.WriteLine($"desert room {++found} seed={WorldGenerationConfig.Seed} eye={eye} owner=({cx},{cy},{cz})");
+            if (found == 2) return;
+        }
+        Assert.Fail("no two wide generated desert rooms found");
+    }
+
+    private static bool TryWideInterior(int cx, int cy, int cz, out Vector3 eye)
+    {
+        eye = default;
+        var cell = WorldGenerationConfig.DesertPocketCellBlocks;
+        var height = WorldGenerationConfig.DesertPocketCellHeight;
+        var y = cy * height + height / 2;
+        for (var x = cx * cell + cell / 4; x < cx * cell + 3 * cell / 4; x += 4)
+        for (var z = cz * cell + cell / 4; z < cz * cell + 3 * cell / 4; z += 4)
+        {
+            if (!DesertCaves.InPocket(x, y, z, 340, 1)) continue;
+            var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var i = VoxelCoords.ColumnIndex(x & Chunk.SizeMask, z & Chunk.SizeMask);
+            if (CaveBiomes.At(x, y, z, column.Biomes[i], column.Heights[i]) != CaveBiome.DesertEcho
+                || !IsWidePocket(x, y, z, column.Heights[i] - y)) continue;
+            var chunk = new Chunk(null!, VoxelCoords.ChunkPosOf(x, y, z), true);
+            Assert.Equal(BlockType.Air, chunk.GetLocalBlock(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask));
+            eye = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+            return true;
+        }
+        return false;
+    }
+
+    private static bool IsWidePocket(int x, int y, int z, int depth)
+    {
+        for (var dx = -12; dx <= 12; dx += 4)
+        for (var dz = -12; dz <= 12; dz += 4)
+            if (!DesertCaves.InPocket(x + dx, y, z + dz, depth, 1)) return false;
+        return true;
     }
 
     [Fact]
