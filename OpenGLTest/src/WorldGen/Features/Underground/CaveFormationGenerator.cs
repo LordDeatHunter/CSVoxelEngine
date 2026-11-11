@@ -65,8 +65,8 @@ public static class CaveFormationGenerator
                 var i = Chunk.Idx(x, ly, z);
                 if (blocks[i] != BlockType.Air) continue;
 
-                var ceiling = blocks[i + Chunk.Size] != BlockType.Air;
-                var floor = blocks[i - Chunk.Size] != BlockType.Air;
+                var ceiling = BlockType.IsSolid(blocks[i + Chunk.Size]);
+                var floor = BlockType.IsSolid(blocks[i - Chunk.Size]);
                 if (ceiling && HasStalactite(worldX0 + x, y, worldZ0 + z))
                 {
                     blocks[i] = StalactiteBlock;
@@ -98,7 +98,7 @@ public static class CaveFormationGenerator
             var di = Chunk.Idx(x, dl, z);
             if (blocks[di] != BlockType.Air) break;
             if (blocks[di - Chunk.Size] == BlockType.Air) continue;
-            blocks[di] = StalagmiteBlock;
+            if (BlockType.IsSolid(blocks[di - Chunk.Size])) blocks[di] = StalagmiteBlock;
             break;
         }
     }

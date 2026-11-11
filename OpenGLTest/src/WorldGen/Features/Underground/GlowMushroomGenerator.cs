@@ -52,7 +52,7 @@ public static class GlowMushroomGenerator
                 if (ly <= 0) break;
                 var i = Chunk.Idx(x, ly, z);
                 if (blocks[i] != BlockType.Air) continue;
-                if (blocks[i - Chunk.Size] == BlockType.Air) continue;
+                if (!BlockType.IsSolid(blocks[i - Chunk.Size])) continue;
                 if (blocks[i + Chunk.Size] != BlockType.Air) continue;
                 blocks[i] = MushroomBlock;
                 break;

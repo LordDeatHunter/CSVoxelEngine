@@ -331,7 +331,7 @@ spot per biome), `LayerBandTests.CaveBiomeBandsLieAboveTheBarrierInOrder`; `visu
 **Cave shape and ores (CB-2)**, read from the same map: crystal cells open bigger cheese rooms, fungal cells wider spaghetti
 tunnels and magma-touched cells both cheese and caverns (`CaveShape`, scaled per region by `NoiseCaves`' ninth channel), and a
 worm node's radius is multiplied by its center's biome factor (`WormCarver.RadiusFactorAt`, exactly 1 above the sub band, so
-worms, which rarely reach it, mostly keep their size); plain and echo caves carve exactly as before. The four Y-band ores shift
+worms, which rarely reach it, mostly keep their size); plain and frozen echo use regular carving; desert has separate elongated tunnels and pocket rooms. The four Y-band ores shift
 their thresholds per cell by biome (`CaveRichness`: malachite richer in crystal, coal in fungal and desert echo caves but leaner
 in the magma deep, hematite richer there, tin in both echoes), and three exclusive ores (`CaveOres`, seeds 183-185, its own
 `Stage.CaveOres` right after `Tin` with a `CaveOres.WriteBand` and a `StampGateTests` row) grow only in plain stone of their own
@@ -348,3 +348,7 @@ Frozen echo volumes (issue #10) also occupy overlapping 3D ellipsoids: determini
 Desert sandstone uses the same 3D echo-volume rule and dimensions as frozen stone (issue #10), seeded from desert surface-biome samples. Both maps cover uncarved stone below the old echo band and may spread laterally under a different surface biome. The point query and map use the same deterministic site priority even if volumes overlap.
 
 DesertEcho now uses its own carve: the existing two tunnel fields sampled with X scaled 0.28, radius 0.075 versus regular 0.13. Large ellipsoid pockets occupy 96x64x96 site cells, radii 25..36 and half-height 12..20, always with at least 3 blocks of wall before each cell boundary. Occupancy rises 0.35 to 0.8 with cover 20..320. Desert bypasses regular cheese/caverns; tunnels may link rooms but the rooms never create an endless open layer. Salt 0x5E81, no additional noise seeds; hell is unchanged.
+
+Verification for issue #10: `visual-examples/cave-revamp.json` (seed 1337, VOXEL_TIME=147) films an unmined seven-block standing walkway, shallow and deep prefilled lava bowls, and both expanded echo materials below the old echo band. Only lamps are added for visibility. `CaveRevampSceneTests` finds the actual generated fixtures, records deterministic id hashes, and restores a modified snapshot under a different procedural seed without changing its stored terrain.
+
+Cave scenery requires solid support: neither glow mushrooms nor stalagmites stand on cave water or lava, and stalactites need solid ceilings. A drip meeting a fluid stops without adding a floating stalagmite. This keeps the new prefilled pond surfaces clear.

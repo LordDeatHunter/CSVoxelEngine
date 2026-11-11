@@ -64,7 +64,7 @@ public static class UndergroundPoolGenerator
                 var i = Chunk.Idx(x, ly, z);
                 if (blocks[i] != BlockType.Air) continue;
                 var floor = blocks[Chunk.Idx(x, ly - 1, z)];
-                if (floor == BlockType.Air || BlockType.IsFluid(floor)) continue;
+                if (!BlockType.IsSolid(floor) || !BlockType.Occludes(floor)) continue;
                 if (!HasPool(worldX0 + x, y, worldZ0 + z, surfaceHeight)) continue;
 
                 blocks[i] = WaterBlock;
