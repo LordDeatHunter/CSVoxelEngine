@@ -47,7 +47,7 @@ internal sealed class ChestCardRenderer
             _ui.DrawTextCenteredY(fill, title.Right - fillWidth + 12f, title.Center.Y, _ui.CountScale, TextDim);
 
         var search = ChestCardLayout.SearchBox(screen);
-        _ui.DrawInputField(search.Center, search.Size, view.Search.Text, searchFocused, view.LanternInstance != null ? "Coal, slime or Everfuel" : "Search the chest", time);
+        _ui.DrawInputField(search.Center, search.Size, view.Search.Text, searchFocused, view.LanternInstance != null ? "Search fuel" : "Search the chest", time);
 
         DrawButton(ChestCardLayout.LootAllButton(screen), view.LanternInstance != null ? "TAKE ALL" : "LOOT ALL", contents is { IsEmpty: false }, ReadyGreen);
         DrawButton(ChestCardLayout.QuickStackButton(screen), view.LanternInstance != null ? "ADD FUEL" : "QUICK STACK", contents != null, AccentGold);
