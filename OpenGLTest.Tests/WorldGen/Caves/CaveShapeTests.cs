@@ -185,6 +185,38 @@ public sealed class CaveShapeTests
     }
 
     [Fact]
+    public void DesertRoomsVaryInScaleAndHaveBothInwardAndOutwardWallDetail()
+    {
+        var areas = new List<int>();
+        var widths = new List<float>();
+        var inward = 0;
+        var outward = 0;
+        var cell = WorldGenerationConfig.DesertPocketCellBlocks;
+        for (var cx = -3; cx <= 3; cx++)
+        for (var cz = -3; cz <= 3; cz++)
+        {
+            var open = new List<(int X, int Z)>();
+            var y = -96;
+            for (var x = cx * cell; x < (cx + 1) * cell; x++)
+            for (var z = cz * cell; z < (cz + 1) * cell; z++)
+            {
+                var detailed = DesertCaves.InPocket(x, y, z, 340, 1);
+                var smooth = DesertCaves.InPocket(x, y, z, 340, 1, detailed: false);
+                if (detailed) open.Add((x, z));
+                if (detailed && !smooth) outward++;
+                if (smooth && !detailed) inward++;
+            }
+            if (open.Count == 0) continue;
+            areas.Add(open.Count);
+            widths.Add((open.Max(p => p.X) - open.Min(p => p.X) + 1f)
+                / (open.Max(p => p.Z) - open.Min(p => p.Z) + 1f));
+        }
+        Assert.True(areas.Max() > areas.Min() * 2, "room scales remain nearly identical");
+        Assert.True(widths.Max() > widths.Min() * 1.5f, "room aspect ratios remain nearly identical");
+        Assert.True(inward > 0 && outward > 0, "wall detail must create alcoves and projecting rock");
+    }
+
+    [Fact]
     public void DesertPocketOwnershipSurvivesNegativeChunkSeamsQueryOrderAndReseeding()
     {
         var positions = (from x in Enumerable.Range(-8, 16)

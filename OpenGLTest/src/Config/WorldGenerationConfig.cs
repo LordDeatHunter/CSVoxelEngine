@@ -352,7 +352,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int MudWaterNeighbors = 2;
 
     // --- Lava ---
-    // Deep cave floors receive spaced source groups and contained, prefilled bowls.
+    // Deep cave floors receive spaced source groups and contained natural depressions.
     // Sources sit at or below LavaMaxY and buried under the
     // terrain, so the surface, ravines and entrances stay dry and sea caves stay water.
     public const bool LavaEnabled = true;
@@ -365,15 +365,20 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int CaveFluidCellShift = 6;
     public const int CaveFluidSiteMargin = 16;
 
-    // Lava pits: one candidate chunk per 64-cube, cut only into intact dry cave floors.
+    // One bounded natural-depression plan per 64-cube; reject spills, never build a rim.
     public const int CaveLavaLakeCellShift = 6;
-    public const int CaveLavaLakeMinRadius = 3;
-    public const int CaveLavaLakeMaxRadius = 6;
-    public const int CaveLavaLakeMinDepth = 2;
-    public const int CaveLavaLakeMaxDepth = 3;
+    public const int CaveLavaLakeMinArea = 12;
+    public const int CaveLavaLakeShallowArea = 120;
+    public const int CaveLavaLakeDeepArea = 1000;
+    public const int CaveLavaLakeMaxDepth = 16;
     public const int CaveLavaLakeBurial = 16;
-    public const int CaveLavaLakeLocalLevel = 6;
     public const int CaveLavaLakeAirHeight = 3;
+    public const int CaveLavaLakeShallowRise = 1;
+    public const int CaveLavaLakeDeepRise = 7;
+    public const int CaveLavaLakeSearchColumns = 8;
+    public const int CaveLavaLakeSearchFloors = 12;
+    public const int CaveLavaLakeCacheCapacity = 2048;
+    public const int CaveLavaLakeCacheGenerations = 4;
     public const float CaveLavaLakeChanceShallow = 0.18f;
     public const float CaveLavaLakeChanceDeep = 0.8f;
 
@@ -691,11 +696,14 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float DesertTunnelRadius = 0.075f;
     public const int DesertPocketCellBlocks = 96;
     public const int DesertPocketCellHeight = 64;
-    public const int DesertPocketMinRadius = 25;
-    public const int DesertPocketMaxRadius = 36;
-    public const int DesertPocketMinHeight = 12;
-    public const int DesertPocketMaxHeight = 20;
+    public const int DesertPocketMinRadius = 15;
+    public const int DesertPocketMaxRadius = 39;
+    public const int DesertPocketMinHeight = 8;
+    public const int DesertPocketMaxHeight = 24;
     public const int DesertPocketWallBlocks = 3;
+    public const float DesertPocketMinAspect = 0.48f;
+    public const float DesertPocketWallDetail = 3.5f;
+    public const float DesertPocketDetailYScale = 0.21f;
     public const int DesertPocketMinLobes = 3;
     public const int DesertPocketMaxLobes = 5;
     public const float DesertPocketCoreRadius = 0.55f;

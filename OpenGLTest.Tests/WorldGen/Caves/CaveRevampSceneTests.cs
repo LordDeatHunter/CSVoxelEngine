@@ -1,8 +1,6 @@
 using System;
 using System.Linq;
 using System.Numerics;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
@@ -20,41 +18,59 @@ namespace VoxelEngine.Tests.WorldGen.Caves;
 public sealed class CaveRevampSceneTests(ITestOutputHelper output)
 {
     [Theory]
-    [InlineData(-128, -64)]
-    [InlineData(-448, -256)]
-    public void ARealPrefilledLakeIsReproducibleAndModifiedSnapshotsKeepTheirTerrain(int minY, int maxY)
+    [InlineData(-2)]
+    [InlineData(-6)]
+    public void ARealNaturalLakeIsContainedSettledSeamSafeAndPreservedByModifiedSnapshots(int cy)
     {
         TestContent.EnsureLoaded();
-        Chunk? lake = null;
-        var surface = Vector3.Zero;
-        for (var x0 = -512; x0 < 512 && lake is null; x0 += Chunk.Size)
-        for (var y0 = minY; y0 < maxY && lake is null; y0 += Chunk.Size)
-        for (var z0 = -512; z0 < 512 && lake is null; z0 += Chunk.Size)
+        CaveLavaLakes.CellPosition[] pool = [];
+        for (var cx = -4; cx <= 4 && pool.Length == 0; cx++)
+        for (var cz = -4; cz <= 4 && pool.Length == 0; cz++) pool = CaveLavaLakes.Plan(cx, cy, cz);
+        Assert.NotEmpty(pool);
+        var top = pool.Max(p => p.Y);
+        var surface = pool.Where(p => p.Y == top).ToArray();
+        output.WriteLine($"pool cy={cy} cells={pool.Length} surface={surface.Length} level={top} bounds="
+            + $"({pool.Min(p => p.X)},{pool.Min(p => p.Z)})..({pool.Max(p => p.X)},{pool.Max(p => p.Z)}) "
+            + $"camera=({surface.Average(p => p.X) + 0.5},{top + 5.5},{surface.Max(p => p.Z) + 4.5})");
+        var probe = new CaveTerrainProbe();
+        var cells = pool.ToHashSet();
+        var manager = new ChunkManager(null!);
+        foreach (var position in pool.Select(p => VoxelCoords.ChunkPosOf(p.X, p.Y, p.Z)).Distinct().Reverse())
+            manager.Chunks[position] = new Chunk(null!, position, true);
+        ushort At(int x, int y, int z)
         {
-            if (!CaveLavaLakes.TrySite(x0, y0, z0, out _, out _, out _)) continue;
-            var candidate = new Chunk(null!, new Vector3(x0 / Chunk.Size, y0 / Chunk.Size, z0 / Chunk.Size), true);
-            if (candidate.Storage.ToDense().Count(id => id == LavaGenerator.LavaBlock) < 12) continue;
-            if (!TryPoolSurface(candidate, out surface)) continue;
-            lake = candidate;
+            var pos = VoxelCoords.ChunkPosOf(x, y, z);
+            if (!manager.Chunks.TryGetValue(pos, out var chunk))
+                manager.Chunks[pos] = chunk = new Chunk(null!, pos, true);
+            return chunk.GetLocalBlock(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask);
         }
-        Assert.NotNull(lake);
-        AssertStillPool(lake);
-        var original = lake.Storage.ToDense();
-        var regenerated = new Chunk(null!, lake.Position, true);
-        Assert.Equal(original, regenerated.Storage.ToDense());
-        var hash = Convert.ToHexString(SHA256.HashData(MemoryMarshal.AsBytes(original.AsSpan())));
-        var eye = lake.Position * Chunk.Size + surface;
-        var lavaCells = (from x in Enumerable.Range(0, Chunk.Size)
-                         from y in Enumerable.Range(0, Chunk.Size)
-                         from z in Enumerable.Range(0, Chunk.Size)
-                         where lake.GetLocalBlock(x, y, z) == LavaGenerator.LavaBlock
-                         select new Vector3(x, y, z)).ToArray();
-        var center = lake.Position * Chunk.Size + new Vector3(lavaCells.Average(p => p.X) + 0.5f,
-            lavaCells.Max(p => p.Y) + 1.5f, lavaCells.Average(p => p.Z) + 0.5f);
-        output.WriteLine($"pool center floor-level camera={center}");
-        output.WriteLine($"seed={WorldGenerationConfig.Seed} lake eye={eye} chunk={lake.Position} ids-sha256={hash}");
+        var fluids = new FluidManager();
+        foreach (var p in pool)
+        {
+            Assert.Equal(BlockType.Air, probe.At(p.X, p.Y, p.Z));
+            Assert.True(CaveLavaLakes.Contains(p.X, p.Y, p.Z));
+            Assert.Equal(LavaGenerator.LavaBlock, At(p.X, p.Y, p.Z));
+            foreach (var (dx, dy, dz) in new[] { (-1, 0, 0), (1, 0, 0), (0, -1, 0), (0, 0, -1), (0, 0, 1) })
+            {
+                var q = p with { X = p.X + dx, Y = p.Y + dy, Z = p.Z + dz };
+                Assert.True(cells.Contains(q) || BlockType.IsSolid(At(q.X, q.Y, q.Z)), $"leak at {p} to {q}");
+            }
+            if (At(p.X, p.Y + 1, p.Z) == BlockType.Air) Assert.Equal(top, p.Y);
+            fluids.ScheduleAround(p.X, p.Y, p.Z);
+        }
+        var before = manager.Chunks.Values.ToDictionary(p => p.Position, p => p.Storage.ToDense());
+        var drops = new DropManager();
+        for (var tick = 0; tick < 32; tick++) fluids.Update(SimulationConfig.FluidTickSeconds, manager, drops);
+        foreach (var (pos, original) in before)
+        {
+            Assert.Equal(original, manager.Chunks[pos].Storage.ToDense());
+            Assert.False(manager.Chunks[pos].ModifiedSinceSave);
+            Assert.Equal(original, new Chunk(null!, pos, true).Storage.ToDense());
+        }
+        var lake = manager.Chunks.Values.First();
         lake.SetBlockRaw(1, 1, 1, ContentRegistry.RequireBlock("lamp").Id, 0);
         var snapshot = lake.TakeSnapshot(null);
+        var owner = pool[0];
         try
         {
             WorldSeed.Apply(WorldSeed.Default + 7919);
@@ -64,55 +80,7 @@ public sealed class CaveRevampSceneTests(ITestOutputHelper output)
             Assert.True(restored.IsRestored);
         }
         finally { WorldSeed.Apply(WorldSeed.Default); }
-    }
-
-    private static bool TryPoolSurface(Chunk chunk, out Vector3 surface)
-    {
-        surface = default;
-        var found = false;
-        for (var x = 1; x < Chunk.Size - 1; x++)
-        for (var z = 1; z < Chunk.Size - 1; z++)
-        for (var y = 1; y < Chunk.Size - 1; y++)
-        {
-            if (chunk.GetLocalBlock(x, y, z) != LavaGenerator.LavaBlock
-                || chunk.GetLocalBlock(x, y + 1, z) != BlockType.Air) continue;
-            surface = new Vector3(x + 0.5f, y + 3.5f, z + 0.5f);
-            found = true;
-        }
-        return found;
-    }
-
-    private static void AssertStillPool(Chunk lake)
-    {
-        var manager = new ChunkManager(null!);
-        manager.Chunks[lake.Position] = lake;
-        var fluids = new FluidManager();
-        var origin = lake.Position * Chunk.Size;
-        int? surfaceY = null;
-        for (var x = 1; x < Chunk.Size - 1; x++)
-        for (var y = 1; y < Chunk.Size - 1; y++)
-        for (var z = 1; z < Chunk.Size - 1; z++)
-        {
-            if (lake.GetLocalBlock(x, y, z) != LavaGenerator.LavaBlock) continue;
-            Assert.True(FluidState.IsSource(lake.GetLocalState(x, y, z)));
-            foreach (var (dx, dy, dz) in new[] { (-1, 0, 0), (1, 0, 0), (0, 0, -1), (0, 0, 1), (0, -1, 0) })
-            {
-                var adjacent = lake.GetLocalBlock(x + dx, y + dy, z + dz);
-                Assert.True(adjacent == LavaGenerator.LavaBlock || BlockType.IsSolid(adjacent), "generated pool leaks");
-            }
-            if (lake.GetLocalBlock(x, y + 1, z) == BlockType.Air)
-            {
-                surfaceY ??= y;
-                Assert.Equal(surfaceY.Value, y);
-            }
-            fluids.ScheduleAround((int)origin.X + x, (int)origin.Y + y, (int)origin.Z + z);
-        }
-        Assert.NotNull(surfaceY);
-        var original = lake.Storage.ToDense();
-        var drops = new DropManager();
-        for (var tick = 0; tick < 32; tick++) fluids.Update(SimulationConfig.FluidTickSeconds, manager, drops);
-        Assert.Equal(original, lake.Storage.ToDense());
-        Assert.False(lake.ModifiedSinceSave);
+        Assert.Equal(pool, CaveLavaLakes.Plan(owner.X >> 6, owner.Y >> 6, owner.Z >> 6));
     }
 
     [Fact]

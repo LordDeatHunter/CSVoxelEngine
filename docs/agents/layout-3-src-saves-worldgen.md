@@ -567,8 +567,10 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
 
 `WorldGen/Caves/CaveEchoVolumes.cs`: deterministic sites that extend Frozen/Taiga and Desert echo materials through solid rock; shared point/map containment and echo policy.
 
-`WorldGen/Caves/DesertCaves.cs`: bounded, separated irregular desert lobe clusters, composed with elongated noise tunnels.
+`WorldGen/Caves/DesertCaves.cs`: bounded desert rooms with broad scale/aspect/depth variation and coherent inward/outward wall detail, composed with elongated noise tunnels.
 
 `WorldGen/Features/Underground/CaveFluidSources.cs`: shared, spaced 3D source-group candidates for cave water and lava.
 
-`WorldGen/Features/Underground/CaveLavaLakes.cs`: depth-weighted, prefilled lava pits carved into intact dry cave floors without adding walls or bottoms.
+`WorldGen/Features/Underground/CaveLavaLakes.cs`: seed-owned bounded floods of natural cave depressions, flat contained source surfaces, depth-dependent size budgets, cross-chunk plans and local writes.
+
+`WorldGen/Features/Underground/CaveTerrainProbe.cs`: private pure completed-terrain queries without lakes/cave life, sharing production generation with independent scratch/maps and no generation-statistics side effects.

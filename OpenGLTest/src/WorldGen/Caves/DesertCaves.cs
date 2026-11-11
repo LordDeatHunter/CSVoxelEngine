@@ -20,7 +20,7 @@ internal static class DesertCaves
             return u * u + w * w < 1f;
         }
     }
-    private readonly record struct Site(int X, int Y, int Z, int Vertical, float FloorScale, float Roll, Lobe[] Lobes);
+    private readonly record struct Site(int X, int Y, int Z, int Vertical, float FloorScale, float Roll, float Aspect, float Cos, float Sin, float Phase, float Detail, Lobe[] Lobes);
     private static readonly GenerationalCache<(int X, int Y, int Z, int Seed), Site> Sites = new(
         WorldGenerationConfig.DesertPocketCacheCapacity, WorldGenerationConfig.DesertPocketCacheGenerations);
     private static readonly Func<(int X, int Y, int Z, int Seed), Site> BuildFor = Build;
@@ -33,7 +33,7 @@ internal static class DesertCaves
         var vertical = WorldGenerationConfig.DesertPocketMinHeight + (int)(SplitMix64.Mix(h + 2)
             % (ulong)(WorldGenerationConfig.DesertPocketMaxHeight - WorldGenerationConfig.DesertPocketMinHeight + 1));
         var wall = WorldGenerationConfig.DesertPocketWallBlocks;
-        var mx = radius + wall;
+        var mx = radius + wall + (int)MathF.Ceiling(WorldGenerationConfig.DesertPocketWallDetail);
         var my = vertical + wall;
         var px = key.X * Cell + mx + (int)(SplitMix64.Mix(h + 3) % (ulong)(Cell - 2 * mx));
         var py = key.Y * Height + my + (int)(SplitMix64.Mix(h + 4) % (ulong)(Height - 2 * my));
@@ -62,10 +62,14 @@ internal static class DesertCaves
         }
         return new Site(px, py, pz, vertical,
             MathUtils.Lerp(WorldGenerationConfig.DesertPocketMinFloorScale, 1f, SplitMix64.Unit(h, 13)),
-            SplitMix64.Unit(h, 0), lobes);
+            SplitMix64.Unit(h, 0),
+            MathUtils.Lerp(WorldGenerationConfig.DesertPocketMinAspect, 1f, SplitMix64.Unit(h, 14)),
+            MathF.Cos(phase), MathF.Sin(phase), SplitMix64.Unit(h, 15) * MathF.Tau,
+            MathUtils.Lerp(WorldGenerationConfig.DesertPocketWallDetail * 0.5f,
+                WorldGenerationConfig.DesertPocketWallDetail, SplitMix64.Unit(h, 16)), lobes);
     }
 
-    internal static bool InPocket(int x, int y, int z, float depth, float gate)
+    internal static bool InPocket(int x, int y, int z, float depth, float gate, bool detailed = true)
     {
         if (gate <= 0) return false;
         var cx = MathUtils.FloorToInt(x / (float)Cell);
@@ -82,8 +86,26 @@ internal static class DesertCaves
         // Taper lobe centers together with their radii: every horizontal slice remains
         // connected through the core, including near the roof and floor.
         var taper = MathF.Sqrt(crossSection);
-        var dx = (x - site.X) / taper;
-        var dz = (z - site.Z) / taper;
+        var wx = (x - site.X) / taper;
+        var wz = (z - site.Z) / taper;
+        var dx = wx * site.Cos + wz * site.Sin;
+        var dz = (wz * site.Cos - wx * site.Sin) / site.Aspect;
+        if (detailed)
+        {
+            // A continuous radial displacement adds real alcoves and inward shoulders. Each
+            // ray still joins the protected core; no independent noise holes fragment the room.
+            // Phases and amplitudes vary per site and with height, so walls do
+            // not extrude the same scallop through every horizontal slice.
+            var distance = MathF.Sqrt(dx * dx + dz * dz);
+            var angle = MathF.Atan2(dz, dx);
+            var phase = site.Phase + (y - site.Y) * WorldGenerationConfig.DesertPocketDetailYScale;
+            var detail = site.Detail * (0.55f * MathF.Sin(7 * angle + phase)
+                + 0.3f * MathF.Sin(11 * angle - phase * 1.7f)
+                + 0.15f * MathF.Sin(17 * angle + phase * 0.7f));
+            var scale = 1f - detail / MathF.Max(distance, WorldGenerationConfig.DesertPocketMinRadius);
+            dx *= scale;
+            dz *= scale;
+        }
         foreach (var lobe in site.Lobes)
             if (lobe.Contains(dx, dz)) return true;
         return false;

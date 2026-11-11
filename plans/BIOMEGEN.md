@@ -1263,4 +1263,4 @@ Issue #10 desert pockets use hash salt 0x5E81; elongated tunnels reuse seeds 111
 
 Issue #10 sparse cave fluid groups use hash salt 0x5E82 (one or two candidates per 64-cube); offset 94 is retired with the old water patch mask.
 
-Issue #10 contained cave lava lakes use hash salt 0x5E83; they carve only new procedural terrain and do not rewrite saved chunk snapshots.
+PR13 comment345 natural cave lava plans retain hash salt 0x5E83. Bounded floods fill connected depressions in completed terrain at a flat source level, rejecting spills/unknown bounds without constructing support; deeper sites admit larger pools. Desert sites retain salt 0x5E81 with broader size/aspect/depth variation and coherent bounded inward/outward wall detail. These changes intentionally re-lay newly generated cave fluids and desert geometry for existing seeds; modified saved snapshots and save/wire formats are unchanged. See `docs/agents/architecture-and-worldgen.md` and `biomes.md` for planning bounds and geometry rules. No new noise offset is consumed.
