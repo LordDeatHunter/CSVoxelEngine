@@ -61,7 +61,7 @@ internal sealed class DropPickup
     private bool _pickupBlocked;
 
     internal static bool Credit(Inventory inventory, ushort id, ItemStack? instance) =>
-        instance != null ? inventory.AddInstance(instance) : inventory.Add(id);
+        instance != null ? inventory.AddInstance(instance, autoEquip: true) : inventory.Add(id);
 
     private void ReturnRefused(int index, ushort id, Vector3 position)
     {

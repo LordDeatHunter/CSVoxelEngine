@@ -169,6 +169,56 @@ public sealed class ChestServerTests : IDisposable
         return cell;
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GroundLanternPickupSendsItsEquipmentAndFuelToItsOwner(bool placed)
+    {
+        using var client = Connect("Collector");
+        var cell = PlaceChest(client); // Also waits for the player's chunk to be loaded.
+        var player = PlayerOf(client);
+        var inventory = player.Inventory;
+        inventory.Import(new PlayerSaveData.InventoryData());
+        var lantern = ContentRegistry.RequireBlock("lantern").Id;
+        var coal = ContentRegistry.RequireItem("coal").Id;
+        inventory.Add(lantern);
+        var stack = inventory.Tools.Last();
+        var fuel = LanternState.Of(stack)!;
+        inventory.Add(coal, 3, autoEquip: false);
+        fuel.Move(inventory, ChestMove.DepositStack(coal, 3));
+        fuel.Advance(LanternState.Duration(coal) * .4f);
+        if (placed)
+        {
+            var chunk = _world.GetChunkManager().ChunkAt(cell.Item1, cell.Item2, cell.Item3)!;
+            var (x, y, z) = VoxelCoords.LocalOf(cell.Item1, cell.Item2, cell.Item3);
+            chunk.SetBlockRaw(x, y, z, lantern, 0);
+            _world.Lanterns.Place(inventory, new Vector3(cell.Item1, cell.Item2, cell.Item3));
+        }
+        else
+            Assert.True(_world.ThrowSelected(false, player.Position, Vector3.UnitY, inventory));
+        inventory.Select(7);
+        _inboxes[client].Inventory = null;
+        if (placed)
+        {
+            var target = new Vector3(cell.Item1, cell.Item2, cell.Item3);
+            var aim = Vector3.Normalize(target + new Vector3(.5f) - player.Position);
+            player.Flags = (byte)NetPlayerFlags.Sneaking;
+            Send(client, NetMessage.WorldIntent, w => WorldIntentCodec.Write(w, 1,
+                WorldIntent.Use(player.Position, aim, target)));
+        }
+        TickUntil(() => _inboxes[client].Inventory is { } data && data.Tools?.Any(t => t.Lantern != null) == true,
+            "pickup never sent its authoritative inventory to the client");
+        var mirror = Inventory.Empty();
+        mirror.Import(_inboxes[client].Inventory!);
+        Assert.Equal(7, mirror.SelectedIndex);
+        Assert.Equal(lantern, mirror.SelectedBlockId);
+        Assert.Equal(inventory.SelectedToolInstance, mirror.SelectedToolInstance);
+        Assert.Equal(2, LanternState.Held(mirror)!.Storage.CountOf(coal));
+        Assert.InRange(LanternState.Held(mirror)!.Remaining, 0.01f, fuel.Capacity);
+        Assert.Single(inventory.Tools);
+        Assert.Empty(_world.Drops);
+    }
+
     [Fact]
     public void LanternMovesAreAuthoritativeAndSelectionInvalidatesTheSession()
     {

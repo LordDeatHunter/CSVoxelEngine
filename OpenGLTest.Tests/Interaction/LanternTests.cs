@@ -55,6 +55,124 @@ public sealed class LanternTests : IDisposable
     private bool Click(out RightClickOutcome outcome) => World.TryUseSelected(World.InteractionReach, _test.Player.Context, out outcome);
     private void AimAt(Vector3 cell) => _test.Player.Aim(new Vector3(cell.X + .5f, cell.Y + .5f, cell.Z + 2.5f), -Vector3.UnitZ);
 
+    [Theory]
+    [InlineData(false, 7)]
+    [InlineData(false, 2)]
+    [InlineData(false, -1)]
+    [InlineData(true, 7)]
+    [InlineData(true, 2)]
+    [InlineData(true, -1)]
+    public void GroundPickupEquipsOnlyThePreferredEmptySlotAndPreservesEachLantern(bool dropped, int target)
+    {
+        var stack = AcquireLantern();
+        var fuel = Fuel(stack, Coal, 3);
+        fuel.Advance(LanternState.Duration(Coal) * .4f);
+        var remaining = fuel.Remaining;
+        var cell = new Vector3(4, _test.Top, 4);
+        Assert.True(World.TryPlaceSelectedBlockAt(_test.Player.Context, cell, Vector3.UnitY));
+        var other = AcquireLantern();
+        var otherFuel = Fuel(other, Slime, 2);
+        Inventory.Add(_test.Stone, autoEquip: false);
+        for (var i = 0; i < Inventory.SlotCount; i++) Inventory.EquipStackable(i, _test.Stone);
+        Inventory.Select(7);
+        if (target >= 0) Inventory.ClearSlot(2);
+        if (target == 7) Inventory.ClearSlot(7);
+        var before = Inventory.Hotbar.ToArray();
+        if (dropped)
+        {
+            Assert.True(_test.Break(4, _test.Top + 1, 4));
+            var drop = Assert.Single(World.Drops);
+            _test.Player.Position = drop.Position + Vector3.UnitY * DropManager.CollectHeightOffset;
+            for (var i = 0; i < 120 && World.Drops.Count > 0; i++) World.Pickup.Update(1d / 60);
+            Assert.Empty(World.Drops);
+            Assert.True(_test.Player.InventoryChanged);
+        }
+        else
+        {
+            AimAt(cell + Vector3.UnitY);
+            _test.Player.Context.RemoteSneaking = true;
+            Assert.True(Click(out var outcome));
+            Assert.Equal(RightClickOutcome.LanternPickup, outcome);
+            Assert.Null(World.Lanterns.Peek((4, _test.Top + 1, 4)));
+        }
+        var picked = Inventory.Tools.Last();
+        Assert.NotEqual(other.InstanceId, picked.InstanceId);
+        Assert.Equal(remaining, LanternState.Of(picked)!.Remaining);
+        Assert.Equal(2, LanternState.Of(picked)!.Storage.CountOf(Coal));
+        Assert.Equal(2, otherFuel.Storage.CountOf(Slime));
+        Assert.Equal(7, Inventory.SelectedIndex); // Pickup does not switch the player's chosen slot.
+        for (var i = 0; i < Inventory.SlotCount; i++)
+            if (i == target) Assert.Equal(picked.InstanceId, Inventory.ToolInstanceAt(i));
+            else Assert.Equal(before[i], Inventory.Hotbar[i]);
+        var mirror = Inventory.Empty();
+        mirror.Import(InventoryNetCodec.Decode(InventoryNetCodec.Encode(Inventory.Export())));
+        Assert.Equal(Inventory.SelectedIndex, mirror.SelectedIndex);
+        Assert.Equal(Inventory.Hotbar, mirror.Hotbar);
+        Assert.Equal(remaining, LanternState.Of(mirror.GetToolStack(picked.InstanceId))!.Remaining);
+    }
+
+    [Fact]
+    public void RefusedInstancePickupLeavesEquipmentAndBothFuelOwnersUntouched()
+    {
+        var stack = AcquireLantern();
+        var fuel = Fuel(stack, Coal, 3);
+        fuel.Advance(.5f);
+        Inventory.Add(Lantern, Inventory.ToolCapacity, autoEquip: false);
+        Inventory.Select(7);
+        var before = InventoryNetCodec.Encode(Inventory.Export());
+        Assert.False(DropPickup.Credit(Inventory, Lantern, stack));
+        var drops = new DropManager();
+        drops.SpawnInstance(stack, _test.Player.Position - Vector3.UnitY * DropManager.CollectHeightOffset,
+            Vector3.Zero, delay: 0f);
+        var pickup = new DropPickup(World, drops, _test.Manager, null, new VoxelEngine.Particles.FireParticleSystem(),
+            null, serverMode: true, clientMode: false);
+        pickup.Update(1d / 60);
+        var refused = Assert.Single(drops.Drops);
+        Assert.Equal(fuel.Remaining, LanternState.Of(refused.Instance)!.Remaining);
+        Assert.False(_test.Player.InventoryChanged);
+        Assert.Equal(before, InventoryNetCodec.Encode(Inventory.Export()));
+        Assert.Equal(2, fuel.Storage.CountOf(Coal));
+        Assert.True(fuel.Remaining > 0f);
+    }
+
+    [Fact]
+    public void PayloadlessGroundPickupEquipsANewLanternEvenWhenAnotherIsOwned()
+    {
+        var other = AcquireLantern();
+        var otherFuel = Fuel(other, Coal, 2);
+        Inventory.Select(7);
+        Assert.True(DropPickup.Credit(Inventory, Lantern, null));
+        Assert.Equal(Lantern, Inventory.SelectedBlockId);
+        Assert.NotEqual(other.InstanceId, Inventory.SelectedToolInstance);
+        Assert.False(LanternState.Held(Inventory)!.HasFuel);
+        Assert.Equal(2, otherFuel.Storage.CountOf(Coal));
+    }
+
+    [Fact]
+    public void CardFuelUsesTheLiveInstanceFractionForEmptyPartialAndEverfuel()
+    {
+        var stack = AcquireLantern();
+        var fuel = LanternState.Of(stack)!;
+        var view = new VoxelEngine.UI.Chest.ChestView();
+        foreach (var instance in new[] { 0, stack.InstanceId })
+        {
+            view.ShowLantern(default, instance, fuel);
+            Assert.Same(fuel, view.LanternFuel);
+            Assert.Equal(VoxelEngine.UI.Hud.ItemTooltip.Hover(Vector2.Zero, Lantern, stack, null).FuelFraction,
+                view.LanternFuel!.Fraction);
+        }
+        Fuel(stack, Coal, 1);
+        fuel.Advance(LanternState.Duration(Coal) * .4f);
+        Assert.InRange(view.LanternFuel!.Fraction, .59f, .61f);
+        Fuel(stack, Everfuel, 1);
+        Assert.True(view.LanternFuel.Endless);
+        Assert.Equal(1f, view.LanternFuel.Fraction);
+        var screen = new Vector2(1920, 1080);
+        var bar = VoxelEngine.UI.Chest.ChestCardLayout.FuelBar(screen);
+        Assert.True(bar.Top >= VoxelEngine.UI.Chest.ChestCardLayout.Title(screen).Bottom);
+        Assert.True(bar.Bottom <= VoxelEngine.UI.Chest.ChestCardLayout.SearchBox(screen).Top);
+    }
+
     [Fact]
     public void AuthoritativeCraftsConsumeIngredientsAndCreateDistinctEmptyLanterns()
     {
@@ -230,10 +348,12 @@ public sealed class LanternTests : IDisposable
         var cell = new Vector3(4, _test.Top, 4);
         Assert.True(World.TryPlaceSelectedBlockAt(_test.Player.Context, cell, Vector3.UnitY));
         Inventory.Add(Lantern, Inventory.ToolCapacity);
+        var before = InventoryNetCodec.Encode(Inventory.Export());
         AimAt(cell + Vector3.UnitY);
         _test.Player.Context.RemoteSneaking = true;
         Assert.True(Click(out var result)); Assert.Equal(RightClickOutcome.LanternPickup, result);
         Assert.Equal(Lantern, _test.IdAt(4, _test.Top + 1, 4));
+        Assert.Equal(before, InventoryNetCodec.Encode(Inventory.Export()));
         Assert.Equal(2, LanternState.Of(World.Lanterns.Peek((4, _test.Top + 1, 4)))!.Storage.CountOf(Coal));
         Assert.Equal(2, state.Storage.CountOf(Coal));
     }
@@ -260,7 +380,7 @@ public sealed class LanternTests : IDisposable
         Assert.Equal(remaining, LanternState.Of(restoredDrop)!.Remaining);
         Assert.True(DropPickup.Credit(Inventory, wire.ItemId, restoredDrop));
         var instance = Inventory.Tools.Last();
-        Inventory.EquipTool(0, instance.InstanceId); Inventory.Select(0);
+        Assert.Equal(instance.InstanceId, Inventory.SelectedToolInstance);
         Assert.True(World.TryPlaceSelectedBlockAt(_test.Player.Context, new Vector3(4, _test.Top, 4), Vector3.UnitY));
         var saved = StationSaveCodec.TryParse(StationSaveCodec.ToBytes(new StationSaveData { Lanterns = World.Lanterns.Capture() }))!;
         var restored = new LanternManager(); restored.Restore(saved.Lanterns);

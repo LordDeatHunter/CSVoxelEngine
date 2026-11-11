@@ -41,6 +41,13 @@ public static class ChestCardLayout
         return UiRect.FromTopLeft(new Vector2(content.Left, content.Top), new Vector2(content.Size.X, TitleHeight));
     }
 
+    /// <summary>The lantern burn bar, in the gap above the search field; chest controls keep their geometry.</summary>
+    public static UiRect FuelBar(Vector2 screen)
+    {
+        var title = Title(screen);
+        return UiRect.FromTopLeft(new Vector2(title.Left, title.Bottom + 1f), new Vector2(title.Size.X, Gap - 2f));
+    }
+
     /// <summary>The search field box.</summary>
     public static UiRect SearchBox(Vector2 screen)
     {

@@ -46,6 +46,16 @@ internal sealed class ChestCardRenderer
         if (fill.Length > 0)
             _ui.DrawTextCenteredY(fill, title.Right - fillWidth + 12f, title.Center.Y, _ui.CountScale, TextDim);
 
+        if (view.LanternInstance != null)
+        {
+            var bar = ChestCardLayout.FuelBar(screen);
+            _ui.DrawRect(bar.Center, bar.Size, SlotBorderColor);
+            var fraction = view.LanternFuel?.Fraction ?? 0f;
+            if (fraction > 0f)
+                _ui.DrawRect(new Vector2(bar.Left + bar.Size.X * fraction * .5f, bar.Center.Y),
+                    new Vector2(bar.Size.X * fraction, bar.Size.Y), AccentGold);
+        }
+
         var search = ChestCardLayout.SearchBox(screen);
         _ui.DrawInputField(search.Center, search.Size, view.Search.Text, searchFocused, view.LanternInstance != null ? "Search fuel" : "Search the chest", time);
 

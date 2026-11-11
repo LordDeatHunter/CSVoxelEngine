@@ -221,7 +221,9 @@ of the panel, so the preview, equipment and crafting cards are neither drawn nor
 
 **Lantern fuel.** `Simulation/Lanterns/` owns the individual `LanternComponent`, eight-slot list storage and
 fuel clock. Right-click a placed lantern to open it; crouch-right-click it to pick it up (a full Tools pool leaves
-it untouched). That pickup takes precedence over a held lantern. Otherwise crouch-right-click opens the selected
+it untouched). Both this pickup and ordinary dropped-lantern collection equip the new instance into the selected
+empty hotbar slot, otherwise the first empty slot, otherwise inventory only; occupied slots and the current selection
+are preserved, including on the authoritative server. That pickup takes precedence over a held lantern. Otherwise crouch-right-click opens the selected
 lantern anywhere; an ordinary click in air opens it, and a click at another block keeps that block's usual
 interaction/placement precedence. The shared chest card draws the list; inventory rows deposit one unit (all with
 Shift), rows on the card withdraw. While this card is open even creative players browse their owned inventory;
@@ -233,7 +235,8 @@ A lantern spends a stored lump only when its current burn is exhausted. Existing
 Everfuel freezes the current burn and consumes neither stored fuel nor itself. Only the selected held lantern of a
 living player and loaded placed lanterns advance; unselected, chest-stored, dropped and unloaded lanterns pause,
 including across restarts. Placement transfers the instance even in creative, so it never duplicates its contents.
-The tooltip includes the current burn's progress bar (full with Everfuel); stored reserves remain in the list.
+The tooltip and the held/placed storage card above Search fuel read the same current burn fraction (empty at zero,
+full with Everfuel); stored reserves remain in the list. `lantern-followup.json` covers these card states and ground pickup.
 Held emissive blocks such as torches and active lanterns use `AmbientEffects.LightCells`, separate from flame
 particle emitters. Remote held id and light status come from the server's own inventory.
 

@@ -7,6 +7,7 @@ using VoxelEngine.Content.Recipes;
 using VoxelEngine.Items;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation.Waystones;
+using VoxelEngine.Simulation.Lanterns;
 using VoxelEngine.UI.Hud;
 
 namespace VoxelEngine.UI.InventoryPanel;
@@ -161,7 +162,7 @@ public class Inventory
                 var firstNewIndex = _tools.Count;
                 for (var i = 0; i < Math.Min(room, amount); i++)
                     _tools.Add(new ItemStack(_nextToolInstance++, id));
-                if (newTool && autoEquip && category.Value == InventoryCategory.Tools)
+                if ((newTool || LanternState.IsLantern(id)) && autoEquip && category.Value == InventoryCategory.Tools)
                     EquipNewTool(_tools[firstNewIndex].InstanceId);
                 return true;
             default:
@@ -202,9 +203,10 @@ public class Inventory
 
     /// <summary>
     /// Takes in a tool or piece of gear that lives elsewhere (a chest slot) as a new instance of this inventory, keeping
-    /// every component it carries. False, changing nothing, when its pool is full or it is not an instance item.
+    /// every component it carries. Ground pickups pass autoEquip to equip lanterns into an empty hotbar slot.
+    /// False, changing nothing, when its pool is full or it is not an instance item.
     /// </summary>
-    public bool AddInstance(ItemStack template)
+    public bool AddInstance(ItemStack template, bool autoEquip = false)
     {
         var category = CategoryOf(template.DefinitionId);
         if (category is not (InventoryCategory.Tools or InventoryCategory.Gear)
@@ -212,6 +214,8 @@ public class Inventory
             return false;
         _known.Add(template.DefinitionId);
         _tools.Add(template.CloneAs(_nextToolInstance++));
+        if (autoEquip && LanternState.IsLantern(template.DefinitionId))
+            EquipNewTool(_tools[^1].InstanceId);
         return true;
     }
 
@@ -689,7 +693,9 @@ public class Inventory
 
     private void EquipNewTool(int instanceId)
     {
-        var slot = FirstEmptySlot();
+        // Lantern pickups prefer the current empty slot, but never switch the player's selection.
+        var lantern = LanternState.IsLantern(GetToolStack(instanceId)!.DefinitionId);
+        var slot = lantern && IdAt(SelectedIndex) == 0 ? SelectedIndex : FirstEmptySlot();
         if (slot >= 0)
             EquipTool(slot, instanceId);
     }
