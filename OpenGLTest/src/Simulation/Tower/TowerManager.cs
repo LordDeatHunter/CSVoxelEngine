@@ -458,11 +458,17 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
         }
     }
 
+    /// <summary>Raised with the tower's record and the floor's index when a floor's last skeleton falls and its door
+    /// opens: by the authoritative tick, and on a client when a snapshot shows a door of a tower it already mirrored
+    /// newly open. Never raised for a door already open on first sight (a loaded save, a tower just tracked).</summary>
+    internal event Action<TowerRecord, int>? FloorConquered;
+
     /// <summary>Replaces the tracked towers with display-only mirrors of a snapshot written by <see cref="WriteNet"/>
     /// (a client's). A floor count outside 1..<see cref="MobConfig.TowerMaxTier"/> + 1, a radius outside
     /// 1..<see cref="MaxNetRadius"/>, an empty band or an undefined altar state is refused as malformed.</summary>
     internal void ReadNet(PacketReader reader)
     {
+        var previous = new Dictionary<(int, int), TowerRecord>(_records);
         _records.Clear();
         var count = StationNetCodec.ReadCount(reader);
         for (var i = 0; i < count; i++)
@@ -485,7 +491,11 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
             }
             var altar = (TowerAltarState)reader.ReadByte();
             if (!Enum.IsDefined(altar)) throw new InvalidDataException($"tower snapshot with altar state {(byte)altar}");
-            _records[key] = TowerRecord.Mirror(key, centerX, centerZ, radius, floors, altar);
+            var mirror = TowerRecord.Mirror(key, centerX, centerZ, radius, floors, altar);
+            _records[key] = mirror;
+            if (!previous.TryGetValue(key, out var before) || before.Floors.Length != floorCount) continue;
+            for (var k = 0; k < floorCount; k++)
+                if (floors[k].DoorOpen && !before.Floors[k].DoorOpen) FloorConquered?.Invoke(mirror, k);
         }
     }
 
@@ -557,6 +567,7 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
                 if (floor.DoorOpen || !TowerRules.DoorMayOpen(k, previousOpen, floor.PilesLeft, floor.Alive)) continue;
                 floor.DoorOpen = true;
                 floor.DoorRemaining.AddRange(floor.DoorCells);
+                FloorConquered?.Invoke(record, k);
             }
         }
     }

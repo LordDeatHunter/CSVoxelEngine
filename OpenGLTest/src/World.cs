@@ -185,6 +185,8 @@ public class World
     /// server).</summary>
     internal TowerCollapseEffects? CollapseEffects { get; }
 
+    internal FloorConqueredEffects? ConqueredEffects { get; }
+
     /// <summary>The block edit paths: breaking, felling, multiblocks, tall blocks, toppling trees, edit reports.</summary>
     internal BlockEditor Edits { get; }
 
@@ -554,6 +556,8 @@ public class World
                 replaced: (x, y, z, before, after) => CollapseEffects?.OnCellChanged(x, y, z, before, after)));
             if (!serverMode)
                 CollapseEffects = new TowerCollapseEffects(Camera, _debris, _chunkManager, _towers);
+            if (!serverMode)
+                ConqueredEffects = new FloorConqueredEffects(Camera, _fire, _towers, sfx);
             LeftClick =new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, sfx, clientMode);
             Placer = new BlockPlacer(this, _chunkManager, _falling, _icebergs, _querns, _fluidManager, _leafDecay,
                 _lodManager, _debris, clientMode, serverMode);
@@ -1071,6 +1075,7 @@ public class World
         Ambient.UpdateKingEffects((float)deltaTime);
         WormEffects?.Update((float)deltaTime, Sandworms);
         CollapseEffects?.Update((float)deltaTime);
+        ConqueredEffects?.Update((float)deltaTime);
         Ambient.GatherStationFires();
         Ambient.AddGoblinTorches();
         _fire.Update((float)deltaTime, Ambient.FireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
@@ -1239,6 +1244,7 @@ public class World
             Ambient.UpdateKingEffects((float)deltaTime);
             WormEffects?.Update((float)deltaTime, Sandworms);
             CollapseEffects?.Update((float)deltaTime);
+            ConqueredEffects?.Update((float)deltaTime);
         }
 
         Edits.UpdateToppling((float)deltaTime);

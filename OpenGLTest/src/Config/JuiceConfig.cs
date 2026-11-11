@@ -253,6 +253,21 @@ public static class JuiceConfig
     public const float SparkRise = 1.6f;
     public const float SparkSize = 0.12f;
 
+    // --- Conquered battle-tower floor (FloorConqueredEffects): when a floor's last skeleton falls and its door
+    // opens, glowing motes pulse outward from the middle of the floor in PulseCount rings, one every
+    // PulseIntervalSeconds, each ring MoteCount motes flung flat at MoteSpeed that fade over MoteLifetime
+    // seconds; the jingle plays when the camera is within SoundRangeBlocks. Cosmetic: singleplayer and a
+    // client (from the door bit of the tower snapshot), never a server. ---
+    public const int FloorConqueredPulseCount = 3;
+    public const float FloorConqueredPulseIntervalSeconds = 0.4f;
+    public const int FloorConqueredMoteCount = 48;
+    public const float FloorConqueredMoteSpeed = 5f;
+    public const float FloorConqueredMoteLifetime = 1.4f;
+    public const float FloorConqueredMoteSize = 0.16f;
+    // Blocks above the floor's slab the pulse starts at
+    public const float FloorConqueredRiseBlocks = 1.2f;
+    public const float FloorConqueredSoundRangeBlocks = 48f;
+
     // --- Low-health vignette (LowHealthVignette, vignette-fragment.glsl) ---
     // Below the threshold (a fraction of the pool) the screen edge pulses red like a slow
     // heartbeat, its strength rising from the min to the max as health falls to nothing. Between
