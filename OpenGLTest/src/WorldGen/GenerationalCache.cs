@@ -37,9 +37,11 @@ namespace VoxelEngine.WorldGen;
 /// <c>Volatile.Read</c> of <c>_current</c> for probing, so no reader can observe a half-rotated set.
 /// Insertion may refresh that snapshot if its newest map has no free slot (point 5).</para>
 ///
-/// <para><b>4. Every insert reserves a slot before publishing.</b> A map's counter includes both
-/// successful entries and pending inserts. Admission uses a CAS that cannot exceed
-/// <c>_generationEntries</c>; a duplicate or throwing insert returns its slot. An insert racing a
+/// <para><b>4. Every insert reserves a slot before publishing.</b> A map's counter conservatively
+/// covers published entries and pending inserts. Admission uses a CAS that cannot exceed
+/// <c>_generationEntries</c>; only a confirmed duplicate (a normal false return) returns its slot.
+/// <c>TryAdd</c> can publish and then throw, so an exceptional insert keeps its reservation until
+/// the map ages out, even if it did not publish. The exception propagates. An insert racing a
 /// rotation may finish in a demoted or detached map, but still owns a slot in that map. It can age
 /// out early, never overfill the map. Factories run before reserving, so a slow factory holds no
 /// slot and retries admission in a newer snapshot if its original map has filled.</para>
@@ -48,7 +50,8 @@ namespace VoxelEngine.WorldGen;
 /// rotates after a successful insert. Another caller finding all slots occupied can also rotate
 /// before retrying admission in the current node. Only one rotation CAS for a given node can win;
 /// losers discard their candidate. If pending inserts later turn out to be duplicates or throw,
-/// the rotated map can be underfull. Sequentially, only successful inserts spend the budget.
+/// the rotated map can be underfull. Without insertion exceptions, sequentially only successful
+/// inserts spend the budget; exceptional inserts conservatively consume slots (point 4).
 /// Admission retries only after a competing CAS or a full generation; it does not wait for a
 /// particular caller. This is not a wait-free bound on an individual call under contention.</para>
 ///
@@ -109,8 +112,9 @@ public sealed class GenerationalCache<TKey, TValue> where TKey : notnull
 {
     /// <summary>
     /// One immutable snapshot of the generation array plus that generation's insert budget. Swapped
-    /// as a unit (point 3) so no reader ever sees a half-rotated set. <see cref="Slots"/> counts
-    /// published entries plus in-flight reservations in Maps[0], always within the map's budget.
+    /// as a unit (point 3) so no reader ever sees a half-rotated set. <see cref="Slots"/> counts spent
+    /// and in-flight reservations in Maps[0], never below its entry count or above its budget.
+    /// An uncertain exceptional insert conservatively spends its slot (point 4).
     /// </summary>
     private sealed class Generation(ConcurrentDictionary<TKey, TValue>[] maps)
     {
@@ -200,9 +204,9 @@ public sealed class GenerationalCache<TKey, TValue> where TKey : notnull
 
     /// <summary>
     /// Reserves space before publishing an entry. A full snapshot is rotated (or was already
-    /// rotated by a peer), then admission retries against the current node. Duplicate inserts and
-    /// exceptions return their reservation. No caller waits for another caller to finish inserting
-    /// or allocating a rotation.
+    /// rotated by a peer), then admission retries against the current node. Only a normal false
+    /// return refunds its reservation: an exception may follow publication and keeps the slot.
+    /// No caller waits for another caller to finish inserting or allocating a rotation.
     /// </summary>
     private void Insert(Generation generation, TKey key, TValue value)
     {
@@ -221,17 +225,15 @@ public sealed class GenerationalCache<TKey, TValue> where TKey : notnull
             if (Interlocked.CompareExchange(ref generation.Slots, slots + 1, slots) != slots)
                 continue;
 
-            var added = false;
-            try
+            // TryAdd can publish a node and then throw during growth. Retain the reservation
+            // on an exception; only a confirmed duplicate proves this call added no entry.
+            if (!generation.Maps[0].TryAdd(key, value))
             {
-                added = generation.Maps[0].TryAdd(key, value);
-            }
-            finally
-            {
-                if (!added) Interlocked.Decrement(ref generation.Slots);
+                Interlocked.Decrement(ref generation.Slots);
+                return;
             }
 
-            if (added && slots + 1 == _generationEntries)
+            if (slots + 1 == _generationEntries)
                 Rotate(generation);
             return;
         }

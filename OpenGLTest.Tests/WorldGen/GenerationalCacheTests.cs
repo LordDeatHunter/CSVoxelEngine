@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Reflection;
 using System.Threading;
 using VoxelEngine.WorldGen;
 using Xunit;
@@ -460,6 +461,51 @@ public sealed class GenerationalCacheTests
         Assert.Equal(0, cache.Rotations);
         cache.GetOrAdd(capacity, CountingFactory.Value);
         Assert.Equal(1, cache.Rotations);
+    }
+
+    [Fact]
+    public void AnInsertThatThrowsAfterPublicationKeepsItsAdmissionSlot()
+    {
+        const int capacity = 8;
+        const int generations = 2;
+        const int entriesPerMap = capacity / generations;
+        var cache = new GenerationalCache<int, string>(capacity, generations);
+
+        // Narrow runtime-coupled fault injection, entirely in this test: ConcurrentDictionary
+        // publishes a node before its checked per-stripe count increment. Force that increment
+        // to overflow, demonstrating a real TryAdd exception AFTER publication without OOM.
+        // See dotnet/runtime v10.0.0 ConcurrentDictionary.TryAddInternal. No production seam.
+        const BindingFlags fields = BindingFlags.Instance | BindingFlags.NonPublic;
+        var current = cache.GetType().GetField("_current", fields)!.GetValue(cache)!;
+        var maps = (ConcurrentDictionary<int, string>[])current.GetType()
+            .GetField("Maps", fields)!.GetValue(current)!;
+        var map = maps[0];
+        var tables = map.GetType().GetField("_tables", fields)!.GetValue(map)!;
+        var counts = (int[])tables.GetType().GetField("_countPerLock", fields)!.GetValue(tables)!;
+
+        // int key 0 hashes to bucket/stripe 0. This private cache has no other callers or entries.
+        counts[0] = int.MaxValue;
+        try
+        {
+            Assert.Throws<OverflowException>(() => cache.GetOrAdd(0, CountingFactory.Value));
+        }
+        finally
+        {
+            // Repair the injected diagnostic count before any Count or subsequent insert. The
+            // dictionary itself owns the published node; never add it independently in the test.
+            counts[0] = map.ContainsKey(0) ? 1 : 0;
+        }
+
+        Assert.True(map.TryGetValue(0, out var published), "TryAdd must throw after publishing its node");
+        Assert.Equal(CountingFactory.Value(0), published);
+
+        for (var key = 1; key <= entriesPerMap; key++)
+            Assert.Equal(CountingFactory.Value(key), cache.GetOrAdd(key, CountingFactory.Value));
+
+        Assert.True(map.Count <= entriesPerMap,
+            $"a throwing published insert lost its slot: map has {map.Count} entries, budget {entriesPerMap}");
+        Assert.True(cache.Rotations > 0, "later callers must still rotate after the exceptional insert");
+        Assert.True(cache.EntryCount <= cache.Capacity);
     }
 
     [Fact]
