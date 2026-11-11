@@ -17,6 +17,7 @@ public static class ChestCardLayout
     public const float SearchHeight = 36f;
     public const float Gap = 8f;
     public const float RowHeight = 42f;
+    public const float ButtonHeight = 30f;
 
     /// <summary>The wheel scrolls this many rows a notch.</summary>
     public const int WheelStepRows = 3;
@@ -48,11 +49,26 @@ public static class ChestCardLayout
             new Vector2(content.Size.X, SearchHeight));
     }
 
-    /// <summary>The list viewport: what is left under the search field.</summary>
+    /// <summary>The LOOT ALL button: left half of the row under the search field.</summary>
+    public static UiRect LootAllButton(Vector2 screen)
+    {
+        var search = SearchBox(screen);
+        var width = (search.Size.X - Gap) * 0.5f;
+        return UiRect.FromTopLeft(new Vector2(search.Left, search.Bottom + Gap), new Vector2(width, ButtonHeight));
+    }
+
+    /// <summary>The QUICK STACK button: right half of the row under the search field.</summary>
+    public static UiRect QuickStackButton(Vector2 screen)
+    {
+        var loot = LootAllButton(screen);
+        return UiRect.FromTopLeft(new Vector2(loot.Right + Gap, loot.Top), loot.Size);
+    }
+
+    /// <summary>The list viewport: what is left under the buttons.</summary>
     public static UiRect List(Vector2 screen)
     {
         var content = Content(screen);
-        var top = content.Top + TitleHeight + Gap + SearchHeight + Gap;
+        var top = content.Top + TitleHeight + Gap + SearchHeight + Gap + ButtonHeight + Gap;
         return UiRect.FromTopLeft(new Vector2(content.Left, top),
             new Vector2(content.Size.X, MathF.Max(0f, content.Bottom - top)));
     }

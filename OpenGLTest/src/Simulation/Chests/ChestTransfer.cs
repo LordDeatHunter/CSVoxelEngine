@@ -70,6 +70,31 @@ public static class ChestTransfer
         return moved;
     }
 
+    /// <summary>Takes every slot out of the chest as far as the inventory has room. Returns how many units moved.</summary>
+    public static int LootAll(Inventory inventory, ChestState chest)
+    {
+        var moved = 0;
+        for (var i = 0; i < chest.SlotCount; i++)
+            moved += Withdraw(inventory, chest, i, 0);
+        return moved;
+    }
+
+    /// <summary>
+    /// Moves every stackable the player holds whose id the chest already holds into the chest, merging into its
+    /// stacks (and empty slots when those are full). Tools and gear stay. Returns how many units moved.
+    /// </summary>
+    public static int QuickStack(Inventory inventory, ChestState chest)
+    {
+        var ids = new System.Collections.Generic.HashSet<ushort>();
+        for (var i = 0; i < chest.SlotCount; i++)
+            if (chest[i] is { IsEmpty: false, Instance: null } slot)
+                ids.Add(slot.Id);
+        var moved = 0;
+        foreach (var id in ids)
+            moved += Deposit(inventory, chest, id, int.MaxValue);
+        return moved;
+    }
+
     /// <summary>
     /// Puts up to <paramref name="count"/> units of a stackable into the chest (merging, then empty slots) and returns
     /// how many fit. Also what the loot materializer fills a ruin chest with.

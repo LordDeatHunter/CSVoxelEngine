@@ -117,6 +117,16 @@ internal sealed class ChestInput
             return true;
         }
         if (!ChestCardLayout.Contains(point, screen)) return false;
+        if (ChestCardLayout.LootAllButton(screen).Contains(point))
+        {
+            Send(world, ChestMove.LootAll());
+            return true;
+        }
+        if (ChestCardLayout.QuickStackButton(screen).Contains(point))
+        {
+            Send(world, ChestMove.QuickStack());
+            return true;
+        }
 
         var rows = view.Rows();
         var offset = ChestCardLayout.ClampedOffset(view.ScrollOffset, rows.Count, screen);

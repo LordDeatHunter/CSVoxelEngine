@@ -240,8 +240,10 @@ public static class NetFraming
     /// tier byte (<c>CrawlerMob.PackStance</c>) and whose yaw is the heading's angle on that face; an older client would
     /// not draw them.
     /// 40: the scorpion (<see cref="NetEntityKind.Scorpion"/>), a crawler on the wire like the spiders; its attack
-    /// count names pinch (even) and sting (odd). An older client would not draw it.</summary>
-    public const int ProtocolVersion = 40;
+    /// count names pinch (even) and sting (odd). An older client would not draw it.
+    /// 41: the chest moves <see cref="Simulation.Chests.ChestMoveKind.LootAll"/> and
+    /// <see cref="Simulation.Chests.ChestMoveKind.QuickStack"/>; an older server would refuse them as malformed.</summary>
+    public const int ProtocolVersion = 41;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

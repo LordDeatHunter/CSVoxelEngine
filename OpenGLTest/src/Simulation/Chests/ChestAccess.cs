@@ -38,6 +38,8 @@ public static class ChestAccess
             ChestTransfer.Deposit(inventory, chest, (ushort)move.Id, move.Count <= 0 ? int.MaxValue : move.Count),
         ChestMoveKind.DepositInstance => ChestTransfer.DepositInstance(inventory, chest, move.Id) ? 1 : 0,
         ChestMoveKind.Withdraw => ChestTransfer.Withdraw(inventory, chest, move.Slot, move.Count),
+        ChestMoveKind.LootAll => ChestTransfer.LootAll(inventory, chest),
+        ChestMoveKind.QuickStack => ChestTransfer.QuickStack(inventory, chest),
         _ => 0,
     };
 }

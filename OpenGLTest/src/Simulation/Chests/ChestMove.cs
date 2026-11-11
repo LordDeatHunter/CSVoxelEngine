@@ -11,6 +11,12 @@ public enum ChestMoveKind : byte
 
     /// <summary>Move units out of a chest slot into the inventory (<see cref="ChestMove.Slot"/>, <see cref="ChestMove.Count"/>).</summary>
     Withdraw = 2,
+
+    /// <summary>Move everything the inventory has room for out of the chest.</summary>
+    LootAll = 3,
+
+    /// <summary>Move every stackable of an id the chest already holds from the inventory into the chest.</summary>
+    QuickStack = 4,
 }
 
 /// <summary>
@@ -24,4 +30,8 @@ public readonly record struct ChestMove(ChestMoveKind Kind, int Slot = 0, int Id
     public static ChestMove DepositInstance(int instanceId) => new(ChestMoveKind.DepositInstance, Id: instanceId);
 
     public static ChestMove Withdraw(int slot, int count) => new(ChestMoveKind.Withdraw, Slot: slot, Count: count);
+
+    public static ChestMove LootAll() => new(ChestMoveKind.LootAll);
+
+    public static ChestMove QuickStack() => new(ChestMoveKind.QuickStack);
 }

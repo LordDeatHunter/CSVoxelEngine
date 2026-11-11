@@ -214,7 +214,7 @@ the server. A break and the stale sweep spill the contents as drops (instances l
 (server) judges each move against that player's open chest and reach, tells every viewer, and closes the chest when it is
 broken or out of reach. Right-clicking a chest is a `RightClickOutcome.Container` claim (sneak places against it instead);
 `ChestInput` (owned by `InventoryPanelInput`) opens the `ChestView` card (`UI/Chest/`, `ChestCardRenderer`) beside the [E] list,
-whose rows then deposit (one unit, all with shift) while the card's rows withdraw; the card's rows wear the same
+whose rows then deposit (one unit, all with shift) while the card's rows withdraw, and whose LOOT ALL and QUICK STACK buttons (`ChestMoveKind.LootAll`/`QuickStack`, `ChestTransfer.LootAll`/`QuickStack`: take everything that fits, or deposit every stackable whose id the chest already holds) sit under the search field; the card's rows wear the same
 `RarityStyle` chrome, accent bar and name color as the [E] rows (see "Rarity chrome"). The chest card takes the right side
 of the panel, so the preview, equipment and crafting cards are neither drawn nor clicked while it is up. `ChestTests`, `TowerChestTests`, `ChestServerTests`;
 `visual-examples/chests.json` (`VOXEL_TIME=147`, with the `setblock`, `chest`, `chestrow` and `chestwobble` ops).
