@@ -34,7 +34,7 @@ public sealed class LavaTests
     }
 
     [Fact]
-    public void LavaSitsOutEveryOtherTick()
+    public void LavaWaitsFourTicksWhileWaterStillFlowsOnTheFirst()
     {
         var manager = FloorBasin();
         var lava = ContentRegistry.RequireBlock("lava").Id;
@@ -43,6 +43,9 @@ public sealed class LavaTests
         var drops = new DropManager();
         manager.Chunks[Vector3.Zero].SetBlockRaw(4, 1, 8, lava, FluidState.Source);
         manager.Chunks[Vector3.Zero].SetBlockRaw(12, 1, 8, water, FluidState.Source);
+        // Keep the faster water from reaching and hardening the lava during the cadence check.
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        for (var z = 0; z < Chunk.Size; z++) manager.Chunks[Vector3.Zero].SetBlockRaw(8, 1, z, stone, 0);
         fluids.ScheduleAround(4, 1, 8);
         fluids.ScheduleAround(12, 1, 8);
 
@@ -52,6 +55,11 @@ public sealed class LavaTests
         Assert.NotEqual(lava, lavaNeighbor);
         Assert.True(manager.TryGetCell(13, 1, 8, out var waterNeighbor, out _));
         Assert.Equal(water, waterNeighbor);
+        // The previous cadence advanced on tick 2. It now waits through ticks 2 and 3.
+        Pump(fluids, 2, manager, drops);
+        Assert.NotEqual(lava, manager.GetBlockGlobal(5, 1, 8));
+        Pump(fluids, 1, manager, drops);
+        Assert.Equal(lava, manager.GetBlockGlobal(5, 1, 8));
     }
 
     [Fact]
@@ -64,7 +72,7 @@ public sealed class LavaTests
         manager.Chunks[Vector3.Zero].SetBlockRaw(8, 1, 8, lava, FluidState.Source);
         fluids.ScheduleAround(8, 1, 8);
 
-        Pump(fluids, 8, manager, drops);
+        Pump(fluids, 16, manager, drops);
 
         Assert.True(manager.TryGetCell(11, 1, 8, out var edge, out var edgeState));
         Assert.Equal(lava, edge);
@@ -85,7 +93,7 @@ public sealed class LavaTests
         fluids.ScheduleAround(2, 1, 8);
         fluids.ScheduleAround(4, 1, 8);
 
-        Pump(fluids, 8, manager, drops);
+        Pump(fluids, 16, manager, drops);
 
         Assert.True(manager.TryGetCell(3, 1, 8, out var middle, out var middleState));
         Assert.Equal(lava, middle);

@@ -36,7 +36,7 @@ public class FluidManager
 {
     private float _accumulator;
 
-    // How many ticks have run. Fluids with a tick divisor above 1 (lava: 2) only process
+    // How many ticks have run. Fluids with a tick divisor above 1 (lava: 4) only process
     // when the index divides evenly, so they flow slower while sharing the one schedule.
     private int _tickIndex;
 
