@@ -149,7 +149,7 @@ internal sealed class InputEvents
             case AppScreen.Loading or AppScreen.Saving:
                 return;
         }
-        if (button == MouseButton.Left) fieldPointer.Press();
+        if (button is MouseButton.Left or MouseButton.Right) fieldPointer.Press(clear: button == MouseButton.Right);
         if (button == MouseButton.Right) _rightPressedOnPanel = inventoryView.IsOpen;
         switch (Screen)
         {
