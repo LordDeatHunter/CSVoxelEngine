@@ -45,6 +45,40 @@ public sealed class CaveShapeTests
     }
 
     [Fact]
+    public void MoreCoverOpensAdditionalRoomsWithoutClosingShallowAir()
+    {
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        ColumnData Column(int height) => new(Enumerable.Repeat(height, Chunk.Size * Chunk.Size).ToArray(),
+            new byte[Chunk.Size * Chunk.Size], new float[Chunk.Size * Chunk.Size], new float[Chunk.Size * Chunk.Size]);
+        var shallowColumn = Column(28);
+        var deepColumn = Column(340);
+        var extra = 0;
+        var shallowAir = 0;
+        var total = 0;
+        for (var cx = -4; cx <= 4; cx++)
+        for (var cz = -4; cz <= 4; cz++)
+        {
+            var shallow = Enumerable.Repeat(stone, Chunk.BlockCount).ToArray();
+            var deep = (ushort[])shallow.Clone();
+            NoiseCaves.Carve(shallow, shallowColumn, cx * Chunk.Size, 0, cz * Chunk.Size);
+            NoiseCaves.Carve(deep, deepColumn, cx * Chunk.Size, 0, cz * Chunk.Size);
+            for (var i = 0; i < shallow.Length; i++)
+            {
+                total++;
+                if (shallow[i] == BlockType.Air)
+                {
+                    shallowAir++;
+                    Assert.Equal(BlockType.Air, deep[i]);
+                }
+                else if (deep[i] == BlockType.Air) extra++;
+            }
+        }
+        Assert.True(shallowAir > 0 && extra > 0);
+        Assert.True(shallowAir + extra < total * 0.7, "deep caves became one continuous open region");
+        Assert.True(NoiseCaves.PocketThreshold(20) > NoiseCaves.PocketThreshold(200));
+    }
+
+    [Fact]
     public void RegularPassagesProvideStandingAndSidewaysClearance()
     {
         var air = 0;

@@ -11,7 +11,7 @@ namespace VoxelEngine.WorldGen;
 /// the curves where two fields are both near zero (a wide and a narrow variant), and rare flat
 /// caverns deep down. Every field is sampled on a coarse lattice per chunk and trilinearly
 /// interpolated per block before thresholding, so the cost is a few hundred noise evaluations
-/// per chunk instead of tens of thousands. Nine channels: the eight cave fields and a shape scale
+/// per chunk instead of tens of thousands. Ten channels: nine cave fields and a shape scale
 /// (seed offset 182, plans/CAVE_BIOMES.md CB-2), sampled only in a chunk holding a cave sub-biome,
 /// which scales that sub-biome's <see cref="CaveShape"/> boosts per region; plain and echo cells
 /// carve exactly as before. All carving is a pure function of world position, the column data and
@@ -36,7 +36,8 @@ public static class NoiseCaves
     private const int ChCavern = 6;
     private const int ChNarrowMask = 7;
     private const int ChShapeScale = 8;
-    private const int Channels = 9;
+    private const int ChPocket = 9;
+    private const int Channels = 10;
 
     private static FastNoiseLite Cheese;
     private static FastNoiseLite SpaghettiA;
@@ -47,6 +48,7 @@ public static class NoiseCaves
     private static FastNoiseLite NarrowMask;
     private static FastNoiseLite Cavern;
     private static FastNoiseLite ShapeScale;
+    private static FastNoiseLite Pocket;
 
     static NoiseCaves() => Reseed();
 
@@ -65,6 +67,7 @@ public static class NoiseCaves
         NarrowMask = TerrainGenerator.MakeNoise(123, WorldGenerationConfig.NarrowSpaghettiMaskFrequency);
         Cavern = TerrainGenerator.MakeNoise(131, WorldGenerationConfig.CavernFrequency);
         ShapeScale = TerrainGenerator.MakeNoise(182, WorldGenerationConfig.CaveShapeScaleFrequency);
+        Pocket = TerrainGenerator.MakeNoise(187, WorldGenerationConfig.CavePocketFrequency, octaves: 2);
     }
 
     /// <summary>
@@ -111,6 +114,7 @@ public static class NoiseCaves
                     samples[ChNarrowB * GridCount + g] = NarrowB.GetNoise(wx, wy * WorldGenerationConfig.SpaghettiYScale, wz);
                     samples[ChCavern * GridCount + g] = Cavern.GetNoise(wx, wy * WorldGenerationConfig.CavernYScale, wz);
                     samples[ChNarrowMask * GridCount + g] = NarrowMask.GetNoise(wx, wy, wz);
+                    samples[ChPocket * GridCount + g] = Pocket.GetNoise(wx, wy * WorldGenerationConfig.CavePocketYScale, wz);
                     if (withShape) samples[ChShapeScale * GridCount + g] = ShapeScale.GetNoise(wx, wy, wz);
                 }
             }
@@ -187,6 +191,11 @@ public static class NoiseCaves
         if (cheese > cheeseThreshold - intensity + (1f - gate) - cheeseBoost)
             return true;
 
+        // Smaller rooms bridge the size gap between a tunnel and the broad cheese regions.
+        var pocket = Trilinear(samples, ChPocket * GridCount + g, fx, fy, fz);
+        if (pocket > PocketThreshold(depth) + (1f - gate) - intensity)
+            return true;
+
         // Wide spaghetti: inside the tube around the curve where both fields are zero
         var a = Trilinear(samples, ChSpaghettiA * GridCount + g, fx, fy, fz);
         var b = Trilinear(samples, ChSpaghettiB * GridCount + g, fx, fy, fz);
@@ -221,6 +230,11 @@ public static class NoiseCaves
 
         return false;
     }
+
+    /// <summary>Intermediate rooms become more prevalent with cover, while remaining bounded noise pockets.</summary>
+    internal static float PocketThreshold(float depth) => MathUtils.Lerp(
+        WorldGenerationConfig.CavePocketThresholdShallow, WorldGenerationConfig.CavePocketThresholdDeep,
+        MathUtils.SmoothStep(WorldGenerationConfig.CavePocketDepthStart, WorldGenerationConfig.CavePocketDepthEnd, depth));
 
     /// <summary>Interpolates one channel at fractional lattice offset (fx, fy, fz) from lattice index base.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -615,7 +615,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // --- Cave surface rule ---
     // Caves fade out this close (in blocks) below the surface...
     public const float CaveSurfaceFadeStart = 2f;
-    public const float CaveSurfaceFadeEnd = 8f;
+    public const float CaveSurfaceFadeEnd = 6f;
     // ...except in entrance zones, sparse patches where the fade is lifted and caves reach the sky
     public const float EntranceFrequency = 1f / 128f;
     public const float EntranceStart = 0.5f;
@@ -643,10 +643,18 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Cheese: blobby rooms where a low-frequency field exceeds a threshold that loosens with depth
     public const float CheeseFrequency = 1f / 80f;
     public const float CheeseYScale = 1.5f;
-    public const float CheeseThresholdShallow = 0.75f;
-    public const float CheeseThresholdDeep = 0.6f;
+    public const float CheeseThresholdShallow = 0.66f;
+    public const float CheeseThresholdDeep = 0.46f;
     public const float CheeseDepthStart = 8f;
-    public const float CheeseDepthEnd = 60f;
+    public const float CheeseDepthEnd = 280f;
+
+    // Intermediate rooms on a shorter wavelength than cheese, increasingly frequent with depth.
+    public const float CavePocketFrequency = 1f / 36f;
+    public const float CavePocketYScale = 1.2f;
+    public const float CavePocketThresholdShallow = 0.64f;
+    public const float CavePocketThresholdDeep = 0.38f;
+    public const float CavePocketDepthStart = 6f;
+    public const float CavePocketDepthEnd = 320f;
 
     // Spaghetti: tunnels along the curves where two independent fields are both near zero.
     // Radii are in noise units; the tunnel radius in blocks is roughly radius * wavelength / 30.
