@@ -205,7 +205,8 @@ internal sealed class InventoryPanelInput
         {
             Chest.Close();
             inventoryView.ClearSelection();
-            inventoryView.ClearInput();
+            // The search text stays for the next opening; only the keyboard focus drops
+            inventoryView.Focus = InventoryFocus.None;
             inventoryView.Craft.Clear();
             inventoryView.EndThumbDrag();
             inventoryView.Drag = null;
