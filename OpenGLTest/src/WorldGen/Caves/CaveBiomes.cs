@@ -247,9 +247,9 @@ public static class CaveBiomes
         WorldGenerationConfig.CaveDeepTopY + WorldGenerationConfig.CaveDeepDriftBlocks * deepDrift;
 
     /// <summary>The cave echo of a surface biome; plain for a biome without one.</summary>
-    private static CaveBiome EchoOf(Biome surface) => surface switch
+    internal static CaveBiome EchoOf(Biome surface) => surface switch
     {
-        Biome.Frozen => CaveBiome.FrozenEcho,
+        Biome.Frozen or Biome.Taiga => CaveBiome.FrozenEcho,
         Biome.Desert => CaveBiome.DesertEcho,
         _ => CaveBiome.Plain,
     };

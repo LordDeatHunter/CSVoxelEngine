@@ -116,6 +116,87 @@ public sealed class CaveRevampSceneTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void TaigaHasFrozenRockAndOpenCavesBelowTheOriginalEchoBand()
+    {
+        TestContent.EnsureLoaded();
+        // Choose a broad taiga patch so neighboring Frozen sites cannot supply the expansion.
+        for (var x0 = -4096; x0 <= 4096; x0 += 128)
+        for (var z0 = -4096; z0 <= 4096; z0 += 128)
+        {
+            if (!IsTaigaPatch(x0, z0)) continue;
+            var column = ColumnCache.Get(x0 / Chunk.Size, z0 / Chunk.Size);
+            for (var y0 = -256; y0 > WorldGenerationConfig.CaveEchoVolumeBottomY; y0 -= Chunk.Size)
+            {
+                var chunk = new Chunk(null!, new Vector3(x0 / Chunk.Size, y0 / Chunk.Size, z0 / Chunk.Size), true);
+                if (!TryOpenFloor(chunk, column, out var x, out var y, out var z)) continue;
+                var eye = chunk.Position * Chunk.Size + new Vector3(x + 0.5f, y + 1 + Camera.EyeHeight, z + 0.5f);
+                output.WriteLine($"taiga seed={WorldGenerationConfig.Seed} eye={eye} floor={chunk.GetLocalBlock(x, y, z)}");
+                AssertMapEqualsPoint(column, x0, y0, z0);
+                var ci = VoxelCoords.ColumnIndex(x, z);
+                Assert.Equal(CaveBiome.FrozenEcho, CaveBiomes.At(x0 + x, y0 + y, z0 + z, column.Biomes[ci], column.Heights[ci]));
+                // Ores retain their ids; prove the surrounding generated rock uses the frozen palette.
+                Assert.Contains(CaveBiomes.BlockFor(CaveBiome.FrozenEcho, CaveCellRole.Interior, x0 + x, y0 + y, z0 + z),
+                    chunk.Storage.ToDense());
+                return;
+            }
+        }
+        Assert.Fail("no open deep taiga cave in the bounded search");
+    }
+
+    private static bool IsTaigaPatch(int x0, int z0)
+    {
+        for (var dx = -256; dx <= 256; dx += 64)
+        for (var dz = -256; dz <= 256; dz += 64)
+            if (TerrainGenerator.BiomeAt(x0 + dx, z0 + dz) != Biome.Taiga) return false;
+        return true;
+    }
+
+    private static bool TryOpenFloor(Chunk chunk, ColumnData column, out int lx, out int ly, out int lz)
+    {
+        for (var x = 3; x < Chunk.Size - 3; x++)
+        for (var y = 1; y < Chunk.Size - 3; y++)
+        for (var z = 3; z < Chunk.Size - 3; z++)
+        {
+            if (!BlockType.IsSolid(chunk.GetLocalBlock(x, y, z))
+                || chunk.GetLocalBlock(x, y + 1, z) != BlockType.Air
+                || chunk.GetLocalBlock(x, y + 2, z) != BlockType.Air
+                || OpenCellsOver(chunk, x, y, z) < 100) continue;
+            var i = VoxelCoords.ColumnIndex(x, z);
+            var origin = chunk.Position * Chunk.Size;
+            if (CaveBiomes.At((int)origin.X + x, (int)origin.Y + y, (int)origin.Z + z,
+                    column.Biomes[i], column.Heights[i]) != CaveBiome.FrozenEcho) continue;
+            (lx, ly, lz) = (x, y, z);
+            return true;
+        }
+        (lx, ly, lz) = (0, 0, 0);
+        return false;
+    }
+
+    private static int OpenCellsOver(Chunk chunk, int x, int y, int z)
+    {
+        var open = 0;
+        for (var dx = -3; dx <= 3; dx++)
+        for (var dz = -3; dz <= 3; dz++)
+        for (var dy = 1; dy <= 3; dy++)
+            if (chunk.GetLocalBlock(x + dx, y + dy, z + dz) == BlockType.Air) open++;
+        return open;
+    }
+
+    private static void AssertMapEqualsPoint(ColumnData column, int x0, int y0, int z0)
+    {
+        var map = new CaveBiomeMap();
+        CaveBiomes.Fill(map, column, x0, y0, z0);
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var y = 0; y < Chunk.Size; y++)
+        for (var z = 0; z < Chunk.Size; z++)
+        {
+            var i = VoxelCoords.ColumnIndex(x, z);
+            Assert.Equal(CaveBiomes.At(x0 + x, y0 + y, z0 + z, column.Biomes[i], column.Heights[i]),
+                (CaveBiome)map.Cells[Chunk.Idx(x, y, z)]);
+        }
+    }
+
+    [Fact]
     public void DesertHasDistinctWideGeneratedPocketInteriors()
     {
         TestContent.EnsureLoaded();
@@ -144,7 +225,7 @@ public sealed class CaveRevampSceneTests(ITestOutputHelper output)
             var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
             var i = VoxelCoords.ColumnIndex(x & Chunk.SizeMask, z & Chunk.SizeMask);
             if (CaveBiomes.At(x, y, z, column.Biomes[i], column.Heights[i]) != CaveBiome.DesertEcho
-                || !IsWidePocket(x, y, z, column.Heights[i] - y)) continue;
+                || !IsWidePocket(x, y, z)) continue;
             var chunk = new Chunk(null!, VoxelCoords.ChunkPosOf(x, y, z), true);
             Assert.Equal(BlockType.Air, chunk.GetLocalBlock(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask));
             eye = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
@@ -153,11 +234,18 @@ public sealed class CaveRevampSceneTests(ITestOutputHelper output)
         return false;
     }
 
-    private static bool IsWidePocket(int x, int y, int z, int depth)
+    private static bool IsWidePocket(int x, int y, int z)
     {
         for (var dx = -12; dx <= 12; dx += 4)
         for (var dz = -12; dz <= 12; dz += 4)
-            if (!DesertCaves.InPocket(x + dx, y, z + dz, depth, 1)) return false;
+        {
+            var wx = x + dx;
+            var wz = z + dz;
+            var column = ColumnCache.Get(wx >> Chunk.SizeShift, wz >> Chunk.SizeShift);
+            var i = VoxelCoords.ColumnIndex(wx & Chunk.SizeMask, wz & Chunk.SizeMask);
+            if (CaveBiomes.At(wx, y, wz, column.Biomes[i], column.Heights[i]) != CaveBiome.DesertEcho
+                || !DesertCaves.InPocket(wx, y, wz, column.Heights[i] - y, 1)) return false;
+        }
         return true;
     }
 

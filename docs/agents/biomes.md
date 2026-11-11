@@ -307,7 +307,7 @@ Three 3D noises (seed offsets 179 echo drift, 180 deep drift, 181 selector) are 
 lattice and blended with `OreNoiseLattice.Trilinear`, and the one rule `CaveBiomes.Classify` turns them, the cell's y,
 its depth under its column's top and the column's stored, dithered surface biome into a cave biome:
 - **Echo**: from a jittered cover (`CaveEchoCoverBlocks` plus up to `CaveEchoCoverJitterBlocks`) under the column top
-  down to `CaveEchoBottomY + CaveEchoDriftBlocks * drift`, a frozen column's caves are FrozenEcho (frost_stone,
+  down to `CaveEchoBottomY + CaveEchoDriftBlocks * drift`, a frozen or taiga column's caves are FrozenEcho (frost_stone,
   permafrost floors), a desert column's DesertEcho (sandstone), every other column's plain.
 - **Sub-biomes**: under the echo, MagmaDeep (scorched_hellrock, magma_block accents) at or below
   `CaveDeepTopY + CaveDeepDriftBlocks * deepDrift`; above it the selector picks Crystal (stone with crystal_block
@@ -343,7 +343,7 @@ Issue #10 regular spaghetti uses a 0.13 noise radius (variation 0.02), patch tun
 
 Intermediate cave pockets use seed offset 187, wavelength 36 and Y scale 1.2. Their threshold falls smoothly 0.64 to 0.38 over cover 6..320; cheese falls 0.66 to 0.46 over 8..280. The surface fade completes at cover 6 (starts at 2), retaining a protected roof outside entrances. This adds rooms between tunnels and large caverns and increases openness with depth without changing the surface heightmap.
 
-Frozen echo volumes (issue #10) also occupy overlapping 3D ellipsoids: deterministic 128-block sites rooted in frozen surface-biome samples (the ordinary shared climate classifier), horizontal radius 96, vertical radius 112, clipped above -400 and at least 8 blocks below each local surface. This widens the material laterally into nearby columns and vertically below the original echo line, including entirely uncarved rock. `CaveEchoVolumes` applies the same containment to `At` and `Fill`; the site cache includes the seed and holds only pure values. Original echo bands remain present.
+Frozen echo volumes (issue #10) also occupy overlapping 3D ellipsoids: deterministic 128-block sites rooted in Frozen or Taiga surface-biome samples from the shared climate classifier, horizontal radius 96, vertical radius 112, clipped above -400 and at least 8 blocks below each local surface. `CaveBiomes.EchoOf` owns the surface-to-echo policy for both the original point/map band and volume seeding. This widens the material laterally into nearby columns and vertically below the original echo line, including entirely uncarved rock. `CaveEchoVolumes` applies the same containment to `At` and `Fill`; the site cache includes the seed and holds only pure values. Original echo bands remain present.
 
 Desert sandstone uses the same 3D echo-volume rule and dimensions as frozen stone (issue #10), seeded from desert surface-biome samples. Both maps cover uncarved stone below the old echo band and may spread laterally under a different surface biome. The point query and map use the same deterministic site priority even if volumes overlap.
 
@@ -352,3 +352,5 @@ DesertEcho now uses its own carve: the existing two tunnel fields sampled with X
 Verification for issue #10: `visual-examples/cave-revamp.json` (seed 1337, VOXEL_TIME=147) films an unmined seven-block standing walkway, shallow and deep prefilled lava bowls, and both expanded echo materials below the old echo band. Only lamps are added for visibility. `CaveRevampSceneTests` finds the actual generated fixtures, records deterministic id hashes, and restores a modified snapshot under a different procedural seed without changing its stored terrain.
 
 Cave scenery requires solid support: neither glow mushrooms nor stalagmites stand on cave water or lava, and stalactites need solid ceilings. A drip meeting a fluid stops without adding a floating stalagmite. This keeps the new prefilled pond surfaces clear.
+
+PR13 comment319 follow-up: `visual-examples/cave-comment319.json` (`VOXEL_TIME=147`, seed 1337) films floor-level and wide views of real shallow/deep lava pits, two separate irregular desert rooms, and a deep Taiga cave. `CaveRevampSceneTests` locates these fixtures and checks still-pool containment/settling, regeneration, modified snapshot preservation and deep Taiga point/map/material agreement. `CaveShapeTests` checks outline asymmetry/variation, connected slices, ownership walls, negative chunk seams, query order and reseeding. Newly generated terrain changes; modified snapshots and save/wire formats remain unchanged.

@@ -24,12 +24,7 @@ internal static class CaveEchoVolumes
         var z = key.Z * Cell + Cell / 4 + (int)(SplitMix64.Mix(hash + 2) % (Cell / 2));
         if (y + Vertical <= WorldGenerationConfig.CaveEchoVolumeBottomY)
             return new Site(x, y, z, CaveBiome.Plain);
-        var biome = TerrainGenerator.BiomeAt(x, z) switch
-        {
-            Biome.Frozen => CaveBiome.FrozenEcho,
-            Biome.Desert => CaveBiome.DesertEcho,
-            _ => CaveBiome.Plain,
-        };
+        var biome = CaveBiomes.EchoOf(TerrainGenerator.BiomeAt(x, z));
         return new Site(x, y, z, biome);
     }
 

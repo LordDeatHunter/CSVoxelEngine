@@ -565,7 +565,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
   visual-examples/                    # the VOXEL_SCRIPT scenario JSONs (see `VOXEL_SCRIPT`)
 ```
 
-`WorldGen/Caves/CaveEchoVolumes.cs`: deterministic ellipsoid sites that extend echo materials through solid rock; shared point/map containment.
+`WorldGen/Caves/CaveEchoVolumes.cs`: deterministic sites that extend Frozen/Taiga and Desert echo materials through solid rock; shared point/map containment and echo policy.
 
 `WorldGen/Caves/DesertCaves.cs`: bounded, separated irregular desert lobe clusters, composed with elongated noise tunnels.
 
