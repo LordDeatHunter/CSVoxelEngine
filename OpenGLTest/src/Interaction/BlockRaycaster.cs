@@ -134,7 +134,7 @@ public static class BlockRaycaster
                 cellNormal = EntryNormal(lastStepNormal, direction);
                 if (!RayIntersectsBox(origin, direction, cell, cell + Vector3.One,
                         range, out cellT, out _))
-                    cellT = 0f;
+                    return false;
                 return true;
             }
 
