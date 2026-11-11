@@ -85,7 +85,6 @@ public static class WorldSeed
         SnowGenerator.Reseed();
         FoliageGenerator.Reseed();
         GravelPocketGenerator.Reseed();
-        UndergroundPoolGenerator.Reseed();
 
         // Every cached value is a function of (key, seed), so all of them are wrong now.
         ColumnCache.Reset();

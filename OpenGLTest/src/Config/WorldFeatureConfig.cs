@@ -132,11 +132,8 @@ public static class WorldFeatureConfig
     // --- Underground pools (UndergroundPoolGenerator): water on cave floors above the lava band
     // and below the sea ---
     public const bool UndergroundPoolsEnabled = true;
-    public const float PoolPatchFrequency = 1f / 96f;
-    public const float PoolPatchThreshold = 0.35f;
     // Blocks under the column's surface a pool needs (entrances and ravine floors stay dry)
     public const int PoolBurial = 8;
-    public const float PoolChance = 0.5f;
 
     // --- Ruined pillars (RuinedPillarGenerator): broken stone-brick columns on the dry land ---
     public const bool RuinedPillarsEnabled = true;

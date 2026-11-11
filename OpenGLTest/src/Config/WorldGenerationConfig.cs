@@ -360,7 +360,9 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int LavaBurial = 2;
     public const float LavaPatchFrequency = 1f / 128f;
     public const float LavaPatchThreshold = 0.2f;
-    public const float LavaPoolChance = 0.3f;
+    // One small source group per 64-cube; candidates stay in its middle half.
+    public const int CaveFluidCellShift = 6;
+    public const int CaveFluidSiteMargin = 16;
 
     // --- Malachite ore (MalachiteGenerator) ---
     // Common coal-like blobs replacing stone at any depth: cells where the vein field

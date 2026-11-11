@@ -144,51 +144,25 @@ public sealed class LavaTests
     }
 
     [Fact]
-    public void PocketsExistSomewhereDeep()
+    public void StampPondsSparseLavaOnBuriedCaveFloors()
     {
-        var found = false;
-        for (var x = -64; x < 64 && !found; x++)
-        for (var z = -64; z < 64 && !found; z++)
-            found = LavaGenerator.HasLava(x, WorldGenerationConfig.LavaMaxY, z, 50);
-        Assert.True(found);
-    }
-
-    [Fact]
-    public void StampPondsLavaOnCaveFloors()
-    {
-        var lava = ContentRegistry.RequireBlock("lava").Id;
-        var stone = ContentRegistry.RequireBlock("stone").Id;
-
-        var wx = 0;
-        var wz = 0;
-        var found = false;
-        for (var x = -64; x < 64 && !found; x++)
-        for (var z = -64; z < 64 && !found; z++)
-        {
-            if (LavaGenerator.HasLava(x, WorldGenerationConfig.LavaMaxY, z, 50))
-            {
-                wx = x;
-                wz = z;
-                found = true;
-            }
-        }
-
-        Assert.True(found);
-        var worldX0 = wx & ~(Chunk.Size - 1);
-        var worldZ0 = wz & ~(Chunk.Size - 1);
-        var worldY0 = WorldGenerationConfig.LavaMaxY & ~(Chunk.Size - 1);
-        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
+        var site = CaveFluidSources.SiteAt(0, -2, 0);
+        for (var cx = 1; (site.Y & Chunk.SizeMask) == 0; cx++) site = CaveFluidSources.SiteAt(cx, -2, 0);
+        Assert.True(LavaGenerator.HasLava(site.X, site.Y, site.Z, 50));
+        Assert.False(LavaGenerator.HasLava(site.X, site.Y, site.Z, site.Y + 1));
+        var x0 = site.X & ~Chunk.SizeMask;
+        var y0 = site.Y & ~Chunk.SizeMask;
+        var z0 = site.Z & ~Chunk.SizeMask;
         var heights = new int[Chunk.Size * Chunk.Size];
-        for (var i = 0; i < heights.Length; i++) heights[i] = 50;
+        System.Array.Fill(heights, 50);
         var column = new ColumnData(heights, new byte[heights.Length], new float[heights.Length], new float[heights.Length]);
-
-        var lx = wx - worldX0;
-        var lz = wz - worldZ0;
-        var ly = WorldGenerationConfig.LavaMaxY - worldY0;
-        blocks[(lx << (2 * Chunk.SizeShift)) | ((ly - 1) << Chunk.SizeShift) | lz] = stone;
-
-        LavaGenerator.Stamp(blocks, column, worldX0, worldY0, worldZ0);
-
-        Assert.Equal(lava, blocks[(lx << (2 * Chunk.SizeShift)) | (ly << Chunk.SizeShift) | lz]);
+        var blocks = new ushort[Chunk.BlockCount];
+        var ly = site.Y - y0;
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var z = 0; z < Chunk.Size; z++)
+            blocks[Chunk.Idx(x, ly - 1, z)] = ContentRegistry.RequireBlock("stone").Id;
+        LavaGenerator.Stamp(blocks, column, x0, y0, z0);
+        Assert.Equal(LavaGenerator.LavaBlock, blocks[Chunk.Idx(site.X - x0, ly, site.Z - z0)]);
+        Assert.InRange(System.Linq.Enumerable.Count(blocks, b => b == LavaGenerator.LavaBlock), 1, 2);
     }
 }
