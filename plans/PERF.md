@@ -8,11 +8,11 @@ Frame time (F#), worldgen, meshing and streaming (G#). Ids F4, F5 and F13 (and t
 comments still cite) exist only in git history or under Ruled out. Every number names its machine and
 date; a win not yet measured is labeled *estimated*. Landed items are summarized under Reference;
 `git log -p -- plans/PERF.md` has the full write-ups (history was trimmed on 2026-10-28, 2026-10-31
-and 2026-11-05). Last updated 2026-11-10.
+and 2026-11-05). Last updated 2026-11-11.
 
 ## In progress
 
-- **C1 column fill use-gating (candidate, not landed)**: see [COLUMN_FILL_USE_GATING.md](COLUMN_FILL_USE_GATING.md).
+- [~] **C1 column fill use-gating (candidate, not landed)**: see [COLUMN_FILL_USE_GATING.md](COLUMN_FILL_USE_GATING.md).
   On the frozen 2026-11-07 single-thread headless fixture, warm whole-generation paired median was
   12.20% lower (17.50 ms per 630 chunks), candidate faster in 7/8 pairs. Cold improvement remains
   unestablished; two cold pairs regressed, including 11.70% in slot 8. This is scoped fixture
@@ -298,6 +298,31 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
   outside the intended footprint.
 
 ### Landed results (kept for the numbers and the traps; the designs live in `AGENTS.md`)
+
+- **Final-world `ColumnCache` release (PR #7, merged 2026-11-11)**.
+  - **Files**: `WorldSeed.EndWorld`, `ColumnCache.Reset`; no cache-size, hot-read or GC change. The
+    existing generation/LOD joins and mesh drain gate the final owner. Direct cache readers and
+    world lifecycle transitions retain the existing serialized-caller contract.
+  - **Measured result**: on Nexus HERDR, 2026-11-05, exact base `996fdf2` versus candidate `b8290a0`, Release,
+    SDK 10.0.114 / .NET 10.0.14 running net9.0 with `DOTNET_ROLL_FORWARD=LatestMajor`. Three
+    fresh-process interleaved pairs of a headless client-World fixture each cached 8192 identical
+    deterministic columns. After final disposal and a test-only full collection, weakly referenced
+    `ColumnData` values still alive were 8192/8192 on base versus 0/8192 on candidate in every
+    pair. Normalizing post-dispose managed live bytes to each process's before-world value gives
+    51,443,688 B retained growth on base versus 391,480 B on candidate: 51,052,208 B
+    (48.687 MiB) difference for this fixture. The same-seed all-field digest matched.
+  - **Costs and limits**: populated disposal main-thread allocation rose from 136 to 157,504 B;
+    paired same-seed reopen/repopulate time rose by 220.111, 196.313 and 25.630 ms (median
+    196.313 ms). A warm-empty control retained the same 110,808 B growth on both arms; a
+    client-first control (no explicit prior seed reset or cache read) retained 157,520 B more
+    and allocated 326,536 B versus 11,648 B on disposal. First-call/JIT costs are included.
+    This is a forced-GC headless client-World measurement, not a normal-menu, RSS or FPS result; no
+    cause for the reopen-time differences was established. The identical new regression fails
+    on base before the next seed reset and passes on candidate; the candidate's full Release
+    suite passed 2793/2793 and solution build had zero warnings/errors. Failed worker/drain and
+    constructor gates were reviewed in source, not fault-injected. Raw methods and all 18 runs:
+    Nexus task `89f63d82`, archive `tff6648498db268146`, SHA-256
+    `15c467da9f8af13291e86b8bf31e0b0734f60a2a1efc1bb14c2586231133db72`.
 
 Machine for all of them: Quadro T1000 Max-Q 4 GB, 12 cpus, Release, 2026-10-31 to 2026-11-03,
 perf-fly `VOXEL_TIME=60` x3 interleaved against a worktree unless noted. Everything below is exact
