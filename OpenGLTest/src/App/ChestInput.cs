@@ -58,6 +58,7 @@ internal sealed class ChestInput
         ChestState? contents = null;
         if (!Connected)
         {
+            if (world.Towers.IsChestSealed((x, y, z))) return;
             contents = ChestAccess.TryOpen(world.Chests, chunks, world.Camera.Position, x, y, z, World.InteractionReach);
             if (contents == null) return;
             world.Towers.AlarmPilesNear((x, y, z));

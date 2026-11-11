@@ -32,8 +32,10 @@ internal sealed class ChestSessions(ServerState state)
             return;
         }
 
-        var chest = ChestAccess.TryOpen(state.World.Chests, state.World.GetChunkManager(), player.Position, x, y, z,
-            World.InteractionReach);
+        var chest = state.World.Towers.IsChestSealed((x, y, z))
+            ? null
+            : ChestAccess.TryOpen(state.World.Chests, state.World.GetChunkManager(), player.Position, x, y, z,
+                World.InteractionReach);
         if (chest == null)
         {
             SendClosed(client);

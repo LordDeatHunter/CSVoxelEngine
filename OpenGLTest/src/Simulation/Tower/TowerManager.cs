@@ -79,6 +79,17 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
     }
 
     /// <summary>
+    /// Whether the chest at <paramref name="chest"/> stands on a floor of a tracked tower that is still sealed (the
+    /// door below it is shut), so it cannot be opened yet. False outside a tracked tower and on a client's mirror.
+    /// </summary>
+    public bool IsChestSealed((int X, int Y, int Z) chest)
+    {
+        if (writer == null || RecordAt(chest.X, chest.Z) is not { } record) return false;
+        var k = record.FloorOf(chest.Y);
+        return !TowerRules.FloorAwake(k, k == 0 || record.Floors[k - 1].DoorOpen);
+    }
+
+    /// <summary>
     /// Opening the chest at <paramref name="chest"/> forces the awake floor it stands on to raise its piles: every
     /// pile of that floor with a wave left within <see cref="MobConfig.SkeletonChestAlarmBlocks"/> of the chest is
     /// <see cref="PileState.Alarmed"/>, so its next wave rises at once, past the near-pile limit. Returns how many
