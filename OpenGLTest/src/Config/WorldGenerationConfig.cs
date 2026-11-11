@@ -651,14 +651,14 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Spaghetti: tunnels along the curves where two independent fields are both near zero.
     // Radii are in noise units; the tunnel radius in blocks is roughly radius * wavelength / 30.
     public const float SpaghettiFrequency = 1f / 64f;
-    public const float SpaghettiYScale = 1.6f;
-    public const float SpaghettiRadius = 0.07f;            // ~2.5 blocks
-    public const float SpaghettiRadiusVariation = 0.025f;
+    public const float SpaghettiYScale = 1.2f;
+    public const float SpaghettiRadius = 0.13f;            // wider walkable core
+    public const float SpaghettiRadiusVariation = 0.02f;
     public const float SpaghettiThicknessFrequency = 1f / 200f;
 
     // Narrow spaghetti: tighter, more frequent tunnels, still walkable, only in patches
     public const float NarrowSpaghettiFrequency = 1f / 32f;
-    public const float NarrowSpaghettiRadius = 0.10f;       // ~2 blocks
+    public const float NarrowSpaghettiRadius = 0.18f;       // standing clearance in developed patches
     public const float NarrowSpaghettiMaskFrequency = 1f / 160f;
     public const float NarrowSpaghettiMaskStart = -0.1f;    // patches exist where mask noise exceeds this...
     public const float NarrowSpaghettiMaskEnd = 0.3f;       // ...and are fully developed above this

@@ -338,3 +338,5 @@ in the magma deep, hematite richer there, tin in both echoes), and three exclusi
 biome below their highest y, before the palette pass, so they survive inside the magma deep's scorched hellrock. Biome borders
 step the cave size and ore richness hard, like the palette. `CaveShapeTests`, `CaveOreRichnessTests`, `CaveOreTests`,
 `LayerBandTests.EveryExclusiveCaveOreGrowsInsideItsBiomesReach`.
+
+Issue #10 regular spaghetti uses a 0.13 noise radius (variation 0.02), patch tunnels 0.18, and Y scale 1.2 instead of 1.6. Wider cores and less vertical compression provide standing clearance; surface gates and hell remain separate. Newly generated chunks intentionally change for existing seeds; edited saved chunks keep their original snapshots.

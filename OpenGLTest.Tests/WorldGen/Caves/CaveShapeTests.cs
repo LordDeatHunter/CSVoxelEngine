@@ -45,6 +45,35 @@ public sealed class CaveShapeTests
     }
 
     [Fact]
+    public void RegularPassagesProvideStandingAndSidewaysClearance()
+    {
+        var air = 0;
+        var standing = 0;
+        var wide = 0;
+        for (var cx = -4; cx <= 4; cx++)
+        for (var cz = -4; cz <= 4; cz++)
+        {
+            var blocks = Carved(cx, -5, cz, null);
+            for (var x = 1; x < Chunk.Size - 1; x++)
+            for (var y = 1; y < Chunk.Size - 2; y++)
+            for (var z = 1; z < Chunk.Size - 1; z++)
+            {
+                if (blocks[Chunk.Idx(x, y, z)] != BlockType.Air) continue;
+                air++;
+                if (blocks[Chunk.Idx(x, y + 1, z)] != BlockType.Air) continue;
+                standing++;
+                if (blocks[Chunk.Idx(x + 1, y, z)] == BlockType.Air
+                    && blocks[Chunk.Idx(x + 1, y + 1, z)] == BlockType.Air
+                    && blocks[Chunk.Idx(x, y, z + 1)] == BlockType.Air
+                    && blocks[Chunk.Idx(x, y + 1, z + 1)] == BlockType.Air) wide++;
+            }
+        }
+        Assert.True(air > 0);
+        Assert.True(standing > air * 0.65, $"standing clearance {standing}/{air}");
+        Assert.True(wide > air * 0.35, $"turning clearance {wide}/{air}");
+    }
+
+    [Fact]
     public void PlainAndEchoCellsCarveExactlyAsWithoutAMap()
     {
         foreach (var biome in new[] { CaveBiome.Plain, CaveBiome.FrozenEcho, CaveBiome.DesertEcho })
