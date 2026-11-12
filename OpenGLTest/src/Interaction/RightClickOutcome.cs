@@ -27,6 +27,10 @@ public enum RightClickOutcome
     /// <summary>A battle tower's roof altar took it: the authoritative side begins the ritual, a client only judges it;
     /// the verdict is in <see cref="RightClickAction.LastAltarVerdict"/>.</summary>
     Altar,
-    /// <summary>The held item's timed use began charging (<see cref="RightClickAction.TryBeginUseCharge"/>); nothing else claimed the click.</summary>
+    /// <summary>The held item's timed use began charging (<see cref="RightClickAction.TryBeginUseCharge()"/>); nothing else claimed the click.</summary>
     UseCharge,
+    /// <summary>A held or placed lantern opens its fuel list.</summary>
+    Lantern,
+    /// <summary>Crouch-right-click picks up a placed lantern, if the inventory has room.</summary>
+    LanternPickup,
 }

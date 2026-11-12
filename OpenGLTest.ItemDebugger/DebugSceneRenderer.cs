@@ -160,9 +160,10 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.Use();
         ApplyFrameUniforms(viewProj, eyePos, time, size);
 
+        player.HoldingLantern = BlockType.ById[editor.SelectedId]?.Lantern == true;
         // First person is the game's framing: the head is not drawn and the body slides back so
         // the eye sits forward of the chest, which is also where the held item is anchored.
-        var backOffset = firstPerson ? PlayerModel.FirstPersonBodyBack : 0f;
+        var backOffset = firstPerson ? player.FirstPersonBack : 0f;
         BindWorldTextures();
         BindArray(0, _paletteTex);
         foreach (var part in PlayerModel.BodyParts)
@@ -340,6 +341,7 @@ public sealed class DebugSceneRenderer : IDisposable
     {
         if (!editor.HasSelection) return;
 
+        player.HoldingLantern = BlockType.ById[editor.SelectedId]?.Lantern == true;
         var hand = player.GetHandAnchorMatrix(eyePos, bodyYaw, backOffset, bodyPitch);
 
         if (editor.IsPureItem && ItemRegistry.TryGet(editor.SelectedId) is { } type)
@@ -356,8 +358,8 @@ public sealed class DebugSceneRenderer : IDisposable
 
         if (_blockCubes.Get(editor.SelectedId) is not { } cube) return;
         BindWorldTextures();
-        var blockModel = RenderManager.PoseHeldItem(hand, Matrix4x4.Identity,
-            editor.BlockHeldScale, editor.BlockGrip);
+        var blockModel = player.HoldingLantern ? HeldItemPose.LanternMatrix(hand, bodyYaw, editor.BlockHeldScale)
+            : RenderManager.PoseHeldItem(hand, Matrix4x4.Identity, editor.BlockHeldScale, editor.BlockGrip);
         Draw(cube, blockModel, viewProj);
     }
 

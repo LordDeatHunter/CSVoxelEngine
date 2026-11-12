@@ -9,6 +9,15 @@ namespace VoxelEngine.Tests.VisualTest;
 public sealed class VisualScenarioUiOpsTests
 {
     [Fact]
+    public void LanternClickIsAUiActionWithNoClientAuthoredFuel()
+    {
+        var step = Assert.Single(VisualScenario.Parse("""{ "steps": [{ "op": "lantern" }] }""", "t").Steps);
+        Assert.Equal("lantern", step.Op);
+        Assert.Null(step.Block);
+        Assert.Null(step.Pos);
+    }
+
+    [Fact]
     public void PanelAndSpellBuilderStepsOpenUnlessToldOtherwise()
     {
         var scenario = VisualScenario.Parse("""

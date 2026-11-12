@@ -311,6 +311,7 @@ internal sealed class LocalPlayer
         _equipTracked = true;
         _hasHeld = _heldId != 0 && (Inventory.SelectedCount > 0 || Inventory.SelectedToolInstance > 0);
         Player.HoldingItem = _hasHeld;
+        Player.HoldingLantern = _hasHeld && Simulation.Lanterns.LanternState.IsLantern(_heldId);
         // The shoulder camera shows the body from outside, where it trails the look; first person
         // and orbit (which turns the body itself) keep it on the look.
         Player.BodyYawLags = Camera.IsShoulderSurf && !Camera.IsOrbit;

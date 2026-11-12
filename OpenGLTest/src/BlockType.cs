@@ -367,6 +367,9 @@ public sealed record BlockType
     /// block entity: it holds stacks, spills them when it breaks and, for a ruin chest, rolls its loot on first use.</summary>
     public ChestProfile? Chest { get; init; }
 
+    /// <summary>Whether this block owns individual lantern fuel/storage.</summary>
+    public bool Lantern { get; init; }
+
     /// <summary>Whether this block is a spell builder station (the spell table): a right-click
     /// with a staff in hand opens the spell builder UI client-side. It has no block entity and
     /// keeps no state of its own.</summary>

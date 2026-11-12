@@ -128,7 +128,8 @@ internal sealed class ServerBroadcasts
         {
             var drop = drops[i];
             NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.Drop, IdFor(drop), drop.Position, 0f, 0, 0,
-                drop.BlockId, drop.Velocity));
+                drop.BlockId, drop.Velocity, Instance: drop.Instance == null ? null
+                    : VoxelEngine.UI.InventoryPanel.InventorySaveCodec.ExportInstance(drop.Instance, new List<string>())));
         }
 
         // The fuse travels in milliseconds in the two int fields, so the client's flash and swell

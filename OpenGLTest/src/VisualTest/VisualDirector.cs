@@ -304,6 +304,11 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 Advance();
                 break;
 
+            case "lantern":
+                RunUi("lantern", u => u.OpenLantern());
+                Advance();
+                break;
+
             case "chest":
                 RunUi("chest", u =>
                 {

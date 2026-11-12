@@ -126,7 +126,7 @@ internal sealed class PlayerSessions
     }
 
     /// <summary>
-    /// Tells <paramref name="client"/> its player's server-owned status: the granted modes, the
+    /// Tells <paramref name="player"/> its server-owned status: the granted modes, the
     /// health, whether it is dead, the knockback queued since the last status (handed over and
     /// cleared here, zero when none), the air and the mana. Clears <see cref="ServerPlayer.StatusDirty"/>.
     /// </summary>
@@ -292,6 +292,8 @@ internal sealed class PlayerSessions
             writer.Write(player.ActionSeq);
             VoxelEngine.Player.ArmorLook.From(player.Inventory.Equipment).CopyTo(worn);
             foreach (var piece in worn) writer.WriteId(piece);
+            writer.WriteId(player.Inventory.HeldItem?.Id ?? 0);
+            writer.Write(!player.IsDead && VoxelEngine.Simulation.Lanterns.LanternManager.Emits(player.Inventory));
         }
         _state.Broadcast(writer.ToArray());
     }

@@ -108,7 +108,7 @@ internal sealed class BlockEditor
     /// hands anything back and nothing fells or topples, since the server runs the real break and
     /// broadcasts what it did.
     /// </summary>
-    internal void RemoveBlock(Vector3 blockPos, PlayerContext player)
+    internal void RemoveBlock(Vector3 blockPos, PlayerContext player, bool lanternPickup = false)
     {
         var chunkPos = VoxelCoords.ChunkPosOf(blockPos);
 
@@ -152,6 +152,16 @@ internal sealed class BlockEditor
         else if (TallBlock.TryGetPartner(brokenId, blockPos, out var partnerCell, out var partnerId))
             RemoveTallBlock(blockPos, brokenId, partnerCell, partnerId, chunk, dropsLoot, player);
         // Everything else rolls its loot table, but only once a block was actually cleared
+        else if (Simulation.Lanterns.LanternState.IsLantern(brokenId))
+        {
+            var stack = !_clientMode ? _world.Lanterns.Open(_chunkManager, blockPos.BlockCell()) : null;
+            if (chunk.RemoveBlockAt(blockPos, _chunkManager) && !_clientMode)
+            {
+                _world.Lanterns.Take(blockPos.BlockCell());
+                if (!lanternPickup && stack != null)
+                    _dropManager.SpawnInstance(stack, blockPos + new Vector3(.5f));
+            }
+        }
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))
         {
             if (dropsLoot)

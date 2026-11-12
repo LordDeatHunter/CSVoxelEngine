@@ -1,8 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
-using VoxelEngine.Config;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Saves;
 
@@ -95,16 +93,15 @@ public sealed class ChestManager
         }
     }
 
-    // Every unit as a drop at the cell, the way a quern hands its input back; a tool or piece of gear drops as its
-    // plain item (a drop carries only an id), so its rolled modifiers and bound spells are lost with the chest
+    // Instance drops retain their payload, including a lantern's fuel and reserves.
     private static void Spill(ChestState state, int x, int y, int z, DropManager drops)
     {
         var cell = new Vector3(x, y, z);
         for (var i = 0; i < state.SlotCount; i++)
         {
             var slot = state[i];
-            for (var c = 0; c < slot.Count && !slot.IsEmpty; c++)
-                drops.Spawn(slot.Id, cell);
+            if (slot.Instance != null) drops.SpawnInstance(slot.Instance, cell + new Vector3(.5f));
+            else for (var c = 0; c < slot.Count && !slot.IsEmpty; c++) drops.Spawn(slot.Id, cell);
         }
     }
 

@@ -11,7 +11,7 @@ namespace VoxelEngine.Networking.Client;
 /// (<paramref name="Action"/>, counted by <paramref name="ActionSeq"/> so a repeat is noticed) and the armor they wear.</summary>
 public readonly record struct RemotePlayerSnapshot(int Id, string Name, Vector3 Eye, float Yaw, float Pitch,
     NetPlayerFlags Flags = NetPlayerFlags.None, NetPlayerAction Action = NetPlayerAction.None, byte ActionSeq = 0,
-    ArmorLook? Armor = null);
+    ArmorLook? Armor = null, ushort HeldId = 0, bool HeldLit = false);
 
 /// <summary>
 /// A player connected to the same server, as the client sees them: a target pose from the last
@@ -60,14 +60,20 @@ public sealed class RemotePlayer
     public float Pitch { get; private set; }
 
     public PlayerModel Model { get; }
+    public ushort HeldId { get; private set; }
+    public bool HeldLit { get; private set; }
 
     /// <summary>Adopts the latest broadcast pose; the first one snaps, later ones smooth. Returns the swing this
     /// broadcast started, <see cref="NetPlayerAction.None"/> when it started none.</summary>
     public NetPlayerAction SetTarget(Vector3 eye, float yaw, float pitch,
         NetPlayerFlags flags = NetPlayerFlags.None, NetPlayerAction action = NetPlayerAction.None, byte actionSeq = 0,
-        ArmorLook? armor = null)
+        ArmorLook? armor = null, ushort heldId = 0, bool heldLit = false)
     {
         Armor = armor ?? ArmorLook.None;
+        HeldId = heldId;
+        HeldLit = heldLit;
+        Model.HoldingItem = heldId != 0;
+        Model.HoldingLantern = Simulation.Lanterns.LanternState.IsLantern(heldId);
         if (!_hasTarget)
         {
             Eye = eye;

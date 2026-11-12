@@ -21,12 +21,29 @@ public sealed class ChestView
     /// <summary>Whether a chest panel is up (it owns part of the mouse while it is).</summary>
     public bool IsOpen { get; private set; }
 
+    /// <summary>Null for a chest, 0 for a placed lantern, positive for the held lantern instance.</summary>
+    public int? LanternInstance { get; private set; }
+    public Simulation.Lanterns.LanternState? LanternFuel { get; private set; }
+
+    public void ShowLantern((int X, int Y, int Z) cell, int instance, Simulation.Lanterns.LanternState? fuel)
+    {
+        Show(cell, "Lantern fuel", fuel?.Storage);
+        LanternInstance = instance;
+        LanternFuel = fuel;
+    }
+
+    public void SetLantern(Simulation.Lanterns.LanternState fuel)
+    {
+        LanternFuel = fuel;
+        Contents = fuel.Storage;
+    }
+
     /// <summary>The cell of the open chest.</summary>
     public (int X, int Y, int Z) Cell { get; private set; }
 
     /// <summary>The cell of the chest this player is looking into, or null while no panel is up: the local
     /// viewer the chest lids count (<c>ChestLids.Update</c>).</summary>
-    public (int X, int Y, int Z)? OpenCell => IsOpen ? Cell : null;
+    public (int X, int Y, int Z)? OpenCell => IsOpen && LanternInstance == null ? Cell : null;
 
     /// <summary>The panel title (the chest block's name).</summary>
     public string Title { get; private set; } = "";
@@ -46,6 +63,8 @@ public sealed class ChestView
     /// <summary>Opens the panel on the chest at a cell with what it holds (null to wait for the server).</summary>
     public void Show((int X, int Y, int Z) cell, string title, ChestState? contents)
     {
+        LanternInstance = null;
+        LanternFuel = null;
         IsOpen = true;
         Cell = cell;
         Title = title;
@@ -60,6 +79,8 @@ public sealed class ChestView
     /// <summary>Closes the panel and forgets the contents.</summary>
     public void Close()
     {
+        LanternInstance = null;
+        LanternFuel = null;
         IsOpen = false;
         Contents = null;
         Search.Clear();

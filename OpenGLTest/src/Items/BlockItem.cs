@@ -20,7 +20,7 @@ public sealed class BlockItem : Item
         Block = block;
     }
 
-    public override InventoryCategory StorageCategory => InventoryCategory.Blocks;
+    public override InventoryCategory StorageCategory => Block.Lantern ? InventoryCategory.Tools : InventoryCategory.Blocks;
 
     public override ItemUseResult OnUse(ItemUseContext ctx, ItemStack? stack)
     {

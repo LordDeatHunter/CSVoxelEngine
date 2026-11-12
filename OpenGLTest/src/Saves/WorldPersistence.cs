@@ -136,7 +136,7 @@ internal sealed class WorldPersistence
     private readonly PlayerSaveData? _hostedPlayer;
 
     // Saved mobs and drops (entities.json) not spawned yet: each waits for its chunk to load,
-    // and the lot is discarded after EntityRestoreTimeoutSeconds of play (RestorePendingEntities)
+    // and ordinary entries expire after EntityRestoreTimeoutSeconds; owned instance drops keep waiting
     private readonly List<EntitySaveData.MobData> _pendingMobs = [];
     private readonly List<EntitySaveData.DropData> _pendingDrops = [];
     private readonly List<EntitySaveData.IcebergData> _pendingIcebergs = [];
@@ -169,7 +169,8 @@ internal sealed class WorldPersistence
     /// and loses nothing, since pending entries are re-saved. An unknown entity kind or item name, or a record with no
     /// position, is dropped with one warning per pass. After
     /// <see cref="SaveConfig.EntityRestoreTimeoutSeconds"/> of play whatever is still
-    /// pending is discarded. Main thread, Playing only; nothing pending costs one check.
+    /// pending is discarded except owned instance drops, which keep waiting and are re-saved.
+    /// Main thread, Playing only; nothing pending costs one check.
     /// </summary>
     internal void RestorePendingEntities(double deltaTime)
     {
@@ -222,7 +223,8 @@ internal sealed class WorldPersistence
             if (!IsCellLoaded(position))
                 continue;
 
-            if (!_dropManager.SpawnRestored(id, position, ToVector(drop.Velocity), drop.Age ?? 0f))
+            if (!_dropManager.SpawnRestored(id, position, ToVector(drop.Velocity), drop.Age ?? 0f,
+                    drop.Instance == null ? null : InventorySaveCodec.ImportInstance(0, drop.Instance, new List<string>())))
                 (dropped ??= []).Add($"drop '{drop.Item}'");
             _pendingDrops.RemoveAt(i);
         }
@@ -235,12 +237,13 @@ internal sealed class WorldPersistence
         if (!(_entityRestoreTimer >= SaveConfig.EntityRestoreTimeoutSeconds)
             || (_pendingMobs.Count <= 0 && _pendingDrops.Count <= 0 && _pendingIcebergs.Count <= 0)) return;
 
-        Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s), {_pendingDrops.Count} drop(s) and {_pendingIcebergs.Count} iceberg(s) whose chunks never loaded or that a full cap kept out");
+        var discardedDrops = _pendingDrops.RemoveAll(drop => drop.Instance == null);
+        if (_pendingMobs.Count == 0 && discardedDrops == 0 && _pendingIcebergs.Count == 0) return;
+        Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s), {discardedDrops} drop(s) and {_pendingIcebergs.Count} iceberg(s) whose chunks never loaded or that a full cap kept out");
         foreach (var mob in _pendingMobs)
             if (TowerFloorOf(mob) is { } floor)
                 _discardedTowerSkeletons.Add(floor);
         _pendingMobs.Clear();
-        _pendingDrops.Clear();
         _pendingIcebergs.Clear();
     }
 
@@ -500,9 +503,10 @@ internal sealed class WorldPersistence
 
         var drops = new List<EntitySaveData.DropData>();
         var unnamed = 0;
-        for (var i = 0; i < _dropSort.Count && drops.Count < SaveConfig.MaxSavedDrops; i++)
+        for (var i = 0; i < _dropSort.Count; i++)
         {
             var drop = _dropSort[i].drop;
+            if (drops.Count >= SaveConfig.MaxSavedDrops && drop.Instance == null) continue;
             if (SaveNames.NameOf(drop.BlockId) is not { } name)
             {
                 unnamed++;
@@ -514,12 +518,13 @@ internal sealed class WorldPersistence
                 Item = name,
                 Position = [drop.Position.X, drop.Position.Y, drop.Position.Z],
                 Velocity = [drop.Velocity.X, drop.Velocity.Y, drop.Velocity.Z],
+                Instance = drop.Instance == null ? null : InventorySaveCodec.ExportInstance(drop.Instance, new List<string>()),
                 Age = drop.Age
             });
         }
         _dropSort.Clear();
-        for (var i = 0; i < _pendingDrops.Count && drops.Count < SaveConfig.MaxSavedDrops; i++)
-            drops.Add(_pendingDrops[i]);
+        for (var i = 0; i < _pendingDrops.Count; i++)
+            if (drops.Count < SaveConfig.MaxSavedDrops || _pendingDrops[i].Instance != null) drops.Add(_pendingDrops[i]);
 
         if (unnamed > 0)
             Log.Warn($"Entity save: skipped {unnamed} drop(s) of an item with no save name");
@@ -565,6 +570,7 @@ internal sealed class WorldPersistence
     {
         if (saved == null)
             return;
+        _world.Lanterns.Restore(saved.Lanterns);
         var skipped = _campfires.Restore(saved.Campfires) + _querns.Restore(saved.Querns)
             + _kilns.Restore(saved.Kilns) + _casting.Restore(saved.Casts) + _world.Chests.Restore(saved.Chests)
             + _world.Waystones.Restore(saved.Waystones) + _world.Smithing.Restore(saved)
@@ -586,6 +592,7 @@ internal sealed class WorldPersistence
             Kilns = _kilns.Capture(),
             Casts = _casting.Capture(),
             Chests = _world.Chests.Capture(),
+            Lanterns = _world.Lanterns.Capture(),
             Waystones = _world.Waystones.Capture(),
             Towers = _world.Towers.Capture(),
         };
