@@ -19,7 +19,7 @@ internal static class TreeWoodEmitter
     /// Emits a thin <see cref="BlockRenderer.TreeWood"/> cell: a centered node box sized by its
     /// <see cref="WoodState"/> thickness and one square tube toward every neighbor it connects
     /// to (<see cref="TreeWoodShape.Connects"/>), at the thinner of the two widths, plus a
-    /// same-width plug toward every solid occluding neighbor (<see cref="TreeWoodShape.PlugMask"/>)
+    /// same-width plug toward a solid occluding block below a root cell (<see cref="TreeWoodShape.PlugMask"/>)
     /// so a root or trunk on the ground meets it. Tubes and plugs carry
     /// only their four walls - the neighbor emits the matching tube from its side, so the two
     /// meet flush with no cap between them - and a node face is dropped where a tube or plug of its

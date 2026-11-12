@@ -18,7 +18,7 @@ namespace VoxelEngine.Content.Shapes;
 /// Three shapes exist. A thin cell is a centered node box <see cref="HalfWidth"/> wide plus one
 /// tube per connected neighbor, running from the node face out to the cell face at the thinner
 /// of the two cells' widths, so the neighbor's tube meets it flush; toward a solid occluding
-/// neighbor that is not wood - the ground, a wall - it instead runs a same-width plug out to the
+/// neighbor below a root cell that is not wood - the ground - it instead runs a same-width plug out to the
 /// cell face (<see cref="PlugMask"/>), so a thin trunk or root rooted on the ground meets it
 /// rather than floating the node clear of it. A full-thickness (or
 /// detached) cell is a plain cube. A trunk shell of a <c>rim: "pixel"</c> species
@@ -89,24 +89,19 @@ public static class TreeWoodShape
     }
 
     /// <summary>
-    /// Bit <c>i</c> set when a thin cell plugs into its neighbor in direction <c>i</c>: the
-    /// neighbor is a solid occluding block that is not tree wood (the ground, a wall), so the
-    /// node geometry runs out to the cell face there instead of ending in mid-air. The plug is
-    /// the node's own width, so it continues the node face; a full-cube or detached cell never
-    /// plugs, and a tree-wood neighbor is handled by <see cref="Connects"/> instead.
+    /// Bit <c>Down</c> set when a thin <b>root</b> cell stands on the ground: the block below is a
+    /// solid occluding block that is not tree wood, so the node geometry runs out to the cell face
+    /// there instead of floating clear of it. Only the root cell, only downward: a limb or trunk
+    /// cell that merely lies over dirt, grass or a ledge, or brushes a wall beside or above it,
+    /// grows nothing toward it. The plug is the node's own width, so
+    /// it continues the node face; a full-cube or detached cell never plugs, and a tree-wood
+    /// neighbor is handled by <see cref="Connects"/> instead.
     /// </summary>
     public static int PlugMask(byte state, ReadOnlySpan<ushort> nbIds)
     {
-        if (!IsThin(state)) return 0;
-        var mask = 0;
-        for (var dir = 0; dir < 6; dir++)
-        {
-            var nb = nbIds[dir];
-            if (nb != 0 && !BlockType.IsTreeWood(nb) && BlockType.Occludes(nb))
-                mask |= 1 << dir;
-        }
-
-        return mask;
+        if (!IsThin(state) || !WoodState.IsRoot(state)) return 0;
+        var below = nbIds[TreeDirections.Down];
+        return below != 0 && !BlockType.IsTreeWood(below) && BlockType.Occludes(below) ? 1 << TreeDirections.Down : 0;
     }
 
     /// <summary>Whether a tree-wood cell draws the node-and-tubes shape rather than a cube:

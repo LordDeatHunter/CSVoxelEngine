@@ -285,6 +285,21 @@ public sealed class TreeWoodShapeTests
         ids[5] = stone;
         var grounded = TreeWoodShape.GetBoxes(oak, state, ids, nbStates);
         Assert.Equal(0f, grounded.Min(b => b.Min.Y), Eps);
+
+        // A limb cell over a ledge (not the root) does not reach down to it either
+        var limb = WoodState.Encode(5, 2, false);
+        Span<ushort> ledge = stackalloc ushort[6];
+        ledge[5] = stone;
+        Assert.Single(TreeWoodShape.GetBoxes(oak, limb, ledge, nbStates));
+
+        // Ground beside or above it is nothing to reach for
+        foreach (var dir in new[] { 0, 1, 2, 3, 4 })
+        {
+            Span<ushort> sideIds = stackalloc ushort[6];
+            sideIds[dir] = stone;
+            var boxes = TreeWoodShape.GetBoxes(oak, state, sideIds, nbStates);
+            Assert.Single(boxes);
+        }
     }
 
     [Fact]
