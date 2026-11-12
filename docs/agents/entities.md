@@ -173,7 +173,7 @@ and the squash spring's windup; `SlimeHopTests`). The largest size (`SlimeMaxSiz
 **giant**: `SlimeSize.Roll` takes the last step into it with only `SlimeMaxSizeChanceFactor` of the
 usual threshold, so it is rarer than the size below it in every light (`GiantSlimeTests`), and it
 splits into that size like any other; `visual-examples/slime-sizes.json` stands it beside the other
-three. **Cave slimes**: slimes also spawn on dark cave floors in the same ring
+three. **Slime sounds**: a hop plays `slime_jump` through `SlimeManager.PlaySound` (set only by the singleplayer `World`, so a server or a client mirror plays nothing); a landed hit plays `slime_hit` and a killing one `slime_death`, through the slime's `HitSoundGroup`/`DeathSoundGroup`. **Cave slimes**: slimes also spawn on dark cave floors in the same ring
 (`MobSpawner.TryFindCaveSpawn`, any biome): each try scans a column down from a random height within
 `SlimeCaveSearchHalfHeight` of the player's feet for at most `SlimeCaveScanDepth` cells and takes the
 first solid floor under two clear, dry cells, if it lies at least `SlimeUndergroundDepthBlocks` under

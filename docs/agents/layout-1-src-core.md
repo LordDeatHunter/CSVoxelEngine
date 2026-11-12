@@ -51,7 +51,7 @@ OpenGLTest/
       AudioDevice.cs           # the shared OpenAL Soft device and context (refcounted; natives for Windows, Linux, macOS)
       AudioOutput.cs           # streams a 16-bit PCM IWaveProvider to an OpenAL source on its own refill thread
       SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups (and names the
-                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle, skeleton_hit, skeleton_death, crow_hit, crow_death, crow_caw)
+                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle, skeleton_hit, skeleton_death, crow_hit, crow_death, crow_caw, slime_hit, slime_death, slime_jump)
       AmbientCallTimer.cs      # a randomized repeat timer for ambient calls (skeleton rattle, crow caw); Tick fires once per interval
       SfxManager.cs            # one-shot sound effects, decoded and mixed like AmbienceManager's, through one AudioOutput
       SfxMixer.cs              # mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline

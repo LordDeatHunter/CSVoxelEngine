@@ -596,6 +596,7 @@ public class World
             {
                 _skeletonRattle = new SkeletonRattle(sfx.Play, Random.Shared);
                 _crowCaws = new CrowCaws(sfx.Play, Random.Shared);
+                if (_slimes != null) _slimes.PlaySound = sfx.Play;
             }
             Renderer = new WorldRenderer(this, _window, _chunkManager, _lodManager, _dropManager, _tntManager, _falling,
                 _goblins, _campfires, _querns, _kilns, _casting, _toppling, _projectiles, _remotePlayers, _debris,

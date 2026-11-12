@@ -59,6 +59,15 @@ public static class SfxLibrary
     /// <summary>Group played ambiently from time to time by a skeleton near the camera.</summary>
     public const string SkeletonRattleGroup = "skeleton_rattle";
 
+    /// <summary>Group played when a hit lands on a slime.</summary>
+    public const string SlimeHitGroup = "slime_hit";
+
+    /// <summary>Group played when a hit kills a slime.</summary>
+    public const string SlimeDeathGroup = "slime_death";
+
+    /// <summary>Group played when a slime launches a hop.</summary>
+    public const string SlimeJumpGroup = "slime_jump";
+
     /// <summary>Group played when a hit lands on a bug (spider, scorpion, dragonfly), and when it dies: a squish.</summary>
     public const string BugSquishGroup = "squish";
 

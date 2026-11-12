@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Effects.Sky;
@@ -46,6 +47,10 @@ public sealed class SlimeManager : IMobPopulation
         _caps = caps ?? new MobCaps();
         _caps.Register(this);
     }
+
+    /// <summary>Plays a sound group by name (singleplayer and the client only, set by <c>World</c>); a
+    /// slime's hop calls it with its jump group. Null on a headless server, so nothing plays there.</summary>
+    public Action<string>? PlaySound { get; set; }
 
     /// <summary>Every slime still drawn: the living ones plus any playing their death
     /// (<see cref="Mob.IsDying"/>), which are no longer targets and do not count toward the cap.</summary>
@@ -101,9 +106,12 @@ public sealed class SlimeManager : IMobPopulation
     {
         if (_caps.ForcedRoom <= 0) return null;
         var slime = new Slime(_type, position, size);
+        slime.Hopped += OnSlimeHopped;
         _slimes.Add(slime);
         return slime;
     }
+
+    private void OnSlimeHopped() => PlaySound?.Invoke(SfxLibrary.SlimeJumpGroup);
 
     /// <summary>Ticks the slimes against the one local player (singleplayer and the tests); see
     /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget}, float, BlockDebrisSystem)"/>.</summary>
