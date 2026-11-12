@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Interaction;
 using VoxelEngine.Player;
@@ -58,6 +59,12 @@ public sealed class Goblin : RiggedMob
     // A floating goblin paddles toward its goal at this fraction of its walk speed, so it can
     // cross a pond and climb out instead of bobbing in place forever.
     private const float SwimSpeedFactor = 0.5f;
+
+    /// <inheritdoc />
+    public override string HitSoundGroup => SfxLibrary.GoblinHitGroup;
+
+    /// <inheritdoc />
+    public override string DeathSoundGroup => SfxLibrary.GoblinDeathGroup;
 
     private float _throwCooldown;
     private float _meleeCooldown;

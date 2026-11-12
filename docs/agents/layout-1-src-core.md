@@ -52,7 +52,7 @@ OpenGLTest/
                                #   asks for or forbids HRTF (SetHrtf, live through alcResetDeviceSOFT) and logs its status
       AudioOutput.cs           # streams a 16-bit PCM IWaveProvider to a head-locked OpenAL source on its own refill thread
       SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups (and names the
-                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle, skeleton_hit, skeleton_death, crow_hit, crow_death, crow_caw, slime_hit, slime_death, slime_jump, slime_land)
+                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle, skeleton_hit, skeleton_death, crow_hit, crow_death, crow_caw, goblin_hit, goblin_death, slime_hit, slime_death, slime_jump, slime_land)
       AmbientCallTimer.cs      # a randomized repeat timer for ambient calls (skeleton rattle, crow caw); Tick fires once per interval
       SfxManager.cs            # one-shot sound effects: Play mixes a clip centered through one AudioOutput, PlayAt
                                #   plays its mono downmix in 3D (SpatialVoices) against the listener SetListener sets

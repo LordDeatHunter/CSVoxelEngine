@@ -59,6 +59,12 @@ public static class SfxLibrary
     /// <summary>Group played ambiently from time to time by a skeleton near the camera.</summary>
     public const string SkeletonRattleGroup = "skeleton_rattle";
 
+    /// <summary>Group played when a hit lands on a goblin.</summary>
+    public const string GoblinHitGroup = "goblin_hit";
+
+    /// <summary>Group played when a hit kills a goblin.</summary>
+    public const string GoblinDeathGroup = "goblin_death";
+
     /// <summary>Group played when a hit lands on a slime.</summary>
     public const string SlimeHitGroup = "slime_hit";
 
