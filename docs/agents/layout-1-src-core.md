@@ -36,7 +36,7 @@ OpenGLTest/
       TextFieldKeys.cs         # maps key events (and the Ctrl/Shift state and clipboard) onto TextFieldEditing for the focused field
       InventoryPanelInput.cs   # the [E] panel's input: clicks, the right-click equip, scrollbar, search keys and scope button,
                                #   creative buttons, hovered row, tooltip
-      RowDragInput.cs          # dragging a listed [E] row onto a hotbar or equipment slot: press, per-frame lift, drop
+      RowDragInput.cs          # dragging a listed [E] row or a hotbar slot onto a hotbar slot, equipment slot, chest or the panel: press, per-frame lift, drop
       MenuInput.cs             # the pause menu's and shared settings page's input, and applying the window-level settings
       ScenarioUi.cs            # the app's IScenarioUi: lets a VOXEL_SCRIPT run open the [E] panel and the spell builder, pick a tab or row,
                                #   type a search, hold the pointer and drive the waystone screen and the anvil's recipe list through the

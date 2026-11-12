@@ -118,6 +118,10 @@ public enum NetInventoryAction : byte
     EquipGear = 11,
     /// <summary>Takes off the gear worn in an equipment slot: <c>Slot</c>.</summary>
     UnequipGear = 12,
+    /// <summary>Moves a hotbar slot's contents into another: <c>Slot</c> is the source, <c>Id</c> the destination slot.</summary>
+    MoveSlot = 13,
+    /// <summary>Empties a hotbar slot: <c>Slot</c>. The item stays in its pool.</summary>
+    ClearSlot = 14,
 }
 
 /// <summary>
@@ -242,8 +246,10 @@ public static class NetFraming
     /// 40: the scorpion (<see cref="NetEntityKind.Scorpion"/>), a crawler on the wire like the spiders; its attack
     /// count names pinch (even) and sting (odd). An older client would not draw it.
     /// 41: the chest moves <see cref="Simulation.Chests.ChestMoveKind.LootAll"/> and
-    /// <see cref="Simulation.Chests.ChestMoveKind.QuickStack"/>; an older server would refuse them as malformed.</summary>
-    public const int ProtocolVersion = 41;
+    /// <see cref="Simulation.Chests.ChestMoveKind.QuickStack"/>; an older server would refuse them as malformed.
+    /// 42: the hotbar's own drags, the <see cref="NetInventoryAction.MoveSlot"/> and <see cref="NetInventoryAction.ClearSlot"/>
+    /// inventory actions; an older server would refuse them as malformed.</summary>
+    public const int ProtocolVersion = 42;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

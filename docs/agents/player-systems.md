@@ -147,7 +147,7 @@ never puts a row on the hotbar: a pick goes there by a click on a slot, a drag o
 that lifts once the pointer leaves it by `RowDrag.LiftDistance`, then `RowEquip.DropOnHotbar`/`DropOnEquipment`, never a
 toggle; a creative catalog row is granted one first), the right-click or a number key over the row (a plain row or a search hit the player holds); a creative catalog
 grant is picked but stays off the hotbar (`Inventory.Add(..., autoEquip: false)`, on the server's replay too), while a
-world pickup still lands in the first empty slot. `GearTests`, `RowEquipTests`; `visual-examples/gear.json` and `accessories.json` (the double jump
+world pickup still lands in the first empty slot. A hotbar slot drags the same way while the panel is open (`RowDragInput.Press`, the same `RowDrag` with a `FromSlot`): released on another hotbar slot it moves there (`Inventory.MoveSlot`, the `MoveSlot` intent; the slot it replaces keeps its item in the pool), released on the open chest's card it deposits the whole stack or tool (`ChestInput.DepositStack`/`DepositInstance`; a creative player's deposit is refused, as a row click's is), released anywhere else on the [E] panel it empties the slot (the `ClearSlot` intent), and released outside all of them nothing changes. `GearTests`, `RowEquipTests`, `HotbarMoveTests`; `visual-examples/gear.json` and `accessories.json` (the double jump
 and a feather-charm fall; both `VOXEL_TIME=147`).
 **Worn armor (I-3).** A body is drawn wearing its visible armor (`equip.visible`, slots head, chest, legs, feet, gloves) as flat
 tinted shells: `ArmorLook` (GL-free) is the item id per armor slot, `ArmorLook.From(Equipment)` for the local player and

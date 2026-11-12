@@ -24,6 +24,9 @@ namespace VoxelEngine.Networking;
 /// <item><see cref="NetInventoryAction.ClearStaffSlot"/>: <see cref="Slot"/>, the staff slot to unbind.</item>
 /// <item><see cref="NetInventoryAction.EquipGear"/>: <see cref="Slot"/> (an equipment slot) and <see cref="Id"/>
 /// (a gear instance id); <see cref="NetInventoryAction.UnequipGear"/>: <see cref="Slot"/>.</item>
+/// <item><see cref="NetInventoryAction.MoveSlot"/>: <see cref="Slot"/> (the source hotbar slot) and <see cref="Id"/>
+/// (the destination hotbar slot).</item>
+/// <item><see cref="NetInventoryAction.ClearSlot"/>: <see cref="Slot"/>, the hotbar slot to empty.</item>
 /// </list>
 /// Record equality compares <see cref="Members"/> and <see cref="Parts"/> by reference, so compare
 /// those fields' contents instead.
@@ -71,4 +74,9 @@ public readonly record struct InventoryIntent(
 
     public static InventoryIntent UnequipGear(int equipmentSlot) =>
         new(NetInventoryAction.UnequipGear, Slot: equipmentSlot);
+
+    public static InventoryIntent MoveSlot(int fromSlot, int toSlot) =>
+        new(NetInventoryAction.MoveSlot, Slot: fromSlot, Id: toSlot);
+
+    public static InventoryIntent ClearSlot(int slot) => new(NetInventoryAction.ClearSlot, Slot: slot);
 }

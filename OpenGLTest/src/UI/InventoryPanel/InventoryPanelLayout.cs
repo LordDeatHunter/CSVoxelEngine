@@ -211,6 +211,15 @@ public static class InventoryPanelLayout
         point.X >= PanelLeft && point.X <= PanelLeft + PanelWidth(screen)
         && point.Y >= ListTop && point.Y < ListTop + ListHeight(screen);
 
+    /// <summary>
+    /// Whether a canvas point is over the [E] panel's own area: the list panel, or the detail card beside it (the craft
+    /// or equipment card). The chest card is judged by its own layout.
+    /// </summary>
+    public static bool IsOverInventory(Vector2 point, Vector2 screen) =>
+        (point.X >= PanelLeft && point.X <= PanelLeft + PanelWidth(screen)
+         && point.Y >= PanelTop && point.Y <= PanelTop + PanelHeight(screen))
+        || InBox(point, DetailCardRect(screen));
+
     /// <summary>The track runs down the middle of the panel's right padding.</summary>
     public static float TrackCenterX(Vector2 screen) => PanelLeft + PanelWidth(screen) - PanelPad * 0.5f;
 

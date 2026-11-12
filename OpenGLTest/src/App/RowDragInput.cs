@@ -2,15 +2,18 @@ using System.Numerics;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Rendering;
+using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.App;
 
 /// <summary>
-/// Dragging a listed row of the [E] panel onto a slot: a left press on an item row starts a <see cref="RowDrag"/>, the
+/// Dragging an item out of the [E] panel: a left press on an item row, or on a hotbar slot showing something, starts a <see cref="RowDrag"/>, the
 /// frame tracks it, and a release after it lifted drops the row into the hotbar slot, or the equipment card's slot,
 /// under the pointer (<see cref="RowEquip.DropOnHotbar"/>, <see cref="RowEquip.DropOnEquipment"/>); a creative player
-/// owning none of it is granted one first. An unlifted release is left to the click. Applied here at once and, while
+/// owning none of it is granted one first. A hotbar slot's drag moves it to another slot, deposits it in an open chest,
+/// or empties its slot anywhere else on the panel; a release outside those changes nothing. An unlifted release is left
+/// to the click. Applied here at once and, while
 /// connected, sent as the intent the server replays. Owned by <see cref="InventoryPanelInput"/>; main thread only.
 /// </summary>
 internal sealed class RowDragInput(
@@ -22,10 +25,18 @@ internal sealed class RowDragInput(
     {
         inventoryView.Drag = null;
         if (inventoryView.ThumbDragGrab.HasValue || Program.ActiveWorld is not { } world) return;
+        var canvas = renderManager.Ui.ToCanvas(window);
+        if (renderManager.Ui.Hud.HotbarSlotAt(window) is { } slot and >= 0)
+        {
+            var inventory = world.Inventory;
+            if (inventory.IdAt(slot) != 0)
+                inventoryView.Drag = new RowDrag(inventory.IdAt(slot), inventory.ToolInstanceAt(slot), canvas, slot);
+            return;
+        }
         var creative = world.Camera.IsCreative;
         if (panel.EntryAt(window, world.Inventory, creative) is not { Recipe: null } entry) return;
         if (creative && panel.IsOnCatalogButton(window, world.Inventory)) return;
-        inventoryView.Drag = new RowDrag(entry.Id, entry.ToolInstance, renderManager.Ui.ToCanvas(window));
+        inventoryView.Drag = new RowDrag(entry.Id, entry.ToolInstance, canvas);
     }
 
     /// <summary>Once a frame: a pressed row lifts once the pointer leaves the press.</summary>
@@ -44,6 +55,11 @@ internal sealed class RowDragInput(
         if (inventoryView.Drag is not { } drag) return false;
         inventoryView.Drag = null;
         if (!drag.Lifted || Program.ActiveWorld is not { } world) return false;
+        if (drag.FromSlot >= 0)
+        {
+            DropHotbarSlot(world, drag.FromSlot, window);
+            return true;
+        }
 
         var inventory = world.Inventory;
         if (renderManager.Ui.Hud.HotbarSlotAt(window) is { } slot and >= 0)
@@ -59,6 +75,35 @@ internal sealed class RowDragInput(
             Send(RowEquip.DropOnEquipment(inventory, drag.Id, drag.ToolInstance, gearSlot));
         }
         return true;
+    }
+
+    // A hotbar slot dragged off the slot it shows: onto another hotbar slot it moves there, onto the open chest's card it
+    // deposits (a creative player's deposit is refused, as a row click's is), anywhere else on the [E] panel it empties
+    // the slot (the item stays in its pool), and outside all of them nothing changes.
+    private void DropHotbarSlot(World world, int from, Vector2 window)
+    {
+        var inventory = world.Inventory;
+        if (renderManager.Ui.Hud.HotbarSlotAt(window) is { } target and >= 0)
+        {
+            if (target == from || !inventory.MoveSlot(from, target)) return;
+            Send(InventoryIntent.MoveSlot(from, target));
+            return;
+        }
+
+        var canvas = renderManager.Ui.ToCanvas(window);
+        var screen = renderManager.Ui.ScreenSize;
+        if (panel.Chest.IsOpen && ChestCardLayout.Contains(canvas, screen))
+        {
+            if (world.Camera.IsCreative) return;
+            var instance = inventory.ToolInstanceAt(from);
+            if (instance != 0) panel.Chest.DepositInstance(instance);
+            else panel.Chest.DepositStack(inventory.IdAt(from), wholeStack: true);
+            return;
+        }
+
+        if (!InventoryPanelLayout.IsOverInventory(canvas, screen)) return;
+        inventory.ClearSlot(from);
+        Send(InventoryIntent.ClearSlot(from));
     }
 
     // A creative catalog row names a kind the player may own none of: the drop grants one, as a click on the row would
