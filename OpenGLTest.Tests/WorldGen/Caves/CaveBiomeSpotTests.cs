@@ -94,6 +94,34 @@ public sealed class CaveBiomeSpotTests
         }
     }
 
+    [Fact]
+    public void ExpandedEchoesHaveOpenSpotsBelowTheOriginalBand()
+    {
+        var found = new Dictionary<CaveBiome, Vector3>();
+        var generated = 0;
+        foreach (var (cx, cz) in Ring(EchoMaxRings, EchoStepChunks))
+        {
+            if (generated >= MaxGeneratedChunks
+                || (found.ContainsKey(CaveBiome.FrozenEcho) && found.ContainsKey(CaveBiome.DesertEcho))) break;
+            var surface = TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8);
+            if (surface is not (Biome.Frozen or Biome.Desert)) continue;
+            var echo = surface == Biome.Frozen ? CaveBiome.FrozenEcho : CaveBiome.DesertEcho;
+            if (found.ContainsKey(echo)) continue;
+            var column = ColumnCache.Get(cx, cz);
+            var top = (WorldGenerationConfig.CaveEchoBottomY - WorldGenerationConfig.CaveEchoDriftBlocks) >> Chunk.SizeShift;
+            for (var cy = top - 1; cy > WorldGenerationConfig.CaveEchoVolumeBottomY / Chunk.Size; cy--)
+            {
+                generated++;
+                Search(new Vector3(cx, cy, cz), column, found);
+            }
+        }
+        foreach (var echo in new[] { CaveBiome.FrozenEcho, CaveBiome.DesertEcho })
+        {
+            Assert.True(found.ContainsKey(echo), $"no deep expanded {echo} cave found");
+            _output.WriteLine($"Expanded {echo}: eye {found[echo]}");
+        }
+    }
+
     private static bool HasAllSubBiomes(Dictionary<CaveBiome, Vector3> found) =>
         found.ContainsKey(CaveBiome.Crystal) && found.ContainsKey(CaveBiome.Fungal)
                                              && found.ContainsKey(CaveBiome.MagmaDeep);

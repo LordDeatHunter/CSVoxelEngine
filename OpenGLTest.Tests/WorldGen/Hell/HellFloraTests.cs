@@ -55,15 +55,19 @@ public sealed class HellFloraTests : IDisposable
 
     private static bool IsFlora(ushort block) => block == HellFlora.VineBlock || IsPlant(block);
 
-    /// <summary>A chunk column wholly in <paramref name="biome"/> (at its corners) in <paramref name="layer"/>.</summary>
+    /// <summary>A chunk column wholly in <paramref name="biome"/> (at every cell) in <paramref name="layer"/>.</summary>
     private static (int Cx, int Cz) ColumnIn(HellBiome biome, int layer, int skip = 0)
     {
         for (var cx = -160; cx <= 160; cx += 5)
         for (var cz = -160; cz <= 160; cz += 7)
         {
             if (HellBiomes.AtLayer(cx * Chunk.Size, layer, cz * Chunk.Size) != biome) continue;
-            if (HellBiomes.AtLayer(cx * Chunk.Size + Chunk.Size - 1, layer, cz * Chunk.Size + Chunk.Size - 1) != biome)
-                continue;
+            // Two opposite corners do not decide the interior of a 3D-noise biome field.
+            var all = true;
+            for (var x = 0; x < Chunk.Size && all; x++)
+            for (var z = 0; z < Chunk.Size && all; z++)
+                all = HellBiomes.AtLayer(cx * Chunk.Size + x, layer, cz * Chunk.Size + z) == biome;
+            if (!all) continue;
             if (skip-- > 0) continue;
             return (cx, cz);
         }

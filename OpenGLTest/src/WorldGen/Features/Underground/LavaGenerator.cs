@@ -5,7 +5,7 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 
 /// <summary>
 /// Lava pockets deep underground: cave floors at or below <see cref="WorldGenerationConfig.LavaMaxY"/>
-/// pond over with lava sources where a low-frequency patch mask and a per-cell roll agree.
+/// take one or two lava sources at the spaced 3D candidates from CaveFluidSources.
 /// A pure function of world position like the other generators, so neighbors agree without
 /// shared state. Runs on a generation worker thread after the carvers and <c>FillWater</c>:
 /// flooded cells are water, not air, so sea caves never pond lava, and the height check keeps
@@ -13,8 +13,6 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 /// </summary>
 public static class LavaGenerator
 {
-    private const int PoolSalt = 0x5A1A91;
-
     private static FastNoiseLite PatchNoise;
 
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
@@ -37,15 +35,15 @@ public static class LavaGenerator
     internal static float PatchValue(int x, int z) => PatchNoise.GetNoise(x, z);
 
     /// <summary>
-    /// Whether the air cell (x, y, z) ponds lava. Deep interior cells only: below the lava
-    /// ceiling and buried under the terrain, inside a patch and winning the pool roll.
+    /// Whether cell (x, y, z) is a sparse lava-source candidate: below the lava
+    /// ceiling, above the barrier and buried under the terrain. Stamp also requires a dry floor.
     /// </summary>
     public static bool HasLava(int x, int y, int z, int surfaceHeight)
     {
         if (y > WorldGenerationConfig.LavaMaxY) return false;
         if (y > surfaceHeight - WorldGenerationConfig.LavaBurial) return false;
-        if (PatchValue(x, z) <= WorldGenerationConfig.LavaPatchThreshold) return false;
-        return UnitHash(x, y, z) < WorldGenerationConfig.LavaPoolChance;
+        if (y <= WorldGenerationConfig.BarrierTopY) return false;
+        return CaveFluidSources.Contains(x, y, z);
     }
 
     /// <summary>
@@ -60,8 +58,6 @@ public static class LavaGenerator
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
         {
-            if (PatchValue(worldX0 + x, worldZ0 + z) <= WorldGenerationConfig.LavaPatchThreshold)
-                continue;
             var surfaceHeight = column.Heights[(x << Chunk.SizeShift) | z];
 
             for (var ly = 1; ly < Chunk.Size; ly++)
@@ -73,17 +69,12 @@ public static class LavaGenerator
                 var i = Chunk.Idx(x, ly, z);
                 if (blocks[i] != BlockType.Air) continue;
                 var floor = blocks[Chunk.Idx(x, ly - 1, z)];
-                if (floor == BlockType.Air || BlockType.IsFluid(floor)) continue;
-                if (UnitHash(worldX0 + x, y, worldZ0 + z) >= WorldGenerationConfig.LavaPoolChance) continue;
+                if (!BlockType.IsSolid(floor) || !BlockType.Occludes(floor)) continue;
+                if (!HasLava(worldX0 + x, y, worldZ0 + z, surfaceHeight)) continue;
 
                 blocks[i] = LavaBlock;
             }
         }
     }
 
-    private static float UnitHash(int x, int y, int z)
-    {
-        var h = SplitMix64.Hash(x ^ (y * 0x9E37), z, WorldGenerationConfig.Seed ^ PoolSalt);
-        return (SplitMix64.Mix(h + 0x9E3779B97F4A7C15UL) >> 40) * (1f / (1 << 24));
-    }
 }

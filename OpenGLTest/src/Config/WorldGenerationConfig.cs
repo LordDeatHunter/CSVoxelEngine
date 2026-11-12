@@ -352,15 +352,35 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int MudWaterNeighbors = 2;
 
     // --- Lava ---
-    // Deep cave floors pond over with lava sources where a patch mask and a per-cell roll
-    // agree (see LavaGenerator). Pockets sit at or below LavaMaxY and buried under the
+    // Deep cave floors receive spaced source groups and contained natural depressions.
+    // Sources sit at or below LavaMaxY and buried under the
     // terrain, so the surface, ravines and entrances stay dry and sea caves stay water.
     public const bool LavaEnabled = true;
     public const int LavaMaxY = -24;
     public const int LavaBurial = 2;
+    // Retained patch field is the barrier vulcanite proximity mask, not a fluid scatter.
     public const float LavaPatchFrequency = 1f / 128f;
     public const float LavaPatchThreshold = 0.2f;
-    public const float LavaPoolChance = 0.3f;
+    // One small source group per 64-cube; candidates stay in its middle half.
+    public const int CaveFluidCellShift = 6;
+    public const int CaveFluidSiteMargin = 16;
+
+    // One bounded natural-depression plan per 64-cube; reject spills, never build a rim.
+    public const int CaveLavaLakeCellShift = 6;
+    public const int CaveLavaLakeMinArea = 12;
+    public const int CaveLavaLakeShallowArea = 120;
+    public const int CaveLavaLakeDeepArea = 1000;
+    public const int CaveLavaLakeMaxDepth = 16;
+    public const int CaveLavaLakeBurial = 16;
+    public const int CaveLavaLakeAirHeight = 3;
+    public const int CaveLavaLakeShallowRise = 1;
+    public const int CaveLavaLakeDeepRise = 7;
+    public const int CaveLavaLakeSearchColumns = 8;
+    public const int CaveLavaLakeSearchFloors = 12;
+    public const int CaveLavaLakeCacheCapacity = 2048;
+    public const int CaveLavaLakeCacheGenerations = 4;
+    public const float CaveLavaLakeChanceShallow = 0.18f;
+    public const float CaveLavaLakeChanceDeep = 0.8f;
 
     // --- Malachite ore (MalachiteGenerator) ---
     // Common coal-like blobs replacing stone at any depth: cells where the vein field
@@ -615,7 +635,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // --- Cave surface rule ---
     // Caves fade out this close (in blocks) below the surface...
     public const float CaveSurfaceFadeStart = 2f;
-    public const float CaveSurfaceFadeEnd = 8f;
+    public const float CaveSurfaceFadeEnd = 6f;
     // ...except in entrance zones, sparse patches where the fade is lifted and caves reach the sky
     public const float EntranceFrequency = 1f / 128f;
     public const float EntranceStart = 0.5f;
@@ -643,25 +663,61 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Cheese: blobby rooms where a low-frequency field exceeds a threshold that loosens with depth
     public const float CheeseFrequency = 1f / 80f;
     public const float CheeseYScale = 1.5f;
-    public const float CheeseThresholdShallow = 0.75f;
-    public const float CheeseThresholdDeep = 0.6f;
+    public const float CheeseThresholdShallow = 0.66f;
+    public const float CheeseThresholdDeep = 0.46f;
     public const float CheeseDepthStart = 8f;
-    public const float CheeseDepthEnd = 60f;
+    public const float CheeseDepthEnd = 280f;
+
+    // Intermediate rooms on a shorter wavelength than cheese, increasingly frequent with depth.
+    public const float CavePocketFrequency = 1f / 36f;
+    public const float CavePocketYScale = 1.2f;
+    public const float CavePocketThresholdShallow = 0.64f;
+    public const float CavePocketThresholdDeep = 0.38f;
+    public const float CavePocketDepthStart = 6f;
+    public const float CavePocketDepthEnd = 320f;
 
     // Spaghetti: tunnels along the curves where two independent fields are both near zero.
     // Radii are in noise units; the tunnel radius in blocks is roughly radius * wavelength / 30.
     public const float SpaghettiFrequency = 1f / 64f;
-    public const float SpaghettiYScale = 1.6f;
-    public const float SpaghettiRadius = 0.07f;            // ~2.5 blocks
-    public const float SpaghettiRadiusVariation = 0.025f;
+    public const float SpaghettiYScale = 1.2f;
+    public const float SpaghettiRadius = 0.13f;            // wider walkable core
+    public const float SpaghettiRadiusVariation = 0.02f;
     public const float SpaghettiThicknessFrequency = 1f / 200f;
 
     // Narrow spaghetti: tighter, more frequent tunnels, still walkable, only in patches
     public const float NarrowSpaghettiFrequency = 1f / 32f;
-    public const float NarrowSpaghettiRadius = 0.10f;       // ~2 blocks
+    public const float NarrowSpaghettiRadius = 0.18f;       // standing clearance in developed patches
     public const float NarrowSpaghettiMaskFrequency = 1f / 160f;
     public const float NarrowSpaghettiMaskStart = -0.1f;    // patches exist where mask noise exceeds this...
     public const float NarrowSpaghettiMaskEnd = 0.3f;       // ...and are fully developed above this
+
+    // Desert caves: long, narrow noise tunnels between bounded irregular lobe clusters.
+    public const float DesertTunnelXScale = 0.28f;
+    public const float DesertTunnelRadius = 0.075f;
+    public const int DesertPocketCellBlocks = 96;
+    public const int DesertPocketCellHeight = 64;
+    public const int DesertPocketMinRadius = 15;
+    public const int DesertPocketMaxRadius = 39;
+    public const int DesertPocketMinHeight = 8;
+    public const int DesertPocketMaxHeight = 24;
+    public const int DesertPocketWallBlocks = 3;
+    public const float DesertPocketMinAspect = 0.48f;
+    public const float DesertPocketWallDetail = 3.5f;
+    public const float DesertPocketDetailYScale = 0.21f;
+    public const int DesertPocketMinLobes = 3;
+    public const int DesertPocketMaxLobes = 5;
+    public const float DesertPocketCoreRadius = 0.55f;
+    public const float DesertPocketMinOffset = 0.3f;
+    public const float DesertPocketMaxOffset = 0.5f;
+    public const float DesertPocketMinWidth = 0.55f;
+    public const float DesertPocketAngleJitter = 0.7f;
+    public const float DesertPocketMinFloorScale = 0.7f;
+    public const int DesertPocketCacheCapacity = 4096;
+    public const int DesertPocketCacheGenerations = 4;
+    public const float DesertPocketChanceShallow = 0.35f;
+    public const float DesertPocketChanceDeep = 0.8f;
+    public const float DesertPocketDepthStart = 20f;
+    public const float DesertPocketDepthEnd = 320f;
 
     // Caverns: rare, wide, flat open spaces that only exist deep down
     public const float CavernFrequency = 1f / 256f;
@@ -775,18 +831,18 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
 
     /// <summary>Top of the barrier band, where its ramp starts: the barrier block's share of the
     /// stone rises from 0 here to 100 % at <see cref="BarrierFullTopY"/>.</summary>
-    public const int BarrierTopY = -300;
+    public const int BarrierTopY = -500;
 
     /// <summary>Top of the barrier band's solid core: 100 % barrier from here down to
     /// <see cref="BarrierFullBottomY"/>.</summary>
-    public const int BarrierFullTopY = -330;
+    public const int BarrierFullTopY = BarrierTopY - 30;
 
     /// <summary>Bottom of the barrier band's solid core; below it the share ramps back to 0 at
     /// <see cref="BarrierBottomY"/>.</summary>
-    public const int BarrierFullBottomY = -370;
+    public const int BarrierFullBottomY = BarrierTopY - 70;
 
     /// <summary>Bottom of the barrier band, where its lower ramp ends at 0 %.</summary>
-    public const int BarrierBottomY = -400;
+    public const int BarrierBottomY = BarrierTopY - 100;
 
     /// <summary>Whether worldgen stamps the barrier band (BarrierGenerator).</summary>
     public const bool BarrierEnabled = true;
@@ -956,6 +1012,14 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <summary>The echo band's mean bottom: an echo cell lies strictly above
     /// <c>CaveEchoBottomY + CaveEchoDriftBlocks * drift</c>, drift being the echo drift noise in -1..1.</summary>
     public const int CaveEchoBottomY = -200;
+
+    // Bounded 3D echo bodies spread under neighboring columns, beyond the original echo band.
+    public const int CaveEchoVolumeBottomY = BarrierTopY + 100;
+    public const int CaveEchoVolumeCellBlocks = 128;
+    public const int CaveEchoVolumeRadius = 96;
+    public const int CaveEchoVolumeVerticalRadius = 112;
+    public const int CaveEchoVolumeCacheCapacity = 4096;
+    public const int CaveEchoVolumeCacheGenerations = 4;
 
     /// <summary>How far the echo band's bottom wanders up and down with the echo drift noise (seed offset 179),
     /// so the hand-over to the sub-biomes is never a flat line.</summary>

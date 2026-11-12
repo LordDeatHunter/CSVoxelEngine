@@ -25,6 +25,7 @@ public sealed class CaveBiomeTests
     private const int ColumnRange = 1250;
 
     private static readonly Lazy<(int Cx, int Cz)> FrozenColumn = new(() => FindColumn(Biome.Frozen, 0xC4FE_0001UL));
+    private static readonly Lazy<(int Cx, int Cz)> TaigaColumn = new(() => FindColumn(Biome.Taiga, 0xC4FE_0003UL));
     private static readonly Lazy<(int Cx, int Cz)> DesertColumn = new(() => FindColumn(Biome.Desert, 0xC4FE_0002UL));
 
     public CaveBiomeTests() => TestContent.EnsureLoaded();
@@ -51,16 +52,29 @@ public sealed class CaveBiomeTests
     private static int EchoChunkY(int cx, int cz) => (ColumnCache.Get(cx, cz).MinHeight >> Chunk.SizeShift) - 2;
 
     [Fact]
+    public void TaigaAndFrozenShareTheUndergroundPolicyIncludingCoverAndRealmGates()
+    {
+        foreach (var y in new[] { 40, -60, -180, -240, WorldGenerationConfig.BarrierTopY, WorldGenerationConfig.BarrierTopY - 20 })
+        foreach (var depth in new[] { 0, 4, 9, 20, 100, 400 })
+        foreach (var drift in new[] { -1f, 0f, 1f })
+            Assert.Equal(CaveBiomes.Classify(y, depth, Biome.Frozen, drift, drift, drift),
+                CaveBiomes.Classify(y, depth, Biome.Taiga, drift, drift, drift));
+    }
+
+    [Fact]
     public void TheStampMatchesThePointQueryAcrossEverySeam()
     {
         var (fx, fz) = FrozenColumn.Value;
         var (dx, dz) = DesertColumn.Value;
+        var (tx, tz) = TaigaColumn.Value;
         // Each block: the 2x2 chunk columns ending at (cx, cz) and the two chunk ys ending at cy. An echo
         // block and a block reaching under the deep's lowest top always hold biome rock, so they must change
         var blocks = new List<(int Cx, int Cz, int Cy, bool MustChange)>
         {
             (fx, fz, EchoChunkY(fx, fz), true),
             (dx, dz, EchoChunkY(dx, dz), true),
+            (tx, tz, EchoChunkY(tx, tz), true),
+            (tx, tz, -17, false),
             (dx, dz, -14, false),
             (fx, fz, -17, true),
             (-2, -4, -14, false),
@@ -117,11 +131,14 @@ public sealed class CaveBiomeTests
     {
         var (fx, fz) = FrozenColumn.Value;
         var (dx, dz) = DesertColumn.Value;
+        var (tx, tz) = TaigaColumn.Value;
         var blocks = new (int Cx, int Cz, int Cy)[]
         {
             (fx, fz, EchoChunkY(fx, fz)),
             (fx, fz, EchoChunkY(fx, fz) + 3),
             (dx, dz, EchoChunkY(dx, dz)),
+            (tx, tz, EchoChunkY(tx, tz)),
+            (tx, tz, -17),
             (dx, dz, -14),
             (fx, fz, -17),
             (-2, -4, -14),
@@ -188,6 +205,33 @@ public sealed class CaveBiomeTests
         }
     }
 
+    [Theory]
+    [InlineData(Biome.Frozen, CaveBiome.FrozenEcho)]
+    [InlineData(Biome.Taiga, CaveBiome.FrozenEcho)]
+    [InlineData(Biome.Desert, CaveBiome.DesertEcho)]
+    public void ExpandedEchoDressesUncarvedRockBelowTheOldBand(Biome surface, CaveBiome expected)
+    {
+        var (cx, cz) = FindColumn(surface, 0xC4FE_0100UL + (ulong)surface);
+        var column = ColumnCache.Get(cx, cz);
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var changed = 0;
+        for (var cy = -23; cy <= -15; cy++)
+        {
+            var map = new CaveBiomeMap();
+            CaveBiomes.Fill(map, column, cx * Chunk.Size, cy * Chunk.Size, cz * Chunk.Size);
+            var blocks = Enumerable.Repeat(stone, Chunk.BlockCount).ToArray();
+            CaveBiomes.Stamp(blocks, map, cx * Chunk.Size, cy * Chunk.Size, cz * Chunk.Size);
+            for (var i = 0; i < blocks.Length; i++)
+            {
+                Assert.NotEqual(BlockType.Air, blocks[i]);
+                if ((CaveBiome)map.Cells[i] != expected) continue;
+                changed++;
+                Assert.Equal(CaveBiomes.Palette(expected).Stone, blocks[i]);
+            }
+        }
+        Assert.True(changed > 0, "expanded material never reached solid rock below the original band");
+    }
+
     [Fact]
     public void BandsAreBoundedAndOrdered()
     {
@@ -210,9 +254,10 @@ public sealed class CaveBiomeTests
 
             if (cave is CaveBiome.FrozenEcho or CaveBiome.DesertEcho)
             {
-                Assert.True(y > WorldGenerationConfig.CaveEchoBottomY - WorldGenerationConfig.CaveEchoDriftBlocks, at);
+                Assert.True(y > Math.Min(WorldGenerationConfig.CaveEchoVolumeBottomY,
+                    WorldGenerationConfig.CaveEchoBottomY - WorldGenerationConfig.CaveEchoDriftBlocks), at);
                 Assert.True(height - y >= WorldGenerationConfig.CaveEchoCoverBlocks, at);
-                Assert.True(surface == (cave == CaveBiome.FrozenEcho ? Biome.Frozen : Biome.Desert), at);
+                // Expanded 3D echoes can extend under a different surface biome.
             }
 
             if (cave is CaveBiome.Crystal or CaveBiome.Fungal or CaveBiome.MagmaDeep)
@@ -244,7 +289,7 @@ public sealed class CaveBiomeTests
             for (var y = height; y > WorldGenerationConfig.BarrierTopY; y--)
             {
                 var cave = CaveBiomes.At(x, y, z, Biome.Frozen, height);
-                if (cave == CaveBiome.FrozenEcho) wasEcho = true;
+                if (cave is CaveBiome.FrozenEcho or CaveBiome.DesertEcho) wasEcho = true;
                 else if (wasEcho && echoBottom is null) echoBottom = y;
                 if (cave == CaveBiome.MagmaDeep)
                 {
@@ -329,12 +374,15 @@ public sealed class CaveBiomeTests
     {
         var (fx, fz) = FrozenColumn.Value;
         var (dx, dz) = DesertColumn.Value;
+        var (tx, tz) = TaigaColumn.Value;
         var positions = new[]
         {
             new Vector3(fx, EchoChunkY(fx, fz), fz),
             new Vector3(fx, EchoChunkY(fx, fz) - 1, fz),
             new Vector3(dx, EchoChunkY(dx, dz), dz),
             new Vector3(dx, EchoChunkY(dx, dz) - 1, dz),
+            new Vector3(tx, EchoChunkY(tx, tz), tz),
+            new Vector3(tx, -17, tz),
             new Vector3(fx, -14, fz),
             new Vector3(dx, -15, dz),
             new Vector3(-3, -17, 5),

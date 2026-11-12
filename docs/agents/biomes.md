@@ -307,7 +307,7 @@ Three 3D noises (seed offsets 179 echo drift, 180 deep drift, 181 selector) are 
 lattice and blended with `OreNoiseLattice.Trilinear`, and the one rule `CaveBiomes.Classify` turns them, the cell's y,
 its depth under its column's top and the column's stored, dithered surface biome into a cave biome:
 - **Echo**: from a jittered cover (`CaveEchoCoverBlocks` plus up to `CaveEchoCoverJitterBlocks`) under the column top
-  down to `CaveEchoBottomY + CaveEchoDriftBlocks * drift`, a frozen column's caves are FrozenEcho (frost_stone,
+  down to `CaveEchoBottomY + CaveEchoDriftBlocks * drift`, a frozen or taiga column's caves are FrozenEcho (frost_stone,
   permafrost floors), a desert column's DesertEcho (sandstone), every other column's plain.
 - **Sub-biomes**: under the echo, MagmaDeep (scorched_hellrock, magma_block accents) at or below
   `CaveDeepTopY + CaveDeepDriftBlocks * deepDrift`; above it the selector picks Crystal (stone with crystal_block
@@ -331,10 +331,29 @@ spot per biome), `LayerBandTests.CaveBiomeBandsLieAboveTheBarrierInOrder`; `visu
 **Cave shape and ores (CB-2)**, read from the same map: crystal cells open bigger cheese rooms, fungal cells wider spaghetti
 tunnels and magma-touched cells both cheese and caverns (`CaveShape`, scaled per region by `NoiseCaves`' ninth channel), and a
 worm node's radius is multiplied by its center's biome factor (`WormCarver.RadiusFactorAt`, exactly 1 above the sub band, so
-worms, which rarely reach it, mostly keep their size); plain and echo caves carve exactly as before. The four Y-band ores shift
+worms, which rarely reach it, mostly keep their size); plain and frozen echo use regular carving; desert has separate elongated tunnels and pocket rooms. The four Y-band ores shift
 their thresholds per cell by biome (`CaveRichness`: malachite richer in crystal, coal in fungal and desert echo caves but leaner
 in the magma deep, hematite richer there, tin in both echoes), and three exclusive ores (`CaveOres`, seeds 183-185, its own
 `Stage.CaveOres` right after `Tin` with a `CaveOres.WriteBand` and a `StampGateTests` row) grow only in plain stone of their own
 biome below their highest y, before the palette pass, so they survive inside the magma deep's scorched hellrock. Biome borders
 step the cave size and ore richness hard, like the palette. `CaveShapeTests`, `CaveOreRichnessTests`, `CaveOreTests`,
 `LayerBandTests.EveryExclusiveCaveOreGrowsInsideItsBiomesReach`.
+
+Issue #10 regular spaghetti uses a 0.13 noise radius (variation 0.02), patch tunnels 0.18, and Y scale 1.2 instead of 1.6. Wider cores and less vertical compression provide standing clearance; surface gates and hell remain separate. Newly generated chunks intentionally change for existing seeds; edited saved chunks keep their original snapshots.
+
+Intermediate cave pockets use seed offset 187, wavelength 36 and Y scale 1.2. Their threshold falls smoothly 0.64 to 0.38 over cover 6..320; cheese falls 0.66 to 0.46 over 8..280. The surface fade completes at cover 6 (starts at 2), retaining a protected roof outside entrances. This adds rooms between tunnels and large caverns and increases openness with depth without changing the surface heightmap.
+
+Frozen echo volumes (issue #10) also occupy overlapping 3D ellipsoids: deterministic 128-block sites rooted in Frozen or Taiga surface-biome samples from the shared climate classifier, horizontal radius 96, vertical radius 112, clipped above -400 and at least 8 blocks below each local surface. `CaveBiomes.EchoOf` owns the surface-to-echo policy for both the original point/map band and volume seeding. This widens the material laterally into nearby columns and vertically below the original echo line, including entirely uncarved rock. `CaveEchoVolumes` applies the same containment to `At` and `Fill`; the site cache includes the seed and holds only pure values. Original echo bands remain present.
+
+Desert sandstone uses the same 3D echo-volume rule and dimensions as frozen stone (issue #10), seeded from desert surface-biome samples. Both maps cover uncarved stone below the old echo band and may spread laterally under a different surface biome. The point query and map use the same deterministic site priority even if volumes overlap.
+
+DesertEcho uses its own carve: the existing two tunnel fields sampled with X scaled 0.28, radius 0.075 versus regular 0.13. PR13 comment345 broadens the bounded 96x64x96 pocket sites to horizontal radii 15..39, half-heights 8..24, and independently rotated aspect ratios 0.48..1. Each site retains its connected core and independently sized/rotated 3..5 lobes and floor/roof proportions. A bounded angular displacement (up to 3.5 blocks, with site-varying phase/amplitude and coherent height variation) adds inward rock shoulders and outward alcoves at smaller scales. It displaces rays of the connected outline, rather than subtracting independent noise holes, so rooms stay navigable. All lobe centers, radii and detail taper together at the floor/roof. The site margin reserves the complete displacement bound plus at least 3 blocks of ownership wall; no clipping plane makes the room outline. Point and bulk carving use exactly the same `InPocket` rule, including negative coordinates. Immutable geometry is cached by coordinates and seed. Occupancy rises 0.35 to 0.8 with cover 20..320. Desert bypasses regular cheese/caverns; separate long narrow tunnels can connect rooms through substantial intervening rock. Salt 0x5E81, no additional noise seeds; Frozen/Taiga policies and hell are unchanged.
+
+Historical issue #10 verification used `visual-examples/cave-revamp.json` (seed 1337, VOXEL_TIME=147). Its prefilled lava-bowl fixtures predate PR13 comment319; use the follow-up scenario below for current cave verification.
+
+Cave scenery requires solid support: neither glow mushrooms nor stalagmites stand on cave water or lava, and stalactites need solid ceilings. A drip meeting a fluid stops without adding a floating stalagmite. This keeps the new prefilled pond surfaces clear.
+
+PR13 comment319 follow-up: `visual-examples/cave-comment319.json` (`VOXEL_TIME=147`, seed 1337) films floor-level and wide views of real shallow/deep lava pits, two separate irregular desert rooms, and a deep Taiga cave. `CaveRevampSceneTests` locates these fixtures and checks still-pool containment/settling, regeneration, modified snapshot preservation and deep Taiga point/map/material agreement. `CaveShapeTests` checks outline asymmetry/variation, connected slices, ownership walls, negative chunk seams, query order and reseeding. Newly generated terrain changes; modified snapshots and save/wire formats remain unchanged.
+
+
+PR13 comment345 verification: `visual-examples/cave-comment345.json` (seed1337, `VOXEL_TIME=147`) retains the original corridor context and films natural shallow/deep floor depressions, two different desert rooms and close wall views. The final `shallow_open` views give a clearer shallow boundary and floor context. Only lamps are scene edits. `CaveLavaLakeTests` checks bounded spill rejection, natural support, flat closure, depth-related budgets and negative cross-chunk point/stamp/state/concurrent agreement; `CaveRevampSceneTests` verifies real settled pools, independent regeneration and modified snapshot restore. Full-suite results and any unresolved failures are retained with task e78b2b13; no save/wire change.
