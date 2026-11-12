@@ -87,9 +87,9 @@ Made by `tools/generate-vulcanite-sprites.py` as palette swaps of the iron sprit
 repainted with the six shades of the committed `vulcanite_shard.png`, the wooden haft kept): re-running
 puts the placeholders back (`--check` compares), so remove or repoint that generator with the replacement.
 The shard, `vulcanite_ingot.png` (refined vulcanite), `vulcanite_pickaxe.png` and `vulcanite_axe.png` are
-committed art and not listed. The sword head and the sword are 42x42 like iron's; the other heads 32x32.
+committed art and not listed. The Bleeding Edge head (`bleeding_edge_head.png`) is hand-drawn art at 32x32 and is not generated; the other heads are 32x32.
 
-- [ ] **Vulcanite tool heads** — `vulcanite_pickaxe_head.png`, `vulcanite_axe_head.png`, `vulcanite_sword_head.png`.
+- [ ] **Vulcanite tool heads** — `vulcanite_pickaxe_head.png`, `vulcanite_axe_head.png`.
 
 ## Blocks
 

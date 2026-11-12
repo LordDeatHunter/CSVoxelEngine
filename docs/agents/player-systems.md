@@ -114,8 +114,8 @@ compiled by `ItemLoader.ParseEquip` into a `GearInfo`. `equip.abilities` (`air_j
 `magnet`, `bone_shrapnel`; an unknown name refuses the item) compiles into `GearInfo.Abilities` (`GearAbility` flags), and
 `Equipment.Abilities`/`Has` caches their union with the stats on `Version` (the `no_fall_damage`, `extra_air` and `magnet`
 consumers are under "Armor, modifiers and sets", `bone_shrapnel` under "Bone shrapnel"). Every gear
-sprite is 32x32 committed pixel art (the same width every item sprite is authored at; the large
-swords are the 42x42 exception; several are still placeholders, listed in `USER_TODO.md`): the five-piece silhouette
+sprite is 32x32 committed pixel art (the same width every item sprite is authored at; the iron, tin
+and bronze swords are the 42x42 exception; several are still placeholders, listed in `USER_TODO.md`): the five-piece silhouette
 of each set is drawn once, shaded by a shared bevel and recolored per material, then dressed per material (stitching on
 leather, rivets on metal), and the rings, charms and belt are drawn the same way. **Cloud boots** (`cloud_boots`, feet, from iron boots and cloud shards) carry `air_jump`: one free air jump per airtime
 (`PlayerPhysics`), on a fresh Space press while airborne, never in water or flight nor on the frame a creative double tap toggles

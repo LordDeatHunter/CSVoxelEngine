@@ -1,8 +1,8 @@
 """Deterministic generator of the vulcanite item sprites (placeholder art, listed in USER_TODO.md).
 
 Writes, under OpenGLTest/assets/textures/items:
-  vulcanite_pickaxe_head.png, vulcanite_axe_head.png,
-  vulcanite_sword_head.png                                  from the iron heads
+  vulcanite_pickaxe_head.png, vulcanite_axe_head.png
+The sword head is not generated any more: bleeding_edge_head.png is hand-drawn art and is never written.
 
 Each is a palette swap of its iron sprite, never noise: the iron's cool gray metal pixels (blue at or over red) are
 repainted with the six shades of the user-authored vulcanite_shard.png, picked by the source shade's luminance rank
@@ -14,7 +14,7 @@ vulcanite_axe.png are committed art and never written.
 No randomness and no image library: a small stdlib PNG reader (zlib, filters 0-4, RGB8 or RGBA8) and the PNG writer
 the other generators use (filter 0, zlib level 9), so re-running reproduces every file byte for byte.
 Run from the repo root:
-    python -I tools/generate-vulcanite-sprites.py           (writes the four sprites)
+    python -I tools/generate-vulcanite-sprites.py           (writes the two sprites)
     python -I tools/generate-vulcanite-sprites.py --check   (exit 1 if any file differs)
 """
 import os
@@ -29,7 +29,6 @@ ITEM_DIR = os.path.join(ROOT, "OpenGLTest", "assets", "textures", "items")
 SPRITES = (
     ("vulcanite_pickaxe_head", "iron_pickaxe_head"),
     ("vulcanite_axe_head", "iron_axe_head"),
-    ("vulcanite_sword_head", "iron_sword_head"),
 )
 
 

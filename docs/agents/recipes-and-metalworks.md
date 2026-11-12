@@ -111,7 +111,7 @@ from a forged head (`iron_pickaxe`, `iron_axe`, `iron_sword`, each head + branch
 **Vulcanite** is the tier above iron, worked on the same anvil with no new mechanic. `vulcanite_ore` (hardness 60, above the
 basalt it veins; `tools: {"pickaxe": 3}`, so the iron pickaxe and up) drops a `vulcanite_shard` (its loot table). The shard is
 a forge metal only because a forge recipe takes it: 3 shards forge into `refined_vulcanite` (`recipes/forge/refined_vulcanite.json`),
-and the refined metal forges into `vulcanite_pickaxe_head` 3, `vulcanite_axe_head` 3 and `vulcanite_sword_head` 4; no crafting
+and the refined metal forges into `vulcanite_pickaxe_head` 3, `vulcanite_axe_head` 3 and `bleeding_edge_head` 4; no crafting
 recipe takes either metal. The tools are crafted like iron's (head + branch + 2 vine): `vulcanite_pickaxe` and `vulcanite_axe`
 (power 4, in the `pickaxe`/`axe` tags) and `bleeding_edge` (the vulcanite sword), every stat above iron's; no armor. Like the other hand tools they `cinder_sword` (24 ember shards, 30 basalt and 1 refined vulcanite, no forge step) hits for twice the Bleeding Edge's base damage and sets its target burning (`onHit`).
 have no durability. **Worldgen** (`VulcaniteGenerator`, `Stage.Vulcanite`, tuning `Vulcanite*` in `WorldGenerationConfig`): the
