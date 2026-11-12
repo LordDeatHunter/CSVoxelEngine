@@ -304,9 +304,12 @@ public abstract class RiggedMob : Mob
     /// while idle, the minimum clearance while <paramref name="chasing"/>) plus a gentle bob, slid along
     /// walls by the probe, at <paramref name="speedFactor"/> of the tuning. The body then sweeps through
     /// <see cref="BoxSweep"/> like any mob, so it never enters a solid cell. It faces its goal, plays the
-    /// fly clip by its 3D speed and pitches and banks. A dying flyer drops out of the sky.
+    /// fly clip by its 3D speed and pitches and banks. A dying flyer drops out of the sky. A non-null
+    /// <paramref name="sink"/> replaces the height steering with a steady descent at that speed (a crow
+    /// idling with nowhere to go); the floor, the walls and the body sweep still stop it.
     /// </summary>
-    protected void Fly(Vector3? goal, bool chasing, float speedFactor, float deltaTime, ChunkManager chunks)
+    protected void Fly(Vector3? goal, bool chasing, float speedFactor, float deltaTime, ChunkManager chunks,
+        float? sink = null)
     {
         if (Flight is not { } flight)
             throw new InvalidOperationException($"Entity '{Type.Name}' has no flight tuning and cannot fly.");
@@ -328,6 +331,7 @@ public abstract class RiggedMob : Mob
                 groundTop, half.Y, flight, overGround: !chasing);
 
             var desired = FlightSteering.DesiredVelocity(Position, aim, flight, speedFactor);
+            if (sink is { } descent) desired.Y = -descent;
             desired = FlightSteering.AvoidSolids(Position, half, desired, flight.VerticalSpeed * speedFactor, chunks);
             _velocity = BodyMotion.Steer(_velocity, desired, flight.Acceleration, deltaTime);
 
