@@ -78,10 +78,10 @@ internal sealed class LeftClickAction
     /// <summary>The id of the block being mined.</summary>
     internal ushort BreakingBlockId => _breakingBlockId;
 
-    /// <summary>Whether the cell being mined shows its progress as an eaten-away face (a natural full-cube trunk
-    /// with a side bite), so the crack overlay stays off for it.</summary>
+    /// <summary>Whether the cell being mined shows its progress as an eaten-away face (a natural trunk or
+    /// limb cell with a side bite, thin or full), so the crack overlay stays off for it.</summary>
     internal bool ShowsEatenFace =>
-        _isBreaking && _breakNatural && WoodState.IsFullCube(_breakState)
+        _isBreaking && _breakNatural
         && _chunkManager.ChopDamage.TryGet((int)_breakingBlockPosition.X, (int)_breakingBlockPosition.Y,
             (int)_breakingBlockPosition.Z, out var chop) && chop.Face != WoodDamage.NoFace;
 
@@ -550,7 +550,7 @@ internal sealed class LeftClickAction
         var damage = _chunkManager.ChopDamage;
         var before = ShownDepth(damage, x, y, z);
         damage.Set(x, y, z, _breakDamage, _breakFace < 0 ? WoodDamage.NoFace : _breakFace);
-        if (WoodState.IsFullCube(_breakState) && ShownDepth(damage, x, y, z) != before)
+        if (ShownDepth(damage, x, y, z) != before)
             _chunkManager.ImmediateRemesh(VoxelCoords.ChunkPosOf(cell));
     }
 

@@ -110,6 +110,7 @@ OpenGLTest/
         ChunkMeshData.cs       # CPU-side mesh of one chunk (opaque + translucent lists, light snapshot, vents, flame points)
         ChunkMeshScheduler.cs  # the dirty set, the per-frame dirty scan, the thread-pool mesh runners, the completed queue and budgeted upload,
                                #   the immediate remesh paths (behind ChunkManager.Update, MarkDirty, ImmediateRemesh*)
+        ThinWoodBite.cs        # the chop slit of a thin (node-and-tubes) wood cell: the bite box, box subtraction, emission
         WoodDamage.cs          # the permanent chop damage per natural trunk cell (damage + first-hit side face) the mesher reads, and the damage -> slit depth rule
       ChunkMesher.cs         # the binary greedy pass, the biome-tinted cube face and model-tint helpers, and the box-face/quad primitives the emitters share
         FaceLight.cs           # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters

@@ -132,6 +132,31 @@ public sealed class ChoppedWoodTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void AChoppedThinCellLosesMoreWoodAsItDeepensAndStaysClosed(int face)
+    {
+        var thin = WoodState.Encode(5, WoodState.ParentRoot, false);
+        var (manager, center) = LogInAir(thin);
+        var whole = Volume(center.GenerateMeshData(manager)!);
+        Assert.True(whole > 0f);
+
+        var hardness = Mining.HardnessOf(ContentRegistry.RequireBlock("oak_log").Id, thin);
+        var previous = 1f;
+        foreach (var depth in new[] { 1, 4, 8, 12, WoodDamage.MaxDepthPx })
+        {
+            manager.ChopDamage.Set(8, 8, 8, hardness * (depth - 0.5f) / WoodDamage.MaxDepthPx, face);
+            var ratio = Volume(center.GenerateMeshData(manager)!) / whole;
+            // A closed surface that keeps a core of the node: less wood with every depth, never none
+            Assert.True(ratio < previous, $"depth {depth} did not remove more than the cut before");
+            Assert.True(ratio > 0.2f);
+            previous = ratio;
+        }
+    }
+
     [Fact]
     public void OnlyNaturalWoodWithASideBiteIsDrawnEaten()
     {

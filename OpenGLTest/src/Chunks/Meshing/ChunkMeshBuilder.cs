@@ -351,6 +351,16 @@ internal static class ChunkMeshBuilder
             {
                 if (TreeWoodShape.IsThin(paddedState[pIdx]))
                 {
+                    // A chopped thin cell shows its slit like a full-cube trunk does
+                    if (chopDamage.TryGet(worldX0 + x, worldY0 + y, worldZ0 + z, out var thinChop)
+                        && thinChop.Face != WoodDamage.NoFace && ThinWoodBite.HasRoom(vertices))
+                    {
+                        ThinWoodBite.Emit(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight,
+                            blockLight, x, y, z, type, basePos, thinChop.Face,
+                            WoodDamage.BiteDepthPx(thinChop.Damage, Mining.HardnessOf(blockId, paddedState[pIdx])));
+                        continue;
+                    }
+
                     TreeWoodEmitter.EmitTreeWood(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
                         x, y, z, type, basePos);
                     continue;

@@ -132,8 +132,12 @@ overshoot or jiggle.
   walls in the log's end-grain tile, a cap where the neighbor hides a face, so it is never see-through; a cut that
   reaches the cell's side also opens the neighboring face). It is cosmetic (the hitbox stays the whole cube), it
   replaces the crack overlay and the mining pop cube for that cell (`LeftClickAction.ShowsEatenFace`; the pop box is
-  a whole cube and would cover the bite), and a thin branch cell or a hit on a top or bottom face still keeps the
-  damage but shows the usual crack overlay.
+  a whole cube and would cover the bite), and a hit on a top or bottom face still keeps the damage but shows the
+  usual crack overlay. A **thin** cell (node and tubes) shows the same slit in its own shape: `ThinWoodBite` cuts a
+  slab across the node on the hit side, perpendicular to the wood's run (`ThinWoodBite.RunAxis`, the axis of the
+  cell's parent direction: horizontal across a trunk or root, vertical across a horizontal limb; as wide as the cell,
+  deeper with the damage but scaled to the node's width so a twig is never severed, always a core left), subtracts it from every box of the cell and draws the pieces
+  whole with the walls in end grain; `RecordChop` remeshes for it exactly as for a full cube.
   The item debugger's `AXE` mode and `visual-examples/animations-axe.json` (`VOXEL_TIME=147`) show it.
 - **Slice** (`SliceMotion.SlicePhase`): a whole-body motion in uneven phases of the same 0.7 s: a slow
   wind-up that coils the body (to 0.26), a strike about twice as fast as before centered on the impact

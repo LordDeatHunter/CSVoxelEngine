@@ -293,9 +293,10 @@ public sealed class TreeWoodShapeTests
         Assert.Single(TreeWoodShape.GetBoxes(oak, limb, ledge, nbStates));
 
         // Ground beside or above it is nothing to reach for
+        Span<ushort> sideIds = stackalloc ushort[6];
         foreach (var dir in new[] { 0, 1, 2, 3, 4 })
         {
-            Span<ushort> sideIds = stackalloc ushort[6];
+            sideIds.Clear();
             sideIds[dir] = stone;
             var boxes = TreeWoodShape.GetBoxes(oak, state, sideIds, nbStates);
             Assert.Single(boxes);
