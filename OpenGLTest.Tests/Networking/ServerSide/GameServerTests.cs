@@ -1804,8 +1804,10 @@ public sealed class GameServerTests : IDisposable
         Assert.Single(inbox.PlayerCorrections);
     }
 
-    [Fact]
-    public void AWearersDoubleJumpIsNeverCorrectedButASecondAirHopIs()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    public void AWearersDoubleJumpIsNeverCorrectedButASecondAirHopIs(int deliveryWaitPumps)
     {
         using var client = Connect("Hopper");
         var arena = PrepareArena(client.Server!.Value.Spawn);
@@ -1871,10 +1873,26 @@ public sealed class GameServerTests : IDisposable
         {
             var before = player.LastStateAt;
             var eye = new Vector3(start.X, feet + Camera.EyeHeight, start.Z);
-            SendState(client, eye, feet > resting ? NetPlayerFlags.Airborne : NetPlayerFlags.None);
             var wait = Stopwatch.StartNew();
+            var pumps = 0;
             while (player.LastStateAt == before && wait.Elapsed.TotalSeconds < 5)
-                Tick(dt);
+            {
+                // Exercise both immediate sends and a state delayed behind empty transport pumps.
+                if (pumps++ == deliveryWaitPumps)
+                    SendState(client, eye, feet > resting ? NetPlayerFlags.Airborne : NetPlayerFlags.None);
+                // The trajectory advances one dt per sample. Delivery waits must not stretch
+                // that sample into extra simulation time and turn its legal climb into a hover.
+                if (pumps == 1)
+                    Tick(dt);
+                else
+                {
+                    _server.Pump(0);
+                    Thread.Sleep(2);
+                    DrainAll();
+                }
+            }
+            Assert.NotEqual(before, player.LastStateAt);
+            Assert.Equal((double)dt, player.LastStateAt - before, 6);
         }
 
         // A ground jump and one air hop at its apex, down to the floor again: never corrected

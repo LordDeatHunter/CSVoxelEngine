@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Reflection;
 using System.Threading;
 using VoxelEngine.WorldGen;
 using Xunit;
@@ -34,8 +35,7 @@ namespace VoxelEngine.Tests.WorldGen;
 /// the oldest map (nothing is ever evicted, so the cache grows without bound and this key is never
 /// recomputed).</item>
 /// <item><see cref="RotationsCountEveryInsertIncludingPromotions"/> - a promotion that does not
-/// spend an insert slot, which breaks the memory ceiling argument, and <c>&gt;=</c> instead of
-/// <c>==</c> on the write counter, which rotates on every insert past the cap.</item>
+/// spend an insert slot, which breaks the memory ceiling argument.</item>
 /// <item><see cref="ResidencyNeverExceedsCapacityUnderPromotions"/> - the same, seen from the
 /// residency side, where the ceiling claim can actually be violated.</item>
 /// <item><see cref="EveryKeyAlwaysReturnsItsOwnValueUnderFourThreads"/> - a key inserted under a
@@ -51,8 +51,8 @@ namespace VoxelEngine.Tests.WorldGen;
 /// races it happens to exercise, on this machine, under this scheduler, for this deadline. It is not
 /// a proof that the design is race-free: that argument is the numbered invariant list on
 /// <see cref="GenerationalCache{TKey,TValue}"/> itself, and this fact is a check on it rather than a
-/// substitute for it. The deterministic facts above are the ones that fail loudly when the policy is
-/// weakened.</para>
+/// substitute for it. The bounded scheduling facts pause rotation or factories to demonstrate
+/// residency races without relying on this stress deadline.</para>
 /// </summary>
 public sealed class GenerationalCacheTests
 {
@@ -291,6 +291,233 @@ public sealed class GenerationalCacheTests
         Assert.Equal(100, factory.Calls);
         Assert.Equal(100, cache.Misses);
         Assert.Equal(0, cache.Promotions);
+    }
+
+    [Fact]
+    public void ADelayedRotationCannotLetOnePeerGrowTheCurrentMapWithoutBound()
+    {
+        const int capacity = 16;
+        const int generations = 4;
+        var cache = new GenerationalCache<int, string>(capacity, generations);
+        using var rotating = new ManualResetEventSlim();
+        using var resume = new ManualResetEventSlim();
+        var rotationAttempts = 0;
+        cache.BeforeRotateForTests = () =>
+        {
+            // Pause only the first rotator, after its threshold insert but before allocation/CAS.
+            // A peer may help rotate; it must not wait for this thread to resume.
+            if (Interlocked.Increment(ref rotationAttempts) != 1) return;
+            rotating.Set();
+            if (!resume.Wait(TimeSpan.FromSeconds(10)))
+                throw new TimeoutException("the test did not release its paused rotator");
+        };
+
+        Exception? workerFailure = null;
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                for (var key = 0; key < capacity / generations; key++)
+                    Assert.Equal(CountingFactory.Value(key), cache.GetOrAdd(key, CountingFactory.Value));
+            }
+            catch (Exception error)
+            {
+                workerFailure = error;
+            }
+        }) { IsBackground = true, Name = "GenerationalCachePausedRotator" };
+
+        var peak = 0;
+        worker.Start();
+        try
+        {
+            Assert.True(rotating.Wait(TimeSpan.FromSeconds(10)), "the threshold insert never reached rotation");
+            // One peer can finish arbitrarily many calls while the threshold thread is delayed.
+            // Three cachefuls suffice to disprove the old capacity + in-flight-threads claim.
+            for (var key = capacity; key < capacity * 4; key++)
+            {
+                Assert.Equal(CountingFactory.Value(key), cache.GetOrAdd(key, CountingFactory.Value));
+                peak = Math.Max(peak, cache.EntryCount);
+            }
+        }
+        finally
+        {
+            resume.Set();
+            Assert.True(worker.Join(TimeSpan.FromSeconds(10)), "the paused rotator did not finish");
+        }
+
+        Assert.Null(workerFailure);
+        Assert.True(peak <= cache.Capacity,
+            $"residency {peak} exceeded capacity {cache.Capacity} while one of two callers paused rotation");
+        Assert.True(cache.Rotations > generations, "the peer must keep aging entries while the first rotator is paused");
+    }
+
+    [Fact]
+    public void LateFactoriesCannotAccumulateExtraEntriesAcrossDemotedMaps()
+    {
+        const int capacity = 20;
+        const int generations = 5;
+        var cache = new GenerationalCache<int, string>(capacity, generations);
+        var filler = 0;
+
+        // Rotation itself is never paused here. A factory retains each successive snapshot while
+        // its newest map fills, then finishes after demotion. The old algorithm leaves an extra
+        // entry in every retained map: slack accumulates across ages, even with just two callers.
+        for (var age = 0; age < generations - 1; age++)
+        {
+            using var computing = new ManualResetEventSlim();
+            using var resume = new ManualResetEventSlim();
+            var delayedKey = -age - 1;
+            Exception? workerFailure = null;
+            var worker = new Thread(() =>
+            {
+                try
+                {
+                    Assert.Equal(CountingFactory.Value(delayedKey), cache.GetOrAdd(delayedKey, key =>
+                    {
+                        computing.Set();
+                        if (!resume.Wait(TimeSpan.FromSeconds(10)))
+                            throw new TimeoutException("the test did not release its delayed factory");
+                        return CountingFactory.Value(key);
+                    }));
+                }
+                catch (Exception error)
+                {
+                    workerFailure = error;
+                }
+            }) { IsBackground = true, Name = "GenerationalCacheLateFactory" };
+
+            worker.Start();
+            try
+            {
+                Assert.True(computing.Wait(TimeSpan.FromSeconds(10)), "the factory never took its snapshot");
+                for (var i = 0; i < capacity / generations; i++)
+                    cache.GetOrAdd(filler++, CountingFactory.Value);
+            }
+            finally
+            {
+                resume.Set();
+                Assert.True(worker.Join(TimeSpan.FromSeconds(10)), "the delayed factory did not finish");
+            }
+            Assert.Null(workerFailure);
+            Assert.True(cache.TryPeek(delayedKey, out var value), "the late result was not admitted");
+            Assert.Equal(CountingFactory.Value(delayedKey), value);
+        }
+
+        for (var i = 0; i < capacity / generations - 1; i++)
+            cache.GetOrAdd(filler++, CountingFactory.Value);
+
+        Assert.True(cache.EntryCount <= cache.Capacity,
+            $"residency {cache.EntryCount} exceeded capacity {cache.Capacity} after late factories");
+        Assert.True(cache.Rotations >= generations - 1, "the test must span multiple demoted maps");
+    }
+
+    [Fact]
+    public void ConcurrentDuplicateInsertsReturnTheirAdmissionSlot()
+    {
+        const int capacity = 16;
+        const int generations = 2;
+        var cache = new GenerationalCache<int, string>(capacity, generations);
+        using var computing = new CountdownEvent(2);
+        using var resume = new ManualResetEventSlim();
+        var failures = new ConcurrentBag<Exception>();
+        var workers = new Thread[2];
+        for (var i = 0; i < workers.Length; i++)
+        {
+            workers[i] = new Thread(() =>
+            {
+                try
+                {
+                    Assert.Equal(CountingFactory.Value(-1), cache.GetOrAdd(-1, key =>
+                    {
+                        computing.Signal();
+                        if (!resume.Wait(TimeSpan.FromSeconds(10)))
+                            throw new TimeoutException("the test did not release its duplicate factories");
+                        return CountingFactory.Value(key);
+                    }));
+                }
+                catch (Exception error)
+                {
+                    failures.Add(error);
+                }
+            }) { IsBackground = true, Name = "GenerationalCacheDuplicate" };
+            workers[i].Start();
+        }
+        try
+        {
+            Assert.True(computing.Wait(TimeSpan.FromSeconds(10)), "both factories must miss before either inserts");
+        }
+        finally
+        {
+            resume.Set();
+            foreach (var worker in workers)
+                Assert.True(worker.Join(TimeSpan.FromSeconds(10)), "a duplicate caller did not finish");
+        }
+        Assert.Empty(failures);
+
+        // Only one of the duplicate results occupies a slot. Fill to one below the budget, then
+        // cross it: a leaked reservation would have rotated early.
+        for (var key = 0; key < capacity / generations - 2; key++)
+            cache.GetOrAdd(key, CountingFactory.Value);
+        Assert.Equal(0, cache.Rotations);
+        cache.GetOrAdd(capacity, CountingFactory.Value);
+        Assert.Equal(1, cache.Rotations);
+    }
+
+    [Fact]
+    public void AnInsertThatThrowsAfterPublicationKeepsItsAdmissionSlot()
+    {
+        const int capacity = 8;
+        const int generations = 2;
+        const int entriesPerMap = capacity / generations;
+        var cache = new GenerationalCache<int, string>(capacity, generations);
+
+        // Synthetic runtime-coupled fault injection, entirely in this test: ConcurrentDictionary
+        // publishes a node before its checked per-stripe count increment. Force that increment
+        // to overflow, demonstrating a real TryAdd exception AFTER publication without OOM.
+        // See dotnet/runtime v10.0.0 ConcurrentDictionary.TryAddInternal. No production seam.
+        const BindingFlags fields = BindingFlags.Instance | BindingFlags.NonPublic;
+        object ReadRequiredField(object owner, string name)
+        {
+            var field = owner.GetType().GetField(name, fields);
+            Assert.True(field is not null,
+                $"test layout changed: expected field {owner.GetType().FullName}.{name}");
+            var value = field!.GetValue(owner);
+            Assert.True(value is not null,
+                $"test layout changed: expected non-null {owner.GetType().FullName}.{name}");
+            return value!;
+        }
+
+        var current = ReadRequiredField(cache, "_current");
+        var maps = Assert.IsType<ConcurrentDictionary<int, string>[]>(ReadRequiredField(current, "Maps"));
+        Assert.NotEmpty(maps);
+        var map = maps[0];
+        var tables = ReadRequiredField(map, "_tables");
+        var counts = Assert.IsType<int[]>(ReadRequiredField(tables, "_countPerLock"));
+        Assert.NotEmpty(counts);
+
+        // int key 0 hashes to bucket/stripe 0. This private cache has no other callers or entries.
+        counts[0] = int.MaxValue;
+        try
+        {
+            Assert.Throws<OverflowException>(() => cache.GetOrAdd(0, CountingFactory.Value));
+        }
+        finally
+        {
+            // Repair the injected diagnostic count before any Count or subsequent insert. The
+            // dictionary itself owns the published node; never add it independently in the test.
+            counts[0] = map.ContainsKey(0) ? 1 : 0;
+        }
+
+        Assert.True(map.TryGetValue(0, out var published), "TryAdd must throw after publishing its node");
+        Assert.Equal(CountingFactory.Value(0), published);
+
+        for (var key = 1; key <= entriesPerMap; key++)
+            Assert.Equal(CountingFactory.Value(key), cache.GetOrAdd(key, CountingFactory.Value));
+
+        Assert.True(map.Count <= entriesPerMap,
+            $"a throwing published insert lost its slot: map has {map.Count} entries, budget {entriesPerMap}");
+        Assert.True(cache.Rotations > 0, "later callers must still rotate after the exceptional insert");
+        Assert.True(cache.EntryCount <= cache.Capacity);
     }
 
     [Fact]

@@ -116,6 +116,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
 
         if (_applyScratch.Count == 0) return;
 
+        var consumed = 0;
         try
         {
             // Sort closest first, then oldest first. List.Sort is unstable, so the sequence
@@ -129,8 +130,11 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
 
             var appliedCount = 0;
 
-            foreach (var (pos, chunk, meshData, revision, seq, distSq) in _applyScratch)
+            while (consumed < _applyScratch.Count)
             {
+                // This item now belongs to Return, ApplyMesh, or the budget requeue below.
+                // ApplyMesh returns its payload even if upload or bookkeeping throws.
+                var (pos, chunk, meshData, revision, seq, distSq) = _applyScratch[consumed++];
                 // Skip chunks that moved out of range of every focus, were unloaded, or were
                 // replaced by a freshly generated chunk at the same position while this build ran:
                 // uploading into the dead one would leave a mesh in Renderable that no unload ever
@@ -165,6 +169,13 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
         }
         finally
         {
+            // An interrupted apply must not discard the untouched tail. Preserve its sequence
+            // and revision; next frame still checks range, live ownership, and synchronous edits.
+            for (; consumed < _applyScratch.Count; consumed++)
+            {
+                var (pos, chunk, meshData, revision, seq, _) = _applyScratch[consumed];
+                _completedMeshQueue.Enqueue((pos, chunk, meshData, revision, seq));
+            }
             // Don't keep the chunk references alive between frames
             _applyScratch.Clear();
         }
@@ -276,18 +287,32 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
     /// </summary>
     private void ApplyMesh(Chunk chunk, ChunkMeshData meshData)
     {
-        MeshBeforeApplyForTests?.Invoke(chunk, meshData);
-        var wasMeshed = chunk.IsMeshed;
-        if (manager.Headless)
-            chunk.MarkMeshedHeadless(meshData);
-        else
-            chunk.UpdateMesh(meshData, opaqueGeometry, translucentGeometry);
-        // BufferSubData copies synchronously, so the lists can be recycled at once.
-        manager.MeshBuffers.Return(meshData);
-        renderLists.SyncRenderable(chunk);
-        // The first mesh makes the chunk count as "drawn" for the LOD cover test even when it is
-        // empty (all air, or enclosed) and therefore never enters Renderable
-        if (!wasMeshed) renderLists.MeshVersion++;
+        var poolReturnAttempted = false;
+        try
+        {
+            MeshBeforeApplyForTests?.Invoke(chunk, meshData);
+            var wasMeshed = chunk.IsMeshed;
+            if (manager.Headless)
+                chunk.MarkMeshedHeadless(meshData);
+            else
+                chunk.UpdateMesh(meshData, opaqueGeometry, translucentGeometry);
+            // BufferSubData copies synchronously, so the lists can be recycled at once.
+            poolReturnAttempted = true;
+            manager.MeshBuffers.Return(meshData);
+            renderLists.SyncRenderable(chunk);
+            // The first mesh makes the chunk count as "drawn" for the LOD cover test even when it is
+            // empty (all air, or enclosed) and therefore never enters Renderable
+            if (!wasMeshed) renderLists.MeshVersion++;
+        }
+        catch
+        {
+            // Upload may have partially changed GPU state. Discard this snapshot and let the
+            // ordinary dirty path rebuild, rather than retry a payload whose lists may be pooled.
+            if (manager.Chunks.TryGetValue(chunk.Position, out var live) && ReferenceEquals(live, chunk))
+                MarkDirtyKey(ChunkKey.Pack(chunk.Position));
+            if (!poolReturnAttempted) manager.MeshBuffers.Return(meshData);
+            throw;
+        }
     }
 
     /// <summary>

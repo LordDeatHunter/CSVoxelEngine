@@ -71,6 +71,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Audio/                       # the sfx library and the ambience bed
   Chunks/                      # chunk storage, keys and map, the chunk manager and its mesh scheduling, the
                                #   column cache, fluid surfaces, lava vents, EntityLight; the replay probes
+    MeshApplyRecoveryTests.cs  # interrupted applies preserve queued tails and return each owned buffer once
     Meshing/                   # greedy and per-voxel meshing, smooth light, the light volume, plant sway,
                                #   cell batches; the mesh-cost probe
     Sources/                   # the generated and imported world sources
