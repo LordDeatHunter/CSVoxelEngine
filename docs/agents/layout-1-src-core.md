@@ -500,7 +500,7 @@ OpenGLTest/
                                #   King and the floor-tier pile waves and limits
         Skeleton.cs            # the undead archer or warrior (a RealmMob, Role by kind): melee stab or punch at its impact
                                #   event, the archer's bow shot at its release event inside its band with a clear line (it
-                               #   backs away nearer), two attack clips over one count, its tier, outfit and wire look byte
+                               #   backs away nearer), two attack clips over one count, its role, outfit and wire look byte
         SkeletonRole.cs        # Archer / Warrior: how a tower skeleton fights, named by its entity kind
         SkeletonArmor.cs       # None / Leather / Copper: one piece of a skeleton's outfit
         SkeletonOutfit.cs      # GL-free: a skeleton's armor (one of 16 head/chest/legs outfits), its roll by role, its
