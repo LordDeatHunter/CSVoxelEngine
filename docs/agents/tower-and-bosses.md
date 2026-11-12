@@ -4,7 +4,7 @@ The skeleton, the battle tower with its king, the sandworm boss and the icebergs
 
 ### Skeleton
 
-Ambiently, `SkeletonRattle` (`src/Entities/TowerMobs/`, ticked by `World`) plays a random `skeleton_rattle_N` clip every
+Ambiently, `SkeletonRattle` (`src/Entities/TowerMobs/`, ticked by `World`, its timer an `AmbientCallTimer`) plays a random `skeleton_rattle_N` clip every
 12-35 s (`AudioConfig`) while a live skeleton is within 24 blocks of the camera; the sound is not positional. A landed hit plays a `skeleton_hit` clip and a killing one a `skeleton_death` clip, via
 `Mob.HitSoundGroup`/`DeathSoundGroup` (null for silence on other mobs) read by `MobStrikes.ShowLandedHit`.
 

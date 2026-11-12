@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 
 namespace VoxelEngine.Entities.Wildlife;
@@ -57,6 +58,12 @@ public sealed class Crow : FlyingAnimal
 
     /// <inheritdoc />
     public override WildlifeKind Kind => WildlifeKind.Crow;
+
+    /// <inheritdoc />
+    public override string? HitSoundGroup => SfxLibrary.CrowHitGroup;
+
+    /// <inheritdoc />
+    public override string? DeathSoundGroup => SfxLibrary.CrowDeathGroup;
 
     /// <inheritdoc />
     public override float BodyHeight => WildlifeConfig.CrowHeight;

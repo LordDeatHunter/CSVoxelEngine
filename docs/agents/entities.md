@@ -328,6 +328,9 @@ debugger take a new species from it instead of naming it; adding one means a cla
   it within `CrowThiefReach` (`TakeLoot`), then rests `CrowThiefCooldownSeconds`. Its rests prefer a tree top
   (`FlyingAnimal.ChoosePerchSpot`: leaf or wood within `FlyerPerchSearchRadiusBlocks`, given up after
   `FlyerPerchSeekSeconds`). It soars on its `glide` clip and pecks the dirt or caws while resting.
+  Its hits and kills play `crow_hit` and `crow_death` clips (`Mob.HitSoundGroup`/`DeathSoundGroup`). Separately, `CrowCaws`
+  (`src/Entities/Wildlife/`, ticked by `World`) plays a random `crow_caw` clip every `CrowCawMinSeconds`..`Max` (`AudioConfig`)
+  while a live crow is within `CrowCawRangeBlocks` of the camera; the sound is not positional.
 - **Dragonfly** (`Dragonfly`): the man-sized hunter of the waterside. A player within `DragonflyNoticeRangeBlocks` is
   prey: it holds itself over their head and darts in its `bite` clip, biting whoever is within `DragonflyBiteReach`
   at the impact. On the ground it plays `perch`. Riding one is a later task (`plans/TODO.md`).
