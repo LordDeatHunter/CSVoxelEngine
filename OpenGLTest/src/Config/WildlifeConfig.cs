@@ -142,12 +142,17 @@ public static class WildlifeConfig
     public const float CrowKnockbackLift = 1f;
     public const float CrowHabitMinSeconds = 3f;
     public const float CrowHabitMaxSeconds = 8f;
-    // Idle in the air with nowhere to go, a crow sinks at CrowIdleSinkSpeed; each flap (every
-    // CrowFlapMin..MaxSeconds) beats it up by CrowFlapBoostSpeed, so it drifts down in short lifts.
-    public const float CrowIdleSinkSpeed = 0.8f;
+    // Calm in the air (not harassing anyone, not after a prize) a crow holds no height: it falls under
+    // CrowGlideGravity until it sinks at CrowGlideSinkSpeed, and below where it is headed it flaps, each flap
+    // one play of its flap clip whose downstroke sets its climb to CrowFlapBoostSpeed (a hop of about
+    // boost^2 / 2 gravity blocks). It flaps every CrowFlapMin..MaxSeconds, back to back while more than
+    // CrowFlapClimbBlocks below its aim.
+    public const float CrowGlideSinkSpeed = 0.8f;
+    public const float CrowGlideGravity = 8f;
     public const float CrowFlapMinSeconds = 0.8f;
-    public const float CrowFlapMaxSeconds = 1.2f;
-    public const float CrowFlapBoostSpeed = 3.5f;
+    public const float CrowFlapMaxSeconds = 1.4f;
+    public const float CrowFlapBoostSpeed = 4f;
+    public const float CrowFlapClimbBlocks = 1f;
     public const float CrowAngerSeconds = 20f;
     public const float CrowThiefRangeBlocks = 16f;
     public const float CrowThiefReach = 0.9f;

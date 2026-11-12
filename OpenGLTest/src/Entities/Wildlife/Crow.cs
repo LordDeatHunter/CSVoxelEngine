@@ -29,9 +29,13 @@ public sealed class Crow : FlyingAnimal
     public const string TakeoffClip = "takeoff";
     public const string LandClip = "land";
     public const string GlideClip = "glide";
+    public const string FlapClip = "flap";
 
     /// <summary>Timeline event on the swoop and peck clips at which the beak strikes.</summary>
     public const string ImpactEvent = "impact";
+
+    /// <summary>Timeline event on the flap clip's downstroke, the moment the flap lifts the crow.</summary>
+    public const string BeatEvent = "beat";
 
     // The counted action clips (RealmMob.StartAttack), which a client's mirror replays by this index
     private const int SwoopAction = 0;
@@ -39,6 +43,7 @@ public sealed class Crow : FlyingAnimal
     private const int CawAction = 2;
     private const int TakeoffActionIndex = 3;
     private const int LandActionIndex = 4;
+    private const int FlapActionIndex = 5;
 
     /// <summary>How the crow flies.</summary>
     public static readonly FlightTuning Tuning = new(
@@ -79,7 +84,7 @@ public sealed class Crow : FlyingAnimal
     public override string AttackClip => SwoopClip;
 
     /// <inheritdoc />
-    protected override int AttackVariants => 5;
+    protected override int AttackVariants => 6;
 
     /// <inheritdoc />
     protected override string AttackClipOf(int variant) => variant switch
@@ -88,16 +93,18 @@ public sealed class Crow : FlyingAnimal
         CawAction => CawClip,
         TakeoffActionIndex => TakeoffClip,
         LandActionIndex => LandClip,
+        FlapActionIndex => FlapClip,
         _ => SwoopClip,
     };
 
     /// <inheritdoc />
     protected override (string Idle, string Move) GroundClips => (EntityAnimator.IdleClip, EntityAnimator.WalkClip);
 
-    // In the air even its idle is a wing beat; with nobody to harass it soars on set wings
+    // Chasing, even its idle is a wing beat; calm it holds set wings and glides down, and each flap
+    // (TickFlaps) plays the flap clip once
     /// <inheritdoc />
     protected override (string Idle, string Move) AirClips(bool chasing) =>
-        (EntityAnimator.FlyClip, chasing ? EntityAnimator.FlyClip : GlideClip);
+        chasing ? (EntityAnimator.FlyClip, EntityAnimator.FlyClip) : (GlideClip, GlideClip);
 
     /// <inheritdoc />
     protected override int TakeoffAction => TakeoffActionIndex;
@@ -115,12 +122,13 @@ public sealed class Crow : FlyingAnimal
     public static bool InSwoopReach(Vector3 center, Vector3 eye) =>
         Vector3.DistanceSquared(center, ChestOf(eye)) <= WildlifeConfig.CrowStrikeReach * WildlifeConfig.CrowStrikeReach;
 
-    /// <summary>Throws, naming the model file, unless the model is a flyer's rig with every clip the crow plays
-    /// and the impact event on its swoop and its peck.</summary>
+    /// <summary>Throws, naming the model file, unless the model is a flyer's rig with every clip the crow plays,
+    /// the impact event on its swoop and its peck and the beat event on its flap.</summary>
     public static void ValidateContent(EntityType type)
     {
         EntityContract.RequireFlyer(type, "Crow", SwoopClip, ImpactEvent);
         EntityContract.RequireEvent(type, "Crow", EntityContract.RequireClip(type, "Crow", PeckClip), ImpactEvent);
+        EntityContract.RequireEvent(type, "Crow", EntityContract.RequireClip(type, "Crow", FlapClip), BeatEvent);
         foreach (var clip in (string[])[EntityAnimator.WalkClip, GlideClip, CawClip, TakeoffClip, LandClip])
             EntityContract.RequireClip(type, "Crow", clip);
     }
@@ -258,25 +266,32 @@ public sealed class Crow : FlyingAnimal
             return;
         }
 
-        // Idle with nowhere to go it sinks, and each flap lifts it a little instead of holding a hover height
-        if (goal == null)
-        {
-            TickFlaps(deltaTime);
-            Fly(null, chasing: false, MoveFactor, deltaTime, chunks, WildlifeConfig.CrowIdleSinkSpeed);
-            return;
-        }
-
-        Fly(goal, chasing: false, MobConfig.MobWanderSpeedFactor * MoveFactor, deltaTime, chunks);
+        // Calm, to a perch, a stroll or nowhere, it never holds a height: it glides down on set wings and flaps
+        // itself back up whenever it has sunk below where it is headed. Nor does it stall over a stroll's
+        // point: nearing one, it is already turning for the next.
+        if (goal is { } point && !HeadsForPerch && NearHorizontally(point, MobConfig.MobFlightArriveBlocks))
+            ForgetWanderGoal();
+        var speedFactor = goal == null ? MoveFactor : MobConfig.MobWanderSpeedFactor * MoveFactor;
+        Fly(goal, chasing: false, speedFactor, deltaTime, chunks,
+            (WildlifeConfig.CrowGlideSinkSpeed, WildlifeConfig.CrowGlideGravity));
+        TickFlaps(deltaTime);
     }
 
-    // Each flap, when its timer runs out, beats the wings and boosts the crow upward; the steering then eases it
-    // back into its sink
+    private bool NearHorizontally(Vector3 point, float blocks) =>
+        Vector2.DistanceSquared(new Vector2(Position.X, Position.Z), new Vector2(point.X, point.Z)) < blocks * blocks;
+
+    // One flap is one play of the flap clip, and its downstroke (BeatEvent) is the one boost it gives. Below its
+    // aim it flaps every CrowFlapMin..MaxSeconds, back to back while more than CrowFlapClimbBlocks under it;
+    // above it, it only glides. Never over another clip (a take-off, a caw) or while dying.
     private void TickFlaps(float deltaTime)
     {
+        if (Animation.ConsumeEvent(BeatEvent)) SetVelocity(Velocity with { Y = WildlifeConfig.CrowFlapBoostSpeed });
         _flapIn -= deltaTime;
-        if (_flapIn > 0f) return;
+        var below = FlightAimHeight - Position.Y;
+        if (IsDying || below <= 0f || Animation.IsActionPlaying) return;
+        if (_flapIn > 0f && below < WildlifeConfig.CrowFlapClimbBlocks) return;
         _flapIn = Roll(WildlifeConfig.CrowFlapMinSeconds, WildlifeConfig.CrowFlapMaxSeconds);
-        SetVelocity(Velocity with { Y = Velocity.Y + WildlifeConfig.CrowFlapBoostSpeed });
+        StartAttack(FlapActionIndex);
     }
 
     /// <inheritdoc />

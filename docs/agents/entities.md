@@ -325,9 +325,13 @@ debugger take a new species from it instead of naming it; adding one means a cla
   within `CrowNoticeRangeBlocks` draws it: it circles overhead and swoops (its `swoop` clip flown at the chest),
   raking whoever is within `CrowStrikeReach` at the impact; on the ground it pecks an ankle within `CrowPeckReach`.
   Calm, it flies down to the nearest loose item within `CrowThiefRangeBlocks` (`WildlifeManager.SendThieves`) and takes
-  it within `CrowThiefReach` (`TakeLoot`), then rests `CrowThiefCooldownSeconds`. Idle in the air with no goal it does
-  not hover: it sinks at `CrowIdleSinkSpeed` (`RiggedMob.Fly`'s `sink`), and each flap (every `CrowFlapMinSeconds`..`Max`,
-  `Crow.TickFlaps`) boosts it up by `CrowFlapBoostSpeed`, so it drifts down in short lifts until it lands. Its rests prefer a tree top
+  it within `CrowThiefReach` (`TakeLoot`), then rests `CrowThiefCooldownSeconds`. Calm in the air (to a wander
+  point, a perch or nowhere) it never holds a height: on its `glide` pose it falls under `CrowGlideGravity` until it
+  sinks at `CrowGlideSinkSpeed` (`RiggedMob.Fly`'s `glide`), and nearing a wander point it already picks the next
+  (`Mob.ForgetWanderGoal`), so it never stalls over one. While below the height `Fly` aims for (`RiggedMob.FlightAimHeight`: the goal under the
+  hover-band floor rule) it flaps (`Crow.TickFlaps`). One flap is one play of the `flap` clip, and only its downstroke's
+  `beat` event lifts it (climb set to `CrowFlapBoostSpeed`): every `CrowFlapMinSeconds`..`Max`, back to back while more
+  than `CrowFlapClimbBlocks` below its aim, never above it. Its rests prefer a tree top
   (`FlyingAnimal.ChoosePerchSpot`: leaf or wood within `FlyerPerchSearchRadiusBlocks`, given up after
   `FlyerPerchSeekSeconds`). It soars on its `glide` clip and pecks the dirt or caws while resting.
   Its hits and kills play `crow_hit` and `crow_death` clips (`Mob.HitSoundGroup`/`DeathSoundGroup`). Separately, `CrowCaws`

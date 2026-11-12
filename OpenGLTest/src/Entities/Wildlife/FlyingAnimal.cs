@@ -110,6 +110,10 @@ public abstract class FlyingAnimal : Animal
         FlyToward(target, Errand ?? _perchSpot ?? wander, deltaTime, chunks);
     }
 
+    /// <summary>Whether its air time is up and it is flying to the perch it chose
+    /// (<see cref="ChoosePerchSpot"/>), the goal <see cref="FlyToward"/> is then given.</summary>
+    protected bool HeadsForPerch => _perchSpot != null;
+
     /// <summary>One frame of flight: toward its place over <paramref name="target"/> (or at it, mid-attack),
     /// to <paramref name="wander"/>, or hovering where it is.</summary>
     protected abstract void FlyToward(IMobTarget? target, Vector3? goal, float deltaTime, ChunkManager chunks);

@@ -224,6 +224,39 @@ public sealed class WildlifeTests
     }
 
     [Fact]
+    public void ACalmCrowInTheAirOnlyRisesOnAFlapAndEachFlapLiftsItOnce()
+    {
+        var chunks = WideFloor();
+        var manager = NewManager();
+        var crow = Airborne<Crow>(manager, Crow.EntityName, 8f, 8f);
+        // In play (so it has wander goals), but far beyond anything it reacts to
+        var player = PlayerAt(8f + 60f, 8f);
+        var drops = new DropManager();
+
+        int flaps = 0, lifts = 0;
+        var lastCount = crow.AttackCount;
+        var lastClimb = crow.Velocity.Y;
+        for (var t = 0f; t < WildlifeConfig.FlyerAirMinSeconds - 1f && !crow.IsPerched; t += Dt)
+        {
+            manager.Update(Dt, chunks, drops, [player]);
+            var flapping = crow.Animation.IsPlaying(Crow.FlapClip);
+            if (crow.AttackCount != lastCount && crow.AttackClipFor(crow.AttackCount) == Crow.FlapClip) flaps++;
+            // The steering only eases the climb a little each frame; a sudden kick upward is a wing beat
+            if (crow.Velocity.Y - lastClimb > 1f)
+            {
+                lifts++;
+                Assert.True(flapping, $"the crow shot up at t = {t} without flapping");
+            }
+            lastCount = crow.AttackCount;
+            lastClimb = crow.Velocity.Y;
+        }
+
+        Assert.True(flaps > 0, "a calm crow kept itself up without ever flapping");
+        // The last flap may still be on its upstroke when the run ends
+        Assert.InRange(lifts, flaps - 1, flaps);
+    }
+
+    [Fact]
     public void ACrowHarassesAPlayerItNoticesAndLeavesADistantOneAlone()
     {
         var chunks = WideFloor();

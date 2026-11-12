@@ -90,6 +90,10 @@ public abstract class RiggedMob : Mob
     /// (0 for a walker): over a chased target's eye (<see cref="FlightSteering.ChaseGoal"/>) or the floor.</summary>
     public float HoverHeight { get; }
 
+    /// <summary>The body-center height the last <see cref="Fly"/> steered to (its goal under the floor rule,
+    /// bob included), which a gliding flyer reads to decide when to beat back up.</summary>
+    protected float FlightAimHeight { get; private set; }
+
     /// <summary>Height of the collision body; <see cref="Mob.Position"/> is its center.</summary>
     public abstract float BodyHeight { get; }
 
@@ -305,11 +309,13 @@ public abstract class RiggedMob : Mob
     /// walls by the probe, at <paramref name="speedFactor"/> of the tuning. The body then sweeps through
     /// <see cref="BoxSweep"/> like any mob, so it never enters a solid cell. It faces its goal, plays the
     /// fly clip by its 3D speed and pitches and banks. A dying flyer drops out of the sky. A non-null
-    /// <paramref name="sink"/> replaces the height steering with a steady descent at that speed (a crow
-    /// idling with nowhere to go); the floor, the walls and the body sweep still stop it.
+    /// <paramref name="glide"/> replaces the height steering: the flyer falls under its <c>Gravity</c> down to a
+    /// steady descent at its <c>Sink</c> speed (a calm crow gliding, which flaps itself back up to
+    /// <see cref="FlightAimHeight"/>, so a flap's lift is a hop that arcs over rather than a nudge the steering
+    /// swallows); the wall probe's climb, the floor and the body sweep still apply.
     /// </summary>
     protected void Fly(Vector3? goal, bool chasing, float speedFactor, float deltaTime, ChunkManager chunks,
-        float? sink = null)
+        (float Sink, float Gravity)? glide = null)
     {
         if (Flight is not { } flight)
             throw new InvalidOperationException($"Entity '{Type.Name}' has no flight tuning and cannot fly.");
@@ -329,11 +335,16 @@ public abstract class RiggedMob : Mob
             var aim = goal ?? Position with { Y = groundTop is { } floor ? floor + half.Y + HoverHeight : Position.Y };
             aim.Y = FlightSteering.GoalHeight(aim.Y + FlightSteering.BobOffset(_flightClock, _bobPhase, flight),
                 groundTop, half.Y, flight, overGround: !chasing);
+            FlightAimHeight = aim.Y;
 
             var desired = FlightSteering.DesiredVelocity(Position, aim, flight, speedFactor);
-            if (sink is { } descent) desired.Y = -descent;
+            if (glide is { } g) desired.Y = -g.Sink;
             desired = FlightSteering.AvoidSolids(Position, half, desired, flight.VerticalSpeed * speedFactor, chunks);
-            _velocity = BodyMotion.Steer(_velocity, desired, flight.Acceleration, deltaTime);
+            var steered = BodyMotion.Steer(_velocity, desired, flight.Acceleration, deltaTime);
+            // Gliding with no wall to climb, it falls under its own weight until it sinks at the glide speed
+            if (glide is { } fall && desired.Y <= -fall.Sink && _velocity.Y > -fall.Sink)
+                steered.Y = MathF.Max(_velocity.Y - fall.Gravity * deltaTime, -fall.Sink);
+            _velocity = steered;
 
             var toGoal = new Vector3(aim.X - Position.X, 0f, aim.Z - Position.Z);
             if (toGoal.LengthSquared() > MobConfig.MobFlightArriveBlocks * MobConfig.MobFlightArriveBlocks)

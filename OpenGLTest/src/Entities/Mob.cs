@@ -191,9 +191,12 @@ public abstract class Mob
         var index = MobTargets.Nearest(targets, Position);
         var chases = _interest.Update(index >= 0 ? targets[index] : null, SightOrigin, deltaTime, chunks);
         if (!chases) return -1;
-        _hasWanderGoal = false;
+        ForgetWanderGoal();
         return index;
     }
+
+    /// <summary>Drops the current wander goal, so the next <see cref="WanderGoal"/> picks a fresh one.</summary>
+    protected void ForgetWanderGoal() => _hasWanderGoal = false;
 
     /// <summary>
     /// Where a mob that chases nobody strolls to: a goal <see cref="MobInterest.WanderPoint"/> picks
