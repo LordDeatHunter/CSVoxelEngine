@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using VoxelEngine.Chunks.Sources;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Climate;
@@ -74,25 +75,38 @@ internal sealed class SelectionPasses : IDisposable
     /// so the block appears to jump out of the terrain.
     /// </summary>
     internal void RenderBlockPop(Camera camera, Vector3 blockPosition, ushort blockId, float grow,
-        BlockHitbox[]? boxes = null)
+        BlockHitbox[]? boxes = null, BakedModel? model = null)
     {
         var type = BlockType.ById[blockId];
         if (type == null) return;
 
         boxes ??= BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
-        if (boxes.Length > _popBoxCapacity)
-            GrowPopBuffers(boxes.Length);
+        var needed = model != null
+            ? (model.Quads.Length + PopBoxEmitter.MaxQuadsPerBox - 1) / PopBoxEmitter.MaxQuadsPerBox
+            : boxes.Length;
+        if (needed > _popBoxCapacity)
+            GrowPopBuffers(needed);
 
         _popVerts.Clear();
         _popIndices.Clear();
         ushort indexOffset = 0;
         var grownVec = new Vector3(grow);
-        foreach (var box in boxes)
+        var treeWood = BlockType.IsTreeWood(blockId);
+        // A facing block pops as its turned model, not as a cube of its hitboxes
+        if (model != null)
         {
-            var half = (box.Size + grownVec) * 0.5f;
-            var grown = new BlockHitbox(box.Center - half, box.Center + half);
-            PopBoxEmitter.EmitBox(_popVerts, _popIndices, ref indexOffset,
-                grown, box, blockPosition, type.FaceTiles, type.BiomeTint);
+            PopBoxEmitter.EmitModel(_popVerts, _popIndices, ref indexOffset, model, grow, blockPosition);
+        }
+        else
+        {
+            foreach (var box in boxes)
+            {
+                var half = (box.Size + grownVec) * 0.5f;
+                var grown = new BlockHitbox(box.Center - half, box.Center + half);
+                PopBoxEmitter.EmitBox(_popVerts, _popIndices, ref indexOffset,
+                    grown, box, blockPosition, type.FaceTiles, type.BiomeTint,
+                    treeWood ? PopBoxEmitter.TubeAxis(box) : -1);
+            }
         }
         if (_popVerts.Count == 0) return;
 

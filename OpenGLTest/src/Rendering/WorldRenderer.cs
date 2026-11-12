@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.Windowing;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
@@ -242,7 +243,8 @@ internal sealed class WorldRenderer
                 // mesh on screen, since the popped whole cube would cover the bite
                 if (popGrow > 0f && !LeftClick.ShowsEatenFace)
                     renderManager.Selection.RenderBlockPop(Camera, LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId, popGrow,
-                        HitboxesAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId));
+                        HitboxesAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId),
+                        FacingModelAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId));
 
                 var selectedId = Edits.BlockIdAt(LeftClick.SelectedBlockPosition);
                 renderManager.Selection.RenderBlockSelection(Camera, LeftClick.SelectedBlockPosition, LeftClick.SelectedFaceNormal, popGrow,
@@ -258,7 +260,8 @@ internal sealed class WorldRenderer
             // whose own out-and-back pop is already playing there
             if (placePopGrow > 0f && !(LeftClick.IsBreaking && LeftClick.BreakingBlockPosition == Placer.PlacePopPosition))
                 renderManager.Selection.RenderBlockPop(Camera, Placer.PlacePopPosition, Placer.PlacePopId, placePopGrow,
-                    HitboxesAt(Placer.PlacePopPosition, Placer.PlacePopId));
+                    HitboxesAt(Placer.PlacePopPosition, Placer.PlacePopId),
+                    FacingModelAt(Placer.PlacePopPosition, Placer.PlacePopId));
 
             renderManager.GpuTimer.EndGpuPass(ProfileSection.SelectPass);
             FrameProfiler.End(ProfileSection.SelectPass);
@@ -357,6 +360,16 @@ internal sealed class WorldRenderer
     /// Hitboxes for the outline, break overlay and mining pop: the cell's drawn shape resolved
     /// from the live world exactly as the raycast aims at it (see <see cref="BlockShape"/>).
     /// </summary>
+    /// <summary>The model a facing block (a hollow log) is drawn with at this cell, turned to its
+    /// state's facing, or null for any other block (it pops as its hitboxes).</summary>
+    private BakedModel? FacingModelAt(Vector3 blockPos, ushort blockId)
+    {
+        var type = BlockType.ById[blockId];
+        if (type is not { HasHorizontalFacing: true, RotatedModels: { } models }) return null;
+        var state = _chunkManager.GetStateGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
+        return models[BlockType.ShapeIndex(state, models.Length)];
+    }
+
     private BlockHitbox[] HitboxesAt(Vector3 blockPos, ushort blockId) =>
         BlockShape.BoxesAt(blockId, _chunkManager, (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
 }
