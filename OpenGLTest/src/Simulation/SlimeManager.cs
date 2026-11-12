@@ -48,9 +48,10 @@ public sealed class SlimeManager : IMobPopulation
         _caps.Register(this);
     }
 
-    /// <summary>Plays a sound group by name (singleplayer and the client only, set by <c>World</c>); a
-    /// slime's hop and landing call it with their groups. Null on a headless server, so nothing plays there.</summary>
-    public Action<string>? PlaySound { get; set; }
+    /// <summary>Plays a sound group at a position (set by <c>World</c> where the slimes are simulated: singleplayer,
+    /// and a server, which sends it to the players near it); a slime's hop and landing call it with their groups at
+    /// the slime. Null on a client, whose mirrors hear the server's.</summary>
+    public Action<string, Vector3>? PlaySound { get; set; }
 
     /// <summary>Every slime still drawn: the living ones plus any playing their death
     /// (<see cref="Mob.IsDying"/>), which are no longer targets and do not count toward the cap.</summary>
@@ -106,15 +107,11 @@ public sealed class SlimeManager : IMobPopulation
     {
         if (_caps.ForcedRoom <= 0) return null;
         var slime = new Slime(_type, position, size);
-        slime.Hopped += OnSlimeHopped;
-        slime.Landed += OnSlimeLanded;
+        slime.Hopped += () => PlaySound?.Invoke(SfxLibrary.SlimeJumpGroup, slime.Position);
+        slime.Landed += () => PlaySound?.Invoke(SfxLibrary.SlimeLandGroup, slime.Position);
         _slimes.Add(slime);
         return slime;
     }
-
-    private void OnSlimeHopped() => PlaySound?.Invoke(SfxLibrary.SlimeJumpGroup);
-
-    private void OnSlimeLanded() => PlaySound?.Invoke(SfxLibrary.SlimeLandGroup);
 
     /// <summary>Ticks the slimes against the one local player (singleplayer and the tests); see
     /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget}, float, BlockDebrisSystem)"/>.</summary>

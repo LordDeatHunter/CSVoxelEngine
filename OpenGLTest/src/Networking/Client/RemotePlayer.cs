@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Interaction;
 using VoxelEngine.Player;
 
@@ -60,8 +61,9 @@ public sealed class RemotePlayer
 
     public PlayerModel Model { get; }
 
-    /// <summary>Adopts the latest broadcast pose; the first one snaps, later ones smooth.</summary>
-    public void SetTarget(Vector3 eye, float yaw, float pitch,
+    /// <summary>Adopts the latest broadcast pose; the first one snaps, later ones smooth. Returns the swing this
+    /// broadcast started, <see cref="NetPlayerAction.None"/> when it started none.</summary>
+    public NetPlayerAction SetTarget(Vector3 eye, float yaw, float pitch,
         NetPlayerFlags flags = NetPlayerFlags.None, NetPlayerAction action = NetPlayerAction.None, byte actionSeq = 0,
         ArmorLook? armor = null)
     {
@@ -84,11 +86,22 @@ public sealed class RemotePlayer
 
         // The counter moves on every swing; the first sighting only records it, so a player already
         // mid-session does not swing the moment they come into view.
-        if (_hasAction && actionSeq != _lastActionSeq)
-            PlayAction(action);
+        var started = _hasAction && actionSeq != _lastActionSeq ? action : NetPlayerAction.None;
+        PlayAction(started);
         _lastActionSeq = actionSeq;
         _hasAction = true;
+        return started;
     }
+
+    /// <summary>The sound a swing makes for those watching, as the swinger's own client plays it: a blade's swoosh
+    /// and a staff's cast; a punch or a throw makes none (a punch's hit is the struck block's or mob's own).</summary>
+    public static string? SoundOf(NetPlayerAction action) => action switch
+    {
+        NetPlayerAction.Slice or NetPlayerAction.SliceReturn or NetPlayerAction.SwordCut or NetPlayerAction.SwordBackCut
+            or NetPlayerAction.SwordChop => SfxLibrary.SwooshGroup,
+        NetPlayerAction.Cast => SfxLibrary.SpellCastGroup,
+        _ => null,
+    };
 
     private void PlayAction(NetPlayerAction action)
     {

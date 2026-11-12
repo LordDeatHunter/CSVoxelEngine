@@ -187,6 +187,9 @@ public class World
 
     internal FloorConqueredEffects? ConqueredEffects { get; }
 
+    /// <summary>Where every component sends its sounds (played here, or queued for nearby players on a server).</summary>
+    public WorldSounds Sounds { get; }
+
     /// <summary>The block edit paths: breaking, felling, multiblocks, tall blocks, toppling trees, edit reports.</summary>
     internal BlockEditor Edits { get; }
 
@@ -217,7 +220,7 @@ public class World
     /// <summary>The cosmetic side of casts (the cast burst and sounds, a client's preview bolts); null on a headless server.</summary>
     internal SpellFeedback? Feedback { get; }
 
-    // The skeletons' ambient rattle; null without audio or on a headless server
+    // The skeletons' ambient rattle and the crows' caws; null on a headless server
     private readonly SkeletonRattle? _skeletonRattle;
     private readonly CrowCaws? _crowCaws;
 
@@ -444,6 +447,7 @@ public class World
         {
             _window = window;
             _saveStore = saveStore;
+            Sounds = new WorldSounds(sfx, serverMode);
             _serverMode = serverMode;
             _clientMode = clientMode;
             // A client never searches the worldgen spawn: it has no terrain of its own, so it
@@ -542,8 +546,10 @@ public class World
                 _icebergs = new IcebergManager(icebergType);
             Camera.BodySolids = _icebergs;
             // The per-job components: each only stores its references here and reads this world lazily
-            Strikes = new MobStrikes(this, _debris, sfx, serverMode);
-            ChestLids.LidStarted += opening => sfx?.Play(opening ? SfxLibrary.ChestOpenGroup : SfxLibrary.ChestCloseGroup);
+            Strikes = new MobStrikes(this, _debris, Sounds, serverMode);
+            // Each side sounds the lids it sees swing (they follow the viewers everywhere), so a server never sends them
+            if (!serverMode) ChestLids.LidStarted += (c, open) => Sounds.PlayAt(open ? SfxLibrary.ChestOpenGroup
+                : SfxLibrary.ChestCloseGroup, new Vector3(c.X + 0.5f, c.Y + 0.5f, c.Z + 0.5f));
             Shrapnel = new BoneShrapnel(this, _chunkManager, _debris, serverMode);
             Ambient = new AmbientEffects(this, _chunkManager, _fire, _torchFire, _bubbles, _debris, _dropManager,
                 _falling, _tntManager, _mobs, _projectiles, serverMode, _campfires, _kilns, _goblins);
@@ -559,8 +565,8 @@ public class World
             if (!serverMode)
                 CollapseEffects = new TowerCollapseEffects(Camera, _debris, _chunkManager, _towers);
             if (!serverMode)
-                ConqueredEffects = new FloorConqueredEffects(Camera, _fire, _towers, sfx);
-            LeftClick =new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, sfx, clientMode);
+                ConqueredEffects = new FloorConqueredEffects(Camera, _fire, _towers, Sounds);
+            LeftClick = new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, clientMode);
             Placer = new BlockPlacer(this, _chunkManager, _falling, _icebergs, _querns, _fluidManager, _leafDecay,
                 _lodManager, _debris, clientMode, serverMode);
             Throws = new ThrowAction(this, _chunkManager, _dropManager, _goblins, _hellMobs, _caveMobs, _skeletons, _kings, _mobs,
@@ -575,7 +581,7 @@ public class World
                 _skyMobs, _wildlife, _caveMobs, _skeletons, _kings, _sandworms, _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
             Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _wildlife, _caveMobs, _skeletons,
                 _kings, _sandworms, _icebergs, _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
-            Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, sfx, serverMode, clientMode);
+            Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, serverMode, clientMode);
             WaystoneTravel = new WaystoneTravel(Camera, LocalPlayer, _chunkManager);
             // Status effects convert cells only where the world is authoritative: a client's effects
             // are mirrors, and the server's writes reach it through the journal
@@ -588,16 +594,14 @@ public class World
                 _mobCaps, _wildlife);
             Spells = statusBlocks == null
                 ? null
-                : new SpellEffects(this, _chunkManager, statusBlocks, ItemUse, _debris, sfx, serverMode);
+                : new SpellEffects(this, _chunkManager, statusBlocks, ItemUse, _debris, serverMode);
             if (Spells != null) Caster.Effect = Spells.Cast;
-            Feedback = serverMode ? null : new SpellFeedback(this, _chunkManager, _debris, sfx, clientMode);
+            Feedback = serverMode ? null : new SpellFeedback(this, _chunkManager, _debris, clientMode);
             if (Feedback != null) Caster.Feedback = Feedback.OnCast;
-            if (sfx != null && !serverMode)
-            {
-                _skeletonRattle = new SkeletonRattle(sfx.Play, Random.Shared);
-                _crowCaws = new CrowCaws(sfx.Play, Random.Shared);
-                if (_slimes != null) _slimes.PlaySound = sfx.Play;
-            }
+            // The ambient calls are each side's own; a slime's hop is the simulation's, so a client hears the server's
+            _skeletonRattle = serverMode ? null : new SkeletonRattle((group, at) => Sounds.PlayAt(group, at), Random.Shared);
+            _crowCaws = serverMode ? null : new CrowCaws((group, at) => Sounds.PlayAt(group, at), Random.Shared);
+            if (_slimes != null && !clientMode) _slimes.PlaySound = (group, at) => Sounds.PlayAt(group, at);
             Renderer = new WorldRenderer(this, _window, _chunkManager, _lodManager, _dropManager, _tntManager, _falling,
                 _goblins, _campfires, _querns, _kilns, _casting, _toppling, _projectiles, _remotePlayers, _debris,
                 _leaves, _fire, _lavaFire, _torchFire, _bubbles, _sliceTrails, _health, _hotbarName, _hotbarPops);

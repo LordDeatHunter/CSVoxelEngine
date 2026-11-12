@@ -25,7 +25,6 @@ internal sealed class DropPickup
     private readonly ChunkManager _chunkManager;
     private readonly GoblinManager? _goblins;
     private readonly FireParticleSystem _fire;
-    private readonly SfxManager? _sfx;
     private readonly bool _serverMode;
     private readonly bool _clientMode;
 
@@ -35,14 +34,13 @@ internal sealed class DropPickup
     private IReadOnlyList<ServerPlayer> ServerPlayers => _world.ServerPlayers;
 
     internal DropPickup(World world, DropManager dropManager, ChunkManager chunkManager, GoblinManager? goblins,
-        FireParticleSystem fire, SfxManager? sfx, bool serverMode, bool clientMode)
+        FireParticleSystem fire, bool serverMode, bool clientMode)
     {
         _world = world;
         _dropManager = dropManager;
         _chunkManager = chunkManager;
         _goblins = goblins;
         _fire = fire;
-        _sfx = sfx;
         _serverMode = serverMode;
         _clientMode = clientMode;
         _canAcceptDrop = Inventory.CanAccept;
@@ -132,7 +130,7 @@ internal sealed class DropPickup
 
         if (pickedUp)
         {
-            _sfx?.Play(SfxLibrary.PickupGroup);
+            _world.Sounds.Play(SfxLibrary.PickupGroup);
             // Bright motes pop where the drop was collected, at the chest
             _fire.Puff(Camera.Position - new Vector3(0f, JuiceConfig.PickupSparkleDrop, 0f),
                 JuiceConfig.PickupSparkleCount, JuiceConfig.PickupSparkleSpread,

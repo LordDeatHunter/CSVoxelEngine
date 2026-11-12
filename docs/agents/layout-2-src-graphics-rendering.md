@@ -192,6 +192,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       NetProtocol.cs           # NetMessage ids, length-prefixed framing, PacketWriter/PacketReader
       PlayerStatusCodec.cs     # PlayerStatusData (modes, health, dead, knockback) and its bounds-checked wire form
       ServerAddress.cs         # host[:port] parsing and formatting (the default port)
+      SoundEventCodec.cs       # the SoundEvents frame (group, position per sound), bounds-checked, and which
+                               #   queued sounds one player is sent (in earshot, not its own)
       StationNetCodec.cs       # the StationState snapshot: campfires, querns, kilns, cast molds
       WaystoneNetCodec.cs      # the waystone messages: the rename request, a player's rows (WaystoneNetRow) and the
                                #   activation answer (WaystoneOpened), bounds-checked

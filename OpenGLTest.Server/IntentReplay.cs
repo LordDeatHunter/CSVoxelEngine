@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
 using VoxelEngine.Magic;
@@ -190,6 +191,7 @@ internal sealed class IntentReplay
         player.Breaking.Start(intent.X, intent.Y, intent.Z, id, state, inventory.HeldItem,
             inventory.SelectedBlockId, inventory.SelectedToolInstance, _state.Elapsed,
             inventory.Equipment.Stats.MiningFactor);
+        SoundHit(player, intent, id);
         return true;
     }
 
@@ -204,8 +206,16 @@ internal sealed class IntentReplay
         var inventory = player.Inventory;
         var verdict = player.Breaking.Complete(intent.X, intent.Y, intent.Z, id, inventory.SelectedBlockId,
             inventory.SelectedToolInstance, player.Creative, _state.Elapsed, NetworkConfig.NetBreakSlackSeconds);
-        return verdict == BreakVerdict.Break && _state.World.BreakBlockFor(player.Context, intent.Cell);
+        if (verdict != BreakVerdict.Break || !_state.World.BreakBlockFor(player.Context, intent.Cell))
+            return false;
+        SoundHit(player, intent, id);
+        return true;
     }
+
+    // A mining or hammer blow's hit sound at the cell, for the players near it but the one whose own client already
+    // played it. The others hear a break's first blow and its last, not every one between.
+    private void SoundHit(ServerPlayer player, in WorldIntent intent, ushort id) =>
+        _state.World.Sounds.PlayAt(SfxLibrary.HitGroupOf(id), intent.Cell + new Vector3(0.5f), player.Id);
 
     /// <summary>
     /// One hammer hit on the anvil the intent names: a smithing hammer in hand, the player's own ray landing on
@@ -218,7 +228,11 @@ internal sealed class IntentReplay
         if (!Mining.IsHammer(held) || !AimsAt(player, intent, out _))
             return false;
         var gap = Mining.HitGapSeconds(held, player.Inventory.Equipment.Stats.MiningFactor);
-        return _state.World.HammerFor(intent.Cell, gap, BloomeryConfig.HammerSlackSeconds).Kind != AnvilHitKind.Refused;
+        if (_state.World.HammerFor(intent.Cell, gap, BloomeryConfig.HammerSlackSeconds).Kind == AnvilHitKind.Refused)
+            return false;
+        if (TryMineable(intent, out var anvil, out _))
+            SoundHit(player, intent, anvil);
+        return true;
     }
 
     /// <summary>

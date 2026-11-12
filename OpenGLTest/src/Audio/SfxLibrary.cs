@@ -86,6 +86,10 @@ public static class SfxLibrary
     /// <summary>Group played when a blade (slice, sword or axe chop) starts a swing: a swoosh.</summary>
     public const string SwooshGroup = "swoosh";
 
+    /// <summary>The group a hit on (or the mining of) a block plays: its authored <c>sfx</c>, the default for an
+    /// unknown or air id, which is also what a block with no authored sfx plays.</summary>
+    public static string HitGroupOf(ushort blockId) => BlockType.ById[blockId]?.Sfx ?? DefaultGroup;
+
     /// <summary>
     /// Every group directly under <paramref name="root"/> (subfolders are ignored, so the
     /// ambience tracks in <c>ambience/</c> never become hit groups). Clips are file-name

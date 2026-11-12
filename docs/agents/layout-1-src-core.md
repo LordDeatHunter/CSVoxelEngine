@@ -48,13 +48,19 @@ OpenGLTest/
                                #   opens on the server's answer and sends the rename and the trip intent
     Audio/                     # sound: the sfx library, mixer and manager, the ambience bed, the OpenAL output
       AmbienceManager.cs       # looping day/night ambience with a slow crossfade
-      AudioDevice.cs           # the shared OpenAL Soft device and context (refcounted; natives for Windows, Linux, macOS)
-      AudioOutput.cs           # streams a 16-bit PCM IWaveProvider to an OpenAL source on its own refill thread
+      AudioDevice.cs           # the shared OpenAL Soft device and context (refcounted; natives for Windows, Linux, macOS);
+                               #   asks for or forbids HRTF (SetHrtf, live through alcResetDeviceSOFT) and logs its status
+      AudioOutput.cs           # streams a 16-bit PCM IWaveProvider to a head-locked OpenAL source on its own refill thread
       SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups (and names the
                                #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle, skeleton_hit, skeleton_death, crow_hit, crow_death, crow_caw, slime_hit, slime_death, slime_jump, slime_land)
       AmbientCallTimer.cs      # a randomized repeat timer for ambient calls (skeleton rattle, crow caw); Tick fires once per interval
-      SfxManager.cs            # one-shot sound effects, decoded and mixed like AmbienceManager's, through one AudioOutput
+      SfxManager.cs            # one-shot sound effects: Play mixes a clip centered through one AudioOutput, PlayAt
+                               #   plays its mono downmix in 3D (SpatialVoices) against the listener SetListener sets
       SfxMixer.cs              # mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline
+      SoundFalloff.cs          # GL-free: a positional sound's distance gain and the earshot a server sends within
+      SpatialVoices.cs         # the pool of OpenAL 3D sources positional one-shots play on (oldest taken when full)
+      WorldSounds.cs           # where a World's components send sounds (SoundEvent): played here, or on a server
+                               #   queued for the players in earshot (see "World sounds")
     Chunks/                    # chunk storage and lifecycle, the column cache and column terrain, the light
                                #   query entities read (EntityLight); meshing, world sources and streaming below
       BoxSweep.cs              # GL-free, state-free solid-box axis sweep every loose body shares (drops, TNT, falling

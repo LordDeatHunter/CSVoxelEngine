@@ -92,6 +92,10 @@ public enum NetMessage : byte
     /// <summary>Server to one client: the sequence id of an intent and whether it was accepted.
     /// Every intent gets exactly one, in order, after its correction and inventory snapshot.</summary>
     IntentResult = 81,
+    /// <summary>Server to one client: the world sounds made near that player since the last pump (a slime's hop, a
+    /// mob's hit or death, another player's mining or spell impact), each a group and a position the client plays
+    /// positionally (<see cref="SoundEventCodec"/>). Sent only when there is one.</summary>
+    SoundEvents = 90,
 }
 
 /// <summary>
@@ -251,8 +255,11 @@ public static class NetFraming
     /// inventory actions; an older server would refuse them as malformed.
     /// 43: a <see cref="NetEntityKind.Skeleton"/>'s item byte packs only its role and outfit (<see cref="Entities.TowerMobs.Skeleton.PackLook"/>),
     /// since a skeleton no longer has a floor tier; an older client would read a warrior or an armored skeleton as a
-    /// different look.</summary>
-    public const int ProtocolVersion = 43;
+    /// different look.
+    /// 44: the <see cref="NetMessage.SoundEvents"/> message, the world sounds the server's simulation made near a
+    /// player (<see cref="SoundEventCodec"/>); an older client would not know the message and an older server would
+    /// leave its clients deaf to every mob.</summary>
+    public const int ProtocolVersion = 44;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

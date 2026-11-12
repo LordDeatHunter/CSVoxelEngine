@@ -190,6 +190,7 @@ public sealed class GameServer : IDisposable
 
         _streaming.ServeLodRequests();
         _broadcasts.DrainCellJournal();
+        _broadcasts.BroadcastSounds();
         _sessions.SendChangedInventories();
         _chests.Tick();
         _waystones.Tick(deltaTime);

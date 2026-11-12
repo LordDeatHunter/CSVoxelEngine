@@ -30,9 +30,10 @@ public sealed class ChestLids(AnimationClip open, AnimationClip close, Animation
     private readonly HashSet<(int X, int Y, int Z)> _open = [];
     private readonly List<(int X, int Y, int Z)> _scratch = [];
 
-    /// <summary>Raised the moment a lid starts its open or close clip (true for open), once per swing. The locked
-    /// rattle never raises it, and a swing reversed mid-clip raises it again. Listeners play the lid sound.</summary>
-    public event Action<bool>? LidStarted;
+    /// <summary>Raised the moment a lid starts its open or close clip, with the chest's cell and true for open, once per
+    /// swing. The locked rattle never raises it, and a swing reversed mid-clip raises it again. Listeners play the lid
+    /// sound there.</summary>
+    public event Action<(int X, int Y, int Z), bool>? LidStarted;
 
     /// <summary>Whether any chest has a viewer told from outside, so the station broadcast has something to say.</summary>
     public bool HasViewed => _viewed.Count > 0;
@@ -143,7 +144,7 @@ public sealed class ChestLids(AnimationClip open, AnimationClip close, Animation
             time = (1f - done) * ClipOf(kind).Length;
         }
         _motions[cell] = (kind, time);
-        LidStarted?.Invoke(kind == Motion.Opening);
+        LidStarted?.Invoke(cell, kind == Motion.Opening);
     }
 
     private AnimationClip ClipOf(Motion kind) => kind switch

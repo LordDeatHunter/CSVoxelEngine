@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Audio;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
@@ -111,6 +112,9 @@ public sealed class GameServerTests : IDisposable
         /// <summary>Every chat line received, decoded by the client's own reader.</summary>
         public readonly List<ChatMessage> Chat = [];
 
+        /// <summary>Every world sound received, decoded by the client's own reader.</summary>
+        public readonly List<SoundEvent> Sounds = [];
+
         public void Drain(NetworkClient client)
         {
             while (client.Inbound.TryDequeue(out var payload))
@@ -189,6 +193,13 @@ public sealed class GameServerTests : IDisposable
                     case NetMessage.ChatMessage:
                         Chat.Add(ChatMessageCodec.Read(reader));
                         break;
+                    case NetMessage.SoundEvents:
+                    {
+                        var sounds = new List<SoundEvent>();
+                        SoundEventCodec.Read(reader, sounds);
+                        Sounds.AddRange(sounds);
+                        break;
+                    }
                 }
             }
         }
@@ -2115,5 +2126,25 @@ public sealed class GameServerTests : IDisposable
         SendIntent(client, InventoryIntent.SelectStaffSlot(staff.Slots));
         Assert.Equal(1, HeldStaff.SelectedSlot(Answer()));
         Assert.Equal(1, HeldStaff.SelectedSlot(player.Inventory));
+    }
+
+    [Fact]
+    public void AWorldSoundReachesThePlayersInEarshotButNotTheOneWhoMadeIt()
+    {
+        var maker = Connect("Maker");
+        var listener = Connect("Listener");
+        var eye = PlayerOf(maker).Position;
+        DrainAll();
+
+        // A slime hopping beside both, the maker's own mining blow, and a sound far out of everyone's earshot
+        _world.Sounds.PlayAt(SfxLibrary.SlimeJumpGroup, eye + new Vector3(3f, 0f, 0f));
+        _world.Sounds.PlayAt(SfxLibrary.StoneGroup, eye + new Vector3(1f, 0f, 0f), PlayerOf(maker).Id);
+        _world.Sounds.PlayAt(SfxLibrary.SlimeLandGroup, eye + new Vector3(AudioConfig.SfxRangeBlocks * 3f, 0f, 0f));
+        PumpFor(0.2);
+        DrainAll();
+
+        Assert.Equal([SfxLibrary.SlimeJumpGroup], InboxOf(maker).Sounds.Select(s => s.Group));
+        Assert.Equal([SfxLibrary.SlimeJumpGroup, SfxLibrary.StoneGroup], InboxOf(listener).Sounds.Select(s => s.Group));
+        Assert.Empty(_world.Sounds.Pending);
     }
 }

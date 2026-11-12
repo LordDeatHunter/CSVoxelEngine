@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
@@ -16,7 +17,7 @@ using VoxelEngine.Networking;
 
 namespace VoxelEngine.Server;
 
-/// <summary>The world state the server broadcasts to every client: the journaled cell writes (BlockChanges), the live entities under stable ids, the station block entities and the day clock. Main thread only, except <see cref="OnCellWritten"/>, which only enqueues.</summary>
+/// <summary>The world state the server broadcasts to every client: the journaled cell writes (BlockChanges), the live entities under stable ids, the station block entities, the day clock and the world sounds (to the players near each). Main thread only, except <see cref="OnCellWritten"/>, which only enqueues.</summary>
 internal sealed class ServerBroadcasts
 {
     private readonly ServerState _state;
@@ -36,6 +37,9 @@ internal sealed class ServerBroadcasts
     private readonly HashSet<object> _entitySeen = new(ReferenceEqualityComparer.Instance);
     private readonly List<object> _entityStale = [];
     private int _nextEntityId = 1;
+
+    // One player's share of the queued world sounds, rebuilt per player
+    private readonly List<SoundEvent> _soundsFor = [];
 
     internal ServerBroadcasts(ServerState state)
     {
@@ -176,6 +180,26 @@ internal sealed class ServerBroadcasts
                 _entityStale.Add(key);
         foreach (var key in _entityStale)
             _entityIds.Remove(key);
+    }
+
+    /// <summary>
+    /// Sends each player the world sounds queued since the last pump (<see cref="World.Sounds"/>) that it is within
+    /// earshot of and not excepted from (a sound its own client already predicted), then forgets them.
+    /// </summary>
+    internal void BroadcastSounds()
+    {
+        var sounds = _state.World.Sounds;
+        if (sounds.Pending.Count == 0) return;
+        foreach (var (id, client) in _state.Clients)
+        {
+            if (!_state.Players.TryGetValue(id, out var player)) continue;
+            SoundEventCodec.SelectFor(sounds.Pending, player.Id, player.Position, _soundsFor);
+            if (_soundsFor.Count == 0) continue;
+            using var writer = new PacketWriter(NetMessage.SoundEvents);
+            SoundEventCodec.Write(writer, _soundsFor);
+            client.Send(writer.ToArray());
+        }
+        sounds.ClearPending();
     }
 
     internal void OnCellWritten(int x, int y, int z, ushort id, byte state) =>

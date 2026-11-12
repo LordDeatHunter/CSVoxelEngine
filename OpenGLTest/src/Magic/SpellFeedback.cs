@@ -22,17 +22,15 @@ internal sealed class SpellFeedback
     private readonly World _world;
     private readonly ChunkManager _chunks;
     private readonly BlockDebrisSystem _debris;
-    private readonly SfxManager? _sfx;
     private readonly bool _clientMode;
     private readonly SpellBoltPreview _preview = new();
     private readonly List<Vector3> _landings = [];
 
-    internal SpellFeedback(World world, ChunkManager chunks, BlockDebrisSystem debris, SfxManager? sfx, bool clientMode)
+    internal SpellFeedback(World world, ChunkManager chunks, BlockDebrisSystem debris, bool clientMode)
     {
         _world = world;
         _chunks = chunks;
         _debris = debris;
-        _sfx = sfx;
         _clientMode = clientMode;
     }
 
@@ -46,7 +44,7 @@ internal sealed class SpellFeedback
     internal void OnCast(SpellCast cast, bool fizzled)
     {
         if (cast.Caster.Camera == null) return;
-        _sfx?.Play(fizzled ? SfxLibrary.SpellFizzleGroup : SfxLibrary.SpellCastGroup);
+        _world.Sounds.Play(fizzled ? SfxLibrary.SpellFizzleGroup : SfxLibrary.SpellCastGroup);
 
         var element = SpellImpactRules.ElementOf(cast.Parts);
         var color = fizzled ? SpellConfig.FizzleSparkColor
@@ -61,8 +59,8 @@ internal sealed class SpellFeedback
     }
 
     /// <summary>
-    /// Flies the preview bolts (the impact sound where one lands near the camera, at most once an update)
-    /// and bursts sparks where a remote player just cast.
+    /// Flies the preview bolts (the impact sound where one lands, at most once an update) and bursts sparks where a
+    /// remote player just cast (its cast sound plays from <see cref="ClientMirror.SyncRemotePlayers"/>).
     /// </summary>
     internal void Update(float deltaTime, IReadOnlyList<RemotePlayer> remotes)
     {
@@ -70,12 +68,8 @@ internal sealed class SpellFeedback
 
         _landings.Clear();
         _preview.Update(deltaTime, _chunks, _world.Mobs, _debris, _landings);
-        for (var i = 0; i < _landings.Count; i++)
-        {
-            if (Vector3.Distance(_landings[i], _world.Camera.Position) > SpellConfig.ImpactSoundRangeBlocks) continue;
-            _sfx?.Play(SfxLibrary.SpellImpactGroup);
-            break;
-        }
+        if (_landings.Count > 0)
+            _world.Sounds.PlayAt(SfxLibrary.SpellImpactGroup, _landings[0]);
 
         for (var i = 0; i < remotes.Count; i++)
         {

@@ -37,6 +37,9 @@ internal sealed unsafe class AudioOutput : IDisposable
         try
         {
             _source = _al.GenSource();
+            // Head-locked: the stream (the ambience, the centered sfx mix) never moves with the listener
+            _al.SetSourceProperty(_source, SourceBoolean.SourceRelative, true);
+            _al.SetSourceProperty(_source, SourceVector3.Position, 0f, 0f, 0f);
             _buffers = _al.GenBuffers(AudioConfig.OutputBufferCount);
             foreach (var buffer in _buffers) Fill(buffer);
             _al.SourceQueueBuffers(_source, _buffers);

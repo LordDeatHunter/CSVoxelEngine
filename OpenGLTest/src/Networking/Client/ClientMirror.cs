@@ -542,7 +542,8 @@ internal sealed class ClientMirror
 
     /// <summary>
     /// Reconciles the remote player set with a server broadcast: upserts each entry (skipping the
-    /// client's own id), then removes anyone no longer listed.
+    /// client's own id), sounding a swing one of them just started from where they stand, then removes
+    /// anyone no longer listed.
     /// </summary>
     internal void SyncRemotePlayers(IReadOnlyList<RemotePlayerSnapshot> snapshot, int selfId)
     {
@@ -553,18 +554,21 @@ internal sealed class ClientMirror
                 continue;
             _remoteIdsSeen.Add(entry.Id);
             var index = IndexOfRemote(entry.Id);
+            RemotePlayer remote;
             if (index < 0)
             {
-                var remote = new RemotePlayer(entry.Id, entry.Name, Player.Rig);
-                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq, entry.Armor);
+                remote = new RemotePlayer(entry.Id, entry.Name, Player.Rig);
                 _remotePlayers.Add(remote);
             }
             else
             {
-                var remote = _remotePlayers[index];
+                remote = _remotePlayers[index];
                 remote.Name = entry.Name;
-                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq, entry.Armor);
             }
+            var started = remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq,
+                entry.Armor);
+            if (RemotePlayer.SoundOf(started) is { } sound)
+                _world.Sounds.PlayAt(sound, entry.Eye);
         }
 
         for (var i = _remotePlayers.Count - 1; i >= 0; i--)
