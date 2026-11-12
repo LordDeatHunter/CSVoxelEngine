@@ -174,6 +174,12 @@ pure function of the seed: only **deltas** and the seed are written.
   chunk loads. An entry whose block, item or molten material name no longer resolves is dropped with
   one aggregated warning, and a cast pour is restored paused (its crucible binding is transient). A
   corrupt file parses to null and is replaced at the next autosave, like `entities.json`.
+- **Lantern state** is name-based, versioned `LanternData` in `ToolData.Lantern` (player, chest and drop payloads)
+  and `StationSaveData.Lanterns` (placed). Old block-pool lantern counts migrate into distinct empty instances;
+  their hotbar references follow, and exceeding today's tool cap never deletes an old lantern. Legacy chest stacks
+  remain withdrawable counts until taken into the instance inventory. Unknown lantern versions or invalid fuel
+  fail explicitly before an existing player inventory is cleared. Instance drops are retained beyond the ordinary
+  loose-block save limit and pending-restore timeout so a lantern's contents are never silently discarded.
 - **Not persisted** (tracked as `M-12` in `plans/TODO.md`): primed TNT, falling blocks, projectiles
   in flight, spell bolts in flight, toppling trees and the sapling clock (a half-grown sapling stands where it is until it
   is grown again).

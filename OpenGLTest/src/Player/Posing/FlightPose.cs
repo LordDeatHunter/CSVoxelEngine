@@ -1,5 +1,4 @@
 using System;
-using VoxelEngine.Config;
 using Pose = VoxelEngine.Player.PlayerModel.Pose;
 
 namespace VoxelEngine.Player.Posing;
@@ -49,9 +48,9 @@ internal sealed class FlightPose
             MathUtils.Lerp(pose.LeftHip, leftHip, b), MathUtils.Lerp(pose.RightHip, rightHip, b),
             MathUtils.Lerp(pose.LeftKnee, leftKnee, b), MathUtils.Lerp(pose.RightKnee, rightKnee, b),
             MathUtils.Lerp(pose.LeftShoulder, restShoulder, b),
-            MathUtils.Lerp(pose.RightShoulder, restShoulder + _model.HoldBlend * PlayerModel.HoldShoulder, b),
+            MathUtils.Lerp(pose.RightShoulder, restShoulder + _model.HoldBlend * _model.CarryShoulder, b),
             MathUtils.Lerp(pose.LeftElbow, restElbow, b),
-            MathUtils.Lerp(pose.RightElbow, restElbow + _model.HoldBlend * PlayerModel.HoldElbow, b),
+            MathUtils.Lerp(pose.RightElbow, restElbow + _model.HoldBlend * _model.CarryElbow, b),
             MathUtils.Lerp(pose.TorsoPitch, -PlayerConfig.FlightLean * share, b),
             MathUtils.Lerp(pose.Bob, 0f, b));
     }

@@ -237,7 +237,8 @@ internal sealed class ClientMirror
         foreach (var netEntity in entities)
         {
             if (netEntity.Kind == NetEntityKind.Drop)
-                _dropManager.SpawnRestored(BlockTables.RequireAssigned(netEntity.ItemId), netEntity.Position, netEntity.Velocity, 0f);
+                _dropManager.SpawnRestored(BlockTables.RequireAssigned(netEntity.ItemId), netEntity.Position, netEntity.Velocity, 0f, netEntity.Instance == null ? null
+                    : UI.InventoryPanel.InventorySaveCodec.ImportInstance(0, netEntity.Instance, new List<string>()));
         }
 
         if (_clientMode)
@@ -353,13 +354,8 @@ internal sealed class ClientMirror
     /// A client replaces its station mirrors with the server's snapshot: the fires, quern tops,
     /// kilns and pours it draws are the server's, which alone runs them.
     /// </summary>
-    internal void ApplyNetworkStations(PacketReader reader)
-    {
-        StationNetCodec.Read(reader, _campfires, _querns, _kilns, _casting);
-        _world.Smithing.ReadNet(reader);
-        _world.Towers.ReadNet(reader);
-        _world.ChestLids.ReadNet(reader);
-    }
+    internal void ApplyNetworkStations(PacketReader reader) => StationNetCodec.ReadWorld(reader,
+        _campfires, _querns, _kilns, _casting, _world.Smithing, _world.Towers, _world.ChestLids, _world.Lanterns);
 
     /// <summary>
     /// A client mirrors the health the server's <see cref="NetMessage.PlayerStatus"/> reports: the
@@ -566,7 +562,7 @@ internal sealed class ClientMirror
                 remote.Name = entry.Name;
             }
             var started = remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq,
-                entry.Armor);
+                entry.Armor, entry.HeldId, entry.HeldLit);
             if (RemotePlayer.SoundOf(started) is { } sound)
                 _world.Sounds.PlayAt(sound, entry.Eye);
         }

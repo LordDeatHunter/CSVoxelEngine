@@ -88,6 +88,12 @@ public enum NetMessage : byte
     InventoryRequest = 71,
     /// <summary>Client to server: a <see cref="VoxelEngine.Networking.WorldIntent"/> (break, place, use,
     /// throw, attack, cast, hammer, waystone trip) with its sequence id (<see cref="WorldIntentCodec"/>).</summary>
+    /// <summary>Client request to open a selected held or aimed placed lantern.</summary>
+    LanternOpen = 72,
+    /// <summary>Server-owned target, fuel and eight-slot storage.</summary>
+    LanternContents = 73,
+    /// <summary>Client transfer intent against its open lantern.</summary>
+    LanternMove = 74,
     WorldIntent = 80,
     /// <summary>Server to one client: the sequence id of an intent and whether it was accepted.
     /// Every intent gets exactly one, in order, after its correction and inventory snapshot.</summary>
@@ -252,14 +258,21 @@ public static class NetFraming
     /// 41: the chest moves <see cref="Simulation.Chests.ChestMoveKind.LootAll"/> and
     /// <see cref="Simulation.Chests.ChestMoveKind.QuickStack"/>; an older server would refuse them as malformed.
     /// 42: the hotbar's own drags, the <see cref="NetInventoryAction.MoveSlot"/> and <see cref="NetInventoryAction.ClearSlot"/>
-    /// inventory actions; an older server would refuse them as malformed.
+    /// inventory actions; an older server would refuse them as malformed. The earlier lantern branch also published an
+    /// incompatible 42 with lantern requests, placed lanterns in StationState, drop instance payloads and held id/light.
+    /// 43: the independent historical bridge branch also used this number for a different layout. Upstream
     /// 43: a <see cref="NetEntityKind.Skeleton"/>'s item byte packs only its role and outfit (<see cref="Entities.TowerMobs.Skeleton.PackLook"/>),
     /// since a skeleton no longer has a floor tier; an older client would read a warrior or an armored skeleton as a
     /// different look.
     /// 44: the <see cref="NetMessage.SoundEvents"/> message, the world sounds the server's simulation made near a
     /// player (<see cref="SoundEventCodec"/>); an older client would not know the message and an older server would
-    /// leave its clients deaf to every mob.</summary>
-    public const int ProtocolVersion = 44;
+    /// leave its clients deaf to every mob. The historical lantern integration also published an incompatible 44,
+    /// combining upstream 42's hotbar actions with lantern requests, station/drop instance data and held id/light.
+    /// 45: the historical independent bridge integration; not compatible with the lantern layout.
+    /// 46: combines the lantern layout (messages 72/73/74) with upstream 43's skeleton role/outfit representation
+    /// and upstream 44's world sounds (message 90). All historical layouts are refused by the handshake.
+    /// The separate planned bridge integration reserves 47.</summary>
+    public const int ProtocolVersion = 46;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

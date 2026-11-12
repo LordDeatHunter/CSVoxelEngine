@@ -1,6 +1,10 @@
 using System.Collections.Generic;
 using System.IO;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Chests;
+using VoxelEngine.Simulation.Lanterns;
+using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Networking;
@@ -42,6 +46,27 @@ public static class StationNetCodec
     public static bool AnyStations(CampfireManager campfires, QuernManager querns, KilnManager kilns,
         CastingManager casting) =>
         campfires.HasAny || querns.HasAny || kilns.HasAny || casting.HasAny;
+
+    /// <summary>Whether any manager contributes to a whole-world station broadcast.</summary>
+    public static bool AnyWorld(CampfireManager campfires, QuernManager querns, KilnManager kilns,
+        CastingManager casting, SmithingStations smithing, TowerManager towers, ChestLids lids, LanternManager lanterns) =>
+        AnyStations(campfires, querns, kilns, casting) || smithing.HasAny || towers.HasAny || lids.HasViewed || lanterns.HasAny;
+
+    /// <summary>Writes every station manager in the protocol's one fixed order.</summary>
+    public static void WriteWorld(PacketWriter writer, CampfireManager campfires, QuernManager querns, KilnManager kilns,
+        CastingManager casting, SmithingStations smithing, TowerManager towers, ChestLids lids, LanternManager lanterns)
+    {
+        Write(writer, campfires, querns, kilns, casting);
+        smithing.WriteNet(writer); towers.WriteNet(writer); lids.WriteNet(writer); lanterns.WriteNet(writer);
+    }
+
+    /// <summary>Replaces every client station mirror in the same order as WriteWorld.</summary>
+    public static void ReadWorld(PacketReader reader, CampfireManager campfires, QuernManager querns, KilnManager kilns,
+        CastingManager casting, SmithingStations smithing, TowerManager towers, ChestLids lids, LanternManager lanterns)
+    {
+        Read(reader, campfires, querns, kilns, casting);
+        smithing.ReadNet(reader); towers.ReadNet(reader); lids.ReadNet(reader); lanterns.ReadNet(reader);
+    }
 
     /// <summary>Reads an entry count, refusing one outside 0..<see cref="MaxEntries"/>.</summary>
     internal static int ReadCount(PacketReader reader)

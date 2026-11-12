@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using VoxelEngine.Items;
+using VoxelEngine.Simulation.Lanterns;
 
 namespace VoxelEngine.UI.InventoryPanel;
 
@@ -64,6 +65,7 @@ public sealed class ItemStack
         Item = item;
         if (item.MaxDurability > 0)
             Set(new DurabilityComponent(item.MaxDurability, item.MaxDurability));
+        if (LanternState.IsLantern(item.Id)) Set(new LanternComponent(new LanternState()));
         Set(new CooldownComponent(0));
         Set(new DisplayNameComponent(null));
     }
@@ -78,7 +80,8 @@ public sealed class ItemStack
         var copy = new ItemStack(instanceId, Item) { Count = Count };
         foreach (var (type, value) in _components)
             if (type != typeof(CooldownComponent))
-                copy._components[type] = value;
+                copy._components[type] = value is LanternComponent lantern
+                    ? new LanternComponent(lantern.State.Clone()) : value;
         foreach (var (enchantment, level) in Enchantments)
             copy.Enchantments[enchantment] = level;
         return copy;

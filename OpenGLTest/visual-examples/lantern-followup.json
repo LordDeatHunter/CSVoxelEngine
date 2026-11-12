@@ -1,0 +1,779 @@
+{
+  "name": "lantern-followup",
+  "output": "visual/lantern-followup",
+  "steps": [
+    {
+      "op": "fly"
+    },
+    {
+      "op": "wait",
+      "seconds": 14
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        0.5,
+        163,
+        5.5
+      ],
+      "yaw": -90,
+      "pitch": 75
+    },
+    {
+      "op": "wait",
+      "seconds": 12
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -2,
+        160,
+        0
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -2,
+        160,
+        1
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -2,
+        160,
+        2
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -2,
+        160,
+        3
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -2,
+        160,
+        4
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -2,
+        160,
+        5
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -2,
+        160,
+        6
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -2,
+        160,
+        7
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -2,
+        160,
+        8
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -1,
+        160,
+        0
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -1,
+        160,
+        1
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -1,
+        160,
+        2
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -1,
+        160,
+        3
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -1,
+        160,
+        4
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -1,
+        160,
+        5
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -1,
+        160,
+        6
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -1,
+        160,
+        7
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        -1,
+        160,
+        8
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        0,
+        160,
+        0
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        0,
+        160,
+        1
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        0,
+        160,
+        2
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        0,
+        160,
+        3
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        0,
+        160,
+        4
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        0,
+        160,
+        5
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        0,
+        160,
+        6
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        0,
+        160,
+        7
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        0,
+        160,
+        8
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        1,
+        160,
+        0
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        1,
+        160,
+        1
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        1,
+        160,
+        2
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        1,
+        160,
+        3
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        1,
+        160,
+        4
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        1,
+        160,
+        5
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        1,
+        160,
+        6
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        1,
+        160,
+        7
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        1,
+        160,
+        8
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        2,
+        160,
+        0
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        2,
+        160,
+        1
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        2,
+        160,
+        2
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        2,
+        160,
+        3
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        2,
+        160,
+        4
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        2,
+        160,
+        5
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        2,
+        160,
+        6
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        2,
+        160,
+        7
+      ]
+    },
+    {
+      "op": "setblock",
+      "block": "stone",
+      "pos": [
+        2,
+        160,
+        8
+      ]
+    },
+    {
+      "op": "fly",
+      "on": false
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        0.5,
+        162.62,
+        5.5
+      ],
+      "yaw": -90,
+      "pitch": 75
+    },
+    {
+      "op": "wait",
+      "seconds": 0.5
+    },
+    {
+      "op": "give",
+      "block": "slimeball",
+      "count": 1
+    },
+    {
+      "op": "give",
+      "block": "coal",
+      "count": 2
+    },
+    {
+      "op": "give",
+      "block": "lantern",
+      "count": 1
+    },
+    {
+      "op": "lantern"
+    },
+    {
+      "op": "wait",
+      "seconds": 0.7
+    },
+    {
+      "op": "screenshot",
+      "name": "held-empty"
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "tab",
+      "tab": "misc"
+    },
+    {
+      "op": "search",
+      "text": "Slime"
+    },
+    {
+      "op": "row",
+      "row": 1
+    },
+    {
+      "op": "wait",
+      "seconds": 6
+    },
+    {
+      "op": "wait",
+      "seconds": 0.7
+    },
+    {
+      "op": "screenshot",
+      "name": "held-partial"
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "chest",
+      "open": false
+    },
+    {
+      "op": "panel",
+      "open": false
+    },
+    {
+      "op": "look",
+      "yaw": -90,
+      "pitch": -43
+    },
+    {
+      "op": "wait",
+      "seconds": 0.7
+    },
+    {
+      "op": "screenshot",
+      "name": "aim-floor"
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "place"
+    },
+    {
+      "op": "look",
+      "yaw": -90,
+      "pitch": -29
+    },
+    {
+      "op": "wait",
+      "seconds": 0.5
+    },
+    {
+      "op": "lantern"
+    },
+    {
+      "op": "wait",
+      "seconds": 0.7
+    },
+    {
+      "op": "screenshot",
+      "name": "placed-partial"
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "wait",
+      "seconds": 10
+    },
+    {
+      "op": "wait",
+      "seconds": 0.7
+    },
+    {
+      "op": "screenshot",
+      "name": "placed-empty"
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "chest",
+      "open": false
+    },
+    {
+      "op": "panel",
+      "open": false
+    },
+    {
+      "op": "give",
+      "block": "everfuel",
+      "count": 1
+    },
+    {
+      "op": "lantern"
+    },
+    {
+      "op": "tab",
+      "tab": "misc"
+    },
+    {
+      "op": "search",
+      "text": "Everfuel"
+    },
+    {
+      "op": "row",
+      "row": 1
+    },
+    {
+      "op": "wait",
+      "seconds": 0.7
+    },
+    {
+      "op": "screenshot",
+      "name": "placed-everfuel"
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "chest",
+      "open": false
+    },
+    {
+      "op": "panel",
+      "open": false
+    },
+    {
+      "op": "select",
+      "slot": 8
+    },
+    {
+      "op": "walk",
+      "keys": [
+        "ControlLeft"
+      ],
+      "seconds": 0.05
+    },
+    {
+      "op": "place"
+    },
+    {
+      "op": "look",
+      "yaw": -90,
+      "pitch": -29
+    },
+    {
+      "op": "wait",
+      "seconds": 0.5
+    },
+    {
+      "op": "wait",
+      "seconds": 0.7
+    },
+    {
+      "op": "screenshot",
+      "name": "pickup-selected-empty"
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "look",
+      "yaw": -90,
+      "pitch": 75
+    },
+    {
+      "op": "lantern"
+    },
+    {
+      "op": "wait",
+      "seconds": 0.7
+    },
+    {
+      "op": "screenshot",
+      "name": "picked-held-everfuel"
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "chest",
+      "open": false
+    },
+    {
+      "op": "panel",
+      "open": false
+    },
+    {
+      "op": "look",
+      "yaw": -90,
+      "pitch": -43
+    },
+    {
+      "op": "wait",
+      "seconds": 0.7
+    },
+    {
+      "op": "screenshot",
+      "name": "aim-floor"
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "place"
+    },
+    {
+      "op": "look",
+      "yaw": -90,
+      "pitch": -29
+    },
+    {
+      "op": "select",
+      "slot": 2
+    },
+    {
+      "op": "walk",
+      "keys": [
+        "ControlLeft"
+      ],
+      "seconds": 0.05
+    },
+    {
+      "op": "place"
+    },
+    {
+      "op": "look",
+      "yaw": -90,
+      "pitch": -29
+    },
+    {
+      "op": "wait",
+      "seconds": 0.5
+    },
+    {
+      "op": "wait",
+      "seconds": 0.7
+    },
+    {
+      "op": "screenshot",
+      "name": "pickup-first-empty"
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "select",
+      "slot": 1
+    },
+    {
+      "op": "look",
+      "yaw": -90,
+      "pitch": 75
+    },
+    {
+      "op": "lantern"
+    },
+    {
+      "op": "wait",
+      "seconds": 0.7
+    },
+    {
+      "op": "screenshot",
+      "name": "first-slot-everfuel"
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "chest",
+      "open": false
+    },
+    {
+      "op": "panel",
+      "open": false
+    }
+  ]
+}

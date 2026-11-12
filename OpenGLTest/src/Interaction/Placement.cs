@@ -44,7 +44,7 @@ public static class Placement
         out ushort placedId, out byte placedState)
     {
         placedId = blockId;
-        placedState = state;
+        placedState = BlockType.ById[blockId]?.Lantern == true ? (byte)(normal.Y > .5f ? 1 : 0) : state;
         var wall = BlockType.ById[blockId]?.WallBlockId ?? 0;
         if (wall == 0 || fillsHitCell || normal.Y > 0.5f) return true;
         if (normal.Y < -0.5f) return false;

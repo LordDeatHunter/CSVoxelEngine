@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
@@ -11,6 +12,7 @@ using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Networking;
+using VoxelEngine.Networking.Client;
 using VoxelEngine.WorldGen;
 using Xunit;
 
@@ -44,6 +46,39 @@ public sealed class NetworkEntitySyncTests : IDisposable
         catch (InvalidOperationException)
         {
         }
+    }
+
+    [Fact]
+    public void RemoteLanternSnapshotsKeepTheirLightAndSoundEachNewSwingOnce()
+    {
+        // A headless world's sound queue observes the mirror's actual positional dispatch without an audio device.
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null, serverMode: true);
+        var lantern = ContentRegistry.RequireBlock("lantern").Id;
+        var eye = new Vector3(3f, 60f, 4f);
+        var first = new RemotePlayerSnapshot(7, "Other", eye, 0f, 0f, Action: NetPlayerAction.Cast,
+            ActionSeq: 4, HeldId: lantern, HeldLit: true);
+        _world.ClientMirror.SyncRemotePlayers([first], selfId: 1);
+        var remote = Assert.Single(_world.RemotePlayers);
+        Assert.Empty(_world.Sounds.Pending); // First sighting records a swing already in progress.
+
+        var next = first with { Eye = eye + Vector3.UnitX, ActionSeq = 5 };
+        _world.ClientMirror.SyncRemotePlayers([next], selfId: 1);
+        Assert.Equal(new SoundEvent(SfxLibrary.SpellCastGroup, next.Eye), Assert.Single(_world.Sounds.Pending));
+        Assert.Same(remote, Assert.Single(_world.RemotePlayers));
+        Assert.Equal(lantern, remote.HeldId);
+        Assert.True(remote.HeldLit);
+        Assert.True(remote.Model.HoldingLantern);
+        Assert.True(remote.TakeCast());
+        Assert.False(remote.TakeCast());
+
+        _world.ClientMirror.SyncRemotePlayers([next], selfId: 1);
+        Assert.Single(_world.Sounds.Pending); // Repeated frames neither replay sounds nor erase held state.
+        Assert.True(remote.HeldLit);
+        _world.ClientMirror.SyncRemotePlayers([next with { HeldId = 0, HeldLit = false }], selfId: 1);
+        Assert.Equal(0, remote.HeldId);
+        Assert.False(remote.HeldLit);
+        Assert.False(remote.Model.HoldingLantern);
+        Assert.Single(_world.Sounds.Pending);
     }
 
     [Fact]

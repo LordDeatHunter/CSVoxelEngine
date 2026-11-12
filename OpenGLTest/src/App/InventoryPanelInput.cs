@@ -38,7 +38,11 @@ internal sealed class InventoryPanelInput
         RowDrag = new RowDragInput(renderManager, inventoryView, session, this);
     }
 
-    /// <summary>The chest panel's input: it opens beside this panel and takes deposits from its list.</summary>
+    // An open lantern browses owned fuel, including for creative players.
+    private bool BrowseCreative => ActiveWorld is { } world && world.Camera.IsCreative
+        && world.ChestPanel.LanternInstance == null;
+
+    /// <summary>The chest or lantern panel beside this inventory and its row transfers.</summary>
     internal ChestInput Chest { get; }
 
     /// <summary>Dragging a listed row onto a hotbar or equipment slot.</summary>
@@ -92,7 +96,7 @@ internal sealed class InventoryPanelInput
         var inventory = world.Inventory;
 
         // A listed row first (the rows sit over the list), then a hotbar slot
-        if (EntryAt(position, inventory, world.Camera.IsCreative) is { } entry)
+        if (EntryAt(position, inventory, BrowseCreative) is { } entry)
         {
             var stack = entry.ToolInstance != 0 ? inventory.GetToolStack(entry.ToolInstance) : null;
             return ItemTooltip.Hover(position, entry.Id, stack, inventory.Equipment);
@@ -123,6 +127,7 @@ internal sealed class InventoryPanelInput
     /// </summary>
     internal RowEntry? EntryAt(Vector2 window, Inventory inventory, bool creative)
     {
+        creative &= BrowseCreative;
         var list = CurrentList(inventory, creative);
         if (renderManager.Ui.Panel.PanelRowAt(window, list.Offset, list.RowCount) is not { } row) return null;
         if (list.Hits != null)
@@ -171,7 +176,7 @@ internal sealed class InventoryPanelInput
 
         var world = ActiveWorld;
         if (world == null || PointerWindow() is not { } pointer) return;
-        if (world.Camera.IsCreative) return;
+        if (BrowseCreative) return;
         var inventory = world.Inventory;
         if (EntryAt(pointer, inventory, creative: false) is not { } entry || entry.Recipe != null) return;
         var id = entry.Id;
@@ -224,9 +229,9 @@ internal sealed class InventoryPanelInput
     internal int RowCountFor(InventoryCategory tab)
     {
         if (tab == InventoryCategory.Crafting)
-            return ActiveWorld!.Inventory.ListedRecipes(ActiveWorld.Camera.IsCreative).Count;
-        if (ActiveWorld?.Camera.IsCreative == true)
-            return CreativeCatalog.Entries(tab, ActiveWorld.Inventory).Count;
+            return ActiveWorld!.Inventory.ListedRecipes(BrowseCreative).Count;
+        if (BrowseCreative)
+            return CreativeCatalog.Entries(tab, ActiveWorld!.Inventory).Count;
         return tab switch
         {
             InventoryCategory.Tools => ActiveWorld!.Inventory.ToolEntries().Count,
@@ -246,7 +251,7 @@ internal sealed class InventoryPanelInput
         var p = renderManager.Ui.ToCanvas(position);
         var searching = !inventoryView.Search.IsEmpty;
         var rowCount = searching
-            ? inventoryView.SearchHits(ActiveWorld!.Inventory, ActiveWorld.Camera.IsCreative).Count
+            ? inventoryView.SearchHits(ActiveWorld!.Inventory, BrowseCreative).Count
             : RowCountFor(inventoryView.Tab);
         var offset = searching
             ? InventoryPanelLayout.ClampedOffset(inventoryView.Search.ScrollOffset, rowCount, canvas)
@@ -323,7 +328,7 @@ internal sealed class InventoryPanelInput
     private void MoveSearchHighlight(int delta)
     {
         if (inventoryView.Search.IsEmpty) return;
-        var count = inventoryView.SearchHits(ActiveWorld!.Inventory, ActiveWorld.Camera.IsCreative).Count;
+        var count = inventoryView.SearchHits(ActiveWorld!.Inventory, BrowseCreative).Count;
         if (count == 0) return;
         inventoryView.Search.Highlight = inventoryView.Search.Highlight < 0
             ? (delta > 0 ? 0 : count - 1)
@@ -347,7 +352,7 @@ internal sealed class InventoryPanelInput
     private void ApplyHighlightedSearchHit()
     {
         if (inventoryView.Search.IsEmpty) return;
-        var hits = inventoryView.SearchHits(ActiveWorld!.Inventory, ActiveWorld.Camera.IsCreative);
+        var hits = inventoryView.SearchHits(ActiveWorld!.Inventory, BrowseCreative);
         if (hits.Count == 0) return;
         // The highlight is only clamped by the arrow keys; the list can shrink under it (an owned
         // item crafted away, a server inventory sync), so Enter falls back to the first hit.
@@ -369,7 +374,7 @@ internal sealed class InventoryPanelInput
             return;
         }
 
-        if (ActiveWorld!.Camera.IsCreative)
+        if (BrowseCreative)
         {
             GrantFromCreative(hit.Id, 1);
             return;
@@ -493,7 +498,7 @@ internal sealed class InventoryPanelInput
     internal void PickRow(int row)
     {
         var world = ActiveWorld ?? throw new InvalidOperationException("No world to pick a row in.");
-        var creative = world.Camera.IsCreative;
+        var creative = BrowseCreative;
         var list = CurrentList(world.Inventory, creative);
         if (creative && list.Hits == null && inventoryView.Tab != InventoryCategory.Crafting)
             throw new InvalidOperationException("Picking a row needs a survival player (creative rows are buttons).");
@@ -613,7 +618,7 @@ internal sealed class InventoryPanelInput
             UnbindHotbarSlot(inventory, hotbar);
             return;
         }
-        if (EntryAt(position, inventory, world.Camera.IsCreative) is not { } entry) return;
+        if (EntryAt(position, inventory, BrowseCreative) is not { } entry) return;
         if (entry.Recipe is { } recipe)
         {
             OpenRecipe(recipe);
@@ -647,7 +652,7 @@ internal sealed class InventoryPanelInput
     internal void HandleInventoryClick(Vector2 position)
     {
         var inventory = ActiveWorld!.Inventory;
-        var creative = ActiveWorld.Camera.IsCreative;
+        var creative = BrowseCreative;
 
         // The search box takes the click before anything else; clicking elsewhere drops focus.
         if (renderManager.Ui.Panel.SearchBoxAt(position))

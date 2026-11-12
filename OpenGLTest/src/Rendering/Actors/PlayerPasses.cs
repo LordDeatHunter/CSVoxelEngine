@@ -8,7 +8,6 @@ using VoxelEngine.Graphics;
 using VoxelEngine.Items;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Particles;
-using VoxelEngine.Config;
 using VoxelEngine.Player;
 
 namespace VoxelEngine.Rendering.Actors;
@@ -111,7 +110,7 @@ internal sealed class PlayerPasses : IDisposable
         var viewProj = camera.GetViewProjection();
         foreach (var remote in players)
         {
-            // Bound per remote: the previous remote's blade left its item texture on unit 0
+            // Bound per remote: the previous held item left its texture on unit 0
             Units.BindUnit(0, TextureTarget.Texture2DArray, _playerPaletteTex);
             var light = _owner.LightAt(remote.Eye);
             foreach (var part in PlayerModel.BodyParts)
@@ -125,20 +124,33 @@ internal sealed class PlayerPasses : IDisposable
             _owner.SetDrawUniforms(head, head * viewProj, 1f, light);
             DrawPart("Head", remote.Armor);
 
-            DrawRemoteBlade(remote, viewProj, light);
+            DrawRemoteHeldItem(remote, viewProj, light);
         }
 
         _owner.BindEntityTextures(false);
     }
 
     /// <summary>
-    /// Draws the blade a remote is assumed to hold while it swings one (nothing otherwise), through
-    /// the same <see cref="DrawItemSprite"/> the local held item uses, then puts back the entity
-    /// textures the remote bodies draw with.
+    /// Draws the authoritative remote held item with the local grip and lantern pose,
+    /// then restores the textures used by remote bodies.
     /// </summary>
-    private void DrawRemoteBlade(RemotePlayer remote, in Matrix4x4 viewProj, EntityLightSample light)
+    private void DrawRemoteHeldItem(RemotePlayer remote, in Matrix4x4 viewProj, EntityLightSample light)
     {
-        if (SliceTrailSystem.AssumedBlade(remote.Model) is not { } item) return;
+        if (remote.HeldId != 0 && BlockType.ById[remote.HeldId] is { } block)
+        {
+            var cube = _owner.BlockCubes.Get(remote.HeldId);
+            if (cube == null) return;
+            _owner.BindWorldTextures();
+            var hand = remote.Model.GetHandAnchorMatrix(remote.Eye, remote.Yaw, 0f, remote.Pitch);
+            var matrix = block.Lantern ? HeldItemPose.LanternMatrix(hand, remote.Yaw)
+                : HeldItemPose.Pose(hand, Matrix4x4.Identity, HeldItemPose.HeldBlockScale, HeldItemPose.HeldBlockGrip);
+            _owner.SetDrawUniforms(matrix, matrix * viewProj, 1f, light);
+            cube.Render();
+            _owner.BindEntityTextures(false);
+            return;
+        }
+        var item = ItemRegistry.TryGet(remote.HeldId) ?? SliceTrailSystem.AssumedBlade(remote.Model);
+        if (item == null) return;
 
         var model = HeldItemPose.SpriteMatrix(remote.Model, item, remote.Eye, remote.Yaw, remote.Pitch, 0f);
         DrawItemSprite(item, 0, model, viewProj, light);
@@ -182,7 +194,7 @@ internal sealed class PlayerPasses : IDisposable
             foreach (var part in PlayerModel.FirstPersonParts)
             {
                 var model = player.GetPartMatrix(part, camera.Position, bodyYaw, camera.Pitch,
-                    PlayerModel.FirstPersonBodyBack);
+                    player.FirstPersonBack);
                 _owner.SetDrawUniforms(model, model * viewProj, 1f, light);
                 DrawPart(part, armor);
             }
@@ -201,7 +213,7 @@ internal sealed class PlayerPasses : IDisposable
         }
         else
         {
-            var back = PlayerModel.FirstPersonBodyBack * (1f - blend);
+            var back = player.FirstPersonBack * (1f - blend);
             foreach (var part in PlayerModel.BodyParts)
             {
                 var model = player.GetPartMatrix(part, camera.Position, bodyYaw, camera.Pitch, back);
@@ -231,7 +243,7 @@ internal sealed class PlayerPasses : IDisposable
     {
         if (camera == null || player == null || selectedId == 0 || !hasHeld) return;
 
-        var backOffset = HeldItemPose.BackOffset(camera.ShoulderBlend);
+        var backOffset = player.FirstPersonBack * (1f - camera.ShoulderBlend);
         var viewProj = camera.GetViewProjection();
         // Lit like the body holding it (RenderPlayer samples the same point)
         var light = _owner.LightAt(camera.Position);
@@ -255,8 +267,9 @@ internal sealed class PlayerPasses : IDisposable
         if (cube == null) return;
         var hand = player.GetHandAnchorMatrix(camera.Position, camera.PlayerYaw, backOffset,
             camera.Pitch);
-        var blockModel = HeldItemPose.Pose(hand, Matrix4x4.Identity, HeldItemPose.HeldBlockScale,
-            HeldItemPose.HeldBlockGrip);
+        var blockModel = BlockType.ById[selectedId]?.Lantern == true
+            ? HeldItemPose.LanternMatrix(hand, camera.PlayerYaw)
+            : HeldItemPose.Pose(hand, Matrix4x4.Identity, HeldItemPose.HeldBlockScale, HeldItemPose.HeldBlockGrip);
         _owner.SetDrawUniforms(blockModel, blockModel * viewProj, 1f, light);
         cube.Render();
     }

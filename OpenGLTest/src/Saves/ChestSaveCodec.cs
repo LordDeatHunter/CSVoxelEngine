@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using VoxelEngine.Config;
 using VoxelEngine.Simulation.Chests;
 using VoxelEngine.UI.InventoryPanel;
 
@@ -62,7 +61,7 @@ public static class ChestSaveCodec
                     dropped.Add(entry.Name ?? "(no name)");
                 continue;
             }
-            if (!SaveNames.TryResolve(entry.Name, out var id) || ChestTransfer.IsInstance(id)
+            if (!SaveNames.TryResolve(entry.Name, out var id) || (ChestTransfer.IsInstance(id) && !Simulation.Lanterns.LanternState.IsLantern(id))
                 || Inventory.CategoryOf(id) == null)
             {
                 dropped.Add(entry.Name ?? "(no name)");

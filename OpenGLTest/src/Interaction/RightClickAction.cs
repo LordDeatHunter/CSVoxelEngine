@@ -37,7 +37,10 @@ internal sealed class RightClickAction
     {
         _world = world;
         _clientMode = clientMode;
+        Lantern = new Simulation.Lanterns.LanternInteraction(world, clientMode);
     }
+
+    internal Simulation.Lanterns.LanternInteraction Lantern { get; }
 
     private float _useChargeSeconds;
     private ushort _useItemId;
@@ -121,6 +124,8 @@ internal sealed class RightClickAction
                 Camera.NotifyPlayerAction();
                 break;
         }
+
+        if (Lantern.TryUse(player, maxDistance, out outcome)) return true;
 
         if (Interactions.TryCookOrCollect(maxDistance, player) || Interactions.TryQuernInteract(maxDistance, player)
                                                   || Interactions.TryKilnInteract(maxDistance, player) || Interactions.TryBloomeryInteract(maxDistance, player)
@@ -212,7 +217,7 @@ internal sealed class RightClickAction
     /// authoritative side, a prediction from the mirror on a client.</summary>
     internal AltarVerdict LastAltarVerdict { get; private set; }
 
-    /// <summary>Whether a timed use is charging (see <see cref="TryBeginUseCharge"/>).</summary>
+    /// <summary>Whether a timed use is charging (see <see cref="TryBeginUseCharge()"/>).</summary>
     internal bool IsUseCharging { get; private set; }
 
     /// <summary>

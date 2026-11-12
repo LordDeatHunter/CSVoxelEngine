@@ -72,7 +72,7 @@ public enum NetEntityKind : byte
 /// fits in a byte, but for a crawler's surface in the byte above. GL-free and content-free.
 /// </summary>
 public readonly record struct NetEntity(NetEntityKind Kind, int Id, Vector3 Position, float Yaw,
-    int Health, int Ammo, ushort ItemId, Vector3 Velocity, byte Effects = 0)
+    int Health, int Ammo, ushort ItemId, Vector3 Velocity, byte Effects = 0, Saves.PlayerSaveData.ToolData? Instance = null)
 {
     /// <summary>Whether <paramref name="kind"/> is a mob (a slime, a goblin, a hell, sky, cave or tower mob or a wild
     /// animal), the only kinds the client's mob reconcile spawns; drops, primed TNT and falling blocks are mirrored apart.</summary>

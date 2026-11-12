@@ -72,6 +72,9 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       Camps/                   # goblin camps, namespace VoxelEngine.Simulation.Camps (see "Goblin camps")
         GoblinCamps.cs         # one camp a dark night by chance, far from a player: a lit fire and torch-bearing goblins
                                #   milling round it (MobDirector owns it, pitching the fire through BlockPlacer)
+      Lanterns/                # per-instance fuel/storage (LanternState, LanternComponent), target/precedence/access
+                               #   (LanternTarget, LanternAccess, LanternInteraction), placed ownership/ticking
+                               #   (LanternManager) and versioned persistence (LanternData, LanternCodec)
       Chests/                  # chest block entities, namespace VoxelEngine.Simulation.Chests (see "Chests (I-4)")
         ChestManager.cs        # the registry by cell: state created on first use (a ruin chest rolls its loot), the
                                #   spill on a break and the stale sweep, the stations.json capture and restore

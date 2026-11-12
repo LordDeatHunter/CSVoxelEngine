@@ -83,6 +83,7 @@ public sealed class GameServer : IDisposable
     private readonly PlayerSessions _sessions;
     private readonly IntentReplay _intents;
     private readonly ChestSessions _chests;
+    private readonly LanternSessions _lanterns;
     private readonly WaystoneSessions _waystones;
     private double _playerSaveTimer;
     private double _sweepTimer;
@@ -102,6 +103,7 @@ public sealed class GameServer : IDisposable
         _waystones = new WaystoneSessions(_state);
         _intents = new IntentReplay(_state, _waystones);
         _chests = new ChestSessions(_state);
+        _lanterns = new LanternSessions(_state);
         _state.World.ServerPlayers = _state.PlayerList;
     }
 
@@ -217,6 +219,7 @@ public sealed class GameServer : IDisposable
         {
             _listTimer = 0;
             _sessions.BroadcastPlayerList();
+            _lanterns.Tick();
         }
         if (_timeTimer >= NetworkConfig.NetTimeSyncSeconds)
         {
@@ -295,7 +298,14 @@ public sealed class GameServer : IDisposable
                 _intents.OnInventoryRequest(client, reader);
                 break;
 
+            case NetMessage.LanternOpen:
+                _lanterns.Open(client, reader);
+                break;
+            case NetMessage.LanternMove:
+                _lanterns.Move(client, reader);
+                break;
             case NetMessage.ChestOpen:
+                _lanterns.Close(client);
                 _chests.OnOpen(client, reader);
                 break;
 
@@ -305,6 +315,7 @@ public sealed class GameServer : IDisposable
 
             case NetMessage.ChestClose:
                 _chests.OnClose(client);
+                _lanterns.Close(client);
                 break;
 
             case NetMessage.WaystoneRename:

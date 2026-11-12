@@ -61,6 +61,9 @@ public class ItemDrop
 
     /// <summary>Block or item id this drop collects as (see <see cref="ItemRegistry.IsItem"/>).</summary>
     public ushort BlockId { get; }
+
+    /// <summary>Owned instance payload; never simulated while dropped.</summary>
+    public UI.InventoryPanel.ItemStack? Instance { get; internal set; }
     public Vector3 Position { get; private set; }
 
     private Vector3 _velocity;

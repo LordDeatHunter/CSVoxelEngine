@@ -16,6 +16,30 @@ public sealed class PlayerModelTests
 {
     public PlayerModelTests() => TestContent.EnsureLoaded();
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ALanternRaisesTheHandAndHangsBelowItWithoutTurningOver(bool flying)
+    {
+        var ordinary = new PlayerModel { HoldingItem = true };
+        var lantern = new PlayerModel { HoldingItem = true, HoldingLantern = true };
+        for (var i = 0; i < 120; i++)
+        {
+            ordinary.Update(1f / 60f, 0f, flying: flying);
+            lantern.Update(1f / 60f, 0f, flying: flying);
+        }
+        var eye = new Vector3(.5f, 70f, .5f);
+        var hand = lantern.GetHandAnchorMatrix(eye, -90f, PlayerModel.FirstPersonBodyBack);
+        var rest = ordinary.GetHandAnchorMatrix(eye, -90f, PlayerModel.FirstPersonBodyBack);
+        Assert.True(hand.Translation.Y > rest.Translation.Y);
+        Assert.True(hand.Translation.Z < eye.Z);
+        var matrix = HeldItemPose.LanternMatrix(hand, -90f);
+        var center = Vector3.Transform(Vector3.Zero, matrix);
+        Assert.True(center.Y < hand.Translation.Y);
+        Assert.True(Vector3.TransformNormal(Vector3.UnitY, matrix).Y > 0f);
+    }
+
+
     [Fact]
     public void StandingStillKeepsLimbsAtRest()
     {

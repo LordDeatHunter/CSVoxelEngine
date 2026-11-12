@@ -58,6 +58,15 @@ internal sealed class DropPickup
     // the transition into the blocked state only
     private bool _pickupBlocked;
 
+    internal static bool Credit(Inventory inventory, ushort id, ItemStack? instance) =>
+        instance != null ? inventory.AddInstance(instance, autoEquip: true) : inventory.Add(id);
+
+    private void ReturnRefused(int index, ushort id, Vector3 position)
+    {
+        if (_dropManager.CollectedInstances[index] is { } stack) _dropManager.SpawnInstance(stack, position);
+        else _dropManager.SpawnAt(id, position, Vector3.Zero);
+    }
+
     // The hotbar slot a collected item's icon flies to: the first slot showing it, else the selected one
     private int FlySlot(ushort id)
     {
@@ -102,7 +111,7 @@ internal sealed class DropPickup
         var collected = _dropManager.Collected;
         var collectors = _dropManager.CollectedBy;
         var collectedAt = _dropManager.CollectedAt;
-        for (var i = 0; i < collected.Length; i++)
+        for (var i = 0; !_clientMode && i < collected.Length; i++)
         {
             if (collectors[i] >= goblinCollectors)
             {
@@ -113,13 +122,15 @@ internal sealed class DropPickup
             if (_serverMode)
             {
                 var player = ServerPlayers[collectors[i]];
-                if (player.Inventory.Add(collected[i]))
+                if (Credit(player.Inventory, collected[i], _dropManager.CollectedInstances[i]))
                     player.InventoryChanged = true;
+                else ReturnRefused(i, collected[i], collectedAt[i]);
                 continue;
             }
 
             var known = Inventory.Knows(collected[i]);
-            var added = Inventory.Add(collected[i]);
+            var added = Credit(Inventory, collected[i], _dropManager.CollectedInstances[i]);
+            if (!added) ReturnRefused(i, collected[i], collectedAt[i]);
             pickedUp |= added;
             if (added)
                 _world.HotbarPops.Flying.Spawn(collected[i], collectedAt[i], FlySlot(collected[i]));

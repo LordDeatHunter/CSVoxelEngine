@@ -223,6 +223,12 @@ public class PlayerModel
     /// <summary>Whether the right hand currently holds something; eases the carrying pose in and out.</summary>
     public bool HoldingItem { get; set; }
 
+    /// <summary>Raises the carrying arm for a hanging lantern.</summary>
+    public bool HoldingLantern { get; set; }
+    internal float FirstPersonBack => HoldingLantern ? 0f : FirstPersonBodyBack;
+    internal float CarryShoulder => HoldingLantern ? LanternConfig.CarryShoulder : HoldShoulder;
+    internal float CarryElbow => HoldingLantern ? LanternConfig.CarryElbow : HoldElbow;
+
     /// <summary>Smoothed 0..1 carrying amount.</summary>
     public float HoldBlend => _holdBlend;
 
@@ -573,7 +579,7 @@ public class PlayerModel
 
     public void StartThrowCharge() => _throwCharge01 = 0f;
 
-    /// <summary>Starts the timed-use pose (see <see cref="VoxelEngine.Interaction.RightClickAction.TryBeginUseCharge"/>).</summary>
+    /// <summary>Starts the timed-use pose (see <see cref="VoxelEngine.Interaction.RightClickAction.TryBeginUseCharge()"/>).</summary>
     public void StartUseCharge(UsePose pose = UsePose.Raise)
     {
         _usePose = pose;

@@ -111,9 +111,19 @@ internal sealed class BlockPlacer
         var inventory = player.Inventory;
         if (!inventory.CanPlaceSelected) return false;
         if (!PlaceAgainstFace(hitCell, hitNormal, inventory.SelectedBlockId, player)) return false;
-        if (!player.IsCreative)
-            inventory.ConsumeSelected();
+        TransferPlaced(player);
         return true;
+    }
+
+    private void TransferPlaced(PlayerContext player)
+    {
+        var inventory = player.Inventory;
+        if (Simulation.Lanterns.LanternState.IsLantern(inventory.SelectedBlockId))
+        {
+            if (!_clientMode) _world.Lanterns.Place(inventory, _placePopPosition);
+            return;
+        }
+        if (!player.IsCreative) inventory.ConsumeSelected();
     }
 
     internal void AdvancePlacePop(double deltaTime)
@@ -133,8 +143,7 @@ internal sealed class BlockPlacer
 
         // Only spend a block if one actually went down (and never in creative)
         if (!TryPlaceBlockFromRaycast(maxDistance, inventory.SelectedBlockId, player)) return false;
-        if (!player.IsCreative)
-            inventory.ConsumeSelected();
+        TransferPlaced(player);
         return true;
     }
 

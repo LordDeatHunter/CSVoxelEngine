@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Items;
+using VoxelEngine.Simulation.Lanterns;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation.Waystones;
 
@@ -14,7 +15,7 @@ namespace VoxelEngine.UI.InventoryPanel;
 /// it is handed, whose pools it reads or refills in place; <see cref="Inventory.Export"/> and
 /// <see cref="Inventory.Import"/> forward here.
 /// </summary>
-internal static class InventorySaveCodec
+public static class InventorySaveCodec
 {
     /// <summary>
     /// Every <see cref="ItemStack"/> component type the save codec accounts for. Durability,
@@ -28,7 +29,7 @@ internal static class InventorySaveCodec
     internal static readonly Type[] HandledComponentTypes =
     [
         typeof(DurabilityComponent), typeof(CrucibleComponent), typeof(DisplayNameComponent),
-        typeof(CooldownComponent), typeof(StaffComponent), typeof(ModifiersComponent),
+        typeof(CooldownComponent), typeof(StaffComponent), typeof(ModifiersComponent), typeof(LanternComponent),
     ];
 
     /// <inheritdoc cref="Inventory.Export"/>
@@ -85,7 +86,7 @@ internal static class InventorySaveCodec
     /// One tool or gear instance with every component it carries, by name (a chest slot, a saved tool). Null, with the
     /// reason noted in <paramref name="unnamed"/>, when its item has no stable save name.
     /// </summary>
-    internal static PlayerSaveData.ToolData? ExportInstance(ItemStack stack, List<string> unnamed)
+    public static PlayerSaveData.ToolData? ExportInstance(ItemStack stack, List<string> unnamed)
     {
         if (SaveNames.NameOf(stack.DefinitionId) is not { } name)
         {
@@ -110,6 +111,7 @@ internal static class InventorySaveCodec
         }
         if (stack.Has<ModifiersComponent>())
             tool.Rolled = ExportRolled(stack.Get<ModifiersComponent>());
+        if (LanternState.Of(stack) is { } lantern) tool.Lantern = LanternCodec.Export(lantern);
         tool.CustomName = stack.Get<DisplayNameComponent>().CustomName;
         if (stack.Enchantments.Count > 0)
             tool.Enchantments = new Dictionary<string, int>(stack.Enchantments, StringComparer.Ordinal);
@@ -118,14 +120,15 @@ internal static class InventorySaveCodec
 
     /// <summary>
     /// Rebuilds one instance from its saved form as instance <paramref name="instanceId"/>: the item must still exist
-    /// and be tool-like (a Tools, Misc or Gear item, never a block), and every component is restored through the same
+    /// and be tool-like (a Tools, Misc or Gear item, including lantern blocks), and every component is restored through the same
     /// rules a player save uses. Null, with the reason in <paramref name="dropped"/>, when it cannot be restored.
     /// </summary>
     internal static ItemStack? ImportInstance(int instanceId, PlayerSaveData.ToolData tool, List<string> dropped)
     {
         // Any pure item may be a tool instance, not just a Tools-category one: the spawn stock puts the
         // copper pickaxe and axe (no durability, no use action, so their StorageCategory is Misc) straight into the
-        // tools pool, and a save must bring them back. Blocks never are.
+        // tools pool, and a save must bring them back. Lantern blocks also own instances.
+        var lantern = ImportLantern(tool);
         if (!SaveNames.TryResolve(tool.Name, out var id)
             || ItemRegistry.TryGet(id) is not { } item
             || Inventory.CategoryOf(id) is not (InventoryCategory.Tools or InventoryCategory.Misc
@@ -136,6 +139,7 @@ internal static class InventorySaveCodec
         }
 
         var stack = new ItemStack(instanceId, item);
+        if (lantern != null) stack.Set(new LanternComponent(lantern));
         if (item.MaxDurability > 0 && tool.UsesLeft is { } usesLeft)
             stack.Set(new DurabilityComponent(Math.Clamp(usesLeft, 0, item.MaxDurability),
                 item.MaxDurability));
@@ -153,6 +157,15 @@ internal static class InventorySaveCodec
         return stack;
     }
 
+    // Validate the component owner before a generic missing-item path could discard a complete lantern payload.
+    private static LanternState? ImportLantern(PlayerSaveData.ToolData tool)
+    {
+        if (tool.Lantern == null) return null;
+        if (!SaveNames.TryResolve(tool.Name, out var id) || !LanternState.IsLantern(id))
+            throw new System.IO.InvalidDataException("Lantern metadata requires a known lantern item");
+        return LanternCodec.Import(tool.Lantern);
+    }
+
     // The obtained set as save names, for Export
     private static List<string> ExportKnown(Inventory inventory)
     {
@@ -165,6 +178,9 @@ internal static class InventorySaveCodec
     /// <inheritdoc cref="Inventory.Import"/>
     internal static void Import(Inventory inventory, PlayerSaveData.InventoryData data)
     {
+        if (data.Tools != null)
+            foreach (var tool in data.Tools)
+                if (tool != null) ImportLantern(tool);
         inventory.Blocks.Clear();
         inventory.Misc.Clear();
         inventory.Tools.Clear();
@@ -189,9 +205,10 @@ internal static class InventorySaveCodec
         inventory.ReplaceKnownParts(knownParts);
         inventory.Waystones.Replace(ImportWaystones(data.Waystones, dropped));
 
-        ImportStore(inventory, data.Blocks, InventoryCategory.Blocks, inventory.Blocks, dropped);
-        ImportStore(inventory, data.Misc, InventoryCategory.Misc, inventory.Misc, dropped);
+        ImportStore(data.Blocks, InventoryCategory.Blocks, inventory.Blocks, dropped);
+        ImportStore(data.Misc, InventoryCategory.Misc, inventory.Misc, dropped);
         ImportTools(inventory, data, dropped);
+        MigrateLanterns(inventory, data.Blocks);
         inventory.Equipment.Restore(data.Equipped);
         ImportHotbar(inventory, data);
         inventory.Select(data.SelectedIndex ?? 0);
@@ -219,7 +236,7 @@ internal static class InventorySaveCodec
         return entries;
     }
 
-    private static void ImportStore(Inventory inventory, List<PlayerSaveData.StackData>? entries,
+    private static void ImportStore(List<PlayerSaveData.StackData>? entries,
         InventoryCategory category, Dictionary<ushort, int> store, List<string> dropped)
     {
         if (entries == null) return;
@@ -228,6 +245,7 @@ internal static class InventorySaveCodec
         foreach (var entry in entries)
         {
             if (entry == null) continue;
+            if (SaveNames.TryResolve(entry.Name, out var legacy) && LanternState.IsLantern(legacy)) continue;
             if (!SaveNames.TryResolve(entry.Name, out var id) || Inventory.CategoryOf(id) != category)
             {
                 dropped.Add(entry.Name ?? "(no name)");
@@ -238,6 +256,16 @@ internal static class InventorySaveCodec
             store[id] = store.GetValueOrDefault(id) + count;
             used += count;
         }
+    }
+
+    // Old lanterns were block-pool counts. Preserve every bounded old unit even when that exceeds today's tool cap.
+    private static void MigrateLanterns(Inventory inventory, List<PlayerSaveData.StackData>? entries)
+    {
+        if (entries == null) return;
+        foreach (var entry in entries)
+            if (entry != null && SaveNames.TryResolve(entry.Name, out var id) && LanternState.IsLantern(id))
+                for (var i = 0; i < Math.Clamp(entry.Count ?? 0, 0, Inventory.BlockCapacity); i++)
+                    inventory.Tools.Add(new ItemStack(inventory.NextToolInstance++, id));
     }
 
     private static void ImportTools(Inventory inventory, PlayerSaveData.InventoryData data, List<string> dropped)
@@ -254,7 +282,7 @@ internal static class InventorySaveCodec
                 }
                 // Each pool keeps its own cap: a full tools pool never crowds out gear, nor the reverse
                 var pool = item is GearItem ? InventoryCategory.Gear : InventoryCategory.Tools;
-                if (inventory.UsedOf(pool) >= Inventory.CapacityOf(pool))
+                if (!LanternState.IsLantern(id) && inventory.UsedOf(pool) >= Inventory.CapacityOf(pool))
                 {
                     dropped.Add($"{tool.Name} (pool full)");
                     continue;
@@ -347,6 +375,9 @@ internal static class InventorySaveCodec
                     && inventory.Tools.Any(t => t.InstanceId == instance && t.Item is not GearItem))
                     inventory.Hotbar[i] = new HotbarSlot(true, 0, instance);
             }
+            else if (SaveNames.TryResolve(slot.Name, out var lanternId) && LanternState.IsLantern(lanternId)
+                     && inventory.Tools.FirstOrDefault(t => t.DefinitionId == lanternId) is { } lantern)
+                inventory.Hotbar[i] = new HotbarSlot(true, 0, lantern.InstanceId);
             else if (SaveNames.TryResolve(slot.Name, out var id) && inventory.StoreOf(id) != null
                      && inventory.CountFor(id) > 0)
                 inventory.Hotbar[i] = new HotbarSlot(false, id, 0);

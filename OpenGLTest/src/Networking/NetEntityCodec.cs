@@ -25,6 +25,8 @@ public static class NetEntityCodec
         else writer.Write(entity.ItemId);
         writer.Write(entity.Velocity);
         writer.Write(entity.Effects);
+        if (entity.Kind == NetEntityKind.Drop)
+            writer.WriteBytes(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(entity.Instance));
     }
 
     /// <summary>Reads one entry written by <see cref="Write"/>.</summary>
@@ -39,7 +41,9 @@ public static class NetEntityCodec
         var itemId = CarriesContentId(kind) ? reader.ReadId() : reader.ReadUInt16();
         var velocity = reader.ReadVector3();
         var effects = reader.ReadEffectMask();
-        return new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity, effects);
+        var instance = kind == NetEntityKind.Drop
+            ? System.Text.Json.JsonSerializer.Deserialize<Saves.PlayerSaveData.ToolData>(reader.ReadBytes()) : null;
+        return new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity, effects, instance);
     }
 
     /// <summary>Whether a kind's <see cref="NetEntity.ItemId"/> is a block or item id rather than mob data.</summary>

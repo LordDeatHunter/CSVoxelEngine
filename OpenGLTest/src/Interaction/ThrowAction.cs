@@ -148,9 +148,11 @@ internal sealed class ThrowAction
         {
             var id = inventory.SelectedBlockId;
             if (id == 0) return false;
-            if (!inventory.RemoveTool(instance)) return false;
-            _dropManager.SpawnAt(id, eye + forward * 0.6f, forward * 4f + Vector3.UnitY * 1.5f,
-                PlayerConfig.ThrownPickupDelaySeconds);
+            var stack = inventory.GetToolStack(instance);
+            if (stack == null) return false;
+            _dropManager.SpawnInstance(stack, eye + forward * .6f,
+                forward * 4f + Vector3.UnitY * 1.5f, PlayerConfig.ThrownPickupDelaySeconds);
+            inventory.RemoveTool(instance);
             return true;
         }
 

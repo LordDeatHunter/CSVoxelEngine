@@ -41,6 +41,16 @@ public static class HeldItemPose
         Pose(player.GetHandAnchorMatrix(eye, yawDeg, backOffset, pitchDeg),
             type.DisplayMatrix(player.HeldItemRotationOffset), HeldItemScale, HeldItemGrip);
 
+    /// <summary>A lantern hangs upright below the hand's grip, regardless of the wrist's rotation.</summary>
+    internal static Matrix4x4 LanternMatrix(Matrix4x4 hand, float yawDeg, float scale = HeldBlockScale)
+    {
+        var grip = Vector3.Transform(new Vector3(-0.06f, 0.02f, -0.10f), hand);
+        // Pivot at the chain's top. A small outward tilt clears the forearm while the grip stays in the fingers.
+        return Matrix4x4.CreateTranslation(0f, -.5f, 0f) * Matrix4x4.CreateScale(scale)
+            * Matrix4x4.CreateRotationZ(LanternConfig.HangTilt)
+            * Matrix4x4.CreateRotationY(-MathUtils.ToRadians(yawDeg + 90f)) * Matrix4x4.CreateTranslation(grip);
+    }
+
     /// <summary>The first-person body's back shift at a shoulder-camera blend (0 first person, 1 shoulder).</summary>
     internal static float BackOffset(float shoulderBlend) => PlayerModel.FirstPersonBodyBack * (1f - shoulderBlend);
 }

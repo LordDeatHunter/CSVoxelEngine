@@ -60,6 +60,14 @@ internal sealed class ScenarioUi(InventoryPanelInput panelInput, SpellBuilderInp
             throw new InvalidOperationException($"({x}, {y}, {z}) is not a chest in reach.");
     }
 
+    public void OpenLantern()
+    {
+        var world = RequirePlaying("lantern");
+        if (!world.RightClick.TryUseSelected(World.InteractionReach, out var outcome) || outcome != RightClickOutcome.Lantern)
+            throw new InvalidOperationException("The click did not open a lantern.");
+        panelInput.Chest.OpenLantern(world, world.RightClick.Lantern.Instance, world.RightClick.Lantern.Cell);
+    }
+
     public void CloseChest() => panelInput.Chest.Close();
 
     public void PickChestRow(int row, bool all)

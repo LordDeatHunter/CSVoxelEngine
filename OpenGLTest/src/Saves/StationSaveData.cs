@@ -26,6 +26,8 @@ public sealed class StationSaveData
     /// <summary>The chests that have been used (a never-opened ruin chest is not here and re-rolls from its seed).</summary>
     public List<ChestData>? Chests { get; set; }
 
+    public List<Simulation.Lanterns.LanternData>? Lanterns { get; set; }
+
     /// <summary>The waystone registry's records (a waystone nobody activated has none).</summary>
     public List<WaystoneData>? Waystones { get; set; }
 

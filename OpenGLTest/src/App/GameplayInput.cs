@@ -349,13 +349,14 @@ internal sealed class GameplayInput
                 // A timed use (use.seconds) charges instead of firing on the click, and runs only
                 // when the hold completes, but only once no block under the crosshair claimed the click
                 // (a chest opens, not a bandage); anything else uses or places on the click
-                var outcome = RightClickOutcome.None;
-                var claimed = w.RightClick.TryUseOrBeginCharge(World.InteractionReach, out outcome);
+                var claimed = w.RightClick.TryUseOrBeginCharge(World.InteractionReach, out var outcome);
                 FrameProfiler.End(ProfileSection.UsePlace);
                 // A spell table opens the builder on this side only (the click itself changes nothing)
                 if (outcome == RightClickOutcome.SpellTable)
                     builderInput.OpenFromStation(w);
                 // A chest opens its panel beside the [E] list (the click itself changes nothing here)
+                if (outcome == RightClickOutcome.Lantern)
+                    panelInput.Chest.OpenLantern(w, w.RightClick.Lantern.Instance, w.RightClick.Lantern.Cell);
                 if (outcome == RightClickOutcome.Container)
                     panelInput.Chest.Open(w, w.RightClick.LastContainerCell);
                 // A waystone is discovered and its screen opened here (the click itself changes nothing)

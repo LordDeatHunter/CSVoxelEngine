@@ -9,7 +9,6 @@ using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Effects.Lighting;
-using VoxelEngine.Items;
 
 namespace VoxelEngine.Content.Blocks;
 
@@ -117,6 +116,10 @@ internal static class BlockLoader
         var (horizontalFacing, supportAttached) =
             BlockSchemaParser.ParseFacingAndSupport(definition, renderer, fluid, falls, stack.StackMax,
                 support.NeedsSupport, path, out var supportAbove);
+        if (definition.Lantern && (renderer != BlockRenderer.Model || fluid || falls || !support.NeedsSupport
+            || !supportAbove || horizontalFacing || supportAttached || stack.StackMax > 0 || definition.Unbreakable == true
+            || definition.HasItem == false || definition.Chest != null))
+            throw new InvalidOperationException($"{path}: lantern requires a collectible supported model with its own state byte");
         var facingFromLook = BlockSchemaParser.ParseFacingFromLook(definition, horizontalFacing, supportAttached, path);
         var openHitboxes = BlockSchemaParser.ParseOpen(definition, horizontalFacing, path);
         var solid = !fluid && (definition.Solid ?? true);
@@ -179,6 +182,7 @@ internal static class BlockLoader
             SpellBuilder = definition.SpellBuilder ?? false,
             Waystone = definition.Waystone ?? false,
             Chest = BlockSchemaParser.ParseChest(definition.Chest, renderer, path),
+            Lantern = definition.Lantern,
             StackMax = (byte)stack.StackMax,
             TipHardness = tipHardness,
             HandMaxThickness = handMaxThickness,
