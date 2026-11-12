@@ -8,3 +8,8 @@ Case open SFX - https://freesound.org/people/RiceWitch/sounds/682729/
 spone_squish_water_blood_squird_1003_2026 - https://freesound.org/people/Artninja/sounds/873150/
 Swoosh - https://freesound.org/people/Brsjak/sounds/482880/
 84526__andreas-mustola__0005-crystal-lamp-with-swing-front_Cleaned - https://freesound.org/people/dheming/sounds/198298/
+## Crows
+https://freesound.org/people/qubodup/sounds/813115/
+https://freesound.org/people/qubodup/sounds/813114/
+https://freesound.org/people/Jofae/sounds/361470/
+https://freesound.org/people/vixuxx/sounds/9874/
