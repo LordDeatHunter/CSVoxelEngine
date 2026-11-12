@@ -893,6 +893,9 @@ public class World
     /// only what the server sends the chest it has open).</summary>
     public ChestManager Chests => _chests;
 
+    /// <summary>The lit campfires, for a body that stands in one (<see cref="PlayerBodyProbe.OnLitCampfire"/>).</summary>
+    public CampfireManager Campfires => _campfires;
+
     /// <summary>The chest panel's UI state: which chest is open and what it shows (see <see cref="ChestView"/>).</summary>
     public ChestView ChestPanel { get; } = new();
 

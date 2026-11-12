@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Simulation;
 
 namespace VoxelEngine.Player;
 
@@ -170,5 +171,27 @@ public static class PlayerBodyProbe
         var max = new Vector3(eye.X + PlayerPhysics.PlayerRadius, feetY + PlayerPhysics.PlayerHeight,
             eye.Z + PlayerPhysics.PlayerRadius);
         return BurningFluid.AnyInBox(min, max, chunks);
+    }
+
+    // A resting body's feet can sit a float short of the cell edge they stand on; this much still counts as in the cell
+    private const float CampfireFeetTolerance = 0.05f;
+
+    /// <summary>
+    /// Whether a body with its eye at <paramref name="eye"/> stands in a lit campfire: the pile in the cell its feet are
+    /// in, under any cell of its footprint. A pile is not solid, so a body stands in it rather than on it; a pile beside
+    /// the body, or one a block below its feet, does not count.
+    /// </summary>
+    public static bool OnLitCampfire(Vector3 eye, CampfireManager campfires)
+    {
+        if (campfires.LitCount == 0) return false;
+        var y = (int)MathF.Floor(eye.Y - Camera.EyeHeight + CampfireFeetTolerance);
+        var minX = (int)MathF.Floor(eye.X - PlayerPhysics.PlayerRadius);
+        var maxX = (int)MathF.Floor(eye.X + PlayerPhysics.PlayerRadius);
+        var minZ = (int)MathF.Floor(eye.Z - PlayerPhysics.PlayerRadius);
+        var maxZ = (int)MathF.Floor(eye.Z + PlayerPhysics.PlayerRadius);
+        for (var x = minX; x <= maxX; x++)
+            for (var z = minZ; z <= maxZ; z++)
+                if (campfires.IsLit(x, y, z)) return true;
+        return false;
     }
 }
