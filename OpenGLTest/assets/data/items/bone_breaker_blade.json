@@ -1,0 +1,12 @@
+{
+  // Bone-Breaker Blade: the bone-shrapnel sword of plans/BATTLE_TOWER.md BT-7. Every landed sword hit
+  // sprays bone fragments that wound nearby enemies; the bone charm sharpens that burst. Sprite is committed art.
+  "name": "Bone-Breaker Blade",
+  "texture": "assets/textures/items/bone_breaker_blade.png",
+  "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.6 },
+  "attack": "sword",
+  "trail": { "color": [226, 216, 190] },
+  "entityDamage": 12,
+  "rarity": "rare",
+  "shrapnel": { "count": 6, "damage": 3 }
+}

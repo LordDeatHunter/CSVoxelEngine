@@ -7,7 +7,7 @@ namespace VoxelEngine.Content.Definitions;
 /// <summary>
 /// JSON shape of <c>assets/data/loot/&lt;name&gt;.json</c>: a simplified Minecraft loot table.
 /// Compiled into a <see cref="LootTable"/> by <see cref="ContentRegistry"/>, which resolves
-/// every entry's item name to a byte id up front so a roll never touches a string.
+/// every entry's item name to an id up front so a roll never touches a string.
 /// </summary>
 public sealed class LootTableDefinition
 {
@@ -23,6 +23,12 @@ public sealed class LootTableDefinition
         public float? Chance { get; set; }
 
         public List<EntryDefinition>? Entries { get; set; }
+
+        /// <summary>The pool only rolls at or above this world Y; default no limit.</summary>
+        public int? MinY { get; set; }
+
+        /// <summary>The pool only rolls at or below this world Y; default no limit.</summary>
+        public int? MaxY { get; set; }
     }
 
     /// <summary>One weighted outcome of a pool.</summary>
@@ -33,6 +39,14 @@ public sealed class LootTableDefinition
 
         /// <summary>Weighted nothing; mutually exclusive with <see cref="Item"/>.</summary>
         public bool? Empty { get; set; }
+
+        /// <summary>Another loot table (a file name) rolled in place of this entry; mutually exclusive with
+        /// <see cref="Item"/> and <see cref="Empty"/>.</summary>
+        public string? Table { get; set; }
+
+        /// <summary>For a piece of gear: the rarity it rolls, a name (<c>"rare"</c>) or <c>{"min":"common","max":"epic"}</c>,
+        /// picked by loot weight. Only legal on a gear item.</summary>
+        public JsonElement Rarity { get; set; }
 
         public int? Weight { get; set; }
 

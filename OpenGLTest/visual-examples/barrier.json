@@ -1,0 +1,51 @@
+{
+  // Barrier band check: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/barrier.json
+  // Shots land in visual/barrier/. The default seed carves a deep cavern at (-8, -316, 56) in the
+  // upper ramp and another at (104, -380, 104) in the lower one (found by a chunk scan around the
+  // origin). In the upper cavern the walls are a patchy mix of stone and the dark barrier, its
+  // share growing toward the floor, which is the gapless core's top at -330. In the lower one the
+  // ceiling is the core's underside at -370 and the walls thin back to stone further down. Lamps
+  // light each cavern (no skylight reaches this deep). The core itself has no opening anywhere:
+  // the middle shot hovers inside it, at -350, and sees the caves above and below with an empty
+  // (sky-colored) band between them where no face is drawn. The bright blue sheets in the cavern
+  // shots are underground pools wearing the sea-level water mirror, not the barrier.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-7.5, -315.5, 56.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 24 },
+    { "op": "give", "block": "lamp", "count": 8 },
+    { "op": "look", "yaw": -90, "pitch": -89 },
+    { "op": "place" },
+    { "op": "look", "yaw": 0, "pitch": 0 },
+    { "op": "place" },
+    { "op": "look", "yaw": 180, "pitch": 0 },
+    { "op": "place" },
+    { "op": "select", "slot": 9 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "look", "yaw": -90, "pitch": -35 },
+    { "op": "screenshot", "name": "upper_ramp_down", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": -10 },
+    { "op": "screenshot", "name": "upper_ramp_side", "hideHud": true },
+
+    { "op": "teleport", "pos": [8.5, -350.5, 8.5], "yaw": -90, "pitch": 0 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "screenshot", "name": "core", "hideHud": true },
+
+    { "op": "teleport", "pos": [104.5, -379.5, 104.5], "yaw": -90, "pitch": 20 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "give", "block": "lamp", "count": 8 },
+    { "op": "look", "yaw": -90, "pitch": 89 },
+    { "op": "place" },
+    { "op": "look", "yaw": 0, "pitch": 0 },
+    { "op": "place" },
+    { "op": "look", "yaw": 180, "pitch": 0 },
+    { "op": "place" },
+    { "op": "select", "slot": 9 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "look", "yaw": -90, "pitch": 35 },
+    { "op": "screenshot", "name": "lower_ramp_up", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": -10 },
+    { "op": "screenshot", "name": "lower_ramp_side", "hideHud": true }
+  ]
+}

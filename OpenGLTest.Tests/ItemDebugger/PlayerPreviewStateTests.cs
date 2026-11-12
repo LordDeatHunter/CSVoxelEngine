@@ -1,5 +1,8 @@
 using System;
+using System.Numerics;
 using VoxelEngine.ItemDebugger;
+using VoxelEngine.Items;
+using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using Xunit;
 
@@ -101,8 +104,9 @@ public sealed class PlayerPreviewStateTests
     public void EveryOneShotPlaysAndThenReplays()
     {
         foreach (var mode in new[] { PlayerPreviewState.Punch, PlayerPreviewState.HeavyPunch, PlayerPreviewState.Slice,
-                     PlayerPreviewState.SliceBack, PlayerPreviewState.Throw, PlayerPreviewState.Hurt,
-                     PlayerPreviewState.Equip, PlayerPreviewState.Death })
+                     PlayerPreviewState.SliceBack, PlayerPreviewState.Cut, PlayerPreviewState.BackCut,
+                     PlayerPreviewState.Chop, PlayerPreviewState.Axe, PlayerPreviewState.Throw, PlayerPreviewState.Cast,
+                     PlayerPreviewState.Hurt, PlayerPreviewState.Equip, PlayerPreviewState.Death })
         {
             var (state, model) = Make(mode);
             Assert.True(state.IsOneShot, mode);
@@ -116,7 +120,9 @@ public sealed class PlayerPreviewStateTests
                 {
                     PlayerPreviewState.Punch or PlayerPreviewState.HeavyPunch => model.MineT < 1f,
                     PlayerPreviewState.Slice or PlayerPreviewState.SliceBack => model.IsSlicing,
+                    PlayerPreviewState.Cut or PlayerPreviewState.BackCut or PlayerPreviewState.Chop or PlayerPreviewState.Axe => model.IsSwordSwinging,
                     PlayerPreviewState.Throw => model.IsThrowing || model.ThrowCharge.HasValue,
+                    PlayerPreviewState.Cast => model.IsCasting,
                     PlayerPreviewState.Hurt => MathF.Abs(model.Flinch) > 0.05f,
                     PlayerPreviewState.Equip => model.EquipLowering > 0.05f,
                     _ => model.DeathFall > 0.05f,
@@ -144,5 +150,76 @@ public sealed class PlayerPreviewStateTests
         Assert.True(model.ThrowCharge.HasValue);
         Assert.True(state.SetMode(PlayerPreviewState.Idle));
         Assert.False(model.ThrowCharge.HasValue);
+    }
+
+    private static readonly Vector3 TrailEye = new(0f, Camera.EyeHeight, 0f);
+    private const float TrailYaw = -90f;
+
+    // Poses the item exactly as the game draws it held, at a fixed eye and yaw, the way the debugger's sampler does.
+    private static SliceTrailSampler SamplerFor(string itemName)
+    {
+        TestContent.EnsureLoaded();
+        var item = ItemRegistry.TryGet(ContentRegistry.RequireItem(itemName).Id)!;
+        return (PlayerModel model, out Matrix4x4 blade, out Matrix4x4 owner) =>
+        {
+            blade = HeldItemPose.SpriteMatrix(model, item, TrailEye, TrailYaw, 0f, 0f);
+            owner = SliceTrail.OwnerFrameAt(TrailEye, model.DrawnBodyYaw(TrailYaw));
+            return true;
+        };
+    }
+
+    private static (PlayerPreviewState State, AnimationClock Clock) TrailPreview(string mode, string itemName)
+    {
+        var state = new PlayerPreviewState(new PlayerModel()) { TrailSampler = SamplerFor(itemName) };
+        Assert.True(state.SetMode(mode));
+        var clock = new AnimationClock { Loop = false };
+        clock.Attach(state);
+        return (state, clock);
+    }
+
+    [Theory]
+    [InlineData(PlayerPreviewState.Slice, "obsidian_blade")]
+    [InlineData(PlayerPreviewState.Chop, "iron_sword")]
+    public void SeekingRebuildsTheTrailPlayingWouldHave(string mode, string itemName)
+    {
+        var (played, playClock) = TrailPreview(mode, itemName);
+        var target = played.Duration * 0.6f;
+        for (var t = 0f; t < target - 1e-5f; t += Dt) playClock.Update(Dt);
+        Assert.True(played.Trail.Count > 2, $"{mode}: the swing left no trail to compare.");
+
+        var (sought, seekClock) = TrailPreview(mode, itemName);
+        seekClock.Seek(playClock.Time);
+
+        Assert.Equal(played.Trail.Count, sought.Trail.Count);
+        var newest = played.Trail.Count - 1;
+        Assert.True(Vector3.Distance(played.Trail.TipAt(newest), sought.Trail.TipAt(newest)) < 1e-4f,
+            $"{mode}: the newest tip differs between playing and seeking.");
+    }
+
+    [Fact]
+    public void RestartingClearsTheTrail()
+    {
+        var (state, clock) = TrailPreview(PlayerPreviewState.Slice, "obsidian_blade");
+        for (var i = 0; i < 20; i++) clock.Update(Dt);
+        Assert.True(state.Trail.Count > 0);
+
+        state.Restart();
+        Assert.Equal(0, state.Trail.Count);
+
+        for (var i = 0; i < 20; i++) clock.Update(Dt);
+        Assert.True(state.Trail.Count > 0);
+        Assert.True(state.SetMode(PlayerPreviewState.Idle));
+        Assert.Equal(0, state.Trail.Count);
+    }
+
+    [Fact]
+    public void APunchModeLeavesNoTrail()
+    {
+        var (state, clock) = TrailPreview(PlayerPreviewState.Punch, "obsidian_blade");
+        for (var t = 0f; t < state.Duration; t += Dt)
+        {
+            clock.Update(Dt);
+            Assert.Equal(0, state.Trail.Count);
+        }
     }
 }

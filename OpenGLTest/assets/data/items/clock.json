@@ -1,7 +1,7 @@
 {
   // While it sits in the hotbar the HUD shows the time of day and the day number in the compass's
-  // place (see Clock and UIRenderer.DrawClock). Crafted from four copper ingots and a mud brick
-  // (recipes/clock.json). The sprite is a placeholder from tools/generate-clock-texture.py.
+  // place (see Clock and UIRenderer.DrawClock). Crafted from four copper rings and a mud brick
+  // (recipes/clock.json). The sprite is committed placeholder art.
   "name": "Clock",
   "texture": "assets/textures/items/clock.png",
   "display": { "rotation": [-60, 0, 0], "scale": 0.67 }

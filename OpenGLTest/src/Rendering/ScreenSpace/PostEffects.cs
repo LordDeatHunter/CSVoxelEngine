@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Effects.Post;
 
@@ -12,8 +13,10 @@ namespace VoxelEngine.Rendering.ScreenSpace;
 /// <param name="DamageFringe">The damage chromatic fringe's strength (<see cref="VoxelEngine.Juice.DamageFringe.Strength"/>); 0 draws none.</param>
 /// <param name="Underwater">The underwater wobble's strength, the eased underwater amount (<see cref="UnderwaterWobble"/>); 0 draws none.</param>
 /// <param name="Time">The wobble's clock in seconds, wrapped to keep float precision.</param>
+/// <param name="Shockwaves">The expanding shells that bend the screen (<see cref="Shockwave"/>), at most
+/// <see cref="Shockwave.Max"/> read; null or empty draws none.</param>
 public readonly record struct PostEffects(float Exposure, Vector3 Grade, float DamageFringe = 0f, float Underwater = 0f,
-    float Time = 0f)
+    float Time = 0f, IReadOnlyList<Shockwave>? Shockwaves = null)
 {
     /// <summary>Every effect off: the default exposure and no grade.</summary>
     public static PostEffects Neutral => new(LightingConfig.TonemapExposure, Vector3.One);

@@ -1,0 +1,15 @@
+{
+  // A worldgen-only bone heap on a battle tower floor: its skeletons rise from it in waves
+  // (BT-4) until it is spent, and the tower's lock then clears it. Unbreakable and never
+  // replaceable, so no gameplay path removes it; walked through, with a low hitbox. The tile
+  // is placeholder art from tools/generate-tower-lock-textures.py.
+  "name": "Skeleton Pile",
+  "model": "block/skeleton_pile",
+  "solid": false,
+  "castsAO": false,
+  "hitbox": { "min": [0.125, 0, 0.125], "max": [0.875, 0.4375, 0.875] },
+  "sfx": "hit_rock",
+  "hasItem": false,
+  "loot": "none",
+  "unbreakable": true
+}

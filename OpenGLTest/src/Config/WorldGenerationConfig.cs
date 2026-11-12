@@ -3,8 +3,8 @@ namespace VoxelEngine.Config;
 /// <summary>
 /// World generation tuning: the seed, terrain shape, dirt depth, sea and water levels, lakes and
 /// rivers, beaches and gravel, snow and ice, biomes, mud, lava pockets, ores, forest hills,
-/// mountains and openness, ravines, caves and worms, tree placement and the deterministic worldgen
-/// cache sizes. Distances and frequencies are in blocks (one block is 0.5 m; a frequency of 1/64
+/// mountains and openness, ravines, caves and worms, tree placement, the deterministic worldgen
+/// cache sizes and the realm layer bands (barrier, hell, cloud slab, sky islands). Distances and frequencies are in blocks (one block is 0.5 m; a frequency of 1/64
 /// means features ~64 blocks across).
 /// </summary>
 public static class WorldGenerationConfig
@@ -205,7 +205,8 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // per column (SnowGenerator.IsFrozenWater), the ice share rising with the cold, so the edge is
     // ragged pack ice that thickens into a solid sheet.
     public const bool SnowAndIceEnabled = true;
-    public const float SnowColdThreshold = 0.55f;   // ColdWeight above which snow starts to settle
+    public const float SnowColdThreshold = 0.48f;   // ColdWeight above which the first snow patches settle
+    public const float SnowFullColdThreshold = 0.6f; // ColdWeight from which every column is snowed (the ragged snow band ends; must stay at or below PackIceColdStart)
     // ColdWeight above which the first floes form. Must stay at or above SnowColdThreshold: Stamp
     // skips sub-snow columns before it ever freezes, and the far LOD covers a frozen sheet in snow
     // only above the snow line, so ice below the snow line would disagree between near and far.
@@ -372,6 +373,9 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const bool MalachiteEnabled = true;
     public const float MalachiteFrequency = 1f / 18f;
     public const float MalachiteThreshold = 0.83f;
+    // Cave biome richness (plans/CAVE_BIOMES.md CB-2): added to the threshold in that cave biome's cells, so
+    // negative means richer and positive poorer; every biome not listed keeps the plain field. First guesses.
+    public const float MalachiteCrystalShift = -0.03f;
 
     // --- Coal ore (CoalGenerator) ---
     // Same threshold-on-noise deposits as malachite (on the same OreNoiseLattice field), but
@@ -383,6 +387,53 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const bool CoalEnabled = true;
     public const float CoalFrequency = 1f / 20f;
     public const float CoalThreshold = 0.84f;
+    // Cave biome richness (plans/CAVE_BIOMES.md CB-2): added to the threshold in that cave biome's cells, so
+    // negative means richer and positive poorer; every biome not listed keeps the plain field. First guesses.
+    public const float CoalFungalShift = -0.03f;
+    public const float CoalDesertEchoShift = -0.02f;
+    public const float CoalMagmaDeepShift = 0.04f;   // burned out by the heat
+
+    // --- Hematite ore (HematiteGenerator) ---
+    // Iron: the same OreNoiseLattice deposits on a noise of its own, but deep stone only, in the
+    // lava pockets' band at or below HematiteMaxY. A higher threshold than malachite's keeps the
+    // veins rarer (measured relationally in HematiteTests, not guessed). The ceiling is an
+    // absolute world Y, so HasOre stays a pure (x, y, z) point query equal to what Stamp writes.
+    public const bool HematiteEnabled = true;
+    public const float HematiteFrequency = 1f / 18f;
+    public const float HematiteThreshold = 0.86f;
+    // Cave biome richness (plans/CAVE_BIOMES.md CB-2): added to the threshold in that cave biome's cells, so
+    // negative means richer and positive poorer; every biome not listed keeps the plain field. First guesses.
+    public const float HematiteMagmaDeepShift = -0.03f;
+    public const int HematiteMaxY = LavaMaxY;
+
+    // --- Tin ore (TinGenerator) ---
+    // The weaker, commoner metal: a lower threshold than malachite's (more ore, measured relationally
+    // in TinTests) in a shallower and wider absolute-Y band, so HasOre stays a pure point query.
+    public const bool TinEnabled = true;
+    public const float TinFrequency = 1f / 18f;
+    public const float TinThreshold = 0.8f;
+    // Cave biome richness (plans/CAVE_BIOMES.md CB-2): added to the threshold in that cave biome's cells, so
+    // negative means richer and positive poorer; every biome not listed keeps the plain field. First guesses.
+    public const float TinFrozenEchoShift = -0.02f;
+    public const float TinDesertEchoShift = -0.02f;
+    public const int TinMinY = -96;
+    public const int TinMaxY = 64;
+
+    // --- Vulcanite ore (VulcaniteGenerator) ---
+    // The tier above iron: the same OreNoiseLattice deposits on a noise of its own (seed offset 186), hosted
+    // by basalt alone (the barrier band and the Magma Caverns' skin), so nothing is written above BarrierTopY.
+    // The threshold is the far-from-lava one, which almost no blend passes; near lava it drops by up to
+    // VulcaniteNearLavaShift, scaled by VulcaniteGenerator.LavaProximity (1 at the lava, 0 out of reach), so
+    // the veins gather at the pools (measured relationally in VulcaniteTests). First guesses.
+    public const bool VulcaniteEnabled = true;
+    public const float VulcaniteFrequency = 1f / 14f;
+    public const float VulcaniteThreshold = 0.93f;
+    public const float VulcaniteNearLavaShift = -0.11f;
+    // Hell: rows above the layer's lava level over which the proximity falls linearly from 1 to 0
+    public const int VulcaniteLavaReachBlocks = 12;
+    // The barrier band: how far (in LavaGenerator patch-noise units) under LavaPatchThreshold the proximity
+    // starts to rise, reaching 1 at a lava patch's edge and staying 1 inside it, where the deep pockets pond
+    public const float VulcanitePatchMargin = 0.15f;
 
     // --- Forest terrain shape (smooth rolling hills with flat valleys between them) ---
     // The floor is a broad swell plus a positive-only hill field gated by a low-frequency
@@ -718,8 +769,459 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int TreeProxyCanopyCacheCapacity = 4096;
     public const int TreeProxyCanopyCacheGenerations = 4;
 
-    // Felled-canopy markers kept before TreeCanopy.CanopyDisturbed is wiped wholesale (it only
-    // bounds memory). Sized so a fell's square, (2 * FellPoisonRadius + 1)^2 ~ 1000 columns, wipes
-    // the set no more often than the old 289-column square did against 16384.
-    public const int CanopyDisturbedLimit = 65536;
+    // --- Layers (plans/LAYERS.md): the hell below and the sky above, as vertical bands of the one
+    // world. Every Y range of the realms lives here (the visual cloud sea in SkyConfig), nowhere
+    // else; LayerBandTests holds their ordering. World y, inclusive at both ends of each band.
+
+    /// <summary>Top of the barrier band, where its ramp starts: the barrier block's share of the
+    /// stone rises from 0 here to 100 % at <see cref="BarrierFullTopY"/>.</summary>
+    public const int BarrierTopY = -300;
+
+    /// <summary>Top of the barrier band's solid core: 100 % barrier from here down to
+    /// <see cref="BarrierFullBottomY"/>.</summary>
+    public const int BarrierFullTopY = -330;
+
+    /// <summary>Bottom of the barrier band's solid core; below it the share ramps back to 0 at
+    /// <see cref="BarrierBottomY"/>.</summary>
+    public const int BarrierFullBottomY = -370;
+
+    /// <summary>Bottom of the barrier band, where its lower ramp ends at 0 %.</summary>
+    public const int BarrierBottomY = -400;
+
+    /// <summary>Whether worldgen stamps the barrier band (BarrierGenerator).</summary>
+    public const bool BarrierEnabled = true;
+
+    /// <summary>Frequency of the barrier's 3D patch noise (seed offset 162): a cell in either ramp
+    /// is barrier where the noise, mapped to 0..1, is under the ramp's share at its y, so the
+    /// band's edges break into coherent patches about this wavelength across.</summary>
+    public const float BarrierPatchFrequency = 1f / 20f;
+
+    /// <summary>Where hell starts: the first cell under the barrier band. Hell has no bottom.</summary>
+    public const int HellTopY = BarrierBottomY - 1;
+
+    /// <summary>Height of one hell layer: an open cavern pocket plus the hellrock slab under it,
+    /// repeating downward forever from <see cref="HellTopY"/> (the layer index counts these).</summary>
+    public const int HellLayerPeriodBlocks = 96;
+
+    /// <summary>Thickness of the hellrock slab at the bottom of every hell layer, separating one
+    /// pocket from the next.</summary>
+    public const int HellSlabThicknessBlocks = 16;
+
+    /// <summary>Whether worldgen fills hell (HellGenerator): below <see cref="HellTopY"/> every cell
+    /// is the hell generator's, cavern pockets in hellrock separated by slabs.</summary>
+    public const bool HellEnabled = true;
+
+    /// <summary>Lattice spacing of the hell cavern noise in blocks: a power of two dividing the
+    /// chunk size, so neighboring chunks sample the same lattice points.</summary>
+    public const int HellNoiseStride = 4;
+
+    /// <summary>Frequency of the hell cavern noise (seed offset 163, two octaves): about the width
+    /// of one cavern chamber.</summary>
+    public const float HellCavernFrequency = 1f / 64f;
+
+    /// <summary>The cavern noise's y is scaled by this, so chambers are a little flatter than wide.</summary>
+    public const float HellCavernYScale = 1.5f;
+
+    /// <summary>How far in from a pocket's ceiling and floor the edge bias reaches: within this many
+    /// cells of either the cells close up, more the nearer the edge, so ceilings and floors follow
+    /// the noise instead of a flat plane.</summary>
+    public const int HellEdgeBlocks = 32;
+
+    /// <summary>The edge bias right at a pocket's ceiling and floor, in noise units (falling
+    /// quadratically to 0 at <see cref="HellEdgeBlocks"/>): above the noise's range, so the
+    /// outermost cells are always hellrock.</summary>
+    public const float HellEdgeStrength = 1.6f;
+
+    /// <summary>The cavern noise must exceed this (plus the edge bias) for a pocket cell of the top
+    /// layer to open; each layer down lowers it by <see cref="HellOpenThresholdPerLayer"/>, so
+    /// deeper pockets are more open, down to <see cref="HellOpenThresholdMin"/>.</summary>
+    public const float HellOpenThresholdTop = -0.1f;
+
+    /// <summary>How much more open each hell layer is than the one above it.</summary>
+    public const float HellOpenThresholdPerLayer = 0.02f;
+
+    /// <summary>The most open a hell layer gets.</summary>
+    public const float HellOpenThresholdMin = -0.3f;
+
+    /// <summary>The lava level of the top hell layer: every open cell fewer than this many cells
+    /// above its pocket's floor holds a lava source, so the dips of a cavern floor pond lava.
+    /// Rises by <see cref="HellLavaDepthPerLayer"/> each layer down, up to <see cref="HellLavaMaxDepth"/>.</summary>
+    public const int HellLavaBaseDepth = 14;
+
+    /// <summary>How many cells the lava level rises each hell layer down.</summary>
+    public const int HellLavaDepthPerLayer = 1;
+
+    /// <summary>The highest lava level of any hell layer, in cells above its pocket's floor.</summary>
+    public const int HellLavaMaxDepth = 22;
+
+    /// <summary>Frequency of the hell biome noise (seed offset 164, two octaves, 3D): sampled at
+    /// each layer's mid row, so a hell biome region is a few hundred blocks across and differs from
+    /// layer to layer.</summary>
+    public const float HellBiomeFrequency = 1f / 320f;
+
+    /// <summary>Largest hashed lean each hell layer adds to the biome noise, so one layer leans
+    /// toward one biome and the next toward another while each still mixes them.</summary>
+    public const float HellBiomeLayerBias = 0.25f;
+
+    /// <summary>Spacing of the 2D lattice per layer the hell biome noise is read on, blended
+    /// bilinearly: the chunk size, so a chunk reads four points per layer.</summary>
+    public const int HellBiomeLatticeStride = 16;
+
+    /// <summary>Spacing of the hell pool noise's lattice: a power of two dividing the chunk size.</summary>
+    public const int HellPoolLatticeStride = 8;
+
+    /// <summary>A hell column whose biome value is under this is Ashlands.</summary>
+    public const float HellAshlandsMaxValue = -0.1f;
+
+    /// <summary>A hell column whose biome value is over this is a Fungal Grove; between the two
+    /// thresholds it is a Magma Cavern.</summary>
+    public const float HellFungalMinValue = 0.1f;
+
+    /// <summary>Frequency of the hell pool noise (seed offset 165, 3D): which columns of a biome
+    /// with a partial lava share pond lava and which fill their pool rows with soil.</summary>
+    public const float HellPoolFrequency = 1f / 24f;
+
+    /// <summary>How many cells under an open cavern cell take the biome's floor skin: the top one
+    /// its surface, the rest its soil.</summary>
+    public const int HellFloorSkinBlocks = 3;
+
+    /// <summary>How many cells over an open cavern cell take the biome's ceiling skin.</summary>
+    public const int HellCeilingSkinBlocks = 2;
+
+    /// <summary>The share of the pool columns that hold lava in the Ashlands (the rest are ash
+    /// plains at the lava level).</summary>
+    public const float HellAshlandsLavaShare = 0.35f;
+
+    /// <summary>The share of the pool columns that hold lava in a Fungal Grove.</summary>
+    public const float HellFungalLavaShare = 0.08f;
+
+    /// <summary>One ceiling cell right over open cavern in this many is an ember crystal in the
+    /// Ashlands and the Magma Caverns.</summary>
+    public const int HellEmberCrystalRate = 40;
+
+    /// <summary>One Magma Cavern floor surface cell in this many is a glowing magma block.</summary>
+    public const int HellMagmaFloorRate = 7;
+
+    /// <summary>One Fungal Grove ceiling cell right over open cavern in this many is a fungal glow.</summary>
+    public const int HellFungalGlowRate = 18;
+
+    /// <summary>The longest vine (HellFlora) a hell ceiling cell hangs: the flora rule reads this many
+    /// cells over an air cell.</summary>
+    public const int HellVineMaxLength = 6;
+
+    /// <summary>One Fungal Grove ceiling cell over open cavern in this many hangs a vine.</summary>
+    public const int HellFungalVineRate = 4;
+
+    /// <summary>One Ashlands ceiling cell over open cavern in this many hangs a vine.</summary>
+    public const int HellAshlandsVineRate = 45;
+
+    /// <summary>One Fungal Grove air cell over fungal moss in this many grows a glow fern.</summary>
+    public const int HellGlowFernRate = 5;
+
+    /// <summary>One Ashlands air cell over ash in this many grows an ember bloom.</summary>
+    public const int HellEmberBloomRate = 16;
+
+    /// <summary>The side of a hell tree cell (HellTrees): each cell of each layer holds at most one
+    /// tree, grown inside the cell, so a tree never meets another. Divides the chunk size.</summary>
+    public const int HellTreeCellBlocks = 8;
+
+    /// <summary>How far inside its cell's sides a hell tree's root stands.</summary>
+    public const int HellTreeCellMargin = 2;
+
+    /// <summary>The chance a Fungal Grove tree cell roots a fungal tree.</summary>
+    public const float HellFungalTreeChance = 0.6f;
+
+    /// <summary>The chance an Ashlands tree cell roots a charred tree.</summary>
+    public const float HellCharredTreeChance = 0.25f;
+
+    /// <summary>Capacity of the hell tree cache (one entry per tree cell and layer, a tree or none),
+    /// read by the generation workers; see <see cref="TreeShapeCacheCapacity"/>.</summary>
+    public const int HellTreeCacheCapacity = 8192;
+
+    /// <summary>Generations of the hell tree cache.</summary>
+    public const int HellTreeCacheGenerations = 4;
+
+    // Cave biomes (plans/CAVE_BIOMES.md CB-1): the overworld's carved caves stop being biome-blind. A frozen
+    // or desert column's caves echo its surface down to a wavy line near CaveEchoBottomY; under it the cave
+    // sub-biomes (crystal, fungal, the magma-touched deep) fill the rock down to the barrier. CaveBiomes
+    // classifies, its palette pass rewrites only stone. LayerBandTests holds the band order. First guesses.
+
+    /// <summary>Whether worldgen dresses the overworld caves in their cave biome's palette (CaveBiomes).</summary>
+    public const bool CaveBiomesEnabled = true;
+
+    /// <summary>Lattice spacing of the three cave-biome noises in blocks: a power of two dividing the chunk
+    /// size, so neighboring chunks sample the same lattice points and the point query equals the stamp.</summary>
+    public const int CaveBiomeLatticeStride = 8;
+
+    /// <summary>The echo band's mean bottom: an echo cell lies strictly above
+    /// <c>CaveEchoBottomY + CaveEchoDriftBlocks * drift</c>, drift being the echo drift noise in -1..1.</summary>
+    public const int CaveEchoBottomY = -200;
+
+    /// <summary>How far the echo band's bottom wanders up and down with the echo drift noise (seed offset 179),
+    /// so the hand-over to the sub-biomes is never a flat line.</summary>
+    public const int CaveEchoDriftBlocks = 24;
+
+    /// <summary>Frequency of the echo drift noise (seed offset 179).</summary>
+    public const float CaveEchoDriftFrequency = 1f / 160f;
+
+    /// <summary>The rock an echo leaves untouched under its column's surface: an echo cell needs a depth of at
+    /// least <c>CaveEchoCoverBlocks + CaveEchoCoverJitterBlocks * (drift + 1) / 2</c> under the column top, so
+    /// the surface, its soil and shallow cliffs keep their own blocks.</summary>
+    public const int CaveEchoCoverBlocks = 8;
+
+    /// <summary>How much deeper the echo cover reaches where the echo drift noise is high, so the echo's top
+    /// edge is ragged rather than a copy of the surface.</summary>
+    public const int CaveEchoCoverJitterBlocks = 6;
+
+    /// <summary>The magma-touched deep's mean top: a cell under the echo band is MagmaDeep at or below
+    /// <c>CaveDeepTopY + CaveDeepDriftBlocks * deepDrift</c>, deepDrift being the deep drift noise in -1..1.
+    /// Nothing is written at or below <see cref="BarrierTopY"/>.</summary>
+    public const int CaveDeepTopY = -264;
+
+    /// <summary>How far the deep's top wanders with the deep drift noise (seed offset 180).</summary>
+    public const int CaveDeepDriftBlocks = 16;
+
+    /// <summary>Frequency of the deep drift noise (seed offset 180).</summary>
+    public const float CaveDeepDriftFrequency = 1f / 120f;
+
+    /// <summary>Frequency of the sub-biome selector noise (seed offset 181, two octaves): about the size of
+    /// one crystal or fungal region between the echo band and the deep.</summary>
+    public const float CaveSubBiomeFrequency = 1f / 96f;
+
+    /// <summary>A sub-band cell above the deep is Crystal where the selector noise is above this.</summary>
+    public const float CaveCrystalMinValue = 0.12f;
+
+    /// <summary>A sub-band cell above the deep is Fungal where the selector noise is below this; between
+    /// this and <see cref="CaveCrystalMinValue"/> it stays plain stone.</summary>
+    public const float CaveFungalMaxValue = -0.12f;
+
+    /// <summary>One crystal cave face cell in this many is a crystal block.</summary>
+    public const int CaveCrystalAccentRate = 10;
+
+    /// <summary>One fungal cave face cell in this many is a fungal glow.</summary>
+    public const int CaveFungalAccentRate = 60;
+
+    /// <summary>One magma-touched cave face cell in this many is a magma block.</summary>
+    public const int CaveMagmaAccentRate = 24;
+
+    // Cave biome shape (plans/CAVE_BIOMES.md CB-2, CaveShape): only the sub-band biomes change the carve. Crystal
+    // caves open bigger cheese rooms, fungal caves wider tunnels and the magma-touched deep both, while plain and
+    // echo caves are carved exactly as before (a boost of 0 and a scale of 1 are exact). Each boost is scaled per
+    // region by 1 + CaveShapeScaleVariation * s, s being NoiseCaves' ninth lattice channel (seed offset 182), so
+    // cave size varies across a biome. A worm node's radius is multiplied at its center. First guesses.
+
+    /// <summary>Frequency of the cave shape scale noise (seed offset 182), NoiseCaves' ninth lattice channel.</summary>
+    public const float CaveShapeScaleFrequency = 1f / 192f;
+
+    /// <summary>How far the shape scale noise moves a sub-biome's boosts: each is multiplied by
+    /// <c>1 + CaveShapeScaleVariation * s</c>, s in -1..1.</summary>
+    public const float CaveShapeScaleVariation = 0.5f;
+
+    /// <summary>How much a crystal cell lowers the cheese threshold: bigger rooms.</summary>
+    public const float CaveCrystalCheeseBoost = 0.10f;
+
+    /// <summary>How much a magma-touched cell lowers the cheese threshold.</summary>
+    public const float CaveMagmaCheeseBoost = 0.05f;
+
+    /// <summary>How much a magma-touched cell lowers the cavern threshold: more open caverns.</summary>
+    public const float CaveMagmaCavernBoost = 0.10f;
+
+    /// <summary>The share a fungal cell widens both spaghetti tunnel radii by.</summary>
+    public const float CaveFungalTunnelBoost = 0.45f;
+
+    /// <summary>What a worm node's radius is multiplied by when its center is a fungal cell.</summary>
+    public const float CaveFungalWormRadiusFactor = 1.35f;
+
+    /// <summary>What a worm node's radius is multiplied by when its center is a magma-touched cell.</summary>
+    public const float CaveMagmaWormRadiusFactor = 1.15f;
+
+    // Cave biome exclusive ores (plans/CAVE_BIOMES.md CB-2, CaveOres): one vein ore per sub-band biome, amethyst in
+    // crystal caves (seed offset 183), jade in fungal caves (184) and cinnabar in the magma-touched deep (185), each
+    // on the OreNoiseLattice like the Y-band ores. Each hosts only plain stone whose cell is its own biome, at or below
+    // its MaxY, and runs right after the Y-band ores, before the palette pass: that pass rewrites only exact stone, so
+    // the ore survives even inside the magma-touched deep's scorched hellrock. The echoes get no exclusive ore. First
+    // guesses.
+
+    /// <summary>Whether worldgen stamps the cave biome exclusive ores (CaveOres).</summary>
+    public const bool CaveOresEnabled = true;
+
+    /// <summary>Frequency of the amethyst vein noise (seed offset 183).</summary>
+    public const float CaveAmethystFrequency = 1f / 16f;
+
+    /// <summary>Amethyst vein threshold in -1..1: higher is rarer.</summary>
+    public const float CaveAmethystThreshold = 0.80f;
+
+    /// <summary>The highest world y amethyst grows at; below the crystal caves' highest reach.</summary>
+    public const int CaveAmethystMaxY = -192;
+
+    /// <summary>Frequency of the jade vein noise (seed offset 184).</summary>
+    public const float CaveJadeFrequency = 1f / 18f;
+
+    /// <summary>Jade vein threshold in -1..1: higher is rarer.</summary>
+    public const float CaveJadeThreshold = 0.80f;
+
+    /// <summary>The highest world y jade grows at; below the fungal caves' highest reach.</summary>
+    public const int CaveJadeMaxY = -192;
+
+    /// <summary>Frequency of the cinnabar vein noise (seed offset 185).</summary>
+    public const float CaveCinnabarFrequency = 1f / 14f;
+
+    /// <summary>Cinnabar vein threshold in -1..1: higher is rarer.</summary>
+    public const float CaveCinnabarThreshold = 0.82f;
+
+    /// <summary>The highest world y cinnabar grows at; below the magma-touched deep's highest reach.</summary>
+    public const int CaveCinnabarMaxY = -256;
+
+    /// <summary>Capacity of the sky tree cache (one entry per sky tree cell, a tree or none), read by the
+    /// generation workers; see <see cref="TreeShapeCacheCapacity"/>.</summary>
+    public const int SkyTreeCacheCapacity = 4096;
+
+    /// <summary>Generations of the sky tree cache.</summary>
+    public const int SkyTreeCacheGenerations = 4;
+
+    /// <summary>Capacity of the battle tower site cache (one entry per tower cell, a site or none), read by the
+    /// generation workers; see <see cref="TreeShapeCacheCapacity"/>.</summary>
+    public const int TowerSiteCacheCapacity = 256;
+
+    /// <summary>Generations of the battle tower site cache.</summary>
+    public const int TowerSiteCacheGenerations = 4;
+
+    // Battle tower (plans/BATTLE_TOWER.md BT-2): a procedural shell of unbreakable tower brick, one hashed site per
+    // tower cell, dressed by hand-authored towerFloor / towerAltar templates. First guesses, tuned against the
+    // default seed's rarity
+
+    /// <summary>Master switch for the battle towers (<c>TowerPlacement</c>).</summary>
+    public const bool TowersEnabled = true;
+
+    /// <summary>The side of a tower cell: each cell rolls at most one tower, wholly inside it.</summary>
+    public const int TowerCellBlocks = 1536;
+
+    /// <summary>The chance a tower cell rolls a tower, before the site rules (level, dry land) refuse it.</summary>
+    public const float TowerChance = 0.6f;
+
+    /// <summary>No tower footprint reaches this close to the origin.</summary>
+    public const float TowerSpawnClearRadius = ReliefSpawnClearStart;
+
+    /// <summary>The smallest radius a tower rolls, to the outside of its outer wall.</summary>
+    public const int TowerMinRadius = 20;
+
+    /// <summary>The largest radius a tower rolls.</summary>
+    public const int TowerMaxRadius = 24;
+
+    /// <summary>The fewest floors a tower rolls.</summary>
+    public const int TowerMinFloors = 4;
+
+    /// <summary>The most floors a tower rolls.</summary>
+    public const int TowerMaxFloors = 8;
+
+    /// <summary>Blocks from one floor slab to the next.</summary>
+    public const int TowerFloorHeight = 7;
+
+    /// <summary>Thickness of the outer wall, in cells.</summary>
+    public const int TowerWallThickness = 2;
+
+    /// <summary>Width of the stair corridor between the outer and the inner wall, in cells.</summary>
+    public const int TowerStairWidth = 3;
+
+    /// <summary>Thickness of the inner wall around the floor rooms, in cells.</summary>
+    public const int TowerInnerWallThickness = 1;
+
+    /// <summary>Half-steps of the spiral stair per full turn around the tower.</summary>
+    public const int TowerStairStepsPerTurn = 60;
+
+    /// <summary>Air cells kept clear above every stair step (and the entrance and doorways).</summary>
+    public const int TowerStairHeadroom = 3;
+
+    /// <summary>Stair half-steps the ground entrance spans before the climb starts.</summary>
+    public const int TowerEntranceSteps = 3;
+
+    /// <summary>How many half-steps either side of a landing its inner-wall doorway spans.</summary>
+    public const int TowerDoorwayHalfSteps = 2;
+
+    /// <summary>Half-steps past a landing at which a floor's barrier door (BT-4) closes the stair; even, and above
+    /// <see cref="TowerDoorwayHalfSteps"/> + 2 so the door stands clear of the doorway.</summary>
+    public const int TowerDoorStepOffset = 6;
+
+    /// <summary>How far the entrance apron reaches outside the outer wall.</summary>
+    public const int TowerApronDepth = 3;
+
+    /// <summary>Height of the crenellated parapet above the roof slab: solid up to the layer under its top, merlons on
+    /// the top layer, where the forcefield dome stands.</summary>
+    public const int TowerParapetHeight = 4;
+
+    /// <summary>How far the roof's forcefield dome rises over its base on the parapet's top layer, at the center
+    /// (<c>TowerDome</c>). It must clear the altar dressing (<see cref="TowerAltarHeight"/>) over the whole template.</summary>
+    public const int TowerDomeHeight = 12;
+
+    /// <summary>The tallest the altar dressing on the roof may be (the towerAltar template's layer cap).</summary>
+    public const int TowerAltarHeight = 8;
+
+    /// <summary>How deep the brick foundation reaches under the ground slab.</summary>
+    public const int TowerFoundationDepth = 6;
+
+    /// <summary>The lowest a conquered tower's wall stump stands above its ground slab, in blocks (BT-8, <c>TowerRuin</c>).</summary>
+    public const int TowerRuinStumpMinBlocks = 2;
+
+    /// <summary>The highest a conquered tower's wall stump stands above its ground slab, in blocks (BT-8); kept under one
+    /// floor's height so no stump reaches the first floor's slab.</summary>
+    public const int TowerRuinStumpMaxBlocks = 9;
+
+    /// <summary>The share of a ruined tower's ground-floor air columns that get a rubble pile on the ground slab (BT-8).</summary>
+    public const float TowerRuinRubbleChance = 0.15f;
+
+    /// <summary>The share of the rubble piles that are gravel rather than cobblestone (BT-8).</summary>
+    public const float TowerRuinGravelShare = 0.4f;
+
+    /// <summary>The share of a ruined tower's brick cells that crumble to cobblestone rather than stone bricks (BT-8).</summary>
+    public const float TowerRuinCobbleShare = 0.35f;
+
+    /// <summary>The largest ground height step from the center a tower site accepts across its disc.</summary>
+    public const int TowerMaxStep = 4;
+
+    /// <summary>Spacing of the ground samples a tower site checks across its disc.</summary>
+    public const int TowerSiteSampleStep = 4;
+
+    /// <summary>How far past the apron the site check keeps sampling for water and level ground.</summary>
+    public const int TowerSiteWaterRing = 3;
+
+    /// <summary>How many Chebyshev rings of tower cells around the player's own cell a <c>/locate tower</c> scans, so it
+    /// covers at least <see cref="TowerLocateRings"/> * <see cref="TowerCellBlocks"/> blocks. Rolling a cell is only a
+    /// hash; a candidate pays its cached site verdict only when it is nearer than the answer.</summary>
+    public const int TowerLocateRings = 8;
+
+    /// <summary>How far west of a tower's footprint box the <c>/locate</c> teleport lands. Keep it at most
+    /// <see cref="TowerSiteWaterRing"/>, so the landing lies inside the ring the site rules judged dry and level.</summary>
+    public const int TowerLocateLandingGapBlocks = 2;
+
+    /// <summary>Bottom of the solid cloud slab: the patchy real cloud blocks around y 200, above the
+    /// relief ceiling (<see cref="ReliefCeilingHeight"/>) and the drawn cloud layer
+    /// (<see cref="SkyConfig.CloudHeight"/>).</summary>
+    public const int CloudSlabBottomY = 198;
+
+    /// <summary>Top of the solid cloud slab.</summary>
+    public const int CloudSlabTopY = 203;
+
+    /// <summary>Master switch for the solid cloud patches (<c>CloudPatchGenerator</c>).</summary>
+    public const bool CloudPatchesEnabled = true;
+
+    /// <summary>Frequency of the 2D noise whose high values outline the cloud patches: patches tens of
+    /// blocks across with open sky between them.</summary>
+    public const float CloudPatchFrequency = 1f / 90f;
+
+    /// <summary>The patch noise value above which a column holds cloud; higher is sparser.</summary>
+    public const float CloudPatchThreshold = 0.3f;
+
+    /// <summary>The patch noise value at which a column reaches the patch's full thickness (the core);
+    /// between the threshold and this the cloud thins toward one cell at the edge.</summary>
+    public const float CloudPatchCoreValue = 0.6f;
+
+    /// <summary>Frequency of the 2D noise that roughens each patch's thickness and lifts its top, so
+    /// the top domes unevenly instead of stepping in rings.</summary>
+    public const float CloudPatchDetailFrequency = 1f / 14f;
+
+    /// <summary>Lowest cell a sky island may occupy.</summary>
+    public const int SkyIslandBottomY = 320;
+
+    /// <summary>Highest cell a sky island may occupy.</summary>
+    public const int SkyIslandTopY = 420;
 }

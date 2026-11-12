@@ -1,0 +1,7 @@
+{
+  "name": "Galeraptor",
+  // The base pool in a small sky zone; SkyDifficulty scales it with the zone's tier
+  "hp": 24,
+  "loot": "galeraptor",
+  "model": "assets/models/entity/galeraptor.bbmodel"
+}

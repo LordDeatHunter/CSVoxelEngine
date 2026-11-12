@@ -43,7 +43,7 @@ public sealed class ImportedMapSourceTests : IDisposable
             Directory.Delete(_map, recursive: true);
     }
 
-    private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
+    private static ushort Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     private static Chunk Filled(IWorldSource source, Vector3 pos)
     {
@@ -88,9 +88,9 @@ public sealed class ImportedMapSourceTests : IDisposable
     }
 
     // A chunk whose cells at or below top are block and the rest air
-    private static ChunkSnapshot Slab(int cy, int top, byte block)
+    private static ChunkSnapshot Slab(int cy, int top, ushort block)
     {
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         for (var x = 0; x < Chunk.Size; x++)
         for (var y = 0; y < Chunk.Size; y++)
         for (var z = 0; z < Chunk.Size; z++)

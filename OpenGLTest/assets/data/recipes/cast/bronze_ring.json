@@ -1,0 +1,10 @@
+{
+  // Pouring molten bronze into a fired ring mold; the cast melts back into the same 200 ml
+  // (recipes/melt/bronze_ring.json).
+  "mold": "block/fired_mold_ring",
+  "fluid": "bronze",
+  "amountMl": 200,
+  "coolSeconds": 2,
+  "result": "item/bronze_ring",
+  "count": 1
+}

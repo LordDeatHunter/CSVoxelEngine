@@ -35,6 +35,17 @@ uniform float uWobbleShare;   // most a pixel sways, as a share of the screen he
 uniform float uWobbleSpeed;
 uniform float uWobbleWaves;   // waves across the screen
 
+// The conquered-floor shockwaves (Shockwave): expanding cylindrical shells that bend the picture. Each pixel's
+// world position is rebuilt from the scene depth (uDepth, unit 1), and one near a shell's radius, inside its
+// height band, is read from a point pushed along the way out. 0 shells draws none.
+uniform sampler2D uDepth;
+uniform mat4 uViewProj;
+uniform mat4 uInvViewProj;
+uniform int uWaveCount;
+uniform vec4 uWaveA[4];       // center xyz, current radius
+uniform vec4 uWaveB[4];       // bottom y, top y, strength, half thickness
+uniform float uWavePushBlocks; // JuiceConfig.FloorConqueredShockwavePushBlocks
+
 out vec4 FragColor;
 
 // Exact piecewise sRGB encode, the twin of ColorSpace.LinearToSrgb.
@@ -153,7 +164,35 @@ void main()
                     cos(uv.x * uWobbleWaves * 6.2831853 + uTime * uWobbleSpeed * 0.83))  // VerticalSpeedShare
              * (uUnderwater * uWobbleShare * uResolution.y);
     }
+    float glow = 0.0;
+    if (uWaveCount > 0) {
+        vec2 uv = gl_FragCoord.xy / uResolution;
+        float depth = texture(uDepth, uv).r;
+        if (depth < 1.0) {
+            vec4 h = uInvViewProj * vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+            vec3 world = h.xyz / h.w;
+            for (int i = 0; i < uWaveCount; i++) {
+                vec2 off = world.xz - uWaveA[i].xz;
+                float dist = length(off);
+                float edge = (dist - uWaveA[i].w) / uWaveB[i].w;
+                float band = smoothstep(uWaveB[i].x - 0.5, uWaveB[i].x + 0.5, world.y)
+                           * (1.0 - smoothstep(uWaveB[i].y, uWaveB[i].y + 0.5, world.y));
+                float env = exp(-edge * edge) * band * uWaveB[i].z;
+                if (env < 0.003) continue;
+                // A lens (the pull to the shell's middle) with a shimmer running along it
+                float shimmer = sin(edge * 4.0 + world.y * 1.9 + dist * 0.7 - uTime * 12.0);
+                vec3 outward = vec3(off.x, 0.0, off.y) / max(dist, 1e-3);
+                vec4 a = uViewProj * vec4(world, 1.0);
+                vec4 b = uViewProj * vec4(world + outward * uWavePushBlocks, 1.0);
+                if (a.w <= 0.0 || b.w <= 0.0) continue;
+                vec2 shift = (b.xy / b.w - a.xy / a.w) * 0.5 * uResolution;
+                pos += shift * env * (-edge * 0.9 + shimmer * 0.35);
+                glow += env;
+            }
+        }
+    }
     vec3 c = Fxaa(pos);
+    c += vec3(1.0, 0.86, 0.5) * min(glow, 1.0) * 0.1;
     // The damage fringe: red and blue read from either side of the pixel along the line from the
     // screen center, nothing in the middle and the most at the corners (DamageFringe.EdgeWeight)
     if (uDamageFringe > 0.0) {

@@ -1,0 +1,20 @@
+{
+  // A teal fern on the Fungal Grove's moss (HellFlora): a dim light in the grove's color, cutout,
+  // swaying, unsupported without its floor and dropping nothing. Tile from
+  // committed art.
+  "name": "Glow Fern",
+  "model": { "parent": "block/cross", "textures": { "cross": "glow_fern" } },
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "sway": true,
+  "light": { "emission": 6, "color": [70, 240, 190], "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "blocksSight": false,
+  "replaceableByPlacement": true,
+  "loot": "none",
+  "hitbox": { "min": [0.2, 0, 0.2], "max": [0.8, 0.8, 0.8] }
+}

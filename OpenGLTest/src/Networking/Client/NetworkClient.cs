@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Concurrent;
+using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using VoxelEngine.Config;
 
 namespace VoxelEngine.Networking.Client;
 
@@ -28,10 +31,19 @@ public readonly record struct ServerHelloInfo(string WorldName, int Seed, double
 public sealed class NetworkClient(ServerAddress address, string playerName, double timeoutSeconds) : IDisposable
 {
     private readonly object _writeGate = new();
+    private readonly object _stateGate = new();
     private TcpClient? _tcp;
     private NetworkStream? _stream;
+    private Stream? _testStream;
     private volatile bool _running;
     private Thread? _reader;
+
+    internal NetworkClient(ServerAddress address, string playerName, double timeoutSeconds, Stream stream)
+        : this(address, playerName, timeoutSeconds)
+    {
+        _testStream = stream;
+        _status = NetworkStatus.Handshaken;
+    }
 
     // Written by the connect and reader threads, read by the main thread every frame: published
     // through volatile fields (the hello info is boxed so the reference write is atomic). Error and
@@ -39,12 +51,21 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
     private volatile NetworkStatus _status = NetworkStatus.Connecting;
     private volatile string? _error;
     private volatile StrongBox<ServerHelloInfo>? _server;
+    private volatile WireIds? _wire;
+
+    // How many of the server's missing content names a refused connect lists before "and N more"
+    private const int MissingNamesShown = 8;
 
     public ServerAddress Address { get; } = address;
     public string PlayerName { get; } = playerName;
     public NetworkStatus Status => _status;
     public string? Error => _error;
     public ServerHelloInfo? Server => _server?.Value;
+
+    /// <summary>The server's id tables from its hello, set before <see cref="Server"/>: every reader and writer of this
+    /// connection passes them, so ids cross the wire in the server's numbering. Null on a test stream, where ids pass
+    /// through unchanged.</summary>
+    public WireIds? Wire => _wire;
 
     /// <summary>Framed payloads (message id first) read by the reader thread for the main thread.</summary>
     public ConcurrentQueue<byte[]> Inbound { get; } = new();
@@ -67,7 +88,10 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
                 return;
             }
 
+            tcp.SendTimeout = NetworkConfig.NetSendTimeoutMs;
             _stream = tcp.GetStream();
+            // Client sends run on the game thread, so use the same finite bound as server writes.
+            _stream.WriteTimeout = NetworkConfig.NetSendTimeoutMs;
             // The handshake read is bounded: a server that accepts but never answers fails the
             // connect instead of leaving the connecting screen up forever.
             _stream.ReadTimeout = (int)Math.Min(int.MaxValue, timeoutSeconds * 1000.0);
@@ -105,6 +129,14 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
             var seed = reader.ReadInt();
             var time = reader.ReadDouble();
             var spawn = reader.ReadVector3();
+            var wire = WireIds.Read(reader);
+            if (wire.Missing.Count > 0)
+            {
+                Fail($"The server has content this game lacks: {string.Join(", ", wire.Missing.Take(MissingNamesShown))}" +
+                     (wire.Missing.Count > MissingNamesShown ? $" and {wire.Missing.Count - MissingNamesShown} more" : ""));
+                return;
+            }
+            _wire = wire;
             _server = new StrongBox<ServerHelloInfo>(new ServerHelloInfo(worldName, seed, time, spawn, playerId));
 
             // Play reads block for as long as the server is quiet; the idle sweep and KeepAlive
@@ -145,40 +177,57 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
         {
         }
 
-        // Unconditional: the reader only ever runs after the handshake, so its end is always a
-        // disconnect (Handshaken was published before it started).
-        _status = NetworkStatus.Disconnected;
+        // A concurrent failed send is terminal and must not be hidden by this reader's exit.
+        lock (_stateGate)
+        {
+            if (_status == NetworkStatus.Handshaken)
+                _status = NetworkStatus.Disconnected;
+        }
     }
 
     public void Send(byte[] payload)
     {
-        var stream = _stream;
+        var stream = (Stream?)_testStream ?? _stream;
         if (stream == null)
             return;
         lock (_writeGate)
         {
+            if (_status == NetworkStatus.Failed)
+                return;
             try
             {
                 NetFraming.WriteFrame(stream, payload);
             }
             catch (Exception e) when (e is System.IO.IOException or SocketException or ObjectDisposedException or InvalidOperationException)
             {
+                Fail($"Connection to {Address} failed while sending: {e.Message}");
             }
         }
     }
 
     private void Fail(string message)
     {
-        _error = message;
-        _status = NetworkStatus.Failed;
+        lock (_stateGate)
+        {
+            if (_status == NetworkStatus.Failed)
+                return;
+            _error = message;
+            _status = NetworkStatus.Failed;
+        }
         try { _tcp?.Dispose(); } catch (SocketException) { }
+        try { _stream?.Dispose(); } catch (IOException) { }
+        try { _testStream?.Dispose(); } catch (IOException) { }
     }
 
     public void Dispose()
     {
         _running = false;
         try { _tcp?.Close(); } catch (SocketException) { }
-        _reader?.Join(1000);
+        if (_tcp == null)
+            try { _testStream?.Dispose(); } catch (IOException) { }
+        var reader = _reader;
+        if (reader != null && (reader.ThreadState & ThreadState.Unstarted) == 0)
+            reader.Join(1000);
         _reader = null;
     }
 }

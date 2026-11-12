@@ -28,9 +28,9 @@ public sealed class HollowLogTests
     public HollowLogTests() => TestContent.EnsureLoaded();
 
     /// <summary>Every (hollow log, the species it belongs to) pair the biome data declares.</summary>
-    private static List<(byte Hollow, TreeSpecies Species)> Pairs()
+    private static List<(ushort Hollow, TreeSpecies Species)> Pairs()
     {
-        var pairs = new List<(byte, TreeSpecies)>();
+        var pairs = new List<(ushort, TreeSpecies)>();
         foreach (var biome in Enum.GetValues<Biome>())
         {
             var hollow = FallenLogGenerator.HollowLogFor(biome);
@@ -126,7 +126,7 @@ public sealed class HollowLogTests
         {
             foreach (var facing in new[] { FallenLogGenerator.FacingAlongX, FallenLogGenerator.FacingAlongZ })
             {
-                var drops = new List<byte>();
+                var drops = new List<ushort>();
                 DropManager.RollLoot(hollow, new LootContext(0, 0, 0, State: facing), drops);
                 Assert.Equal([species.WoodId], drops);
             }

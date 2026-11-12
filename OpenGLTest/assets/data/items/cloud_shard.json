@@ -1,0 +1,5 @@
+{
+  "name": "Cloud Shard",
+  // A sliver of hardened cloud, dropped by the sky mobs
+  "texture": "assets/textures/items/cloud_shard.png"
+}

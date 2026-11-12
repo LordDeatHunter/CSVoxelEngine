@@ -42,7 +42,7 @@ public static class SnowGenerator
         // unreachable; a multiplier keeps the toggle a real expression (see BiomeWeights).
         var cold = ColdWeightAt(x, z, height)
                    * (WorldGenerationConfig.SnowAndIceEnabled ? 1f : 0f);
-        if (cold <= WorldGenerationConfig.SnowColdThreshold) return 0;
+        if (!HasSnow(x, z, cold)) return 0;
 
         var amount = (cold - WorldGenerationConfig.SnowColdThreshold)
                      / (1f - WorldGenerationConfig.SnowColdThreshold);
@@ -52,6 +52,25 @@ public static class SnowGenerator
         return depth < 1 ? 1 : depth;
     }
 
+    /// <summary>
+    /// Whether snow settles on the column (x, z) at coldness <paramref name="cold"/>: never at or below
+    /// <see cref="WorldGenerationConfig.SnowColdThreshold"/>, always from
+    /// <see cref="WorldGenerationConfig.SnowFullColdThreshold"/> up, and in between a coherent noise against a
+    /// smoothstep of the cold, so the snow line is a ragged band of drifts and bare patches rather than a hard
+    /// edge, the way the pack-ice edge breaks into floes. Monotone in the cold, pure, safe on any thread; the
+    /// near stamp, the drawn depth and the far LOD all call it.
+    /// </summary>
+    public static bool HasSnow(float x, float z, float cold)
+    {
+        // SnowAndIceEnabled is a compile-time const (see DepthAt): a multiplier keeps the toggle real
+        var c = cold * (WorldGenerationConfig.SnowAndIceEnabled ? 1f : 0f);
+        if (c <= WorldGenerationConfig.SnowColdThreshold) return false;
+        if (c >= WorldGenerationConfig.SnowFullColdThreshold) return true;
+        // Sampled far from the floe field's own coordinates so the two patterns never line up
+        var noise = 0.5f + 0.5f * TerrainNoise.PackIceNoise.GetNoise(x + 4096f, z - 4096f);
+        return noise < MathUtils.SmoothStep(WorldGenerationConfig.SnowColdThreshold,
+            WorldGenerationConfig.SnowFullColdThreshold, c);
+    }
     /// <summary>
     /// The coldness the snow rules read at a column: the climate's own
     /// <see cref="TerrainGenerator.ColdWeight"/>, raised by altitude so a peak above
@@ -104,7 +123,7 @@ public static class SnowGenerator
     /// the ground or the ice. Runs on a generation worker thread; writes only this chunk's own
     /// cells. Runs before <see cref="StampCanopy"/>, which must see the snowed ground.
     /// </summary>
-    public static void StampGround(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void StampGround(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         // The caller gates this on SnowAndIceEnabled, so the body has no toggle of its own.
         var seaBlock = TerrainGenerator.SeaBlock;
@@ -129,7 +148,6 @@ public static class SnowGenerator
                 var wi = Chunk.Idx(x, seaLy, z);
                 if (blocks[wi] != seaBlock) continue;
                 var cold = ColdWeightAt(worldX, worldZ, height);
-                if (cold <= WorldGenerationConfig.SnowColdThreshold) continue;
                 // Open water (a lead in the pack ice, or a hot spring) keeps its surface and no snow
                 if (!IsFrozenWater(worldX, worldZ, cold)) continue;
                 blocks[wi] = iceBlock;
@@ -144,7 +162,7 @@ public static class SnowGenerator
                 var groundSnowLy = surfaceLy + 1;
                 if ((uint)groundSnowLy >= Chunk.Size) continue;
                 if (blocks[Chunk.Idx(x, groundSnowLy, z)] != BlockType.Air) continue;
-                if (ColdWeightAt(worldX, worldZ, height) <= WorldGenerationConfig.SnowColdThreshold) continue;
+                if (!HasSnow(worldX, worldZ, ColdWeightAt(worldX, worldZ, height))) continue;
             }
 
             var snowLy = surfaceLy + 1;
@@ -173,7 +191,7 @@ public static class SnowGenerator
     /// Runs after <see cref="StampGround"/>; writes only this chunk's own cells. Never gated by a
     /// band: its leaves can come from trees rooted in neighbor columns.
     /// </summary>
-    public static void StampCanopy(byte[] blocks, ColumnData column, int worldX0, int worldZ0)
+    public static void StampCanopy(ushort[] blocks, ColumnData column, int worldX0, int worldZ0)
     {
         var snowBlock = TerrainGenerator.SnowBlock;
 
@@ -194,7 +212,7 @@ public static class SnowGenerator
             if (top < 0) continue;
             if (!TreeGenerator.IsLeaf(blocks[top]) || blocks[top + Chunk.Size] != BlockType.Air) continue;
             var height = column.Heights[(x << Chunk.SizeShift) | z];
-            if (ColdWeightAt(worldX0 + x, worldZ0 + z, height) <= WorldGenerationConfig.SnowColdThreshold)
+            if (!HasSnow(worldX0 + x, worldZ0 + z, ColdWeightAt(worldX0 + x, worldZ0 + z, height)))
                 continue;
             blocks[top + Chunk.Size] = snowBlock;
         }

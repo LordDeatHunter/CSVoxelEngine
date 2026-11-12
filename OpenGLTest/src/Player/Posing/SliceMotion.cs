@@ -1,6 +1,8 @@
+using System.Numerics;
+
 namespace VoxelEngine.Player.Posing;
 
-/// <summary>The slice swing's phase shapes: the arm and body sweeps, the stroke, the hand's diagonal and the main-cut weight, as pure functions of the slice clock.</summary>
+/// <summary>The slice swing's phase shapes: the arm and body sweeps, the stroke, the hand's diagonal and the main-cut weight, as pure functions of the slice clock, and the <see cref="BladeSwingFrame"/> they make.</summary>
 internal static class SliceMotion
 {
     // The wind-up cocks the arm further out than the strike carries it back, so the swing reads
@@ -28,6 +30,63 @@ internal static class SliceMotion
     internal const float SliceEndDropBlocks = 0.10f;
     internal const float SliceBodyWindup = 1.0f;
     internal const float SliceBodyFar = 0.85f;
+
+    // The slicing arm is held out in front, nearly straight, at about chest height: the upper arm raised to
+    // roughly horizontal (SliceArmShoulder, a flexion about X) with only a slight bend at the elbow
+    // (SliceArmElbow), so the forearm points forward along the arm rather than up. The carrying pose (elbow bent
+    // 75 degrees, forearm up) is eased into this as the stroke ramps in, and back out as it ramps out.
+    internal const float SliceArmShoulder = 1.5f;
+    internal const float SliceArmElbow = 0.3f;
+    // The blade is carried by the wrist: its tip points along the forearm (so it follows the sweep of the arm and
+    // is always across the direction the hand travels, never turned up), rolled about its own length by
+    // SliceBladeRoll (an edge-leading cant, not laid fully flat) and cocked up from the forearm by SliceBladeCant,
+    // the way a blade is held out ahead of the hand. Both mirror with the swing's direction.
+    internal const float SliceBladeRoll = 0.8f;
+    internal const float SliceBladeCant = 0.12f;
+    // During the main part of the cut (SliceMainWeight) the blade is also turned about the vertical by this much
+    // from the forearm's direction, in the engine's yaw convention (positive: counter-clockwise seen from above, toward the
+    // player's left for the first swing, so the tip leads ahead of the hand's travel). Mirrored for the return.
+    internal const float SliceBladeYawOffset = 0.785f;
+
+    // On top of that, through the main part of the cut the held blade is drawn with this much added to its own display
+    // rotation (PlayerModel.HeldItemRotationOffset): the same [pitch, yaw, roll] degrees the item JSON's display.rotation
+    // and the item debugger's Rot sliders use, so a value found by sliding them at a mid-cut frame transfers here as is.
+    // The blade's rest display is yaw -90 / roll 45; mid-cut it reads right at yaw -145 / roll 70. The yaw part mirrors
+    // for the return swing (for a display yaw of -90 the mirror image of yaw -90 + d is yaw -90 - d), the roll does not.
+    internal const float SliceBladeDisplayYawDegrees = -55f;
+    internal const float SliceBladeDisplayRollDegrees = 25f;
+
+    // The slice shifts the body's weight: the hip, knee, torso dip and drop of a full strike (Dip 1), the
+    // torso's roll toward the swing's side, and the shoulder dragged across with the sweep.
+    private const float SliceRoll = 0.07f;
+    private const float SliceShoulderPull = 0.035f;
+
+    /// <summary>The frame of a slice at <paramref name="sliceT"/> (0..1) swinging <paramref name="sliceDir"/> (+1
+    /// right-to-left, -1 the return): every term the body reads, zero outside the swing.</summary>
+    internal static BladeSwingFrame FrameAt(float sliceT, int sliceDir)
+    {
+        if (sliceT <= 0f || sliceT >= 1f) return BladeSwingFrame.None;
+        var stroke = SliceStroke(sliceT);
+        var body = SliceBodySweep(sliceT, sliceDir);
+        var main = SliceMainWeight(sliceT);
+        return new BladeSwingFrame
+        {
+            Stroke = stroke,
+            ArmYaw = SliceSweep(sliceT, sliceDir),
+            Shoulder = SliceArmShoulder,
+            Elbow = SliceArmElbow,
+            HandLift = SliceDrop(sliceT),
+            RootYaw = body * SliceBodyYaw,
+            TorsoTwist = body * SliceTorsoYaw,
+            TorsoRoll = sliceDir * SliceRoll * stroke,
+            Dip = MathUtils.Pulse(sliceT, PlayerModel.SliceImpactProgress),
+            ShoulderPull = new Vector3(-SliceShoulderPull * body, 0f, 0f),
+            BladeRoll = SliceBladeRoll * sliceDir,
+            BladeCant = SliceBladeCant,
+            BladeYaw = SliceBladeYawOffset * sliceDir * main,
+            DisplayOffset = new Vector3(0f, SliceBladeDisplayYawDegrees * sliceDir, SliceBladeDisplayRollDegrees) * main,
+        };
+    }
 
     // Signed yaw the right arm sweeps through: 0 at rest, out to the swing's start side on the
     // wind-up, across the aim to the far side on the strike, then eased back to 0 on the recovery

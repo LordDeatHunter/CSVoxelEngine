@@ -1,0 +1,8 @@
+{
+  "mold": "block/fired_mold_pickaxe",
+  "fluid": "bronze",
+  "amountMl": 200,
+  "coolSeconds": 2,
+  "result": "item/bronze_pickaxe_head",
+  "count": 1
+}

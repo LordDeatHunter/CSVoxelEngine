@@ -2,8 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
+using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.Sandworms;
+using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Networking;
 using VoxelEngine.WorldGen;
 using Xunit;
@@ -38,6 +44,312 @@ public sealed class NetworkEntitySyncTests : IDisposable
         catch (InvalidOperationException)
         {
         }
+    }
+
+    [Fact]
+    public void HellMobsMirrorByKindFromASnapshotAndPlayTheirDeathWhenDropped()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+
+        var brutePos = new Vector3(4f, 60f, 4f);
+        var casterPos = new Vector3(-4f, 60f, 4f);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Hellbrute, 7, brutePos, 1f, 30, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Cinderwitch, 8, casterPos, 0.5f, 12, 0, 0, Vector3.Zero),
+        ]);
+        Assert.Equal(2, _world.HellMobs.Count);
+        var brute = Assert.IsType<Hellbrute>(Assert.Single(_world.HellMobs, m => m is Hellbrute));
+        var caster = Assert.IsType<Cinderwitch>(Assert.Single(_world.HellMobs, m => m is Cinderwitch));
+        Assert.Equal(brutePos, brute.Position);
+        Assert.Equal(30, brute.Health);
+        Assert.Equal(12, caster.Health);
+
+        // The same id updates in place; a kind that changed under one id is replaced, not reused
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Hellbrute, 7, brutePos + Vector3.UnitX, 1f, 20, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Hellbrute, 8, casterPos, 0.5f, 12, 0, 0, Vector3.Zero),
+        ]);
+        Assert.Same(brute, Assert.Single(_world.HellMobs, m => m.Position == brutePos + Vector3.UnitX));
+        Assert.Equal(20, brute.Health);
+        Assert.True(caster.IsDying);
+
+        // A mob the server stops reporting plays its death and is then dropped
+        _world.ClientMirror.ApplyNetworkEntities([]);
+        Assert.True(brute.IsDying);
+        for (var i = 0; i < 120 && _world.HellMobs.Count > 0; i++)
+            _world.Update(Dt, null);
+        Assert.Empty(_world.HellMobs);
+    }
+
+    [Fact]
+    public void ASkeletonMirrorTakesItsTierFromTheSnapshotAndIsReplacedWhenTheTierDiffers()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+
+        var pos = new Vector3(4f, 60f, 4f);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Skeleton, 7, pos, 1f, 25, 0, 4, Vector3.Zero),
+        ]);
+        var skeleton = Assert.IsType<Skeleton>(Assert.Single(_world.Skeletons));
+        // Nothing about where it stands names its floor: the tier is the snapshot's, and so is its scaled pool
+        Assert.Equal(4, skeleton.Tier);
+        Assert.Equal(25, skeleton.Health);
+
+        // The same tier updates in place, and its attack count plays the clip the count names
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Skeleton, 7, pos + Vector3.UnitX, 1f, 20, 1, 4, Vector3.Zero),
+        ]);
+        Assert.Same(skeleton, Assert.Single(_world.Skeletons, s => !s.IsDying));
+        Assert.Equal(20, skeleton.Health);
+        Assert.True(skeleton.Animation.IsPlaying(Skeleton.ShootClip));
+
+        // A different tier under the same id is a different mob: the old one dies, a new one takes the tier
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Skeleton, 7, pos, 1f, 20, 1, 6, Vector3.Zero),
+        ]);
+        Assert.True(skeleton.IsDying);
+        var replaced = Assert.Single(_world.Skeletons, s => !s.IsDying);
+        Assert.NotSame(skeleton, replaced);
+        Assert.Equal(6, replaced.Tier);
+
+        // A tier past the tower's top floor clamps, and then matches the clamped mirror instead of churning
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Skeleton, 8, pos, 1f, 20, 0, 255, Vector3.Zero),
+        ]);
+        var clamped = Assert.Single(_world.Skeletons, s => !s.IsDying && s != replaced);
+        Assert.Equal(MobConfig.TowerMaxTier, clamped.Tier);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Skeleton, 8, pos, 1f, 20, 0, 255, Vector3.Zero),
+        ]);
+        Assert.False(clamped.IsDying);
+    }
+
+    [Fact]
+    public void CaveMobsMirrorByKindFromASnapshotAndPlayTheirDeathWhenDropped()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+
+        var shardPos = new Vector3(4f, 60f, 4f);
+        var sporePos = new Vector3(-4f, 60f, 4f);
+        var magmaPos = new Vector3(4f, 60f, -4f);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Shardling, 7, shardPos, 1f, 20, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Sporeling, 8, sporePos, 0.5f, 25, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Magmaborn, 9, magmaPos, 0f, 60, 0, 0, Vector3.Zero),
+        ]);
+        Assert.Equal(3, _world.CaveMobs.Count);
+        var shard = Assert.IsType<Shardling>(Assert.Single(_world.CaveMobs, m => m is Shardling));
+        var spore = Assert.IsType<Sporeling>(Assert.Single(_world.CaveMobs, m => m is Sporeling));
+        var magma = Assert.IsType<Magmaborn>(Assert.Single(_world.CaveMobs, m => m is Magmaborn));
+        Assert.Equal(shardPos, shard.Position);
+        Assert.Equal(20, shard.Health);
+        Assert.Equal(25, spore.Health);
+        Assert.Equal(60, magma.Health);
+
+        // The same id updates in place and its attack count plays the attack clip; a kind changed under an id is replaced
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Shardling, 7, shardPos + Vector3.UnitX, 1f, 15, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Shardling, 8, sporePos, 0.5f, 25, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Magmaborn, 9, magmaPos, 0f, 60, 1, 0, Vector3.Zero),
+        ]);
+        Assert.Same(shard, Assert.Single(_world.CaveMobs, m => m.Position == shardPos + Vector3.UnitX));
+        Assert.Equal(15, shard.Health);
+        Assert.True(spore.IsDying);
+        Assert.True(magma.Animation.IsPlaying(magma.AttackClip));
+
+        // A mob the server stops reporting plays its death and is then dropped
+        _world.ClientMirror.ApplyNetworkEntities([]);
+        Assert.True(shard.IsDying);
+        for (var i = 0; i < 120 && _world.CaveMobs.Count > 0; i++)
+            _world.Update(Dt, null);
+        Assert.Empty(_world.CaveMobs);
+    }
+
+    [Fact]
+    public void ACaveMobMirrorTakesItsTierFromTheSnapshotNotWhereItIsFirstSeen()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+
+        // Seen above the echo bottom, where the depth would give tier 0: the tier, and so the pool, is the snapshot's
+        var pos = new Vector3(4f, 60f, 4f);
+        Assert.Equal(0, CaveDifficulty.TierAt(pos.Y));
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Sporeling, 7, pos, 1f, 30, 0, 3, Vector3.Zero),
+        ]);
+        var sporeling = Assert.IsType<Sporeling>(Assert.Single(_world.CaveMobs));
+        Assert.Equal(3, sporeling.Tier);
+        var server = new Sporeling(EntityRegistry.Require(Sporeling.EntityName), new Vector3(0f, -300f, 0f), 3);
+        Assert.Equal(server.MaxHealth, sporeling.MaxHealth);
+        Assert.True(sporeling.MaxHealth > EntityRegistry.Require(Sporeling.EntityName).MaxHealth);
+        Assert.Equal(30, sporeling.Health);
+
+        // The same tier updates in place
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Sporeling, 7, pos + Vector3.UnitX, 1f, 25, 0, 3, Vector3.Zero),
+        ]);
+        Assert.Same(sporeling, Assert.Single(_world.CaveMobs, m => !m.IsDying));
+        Assert.Equal(25, sporeling.Health);
+
+        // A different tier under the same id is a different mob
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Sporeling, 7, pos, 1f, 25, 0, 1, Vector3.Zero),
+        ]);
+        Assert.True(sporeling.IsDying);
+        var replaced = Assert.Single(_world.CaveMobs, m => !m.IsDying);
+        Assert.NotSame(sporeling, replaced);
+        Assert.Equal(1, replaced.Tier);
+
+        // A tier past the deepest clamps, and then matches the clamped mirror instead of churning
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Magmaborn, 8, pos, 1f, 20, 0, 255, Vector3.Zero),
+        ]);
+        var clamped = Assert.Single(_world.CaveMobs, m => !m.IsDying && m is Magmaborn);
+        Assert.Equal(MobConfig.CaveMaxTier, clamped.Tier);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Magmaborn, 8, pos, 1f, 20, 0, 255, Vector3.Zero),
+        ]);
+        Assert.False(clamped.IsDying);
+    }
+
+    [Fact]
+    public void TheSkeletonKingMirrorsByKindWithItsPhaseAndAttacks()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+
+        var pos = new Vector3(4f, 60f, 4f);
+        var type = EntityRegistry.Require(SkeletonKing.EntityName);
+        var wounded = type.MaxHealth / 2;
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.SkeletonKing, 9, pos, 0f, wounded, 0, 2, Vector3.Zero),
+        ]);
+        var king = Assert.IsType<SkeletonKing>(Assert.Single(_world.SkeletonKings));
+        Assert.True(king.IsBoss);
+        Assert.Equal(2, king.Phase);
+        Assert.Equal(wounded, king.Health);
+
+        // The boss bar reads the mirror like the server's own king: its name and health share
+        _world.RefreshMobs();
+        var bar = BossSelection.Nearest(_world.Mobs, pos + new Vector3(3f, 0f, 0f));
+        Assert.NotNull(bar);
+        Assert.Equal(type.DisplayName, bar.Value.Name);
+        Assert.Equal(wounded / (float)king.MaxHealth, bar.Value.Share, 3);
+
+        // The same id updates in place: the phase follows the item id, and an attack count of 1 plays the volley
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.SkeletonKing, 9, pos, 0f, wounded, 1, 3, Vector3.Zero),
+        ]);
+        Assert.Same(king, Assert.Single(_world.SkeletonKings));
+        Assert.Equal(3, king.Phase);
+        Assert.True(king.Animation.IsPlaying(SkeletonKing.VolleyClip));
+
+        // A phase byte out of range clamps to the king's three phases
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.SkeletonKing, 9, pos, 0f, wounded, 1, 0, Vector3.Zero),
+        ]);
+        Assert.Equal(1, king.Phase);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.SkeletonKing, 9, pos, 0f, wounded, 1, 200, Vector3.Zero),
+        ]);
+        Assert.Equal(3, king.Phase);
+
+        // A king the server stops reporting dies on the client too
+        _world.ClientMirror.ApplyNetworkEntities([]);
+        Assert.True(king.IsDying);
+    }
+
+    [Fact]
+    public void SkyMobsMirrorByKindAndAFlyerKeepsItsHeight()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+
+        var raptorPos = new Vector3(4f, WorldGenerationConfig.SkyIslandBottomY + 40f, 4f);
+        var golemPos = new Vector3(-4f, WorldGenerationConfig.SkyIslandBottomY + 20f, 4f);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Galeraptor, 7, raptorPos, 1f, 20, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Cloudgolem, 8, golemPos, 0.5f, 90, 0, 0, Vector3.Zero),
+        ]);
+        Assert.Equal(2, _world.SkyMobs.Count);
+        var raptor = Assert.IsType<Galeraptor>(Assert.Single(_world.SkyMobs, m => m is Galeraptor));
+        var golem = Assert.IsType<Cloudgolem>(Assert.Single(_world.SkyMobs, m => m is Cloudgolem));
+        Assert.Equal(raptorPos, raptor.Position);
+        Assert.Equal(golemPos, golem.Position);
+        Assert.Equal(90, golem.Health);
+
+        // A mirrored flyer neither falls nor drifts between snapshots, and the next one moves it in 3D
+        for (var i = 0; i < 60; i++)
+            raptor.AnimateMirror((float)Dt);
+        Assert.Equal(raptorPos.Y, raptor.Position.Y);
+        var climbed = raptorPos + new Vector3(1f, 3f, 0f);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Galeraptor, 7, climbed, 1f, 20, 0, 0, new Vector3(0f, 2f, 0f)),
+            new NetEntity(NetEntityKind.Cloudgolem, 8, golemPos, 0.5f, 90, 0, 0, Vector3.Zero),
+        ]);
+        Assert.Same(raptor, Assert.Single(_world.SkyMobs, m => m is Galeraptor));
+        Assert.Equal(climbed, raptor.Position);
+
+        // A kind that changed under one id is replaced, and a mob the server drops plays its death
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Cloudgolem, 7, climbed, 1f, 20, 0, 0, Vector3.Zero),
+        ]);
+        Assert.True(raptor.IsDying);
+        Assert.True(golem.IsDying);
+    }
+
+    [Fact]
+    public void ASandwormMirrorsItsPhaseAndTargetAndDragsItsChainAfterTheHead()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+        var head = new Vector3(4f, 40f, 4f);
+        var target = new Vector3(20f, 66f, 4f);
+        var wounded = EntityRegistry.Require(Sandworm.EntityName).MaxHealth - 10;
+
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Sandworm, 5, head, 0.5f, wounded, (int)SandwormPhase.Dig, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.SandwormTarget, 5, target, 0f, 750, 0, 0, Vector3.Zero),
+        ]);
+
+        var worm = Assert.Single(_world.Sandworms);
+        Assert.True(worm.IsMirror);
+        Assert.Equal(SandwormPhase.Dig, worm.Phase);
+        Assert.Equal(head, worm.Position);
+        Assert.Equal(wounded, worm.Health);
+        Assert.Equal(target, worm.SurfacePoint);
+        Assert.Equal(0.75f, worm.Telegraph, 3);
+        Assert.Contains(worm, _world.Mobs);
+
+        // Between snapshots the head dead-reckons along the server's velocity and the body is dragged after it
+        var velocity = new Vector3(8f, 0f, 0f);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Sandworm, 5, head, 0.5f, wounded, (int)SandwormPhase.Dig, 0, velocity),
+        ]);
+        var tailBefore = worm.Chain[worm.Chain.Count - 1];
+        for (var i = 0; i < 120; i++)
+            worm.AnimateMirrorFrame((float)Dt, (_, _) => (65f, true));
+        Assert.True(worm.Position.X > head.X + 10f);
+        Assert.True(worm.Chain[worm.Chain.Count - 1].X > tailBefore.X);
+        // No target entry this snapshot: nothing to telegraph
+        Assert.Equal(0f, worm.Telegraph);
+
+        // A phase change restarts the phase clock; the server dropping the worm plays its death
+        worm.MirrorPhase(SandwormPhase.Breach);
+        Assert.Equal(SandwormPhase.Breach, worm.Phase);
+        Assert.Equal(0f, worm.PhaseSeconds);
+        _world.ClientMirror.ApplyNetworkEntities([]);
+        Assert.True(worm.IsDying);
+    }
+
+    [Fact]
+    public void TheSandwormHeadIsAMobEntryAndItsTargetIsNot()
+    {
+        Assert.True(NetEntity.IsMob(NetEntityKind.Sandworm));
+        Assert.False(NetEntity.IsMob(NetEntityKind.SandwormTarget));
     }
 
     [Fact]
@@ -103,6 +415,62 @@ public sealed class NetworkEntitySyncTests : IDisposable
         var replaced = Assert.Single(_world.Mobs);
         Assert.NotSame(mirrored, replaced);
         Assert.Equal(SlimeSize.Min, Assert.IsType<Slime>(replaced).Size);
+    }
+
+    [Fact]
+    public void AMobMirrorTakesTheEffectMaskAndDropsUnknownBits()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        _world.GetChunkManager().Headless = true;
+        var burning = StatusEffectRegistry.Require("burning");
+        var unknown = (byte)(~StatusEffectRegistry.KnownMask & 0xFF);
+
+        // A fresh mirror spawns burning, carrying no bit the loaded content does not define
+        var pos = new Vector3(4f, 60f, 4f);
+        _world.ClientMirror.ApplyNetworkEntities(
+            [new NetEntity(NetEntityKind.Slime, 7, pos, 1f, 3, 0, 0, Vector3.Zero, (byte)(burning.Bit | unknown))]);
+        var mirrored = Assert.Single(_world.Slimes);
+        Assert.True(mirrored.Effects.IsActive(burning));
+        Assert.Equal(burning.Bit, mirrored.Effects.Mask);
+
+        // The same mirror updated in place takes the server's newest mask, here none
+        _world.ClientMirror.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, pos, 1f, 3, 0, 0, Vector3.Zero)]);
+        Assert.Same(mirrored, Assert.Single(_world.Slimes));
+        Assert.False(mirrored.Effects.IsActive(burning));
+        Assert.Equal(0, mirrored.Effects.Mask);
+
+        // ...and a mask of nothing but unknown bits stays empty
+        _world.ClientMirror.ApplyNetworkEntities(
+            [new NetEntity(NetEntityKind.Slime, 7, pos, 1f, 3, 0, 0, Vector3.Zero, unknown)]);
+        Assert.Equal(0, mirrored.Effects.Mask);
+    }
+
+    [Fact]
+    public void AClientNeverTicksAMirroredPlayerEffect()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        _world.GetChunkManager().Headless = true;
+        var burning = StatusEffectRegistry.Require("burning");
+        Assert.True(burning.DamageShare > 0f && burning.TickSeconds > 0f);
+
+        // The server says the player burns; the client shows it, and its physics reads the same set
+        _world.ClientMirror.ApplyNetworkEffects(burning.Bit);
+        Assert.True(_world.Camera.Effects!.IsActive(burning));
+        var health = _world.Health;
+
+        // Frames spanning several of the effect's tick intervals: the client deals itself no damage
+        // and expires nothing, since only the server ticks effects and reports the health
+        var frames = (int)Math.Ceiling(burning.TickSeconds * 3 / Dt);
+        for (var i = 0; i < frames; i++)
+            _world.Update(Dt, null);
+        Assert.Equal(health, _world.Health);
+        Assert.True(_world.Camera.Effects.IsActive(burning));
+
+        // The server's next status, with the effect gone, clears it
+        _world.ClientMirror.ApplyNetworkEffects(0);
+        Assert.False(_world.Camera.Effects.IsActive(burning));
     }
 
     [Fact]

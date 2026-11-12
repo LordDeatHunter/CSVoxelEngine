@@ -293,7 +293,7 @@ public sealed class WorldgenTests
         // `blocks[idx] == BlockType.Air` continue cannot mask a write.
         var (cx, cz) = FindSubmergedChunkColumn();
         var column = ColumnCache.Get(cx, cz);
-        var probe = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var probe = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         Array.Fill(probe, TerrainGenerator.RockBlock);
 
         NoiseCaves.Carve(probe, column, cx * Chunk.Size, 0, cz * Chunk.Size);
@@ -313,7 +313,7 @@ public sealed class WorldgenTests
         {
             var column = ColumnCache.Get(cx, cz);
             var cy = (column.MinHeight - 48) >> Chunk.SizeShift;
-            var probe = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+            var probe = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
             Array.Fill(probe, TerrainGenerator.RockBlock);
 
             NoiseCaves.Carve(probe, column, cx * Chunk.Size, cy * Chunk.Size, cz * Chunk.Size);

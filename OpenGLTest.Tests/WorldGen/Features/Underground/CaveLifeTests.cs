@@ -40,7 +40,7 @@ public sealed class CaveLifeTests
 
         // A chunk at y=0: a dry carved cave with a floor at y=4 and a ceiling at y=9, except one
         // flooded column (a cave lake)
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         var waterBlock = ContentRegistry.RequireBlock("water").Id;
         var stone = ContentRegistry.RequireBlock("stone").Id;
         for (var x = 0; x < Chunk.Size; x++)
@@ -71,7 +71,7 @@ public sealed class CaveLifeTests
     public void AStalactiteDripsAStalagmiteOntoTheFloorBelow()
     {
         var column = Column();
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         // A cave room: floor at y=4, air up to a ceiling at y=12
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

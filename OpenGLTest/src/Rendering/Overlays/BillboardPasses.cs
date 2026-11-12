@@ -9,8 +9,9 @@ namespace VoxelEngine.Rendering.Overlays;
 
 /// <summary>
 /// The billboard draws of the entity pass: the five-heart healthbars over the mobs, the floating
-/// damage numbers, the goblins' notice pips and the falling-leaf, fire and bubble particles. Holds
-/// no GL resource and issues no GL call of its own: the six renderers stay owned by
+/// damage numbers, the goblins' notice pips, the falling-leaf, fire and bubble particles and the
+/// blade slice trails. Holds no GL resource and issues no GL call of its own: the seven renderers
+/// stay owned by
 /// <see cref="RenderManager"/> (their creation is not one contiguous run) and, like the frame's
 /// light and the texture units, are read live through it. Render thread only.
 /// </summary>
@@ -26,6 +27,8 @@ internal sealed class BillboardPasses
         _owner = owner;
     }
 
+    private readonly List<Mob> _healthbarMobs = [];
+
     /// <summary>
     /// Draws the five-heart healthbar above every live mob (see
     /// <see cref="EntityHealthbarRenderer"/>), right after the bodies so the row tracks them.
@@ -34,7 +37,13 @@ internal sealed class BillboardPasses
     {
         if (camera == null || mobs.Count == 0 || _owner.Healthbars == null) return;
 
-        _owner.Healthbars.Render(mobs, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
+        // A boss hidden under the ground shows no bar (its bar would hang in the sand)
+        _healthbarMobs.Clear();
+        for (var i = 0; i < mobs.Count; i++)
+            if (mobs[i].ShowsHealthbar) _healthbarMobs.Add(mobs[i]);
+        if (_healthbarMobs.Count == 0) return;
+
+        _owner.Healthbars.Render(_healthbarMobs, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
             Lighting.FogColor, Lighting.FogNear, Lighting.FogFar);
         // The healthbar renderer binds its own heart sprites to unit 0.
         Units.InvalidateTextureUnits();
@@ -101,5 +110,19 @@ internal sealed class BillboardPasses
             Lighting.FogColor, Lighting.FogNear, Lighting.FogFar);
         // BubbleParticleRenderer binds its own sprite to unit 0.
         Units.InvalidateTextureUnits();
+    }
+
+    /// <summary>
+    /// Draws every active blade slice trail (see <see cref="SliceTrailRenderer"/>) as an additive
+    /// ribbon, faded with the world fog distances.
+    /// </summary>
+    internal void RenderSliceTrails(Camera camera, IReadOnlyList<SliceTrail> trails, double now)
+    {
+        if (camera == null || trails.Count == 0 || _owner.SliceTrails == null) return;
+
+        var viewProj = camera.GetViewProjection();
+        for (var i = 0; i < trails.Count; i++)
+            _owner.SliceTrails.Render(trails[i], now, viewProj, camera.RenderEye, Lighting.FogNear, Lighting.FogFar);
+        // The slice trail renderer binds no texture unit, so the unit cache stays valid.
     }
 }

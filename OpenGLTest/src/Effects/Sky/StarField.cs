@@ -14,7 +14,9 @@ namespace VoxelEngine.Effects.Sky;
 /// leaves a cell at a face edge a little smaller in solid angle than one at the face center, so
 /// <see cref="Probability"/> scales each cell's chance by its relative solid angle and the field
 /// is equally dense in every direction (no cube-shaped clumping at the face corners). The stars
-/// stay put in the sky; only <see cref="Visibility"/> moves.
+/// turn with the sky instead: the sun orbits the +Z axis (<see cref="DayCycle.SunDirection"/>), and so do
+/// the stars, at the same rate, so the sun keeps its place among them (<see cref="ToStarSpace"/>); the
+/// moon, which sits opposite the sun, is fixed among them too.
 /// </summary>
 public static class StarField
 {
@@ -26,6 +28,19 @@ public static class StarField
     /// (a few pixels wide) never reaches into a neighboring cell the shader would not evaluate.
     /// </summary>
     public const float CellMargin = 0.25f;
+
+    /// <summary>
+    /// The star-space direction of world direction <paramref name="d"/> when the sky has turned
+    /// <paramref name="orbitAngle"/> (<see cref="DayCycle.OrbitAngle"/>): the inverse of the sun's orbit, a
+    /// turn of -angle about +Z, so the sun's own direction maps to the same star-space point at every hour.
+    /// The shader works it out from the angle's cosine and sine.
+    /// </summary>
+    public static Vector3 ToStarSpace(Vector3 d, float orbitAngle)
+    {
+        var c = MathF.Cos(orbitAngle);
+        var s = MathF.Sin(orbitAngle);
+        return new Vector3(c * d.X + s * d.Y, -s * d.X + c * d.Y, d.Z);
+    }
 
     /// <summary>
     /// How visible the stars are for a sun at sine-elevation <paramref name="sunElevation"/>: 0 by

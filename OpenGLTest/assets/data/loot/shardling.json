@@ -1,0 +1,17 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "block/amethyst_ore", "weight": 1, "count": { "min": 0, "max": 2 } }
+      ]
+    },
+    {
+      "rolls": 1,
+      "chance": 0.3,
+      "entries": [
+        { "item": "block/crystal_block", "weight": 1, "count": 1 }
+      ]
+    }
+  ]
+}

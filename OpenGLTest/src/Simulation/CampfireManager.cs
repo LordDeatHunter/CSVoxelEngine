@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Networking;
+using VoxelEngine.Saves;
 using VoxelEngine.WorldGen.Features;
 
 namespace VoxelEngine.Simulation;
@@ -35,8 +37,8 @@ public sealed class CampfireManager
 
     public sealed class CookSlot
     {
-        public byte InputId;
-        public byte OutputId;
+        public ushort InputId;
+        public ushort OutputId;
         public int OutputCount;
         public float TimeLeft;
         public float TotalTime;
@@ -48,7 +50,7 @@ public sealed class CampfireManager
     private readonly List<(int X, int Y, int Z)> _scratch = new();
     private readonly List<(int X, int Y, int Z)> _stale = new();
     private readonly List<Vector3> _cells = new();
-    private readonly List<byte> _collected = new();
+    private readonly List<ushort> _collected = new();
 
     public int LitCount => _lit.Count;
 
@@ -59,11 +61,15 @@ public sealed class CampfireManager
 
     public bool IsLit(int x, int y, int z) => _lit.ContainsKey((x, y, z));
 
-    public bool Ignite(int x, int y, int z)
+    public bool Ignite(int x, int y, int z) => Ignite(x, y, z, BurnSeconds);
+
+    /// <summary>Lights the pile with its first branch burning <paramref name="firstBranchSeconds"/> (a goblin camp's
+    /// fire lasts the night); the rest burn <see cref="BurnSeconds"/> each. False when it already burns.</summary>
+    public bool Ignite(int x, int y, int z, float firstBranchSeconds)
     {
         var key = (x, y, z);
         if (_lit.ContainsKey(key)) return false;
-        _lit[key] = BurnSeconds;
+        _lit[key] = firstBranchSeconds;
         RefreshCells();
         return true;
     }
@@ -82,7 +88,7 @@ public sealed class CampfireManager
     public IReadOnlyList<CookSlot>? CookingAt(int x, int y, int z) =>
         _cooking.TryGetValue((x, y, z), out var slots) ? slots : null;
 
-    public bool TryPlaceFood(int x, int y, int z, byte inputId)
+    public bool TryPlaceFood(int x, int y, int z, ushort inputId)
     {
         if (!IsLit(x, y, z)) return false;
         var recipe = ContentRegistry.CookRecipeForInput(inputId);
@@ -106,7 +112,7 @@ public sealed class CampfireManager
         return true;
     }
 
-    public IReadOnlyList<byte> CollectFinished(int x, int y, int z)
+    public IReadOnlyList<ushort> CollectFinished(int x, int y, int z)
     {
         _collected.Clear();
         if (!_cooking.TryGetValue((x, y, z), out var slots)) return _collected;
@@ -122,7 +128,7 @@ public sealed class CampfireManager
         return _collected;
     }
 
-    public IEnumerable<(Vector3 Cell, int Slot, byte ItemId, bool Done, float Progress)> CookingView()
+    public IEnumerable<(Vector3 Cell, int Slot, ushort ItemId, bool Done, float Progress)> CookingView()
     {
         foreach (var (key, slots) in _cooking)
         {
@@ -252,6 +258,88 @@ public sealed class CampfireManager
             _cells.Add(new Vector3(x, y, z));
     }
 
+    /// <summary>Every lit pile and every cooking pile by content name, for <c>stations.json</c>
+    /// (at most <see cref="StationNetCodec.MaxEntries"/>). A slot whose item has no save name is skipped.</summary>
+    internal List<StationSaveData.CampfireData> Capture()
+    {
+        var result = new List<StationSaveData.CampfireData>();
+        var keys = new HashSet<(int X, int Y, int Z)>(_lit.Keys);
+        keys.UnionWith(_cooking.Keys);
+        foreach (var key in keys)
+        {
+            if (result.Count >= StationNetCodec.MaxEntries) break;
+            var data = new StationSaveData.CampfireData
+            {
+                Cell = [key.X, key.Y, key.Z],
+                Lit = _lit.TryGetValue(key, out var burn),
+                BurnLeft = burn,
+            };
+            if (_cooking.TryGetValue(key, out var slots))
+            {
+                data.Slots = [];
+                foreach (var slot in slots)
+                {
+                    if (SaveNames.NameOf(slot.InputId) is not { } input
+                        || SaveNames.NameOf(slot.OutputId) is not { } output)
+                        continue;
+                    data.Slots.Add(new StationSaveData.CookSlotData
+                    {
+                        Input = input,
+                        Output = output,
+                        Count = slot.OutputCount,
+                        TimeLeft = slot.TimeLeft,
+                        TotalTime = slot.TotalTime,
+                        Done = slot.IsDone,
+                    });
+                }
+            }
+            result.Add(data);
+        }
+        return result;
+    }
+
+    /// <summary>Adds the piles saved by <see cref="Capture"/> to an empty registry. Entries with
+    /// a bad cell or a name that no longer resolves are dropped; returns how many were.</summary>
+    internal int Restore(IReadOnlyList<StationSaveData.CampfireData>? saved)
+    {
+        var skipped = 0;
+        if (saved == null) return 0;
+        foreach (var data in saved.Take(StationNetCodec.MaxEntries))
+        {
+            if (!StationSaveCodec.TryCell(data.Cell, out var key))
+            {
+                skipped++;
+                continue;
+            }
+            if (data.Lit && float.IsFinite(data.BurnLeft))
+                _lit[key] = Math.Min(data.BurnLeft, BurnSeconds);
+            var slots = new List<CookSlot>(MaxCookSlots);
+            foreach (var s in data.Slots ?? [])
+            {
+                if (slots.Count >= MaxCookSlots) break;
+                if (!SaveNames.TryResolve(s.Input, out var input) || !SaveNames.TryResolve(s.Output, out var output)
+                    || !float.IsFinite(s.TimeLeft) || !float.IsFinite(s.TotalTime))
+                {
+                    skipped++;
+                    continue;
+                }
+                slots.Add(new CookSlot
+                {
+                    InputId = input,
+                    OutputId = output,
+                    OutputCount = Math.Clamp(s.Count, 0, byte.MaxValue),
+                    TimeLeft = Math.Max(0f, s.TimeLeft),
+                    TotalTime = Math.Max(0f, s.TotalTime),
+                    IsDone = s.Done,
+                });
+            }
+            if (slots.Count > 0)
+                _cooking[key] = slots;
+        }
+        RefreshCells();
+        return skipped;
+    }
+
     /// <summary>Writes every lit pile (with its burn timer) and every cooking slot, for the
     /// station broadcast (<see cref="StationNetCodec"/>).</summary>
     internal void WriteNet(PacketWriter writer)
@@ -276,8 +364,8 @@ public sealed class CampfireManager
             writer.Write((byte)slots.Count);
             foreach (var slot in slots)
             {
-                writer.Write(slot.InputId);
-                writer.Write(slot.OutputId);
+                writer.WriteId(slot.InputId);
+                writer.WriteId(slot.OutputId);
                 writer.Write((byte)Math.Clamp(slot.OutputCount, 0, byte.MaxValue));
                 writer.Write(slot.TimeLeft);
                 writer.Write(slot.TotalTime);
@@ -311,8 +399,8 @@ public sealed class CampfireManager
             {
                 slots.Add(new CookSlot
                 {
-                    InputId = reader.ReadByte(),
-                    OutputId = reader.ReadByte(),
+                    InputId = BlockTables.RequireAssigned(reader.ReadId()),
+                    OutputId = BlockTables.RequireAssigned(reader.ReadId()),
                     OutputCount = reader.ReadByte(),
                     TimeLeft = StationNetCodec.ReadFinite(reader),
                     TotalTime = StationNetCodec.ReadFinite(reader),

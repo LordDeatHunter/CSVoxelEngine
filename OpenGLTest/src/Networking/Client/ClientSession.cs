@@ -5,12 +5,14 @@ using System.Linq;
 using System.Threading;
 using VoxelEngine.App;
 using VoxelEngine.Audio;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Platform;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.Menus;
+using VoxelEngine.UI.Waystone;
 
 namespace VoxelEngine.Networking.Client;
 
@@ -44,6 +46,7 @@ internal sealed class ClientSession
     private readonly List<NetCellChange> netCellsScratch = new();
     // The server values a message lets through to the world (the rest wait behind a prediction)
     private readonly List<NetCellChange> netApplyScratch = new();
+    private readonly List<WaystoneNetRow> waystoneRowsScratch = new();
     // What this client predicted and the server has not answered yet; one per connection
     private ClientPrediction prediction = new();
     private double netStateTimer;
@@ -55,6 +58,8 @@ internal sealed class ClientSession
     // intent sent while it does
     private bool netDead;
     private float netRespawnTimer;
+    // The client's death screen: it asks the server to respawn only once the player chooses to
+    private readonly RespawnPrompt respawnPrompt = new();
 
     // The BlockChanges filter, made once in the constructor: it reads the live prediction field, and a lambda written at the call would capture this session and allocate a delegate per message
     private readonly Func<NetCellChange, bool> offerServerWrite;
@@ -73,6 +78,30 @@ internal sealed class ClientSession
 
     /// <summary>The connection, null in singleplayer, on the menu and after a disconnect.</summary>
     internal NetworkClient? Client => netClient;
+
+    /// <summary>The waystone rows, the activation answer and the trip the server is handling for this player (empty
+    /// while not connected).</summary>
+    internal WaystoneMirror Waystones { get; } = new();
+
+    /// <summary>The death screen's state for the running session: this connection's while connected, else the world's own (singleplayer).</summary>
+    internal RespawnPrompt RespawnPromptOf(World world) =>
+        netClient != null ? respawnPrompt : world.LocalPlayer.RespawnPrompt;
+
+    /// <summary>
+    /// The player chose RESPAWN on the death screen. Connected, it sends the intent (and the retry
+    /// clock keeps asking while the server still reports the player dead); in singleplayer the
+    /// world's next health tick carries the respawn out.
+    /// </summary>
+    internal void RequestRespawn(World world)
+    {
+        if (netClient == null)
+        {
+            world.LocalPlayer.RespawnPrompt.Request();
+            return;
+        }
+        if (respawnPrompt.Request())
+            SendRespawn(world.Camera);
+    }
 
 
     /// <summary>Starts the connect + handshake on a background thread; the loading screen polls it.</summary>
@@ -146,8 +175,8 @@ internal sealed class ClientSession
             if (fb.Y > 0)
                 ActiveWorld.Camera.SetAspectRatio(fb.X / (float)fb.Y);
 
-            clientStreamer = new ClientChunkStreamer(ActiveWorld.GetChunkManager(), SendChunkRequest, SendColumnRequest);
-            clientLodStreamer = new ClientLodStreamer(ActiveWorld.GetLodManager(), SendLodRequest);
+            clientStreamer = new ClientChunkStreamer(ActiveWorld.GetChunkManager(), SendChunkRequest, SendColumnRequest, client.Wire);
+            clientLodStreamer = new ClientLodStreamer(ActiveWorld.GetLodManager(), SendLodRequest, client.Wire);
         }
         catch (Exception e)
         {
@@ -178,7 +207,7 @@ internal sealed class ClientSession
         {
             netStateTimer = 0;
             var camera = w.Camera;
-            using var writer = new PacketWriter(NetMessage.PlayerState);
+            using var writer = new PacketWriter(NetMessage.PlayerState, netClient?.Wire);
             writer.Write(camera.Position);
             writer.Write(camera.Yaw);
             writer.Write(camera.Pitch);
@@ -199,11 +228,12 @@ internal sealed class ClientSession
             client.Send(writer.ToArray());
         }
 
-        // A dead player comes back only through a Respawn intent: the first goes out when the
-        // status says so, and it is asked again while the server still reports the player dead
-        if (netDead)
+        // A dead player comes back only through a Respawn intent, sent when the player chooses
+        // RESPAWN on the death screen and asked again while the server still reports them dead
+        respawnPrompt.Update((float)deltaTime, netDead);
+        if (netDead && respawnPrompt.Requested)
         {
-            netRespawnTimer += deltaTime;
+            netRespawnTimer += (float)deltaTime;
             if (netRespawnTimer >= NetworkConfig.NetRespawnRetrySeconds)
                 SendRespawn(w.Camera);
         }
@@ -212,7 +242,7 @@ internal sealed class ClientSession
         if (netKeepAliveTimer >= NetworkConfig.NetKeepAliveSeconds)
         {
             netKeepAliveTimer = 0;
-            using var writer = new PacketWriter(NetMessage.KeepAlive);
+            using var writer = new PacketWriter(NetMessage.KeepAlive, netClient?.Wire);
             client.Send(writer.ToArray());
         }
 
@@ -239,15 +269,13 @@ internal sealed class ClientSession
 
     private void HandleNetworkMessage(World w, byte[] payload)
     {
-        using var reader = new PacketReader(payload);
+        using var reader = new PacketReader(payload, netClient?.Wire);
         switch (reader.Message)
         {
             case NetMessage.ChatMessage:
             {
-                var kind = (ChatKind)reader.ReadByte();
-                var sender = reader.ReadString();
-                var text = reader.ReadString();
-                chatView.AddMessage(kind, sender, text);
+                var message = ChatMessageCodec.Read(reader);
+                chatView.AddMessage(message.Kind, message.Sender, message.Text, message.Link);
                 break;
             }
             case NetMessage.TimeSync:
@@ -257,6 +285,7 @@ internal sealed class ClientSession
             {
                 var count = reader.ReadInt();
                 remoteScratch.Clear();
+                Span<ushort> worn = stackalloc ushort[VoxelEngine.Config.GearConfig.ArmorSlotCount];
                 for (var i = 0; i < count; i++)
                 {
                     var id = reader.ReadInt();
@@ -267,7 +296,9 @@ internal sealed class ClientSession
                     var flags = (NetPlayerFlags)reader.ReadByte();
                     var action = (NetPlayerAction)reader.ReadByte();
                     var actionSeq = reader.ReadByte();
-                    remoteScratch.Add(new RemotePlayerSnapshot(id, name, eye, yaw, pitch, flags, action, actionSeq));
+                    for (var slot = 0; slot < worn.Length; slot++) worn[slot] = BlockTables.RequireAssigned(reader.ReadId());
+                    remoteScratch.Add(new RemotePlayerSnapshot(id, name, eye, yaw, pitch, flags, action, actionSeq,
+                        VoxelEngine.Player.ArmorLook.FromWire(worn)));
                 }
                 w.ClientMirror.SyncRemotePlayers(remoteScratch, netPlayerId);
                 break;
@@ -293,6 +324,8 @@ internal sealed class ClientSession
                 netApplyScratch.Clear();
                 prediction.Resolve(seq, netApplyScratch);
                 w.ClientMirror.ApplyNetworkBlockChanges(netApplyScratch);
+                if (Waystones.NoteResult(seq, accepted) && !accepted)
+                    w.Toast.Show(WaystoneText.TripRefused);
                 if (!accepted && diagnostics.DebugEnabled)
                     Log.WriteLine($"Multiplayer: the server refused intent #{seq}");
                 break;
@@ -310,6 +343,10 @@ internal sealed class ClientSession
                     status.Modes.HasFlag(NetPlayerFlags.Flying));
                 var healthBefore = w.Health;
                 w.ClientMirror.ApplyNetworkHealth(status.Health);
+                w.ClientMirror.ApplyNetworkAir(status.Air);
+                w.ClientMirror.ApplyNetworkMana(status.Mana, status.MaxMana);
+                w.ClientMirror.ApplyNetworkEffects(status.EffectMask);
+                w.ClientMirror.ApplyNetworkCaveBiome(status.CaveBiome);
                 var knockback = status.Knockback;
                 // AddKnockback normalizes the direction itself and keeps a lift-only hit's pop
                 if (knockback.LengthSquared() > 0f || status.Lift > 0f)
@@ -317,15 +354,7 @@ internal sealed class ClientSession
                 // A shove that came with lost health was a blow: the damage arc points back at it
                 if (status.Health < healthBefore)
                     w.Camera.AddDamageDirection(knockback);
-                if (status.Dead && !netDead)
-                {
-                    netDead = true;
-                    SendRespawn(w.Camera);
-                }
-                else if (!status.Dead)
-                {
-                    netDead = false;
-                }
+                netDead = status.Dead;
                 break;
             }
             case NetMessage.PlayerCorrection:
@@ -339,6 +368,9 @@ internal sealed class ClientSession
                 w.Camera.TestTeleport(eye, w.Camera.Yaw, w.Camera.Pitch);
                 netCorrectionAck = seq;
                 netStateTimer = NetworkConfig.NetPlayerStateSeconds;
+                // A waystone trip's landing: held there, facing away from the waystone, until this side's chunks are in
+                if (Waystones.TryTakeLanding(out var destination))
+                    w.WaystoneTravel.BeginLanding(eye, destination);
                 break;
             }
             case NetMessage.ChunkData:
@@ -369,17 +401,7 @@ internal sealed class ClientSession
                 var count = reader.ReadInt();
                 netEntitiesScratch.Clear();
                 for (var i = 0; i < count; i++)
-                {
-                    var kind = (NetEntityKind)reader.ReadByte();
-                    var id = reader.ReadInt();
-                    var position = reader.ReadVector3();
-                    var yaw = reader.ReadFloat();
-                    var health = reader.ReadInt();
-                    var ammo = reader.ReadInt();
-                    var itemId = reader.ReadByte();
-                    var velocity = reader.ReadVector3();
-                    netEntitiesScratch.Add(new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity));
-                }
+                    netEntitiesScratch.Add(NetEntityCodec.Read(reader));
                 w.ClientMirror.ApplyNetworkEntities(netEntitiesScratch);
                 break;
             }
@@ -394,6 +416,17 @@ internal sealed class ClientSession
                 w.ClientMirror.ApplyNetworkBlockChanges(netApplyScratch);
                 break;
             }
+            case NetMessage.ChestContents:
+                ApplyChestContents(w, reader);
+                break;
+            case NetMessage.WaystoneRows:
+                WaystoneNetCodec.ReadRows(reader, waystoneRowsScratch);
+                Waystones.Replace(waystoneRowsScratch);
+                break;
+            case NetMessage.WaystoneOpened:
+                // The server discovered the waystone this player right-clicked: the waystone screen opens on it
+                Waystones.Offer(WaystoneNetCodec.ReadOpened(reader));
+                break;
             case NetMessage.InventoryState:
             {
                 // A snapshot answering an older intent than the newest one that changed the
@@ -407,7 +440,8 @@ internal sealed class ClientSession
         }
     }
 
-    /// <summary>Reads a count-prefixed batch of cell changes into <c>netCellsScratch</c>.</summary>
+    /// <summary>Reads a count-prefixed batch of cell changes into <c>netCellsScratch</c>; an id outside this build's
+    /// content is bad data (<see cref="BlockTables.RequireAssigned"/>).</summary>
     private void ReadCellChanges(PacketReader reader)
     {
         var count = reader.ReadInt();
@@ -416,12 +450,9 @@ internal sealed class ClientSession
         netCellsScratch.Clear();
         for (var i = 0; i < count; i++)
         {
-            var x = reader.ReadInt();
-            var y = reader.ReadInt();
-            var z = reader.ReadInt();
-            var blockId = reader.ReadByte();
-            var state = reader.ReadByte();
-            netCellsScratch.Add(new NetCellChange(x, y, z, blockId, state));
+            var change = NetCellChangeCodec.Read(reader);
+            BlockTables.RequireAssigned(change.Id);
+            netCellsScratch.Add(change);
         }
     }
 
@@ -430,7 +461,7 @@ internal sealed class ClientSession
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return;
-        using var writer = new PacketWriter(NetMessage.ChunkRequest);
+        using var writer = new PacketWriter(NetMessage.ChunkRequest, netClient?.Wire);
         writer.Write(cx);
         writer.Write(cy);
         writer.Write(cz);
@@ -442,7 +473,7 @@ internal sealed class ClientSession
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return;
-        using var writer = new PacketWriter(NetMessage.ColumnRequest);
+        using var writer = new PacketWriter(NetMessage.ColumnRequest, netClient?.Wire);
         writer.Write(cx);
         writer.Write(cz);
         client.Send(writer.ToArray());
@@ -453,7 +484,7 @@ internal sealed class ClientSession
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return;
-        using var writer = new PacketWriter(NetMessage.LodRegionRequest);
+        using var writer = new PacketWriter(NetMessage.LodRegionRequest, netClient?.Wire);
         writer.Write(level);
         writer.Write(rx);
         writer.Write(rz);
@@ -468,9 +499,10 @@ internal sealed class ClientSession
     /// </summary>
     internal bool SendInventoryIntent(InventoryIntent intent)
     {
+        PlayEquipSound(intent);
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return false;
-        using var writer = new PacketWriter(NetMessage.InventoryRequest);
+        using var writer = new PacketWriter(NetMessage.InventoryRequest, netClient?.Wire);
         // Every inventory intent may change the inventory here, so snapshots answering an older
         // intent are dropped until this one's answer arrives
         writer.Write(prediction.Commit(predictsInventory: true));
@@ -479,8 +511,87 @@ internal sealed class ClientSession
         return true;
     }
 
+    /// <summary>
+    /// The equip and unequip cues, for every way a player puts an item on the hotbar or off it, or wears or takes
+    /// off gear. Called with the local change already applied.
+    /// </summary>
+    private void PlayEquipSound(InventoryIntent intent)
+    {
+        switch (intent.Action)
+        {
+            case NetInventoryAction.Equip:
+                // Equipping what the slot already shows clears it, so the (already applied) slot says which happened
+                var shown = ActiveWorld?.Inventory.SlotAt(intent.Slot);
+                var equipped = shown is { } slot && (intent.IsTool ? slot.IsTool && slot.ToolInstance == intent.Id : !slot.IsTool && slot.Id == intent.Id);
+                sfx?.Play(equipped ? SfxLibrary.EquipGroup : SfxLibrary.UnequipGroup);
+                break;
+            case NetInventoryAction.EquipGear:
+                sfx?.Play(SfxLibrary.EquipGroup);
+                break;
+            case NetInventoryAction.UnequipGear:
+                sfx?.Play(SfxLibrary.UnequipGroup);
+                break;
+        }
+    }
+
+    /// <summary>Asks the server to open the chest at a cell; false when not connected. The answer is a
+    /// <see cref="NetMessage.ChestContents"/>.</summary>
+    internal bool SendChestOpen(int x, int y, int z)
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;
+        using var writer = new PacketWriter(NetMessage.ChestOpen, netClient?.Wire);
+        ChestNetCodec.WriteOpen(writer, x, y, z);
+        client.Send(writer.ToArray());
+        return true;
+    }
+
+    /// <summary>Sends one move against the chest this player has open; false when not connected. Nothing is predicted:
+    /// the panel shows what the server answers.</summary>
+    internal bool SendChestMove(VoxelEngine.Simulation.Chests.ChestMove move)
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;
+        using var writer = new PacketWriter(NetMessage.ChestMove, netClient?.Wire);
+        ChestNetCodec.WriteMove(writer, move);
+        client.Send(writer.ToArray());
+        return true;
+    }
+
+    /// <summary>Tells the server this player closed its chest panel; false when not connected.</summary>
+    internal bool SendChestClose()
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;
+        using var writer = new PacketWriter(NetMessage.ChestClose, netClient?.Wire);
+        client.Send(writer.ToArray());
+        return true;
+    }
+
+    // The server's answer for the open chest: the contents the panel shows, or the closed answer, which takes the
+    // chest part of the panel down (a snapshot of a chest the panel is no longer on is stale and ignored)
+    private static void ApplyChestContents(World w, PacketReader reader)
+    {
+        var answer = ChestNetCodec.ReadContents(reader);
+        if (answer is not { } open)
+        {
+            w.ChestPanel.Close();
+            return;
+        }
+        if (w.ChestPanel is { IsOpen: true } panel && panel.Cell == open.Cell)
+            panel.SetContents(open.Contents);
+    }
+
+    /// <summary>Asks the server to rename the waystone at a cell (only its first discoverer may); false when not
+    /// connected. The answer is fresh <see cref="NetMessage.WaystoneRows"/>.</summary>
+    internal bool SendWaystoneRename((int X, int Y, int Z) cell, string name)
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;
+        using var writer = new PacketWriter(NetMessage.WaystoneRename, netClient?.Wire);
+        WaystoneNetCodec.WriteRename(writer, cell, name);
+        client.Send(writer.ToArray());
+        return true;
+    }
+
     /// <summary>A cell the world just changed as part of a predicted action (World.BlockEdited).</summary>
-    private void StagePredictedCell(int x, int y, int z, byte blockId, byte state) =>
+    private void StagePredictedCell(int x, int y, int z, ushort blockId, byte state) =>
         prediction.Stage(x, y, z);
 
     /// <summary>
@@ -492,9 +603,13 @@ internal sealed class ClientSession
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return;
-        using var writer = new PacketWriter(NetMessage.WorldIntent);
-        WorldIntentCodec.Write(writer, prediction.Commit(intent.PredictsInventory), intent);
+        using var writer = new PacketWriter(NetMessage.WorldIntent, netClient?.Wire);
+        var seq = prediction.Commit(intent.PredictsInventory);
+        WorldIntentCodec.Write(writer, seq, intent);
         client.Send(writer.ToArray());
+        // A waystone trip lands with a correction later; the session watches for it
+        if (intent.Kind == NetIntentKind.Waystone)
+            Waystones.NoteTripSent(seq, (intent.X, intent.Y, intent.Z));
     }
 
     /// <summary>
@@ -534,7 +649,9 @@ internal sealed class ClientSession
         netCorrectionAck = 0;
         netDead = false;
         netRespawnTimer = 0f;
+        respawnPrompt.Reset();
         prediction = new ClientPrediction();
+        Waystones.Clear();
         if (ActiveWorld == null) return;
         ActiveWorld.ClientMirror.ClearRemotePlayers();
         ActiveWorld.BlockEdited = null;
@@ -547,7 +664,7 @@ internal sealed class ClientSession
     {
         if (netClient is { Status: NetworkStatus.Handshaken } client)
         {
-            using var writer = new PacketWriter(NetMessage.ChatSend);
+            using var writer = new PacketWriter(NetMessage.ChatSend, netClient?.Wire);
             writer.Write(text);
             client.Send(writer.ToArray());
             return;

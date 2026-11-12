@@ -1,0 +1,13 @@
+{
+  // Raw casting basin: a mud bowl pressed from four mudballs (recipes/casting_basin_raw.json),
+  // pressed back apart by recipes/mudball_from_casting_basin_raw.json. Baked on a lit campfire
+  // it hardens into casting_basin (recipes/cook/casting_basin_raw.json). Not a cast mold itself.
+  // The hitbox height must equal the model's rim top (8 px).
+  "name": "Raw Casting Basin",
+  "model": "block/casting_basin_raw",
+  "hardness": 2,
+  "sfx": "hit_default",
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": { "min": [0, 0, 0], "max": [1, 0.5, 1] }
+}

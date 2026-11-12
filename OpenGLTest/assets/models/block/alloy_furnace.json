@@ -1,0 +1,87 @@
+{
+  // Alloy furnace: the anchor model of a 3x3x3 multiblock, authored in 0..48 model units (three
+  // cells on every axis, the anchor cell's origin at 0) with the opening on the NORTH (-Z) face.
+  // ContentRegistry pre-rotates the bake to the other three facings (MultiblockShape.Rotate), so
+  // this file is the only orientation ever written by hand. The same bake rules as the mud brick
+  // kiln hold: no face carries a "cullface", and no face covers a whole cell face.
+  //
+  // A hollow shell around a deep chamber: two side walls, a roof slab, a back body and a low
+  // hearth floor the crucible, the fire and the fuel stand on. No face declares "uv": the baker's
+  // defaults span one tile unit per cell and the sampler's REPEAT tiles the bricks once per cell.
+  //
+  // The opening is x 8..40, y 4..30, z 0..36 - cell space [0.5,2.5] x [0.25,1.875] x [0,2.25],
+  // the numbers KilnLayout.Furnace mirrors. Every face omitted below is buried inside another
+  // element.
+  "textures": {
+    "brick": "alloy_bricks",
+    "hearth": "fired_mud"
+  },
+  "elements": [
+    // Back body: the solid rear of the shell. Its north side is hidden by the side walls, the
+    // roof, the hearth floor and the chamber's back wall.
+    {
+      "from": [0, 0, 36],
+      "to": [48, 48, 48],
+      "faces": {
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#brick" },
+        "down": { "texture": "#brick" }
+      }
+    },
+    // Chamber back wall: the north-facing quad seen through the opening, fired by the fire in
+    // front of it.
+    {
+      "from": [8, 4, 36],
+      "to": [40, 30, 37],
+      "faces": {
+        "north": { "texture": "#hearth" }
+      }
+    },
+    // West wall of the chamber; its inner (east) side is fired.
+    {
+      "from": [0, 0, 0],
+      "to": [8, 48, 36],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#hearth" },
+        "up": { "texture": "#brick" },
+        "down": { "texture": "#brick" }
+      }
+    },
+    // East wall of the chamber; its inner (west) side is fired.
+    {
+      "from": [40, 0, 0],
+      "to": [48, 48, 36],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "west": { "texture": "#hearth" },
+        "up": { "texture": "#brick" },
+        "down": { "texture": "#brick" }
+      }
+    },
+    // Roof over the chamber; its underside is fired.
+    {
+      "from": [8, 30, 0],
+      "to": [40, 48, 36],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "up": { "texture": "#brick" },
+        "down": { "texture": "#hearth" }
+      }
+    },
+    // Hearth floor: the ledge the crucible, the fire and the fuel stand on.
+    {
+      "from": [8, 0, 0],
+      "to": [40, 4, 36],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "up": { "texture": "#hearth" },
+        "down": { "texture": "#brick" }
+      }
+    }
+  ]
+}

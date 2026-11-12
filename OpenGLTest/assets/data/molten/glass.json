@@ -1,0 +1,8 @@
+{
+  // Molten glass: what sand melts into (recipes/melt/sand.json) and what a casting basin turns
+  // back into a glass block (recipes/cast/glass.json). Reuses the lava tile like copper does;
+  // the pale tint is what makes it read as glass.
+  "name": "Molten Glass",
+  "texture": "lava_still",
+  "color": [200, 235, 255]
+}

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Entities.Posing;
 using VoxelEngine.Player;
 
 namespace VoxelEngine.Entities;
@@ -8,21 +9,25 @@ namespace VoxelEngine.Entities;
 /// <summary>
 /// Plays an entity's Blockbench keyframe clips (<see cref="AnimationClip"/>) on its rig, one
 /// instance per entity. Two layers: a <b>locomotion</b> layer that crossfades the looping
-/// <see cref="IdleClip"/> and <see cref="WalkClip"/> by horizontal speed (walk playback rate
-/// scales with that speed), and a one-shot <b>action</b> layer (<see cref="Play"/>) that
+/// <see cref="IdleClip"/> and a moving clip (<see cref="WalkClip"/>, or <see cref="FlyClip"/> for a
+/// flyer) by the speed the owner hands it (horizontal for a walker, 3D for a flyer; the moving clip's
+/// playback rate scales with it), and a one-shot <b>action</b> layer (<see cref="Play"/>) that
 /// overrides only the bones its clip keys, blending in and out over
 /// <see cref="ActionBlendSeconds"/> so an action starts and ends exactly on the locomotion pose.
 /// Timeline events crossed by an action's playback are queued for <see cref="ConsumeEvent"/>,
 /// which is how gameplay learns the frame a stone leaves the hand or a swing lands.
 /// GL-free; allocates nothing per frame after construction.
 /// </summary>
-public sealed class EntityAnimator
+public sealed class EntityAnimator : IBonePose
 {
     /// <summary>Name of the looping clip played while standing.</summary>
     public const string IdleClip = "idle";
 
     /// <summary>Name of the looping clip played while moving.</summary>
     public const string WalkClip = "walk";
+
+    /// <summary>Name of the looping clip a flyer plays while moving, in place of <see cref="WalkClip"/>.</summary>
+    public const string FlyClip = "fly";
 
     /// <summary><see cref="MathUtils.Damp"/> rate of the idle/walk crossfade, per second.</summary>
     public const float WalkBlendRate = 8f;
@@ -37,11 +42,14 @@ public sealed class EntityAnimator
     private const float WalkClockMinBlend = 0.01f;
     // A fading walk keeps stepping at least this fraction of its authored rate.
     private const float MinWalkRate = 0.5f;
-    // Longest parent chain composed before a cycle is assumed.
-    private const int MaxChainDepth = 16;
 
-    private readonly AnimationClip? _idle;
-    private readonly AnimationClip? _walk;
+    private AnimationClip? _idle;
+    private AnimationClip? _walk;
+    // The locomotion pair a gait change is fading out of, with its walk clock, and how far the fade is (1 = done)
+    private AnimationClip? _fromIdle;
+    private AnimationClip? _fromWalk;
+    private float _fromWalkTime;
+    private float _gaitBlend = 1f;
     private readonly List<string> _pendingEvents = new(4);
 
     private float _idleTime;
@@ -53,22 +61,62 @@ public sealed class EntityAnimator
     private AnimationClip? _overlay;
     private float _overlayTime;
 
-    /// <param name="clips">Every clip the model authored; idle and walk are found by name.</param>
-    /// <param name="walkReferenceSpeed">Horizontal speed (blocks/s) at which the walk clip plays
-    /// at its authored rate.</param>
-    public EntityAnimator(IReadOnlyList<AnimationClip> clips, float walkReferenceSpeed = 3f)
+    /// <param name="clips">Every clip the model authored; idle and the moving clip are found by name.</param>
+    /// <param name="walkReferenceSpeed">Speed (blocks/s) at which the moving clip plays at its
+    /// authored rate.</param>
+    /// <param name="moveClip">The clip crossfaded in while moving: <see cref="WalkClip"/>, or
+    /// <see cref="FlyClip"/> for a flyer.</param>
+    public EntityAnimator(IReadOnlyList<AnimationClip> clips, float walkReferenceSpeed = 3f, string moveClip = WalkClip)
     {
         Clips = clips;
         WalkReferenceSpeed = walkReferenceSpeed > 0f ? walkReferenceSpeed : 1f;
         _idle = Find(IdleClip);
-        _walk = Find(WalkClip);
+        _walk = Find(moveClip);
     }
 
     /// <summary>Every clip this animator can play, in the model's file order.</summary>
     public IReadOnlyList<AnimationClip> Clips { get; }
 
-    /// <summary>Horizontal speed at which the walk clip plays at its authored rate.</summary>
-    public float WalkReferenceSpeed { get; }
+    /// <summary>Speed at which the moving clip (walk or fly) plays at its authored rate.</summary>
+    public float WalkReferenceSpeed { get; private set; }
+
+    /// <summary>Seconds a gait change (<see cref="SetGait"/>) takes to fade from the old pair to the new.</summary>
+    public const float GaitBlendSeconds = 0.2f;
+
+    /// <summary>
+    /// Switches the locomotion pair to the clips named <paramref name="idleClip"/> and <paramref name="moveClip"/>
+    /// (a deer breaking from its walk into its run, a crow leaving the ground for its flight), the moving one
+    /// authored at <paramref name="referenceSpeed"/>. The pose fades from the old pair to the new over
+    /// <see cref="GaitBlendSeconds"/>; naming the pair already in use only updates the reference speed. A name
+    /// the model lacks leaves that half of the pair empty (the rest pose).
+    /// </summary>
+    public void SetGait(string idleClip, string moveClip, float referenceSpeed)
+    {
+        var idle = Find(idleClip);
+        var walk = Find(moveClip);
+        WalkReferenceSpeed = referenceSpeed > 0f ? referenceSpeed : 1f;
+        if (ReferenceEquals(idle, _idle) && ReferenceEquals(walk, _walk)) return;
+
+        _fromIdle = _idle;
+        _fromWalk = _walk;
+        _fromWalkTime = _walkTime;
+        _idle = idle;
+        _walk = walk;
+        _walkTime = 0f;
+        _gaitBlend = 0f;
+    }
+
+    /// <summary>
+    /// Ends the running action early: it blends back out to the locomotion pose over
+    /// <see cref="ActionBlendSeconds"/> instead of playing to its end, and the events it had not reached
+    /// never fire (a grazing deer that bolts). Does nothing with no action playing.
+    /// </summary>
+    public void CutAction()
+    {
+        if (_action == null) return;
+        _actionTime = MathF.Max(_actionTime, _action.Length - ActionBlendSeconds);
+        _lastActionTime = _actionTime;
+    }
 
     /// <summary>True while any one-shot action is playing.</summary>
     public bool IsActionPlaying => _action != null;
@@ -91,6 +139,10 @@ public sealed class EntityAnimator
             return MathUtils.SmoothStep(MathF.Min(edge, 1f));
         }
     }
+
+    /// <summary>Whether the running action keys <paramref name="bone"/>, and so overrides it by
+    /// <see cref="ActionWeight"/>; false with no action playing.</summary>
+    public bool ActionKeys(string bone) => _action != null && _action.Keys(bone);
 
     /// <summary>True while an additive overlay (<see cref="PlayOverlay"/>) is running.</summary>
     public bool IsOverlayPlaying => _overlay != null;
@@ -124,15 +176,16 @@ public sealed class EntityAnimator
 
     /// <summary>
     /// Advances both layers by <paramref name="deltaTime"/>. The idle clock always runs; the walk
-    /// clock runs while the walk still shows, at a rate proportional to
-    /// <paramref name="horizontalSpeed"/> (never below half the authored rate, so a fading walk
-    /// keeps stepping). Events the action crosses this frame are queued before the action ends.
+    /// clock runs while the walk (or fly) clip still shows, at a rate proportional to
+    /// <paramref name="speed"/> (never below half the authored rate, so a fading walk keeps
+    /// stepping): a walker's horizontal speed, a flyer's 3D speed. Events the action crosses this
+    /// frame are queued before the action ends.
     /// </summary>
-    public void Update(float deltaTime, float horizontalSpeed)
+    public void Update(float deltaTime, float speed)
     {
         if (deltaTime <= 0f) return;
 
-        var moving = horizontalSpeed > MovingSpeedThreshold;
+        var moving = speed > MovingSpeedThreshold;
         _walkBlend = MathUtils.Damp(_walkBlend, moving ? 1f : 0f, WalkBlendRate, deltaTime);
         _idleTime += deltaTime;
         if (_overlay != null)
@@ -141,7 +194,12 @@ public sealed class EntityAnimator
             if (_overlayTime >= _overlay.Length) _overlay = null;
         }
         if (_walkBlend > WalkClockMinBlend)
-            _walkTime += deltaTime * MathF.Max(horizontalSpeed / WalkReferenceSpeed, MinWalkRate);
+        {
+            var step = deltaTime * MathF.Max(speed / WalkReferenceSpeed, MinWalkRate);
+            _walkTime += step;
+            _fromWalkTime += step;
+        }
+        if (_gaitBlend < 1f) _gaitBlend = MathF.Min(1f, _gaitBlend + deltaTime / GaitBlendSeconds);
 
         if (_action == null) return;
         var from = _lastActionTime;
@@ -207,9 +265,9 @@ public sealed class EntityAnimator
     /// </summary>
     public AnimationClip.BoneTransform LocalTransform(string bone)
     {
-        var idle = _idle?.Sample(bone, _idleTime) ?? AnimationClip.BoneTransform.Identity;
-        var walk = _walk?.Sample(bone, _walkTime) ?? AnimationClip.BoneTransform.Identity;
-        var pose = Blend(idle, walk, _walkBlend);
+        var pose = Locomotion(_idle, _walk, _walkTime, bone);
+        if (_gaitBlend < 1f)
+            pose = Blend(Locomotion(_fromIdle, _fromWalk, _fromWalkTime, bone), pose, MathUtils.SmoothStep(_gaitBlend));
         if (_action != null && _action.Keys(bone))
             pose = Blend(pose, _action.Sample(bone, _actionTime), ActionWeight);
         if (_overlay != null && _overlay.Keys(bone))
@@ -223,19 +281,13 @@ public sealed class EntityAnimator
 
     /// <summary>
     /// World matrix of <paramref name="part"/>: its animated local transform composed down the
-    /// outliner's parent chain onto a root placed at <paramref name="feet"/> and turned by
-    /// <paramref name="facingYaw"/> (radians about +Y; the model faces -Z at 0). Per link,
-    /// scale, rotate, then translate by the pivot offset from the parent plus the animated
-    /// translation, then the parent — System.Numerics is row-vector, so the leftmost factor runs
-    /// first. The part's cubes are pivot-relative, so this is their model matrix. An unknown part
-    /// or a parent cycle yields identity.
+    /// outliner's parent chain (<see cref="RigPose.PartMatrix"/>) onto a root placed at
+    /// <paramref name="feet"/> and turned by <paramref name="facingYaw"/> (radians about +Y; the
+    /// model faces -Z at 0). The part's cubes are pivot-relative, so this is their model matrix.
+    /// An unknown part or a parent cycle yields identity.
     /// </summary>
-    public Matrix4x4 GetPartMatrix(string part, PlayerRig rig, Vector3 feet, float facingYaw)
-    {
-        if (!rig.Parts.ContainsKey(part)) return Matrix4x4.Identity;
-        var root = Matrix4x4.CreateRotationY(facingYaw) * Matrix4x4.CreateTranslation(feet);
-        return TryCompose(part, rig, root, 0, out var matrix) ? matrix : Matrix4x4.Identity;
-    }
+    public Matrix4x4 GetPartMatrix(string part, PlayerRig rig, Vector3 feet, float facingYaw) =>
+        RigPose.PartMatrix(this, part, rig, Matrix4x4.CreateRotationY(facingYaw) * Matrix4x4.CreateTranslation(feet));
 
     /// <summary>
     /// Anchor for an item held by <paramref name="part"/>: the part's matrix moved down to the
@@ -251,33 +303,10 @@ public sealed class EntityAnimator
         return Matrix4x4.CreateTranslation(0f, depth, 0f) * GetPartMatrix(part, rig, feet, facingYaw);
     }
 
-    private bool TryCompose(string name, PlayerRig rig, Matrix4x4 root, int depth,
-        out Matrix4x4 matrix)
-    {
-        matrix = Matrix4x4.Identity;
-        if (depth > MaxChainDepth) return false;
-        var part = rig.Parts[name];
-
-        Matrix4x4 parentMatrix;
-        Vector3 parentPivot;
-        if (part.Parent != null && rig.Parts.TryGetValue(part.Parent, out var parent))
-        {
-            if (!TryCompose(part.Parent, rig, root, depth + 1, out parentMatrix)) return false;
-            parentPivot = parent.Pivot;
-        }
-        else
-        {
-            parentMatrix = root;
-            parentPivot = Vector3.Zero;
-        }
-
-        var tr = LocalTransform(name);
-        var local = Matrix4x4.CreateScale(tr.Scale)
-            * Matrix4x4.CreateFromQuaternion(tr.Rotation)
-            * Matrix4x4.CreateTranslation(part.Pivot - parentPivot + tr.Translation);
-        matrix = local * parentMatrix;
-        return true;
-    }
+    // One locomotion pair's pose for a bone: its idle and moving clips blended by the walk weight
+    private AnimationClip.BoneTransform Locomotion(AnimationClip? idle, AnimationClip? walk, float walkTime, string bone) =>
+        Blend(idle?.Sample(bone, _idleTime) ?? AnimationClip.BoneTransform.Identity,
+            walk?.Sample(bone, walkTime) ?? AnimationClip.BoneTransform.Identity, _walkBlend);
 
     private static AnimationClip.BoneTransform Blend(AnimationClip.BoneTransform a,
         AnimationClip.BoneTransform b, float t)

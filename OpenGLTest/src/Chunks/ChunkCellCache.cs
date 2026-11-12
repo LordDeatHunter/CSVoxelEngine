@@ -19,8 +19,8 @@ internal sealed class ChunkCellCache
     // validated by the packed chunk key (always non-negative, so -1 is a safe empty sentinel).
     // The keys are cleared by every BeginFrame: an unload can replace a chunk between
     // frames, and a cached reference must never outlive that. Only the Chunk is cached, never
-    // its block/state arrays — SetBlockRaw swaps in a fresh state array on the first non-zero
-    // write, so a cached array pointer would miss later fluid state.
+    // its block storage or state array — SetBlockRaw swaps in a fresh state array on the first
+    // non-zero write and a fresh storage on a mode upgrade, so a cached one would miss later writes.
     private const int ChunkCacheSize = 16;
     private const int ChunkCacheMask = ChunkCacheSize - 1;
     private readonly Chunk?[] _chunkCache = new Chunk?[ChunkCacheSize];
@@ -56,9 +56,9 @@ internal sealed class ChunkCellCache
     /// The loaded chunk owning a cell, through the frame's direct-mapped cache. A miss probes
     /// the chunk dictionary once and stores the reference; because the keys are cleared every
     /// frame, a hit can never hand back a chunk an unload has since replaced. Only the
-    /// <see cref="Chunk"/> is cached, never its block or state arrays: <see cref="Chunk.SetBlockRaw"/>
-    /// swaps in a fresh state array on the first non-zero write, so a cached array would miss
-    /// later state. The miss path goes through <see cref="ChunkManager.ChunkAt"/>, which keeps
+    /// <see cref="Chunk"/> is cached, never its block storage or state array: <see cref="Chunk.SetBlockRaw"/>
+    /// swaps in a fresh state array on the first non-zero write and a fresh storage on a mode
+    /// upgrade, so a cached one would miss later writes. The miss path goes through <see cref="ChunkManager.ChunkAt"/>, which keeps
     /// the tests' contract that a chunk without ready block data reads as unloaded.
     /// </summary>
     private bool TryGetChunk(int x, int y, int z, out Chunk? chunk)
@@ -85,7 +85,7 @@ internal sealed class ChunkCellCache
     /// matches <see cref="ChunkManager.TryGetCell"/>: false means the chunk is not loaded, and
     /// an unloaded cell must never read as air.
     /// </summary>
-    internal bool TryGetCell(int x, int y, int z, out byte id, out byte state)
+    internal bool TryGetCell(int x, int y, int z, out ushort id, out byte state)
     {
         if (!TryGetChunk(x, y, z, out var chunk))
         {
@@ -110,7 +110,7 @@ internal sealed class ChunkCellCache
     /// which is right for fluids, leaves and tree wood, all of which pass light and cast no ambient
     /// occlusion. A leaf decay hydration rewrite passes false: the mesher never reads <c>LeafState</c>.
     /// </summary>
-    internal bool Write(int x, int y, int z, byte id, byte state, bool remesh)
+    internal bool Write(int x, int y, int z, ushort id, byte state, bool remesh)
     {
         if (!TryGetChunk(x, y, z, out var chunk)) return false;
 
@@ -120,7 +120,10 @@ internal sealed class ChunkCellCache
     }
 
     /// <summary>Adds the chunk owning a cell, plus the face-adjacent chunk on every axis where
-    /// the cell sits on a chunk border, to <paramref name="into"/> as packed chunk keys.</summary>
+    /// the cell sits on a chunk border, to <paramref name="into"/> as packed chunk keys. A cell on a
+    /// Y border and an X or Z border one also adds the edge-diagonal chunk across both: a beveled
+    /// tree-wood shell's cap reads the vertical neighbor's horizontal neighbors, so an edit there
+    /// changes the mesh of a chunk no face-adjacent rule reaches.</summary>
     internal static void AddTouchedChunks(int x, int y, int z, HashSet<long> into)
     {
         var cx = x >> Chunk.SizeShift;
@@ -132,13 +135,16 @@ internal sealed class ChunkCellCache
         var ly = y & Chunk.SizeMask;
         var lz = z & Chunk.SizeMask;
 
-        if (lx == 0) into.Add(ChunkKey.Pack(cx - 1, cy, cz));
-        else if (lx == Chunk.SizeMask) into.Add(ChunkKey.Pack(cx + 1, cy, cz));
+        var dx = lx == 0 ? -1 : lx == Chunk.SizeMask ? 1 : 0;
+        var dy = ly == 0 ? -1 : ly == Chunk.SizeMask ? 1 : 0;
+        var dz = lz == 0 ? -1 : lz == Chunk.SizeMask ? 1 : 0;
 
-        if (ly == 0) into.Add(ChunkKey.Pack(cx, cy - 1, cz));
-        else if (ly == Chunk.SizeMask) into.Add(ChunkKey.Pack(cx, cy + 1, cz));
+        if (dx != 0) into.Add(ChunkKey.Pack(cx + dx, cy, cz));
+        if (dy != 0) into.Add(ChunkKey.Pack(cx, cy + dy, cz));
+        if (dz != 0) into.Add(ChunkKey.Pack(cx, cy, cz + dz));
 
-        if (lz == 0) into.Add(ChunkKey.Pack(cx, cy, cz - 1));
-        else if (lz == Chunk.SizeMask) into.Add(ChunkKey.Pack(cx, cy, cz + 1));
+        if (dy == 0) return;
+        if (dx != 0) into.Add(ChunkKey.Pack(cx + dx, cy + dy, cz));
+        if (dz != 0) into.Add(ChunkKey.Pack(cx, cy + dy, cz + dz));
     }
 }

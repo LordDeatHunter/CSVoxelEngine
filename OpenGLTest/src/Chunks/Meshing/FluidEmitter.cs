@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Numerics;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Lighting;
+using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Simulation.Fluids;
 using static VoxelEngine.Chunks.Chunk;
 using static VoxelEngine.Chunks.Meshing.ChunkLighting;
@@ -24,8 +25,9 @@ internal static class FluidEmitter
     /// no crack. No face is ever emitted between two fluid cells, so a body of water reads as
     /// a single skin instead of a stack of blended cubes.
     /// </summary>
-    internal static void EmitFluid(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+    internal static void EmitFluid(MeshBufferPool pool, ref List<Vertex>? vertices, ref List<ushort>? indices,
+        ref ushort indexOffset,
+        ushort[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos)
     {
         // Smooth light per (X, Z) corner, averaged over the same 2x2 cells CornerHeight reads.
@@ -80,7 +82,10 @@ internal static class FluidEmitter
 
             // Meshes are indexed with ushort (mirrors LodFaceEmitter.AddQuad): stop emitting
             // instead of wrapping the offset if a chunk somehow runs past the limit
-            if (vertices.Count > ushort.MaxValue - 3) return;
+            if (vertices is { Count: > ushort.MaxValue - 3 }) return;
+
+            vertices ??= pool.RentTranslucentVertices();
+            indices ??= pool.RentTranslucentIndices();
 
             if (!flowComputed)
             {
@@ -124,7 +129,7 @@ internal static class FluidEmitter
     /// plus the cell's falling flag) and reports whether any is nonzero. Falling is the cell's own
     /// state alone, never "fluid above": a stack of still sources is not a waterfall.
     /// </summary>
-    internal static bool ComputeFluidFlowCodes(byte[] padded, byte[] paddedState, int pIdx, Span<ushort> codes)
+    internal static bool ComputeFluidFlowCodes(ushort[] padded, byte[] paddedState, int pIdx, Span<ushort> codes)
     {
         var cells = new PaddedFluidCells(padded, paddedState, pIdx);
         var falling = FluidState.IsFalling(paddedState[pIdx]);
@@ -152,9 +157,9 @@ internal static class FluidEmitter
     /// any own cell at padded 1..16, and an absent edge/corner chunk reads as air there - the same
     /// "no term" branch a live TryGetCell == false would take.
     /// </summary>
-    private readonly struct PaddedFluidCells(byte[] padded, byte[] paddedState, int pIdx) : IFluidCellReader
+    private readonly struct PaddedFluidCells(ushort[] padded, byte[] paddedState, int pIdx) : IFluidCellReader
     {
-        public bool TryGetCell(int x, int y, int z, out byte id, out byte state)
+        public bool TryGetCell(int x, int y, int z, out ushort id, out byte state)
         {
             var q = pIdx + x * PaddedSq + y * Padded + z;
             id = padded[q];
@@ -175,7 +180,7 @@ internal static class FluidEmitter
     /// rule never asks which of the four cells is the own one, so every fluid cell sharing the
     /// corner computes the same code.
     /// </summary>
-    internal static int FluidCornerLight(byte[] padded, int pIdx, byte[] sunLight, byte[] blockLight,
+    internal static int FluidCornerLight(ushort[] padded, int pIdx, byte[] sunLight, byte[] blockLight,
         int lightBase, int cx, int cz)
     {
         var pdx = cx == 0 ? -PaddedSq : PaddedSq;
@@ -228,7 +233,7 @@ internal static class FluidEmitter
 
     /// <summary>Surface height inside one fluid cell of the padded snapshot, 0..1. Fluid
     /// directly above fills the cell completely, so stacked water shows no seam.</summary>
-    internal static float FluidHeight(byte[] padded, byte[] paddedState, int p) =>
+    internal static float FluidHeight(ushort[] padded, byte[] paddedState, int p) =>
         BlockType.IsFluid(padded[p + ChunkFaceTables.FaceNeighborDelta[4]])
             ? 1f
             : FluidState.SurfaceHeight(paddedState[p]);
@@ -244,7 +249,7 @@ internal static class FluidEmitter
     /// orthogonal cells stay separate instead of visually joining. The cell itself is fluid, so
     /// the weight is never zero.
     /// </summary>
-    internal static float CornerHeight(byte[] padded, byte[] paddedState, int p, int dx, int dz)
+    internal static float CornerHeight(ushort[] padded, byte[] paddedState, int p, int dx, int dz)
     {
         var total = 0f;
         var weight = 0f;

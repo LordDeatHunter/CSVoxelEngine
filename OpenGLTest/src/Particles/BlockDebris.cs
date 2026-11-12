@@ -16,7 +16,7 @@ public class BlockDebris
 {
     /// <summary>Block the cube renders as (see <see cref="BlockCubeCache"/>); air for a
     /// <see cref="DebrisLook.Color"/> chip.</summary>
-    public byte BlockId { get; }
+    public ushort BlockId { get; }
 
     /// <summary>Which cached cube draws the chip: the whole block (a mining chip), its surface
     /// (dust) or a plain color (goo).</summary>
@@ -84,7 +84,7 @@ public class BlockDebris
     /// <param name="pop">True (a mining chip) adds the random upward pop every chip leaves the
     /// block with on top of <paramref name="toss"/>; false launches at exactly
     /// <paramref name="toss"/>, so a caller that scales the launch (landing dust) owns the whole of it.</param>
-    public BlockDebris(byte blockId, Vector3 position, Vector3? toss = null, float? size = null, Random? random = null,
+    public BlockDebris(ushort blockId, Vector3 position, Vector3? toss = null, float? size = null, Random? random = null,
         Vector3? tint = null, bool pop = true, DebrisLook look = DebrisLook.Block)
     {
         var rng = random ?? Random.Shared;

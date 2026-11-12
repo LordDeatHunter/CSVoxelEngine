@@ -4,6 +4,7 @@ using Silk.NET.Input;
 using VoxelEngine.Content;
 using VoxelEngine.Interaction;
 using VoxelEngine.Networking.Client;
+using VoxelEngine.Platform;
 using VoxelEngine.UI.Hud;
 
 namespace VoxelEngine.App;
@@ -14,10 +15,13 @@ internal sealed class ChatInput
     private readonly ChatView chatView;
     private readonly ClientSession session;
 
-    internal ChatInput(ChatView chatView, ClientSession session)
+    private readonly TextFieldKeys textKeys;
+
+    internal ChatInput(ChatView chatView, ClientSession session, InputManager inputManager)
     {
         this.chatView = chatView;
         this.session = session;
+        textKeys = new TextFieldKeys(inputManager);
     }
 
     private World? ActiveWorld => Program.ActiveWorld;
@@ -26,11 +30,11 @@ internal sealed class ChatInput
     /// handler, so closing chat and the pause menu never both fire on one press.</summary>
     internal void HandleChatKey(Key key)
     {
+        // Up and Down recall sent lines here, so only the other editing keys go to the field
+        if (key is not (Key.Up or Key.Down) && textKeys.TryHandle(chatView.Input, key, upDownJump: false, out _))
+            return;
         switch (key)
         {
-            case Key.Backspace:
-                chatView.Backspace();
-                break;
             case Key.Enter or Key.KeypadEnter:
                 SubmitChat();
                 break;
@@ -75,8 +79,8 @@ internal sealed class ChatInput
 
     /// <summary>
     /// Runs one chat command locally, on the same table a server uses (<see cref="ChatCommands"/>):
-    /// <c>/tp</c> and <c>/give</c> need creative mode, <c>/time</c> and <c>/help</c> do not, and
-    /// every answer is a system chat line.
+    /// <c>/tp</c> and <c>/give</c> need creative mode, <c>/time</c>, <c>/locate</c> and <c>/help</c>
+    /// do not, and every answer is a system chat line (<c>/locate</c>'s with a link).
     /// </summary>
     private void RunCommand(string line)
     {
@@ -129,6 +133,19 @@ internal sealed class ChatInput
                 chatView.AddSystem($"Gave {request.Count} x {request.Item}");
                 return;
 
+            case ChatCommands.CommandKind.Locate:
+            {
+                // A client holds no seed to search worldgen with; its '/' lines go to the server, which answers
+                if (w.IsClientMode)
+                {
+                    chatView.AddSystem("/locate needs a connection to the server");
+                    return;
+                }
+                var (text, link) = ChatCommands.Locate(parsed.Args, w.Camera.Position, w.Towers);
+                chatView.AddSystem(text, link);
+                return;
+            }
+
             default:
                 chatView.AddSystem(ChatCommands.HelpText);
                 return;
@@ -137,7 +154,7 @@ internal sealed class ChatInput
 
     // An item or block by plain name (blocks first, like a loot entry) or by its block//item/
     // pinned name
-    private static bool TryResolveContent(string name, out byte id)
+    private static bool TryResolveContent(string name, out ushort id)
     {
         var trimmed = name.Trim();
         if (trimmed.StartsWith("block/", StringComparison.OrdinalIgnoreCase))

@@ -1,0 +1,11 @@
+{
+  // Feathers fletch better than bone: the same shaft and head make six arrows instead of four
+  // (flint_arrow.json; see mudball_from_mold_pickaxe.json for the <result>_from_<ingredient> naming).
+  "result": "item/flint_arrow",
+  "count": 6,
+  "ingredients": [
+    { "item": "item/branch", "count": 1 },
+    { "item": "item/flint", "count": 1 },
+    { "item": "item/crow_feather", "count": 1 }
+  ]
+}

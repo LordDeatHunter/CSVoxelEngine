@@ -180,7 +180,7 @@ public sealed class GoblinManagerTests
         high.TestTeleport(new Vector3(0.5f, 100f, 0.5f), yaw: 0f, pitch: 0f);
         var spawning = Manager();
         for (var attempt = 0; attempt < 40 && spawning.Goblins.Count == 0; attempt++)
-            spawning.Update(interval, surface, drops, high);
+            spawning.Update(interval, surface, drops, high, night: 1f);
 
         // One ring spawn rolls a pack of up to GoblinPackMaxSize goblins: the leader stands in
         // the ring, its mates within GoblinPackSpawnRadiusBlocks of it, all on dry ground

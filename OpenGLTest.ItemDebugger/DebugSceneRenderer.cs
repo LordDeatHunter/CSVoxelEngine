@@ -14,6 +14,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Graphics;
 using VoxelEngine.Items;
+using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering;
 using VoxelEngine.Rendering.Overlays;
@@ -51,6 +52,8 @@ public sealed class DebugSceneRenderer : IDisposable
     private readonly Dictionary<string, Mesh> _playerMeshes;
     private readonly BlockCubeCache _blockCubes;
     private readonly ItemMeshCache _itemMeshes;
+    // The debugger renders straight into display space, so the trail keeps its sRGB color undecoded.
+    private readonly SliceTrailRenderer _sliceTrail;
     private readonly int _locModel;
     private readonly int _locMvp;
     private readonly int _locAlpha;
@@ -59,7 +62,7 @@ public sealed class DebugSceneRenderer : IDisposable
     private readonly int[] _locPointColor;
     // Resolved in the ctor body after ContentRegistry.Load: a field initializer would run first,
     // against an empty registry.
-    private readonly byte _flintId;
+    private readonly ushort _flintId;
     // Entity rigs, built the first time the ENTITIES tab shows each one.
     private readonly Dictionary<(string Type, int Variant), EntityPreview> _entityPreviews = new();
 
@@ -135,6 +138,7 @@ public sealed class DebugSceneRenderer : IDisposable
         _playerMeshes = PlayerRig.BuildMeshes(gl, Rig);
         _blockCubes = new BlockCubeCache(gl);
         _itemMeshes = new ItemMeshCache(gl);
+        _sliceTrail = new SliceTrailRenderer(gl, linearOutput: false);
         Ui = new UIRenderer(gl, _atlasTexture, _blockCubes, _itemMeshes, atlasIsSrgb: false);
         _lavaLayer = ContentRegistry.RequireBlock("lava").Top;
     }
@@ -170,9 +174,20 @@ public sealed class DebugSceneRenderer : IDisposable
     }
 
     /// <summary>
+    /// Draws the previewed blade's slice trail additively over the scene <see cref="Render"/> just drew, at
+    /// <paramref name="now"/> on the preview's own clock, with no distance fade, and leaves the world program
+    /// bound again.
+    /// </summary>
+    public void RenderSliceTrail(SliceTrail trail, double now, Matrix4x4 viewProj, Vector3 cameraEye)
+    {
+        _sliceTrail.Render(trail, now, viewProj, cameraEye, 1000f, 2000f);
+        _world.Use();
+    }
+
+    /// <summary>
     /// Draws the entity <paramref name="state"/> previews, part by part, at the origin: each part
-    /// from the state's <see cref="EntityAnimator.GetPartMatrix"/>, the flint in the hand when the
-    /// rig has one, and the hurt mode's hit-flash tint. Same frame setup as <see cref="Render"/>.
+    /// from the state's <see cref="EntityPreviewState.PartMatrix"/>, the flint in the hand when the
+    /// rig has one, the item its entity file holds, and the hurt mode's hit-flash tint. Same frame setup as <see cref="Render"/>.
     /// </summary>
     public void RenderEntity(Matrix4x4 viewProj, Vector3 eyePos, EntityPreviewState state, float time,
         Vector2D<int> size)
@@ -191,7 +206,7 @@ public sealed class DebugSceneRenderer : IDisposable
         BindArray(0, preview.Texture);
         for (var i = 0; i < preview.Parts.Length; i++)
             Draw(preview.Parts[i],
-                animator.GetPartMatrix(preview.PartNames[i], preview.Rig, feet, state.FacingYaw) * effect, viewProj);
+                state.PartMatrix(preview.PartNames[i], preview.Rig, feet) * effect, viewProj);
 
         if (state.ShowsHeldStone && _itemMeshes.TryGet(_flintId, out var stone, out var stoneTex))
         {
@@ -199,6 +214,13 @@ public sealed class DebugSceneRenderer : IDisposable
             var model = Matrix4x4.CreateScale(Goblin.HeldStoneScale)
                         * animator.HandAnchor(Goblin.HandPart, preview.Rig, feet, state.FacingYaw) * effect;
             Draw(stone, model, viewProj);
+        }
+
+        // The item the kind's entity file holds (the skeleton warrior's dagger), as the game's MobPasses draws it
+        if (type.HeldItemId != 0 && _itemMeshes.TryGet(type.HeldItemId, out var held, out var heldTex))
+        {
+            BindArray(0, heldTex);
+            Draw(held, type.HeldMatrix(animator, preview.Rig, feet, state.FacingYaw) * effect, viewProj);
         }
         _world.SetUniform("uHitFlash", 0f);
     }
@@ -456,6 +478,7 @@ public sealed class DebugSceneRenderer : IDisposable
         Ui.Dispose();
         _itemMeshes.Dispose();
         _blockCubes.Dispose();
+        _sliceTrail.Dispose();
         foreach (var mesh in _playerMeshes.Values) mesh.Dispose();
         foreach (var preview in _entityPreviews.Values)
         {

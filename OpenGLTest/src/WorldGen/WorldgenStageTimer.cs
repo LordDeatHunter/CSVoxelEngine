@@ -10,8 +10,14 @@ namespace VoxelEngine.WorldGen;
 /// passes it explicitly, so the generation workers never see one; production passes null and pays
 /// one null check per stage. Not thread-safe: use one instance per thread. The
 /// <see cref="Stage.Water"/> stage is marked only while <see cref="WorldGenerationConfig.WaterEnabled"/>;
-/// every other stage is marked once on every filled chunk, and an early-out chunk (entirely above
-/// the terrain and any water) marks only <see cref="Stage.Columns"/>.
+/// every other stage is marked once on every filled chunk, an early-out chunk (entirely above
+/// the terrain and any water) marks only <see cref="Stage.Columns"/>, one of those in a sky layer's band
+/// marks <see cref="Stage.Columns"/>, <see cref="Stage.Clouds"/>, <see cref="Stage.CloudSea"/>,
+/// <see cref="Stage.SkyIslands"/>, <see cref="Stage.SkyTrees"/>, <see cref="Stage.RuinsSky"/>, <see cref="Stage.WaystonesSky"/>,
+/// <see cref="Stage.SolidCount"/> and <see cref="Stage.FluidFrontier"/>, and a chunk wholly in hell marks
+/// only <see cref="Stage.Columns"/>, <see cref="Stage.Hell"/>, <see cref="Stage.Vulcanite"/>, <see cref="Stage.HellTrees"/>,
+/// <see cref="Stage.RuinsHell"/>,
+/// <see cref="Stage.WaystonesHell"/>, <see cref="Stage.SolidCount"/> and <see cref="Stage.FluidFrontier"/>.
 /// </summary>
 internal sealed class WorldgenStageTimer
 {
@@ -22,6 +28,8 @@ internal sealed class WorldgenStageTimer
         Columns,
         /// <summary>The ColumnCache.GenerateColumn loop.</summary>
         Fill,
+        /// <summary>CaveBiomes.Fill, the per-cell cave biome map every cave consumer reads.</summary>
+        CaveBiomeMap,
         /// <summary>NoiseCaves.Carve.</summary>
         NoiseCaves,
         /// <summary>WormCarver.Carve.</summary>
@@ -30,6 +38,12 @@ internal sealed class WorldgenStageTimer
         Malachite,
         /// <summary>CoalGenerator.Stamp.</summary>
         Coal,
+        /// <summary>HematiteGenerator.Stamp.</summary>
+        Hematite,
+        /// <summary>TinGenerator.Stamp.</summary>
+        Tin,
+        /// <summary>CaveOres.Stamp.</summary>
+        CaveOres,
         /// <summary>FillWater (marked only while water is enabled).</summary>
         Water,
         /// <summary>StampMud.</summary>
@@ -48,6 +62,10 @@ internal sealed class WorldgenStageTimer
         RuinedPillars,
         /// <summary>DesertWellGenerator.Stamp.</summary>
         DesertWells,
+        /// <summary>RuinPlacement.StampSurface.</summary>
+        RuinsSurface,
+        /// <summary>WaystonePlacement.StampSurface.</summary>
+        WaystonesSurface,
         /// <summary>GeodeGenerator.Stamp.</summary>
         Geodes,
         /// <summary>MeteorGenerator.Stamp.</summary>
@@ -64,6 +82,12 @@ internal sealed class WorldgenStageTimer
         GravelPockets,
         /// <summary>UndergroundPoolGenerator.Stamp.</summary>
         UndergroundPools,
+        /// <summary>CaveBiomes.Stamp, from the map <see cref="CaveBiomeMap"/> filled.</summary>
+        CaveBiomes,
+        /// <summary>RuinPlacement.StampUnderground.</summary>
+        RuinsUnderground,
+        /// <summary>WaystonePlacement.StampUnderground.</summary>
+        WaystonesUnderground,
         /// <summary>IceSpikeGenerator.Stamp.</summary>
         IceSpikes,
         /// <summary>SnowGenerator.StampGround and StampCanopy.</summary>
@@ -76,7 +100,33 @@ internal sealed class WorldgenStageTimer
         Flowers,
         /// <summary>FoliageGenerator.Stamp.</summary>
         Foliage,
-        /// <summary>The SolidCount recount.</summary>
+        /// <summary>TowerPlacement.Stamp, the battle towers.</summary>
+        Towers,
+        /// <summary>CloudPatchGenerator.Stamp.</summary>
+        Clouds,
+        /// <summary>CloudSeaGenerator.Stamp.</summary>
+        CloudSea,
+        /// <summary>SkyIslandGenerator.Stamp.</summary>
+        SkyIslands,
+        /// <summary>SkyTrees.Stamp (the trees grown on a cache miss included).</summary>
+        SkyTrees,
+        /// <summary>RuinPlacement.StampSky.</summary>
+        RuinsSky,
+        /// <summary>WaystonePlacement.StampSky.</summary>
+        WaystonesSky,
+        /// <summary>BarrierGenerator.Stamp.</summary>
+        Barrier,
+        /// <summary>HellGenerator.Stamp.</summary>
+        Hell,
+        /// <summary>VulcaniteGenerator.Stamp, over the barrier band's and hell's basalt.</summary>
+        Vulcanite,
+        /// <summary>HellTrees.Stamp (the trees grown on a cache miss included).</summary>
+        HellTrees,
+        /// <summary>RuinPlacement.StampHell.</summary>
+        RuinsHell,
+        /// <summary>WaystonePlacement.StampHell.</summary>
+        WaystonesHell,
+        /// <summary>The palette build (ChunkBlocks.FromDense) and the solid count.</summary>
         SolidCount,
         /// <summary>ScanFluidFrontier.</summary>
         FluidFrontier,

@@ -48,7 +48,7 @@ internal sealed class SupportTestWorld : IDisposable
     /// <summary>World y of the plateau's top cell; every cell above it starts as air.</summary>
     public int Top { get; }
 
-    public byte Stone { get; }
+    public ushort Stone { get; }
 
     /// <summary>Streams in the chunk holding the cell and its six face neighbors.</summary>
     public void Load(int x, int y, int z)
@@ -77,20 +77,20 @@ internal sealed class SupportTestWorld : IDisposable
     }
 
     /// <summary>Writes one cell raw, as a test's setup.</summary>
-    public void Set(int x, int y, int z, byte id, byte state = 0)
+    public void Set(int x, int y, int z, ushort id, byte state = 0)
     {
         var chunk = Manager.ChunkAt(x, y, z) ?? throw new InvalidOperationException($"({x}, {y}, {z}) is not loaded");
         var (lx, ly, lz) = VoxelCoords.LocalOf(x, y, z);
         chunk.SetBlockRaw(lx, ly, lz, id, state);
     }
 
-    public byte IdAt(int x, int y, int z) => Manager.GetBlockGlobal(x, y, z);
+    public ushort IdAt(int x, int y, int z) => Manager.GetBlockGlobal(x, y, z);
 
     public byte StateAt(int x, int y, int z) => Manager.GetStateGlobal(x, y, z);
 
     /// <summary>Gives the player one <paramref name="id"/>, puts it in hand and places it against the
     /// face of <paramref name="hitCell"/> with outward normal <paramref name="normal"/>.</summary>
-    public bool Place(byte id, Vector3 hitCell, Vector3 normal)
+    public bool Place(ushort id, Vector3 hitCell, Vector3 normal)
     {
         Player.Inventory.Add(id);
         Assert.True(Player.Inventory.PickBlock(id));

@@ -4,12 +4,22 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Threading;
+using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
+using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.Sandworms;
+using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Structures;
 using Xunit;
 
 namespace VoxelEngine.Tests.Core;
@@ -65,11 +75,58 @@ public sealed class WorldLifecycleTests : IDisposable
         }
     }
 
-    private World NewWorld(ChunkSaveStore? store)
+    private World NewWorld(ChunkSaveStore? store, bool clientMode = false)
     {
-        var world = new World(null!, null!, null!, null!, null!, null!, null, store);
+        var world = new World(null!, null!, null!, null!, null!, null!, null, store,
+            clientMode: clientMode);
         _worlds.Add(world);
         return world;
+    }
+
+    private const int CacheProbeX = 123456;
+    private const int CacheProbeZ = -654321;
+
+    // Keep the original ColumnData out of the test method's JIT locals. The array copies are an
+    // output oracle, not a reference to the cache entry we expect the final world to release.
+    private sealed record ColumnSnapshot(int[] Heights, byte[] DirtDepth, float[] EntranceWeight,
+        float[] CaveIntensity, Biome[] Biomes, int[] Bed, int[] WaterLevel, bool[] Oasis,
+        int MinHeight, int MaxHeight, int MaxWaterLevel, float CornerWarmth, float CornerWetness)
+    {
+        public static ColumnSnapshot From(ColumnData c) => new(c.Heights.ToArray(), c.DirtDepth.ToArray(),
+            c.EntranceWeight.ToArray(), c.CaveIntensity.ToArray(), c.Biomes.ToArray(), c.Bed.ToArray(),
+            c.WaterLevel.ToArray(), c.Oasis.ToArray(), c.MinHeight, c.MaxHeight, c.MaxWaterLevel,
+            c.CornerWarmth, c.CornerWetness);
+
+        public void AssertMatches(ColumnData c)
+        {
+            Assert.True(Heights.SequenceEqual(c.Heights));
+            Assert.True(DirtDepth.SequenceEqual(c.DirtDepth));
+            Assert.True(EntranceWeight.SequenceEqual(c.EntranceWeight));
+            Assert.True(CaveIntensity.SequenceEqual(c.CaveIntensity));
+            Assert.True(Biomes.SequenceEqual(c.Biomes));
+            Assert.True(Bed.SequenceEqual(c.Bed));
+            Assert.True(WaterLevel.SequenceEqual(c.WaterLevel));
+            Assert.True(Oasis.SequenceEqual(c.Oasis));
+            Assert.Equal(MinHeight, c.MinHeight);
+            Assert.Equal(MaxHeight, c.MaxHeight);
+            Assert.Equal(MaxWaterLevel, c.MaxWaterLevel);
+            Assert.Equal(CornerWarmth, c.CornerWarmth);
+            Assert.Equal(CornerWetness, c.CornerWetness);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (WeakReference<ColumnData> Weak, ColumnSnapshot Snapshot) CacheProbe()
+    {
+        var column = ColumnCache.Get(CacheProbeX, CacheProbeZ);
+        return (new WeakReference<ColumnData>(column), ColumnSnapshot.From(column));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void AssertProbeStillCached(WeakReference<ColumnData> weak)
+    {
+        Assert.True(weak.TryGetTarget(out var original));
+        Assert.Same(original, ColumnCache.Get(CacheProbeX, CacheProbeZ));
     }
 
     /// <summary>Updates <paramref name="world"/> with measured wall deltas (clamped to 0.1 s)
@@ -117,7 +174,7 @@ public sealed class WorldLifecycleTests : IDisposable
     /// <summary>Grants a few stone, equips it on hotbar slot 0 and selects it: a new survival
     /// world starts empty, so a throw or a consume is a no-op until something is granted and
     /// equipped. Add may already have auto-equipped slot 0, hence the guard against toggling.</summary>
-    private static byte EquipRock(World world)
+    private static ushort EquipRock(World world)
     {
         var id = TerrainGenerator.RockBlock;
         world.Inventory.Add(id, 10);
@@ -145,6 +202,41 @@ public sealed class WorldLifecycleTests : IDisposable
         // Idempotent: the second call reports the first result and changes nothing
         Assert.Equal(result, world.SaveAndDispose());
         Assert.False(WorldSeed.WorldIsLive);
+    }
+
+    [Fact]
+    public void FinalQuietWorldReleasesColumnValuesWhileAnotherWorldKeepsThem()
+    {
+        // Client Worlds also own the process seed. Neither generates columns in the background,
+        // so the far-away probe cannot be evicted during this ownership check.
+        var first = NewWorld(null, clientMode: true);
+        var last = NewWorld(null, clientMode: true);
+        var (weak, snapshot) = CacheProbe();
+
+        Assert.True(first.SaveAndDispose());
+        Assert.True(WorldSeed.WorldIsLive);
+        AssertProbeStillCached(weak);
+        Assert.True(first.SaveAndDispose()); // An ended owner must not release the live owner's cache.
+        Assert.True(WorldSeed.WorldIsLive);
+        AssertProbeStillCached(weak);
+
+        Assert.True(last.SaveAndDispose());
+        Assert.False(WorldSeed.WorldIsLive);
+        GC.Collect(); // Test-only root check; production does not force a collection.
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        Assert.False(weak.TryGetTarget(out _), "the final world left ColumnData rooted by ColumnCache");
+
+        var recomputed = ColumnCache.Get(CacheProbeX, CacheProbeZ);
+        snapshot.AssertMatches(recomputed);
+        Assert.True(last.SaveAndDispose()); // Repeated disposal must not clear a new entry.
+        Assert.Same(recomputed, ColumnCache.Get(CacheProbeX, CacheProbeZ));
+
+        // A menu-launched next world applies even the same seed before construction.
+        WorldSeed.Apply(WorldSeed.Value);
+        var reopened = NewWorld(null, clientMode: true);
+        snapshot.AssertMatches(ColumnCache.Get(CacheProbeX, CacheProbeZ));
+        Assert.True(reopened.SaveAndDispose());
     }
 
     [Fact]
@@ -260,6 +352,36 @@ public sealed class WorldLifecycleTests : IDisposable
     }
 
     [Fact]
+    public void ASandwormRoundTripsThroughSaveAndReloadAndResumesTheHunt()
+    {
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+
+        var first = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(first, () => first.IsLoaded, LoadWallSeconds), "the first world did not finish loading");
+        Assert.True(first.SpawnEntity(Sandworm.EntityName, new Vector3(2f, High - 1f, 2f)));
+        var worm = Assert.Single(first.Sandworms);
+        Assert.Equal(SandwormPhase.Thump, worm.Phase);
+        var head = worm.Position;
+        var wounded = worm.MaxHealth - 40;
+        worm.RestoreState(wounded, 0.5f, Vector3.Zero);
+        Assert.True(first.SaveAndDispose());
+
+        var second = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(second, () => second.IsLoaded, LoadWallSeconds), "the second world did not finish loading");
+
+        // The worm burrows under the surface, far under the spawn bubble, so it waits for its chunk like any saved mob
+        Assert.True(RunUntil(second, () => second.Sandworms.Count > 0, LoadWallSeconds), "the worm was not restored");
+
+        // Back where it was with its wounds, and already hunting: a restore never thumps a second time
+        var restored = Assert.Single(second.Sandworms);
+        Assert.Equal(head, restored.Position);
+        Assert.Equal(wounded, restored.Health);
+        Assert.NotEqual(SandwormPhase.Thump, restored.Phase);
+        Assert.Contains(restored, second.Mobs);
+        Assert.True(second.SaveAndDispose());
+    }
+
+    [Fact]
     public void EntitiesRoundTripThroughSaveAndReload()
     {
         WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
@@ -271,6 +393,26 @@ public sealed class WorldLifecycleTests : IDisposable
         // A large slime, so the restore cannot pass on the default size either
         Assert.True(first.SpawnEntity("slime", new Vector3(2f, High - 1f, 2f), SlimeSize.Max));
         Assert.True(first.SpawnEntity("goblin", new Vector3(-2f, High - 1f, 3f)));
+        Assert.True(first.SpawnEntity(Hellbrute.EntityName, new Vector3(3f, High - 1f, -3f)));
+        Assert.True(first.SpawnEntity(Cinderwitch.EntityName, new Vector3(-3f, High - 1f, -3f)));
+        Assert.True(first.SpawnEntity(Galeraptor.EntityName, new Vector3(4f, High - 1f, 4f)));
+        Assert.True(first.SpawnEntity(Cloudgolem.EntityName, new Vector3(-4f, High - 1f, 4f)));
+        // One of each wild animal
+        foreach (var (name, i) in WildlifeSpecies.Names.Select((name, i) => (name, i)))
+            Assert.True(first.SpawnEntity(name, new Vector3(-8f + 3f * i, High - 1f, 8f)));
+        // A tower skeleton above the first floor: its tier cannot be read back from the position
+        Assert.True(first.SpawnEntity(Skeleton.EntityName, new Vector3(5f, High - 1f, -5f), tier: 4));
+        // A second, first-floor skeleton left unbound, beside the first one bound to a tower floor
+        Assert.True(first.SpawnEntity(Skeleton.EntityName, new Vector3(-5f, High - 1f, -5f), tier: 0));
+        // The three cave kinds beside the surface player (their chunks load with it), one at a scenario tier its
+        // position (far above the caves, depth tier 0) cannot give back
+        Assert.True(first.SpawnEntity(Shardling.EntityName, new Vector3(6f, High - 1f, 6f)));
+        Assert.True(first.SpawnEntity(Sporeling.EntityName, new Vector3(-6f, High - 1f, 6f), tier: 3));
+        Assert.True(first.SpawnEntity(Magmaborn.EntityName, new Vector3(6f, High - 1f, -6f)));
+        var tieredCave = Assert.Single(first.CaveMobs, m => m.Tier > 0);
+        var boundFloor = new TowerFloorRef(7, -3, 4);
+        var bound = Assert.Single(first.Skeletons, s => s.Tier > 0);
+        bound.Floor = boundFloor;
         var slime = Assert.Single(first.Slimes);
         var goblin = Assert.Single(first.Goblins);
         Assert.True(slime.Size > SlimeSize.Min);
@@ -284,6 +426,23 @@ public sealed class WorldLifecycleTests : IDisposable
         var goblinCenter = goblin.Position;
         var goblinAmmo = goblin.Ammo;
         var goblinHealth = goblin.Health;
+        // Every hell, sky, cave and tower kind wounded and turned, so the restore keeps each kind and its own state
+        var realmSaved = new List<(Type Kind, Vector3 Center, int Health, float Facing)>();
+        var realmSpawned = first.HellMobs.Concat<RealmMob>(first.SkyMobs).Concat(first.CaveMobs).Concat(first.Skeletons)
+            .Concat(first.Wildlife).ToList();
+        foreach (var realmMob in realmSpawned)
+        {
+            realmMob.RestoreState(realmMob.MaxHealth - 2, 0.75f, Vector3.Zero);
+            realmSaved.Add((realmMob.GetType(), realmMob.Position, realmMob.Health, realmMob.Facing));
+        }
+        // Two hell, two sky, three cave kinds, two skeletons and every wild animal, each spawned above
+        Assert.Equal(2 + 2 + 3 + 2 + WildlifeSpecies.Names.Length, realmSaved.Count);
+        var caveTier = tieredCave.Tier;
+        var caveCenter = tieredCave.Position;
+        var cavePool = tieredCave.MaxHealth;
+        var skeletonTier = bound.Tier;
+        var boundCenter = bound.Position;
+        var unboundCenter = Assert.Single(first.Skeletons, s => s != bound).Position;
 
         var rock = EquipRock(first);
         first.Throws.ThrowSelected();
@@ -310,13 +469,179 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(goblinCenter, restoredGoblin.Position);
         Assert.Equal(goblinAmmo, restoredGoblin.Ammo);
         Assert.Equal(goblinHealth, restoredGoblin.Health);
-        Assert.Equal(2, second.Mobs.Count); // RefreshMobs ran at the flip
+        var restoredRealm = second.HellMobs.Concat<RealmMob>(second.SkyMobs).Concat(second.CaveMobs)
+            .Concat(second.Skeletons).Concat(second.Wildlife).ToList();
+        Assert.Equal(realmSaved.Count, restoredRealm.Count);
+        foreach (var (kind, center, health, facing) in realmSaved)
+        {
+            var restored = Assert.Single(restoredRealm, m => m.GetType() == kind && m.Position == center);
+            Assert.Equal(center, restored.Position);
+            Assert.Equal(health, restored.Health);
+            Assert.Equal(facing, restored.Facing);
+        }
+        // The bound skeleton came back at its saved tier, so its wounded health fits a pool above the first floor's,
+        // and bound to the same tower floor; the unbound one came back bound to none
+        var restoredSkeleton = Assert.Single(second.Skeletons, s => s.Position == boundCenter);
+        Assert.Equal(skeletonTier, restoredSkeleton.Tier);
+        Assert.Equal(boundFloor, restoredSkeleton.Floor);
+        Assert.Null(Assert.Single(second.Skeletons, s => s.Position == unboundCenter).Floor);
+        // The tiered cave mob came back at its saved tier with the same, tier-scaled pool, not its position's tier 0
+        var restoredCave = Assert.Single(second.CaveMobs, m => m.Position == caveCenter);
+        Assert.Equal(caveTier, restoredCave.Tier);
+        Assert.Equal(cavePool, restoredCave.MaxHealth);
+        Assert.True(restoredCave.MaxHealth > restoredCave.Type.MaxHealth);
+        Assert.Equal(2 + realmSaved.Count, second.Mobs.Count); // RefreshMobs ran at the flip
 
         var restoredDrop = Assert.Single(second.Drops);
         Assert.Equal(rock, restoredDrop.BlockId);
         Assert.Equal(dropPosition, restoredDrop.Position);
         Assert.Equal(dropVelocity, restoredDrop.Velocity);
         Assert.True(second.SaveAndDispose());
+    }
+
+    [Fact]
+    public void ACaveMobSpawnedWithNoTierTakesTheDepthTierOfItsFeet()
+    {
+        var world = NewWorld(null);
+        Assert.True(world.IsPlaying);
+
+        // Above the echo bottom the depth tier is 0, so the spawn op's tierless sporeling is a tier-0 one
+        var feet = new Vector3(0f, High - 1f, 0f);
+        Assert.True(world.SpawnEntity(Sporeling.EntityName, feet));
+        var sporeling = Assert.IsType<Sporeling>(Assert.Single(world.CaveMobs));
+        Assert.Equal(CaveDifficulty.TierAt(feet.Y), sporeling.Tier);
+        Assert.Equal(0, sporeling.Tier);
+        Assert.Contains(sporeling, world.Mobs);
+        Assert.True(world.SaveAndDispose());
+    }
+
+    // The default seed's nearest battle tower: only a site-built tower record is saved and restored
+    private static TowerSite NearestTower()
+    {
+        Assert.True(TowerPlacement.TryFindNearest(0, 0, 4, out var site), "no tower within the window");
+        return site;
+    }
+
+    // An awake tower record of the nearest site in world, and a king bound to it standing at (x, High, z): the state a
+    // finished ritual leaves, without the ritual's frames over terrain this all-air test world never streams
+    private static (TowerRecord Record, SkeletonKing King) RaiseBoundKing(World world, float x, float z)
+    {
+        var record = world.Towers.Track(NearestTower());
+        record.AltarState = TowerAltarState.Awake;
+        var king = world.SkeletonKingManager!.Spawn(new Vector3(x, High, z), record.KingHome, spawnIn: false);
+        Assert.NotNull(king);
+        return (record, king);
+    }
+
+    [Fact]
+    public void TheSkeletonKingRoundTripsAndResumesItsFight()
+    {
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+
+        var first = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(first, () => first.IsLoaded, LoadWallSeconds), "the first world did not finish loading");
+
+        // An unbound king (the scenario's spawn op), wounded so the restore cannot pass on a fresh pool
+        Assert.True(first.SpawnEntity(SkeletonKing.EntityName, new Vector3(-3f, High - 1f, 3f)));
+        var unbound = Assert.Single(first.SkeletonKings);
+        Assert.Null(unbound.Home.Tower);
+        unbound.RestoreState(unbound.MaxHealth - 30, 0.5f, Vector3.Zero);
+        var unboundCenter = unbound.Position;
+        var unboundHealth = unbound.Health;
+
+        // A tower-bound king wounded into the second phase
+        var (record, bound) = RaiseBoundKing(first, 3f, 3f);
+        bound.RestoreState(bound.MaxHealth / 2, 0.25f, Vector3.Zero);
+        var boundHealth = bound.Health;
+        var share = boundHealth / (float)bound.MaxHealth;
+        Assert.True(SkeletonKingBrain.PhaseOf(share) >= 2, "the saved king must be past the first phase");
+        var home = bound.Home;
+        var altar = record.AltarCell;
+        Assert.True(first.SaveAndDispose());
+
+        var second = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(second, () => second.IsLoaded, LoadWallSeconds), "the second world did not finish loading");
+
+        // Both kings came back by kind with their wounds, read right after the flipping Update like the other mobs
+        Assert.Equal(2, second.SkeletonKings.Count);
+        var restoredUnbound = Assert.Single(second.SkeletonKings, k => k.Home.Tower == null);
+        Assert.Equal(unboundCenter, restoredUnbound.Position);
+        Assert.Equal(unboundHealth, restoredUnbound.Health);
+        var restored = Assert.Single(second.SkeletonKings, k => k.Home.Tower != null);
+        Assert.Equal(boundHealth, restored.Health);
+        Assert.Equal(home.Tower, restored.Home.Tower);
+        Assert.Equal(home.SummonTier, restored.Home.SummonTier);
+        Assert.Equal(home.Feet, restored.Home.Feet);
+        Assert.Contains(restored, second.Mobs);
+
+        // The fight resumes where it stood: the restored health sets the phase silently, and no summon is owed
+        // (an owed summon would win the next choice whatever the range)
+        restored.Brain.Observe(restored.Health / (float)restored.MaxHealth);
+        Assert.Equal(SkeletonKingBrain.PhaseOf(share), restored.Phase);
+        Assert.Equal(SkeletonKingAttack.None, restored.Brain.Choose(1000f, false, false, false));
+
+        // The tower stayed awake across the reload: no second ritual while its king walks
+        var tower = Assert.Single(second.Towers.Records, r => r.Key == home.Tower);
+        Assert.Equal(TowerAltarState.Awake, tower.AltarState);
+        Assert.Equal(AltarVerdict.Awake, second.UseAltar(new Vector3(altar.X, altar.Y, altar.Z)));
+        Assert.True(second.SaveAndDispose());
+    }
+
+    [Fact]
+    public void AKingKilledBeforeASaveLeavesItsTowerDefeated()
+    {
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+
+        var first = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(first, () => first.IsLoaded, LoadWallSeconds), "the first world did not finish loading");
+        var (record, king) = RaiseBoundKing(first, 3f, 3f);
+        var key = record.Key;
+        var altar = record.AltarCell;
+
+        // The killing blow lands with no update after it: the save itself settles the altar, never dormant
+        king.TakeDamage(king.Health);
+        Assert.True(king.IsDead);
+        Assert.True(first.SaveAndDispose());
+
+        var second = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(second, () => second.IsLoaded, LoadWallSeconds), "the second world did not finish loading");
+        Assert.Empty(second.SkeletonKings);
+        var tower = Assert.Single(second.Towers.Records, r => r.Key == key);
+        Assert.Equal(TowerAltarState.Defeated, tower.AltarState);
+        Assert.True(tower.BossDefeated);
+        Assert.Equal(AltarVerdict.Defeated, second.UseAltar(new Vector3(altar.X, altar.Y, altar.Z)));
+        Assert.True(second.SaveAndDispose());
+    }
+
+    [Fact]
+    public void StationsSurviveASaveAndReloadWhileTheirChunkIsAway()
+    {
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+        var seeded = new ChunkSaveStore(_dir);
+        seeded.EnqueueFile(StationSaveCodec.FileName, StationSaveCodec.ToBytes(new StationSaveData
+        {
+            Querns = [new StationSaveData.QuernData { Cell = [0, 0, 0], Input = "item/malachite_ore" }],
+            Campfires = [new StationSaveData.CampfireData { Cell = [4, 0, 0], Lit = true, BurnLeft = 12f }],
+        }));
+        Assert.True(seeded.Shutdown(TimeSpan.FromSeconds(10)));
+
+        // The stations' cells are nowhere near the player, so their chunks never load: the managers
+        // freeze them (no sweep), and a save must still carry them
+        var world = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(world, () => world.IsLoaded, LoadWallSeconds), "the world did not finish loading");
+        // Play a moment (RunUntil reports false when its time runs out, which is the point here)
+        Assert.False(RunUntil(world, () => false, 0.5));
+        Assert.True(world.SaveAndDispose());
+
+        var store = new ChunkSaveStore(_dir);
+        var data = StationSaveCodec.TryParse(store.ReadFile(StationSaveCodec.FileName));
+        Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+        Assert.NotNull(data);
+        var quern = Assert.Single(data!.Querns!);
+        Assert.Equal("item/malachite_ore", quern.Input);
+        var fire = Assert.Single(data.Campfires!);
+        Assert.True(fire.Lit);
+        Assert.Equal(12f, fire.BurnLeft);
     }
 
     [Fact]

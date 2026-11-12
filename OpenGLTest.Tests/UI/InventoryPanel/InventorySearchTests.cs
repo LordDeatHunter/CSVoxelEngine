@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using VoxelEngine.UI.InventoryPanel;
 using Xunit;
@@ -49,7 +50,7 @@ public sealed class InventorySearchTests
         var inventory = new Inventory();
         var pickaxe = ContentRegistry.RequireItem("primitive_pickaxe");
 
-        var hits = InventorySearch.Search(Inventory.DisplayName(pickaxe.Id), inventory);
+        var hits = InventorySearch.Search(Inventory.DisplayName(pickaxe.Id), inventory, creative: true);
 
         Assert.Contains(hits, h => h.IsRecipe && h.Id == pickaxe.Id && h.Recipe != null);
     }
@@ -60,10 +61,81 @@ public sealed class InventorySearchTests
         var inventory = new Inventory();
         var flint = ContentRegistry.RequireItem("flint");
 
-        var hits = InventorySearch.Search(Inventory.DisplayName(flint.Id), inventory);
+        var hits = InventorySearch.Search(Inventory.DisplayName(flint.Id), inventory, creative: true);
 
         Assert.Contains(hits, h => h.IsRecipe
             && h.Recipe!.Ingredients.Any(i => i.Accepts(flint.Id)));
+    }
+
+    [Fact]
+    public void ASurvivalSearchOnlyFindsTheRecipesTheCraftTabLists()
+    {
+        var inventory = new Inventory();
+        var listed = inventory.ListedRecipes(creative: false);
+
+        foreach (var letter in "aeiou")
+        {
+            var recipeHits = InventorySearch.Search(letter.ToString(), inventory).Where(h => h.IsRecipe);
+            Assert.All(recipeHits, h => Assert.Contains(h.Recipe!, listed));
+        }
+    }
+
+    [Fact]
+    public void ARecipeJoinsTheSurvivalSearchOnlyOnceItCanBeMade()
+    {
+        var inventory = Inventory.Empty();
+        // A recipe of stackables only, so stocking its ingredients is a plain Add
+        var recipe = ContentRegistry.CraftingRecipes.First(r => r.Ingredients.All(i =>
+            Inventory.CategoryOf(i.AcceptedIds[0]) is InventoryCategory.Blocks or InventoryCategory.Misc));
+        var query = Inventory.DisplayName(recipe.ResultId);
+
+        Assert.DoesNotContain(InventorySearch.Search(query, inventory), h => h.Recipe == recipe);
+        Assert.Contains(InventorySearch.Search(query, inventory, creative: true), h => h.Recipe == recipe);
+
+        foreach (var ingredient in recipe.Ingredients)
+            Assert.True(inventory.Add(ingredient.AcceptedIds[0], ingredient.Count));
+        Assert.True(inventory.CanCraft(recipe));
+        Assert.Contains(InventorySearch.Search(query, inventory), h => h.Recipe == recipe);
+    }
+
+    [Fact]
+    public void TheScopeKeepsOnlyTheItemsOrOnlyTheRecipes()
+    {
+        var inventory = new Inventory();
+        var pickaxe = ContentRegistry.RequireItem("primitive_pickaxe");
+        var query = Inventory.DisplayName(pickaxe.Id);
+
+        var all = InventorySearch.Search(query, inventory, creative: true);
+        Assert.Contains(all, h => h.IsRecipe);
+        Assert.Contains(all, h => !h.IsRecipe);
+
+        var items = InventorySearch.Search(query, inventory, creative: true, SearchScope.Items);
+        Assert.All(items, h => Assert.False(h.IsRecipe));
+        Assert.Equal(all.Count(h => !h.IsRecipe), items.Count);
+
+        var recipes = InventorySearch.Search(query, inventory, creative: true, SearchScope.Recipes);
+        Assert.All(recipes, h => Assert.True(h.IsRecipe));
+        Assert.Equal(all.Count(h => h.IsRecipe), recipes.Count);
+    }
+
+    [Fact]
+    public void TheScopeButtonCyclesThroughEveryScopeBackToTheDefault()
+    {
+        var view = new InventoryView();
+        Assert.Equal(SearchScope.All, view.SearchScope);
+
+        var seen = new HashSet<SearchScope>();
+        foreach (var _ in Enum.GetValues<SearchScope>())
+        {
+            seen.Add(view.SearchScope);
+            view.CycleSearchScope();
+        }
+        Assert.Equal(Enum.GetValues<SearchScope>().Length, seen.Count);
+        Assert.Equal(SearchScope.All, view.SearchScope);
+
+        view.CycleSearchScope();
+        view.ResetForNewWorld();
+        Assert.Equal(SearchScope.All, view.SearchScope);
     }
 
     [Fact]

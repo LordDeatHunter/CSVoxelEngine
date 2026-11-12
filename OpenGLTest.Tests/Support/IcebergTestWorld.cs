@@ -68,7 +68,7 @@ internal sealed class IcebergTestWorld
         return new IcebergTestWorld(chunks);
     }
 
-    private static void Set(ChunkManager chunks, int x, int y, int z, byte id) =>
+    private static void Set(ChunkManager chunks, int x, int y, int z, ushort id) =>
         chunks.ChunkAt(x, y, z)!.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, id, 0);
 
     /// <summary>A berg's waterline center over column (<paramref name="x"/>, <paramref name="z"/>).</summary>

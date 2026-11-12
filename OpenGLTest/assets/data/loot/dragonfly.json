@@ -1,0 +1,12 @@
+{
+  // A wing more often than not.
+  "pools": [
+    {
+      "rolls": 1,
+      "chance": 0.6,
+      "entries": [
+        { "item": "item/dragonfly_wing", "weight": 1, "count": { "min": 1, "max": 2 } }
+      ]
+    }
+  ]
+}

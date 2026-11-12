@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.WorldGen.Trees.Shape;
 
@@ -15,7 +16,7 @@ internal sealed class TipHydration
     // Per leaf id, every offset from a tip to a cell that tip hydrates (h >= 1), sorted by
     // hydration descending: the first live tip a scan meets gives the cell its best hydration,
     // so an intact leaf usually stops after a candidate or two
-    private readonly TipOffset[]?[] _offsetsByLeaf = new TipOffset[]?[256];
+    private readonly TipOffset[]?[] _offsetsByLeaf = new TipOffset[]?[BlockTables.IdCount];
 
     private readonly record struct TipOffset(int Dx, int Dy, int Dz, int Hydration);
 

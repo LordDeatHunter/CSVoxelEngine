@@ -1,0 +1,7 @@
+{
+  // Iron Pants: placeholder gear.
+  "name": "Iron Pants",
+  "texture": "assets/textures/items/iron_pants.png",
+  "rarity": "uncommon",
+  "equip": { "slot": "legs", "armor": 4, "set": "iron", "visible": true }
+}

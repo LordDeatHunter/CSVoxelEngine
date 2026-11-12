@@ -1,0 +1,10 @@
+{
+  // Two sticks bound around a crystal: the first spell staff. A Tools-pool item, so each craft
+  // is its own staff with its own bound spells.
+  "result": "item/wooden_staff",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/branch", "count": 2 },
+    { "item": "block/crystal_block", "count": 1 }
+  ]
+}

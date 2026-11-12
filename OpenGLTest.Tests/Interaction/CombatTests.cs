@@ -10,6 +10,20 @@ public sealed class CombatTests
     public CombatTests() => TestContent.EnsureLoaded();
 
     [Fact]
+    public void UndeadBonusRaisesOnlyBlowsAgainstTheUndead()
+    {
+        Assert.True(Combat.VersusUndead(10, true, 0.1f) > 10);
+        Assert.Equal(10, Combat.VersusUndead(10, false, 0.1f));
+        Assert.Equal(10, Combat.VersusUndead(10, true, 0f));
+        Assert.Equal(0, Combat.VersusUndead(0, true, 0.1f));
+        for (var d = 1; d <= 50; d++)
+        {
+            Assert.True(Combat.VersusUndead(d, true, 0.1f) >= d);
+            Assert.True(Combat.VersusUndead(d, true, 0.2f) >= Combat.VersusUndead(d, true, 0.1f));
+        }
+    }
+
+    [Fact]
     public void PunchConeAcceptsAheadWithinReachAndRejectsBehindAndBeyond()
     {
         var origin = Vector3.Zero;
@@ -82,5 +96,37 @@ public sealed class CombatTests
 
         Assert.Equal(1, Combat.SliceDamage(null, returnSwing: false));
         Assert.Equal(1, Combat.SliceDamage(null, returnSwing: true));
+    }
+
+    [Fact]
+    public void TheSwordChainRewardsTheChopAndDiscountsTheQuickBackCut()
+    {
+        var sword = ContentRegistry.RequireItem("iron_sword");
+        var cut = Combat.SwordDamage(sword, SwordSwing.Cut);
+        var backCut = Combat.SwordDamage(sword, SwordSwing.BackCut);
+        var chop = Combat.SwordDamage(sword, SwordSwing.Chop);
+
+        Assert.True(chop > cut, $"the chop ({chop}) should out-hit the cut ({cut})");
+        Assert.True(cut > backCut, $"the cut ({cut}) should out-hit the back cut ({backCut})");
+        Assert.True(backCut >= 1);
+        // The cut is the item's own entityDamage, as a punch with it would be
+        Assert.Equal(Combat.PunchDamage(sword), cut);
+        // Bare-handed, every swing still lands at least a point
+        foreach (var swing in SwordSwings.All)
+            Assert.True(Combat.SwordDamage(null, swing) >= 1);
+    }
+
+    [Fact]
+    public void TheChopIsANarrowSingleTargetBlowAndTheCutsSweepSeveral()
+    {
+        Assert.True(SwordSwings.IsCone(SwordSwing.Chop));
+        Assert.Equal(1, SwordSwings.MaxTargets(SwordSwing.Chop));
+        foreach (var sweep in new[] { SwordSwing.Cut, SwordSwing.BackCut })
+        {
+            Assert.False(SwordSwings.IsCone(sweep));
+            Assert.True(SwordSwings.MaxTargets(sweep) > 1);
+            Assert.True(SwordSwings.ShoveFactor(SwordSwing.Chop) > SwordSwings.ShoveFactor(sweep));
+            Assert.True(SwordSwings.HitStopWeight(SwordSwing.Chop) > SwordSwings.HitStopWeight(sweep));
+        }
     }
 }

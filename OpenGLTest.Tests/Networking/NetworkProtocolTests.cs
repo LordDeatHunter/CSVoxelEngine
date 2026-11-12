@@ -2,19 +2,143 @@ using System;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Numerics;
 using System.Threading;
+using System.Threading.Tasks;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Player;
 using VoxelEngine.Server;
 using VoxelEngine.UI.Hud;
+using VoxelEngine.WorldGen.Caves;
 using Xunit;
 
 namespace VoxelEngine.Tests.Networking;
 
+[Collection("Worldgen seed")]
 public sealed class NetFramingTests
 {
+    private readonly Xunit.Abstractions.ITestOutputHelper _output;
+
+    public NetFramingTests(Xunit.Abstractions.ITestOutputHelper output) => _output = output;
+
+    [Fact]
+    public async Task PartialFrameWriteFailureIsTerminalAndNeverWritesAgain()
+    {
+        using var stream = new HeaderThenFailStream();
+        using var client = new NetworkClient(new ServerAddress("127.0.0.1", 1), "Tester", 1, stream);
+        var payload = new byte[1024];
+
+        var send = Task.Run(() => client.Send(payload));
+        await send.WaitAsync(TimeSpan.FromSeconds(2)); // watchdog ensures a broken send cannot hang the suite
+
+        Assert.Equal(NetworkStatus.Failed, client.Status);
+        Assert.Contains("sending", client.Error, StringComparison.OrdinalIgnoreCase);
+        client.Send(payload);
+        Assert.Equal(2, stream.WriteCalls); // header succeeded; payload failed; later send is inert
+    }
+
+    [Fact]
+    public async Task ClientWriteToPeerThatStopsReadingFailsWithinConfiguredBound()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var address = (IPEndPoint)listener.LocalEndpoint;
+        var acceptAndHandshake = Task.Run(() =>
+        {
+            var peer = listener.AcceptTcpClient();
+            peer.ReceiveBufferSize = 4096;
+            var stream = peer.GetStream();
+            Assert.NotNull(NetFraming.ReadFrame(stream)); // client hello
+            using var hello = new PacketWriter(NetMessage.ServerHello);
+            hello.Write(NetFraming.ProtocolVersion).Write(1).Write("Slow reader")
+                .Write(1).Write(0.0).Write(Vector3.Zero);
+            WireIds.WriteTables(hello);
+            NetFraming.WriteFrame(stream, hello.ToArray());
+            return peer; // Keep the peer open but never read client payloads.
+        });
+
+        using var client = new NetworkClient(new ServerAddress("127.0.0.1", address.Port), "Tester", 3.0);
+        var connect = Task.Run(client.Connect);
+        TcpClient? peer = null;
+        Task? sendLoop = null;
+        using var sendCancellation = new CancellationTokenSource();
+        TimeSpan elapsed = default;
+        try
+        {
+            peer = await acceptAndHandshake.WaitAsync(TimeSpan.FromSeconds(5));
+            await connect.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(NetworkStatus.Handshaken, client.Status);
+
+            var payload = new byte[NetFraming.MaxPayload];
+            var watch = Stopwatch.StartNew();
+            sendLoop = Task.Run(() =>
+            {
+                while (!sendCancellation.IsCancellationRequested && client.Status == NetworkStatus.Handshaken)
+                    client.Send(payload);
+            });
+
+            await sendLoop.WaitAsync(TimeSpan.FromMilliseconds(NetworkConfig.NetSendTimeoutMs + 3000));
+            elapsed = watch.Elapsed;
+        }
+        finally
+        {
+            sendCancellation.Cancel();
+            peer?.Dispose();
+            client.Dispose();
+            listener.Stop();
+        }
+
+        if (sendLoop != null)
+            await sendLoop.WaitAsync(TimeSpan.FromSeconds(2)); // forced close above is the watchdog cleanup
+        _output.WriteLine("Slow-reader send loop terminal status: {0}; elapsed: {1:F0} ms; configured write bound: {2} ms",
+            client.Status, elapsed.TotalMilliseconds, NetworkConfig.NetSendTimeoutMs);
+        Assert.Equal(NetworkStatus.Failed, client.Status);
+        Assert.False(string.IsNullOrWhiteSpace(client.Error));
+        Assert.InRange(elapsed.TotalMilliseconds, 0, NetworkConfig.NetSendTimeoutMs + 3000);
+    }
+
+    [Fact]
+    public void SuccessfulSendKeepsConnectionHandshaken()
+    {
+        using var stream = new MemoryStream();
+        using var client = new NetworkClient(new ServerAddress("127.0.0.1", 1), "Tester", 1, stream);
+
+        client.Send(new byte[] { 7, 8, 9 });
+
+        Assert.Equal(NetworkStatus.Handshaken, client.Status);
+        Assert.Null(client.Error);
+        Assert.Equal(new byte[] { 3, 0, 0, 0, 7, 8, 9 }, stream.ToArray());
+    }
+
+    private sealed class HeaderThenFailStream : Stream
+    {
+        public int WriteCalls { get; private set; }
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            WriteCalls++;
+            if (WriteCalls == 2)
+                throw new IOException("simulated payload write timeout");
+        }
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            WriteCalls++;
+            if (WriteCalls == 2)
+                throw new IOException("simulated payload write timeout");
+        }
+    }
+
     [Fact]
     public void FramesRoundTripInOrderAndEndCleanly()
     {
@@ -72,8 +196,8 @@ public sealed class NetFramingTests
 
 /// <summary>
 /// The protocol-4 player messages: a <see cref="NetMessage.PlayerStatus"/> carries the granted
-/// modes, the health (clamped to the pool), the dead flag and a knockback through
-/// <see cref="PlayerStatusCodec"/>, refusing a non-finite shove as a malformed frame, and a
+/// modes, the health (clamped to the pool), the dead flag, a knockback, the air and the mana (each
+/// clamped) through <see cref="PlayerStatusCodec"/>, refusing a non-finite shove as a malformed frame, and a
 /// <see cref="NetMessage.PlayerCorrection"/> carries its sequence id and eye.
 /// </summary>
 public sealed class NetworkProtocolTests
@@ -104,13 +228,37 @@ public sealed class NetworkProtocolTests
         var dead = new PlayerStatusData(NetPlayerFlags.None, 0, Dead: true, Vector3.Zero, 0f);
         Assert.Equal(dead, RoundTrip(dead));
 
-        // A health outside the pool is clamped into it, and mode bits the protocol does not define
+        // A health past the biggest pool gear can make is clamped into it, and mode bits the protocol does not define
         // are dropped rather than handed to the camera
-        var overfull = RoundTrip(new PlayerStatusData((NetPlayerFlags)0xFF, PlayerHealth.MaxHealth + 50, false,
+        var overfull = RoundTrip(new PlayerStatusData((NetPlayerFlags)0xFF, PlayerHealth.MaxHealth + GearConfig.MaxHealthBonusCap + 50, false,
             Vector3.Zero, 0f));
-        Assert.Equal(PlayerHealth.MaxHealth, overfull.Health);
+        Assert.Equal(PlayerHealth.MaxHealth + GearConfig.MaxHealthBonusCap, overfull.Health);
         Assert.Equal(NetPlayerFlags.Creative | NetPlayerFlags.Flying, overfull.Modes);
         Assert.Equal(0, RoundTrip(dead with { Health = -10 }).Health);
+
+        // The air rides along and is clamped to a full lung
+        Assert.Equal(7, RoundTrip(hurt with { Air = 7 }).Air);
+        Assert.Equal(VoxelEngine.Player.Breath.NetSteps, RoundTrip(hurt with { Air = 250 }).Air);
+
+        // The mana and its max ride along; the max is clamped to 1..WireMaxCap and the mana into it
+        var casting = hurt with { Mana = 12, MaxMana = ManaConfig.StartMax + ManaConfig.MaxPerKnownPart };
+        Assert.Equal(casting, RoundTrip(casting));
+        var overflowing = RoundTrip(hurt with { Mana = 5000, MaxMana = 50 });
+        Assert.Equal(50, overflowing.Mana);
+        Assert.Equal(50, overflowing.MaxMana);
+        Assert.Equal(PlayerMana.WireMaxCap, RoundTrip(hurt with { MaxMana = int.MaxValue }).MaxMana);
+        var negative = RoundTrip(hurt with { Mana = -3, MaxMana = 0 });
+        Assert.Equal(0, negative.Mana);
+        Assert.Equal(1, negative.MaxMana);
+
+        // The eye's cave biome rides along; a status built without one reads back plain, and an undefined byte reads
+        // as plain rather than a value no rule knows
+        foreach (var biome in Enum.GetValues<CaveBiome>())
+            Assert.Equal(biome, RoundTrip(hurt with { CaveBiome = biome }).CaveBiome);
+        Assert.Equal(CaveBiome.Plain, RoundTrip(hurt).CaveBiome);
+        var undefined = RoundTrip(hurt with { CaveBiome = (CaveBiome)250 }).CaveBiome;
+        Assert.True(Enum.IsDefined(undefined));
+        Assert.Equal(CaveBiome.Plain, undefined);
 
         // A correction: the sequence id the client acks, then the eye it snaps to
         var eye = new Vector3(12.5f, 70.62f, -8.5f);
@@ -120,6 +268,25 @@ public sealed class NetworkProtocolTests
         Assert.Equal(NetMessage.PlayerCorrection, reader.Message);
         Assert.Equal(7, reader.ReadInt());
         Assert.Equal(eye, reader.ReadVector3());
+    }
+
+    [Fact]
+    public void PlayerStatusRoundTripsItsEffectMask()
+    {
+        // The mask rides last and raw, every bit kept: the codec is content-free, and the client's
+        // mirror (StatusEffectSet.SetMirrorMask) is what drops bits no loaded effect owns
+        var status = new PlayerStatusData(NetPlayerFlags.None, 40, false, Vector3.Zero, 0f, EffectMask: 0b1010_0101);
+        Assert.Equal(status, RoundTrip(status));
+        Assert.Equal(0, RoundTrip(status with { EffectMask = 0 }).EffectMask);
+        Assert.Equal(byte.MaxValue, RoundTrip(status with { EffectMask = byte.MaxValue }).EffectMask);
+
+        // A status cut short before its mask is a short frame, never a status with no effects
+        using var writer = new PacketWriter(NetMessage.PlayerStatus);
+        PlayerStatusCodec.Write(writer, status);
+        var full = writer.ToArray();
+        using var reader = new PacketReader(full.AsSpan(0, full.Length - 1).ToArray());
+        _ = reader.Message;
+        Assert.Throws<EndOfStreamException>(() => PlayerStatusCodec.Read(reader));
     }
 
     [Fact]
@@ -161,6 +328,50 @@ public sealed class NetworkProtocolTests
         // Every quarter turn survives the yaw it travels in
         for (var turns = 0; turns < 4; turns++)
             Assert.Equal(turns, NetEntity.TurnsFromYaw(NetEntity.YawFromTurns(turns)));
+    }
+
+    [Fact]
+    public void UInt16RoundTripsAndConsumesExactlyTwoBytes()
+    {
+        // Values on both sides of the byte boundary: a reader that took one byte, or three, would misread the sentinel
+        ushort[] values = [0, 0x00FF, 0x0100, ushort.MaxValue];
+        const int sentinel = 0x5EED_1234;
+        using var writer = new PacketWriter(NetMessage.KeepAlive);
+        foreach (var value in values)
+            writer.Write(value).Write(sentinel);
+        var payload = writer.ToArray();
+        Assert.Equal(1 + values.Length * (sizeof(ushort) + sizeof(int)), payload.Length);
+
+        using var reader = new PacketReader(payload);
+        Assert.Equal(NetMessage.KeepAlive, reader.Message);
+        foreach (var value in values)
+        {
+            Assert.Equal(value, reader.ReadUInt16());
+            Assert.Equal(sentinel, reader.ReadInt());
+        }
+        Assert.Throws<EndOfStreamException>(() => reader.ReadByte());
+    }
+
+    [Fact]
+    public void ABlockOrItemIdRoundTripsAtItsExtremes()
+    {
+        // An id takes exactly the width of the id type on the wire, so the field after it reads back intact
+        ushort[] ids = [BlockType.Air, ushort.MaxValue];
+        const int sentinel = 0x5EED_1234;
+        using var writer = new PacketWriter(NetMessage.KeepAlive);
+        foreach (var id in ids)
+            writer.WriteId(id).Write(sentinel);
+        var payload = writer.ToArray();
+        Assert.Equal(1 + ids.Length * (sizeof(ushort) + sizeof(int)), payload.Length);
+
+        using var reader = new PacketReader(payload);
+        Assert.Equal(NetMessage.KeepAlive, reader.Message);
+        foreach (var id in ids)
+        {
+            Assert.Equal(id, reader.ReadId());
+            Assert.Equal(sentinel, reader.ReadInt());
+        }
+        Assert.Throws<EndOfStreamException>(() => reader.ReadByte());
     }
 }
 
@@ -225,11 +436,13 @@ public sealed class NetworkLoopbackTests : IDisposable
                 using var reader = new PacketReader(payload);
                 if (reader.Message != NetMessage.ChatMessage)
                     continue;
-                var kind = (ChatKind)reader.ReadByte();
-                var sender = reader.ReadString();
-                var text = reader.ReadString();
-                if (kind == ChatKind.Player && sender == "Tester" && text == "hello")
+                var message = ChatMessageCodec.Read(reader);
+                if (message is { Kind: ChatKind.Player, Sender: "Tester", Text: "hello" })
+                {
+                    // A plain line carries no link
+                    Assert.Null(message.Link);
                     seen = true;
+                }
             }
             Thread.Sleep(5);
         }

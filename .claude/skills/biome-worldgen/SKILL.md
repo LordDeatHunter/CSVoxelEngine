@@ -5,7 +5,7 @@ description: Rules and checklist for changing CSVoxelEngine biome, climate, terr
 
 # Biome and terrain-shape worldgen
 
-`BIOMEGEN.md` (repo root) is the map of what exists today, every tuning constant and the §9 invariants. This skill is the procedure and the principles; read the BIOMEGEN sections it points to before editing.
+`plans/BIOMEGEN.md` is the map of what exists today, every tuning constant and the §9 invariants. This skill is the procedure and the principles; read the BIOMEGEN sections it points to before editing.
 
 ## Principles (every change keeps these)
 
@@ -16,12 +16,12 @@ description: Rules and checklist for changing CSVoxelEngine biome, climate, terr
 - The far LOD follows heightmap and `WaterLevel` by construction, but re-verify LOD level nesting and `LodSkyExposure` against any new height range (`LodReliefTests`).
 - Climate is read only through `BiomeClassifier.SampleClimate` (the one warped sample). Never warp anywhere else, and never warp `ContinentNoise` for climate (it re-lays every coast).
 - Hashed sites go through `TerrainSites` + a `GenerationalCache` verdict; acceptance tests must never read the function they feed (`LandHeight`), or they recurse. Cache factories are static non-capturing delegates; only pure-of-key values live in the cache.
-- Price each phase with the `perf-capture` skill: `LandHeight` and `BiomeWeights` run per column cell, per far-LOD cell and per tree candidate. Record the numbers in `PERF_TODO.md`, not in BIOMEGEN.
+- Price each phase with the `perf-capture` skill: `LandHeight` and `BiomeWeights` run per column cell, per far-LOD cell and per tree candidate. Record the numbers in `plans/PERF.md`, not in BIOMEGEN.
 - One phase per prompt (plan-and-implement workflow), ending with a green Release build and test run, new shots in `visual-examples/terrain-shape.json` or `biomes.json`, and BIOMEGEN §4/§6/§7/§9/§11 plus AGENTS.md "Biomes" updated.
 
 ## Traps
 
-- **Next free noise seed offset is 162** (153-161 are relief, mountains, peaks, islands, great lakes). A new `TerrainNoise` instance needs a new unused offset. `SnowGenerator.DriftNoise` shares offset 89 with `BiomeDitherNoise`; do not "fix" it, it re-lays snow drift.
+- **Next free noise seed offset is 187** (179-185 the cave biomes, their shape scale and their ores; 186 the vulcanite veins; 153-161 are relief, mountains, peaks, islands, great lakes; 162 the barrier band's patches; 163 the hell caverns; 164 the hell biomes; 165 the hell pools; 166-167 the solid cloud patches; 168-171 the sky islands (zone outline, island outline, top, stalactites); 172-173 the cloud sea; 174 the sky biomes; 175-178 the sky landmasses). Hashed structures use no noise but a `SplitMix64` hash salt instead (ruins 0x5E7A-0x5E7D, waystone satellites 0x5E7E, battle towers 0x5E7F; next free 0x5E80), listed in BIOMEGEN.md under the seed offsets; a new hashed structure takes the next salt and records it there. A new `TerrainNoise` instance needs a new unused offset. `SnowGenerator.DriftNoise` shares offset 89 with `BiomeDitherNoise`; do not "fix" it, it re-lays snow drift.
 - Changing any frequency, octave count, warp amplitude or seed offset re-lays the whole world for existing seeds; existing saves show seams at the edge of edited chunks. Say so in BIOMEGEN §11.
 - The origin's raw temperature and humidity are exactly 0 (OpenSimplex at the lattice origin); the semi-dry ramp midpoint sits just below 0 to keep spawn Forest. A change moving the origin's climate sample breaks `OriginColumnIsForest`; relax the test to its real rule, never tune toward one seed.
 - Widen the temperate band by raising both `TemperatureWarm*` constants together; never move the cold ramp. The climate warp is bounded by stretch <= 2 and by the desert/snow load-radius separation (the tighter limit); if the separation test fails lower the warp or `TemperatureFrequency`, never the rule.
@@ -39,4 +39,4 @@ description: Rules and checklist for changing CSVoxelEngine biome, climate, terr
 6. Features: tree species JSON `worldgen.biomes` (check tree reach), generators that gate on biome (flowers, tufts, cotton, boulders), `MobSpawner.SpawnsMobs`.
 7. LOD (`LodMeshBuilder` + `LodFaceEmitter`) so distance matches near terrain, and the world-source-supplied column path.
 8. Tint palette / grade if it should differ (they key on climate, not biome; a new palette row must keep the grass monotone).
-9. Relational tests in `BiomeTests` computed from the seams; update `AGENTS.md` and `BIOMEGEN.md`; frame it in `visual-examples/biomes.json`.
+9. Relational tests in `BiomeTests` computed from the seams; update `docs/agents/biomes.md` and `plans/BIOMEGEN.md`; frame it in `visual-examples/biomes.json`.

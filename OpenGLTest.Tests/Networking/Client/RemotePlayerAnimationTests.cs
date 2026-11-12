@@ -1,4 +1,5 @@
 using System.Numerics;
+using VoxelEngine.Interaction;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
@@ -51,6 +52,56 @@ public sealed class RemotePlayerAnimationTests
 
         remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Throw, 2);
         Assert.True(remote.Model.IsThrowing);
+    }
+
+    [Fact]
+    public void EachSwordSwingStartsItsOwnAnimation()
+    {
+        var remote = NewRemote();
+        var eye = new Vector3(0f, 1.62f, 0f);
+        byte seq = 0;
+        foreach (var (action, swing) in new[]
+                 {
+                     (NetPlayerAction.SwordCut, SwordSwing.Cut),
+                     (NetPlayerAction.SwordBackCut, SwordSwing.BackCut),
+                     (NetPlayerAction.SwordChop, SwordSwing.Chop),
+                 })
+        {
+            remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, action, ++seq);
+            Assert.True(remote.Model.IsSwordSwinging);
+            Assert.Equal(swing, remote.Model.ActiveSwordSwing);
+            Assert.False(remote.Model.IsSlicing);
+            for (var i = 0; i < 90; i++) remote.Update(Dt);
+        }
+    }
+
+    [Fact]
+    public void ABroadcastCastPlaysTheGestureAndHandsOutOneBurst()
+    {
+        var remote = NewRemote();
+        var eye = new Vector3(0f, 1.62f, 0f);
+        Assert.False(remote.TakeCast());
+
+        remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Cast, 1);
+        Assert.True(remote.Model.IsCasting);
+        Assert.True(remote.TakeCast());
+        Assert.False(remote.TakeCast());
+
+        // The same counter again is the same broadcast: no second gesture and no second burst
+        for (var i = 0; i < 60; i++) remote.Update(Dt);
+        remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Cast, 1);
+        Assert.False(remote.Model.IsCasting);
+        Assert.False(remote.TakeCast());
+    }
+
+    [Fact]
+    public void AFirstSightingOfACastReplaysNothing()
+    {
+        var remote = new RemotePlayer(3, "Mage", PlayerRig.BuiltIn());
+        remote.SetTarget(new Vector3(0f, 1.62f, 0f), -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Cast, 4);
+
+        Assert.False(remote.Model.IsCasting);
+        Assert.False(remote.TakeCast());
     }
 
     [Fact]

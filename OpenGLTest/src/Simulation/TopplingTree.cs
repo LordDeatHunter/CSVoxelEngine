@@ -7,10 +7,10 @@ using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Data;
-using VoxelEngine.Effects.Climate;
 using VoxelEngine.Graphics;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Shape;
 
 namespace VoxelEngine.Simulation;
 
@@ -18,8 +18,9 @@ namespace VoxelEngine.Simulation;
 /// A felled tree: the wood a mined tree-wood cell held up (see <see cref="Collect"/>) and the
 /// canopy around it, swinging from upright to flat around the cut and popping out item drops
 /// after coming to rest. The mesh is baked
-/// once from the real chunk mesher (correct node and tube boxes, AO and crop UVs) rebased to
-/// pivot-relative coords; only the GPU upload waits for a GL context on first render.
+/// once from the real chunk mesher (correct node and tube boxes, AO and crop UVs), one mesh per
+/// chunk the tree's cells span, rebased to pivot-relative coords; only the GPU upload waits for
+/// a GL context on first render.
 /// Everything here runs on the main thread; the block set is fixed at fell time, so chunk
 /// streaming and later edits cannot disturb the fall.
 /// </summary>
@@ -28,7 +29,7 @@ public class TopplingTree : IDisposable
     /// <summary>One collected block: integer world coords plus its id and state byte (the
     /// <see cref="WoodState"/> or <see cref="LeafState"/> it stood with, which the falling mesh
     /// and the loot roll both read).</summary>
-    public readonly record struct FellBlock(Vector3 Cell, byte Id, byte State);
+    public readonly record struct FellBlock(Vector3 Cell, ushort Id, byte State);
 
     private readonly List<FellBlock> _blocks;
     private readonly Vector3 _pivot;
@@ -39,11 +40,14 @@ public class TopplingTree : IDisposable
     // Set by the update the swing reaches flat, cleared by TryTakeLanding
     private bool _landingPending;
 
-    /// <summary>CPU-side mesh, pivot-relative, daylight-baked. Built in the constructor.</summary>
-    public ChunkMeshData MeshData { get; }
+    /// <summary>CPU-side meshes, one per chunk the tree's cells touch, pivot-relative, daylight-baked. Built in the constructor.</summary>
+    public IReadOnlyList<ChunkMeshData> MeshData { get; }
 
-    /// <summary>GPU mesh, uploaded lazily by <see cref="EnsureMesh"/> on first render.</summary>
-    public Mesh? Mesh { get; private set; }
+    /// <summary>GPU meshes, uploaded lazily by <see cref="EnsureMesh"/> on first render; empty until then.</summary>
+    public IReadOnlyList<Mesh> Meshes => _meshes;
+
+    private readonly List<Mesh> _meshes = [];
+    private bool _meshUploaded;
 
     /// <summary>True once the tree has lain still for <see cref="SimulationConfig.TreeFellRestSeconds"/>.</summary>
     public bool IsDone { get; private set; }
@@ -80,7 +84,7 @@ public class TopplingTree : IDisposable
     /// thread, and safe whether or not the broken cell was already cleared (it is seeded from
     /// the passed id and state, and the search reads it as absent).
     /// </summary>
-    public static List<FellBlock> Collect(ChunkManager chunks, Vector3 breakCell, byte brokenId, byte brokenState)
+    public static List<FellBlock> Collect(ChunkManager chunks, Vector3 breakCell, ushort brokenId, byte brokenState)
     {
         if (!BlockType.IsTreeWood(brokenId) || WoodState.IsDetached(brokenState))
             return [new FellBlock(breakCell, brokenId, brokenState)];
@@ -168,78 +172,41 @@ public class TopplingTree : IDisposable
     }
 
     /// <summary>
-    /// Meshes collected blocks with the real chunk mesher (node and tube boxes, AO, crop
-    /// UVs) inside one scratch chunk, then rebases positions to pivot-relative and bakes
-    /// full daylight (a falling tree is out in the open; sampling its old nook's light would
-    /// freeze stale cave shade onto it). The scratch chunk sits in a throwaway manager holding
-    /// nothing but empty neighbors, so everything around it reads as air and severed ends cap
-    /// themselves. Its local 0..16 is one origin computed once: horizontally centered on the
-    /// pivot's column (<see cref="ScratchOrigin"/>), vertically from the lowest collected cell,
-    /// so a crown spreads evenly around its trunk; cells outside it still drop their loot but
-    /// skip the falling mesh. The biome tint is the field over that same footprint
-    /// (<see cref="BiomeTint.FieldsAt"/> at the origin), not the scratch chunk's, so a felled
-    /// canopy keeps the color it stood in.
+    /// Meshes collected blocks with the real chunk mesher (node and tube boxes, AO, crop UVs)
+    /// through <see cref="CellBatchMesher.Build"/>: one mesh per chunk the cells touch, each
+    /// chunk at its real position inside a ring of empty ones, so a crown of any size is meshed
+    /// whole, severed ends cap themselves against air and the biome tint is the field the tree
+    /// stood in. Positions are then rebased to pivot-relative; full daylight is already baked in
+    /// (a falling tree is out in the open; sampling its old nook's light would freeze stale cave
+    /// shade onto it).
     /// </summary>
-    public static ChunkMeshData BuildMeshData(List<FellBlock> blocks, Vector3 pivot)
+    public static List<ChunkMeshData> BuildMeshData(List<FellBlock> blocks, Vector3 pivot)
     {
-        var minY = float.MaxValue;
+        // Each block keeps its own state byte: the wood keeps its thickness and connections, so
+        // the falling tree draws the shape it stood with
+        var cells = new List<TreeCell>(blocks.Count);
         foreach (var block in blocks)
-            minY = MathF.Min(minY, block.Cell.Y);
-        var origin = ScratchOrigin(pivot, blocks.Count == 0 ? pivot.Y : minY);
+            cells.Add(new TreeCell((int)block.Cell.X, (int)block.Cell.Y, (int)block.Cell.Z, block.Id, block.State));
 
-        // The scratch chunk stands at (256, 0, 256) but its local 0..16 is the footprint from
-        // origin, so the tint field has to be the one over that footprint, or a felled canopy
-        // would wear the climate of world (4096, 4096).
-        var tintFields = BiomeTint.FieldsAt((int)origin.X, (int)origin.Z);
-
-        var scratchManager = new ChunkManager(null!);
-        var scratch = new Chunk(null!, new Vector3(256, 0, 256), generateBlockData: false);
-        foreach (var block in blocks)
+        var meshes = CellBatchMesher.Build(cells);
+        foreach (var mesh in meshes)
         {
-            var local = block.Cell - origin;
-            if (local.X < 0 || local.Y < 0 || local.Z < 0 || local.X >= Chunk.Size || local.Y >= Chunk.Size || local.Z >= Chunk.Size)
-                continue;
-
-            // Raw write with the cell's own state byte: the wood keeps its thickness and
-            // connections, so the falling tree draws the shape it stood with
-            scratch.SetBlockRaw((int)local.X, (int)local.Y, (int)local.Z, block.Id, block.State);
+            RebaseToPivot(mesh.Vertices, pivot);
+            RebaseToPivot(mesh.TranslucentVertices, pivot);
         }
 
-        // GenerateMeshData refuses to build without its six face neighbors (a real chunk
-        // meshed across an unloaded one bakes border artifacts), so the scratch chunk gets six
-        // empty ones. All air, which is exactly the "missing neighbors" the severed ends want
-        // to cap themselves against.
-        foreach (var offset in Vector3Directions.CardinalDirections)
-        {
-            var emptyNeighbor = new Chunk(null!, scratch.Position + offset, generateBlockData: false)
-            {
-                IsBlockDataReady = true
-            };
-            scratchManager.Chunks[emptyNeighbor.Position] = emptyNeighbor;
-        }
-
-        var meshData = scratch.GenerateMeshData(scratchManager, greedy: true, tintFields) ?? new ChunkMeshData([], [], [], [], false);
-
-        var rebase = origin - pivot;
-        for (var i = 0; i < meshData.Vertices.Count; i++)
-        {
-            var vertex = meshData.Vertices[i];
-            vertex.Position += rebase;
-            vertex.Sun = 255;
-            vertex.Block = 0;
-            meshData.Vertices[i] = vertex;
-        }
-
-        return meshData;
+        return meshes;
     }
 
-    /// <summary>
-    /// World cell the felled mesh's scratch chunk maps to its local (0, 0, 0): the pivot's
-    /// column minus half a chunk on X and Z, so the trunk sits in the middle and a crown up to
-    /// a chunk wide fits around it, and <paramref name="minY"/> (the lowest collected cell) on Y.
-    /// </summary>
-    public static Vector3 ScratchOrigin(Vector3 pivot, float minY) =>
-        new(MathF.Floor(pivot.X) - Chunk.Size / 2, minY, MathF.Floor(pivot.Z) - Chunk.Size / 2);
+    private static void RebaseToPivot(List<Vertex> vertices, Vector3 pivot)
+    {
+        for (var i = 0; i < vertices.Count; i++)
+        {
+            var vertex = vertices[i];
+            vertex.Position -= pivot;
+            vertices[i] = vertex;
+        }
+    }
 
     /// <summary>Current swing angle: cubic ease-in from upright to flat over the topple time.</summary>
     public float AngleNow
@@ -302,9 +269,9 @@ public class TopplingTree : IDisposable
     /// felled canopy yields exactly what mining or blasting it would. Single-use: the second
     /// call returns nothing. A tree felled in creative mode yields nothing.
     /// </summary>
-    public List<(byte Id, Vector3 Cell)> TakeDrops()
+    public List<(ushort Id, Vector3 Cell)> TakeDrops()
     {
-        var drops = new List<(byte, Vector3)>();
+        var drops = new List<(ushort, Vector3)>();
         if (_dropsTaken)
             return drops;
         _dropsTaken = true;
@@ -313,7 +280,7 @@ public class TopplingTree : IDisposable
             return drops;
 
         var landed = Matrix4x4.CreateFromAxisAngle(_axis, MathF.PI * 0.5f);
-        var rolled = new List<byte>();
+        var rolled = new List<ushort>();
         foreach (var block in _blocks)
         {
             var cell = RestCell(block, landed);
@@ -330,21 +297,28 @@ public class TopplingTree : IDisposable
         return drops;
     }
 
-    /// <summary>Uploads the baked mesh on first render (GL is only legal on the main thread).</summary>
+    /// <summary>Uploads the baked meshes on first render (GL is only legal on the main thread).</summary>
     public void EnsureMesh(GL gl)
     {
-        if (Mesh != null || MeshData.Vertices.Count == 0)
+        if (_meshUploaded)
             return;
+        _meshUploaded = true;
 
-        Mesh = new Mesh(gl,
-            CollectionsMarshal.AsSpan(MeshData.Vertices),
-            CollectionsMarshal.AsSpan(MeshData.Indices));
+        foreach (var data in MeshData)
+        {
+            if (data.Vertices.Count == 0)
+                continue;
+            _meshes.Add(new Mesh(gl,
+                CollectionsMarshal.AsSpan(data.Vertices),
+                CollectionsMarshal.AsSpan(data.Indices)));
+        }
     }
 
     public void Dispose()
     {
-        Mesh?.Dispose();
-        Mesh = null;
+        foreach (var mesh in _meshes)
+            mesh.Dispose();
+        _meshes.Clear();
         GC.SuppressFinalize(this);
     }
 }

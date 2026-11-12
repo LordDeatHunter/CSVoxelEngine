@@ -2,7 +2,7 @@
   // A dim cyan glow on deep cave floors (GlowMushroomGenerator): light 7 in its own palette
   // color, so it lights its little patch without a torch's reach. Cutout, swaying, unsupported
   // without its floor, and dropping nothing; the tile is a placeholder from
-  // tools/generate-cave-plants.py.
+  // committed art.
   "name": "Glow Mushroom",
   "model": { "parent": "block/cross", "textures": { "cross": "glow_mushroom" } },
   "hardness": 0,

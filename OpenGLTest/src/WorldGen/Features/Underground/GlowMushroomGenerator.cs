@@ -13,7 +13,7 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 public static class GlowMushroomGenerator
 {
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte MushroomBlock;
+    public static readonly ushort MushroomBlock;
 
     static GlowMushroomGenerator() => MushroomBlock = ContentRegistry.RequireBlock("glow_mushroom").Id;
 
@@ -31,7 +31,7 @@ public static class GlowMushroomGenerator
     /// Every test is pure, so the order is free: the hash waits for a column whose depth line
     /// reaches into the chunk.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

@@ -23,10 +23,12 @@ public static class LookLabel
     /// The label for a targeted cell's block: an empty text with no target (air or an unknown id).
     /// <paramref name="knows"/> is the player's obtained set (<see cref="Inventory.Knows"/>).
     /// </summary>
-    public static State For(byte blockId, bool creative, Func<byte, bool> knows, Item? held)
+    public static State For(ushort blockId, bool creative, Func<ushort, bool> knows, Item? held)
     {
         if (BlockType.ById[blockId] is not { } block) return new State("", false, false);
         var known = creative || !block.HasItem || knows(blockId);
-        return new State(known ? block.DisplayName : "Unknown", known, creative || Mining.CanMine(blockId, held));
+        // An unbreakable block reads red even in creative, where nothing else is gated
+        var mineable = !block.Unbreakable && (creative || Mining.CanMine(blockId, held));
+        return new State(known ? block.DisplayName : "Unknown", known, mineable);
     }
 }

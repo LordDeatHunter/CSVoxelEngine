@@ -3,8 +3,12 @@ using System.Threading;
 using VoxelEngine.Chunks;
 using VoxelEngine.Lod;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
+using VoxelEngine.WorldGen.Hell;
+using VoxelEngine.WorldGen.Sky;
+using VoxelEngine.WorldGen.Structures;
 
 namespace VoxelEngine;
 
@@ -35,8 +39,22 @@ public static class WorldSeed
     /// <summary>Registers a live world; <see cref="Apply"/> refuses to run until it ends.</summary>
     internal static void BeginWorld() => Interlocked.Increment(ref _liveWorlds);
 
-    /// <summary>Ends a world registered by <see cref="BeginWorld"/>, after its workers are joined.</summary>
-    internal static void EndWorld() => Interlocked.Decrement(ref _liveWorlds);
+    /// <summary>
+    /// Ends a world registered by <see cref="BeginWorld"/>, after its generation and LOD workers
+    /// are joined and its mesh work is drained. The last world releases the derivable column values
+    /// while the process is between worlds; the next <see cref="Apply"/> clears them again even
+    /// when it selects the same seed.
+    /// </summary>
+    /// <remarks>
+    /// Lifecycle transitions and direct worldgen readers (including calls made without a World)
+    /// must be serialized by the caller, just as for <see cref="Apply"/>. The live-world count
+    /// distinguishes owners; it does not make a concurrent BeginWorld or cache read safe here.
+    /// </remarks>
+    internal static void EndWorld()
+    {
+        if (Interlocked.Decrement(ref _liveWorlds) == 0)
+            ColumnCache.Reset();
+    }
 
     /// <summary>Whether any world is registered, which makes <see cref="Apply"/> illegal.</summary>
     public static bool WorldIsLive => Volatile.Read(ref _liveWorlds) > 0;
@@ -64,6 +82,18 @@ public static class WorldSeed
         NoiseCaves.Reseed();
         CoalGenerator.Reseed();
         MalachiteGenerator.Reseed();
+        HematiteGenerator.Reseed();
+        TinGenerator.Reseed();
+        VulcaniteGenerator.Reseed();
+        BarrierGenerator.Reseed();
+        HellGenerator.Reseed();
+        HellBiomes.Reseed();
+        CaveBiomes.Reseed();
+        CaveOres.Reseed();
+        CloudPatchGenerator.Reseed();
+        CloudSeaGenerator.Reseed();
+        SkyIslands.Reseed();
+        SkyBiomes.Reseed();
         LavaGenerator.Reseed();
         PebbleGenerator.Reseed();
         SnowGenerator.Reseed();
@@ -75,6 +105,9 @@ public static class WorldSeed
         ColumnCache.Reset();
         WormCarver.ResetCellCache();
         TreeGenerator.ResetCaches();
+        HellTrees.ResetCache();
+        SkyTrees.ResetCache();
+        TowerPlacement.ResetCache();
         TerrainPeaks.ResetCaches();
         GreatLakes.ResetCaches();
         WaterBodies.ResetCaches();

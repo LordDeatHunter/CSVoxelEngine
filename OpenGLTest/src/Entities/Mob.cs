@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Particles;
+using VoxelEngine.Status;
 
 namespace VoxelEngine.Entities;
 
@@ -34,9 +35,14 @@ public abstract class Mob
         Type = type;
         Position = position;
         Health = type.MaxHealth;
+        if (type.Immune.Count > 0) Effects.ImmunityCheck = type.Immune.Contains;
     }
 
     public EntityType Type { get; }
+
+    /// <summary>Whether this mob flies (<see cref="RiggedMob.Fly"/>): no gravity, no fall damage, no ledge
+    /// caution, a 3D wander goal and a 3D knock. Fixed by its kind, so nothing about it rides the wire.</summary>
+    public virtual bool Flies => false;
 
     /// <summary>Body center.</summary>
     public Vector3 Position { get; protected set; }
@@ -129,11 +135,12 @@ public abstract class Mob
     /// Two landings before a take keep the harder one; nothing but the cosmetic dust reads it. The
     /// landing also bills its fall (<see cref="MobFallDamage"/> over <see cref="SafeFallBlocks"/>)
     /// unless the feet were <paramref name="inWater"/>; only a mob's own physics lands, which runs in
-    /// the authoritative simulation alone, so a client's mirror never takes fall damage.
+    /// the authoritative simulation alone, so a client's mirror never takes fall damage. A flyer
+    /// (<see cref="Flies"/>) never falls, so it never bills one either.
     /// </summary>
     protected void NoteLanding(float impactSpeed, float gravity, bool inWater = false)
     {
-        if (!inWater)
+        if (!inWater && !Flies)
         {
             var damage = MobFallDamage.Damage(LandingDust.FallFromImpactSpeed(impactSpeed, gravity),
                 SafeFallBlocks, MaxHealth);
@@ -163,6 +170,10 @@ public abstract class Mob
     private float _wanderTimer;
     private bool _hasWanderGoal;
 
+    /// <summary>Where a walker's wander goals are picked round instead of its own position (a camp goblin's fire,
+    /// <c>GoblinCamps</c>), so it mills about there; null wanders from wherever it stands. Not saved.</summary>
+    public Vector3? WanderAnchor { get; set; }
+
     /// <summary>Where the mob looks from for its line of sight: a little above the body center.</summary>
     public Vector3 SightOrigin => Position + new Vector3(0f, BodyHalfHeight * 0.6f, 0f);
 
@@ -188,22 +199,39 @@ public abstract class Mob
     /// Where a mob that chases nobody strolls to: a goal <see cref="MobInterest.WanderPoint"/> picks
     /// around it, picked anew every <see cref="MobConfig.MobWanderRepickSeconds"/> or once
     /// reached. Null when there is nobody in play at all (<paramref name="targetCount"/> 0), so an empty
-    /// server's mobs stand still.
+    /// server's mobs stand still. A flyer's goal is 3D (<see cref="MobInterest.FlyingWanderPoint"/>, an air
+    /// cell of <paramref name="chunks"/> when given) and is reached in 3D.
     /// </summary>
-    public Vector3? WanderGoal(int targetCount, float deltaTime)
+    public Vector3? WanderGoal(int targetCount, float deltaTime, ChunkManager? chunks = null)
     {
         if (targetCount <= 0 || IsDying) return null;
         _wanderTimer -= deltaTime;
-        var dx = _wanderGoal.X - Position.X;
-        var dz = _wanderGoal.Z - Position.Z;
+        var to = _wanderGoal - Position;
+        if (!Flies) to.Y = 0f;
         var arrive = MobConfig.MobWanderArriveBlocks;
-        if (!_hasWanderGoal || _wanderTimer <= 0f || dx * dx + dz * dz < arrive * arrive)
+        if (!_hasWanderGoal || _wanderTimer <= 0f || to.LengthSquared() < arrive * arrive)
         {
-            _wanderGoal = MobInterest.WanderPoint(Position, Random.Shared.NextSingle(), Random.Shared.NextSingle());
+            _wanderGoal = Flies
+                ? FlyingWanderGoal(chunks)
+                : MobInterest.WanderPoint(WanderAnchor ?? Position, Random.Shared.NextSingle(), Random.Shared.NextSingle());
             _wanderTimer = MobConfig.MobWanderRepickSeconds * (0.75f + 0.5f * Random.Shared.NextSingle());
             _hasWanderGoal = true;
         }
         return _wanderGoal;
+    }
+
+    // A 3D wander point in an air cell, rerolled a few times; hovering in place when every roll hits a block
+    private Vector3 FlyingWanderGoal(ChunkManager? chunks)
+    {
+        for (var i = 0; i < MobConfig.MobFlightWanderTries; i++)
+        {
+            var point = MobInterest.FlyingWanderPoint(Position, Random.Shared.NextSingle(),
+                Random.Shared.NextSingle(), Random.Shared.NextSingle());
+            var cell = point.BlockCell();
+            if (chunks == null || chunks.GetBlockGlobal(cell.X, cell.Y, cell.Z) == 0)
+                return point;
+        }
+        return Position;
     }
 
     /// <summary>Whether this mob, idle long enough and far from every one of <paramref name="targets"/>,
@@ -216,23 +244,54 @@ public abstract class Mob
     /// Ledge caution (<see cref="LedgeProbe"/>): whether moving along the horizontal
     /// <paramref name="direction"/> to <paramref name="distance"/> blocks from the body center would step
     /// off a drop of more than <see cref="MobConfig.MobLedgeMaxDropBlocks"/>, with
-    /// <paramref name="targetEye"/> (the chased target's eye, or null) not standing below it.
+    /// <paramref name="targetEye"/> (the chased target's eye, or null) not standing below it. Never for a
+    /// flyer, which has no ledge to fall off.
     /// </summary>
     public bool IsLedgeAhead(Vector3 direction, float distance, ChunkManager chunks, Vector3? targetEye) =>
-        LedgeProbe.IsLedgeAhead(chunks, Position, Position.Y - BodyHalfHeight, direction, distance, targetEye);
+        !Flies
+        && LedgeProbe.IsLedgeAhead(chunks, Position, Position.Y - BodyHalfHeight, direction, distance, targetEye);
 
     private float _lavaTimer;
 
+    /// <summary>The status effects on this mob (<see cref="StatusEffects"/>): ticked by
+    /// <see cref="UpdateHazards"/> in the authoritative simulation, mirrored from the server on a client.</summary>
+    public StatusEffectSet Effects { get; } = new();
+
+    /// <summary>The movement speed factor of the active status effects (1 when none slows).</summary>
+    public float MoveFactor => Effects.MoveFactor;
+
+    /// <summary>The attack pace factor of the active status effects (1 when none slows).</summary>
+    public float AttackFactor => Effects.AttackFactor;
+
     /// <summary>
     /// The shared world hazards, called by the owning manager once a frame right after the mob's own
-    /// update, in the authoritative simulation only: a body box in lava (<see cref="MobLava"/>) burns
-    /// one damage tick per <see cref="MobConfig.MobLavaTickSeconds"/> with the hit flash, and
-    /// leaving it (or dying) clears the partial tick. A death it causes rolls the loot as usual, since the
-    /// manager checks <see cref="IsDead"/> after this.
+    /// update, in the authoritative simulation only. The status effects tick first (their damage over
+    /// time lands through <see cref="TakeDamage"/>; a dying mob's effects are cleared). Then a body box
+    /// in lava (<see cref="MobLava"/>) burns one damage tick per <see cref="MobConfig.MobLavaTickSeconds"/>
+    /// with the hit flash, and leaving it (or dying) clears the partial tick. A death either causes rolls
+    /// the loot as usual, since the manager checks <see cref="IsDead"/> after this.
     /// </summary>
     public void UpdateHazards(float deltaTime, ChunkManager chunks)
     {
         if (deltaTime <= 0f || chunks == null) return;
+        UpdateEffects(deltaTime);
+        UpdateLava(deltaTime, chunks);
+    }
+
+    private void UpdateEffects(float deltaTime)
+    {
+        if (IsDying)
+        {
+            Effects.Clear();
+            return;
+        }
+
+        var damage = Effects.Tick(deltaTime, MaxHealth);
+        if (damage > 0) TakeDamage(damage);
+    }
+
+    private void UpdateLava(float deltaTime, ChunkManager chunks)
+    {
         if (IsDying || !MobLava.BodyInLava(Position, BodyHalfExtent, BodyHalfHeight, chunks))
         {
             _lavaTimer = 0f;
@@ -250,6 +309,15 @@ public abstract class Mob
     /// <summary>The mob's water-splash memory, stepped by the world from its feet each frame
     /// (<see cref="WaterSplash.Track"/>); cosmetic, so a server never steps it.</summary>
     public WaterSplashTracker Splash { get; } = new();
+
+    /// <summary>
+    /// Advances what only the eye sees of this mob (a spider's legs finding their footholds), once a frame from
+    /// the world's effects pass; never on a server. <paramref name="chunks"/> is null where there is no world (a
+    /// model viewer). Nothing by default.
+    /// </summary>
+    public virtual void AnimateCosmetics(float deltaTime, ChunkManager? chunks)
+    {
+    }
 
     /// <summary>Horizontal half extent of the collision body, used by touch and hit tests.</summary>
     public abstract float BodyHalfExtent { get; }
@@ -269,6 +337,62 @@ public abstract class Mob
     /// <summary>The amount of the last hit <see cref="TakeDamage"/> accepted.</summary>
     public int LastHitDamage { get; private set; }
 
+    /// <summary>
+    /// Whether a cube of half extent <paramref name="halfExtent"/> centered at <paramref name="center"/> touches
+    /// this mob's body (with a small slack): the body box by default; a multi-part body (the sandworm) tests
+    /// every exposed part. Shared by thrown items and spell bolts (<see cref="ThrownProjectile.FindMobHit"/>).
+    /// </summary>
+    public virtual bool OverlapsBox(Vector3 center, float halfExtent)
+    {
+        var d = center - Position;
+        var reachXz = halfExtent + BodyHalfExtent + 0.05f;
+        var reachY = halfExtent + BodyHalfHeight + 0.05f;
+        return MathF.Abs(d.X) <= reachXz && MathF.Abs(d.Z) <= reachXz && MathF.Abs(d.Y) <= reachY;
+    }
+
+    /// <summary>
+    /// Slides the body horizontally by <paramref name="delta"/> through the shared block sweep, so a
+    /// nudge can never push it into a solid cell: how <see cref="MobSeparation"/> resolves two
+    /// bodies standing in the same space.
+    /// </summary>
+    internal void Nudge(Vector3 delta, ChunkManager chunks)
+    {
+        var half = new Vector3(BodyHalfExtent, BodyHalfHeight, BodyHalfExtent);
+        if (delta.X != 0f) Position = BoxSweep.MoveOnAxis(Position, delta.X, 0, half, chunks, out _);
+        if (delta.Z != 0f) Position = BoxSweep.MoveOnAxis(Position, delta.Z, 2, half, chunks, out _);
+    }
+
+    /// <summary>
+    /// The point melee swings aim at and test their line of sight to, seen from <paramref name="from"/>: the body
+    /// center by default; a multi-part body gives its nearest exposed part, or null while none can be hit (a worm
+    /// fully under the sand), which keeps the mob out of every swing.
+    /// </summary>
+    public virtual Vector3? AimPointFrom(Vector3 from) => Position;
+
+    /// <summary>The damage a blow of <paramref name="amount"/> from <paramref name="from"/> deals: unchanged by
+    /// default; a multi-part body scales it by the part the blow lands on.</summary>
+    public virtual int ScaleDamage(int amount, Vector3 from) => amount;
+
+    /// <summary>Whether the floating healthbar is drawn over this mob: always, except a boss hidden under the
+    /// ground (the sandworm), whose bar would hang in the sand.</summary>
+    public virtual bool ShowsHealthbar => true;
+
+    /// <summary>Whether this mob is a boss: while one lives (and is not dying) the HUD shows its boss bar.</summary>
+    public virtual bool IsBoss => false;
+
+    /// <summary>How far from the viewer this boss's bar still shows, in blocks: unlimited by default (the sandworm);
+    /// a boss bound to an arena (the Skeleton King) shows its bar only nearby.</summary>
+    public virtual float BossBarRange => float.PositiveInfinity;
+
+    /// <summary>Whether this mob is undead (the tower's skeletons): gear with undead damage hits it harder.</summary>
+    public virtual bool IsUndead => false;
+
+    /// <summary>Sound group (see <c>SfxLibrary</c>) played when a hit lands on this mob without killing it; null for silence.</summary>
+    public virtual string? HitSoundGroup => null;
+
+    /// <summary>Sound group played when a hit kills this mob; null for silence.</summary>
+    public virtual string? DeathSoundGroup => null;
+
     /// <summary>Applies a hit; the owner drops the loot and removes the mob once dead.</summary>
     public virtual void TakeDamage(int amount)
     {
@@ -280,9 +404,14 @@ public abstract class Mob
         LastHitDamage = amount;
     }
 
-    /// <summary>Sets the horizontal shove a contact or hit imparts, leaving vertical motion
-    /// alone. Setting (not adding) keeps a sustained touch from accelerating the mob.</summary>
-    public abstract void Shove(Vector3 horizontalDirection, float speed);
+    /// <summary>Whether the mob is in the middle of an attack (a swing, a throw, a bite): a blow that lands now
+    /// still hurts it but does not knock it back, so a hit never cancels the attack. False by default.</summary>
+    public virtual bool IsMidAttack => false;
+
+    /// <summary>Sets the shove a contact or hit imparts along <paramref name="direction"/>: a ground mob
+    /// takes only its horizontal part and keeps its vertical motion, a flyer (<see cref="Flies"/>) is
+    /// knocked along all three axes. Setting (not adding) keeps a sustained touch from accelerating the mob.</summary>
+    public abstract void Shove(Vector3 direction, float speed);
 
     /// <summary>Current body velocity in blocks per second (what an entity save records).</summary>
     public abstract Vector3 Velocity { get; }

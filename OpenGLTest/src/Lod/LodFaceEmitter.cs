@@ -51,8 +51,8 @@ internal ref struct LodFaceEmitter
     private readonly Biome[] _biomeGrid;
     private readonly int[] _waterLevels;
     private readonly byte[] _seaFloor;
-    private readonly byte[] _canopyLeaf;
-    private readonly byte[] _topBlockGrid;
+    private readonly ushort[] _canopyLeaf;
+    private readonly ushort[] _topBlockGrid;
     private readonly List<Vertex> _vertices;
     private readonly List<ushort> _indices;
     private readonly List<Vertex> _waterVertices;
@@ -65,7 +65,7 @@ internal ref struct LodFaceEmitter
         ColumnData[] columns, Vector3[] grassTint, Vector3[] foliageTint, bool hasRegionOverrides, int[] topCell,
         int[] groundTop, bool[] beachTop, bool[] gravelTop, bool[] rockTop, bool[] soilStripped, bool[] snowTop,
         bool[] iceTop,
-        Biome[] biomeGrid, int[] waterLevels, byte[] seaFloor, byte[] canopyLeaf, byte[] topBlockGrid)
+        Biome[] biomeGrid, int[] waterLevels, byte[] seaFloor, ushort[] canopyLeaf, ushort[] topBlockGrid)
     {
         _spec = spec;
         _cellSize = cellSize;
@@ -129,7 +129,7 @@ internal ref struct LodFaceEmitter
         _yMax = float.MinValue;
     }
 
-    private BlockType CanopyBlock(byte leafId) =>
+    private BlockType CanopyBlock(ushort leafId) =>
         (leafId != 0 ? BlockType.ById[leafId] : null) ?? _fallbackLeaves;
 
     // Ocean floor block by the depth band the chunk mesher's GenerateColumn would pick for the

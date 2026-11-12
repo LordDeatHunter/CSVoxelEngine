@@ -37,7 +37,7 @@ internal sealed class FluidCells
     /// an unloaded cell must never read as air.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool TryGetCell(int x, int y, int z, out byte id, out byte state) => _cache.TryGetCell(x, y, z, out id, out state);
+    internal bool TryGetCell(int x, int y, int z, out ushort id, out byte state) => _cache.TryGetCell(x, y, z, out id, out state);
 
     /// <summary>
     /// Writes a cell's id and state with no remesh of its own, queueing the chunks whose mesh
@@ -45,7 +45,7 @@ internal sealed class FluidCells
     /// no ambient occlusion, so only the cell's own chunk and the chunks across a border it
     /// touches are affected — never the whole light radius.
     /// </summary>
-    internal void Write(int x, int y, int z, byte id, byte state)
+    internal void Write(int x, int y, int z, ushort id, byte state)
     {
         if (!_cache.Write(x, y, z, id, state, remesh: true)) return;
 

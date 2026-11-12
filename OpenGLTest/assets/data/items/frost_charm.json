@@ -1,0 +1,8 @@
+{
+  // Frostward Charm: a loot-only accessory (never crafted; ruin chests and mob drops, see AGENTS.md "Gear and equipment") that makes its wearer immune to frostburn (equip.immune).
+  // Committed placeholder sprite.
+  "name": "Frostward Charm",
+  "texture": "assets/textures/items/frost_charm.png",
+  "rarity": "rare",
+  "equip": { "slot": "accessory", "immune": ["frostburn"] }
+}

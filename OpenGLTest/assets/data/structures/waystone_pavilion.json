@@ -1,0 +1,93 @@
+{
+  // The surface waystone (plans/WAYSTONES.md): an open pavilion a short walk from a surface ruin (WaystonePlacement). Four
+  // wall-post pillars on a stone-brick platform carry a stepped cobblestone roof high over the two-cell waystone, and a
+  // lantern hangs from the roof above it.
+  "kind": "surface",
+  "satellite": true,
+  "groundLayer": 2,
+  "palette": {
+    "c": "cobblestone",
+    "b": "stone_bricks",
+    "p": "cobblestone_wall",
+    "W": "waystone_surface",
+    "U": "waystone_surface_upper",
+    "L": "lantern",
+    "h": "cobblestone_slab",
+    "N": { "block": "cobblestone_stairs", "facing": "south" },
+    "S": { "block": "cobblestone_stairs", "facing": "north" },
+    "E": { "block": "cobblestone_stairs", "facing": "east" },
+    "Q": { "block": "cobblestone_stairs", "facing": "west" }
+  },
+  "layers": [
+    [
+      "ccccc",
+      "ccccc",
+      "ccccc",
+      "ccccc",
+      "ccccc"
+    ],
+    [
+      "bbbbb",
+      "bbbbb",
+      "bbbbb",
+      "bbbbb",
+      "bbbbb"
+    ],
+    [
+      "b...b",
+      ".....",
+      "..W..",
+      ".....",
+      "b...b"
+    ],
+    [
+      "p...p",
+      ".....",
+      "..U..",
+      ".....",
+      "p...p"
+    ],
+    [
+      "p...p",
+      ".....",
+      ".....",
+      ".....",
+      "p...p"
+    ],
+    [
+      "p...p",
+      ".....",
+      ".....",
+      ".....",
+      "p...p"
+    ],
+    [
+      "p...p",
+      ".....",
+      "..L..",
+      ".....",
+      "p...p"
+    ],
+    [
+      "hNNNh",
+      "EbbbQ",
+      "EbbbQ",
+      "EbbbQ",
+      "hSSSh"
+    ],
+    [
+      "     ",
+      " hNh ",
+      " EbQ ",
+      " hSh ",
+      "     "
+    ],
+    [
+      "     ",
+      "     ",
+      "  h  ",
+      "     ",
+      "     "
+    ]
+  ]
+}

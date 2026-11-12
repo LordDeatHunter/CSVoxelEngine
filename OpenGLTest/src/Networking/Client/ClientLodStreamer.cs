@@ -24,10 +24,13 @@ public sealed class ClientLodStreamer
     private readonly Dictionary<(int Level, int X, int Z), double> _asked = new();
     private readonly List<(int Level, int X, int Z)> _expired = [];
     private double _time;
+    private readonly WireIds? _wire;
 
-    public ClientLodStreamer(LodManager lod, Action<int, int, int> request)
+    /// <summary><paramref name="wire"/> is the connection's id tables (null keeps the mesh's atlas layers as they came).</summary>
+    public ClientLodStreamer(LodManager lod, Action<int, int, int> request, WireIds? wire = null)
     {
         _lod = lod;
+        _wire = wire;
         _request = request;
     }
 
@@ -68,7 +71,7 @@ public sealed class ClientLodStreamer
     /// its in-flight slot.</summary>
     public void Apply(byte[] payload)
     {
-        var data = LodNetCodec.Decode(payload);
+        var data = LodNetCodec.Decode(payload, _wire);
         _asked.Remove((data.Level, data.X, data.Z));
         _lod.AddStreamedRegion(data);
     }

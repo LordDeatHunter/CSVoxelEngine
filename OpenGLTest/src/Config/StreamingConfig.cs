@@ -114,6 +114,9 @@ public static class StreamingConfig
     public const int LoadReadyRadiusChunks = 3;
     // A loading world starts playing anyway after this much accumulated update time.
     public const double LoadTimeoutSeconds = 30.0;
+    // A waystone traveler is held over the destination until its chunks are generated and meshed
+    // (WaystoneTravel); past this much update time it lands on top of the waystone anyway.
+    public const double WaystoneArrivalTimeoutSeconds = 20.0;
     // The per-frame caps while loading: larger than play, still bounded so no frame spikes.
     public const int LoadingMeshUploadsPerFrame = 64;
     public const int LoadingDirtyChunksPerFrame = 128;

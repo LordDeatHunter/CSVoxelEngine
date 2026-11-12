@@ -20,7 +20,7 @@ public static class UndergroundPoolGenerator
     private static FastNoiseLite PatchNoise;
 
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte WaterBlock;
+    public static readonly ushort WaterBlock;
 
     static UndergroundPoolGenerator()
     {
@@ -53,7 +53,7 @@ public static class UndergroundPoolGenerator
     /// pure, so the order is free: the patch noise waits for a column whose band window
     /// (above the lava, at or below the sea, buried under its surface) overlaps the chunk.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

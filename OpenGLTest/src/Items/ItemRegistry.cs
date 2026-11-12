@@ -7,27 +7,27 @@ namespace VoxelEngine.Items;
 
 /// <summary>
 /// Static singletons for every item: pure items from <c>assets/data/items/</c> plus one
-/// <see cref="BlockItem"/> per placeable block, all keyed by the shared byte id.
+/// <see cref="BlockItem"/> per placeable block, all keyed by the shared id.
 /// Published once by <see cref="ContentRegistry.Load"/> before the <see cref="World"/> (and any
 /// worker thread) exists, then read-only. Gameplay resolves items here instead of naming ids.
 /// </summary>
 public static class ItemRegistry
 {
-    private static Dictionary<byte, Item> _byId = new();
-    private static Dictionary<string, byte> _names = new(System.StringComparer.Ordinal);
+    private static Dictionary<ushort, Item> _byId = new();
+    private static Dictionary<string, ushort> _names = new(System.StringComparer.Ordinal);
 
     /// <summary>Every registered item by id, pure items and block items alike.</summary>
-    public static IReadOnlyDictionary<byte, Item> ById => _byId;
+    public static IReadOnlyDictionary<ushort, Item> ById => _byId;
 
     /// <summary>Every registered item; prefer <see cref="TryGet"/> by id on hot paths.</summary>
     public static IEnumerable<Item> All => _byId.Values;
 
     /// <summary>Whether an id is a pure item rather than a block (or air/unknown). Blocks wrapped
     /// as <see cref="BlockItem"/> are placeable and deliberately excluded.</summary>
-    public static bool IsItem(byte id) => _byId.TryGetValue(id, out var item) && item is not BlockItem;
+    public static bool IsItem(ushort id) => _byId.TryGetValue(id, out var item) && item is not BlockItem;
 
     /// <summary>Item singleton for an id, or null for air/unknown ids.</summary>
-    public static Item? TryGet(byte id) => _byId.GetValueOrDefault(id);
+    public static Item? TryGet(ushort id) => _byId.GetValueOrDefault(id);
 
     /// <summary>The pure item registered under that JSON file name; throws naming the missing
     /// content at startup instead of silently mis-indexing.</summary>
@@ -43,12 +43,18 @@ public static class ItemRegistry
     public static Item? FindByAction(ItemUseAction action) =>
         _byId.Values.FirstOrDefault(i => i is not BlockItem && i.UseAction == action);
 
+    /// <summary>The lowest-id pure item whose left-click drives this attack pattern, or null when
+    /// none does. Deterministic by construction (dictionary order is no guarantee): a client draws
+    /// this blade, and its slice trail, for a remote player whose held item is not on the wire.</summary>
+    public static Item? FindByAttack(AttackPattern attack) =>
+        _byId.Values.Where(i => i is not BlockItem && i.Attack == attack).MinBy(i => i.Id);
+
     /// <summary>Pure item with this display name, or null. Used for spawn stock (compass).</summary>
     public static Item? FindByName(string name) =>
         _byId.Values.FirstOrDefault(i => i is not BlockItem
             && i.Name.Equals(name, System.StringComparison.OrdinalIgnoreCase));
 
-    internal static void Publish(Dictionary<byte, Item> items, Dictionary<string, byte> names)
+    internal static void Publish(Dictionary<ushort, Item> items, Dictionary<string, ushort> names)
     {
         _byId = items;
         _names = names;
@@ -67,7 +73,7 @@ public static class ItemRegistry
 
     internal static void Reset()
     {
-        _byId = new Dictionary<byte, Item>();
-        _names = new Dictionary<string, byte>(System.StringComparer.Ordinal);
+        _byId = new Dictionary<ushort, Item>();
+        _names = new Dictionary<string, ushort>(System.StringComparer.Ordinal);
     }
 }

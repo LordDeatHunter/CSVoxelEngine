@@ -29,7 +29,7 @@ public sealed class CraftCardLayoutTests
         new("test", 1, 1, ingredients);
 
     private static CraftingRecipe.Ingredient Tag(int members) =>
-        new(0, 2, "log", Enumerable.Range(10, members).Select(i => (byte)i).ToArray());
+        new(0, 2, "log", Enumerable.Range(10, members).Select(i => (ushort)i).ToArray());
 
     private static CraftingRecipe ThreeIngredients(int middleMembers) =>
         Recipe(new CraftingRecipe.Ingredient(2, 1), Tag(middleMembers), new CraftingRecipe.Ingredient(3, 4));

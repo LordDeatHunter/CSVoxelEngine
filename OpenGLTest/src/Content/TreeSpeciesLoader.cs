@@ -24,7 +24,7 @@ internal static class TreeSpeciesLoader
         var species = new Dictionary<string, TreeSpecies>(StringComparer.Ordinal);
         // The rim is a property of the wood block (the mesher and collision only see the id), so
         // two species sharing one wood must agree on it
-        var rimByWood = new Dictionary<byte, (TrunkRim Rim, string Path)>();
+        var rimByWood = new Dictionary<ushort, (TrunkRim Rim, string Path)>();
         if (Directory.Exists(folder))
         {
             foreach (var (name, path) in ContentFiles.JsonFilesIn(folder))
@@ -73,7 +73,7 @@ internal static class TreeSpeciesLoader
     /// Species name blocks only, never items, which is why <see cref="ContentFiles.TryResolve"/>'s bare-name
     /// item fallback is not used; anything else resolves to null.
     /// </summary>
-    private static byte? ResolveSpeciesBlock(string reference)
+    private static ushort? ResolveSpeciesBlock(string reference)
     {
         if (reference.StartsWith("item/", StringComparison.Ordinal)) return null;
         var bare = reference.StartsWith("block/", StringComparison.Ordinal) ? reference["block/".Length..] : reference;

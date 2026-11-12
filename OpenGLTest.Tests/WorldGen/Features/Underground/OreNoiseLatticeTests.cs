@@ -38,16 +38,25 @@ public sealed class OreNoiseLatticeTests
             MalachiteGenerator.OreBlock, stone, "malachite");
         AssertStampMatchesPointQuery(CoalGenerator.Stamp, CoalGenerator.HasOre,
             CoalGenerator.OreBlock, stone, "coal");
+
+        // Hematite's ceiling runs through chunk c, so the volume straddles it; a wider footprint
+        // keeps the rare ore present in it
+        var c = (WorldGenerationConfig.HematiteMaxY >> 4) << 4;
+        int[] wide = { -32, -16, 0, 16 };
+        AssertStampMatchesPointQuery(HematiteGenerator.Stamp, HematiteGenerator.HasOre,
+            HematiteGenerator.OreBlock, stone, "hematite",
+            seamX: wide, seamY: new[] { c - 16, c }, seamZ: wide);
     }
 
-    private static void AssertStampMatchesPointQuery(Action<byte[], int, int, int> stamp,
-        Func<int, int, int, bool> hasOre, byte ore, byte stone, string name)
+    private static void AssertStampMatchesPointQuery(Action<ushort[], int, int, int> stamp,
+        Func<int, int, int, bool> hasOre, ushort ore, ushort stone, string name,
+        int[]? seamX = null, int[]? seamY = null, int[]? seamZ = null)
     {
         var oreCells = 0;
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
-        foreach (var x0 in SeamX)
-        foreach (var y0 in SeamY)
-        foreach (var z0 in SeamZ)
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
+        foreach (var x0 in seamX ?? SeamX)
+        foreach (var y0 in seamY ?? SeamY)
+        foreach (var z0 in seamZ ?? SeamZ)
         {
             Array.Fill(blocks, stone);
             stamp(blocks, x0, y0, z0);
@@ -73,7 +82,7 @@ public sealed class OreNoiseLatticeTests
         var sand = GravelPocketGenerator.SandBlock;
 
         var loose = 0;
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         foreach (var x0 in SeamX)
         foreach (var z0 in SeamZ)
         {
@@ -130,7 +139,7 @@ public sealed class OreNoiseLatticeTests
         var ore = MalachiteGenerator.OreBlock;
 
         var oreCells = 0;
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         foreach (var x0 in SeamX)
         foreach (var y0 in SeamY)
         foreach (var z0 in SeamZ)
@@ -138,7 +147,7 @@ public sealed class OreNoiseLatticeTests
             // About half the cells are stone, so most lattice cells hold host and non-host cells alike
             var rng = new SplitMix64(SplitMix64.Hash(x0 ^ (y0 * 31), z0, 0x4057));
             for (var i = 0; i < blocks.Length; i++) blocks[i] = rng.NextFloat() < 0.5f ? stone : dirt;
-            var before = (byte[])blocks.Clone();
+            var before = (ushort[])blocks.Clone();
 
             MalachiteGenerator.Stamp(blocks, x0, y0, z0);
 
@@ -186,12 +195,12 @@ public sealed class OreNoiseLatticeTests
         }
     }
 
-    /// <summary>The malachite and coal cells stamped into the seam chunks, filled with stone.</summary>
-    private static HashSet<(int x, int y, int z, byte ore)> StampedOre()
+    /// <summary>The malachite, coal and hematite cells stamped into the seam chunks, filled with stone.</summary>
+    private static HashSet<(int x, int y, int z, ushort ore)> StampedOre()
     {
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        var cells = new HashSet<(int x, int y, int z, byte ore)>();
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var cells = new HashSet<(int x, int y, int z, ushort ore)>();
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         foreach (var x0 in SeamX)
         foreach (var y0 in SeamY)
         foreach (var z0 in SeamZ)
@@ -199,6 +208,7 @@ public sealed class OreNoiseLatticeTests
             Array.Fill(blocks, stone);
             MalachiteGenerator.Stamp(blocks, x0, y0, z0);
             CoalGenerator.Stamp(blocks, x0, y0, z0);
+            HematiteGenerator.Stamp(blocks, x0, y0, z0);
             for (var x = 0; x < Chunk.Size; x++)
             for (var y = 0; y < Chunk.Size; y++)
             for (var z = 0; z < Chunk.Size; z++)
@@ -226,7 +236,7 @@ public sealed class OreNoiseLatticeTests
 
         // Every column's surface far above the scan volume, so all of it lies inside the burial band
         var deepColumn = Column(0, 0, (_, _) => 200);
-        void StampPockets(byte[] blocks, int x0, int y0, int z0) =>
+        void StampPockets(ushort[] blocks, int x0, int y0, int z0) =>
             GravelPocketGenerator.Stamp(blocks, deepColumn, x0, y0, z0);
         AssertUnlocked("gravel",
             OreScan.Deposits(OreScan.StampedCells(StampPockets, stone, b => b == gravel || b == sand)),

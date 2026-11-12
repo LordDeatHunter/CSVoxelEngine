@@ -13,9 +13,9 @@ public sealed class FirestarterTests
 {
     public FirestarterTests() => TestContent.EnsureLoaded();
 
-    private static byte Firestarter => ContentRegistry.RequireItem("firestarter").Id;
-    private static byte Ash => ContentRegistry.RequireItem("ash").Id;
-    private static byte BranchPile => ContentRegistry.RequireBlock("branch_pile").Id;
+    private static ushort Firestarter => ContentRegistry.RequireItem("firestarter").Id;
+    private static ushort Ash => ContentRegistry.RequireItem("ash").Id;
+    private static ushort BranchPile => ContentRegistry.RequireBlock("branch_pile").Id;
 
     [Fact]
     public void FirestarterIsAToolSoInstancesNeverStack()

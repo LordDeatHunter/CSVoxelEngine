@@ -1,0 +1,8 @@
+{
+  "name": "Bleeding Edge",
+  "texture": "assets/textures/items/bleeding_edge.png",
+  "display": { "rotation": [0, -90, 45], "translation": [0, 0.25, 0.1], "scale": 1.8 },
+  "attack": "sword",
+  "trail": { "color": [255, 120, 80] },
+  "entityDamage": 20
+}

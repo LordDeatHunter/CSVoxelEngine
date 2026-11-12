@@ -12,4 +12,9 @@ public enum NetPlayerAction : byte
     Slice = 2,
     SliceReturn = 3,
     Throw = 4,
+    SwordCut = 5,
+    SwordBackCut = 6,
+    SwordChop = 7,
+    /// <summary>A staff cast's gesture: the staff raised and thrust forward (PlayerModel.Cast).</summary>
+    Cast = 8,
 }

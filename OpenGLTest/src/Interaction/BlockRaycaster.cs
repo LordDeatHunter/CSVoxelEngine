@@ -109,7 +109,7 @@ public static class BlockRaycaster
 
         return false;
 
-        bool TryHitCell(int step, int cellX, int cellY, int cellZ, byte cellId, Vector3 cell,
+        bool TryHitCell(int step, int cellX, int cellY, int cellZ, ushort cellId, Vector3 cell,
             out float cellT, out Vector3 cellNormal, out int cellBox)
         {
             cellT = 0f;

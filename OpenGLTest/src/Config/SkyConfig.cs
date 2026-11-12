@@ -138,6 +138,30 @@ public const float DayLengthSeconds = 1200f;
     public const float StarTwinkleRateMin = 0.25f;
     public const float StarTwinkleRateMax = 1.2f;
 
+    // --- Shooting stars (ShootingStar, ShootingStar in sky-fragment.glsl) ---
+    /// <summary>Seconds per slot; a slot holds at most one streak. Must divide the star clock's hourly wrap (3600) so the slots wrap with it.</summary>
+    public const float ShootingStarSlotSeconds = 9f;
+
+    /// <summary>Chance a slot holds a streak: about one every ShootingStarSlotSeconds / this.</summary>
+    public const float ShootingStarChance = 0.3f;
+
+    /// <summary>How long a streak lives; shorter than a slot, so one never spills into the next.</summary>
+    public const float ShootingStarLifeSeconds = 0.9f;
+
+    /// <summary>The angle the head travels along its great circle over its life, and how far the tail trails it.</summary>
+    public const float ShootingStarArcDegrees = 30f;
+    public const float ShootingStarTrailDegrees = 10f;
+
+    /// <summary>The band of sine-elevations a streak starts in (high enough to clear the horizon haze).</summary>
+    public const float ShootingStarMinSinElevation = 0.3f;
+    public const float ShootingStarMaxSinElevation = 0.85f;
+
+    /// <summary>Gaussian radius of the streak across its path in screen pixels (pixel-relative like the stars').</summary>
+    public const float ShootingStarRadiusPixels = 1.5f;
+
+    /// <summary>Linear HDR brightness of the head, like StarBrightness.</summary>
+    public const float ShootingStarBrightness = 2.2f;
+
     // --- Moon (MoonPhase, SkyPasses.RenderMoon, moon-fragment.glsl) ---
     /// <summary>Days from one full moon to the next; the phase steps once a day, at noon.</summary>
     public const int MoonCycleDays = 8;
@@ -179,6 +203,79 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>How fast the curtains drift and ripple along the sky (noise cells per second).</summary>
     public const float AuroraDriftSpeed = 0.035f;
 
+    // --- Realm layers (LayerClimate, FrameLighting.SetLighting; the Y bands are in WorldGenerationConfig) ---
+    /// <summary>sRGB color the sky palette, and with it the fog and the clear color, turns to with the
+    /// eye inside hell: a dim ember red.</summary>
+    public static readonly System.Numerics.Vector3 HellFogColor = new(0.32f, 0.06f, 0.03f);
+
+    /// <summary>Blocks below hell's top over which the hell tint ramps from none to full, so crossing
+    /// the boundary never pops.</summary>
+    public const float HellFogRampBlocks = 24f;
+
+    /// <summary>How fast (MathUtils.Damp rate, per second) the eased hell and altitude amounts follow
+    /// the eye, so a teleport or a fast fall still fades.</summary>
+    public const float LayerFogEaseRate = 2.5f;
+
+    /// <summary>The world fog's near distance in hell, in blocks: the caverns close in.</summary>
+    public const float HellFogNearBlocks = 8f;
+
+    /// <summary>The world fog's far distance in hell, in blocks.</summary>
+    public const float HellFogFarBlocks = 110f;
+
+    /// <summary>Per-channel factor the sky palette is multiplied by at full altitude (the eye at the sky
+    /// islands, ramped in from the cloud slab's top): a slightly deeper, brighter blue that keeps a
+    /// night sky dark.</summary>
+    public static readonly System.Numerics.Vector3 SkyAltitudeTint = new(0.82f, 0.93f, 1.1f);
+
+    // --- Cave biome atmosphere (CaveClimate, FrameLighting.SetLighting) ---
+    /// <summary>How fast (MathUtils.Damp rate, per second) the eased cave atmosphere follows the eye's cave
+    /// biome: slower than the layer fog, so stepping across a biome or cover line fades.</summary>
+    public const float CaveFogEaseRate = 1.2f;
+
+    /// <summary>The world fog's near distance in a cave biome at full strength, in blocks.</summary>
+    public const float CaveFogNearBlocks = 16f;
+
+    /// <summary>The world fog's far distance in a cave biome at full strength, in blocks.</summary>
+    public const float CaveFogFarBlocks = 180f;
+
+    /// <summary>How strongly a cave biome's atmosphere applies at full ease (0..1), every biome but the
+    /// magma deep.</summary>
+    public const float CaveFogStrength = 0.8f;
+
+    /// <summary>How strongly the magma deep's atmosphere applies at full ease (0..1): its haze is the
+    /// thickest.</summary>
+    public const float CaveFogStrengthMagmaDeep = 0.9f;
+
+    /// <summary>sRGB fog color of a frozen echo cave: a dim, cold pale blue.</summary>
+    public static readonly System.Numerics.Vector3 CaveFogFrozenEcho = new(0.07f, 0.10f, 0.14f);
+
+    /// <summary>sRGB fog color of a desert echo cave: a dusty ochre.</summary>
+    public static readonly System.Numerics.Vector3 CaveFogDesertEcho = new(0.12f, 0.09f, 0.05f);
+
+    /// <summary>sRGB fog color of a crystal cave: a dim violet.</summary>
+    public static readonly System.Numerics.Vector3 CaveFogCrystal = new(0.08f, 0.06f, 0.13f);
+
+    /// <summary>sRGB fog color of a fungal cave: a dim teal green.</summary>
+    public static readonly System.Numerics.Vector3 CaveFogFungal = new(0.04f, 0.10f, 0.08f);
+
+    /// <summary>sRGB fog color of the magma deep: a dim ember.</summary>
+    public static readonly System.Numerics.Vector3 CaveFogMagmaDeep = new(0.14f, 0.05f, 0.03f);
+
+    /// <summary>Per-channel ambient factor of a frozen echo cave at full strength: a touch cooler.</summary>
+    public static readonly System.Numerics.Vector3 CaveAmbientFrozenEcho = new(0.92f, 0.97f, 1.06f);
+
+    /// <summary>Per-channel ambient factor of a desert echo cave at full strength: a touch warmer.</summary>
+    public static readonly System.Numerics.Vector3 CaveAmbientDesertEcho = new(1.05f, 1f, 0.92f);
+
+    /// <summary>Per-channel ambient factor of a crystal cave at full strength: a touch cooler and violet.</summary>
+    public static readonly System.Numerics.Vector3 CaveAmbientCrystal = new(0.98f, 0.94f, 1.08f);
+
+    /// <summary>Per-channel ambient factor of a fungal cave at full strength: a touch greener.</summary>
+    public static readonly System.Numerics.Vector3 CaveAmbientFungal = new(0.94f, 1.06f, 0.98f);
+
+    /// <summary>Per-channel ambient factor of the magma deep at full strength: warmer.</summary>
+    public static readonly System.Numerics.Vector3 CaveAmbientMagmaDeep = new(1.1f, 0.96f, 0.88f);
+
     // --- Moonlight (Moonlight, FrameLighting.SetLighting) ---
     /// <summary>
     /// Sine of the sun's elevation at and below which the moon lights the world instead of the sun.
@@ -206,6 +303,15 @@ public const float DayLengthSeconds = 1200f;
     public const float CloudFieldSize = 2048f;
     public const float CloudCellSize = 16f;
     public const float CloudLayerThickness = 4f;
+
+    /// <summary>Base height of the second, thick cloud sea that lies under the sky islands
+    /// (visual only, plans/LAYERS.md): above the solid cloud slab
+    /// (<see cref="WorldGenerationConfig.CloudSlabTopY"/>) and below
+    /// <see cref="WorldGenerationConfig.SkyIslandBottomY"/>.</summary>
+    public const float SkyCloudSeaHeight = 290f;
+
+    /// <summary>Thickness of the sky-island cloud sea in blocks.</summary>
+    public const float SkyCloudSeaThickness = 12f;
     public const int CloudMaxLevels = 2;
     // Density above which a cell holds a cloud (tuned for 30-45 % coverage; CloudTests asserts it),
     // and how much more density each extra stacked layer needs.

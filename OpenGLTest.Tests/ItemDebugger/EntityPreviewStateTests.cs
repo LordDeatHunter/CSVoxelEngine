@@ -2,6 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
+using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.SkyMobs;
+using VoxelEngine.Entities.Crawlers;
+using VoxelEngine.Entities.TowerMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.ItemDebugger;
 using Xunit;
 
@@ -268,5 +274,45 @@ public sealed class EntityPreviewStateTests
         // Another entity draws its one model again.
         Assert.True(state.SelectByName("goblin"));
         Assert.Equal(0, state.SelectedVariant);
+    }
+
+    [Theory]
+    [InlineData(Hellbrute.EntityName)]
+    [InlineData(Cinderwitch.EntityName)]
+    [InlineData(Galeraptor.EntityName)]
+    [InlineData(Cloudgolem.EntityName)]
+    [InlineData(Skeleton.EntityName)]
+    [InlineData(SkeletonKing.EntityName)]
+    [InlineData(Shardling.EntityName)]
+    [InlineData(Sporeling.EntityName)]
+    [InlineData(Magmaborn.EntityName)]
+    [InlineData(Spider.EntityName)]
+    [InlineData(Spider.BroodmotherEntityName)]
+    [InlineData(Scorpion.EntityName)]
+    [InlineData(Deer.EntityName)]
+    [InlineData(Boar.EntityName)]
+    [InlineData(Boar.DireEntityName)]
+    [InlineData(Crow.EntityName)]
+    [InlineData(Dragonfly.EntityName)]
+    public void EveryRealmEntityHasAPreviewMob(string name)
+    {
+        var state = new EntityPreviewState();
+        Assert.True(state.SelectByName(name));
+
+        // Previewed as the real mob of its own kind, so its spawn, recoil and death show as in game.
+        var mob = Assert.IsAssignableFrom<RealmMob>(state.PreviewMob);
+        Assert.Same(state.Selected, mob.Type);
+
+        // A one-shot attack clip plays on the real mob through the preview.
+        var attack = mob.AttackClip;
+        Assert.Contains(attack, state.Modes, StringComparer.OrdinalIgnoreCase);
+        Assert.True(state.SetMode(attack));
+        var played = false;
+        for (var frame = 0; frame < (int)(2f / Dt) && !played; frame++)
+        {
+            state.Update(Dt);
+            played = state.Animator.IsPlaying(attack);
+        }
+        Assert.True(played, $"{name}: the {attack} mode never played.");
     }
 }

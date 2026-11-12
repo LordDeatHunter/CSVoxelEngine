@@ -17,7 +17,9 @@ namespace VoxelEngine.Lod;
 /// unloads regions that fall out of range. That constant ships at 1 — C5 measured a wider pool
 /// and declined it (the reasoning is on the constant) — but everything here is written for N
 /// workers and is correct at any N.
-/// Levels are filled finest-first so detail appears near the player before the horizon.
+/// Regions are built nearest-first across every level, the finer level first at equal distance, so detail
+/// appears near the player before the horizon and a coarse shell under the player (after a long teleport) is
+/// replaced by its finer children within the first few builds.
 /// Each worker claims a region through <see cref="ClaimNextRegion"/>, which registers the key in
 /// <c>LodRegionClaims._building</c>; the claim protocol, not the concurrent collections, is what keeps two
 /// workers off one region (item C5).
@@ -177,6 +179,9 @@ public class LodManager
         var size = LodRegion.Levels[level].RegionBlocks;
         return (MathUtils.FloorToInt(pos.X / size), MathUtils.FloorToInt(pos.Z / size));
     }
+
+    /// <summary>The camera's horizontal position in blocks (x, z), which the claim scan measures region distance from.</summary>
+    internal Vector2 CameraXZ => new(_camera!.Position.X, _camera.Position.Z);
 
     public void Update(ChunkManager chunkManager)
     {

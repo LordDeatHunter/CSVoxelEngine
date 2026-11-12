@@ -1,0 +1,6 @@
+{
+  // A boar's haunch (loot/boar.json, loot/dire_boar.json). Inedible raw: a lit campfire cooks it
+  // (recipes/cook/raw_boar_meat.json). The sprite is placeholder art.
+  "name": "Raw Boar Meat",
+  "texture": "assets/textures/items/raw_boar_meat.png"
+}

@@ -3,7 +3,7 @@ using Pose = VoxelEngine.Player.PlayerModel.Pose;
 
 namespace VoxelEngine.Player.Posing;
 
-/// <summary>The body-wide secondary motion laid over the pose: landing dip, crouch, flinch, sway, equip dip, slice and throw twist and lean, the swim tilt, head turn and death fall.</summary>
+/// <summary>The body-wide secondary motion laid over the pose: landing dip, crouch, flinch, sway, equip dip, the blade swings' and the throw's twist and lean, the cast's lean, the swim tilt, head turn and death fall.</summary>
 internal sealed class SecondaryMotion
 {
     private readonly PlayerModel _model;
@@ -20,12 +20,10 @@ internal sealed class SecondaryMotion
         var ground = 1f - _model.AirBlend;
         var move = _model.MoveBlend * ground * (1f - _model.SwimBlend);
 
-        // Slice: the shoulders twist with the sweep and the body shifts its weight onto the lead leg.
-        var sliceBody = _model.IsSlicing ? SliceMotion.SliceBodySweep(_model.SliceProgress, _model.SliceDir) : 0f;
-        var sliceTwist = sliceBody * SliceMotion.SliceTorsoYaw;
-        var sliceRoll = _model.IsSlicing ? _model.SliceDir * 0.07f * SliceMotion.SliceStroke(_model.SliceProgress) : 0f;
-        // The weight sinks into the strike: knees and hips bend and the torso dips toward the blow.
-        var sliceDip = _model.IsSlicing ? MathUtils.Pulse(_model.SliceProgress, PlayerModel.SliceImpactProgress) : 0f;
+        // A blade swing (a slice or a sword swing): the body turns and the shoulders twist with the sweep, it
+        // rolls toward the swing's side, leans over the blow, and the weight sinks into the strike (knees and hips
+        // bend and the torso dips toward it).
+        var blade = _model.Blade;
 
         // Throw: the shoulders wind back toward the throwing (right) side and lean back while the
         // arm is cocked, then whip forward through the release and settle.
@@ -49,17 +47,18 @@ internal sealed class SecondaryMotion
         var fall = _model.DeathFall;
         return new PoseMods
         {
-            HipBend = dip * 0.55f + crouch * 0.7f + sliceDip * 0.25f,
-            KneeBend = dip * 1.1f + crouch * 1.4f + sliceDip * 0.4f,
-            RootYaw = sliceBody * SliceMotion.SliceBodyYaw,
+            HipBend = dip * 0.55f + crouch * 0.7f + blade.Dip * 0.25f,
+            KneeBend = dip * 1.1f + crouch * 1.4f + blade.Dip * 0.4f,
+            RootYaw = blade.RootYaw,
             Shoulders = _model.SwayPitch + dip * 0.3f,
             RightShoulderExtra = -_model.EquipLowering * 0.9f,
-            TorsoPitch = -dip * 0.2f - crouch * 0.25f + _model.Flinch * 0.3f + throwLean - sliceDip * 0.22f,
-            Drop = dip * 0.12f + crouch * 0.17f + sliceDip * 0.06f,
-            TorsoYaw = MathF.Sin(_model.WalkPhase) * 0.1f * move + sliceTwist + throwTwist
+            TorsoPitch = -dip * 0.2f - crouch * 0.25f + _model.Flinch * 0.3f + throwLean - blade.Dip * 0.22f + blade.Lean
+                         + _model.Bow.TorsoLean() + CastMotion.Lean(_model.CastProgress),
+            Drop = dip * 0.12f + crouch * 0.17f + blade.Dip * 0.06f,
+            TorsoYaw = MathF.Sin(_model.WalkPhase) * 0.1f * move + blade.TorsoTwist + throwTwist + _model.Bow.TorsoTwist()
                        - PunchPose.PunchTwist * PunchPose.PunchWeights(_model.MineT).Extend,
             // The body also leans a little toward whichever side its shoulders are being pulled out to.
-            TorsoRoll = MathF.Cos(_model.WalkPhase) * 0.035f * move + sliceRoll + _model.Flinch * 0.08f
+            TorsoRoll = MathF.Cos(_model.WalkPhase) * 0.035f * move + blade.TorsoRoll + _model.Flinch * 0.08f
                         - (_model.RightPullX + _model.LeftPullX) * 0.8f,
             HeadPitch = _model.Flinch * 0.45f - crouch * 0.1f,
             HeadYaw = _model.BodyYawLags && _model.LookKnown ? -MathUtils.ToRadians(PlayerModel.WrapDegrees(_model.LookYaw - _model.TrailingBodyYaw)) : 0f,

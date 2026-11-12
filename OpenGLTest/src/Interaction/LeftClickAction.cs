@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Entities;
 using VoxelEngine.Items;
@@ -9,23 +11,28 @@ using VoxelEngine.Juice;
 using VoxelEngine.Networking;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// The left-click action and the target it works on: the crosshair raycast that picks the
 /// targeted block (with the face, box and aim a client's intents carry), hit-based mining with its
-/// pop and break overlay, the attack-first punch and the blade's slice combo, the HUD crosshair and
-/// look-at label read from them, and the punch and slice a server lands for a connected player.
-/// Owned by <see cref="World"/>; main thread only.
+/// pop and break overlay, the attack-first punch, the short blade's slice combo and the sword's
+/// three-swing chain, the HUD crosshair and look-at label read from them, and the punch and swings
+/// a server lands for a connected player. Owned by <see cref="World"/>; main thread only.
 /// </summary>
 internal sealed class LeftClickAction
 {
     private readonly World _world;
     private readonly ChunkManager _chunkManager;
     private readonly BlockDebrisSystem _debris;
+    private readonly LeafParticleSystem _leaves;
+    private readonly List<Vector3> _shudderCells = [];
     private readonly HitMarker _hitMarker;
     private readonly List<Mob> _mobs;
     private readonly SfxManager? _sfx;
@@ -39,9 +46,10 @@ internal sealed class LeftClickAction
     private LocalPlayer LocalPlayer => _world.LocalPlayer;
     private MobStrikes Strikes => _world.Strikes;
 
-    internal LeftClickAction(World world, ChunkManager chunkManager, BlockDebrisSystem debris, HitMarker hitMarker,
-        List<Mob> mobs, SfxManager? sfx, bool clientMode)
+    internal LeftClickAction(World world, ChunkManager chunkManager, BlockDebrisSystem debris, LeafParticleSystem leaves,
+        HitMarker hitMarker, List<Mob> mobs, SfxManager? sfx, bool clientMode)
     {
+        _leaves = leaves;
         _world = world;
         _chunkManager = chunkManager;
         _debris = debris;
@@ -70,7 +78,14 @@ internal sealed class LeftClickAction
     internal Vector3 BreakingBlockPosition => _breakingBlockPosition;
 
     /// <summary>The id of the block being mined.</summary>
-    internal byte BreakingBlockId => _breakingBlockId;
+    internal ushort BreakingBlockId => _breakingBlockId;
+
+    /// <summary>Whether the cell being mined shows its progress as an eaten-away face (a natural full-cube trunk
+    /// with a side bite), so the crack overlay stays off for it.</summary>
+    internal bool ShowsEatenFace =>
+        _isBreaking && _breakNatural && WoodState.IsFullCube(_breakState)
+        && _chunkManager.ChopDamage.TryGet((int)_breakingBlockPosition.X, (int)_breakingBlockPosition.Y,
+            (int)_breakingBlockPosition.Z, out var chop) && chop.Face != WoodDamage.NoFace;
 
     /// <summary>
     /// Fires this frame's crosshair raycast: the targeted block, its face and box, and the head ray
@@ -99,19 +114,26 @@ internal sealed class LeftClickAction
     private int _selectedBoxIndex;
     private bool _isBreaking;
     private Vector3 _breakingBlockPosition;
-    private byte _breakingBlockId;
-    private byte _breakingHeldId;
+    private ushort _breakingBlockId;
+    private ushort _breakingHeldId;
     private float _breakDamage;
     private float _breakHardness;
     private float _breakPower;
     private float _breakHitSeconds = Mining.DefaultHitGapMs / 1000f;
     private bool _breakAllowed;
     private float _hitTimer;
+    // An axe's chop already started ahead of the coming hit, so the blow lands with it
+    private bool _chopStarted;
+    // A natural tree's wood keeps its chop damage for good (WoodDamage): the break is of such a cell, the
+    // state byte it was started with, and the side face the crosshair hit (-1 for a top or bottom)
+    private bool _breakNatural;
+    private byte _breakState;
+    private int _breakFace;
     private float _popElapsed = BlockPopSeconds;
 
-    // Punch cadence: the left-click attack runs on the held item's mining pace. Seeded to
-    // infinity while the button is up, so the first frame of a press punches at once, exactly
-    // like the break timer's seeded first hit.
+    // Swing cadence: seconds since the last swing or block hit, the left-click attack running on the held item's
+    // pace. It keeps counting while the button is up, so releasing and pressing again never skips the wait (no
+    // spam-clicking past the pace); infinity until the first swing, so that one lands at once.
     private float _punchTimer = float.PositiveInfinity;
     private float _punchGap = Mining.DefaultHitGapMs / 1000f;
 
@@ -119,16 +141,20 @@ internal sealed class LeftClickAction
     // and the per-swing latch that lands its damage once at the impact frame.
     private readonly SliceCombo _sliceCombo = new();
     private bool _sliceImpactDone;
-    // Previous frame's left-click state, so the slice combo can see a fresh press.
+    // Sword attack (AttackPattern.Sword): the cut, back cut and chop chain and the same latch.
+    private readonly SwordCombo _swordCombo = new();
+    private bool _swordImpactDone;
+    // Previous frame's left-click state, so the combos can see a fresh press.
     private bool _attackWasPressed;
+    // The mobs a swing reaches, nearest first (reused every swing, so a swing allocates nothing).
+    private readonly List<(float Distance, Mob Mob)> _strikeScratch = [];
 
     // The head ray the selection raycast fired along (Camera.LastAimDirection), which a client's
     // break intents carry so the server's first-person ray lands on the same cell.
     private Vector3 _selectedAimDirection = -Vector3.UnitZ;
 
-    // A connected client's creative mining pace: one block per ClientCreativeBreakSeconds while
-    // the button is held (singleplayer mines one per frame). Infinity while released, so a click
-    // breaks at once.
+    // Creative mining pace: one block per CreativeBreakRepeatSeconds while the button is held.
+    // Infinity while released, so a click breaks at once.
     private float _creativeBreakTimer = float.PositiveInfinity;
 
     /// <summary>
@@ -151,14 +177,30 @@ internal sealed class LeftClickAction
         get
         {
             if (!_hasSelectedBlock) return null;
-            var blockId = Edits.BlockIdAt(_selectedBlockPosition);
+            var cellId = Edits.BlockIdAt(_selectedBlockPosition);
+            var (x, y, z) = _selectedBlockPosition.BlockCell();
+            // Any cell of a multiblock shows the whole structure, not its plain part block
+            var blockId = Multiblock.TryResolveAnchor(_chunkManager, x, y, z, out var anchorPos, out _, out var anchorType)
+                ? anchorType!.Id
+                : cellId;
             var state = LookLabel.For(blockId, Camera.IsCreative, Inventory.Knows, HeldItem());
             if (state.Text.Length == 0) return null;
-            var (x, y, z) = _selectedBlockPosition.BlockCell();
             return new LookLabelState(state.Text, state.Known, state.Mineable, _selectedBlockPosition,
                 blockId, _chunkManager.GetStateGlobal(x, y, z),
-                EntityLight.Sample(_chunkManager, _selectedBlockPosition));
+                EntityLight.Sample(_chunkManager, _selectedBlockPosition),
+                IronWorksDetail(blockId, anchorPos, x, y, z) ?? _world.Towers.Detail(blockId, x, y, z));
         }
+    }
+
+    // The status line of the bloomery or anvil under the crosshair (see SmithingReadout), null for anything else
+    private string? IronWorksDetail(ushort blockId, Vector3 anchor, int x, int y, int z)
+    {
+        var type = BlockType.ById[blockId];
+        if (type?.Bloomery != null && _world.Smithing.Bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z) is { } bloomery)
+            return SmithingReadout.Bloomery(bloomery);
+        if (type?.Anvil != null && _world.Smithing.Anvils.StateAt(x, y, z) is { } anvil)
+            return SmithingReadout.Anvil(anvil);
+        return null;
     }
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
@@ -179,7 +221,9 @@ internal sealed class LeftClickAction
     {
         if (!IsPlaying) return false;
         if (!TryFindPunchTarget(player.Eye, player.ViewDirection, out var target)) return false;
-        Strikes.StrikeMob(target, Combat.PunchDamage(HeldItem(player.Inventory)), player.Eye);
+        var held = HeldItem(player.Inventory);
+        Strikes.StrikeMob(target, Combat.PunchDamage(held, GearDamage(player.Inventory)), player.Eye, player.Health,
+            shrapnel: ShrapnelFor(held, player.Health));
         return true;
     }
 
@@ -191,7 +235,18 @@ internal sealed class LeftClickAction
     internal int SliceFor(PlayerContext player, bool returnSwing)
     {
         if (!IsPlaying) return 0;
-        return ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(player.Inventory), returnSwing);
+        return ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(player.Inventory), returnSwing, player.Health, GearDamage(player.Inventory));
+    }
+
+    /// <summary>
+    /// Lands one of <paramref name="player"/>'s sword swings (<see cref="SwordSwings"/>: the cut and
+    /// back cut on the nearest few mobs in the forward hemisphere, the chop on the one under the
+    /// aim), each with a clear line of sight. Returns how many were struck.
+    /// </summary>
+    internal int SwordFor(PlayerContext player, SwordSwing swing)
+    {
+        if (!IsPlaying) return 0;
+        return ApplySwordDamage(player.Eye, player.ViewDirection, HeldItem(player.Inventory), swing, player.Health, GearDamage(player.Inventory));
     }
 
     /// <summary>
@@ -206,21 +261,31 @@ internal sealed class LeftClickAction
     /// (wrong kind, or below its required tier) takes 0 damage and shows no progress, though the
     /// swing still plays. A block of hardness 0 breaks on first contact. Damage is discarded when
     /// the target, the held tool or the button changes. A click with no block under the
-    /// crosshair still swings the fist. Creative instamines and ignores the gate.
+    /// crosshair still swings the fist. Creative instamines and ignores the gate, but an
+    /// unbreakable block never breaks (survival hits on it whiff with no progress).
     /// Call after Update so the selection is current. Does nothing unless the world is playing:
     /// nothing may edit an unloaded world.
     /// </summary>
     internal void UpdateBlockBreaking(double deltaTime, bool isHolding)
     {
         if (!IsPlaying) return;
+        // A downed player lands nothing: a swing already in flight (or buffered) is abandoned, not just new presses
+        if (Camera.IsDead)
+        {
+            ResetCombos();
+            StopBreaking();
+            _attackWasPressed = false;
+            return;
+        }
         var justPressed = isHolding && !_attackWasPressed;
         _attackWasPressed = isHolding;
+        _anvilCooldown = MathF.Max(0f, _anvilCooldown - (float)deltaTime);
 
         var held = HeldItem();
         var player = LocalPlayer.LocalContext();
 
-        // A slice weapon owns the left-click outright: every press swings the blade (and buffers
-        // the return while one plays), so it never mines.
+        // A blade owns the left-click outright: every press swings it (and buffers the next swing
+        // while one plays), so it never mines.
         if (held is { Attack: AttackPattern.Slice })
         {
             Camera.NotifyPlayerAction();
@@ -228,16 +293,22 @@ internal sealed class LeftClickAction
             StopBreaking();
             return;
         }
+        if (held is { Attack: AttackPattern.Sword })
+        {
+            Camera.NotifyPlayerAction();
+            UpdateSword(justPressed, (float)deltaTime, player);
+            StopBreaking();
+            return;
+        }
 
-        // Switching away from a slice weapon abandons any in-flight combo; its animation still
-        // finishes, it just no longer lands a hit.
-        _sliceCombo.Reset();
-        _sliceImpactDone = false;
+        // Switching away from a blade abandons any in-flight combo; its animation still finishes,
+        // it just no longer lands a hit.
+        ResetCombos();
 
+        _punchTimer += (float)deltaTime;
         if (!isHolding)
         {
             StopBreaking();
-            _punchTimer = float.PositiveInfinity;
             _creativeBreakTimer = float.PositiveInfinity;
             return;
         }
@@ -247,7 +318,7 @@ internal sealed class LeftClickAction
 
         // Attack-first: while a mob is in the punch cone it owns the swing, so no block is
         // mined through it (including while the punch itself is on cooldown).
-        if (UpdatePunch(deltaTime, player))
+        if (UpdatePunch(player))
         {
             StopBreaking();
             return;
@@ -267,21 +338,29 @@ internal sealed class LeftClickAction
             return;
         }
 
+        // A smithing hammer on an anvil works what lies on it instead of mining the anvil
+        if (Mining.IsHammer(held) && BlockType.ById[Edits.BlockIdAt(_selectedBlockPosition)]?.Anvil != null)
+        {
+            StopBreaking();
+            UpdateAnvilHammer(held!, player);
+            return;
+        }
+
         if (Camera.IsCreative)
         {
             StopBreaking();
-            // A connected client mines at a pace the server's edit rate accepts; singleplayer
-            // keeps taking one block a frame
-            if (_clientMode)
-            {
-                _creativeBreakTimer += (float)deltaTime;
-                if (_creativeBreakTimer < NetworkConfig.ClientCreativeBreakSeconds)
-                    return;
-                _creativeBreakTimer = 0f;
-            }
+            // The press breaks at once; holding repeats only after a delay, so a tap never
+            // takes the block behind the target too (this also keeps a client under the edit rate)
+            _creativeBreakTimer += (float)deltaTime;
+            if (_creativeBreakTimer < PlayerConfig.CreativeBreakRepeatSeconds)
+                return;
+            _creativeBreakTimer = 0f;
+            var creativeTarget = Edits.BlockIdAt(_selectedBlockPosition);
             LocalPlayer.PunchSwing();
-            PlayHitSfx(Edits.BlockIdAt(_selectedBlockPosition));
-            BreakMined(_selectedBlockPosition, player);
+            PlayHitSfx(creativeTarget);
+            // Creative swings at an unbreakable block like at any other, but it never breaks
+            if (!BlockType.IsUnbreakable(creativeTarget))
+                BreakMined(_selectedBlockPosition, player);
             return;
         }
 
@@ -292,20 +371,27 @@ internal sealed class LeftClickAction
         if (!_isBreaking || _selectedBlockPosition != _breakingBlockPosition || heldId != _breakingHeldId)
         {
             _isBreaking = true;
+            _breakFace = SideFaceOf(_selectedFaceNormal);
             _breakingBlockPosition = _selectedBlockPosition;
             _breakingBlockId = Edits.BlockIdAt(_selectedBlockPosition);
             _breakingHeldId = heldId;
             // Tree wood's hardness follows its thickness, which lives in the state byte
-            _breakHardness = Mining.HardnessOf(_breakingBlockId, _chunkManager.GetStateGlobal(
-                (int)_selectedBlockPosition.X, (int)_selectedBlockPosition.Y, (int)_selectedBlockPosition.Z));
+            _breakState = _chunkManager.GetStateGlobal(
+                (int)_selectedBlockPosition.X, (int)_selectedBlockPosition.Y, (int)_selectedBlockPosition.Z);
+            _breakHardness = Mining.HardnessOf(_breakingBlockId, _breakState);
             _breakAllowed = Mining.CanMine(_breakingBlockId, held);
             _breakPower = Mining.BlockDamage(held);
-            _breakHitSeconds = Mining.HitGapSeconds(held);
-            _breakDamage = 0f;
-            // Seed the timer a whole interval in so the loop below lands the first hit this
-            // frame: a tap then counts as one hit instead of being released before the gap
-            // it would have to survive.
-            _hitTimer = _breakHitSeconds;
+            _breakHitSeconds = Mining.HitGapSeconds(held,
+                (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
+            // A natural tree's wood keeps the damage it took (only here: a connected client's server counts
+            // its own break from zero, and a placed log never keeps any)
+            _breakNatural = !_clientMode && BlockType.IsTreeWood(_breakingBlockId) && !WoodState.IsDetached(_breakState);
+            _breakDamage = _breakNatural && _chunkManager.ChopDamage.TryGet((int)_selectedBlockPosition.X,
+                (int)_selectedBlockPosition.Y, (int)_selectedBlockPosition.Z, out var kept) ? kept.Damage : 0f;
+            // Seed the timer with the time since the last swing, up to a whole interval: after a pause the
+            // loop below lands the first hit this frame (a tap counts as one hit), but a press right after
+            // a swing waits out what is left of the pace instead of restarting it.
+            _hitTimer = MathF.Min(_breakHitSeconds, _punchTimer);
             _popElapsed = BlockPopSeconds;
             // A connected client: the server starts its own count of this break here, and judges
             // the completion against it (BreakProgress)
@@ -332,11 +418,26 @@ internal sealed class LeftClickAction
         _hitTimer += (float)deltaTime;
         _popElapsed += (float)deltaTime;
 
+        // An axe winds up ahead of the hit: its chop starts early enough that the blade reaches the block
+        // as the hit lands (the first hit of a break lands at once, so it chops a beat late)
+        if (_breakAllowed && !_chopStarted && Mining.IsAxe(held) && _hitTimer < _breakHitSeconds)
+        {
+            var chopSeconds = LocalPlayer.AxeChopSeconds(_breakHitSeconds);
+            var lead = chopSeconds * PlayerModel.SwordImpactProgress(SwordSwing.AxeChop);
+            if (_hitTimer >= _breakHitSeconds - lead)
+            {
+                Player.StartAxeChop(chopSeconds);
+                _chopStarted = true;
+            }
+        }
+
         // A long frame can carry more than one hit; the leftover time rolls into the next
         while (_hitTimer >= _breakHitSeconds)
         {
             _hitTimer -= _breakHitSeconds;
-            LocalPlayer.PunchSwing();
+            _punchTimer = _hitTimer;
+            LocalPlayer.PunchSwing(_chopStarted);
+            _chopStarted = false;
             PlayHitSfx(_breakingBlockId);
 
             // Start the pop from where the hit actually landed inside this frame, not from
@@ -350,7 +451,16 @@ internal sealed class LeftClickAction
 
             _breakDamage += _breakPower;
 
-            if (_breakDamage < _breakHardness)
+            var breaks = _breakDamage >= _breakHardness;
+            if (BlockType.IsTreeWood(_breakingBlockId) && !breaks)
+            {
+                ShudderCanopy(_breakingBlockPosition);
+                if (_breakNatural) RecordChop();
+            }
+            var kick = BreakKick.Strength(_breakHardness, breaks);
+            if (kick > 0f) Camera.AddHitKick(Vector3.Zero, kick);
+
+            if (!breaks)
             {
                 _debris.Burst(_breakingBlockPosition, _breakingBlockId, ParticleConfig.BlockDebrisPerHit,
                     columns: _chunkManager.ColumnSource);
@@ -363,6 +473,48 @@ internal sealed class LeftClickAction
         }
     }
 
+    // Seconds until the next hammer hit may land: the hammer's own gap, counted down whether or not the button is
+    // held, so releasing and pressing again never skips it
+    private float _anvilCooldown;
+
+    /// <summary>
+    /// One hammer hit on the aimed anvil, while the button is held: the first lands at once, the next after the
+    /// hammer's own gap (<see cref="Mining.HitGapSeconds(Item, float)"/>, a smithing hammer's is a couple of seconds, so
+    /// there is no spamming). A hit with nothing on the anvil does nothing. A connected client only predicts it
+    /// (the swing, sound and chips, from the anvil it mirrors) and raises <see cref="NetIntentKind.Hammer"/>; the
+    /// server judges the gap itself and its snapshot carries the result.
+    /// </summary>
+    private void UpdateAnvilHammer(Item held, PlayerContext player)
+    {
+        if (_anvilCooldown > 0f) return;
+
+        var cell = _selectedBlockPosition;
+        var gap = Mining.HitGapSeconds(held,
+            (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
+        if (_clientMode)
+        {
+            _world.Interactions.TryTrackAnvilAt(cell);
+            if (_world.Smithing.Anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z) is not { HasPiece: true })
+                return;
+        }
+        else if (_world.HammerFor(cell, gap, 0f).Kind == AnvilHitKind.Refused)
+        {
+            return;
+        }
+
+        _anvilCooldown = gap;
+        Camera.NotifyPlayerAction();
+        LocalPlayer.PunchSwing();
+        var anvilId = Edits.BlockIdAt(cell);
+        PlayHitSfx(anvilId);
+        _debris.Burst(cell, anvilId, ParticleConfig.BlockDebrisPerHit, columns: _chunkManager.ColumnSource);
+        Camera.AddHitKick(Vector3.Zero, BreakKick.Strength(AnvilKickHardness, false));
+        _world.RaiseIntent(WorldIntent.Hammer(Camera.Position, _selectedAimDirection, cell));
+    }
+
+    // The hardness the camera kick of a hammer blow is sized as: a solid knock, like mining stone
+    private const float AnvilKickHardness = 5f;
+
     /// <summary>
     /// Breaks a block the local player's mining finished. On a connected client the break is only
     /// a prediction: the completion goes out as an intent, and the server breaks the block only
@@ -370,13 +522,57 @@ internal sealed class LeftClickAction
     /// </summary>
     private void BreakMined(Vector3 cell, PlayerContext player)
     {
+        // Mining a block discovers it (the look label's "Unknown"), whether or not its drop is picked up
+        var mined = Edits.BlockIdAt(cell);
         Edits.RemoveBlock(cell, player);
+        if (Edits.BlockIdAt(cell) == 0) player.Inventory.MarkKnown(mined);
         _world.RaiseIntent(WorldIntent.BreakComplete(Camera.Position, _selectedAimDirection, cell));
+    }
+
+    // The engine side face (0 -Z, 1 +Z, 2 -X, 3 +X) a horizontal normal points out of, or -1 for a vertical one
+    private static int SideFaceOf(Vector3 normal)
+    {
+        if (normal.Z < -0.5f) return 0;
+        if (normal.Z > 0.5f) return 1;
+        if (normal.X < -0.5f) return 2;
+        return normal.X > 0.5f ? 3 : -1;
+    }
+
+    /// <summary>
+    /// Keeps the damage so far on the natural trunk cell being chopped for good (<see cref="WoodDamage"/>) and
+    /// remeshes its chunk when the slit in its face got deeper (<see cref="WoodDamage.BiteDepthPx"/>). The bite is
+    /// on the side face the first hit landed on; a hit on a top or bottom face shows none.
+    /// </summary>
+    private void RecordChop()
+    {
+        var cell = _breakingBlockPosition;
+        int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
+        var damage = _chunkManager.ChopDamage;
+        var before = ShownDepth(damage, x, y, z);
+        damage.Set(x, y, z, _breakDamage, _breakFace < 0 ? WoodDamage.NoFace : _breakFace);
+        if (WoodState.IsFullCube(_breakState) && ShownDepth(damage, x, y, z) != before)
+            _chunkManager.ImmediateRemesh(VoxelCoords.ChunkPosOf(cell));
+    }
+
+    // How deep the slit of the cell's stored damage is (0 with no damage or no side face)
+    private int ShownDepth(WoodDamage damage, int x, int y, int z) =>
+        damage.TryGet(x, y, z, out var entry) && entry.Face != WoodDamage.NoFace
+            ? WoodDamage.BiteDepthPx(entry.Damage, _breakHardness) : 0;
+
+    /// <summary>A hit on tree wood shakes some of the canopy above and around it loose.</summary>
+    private void ShudderCanopy(Vector3 woodCell)
+    {
+        TreeShudder.Gather(woodCell, (x, y, z) => TreeGenerator.IsLeaf(_chunkManager.GetBlockGlobal(x, y, z)),
+            _shudderCells, ParticleConfig.TreeShudderCells, ParticleConfig.TreeShudderReachBlocks,
+            ParticleConfig.TreeShudderHeightBlocks);
+        _leaves.BurstCells(_shudderCells, ParticleConfig.TreeShudderCells * ParticleConfig.TreeShudderLeavesPerCell);
     }
 
     private void StopBreaking()
     {
         _isBreaking = false;
+        _breakNatural = false;
+        _chopStarted = false;
         _breakDamage = 0f;
         _breakHardness = 0f;
         _breakAllowed = false;
@@ -387,6 +583,13 @@ internal sealed class LeftClickAction
 
     /// <summary>The item in hand, or null when the selected slot holds nothing.</summary>
     private Item? HeldItem() => HeldItem(Inventory);
+
+    // The damage multiplier of the gear a player wears (1 when nothing changes it)
+    private static float GearDamage(Inventory inventory) => inventory.Equipment.Stats.DamageFactor;
+
+    // The bone shrapnel a landed strike with this item sprays for the striker's worn gear
+    private static ShrapnelProfile ShrapnelFor(Item? held, PlayerHealth? striker) =>
+        ShrapnelProfile.Resolve(held, striker?.Gear?.Has(GearAbility.BoneShrapnel) == true);
 
     /// <summary>The item in <paramref name="inventory"/>'s selected slot, or null when it holds nothing.</summary>
     private static Item? HeldItem(Inventory inventory) => inventory.HeldItem;
@@ -400,11 +603,11 @@ internal sealed class LeftClickAction
     /// swings on the same pace, so left-clicking the sky plays the animation. A connected client
     /// never damages a mob itself: it sends the punch, and the server lands it on its own mobs.
     /// </summary>
-    private bool UpdatePunch(double deltaTime, PlayerContext player)
+    private bool UpdatePunch(PlayerContext player)
     {
         var held = HeldItem();
-        _punchGap = Mining.HitGapSeconds(held);
-        _punchTimer += (float)deltaTime;
+        _punchGap = Mining.HitGapSeconds(held,
+            (Camera.Effects?.AttackFactor ?? 1f) * player.Inventory.Equipment.Stats.AttackSpeedFactor);
 
         if (TryFindPunchTarget(player.Eye, player.ViewDirection, out var target))
         {
@@ -420,7 +623,8 @@ internal sealed class LeftClickAction
                 Strikes.SpawnHitSparks(target, player.Eye);
             }
             else
-                Strikes.StrikeMob(target, Combat.PunchDamage(held), player.Eye);
+                Strikes.StrikeMob(target, Combat.PunchDamage(held, GearDamage(player.Inventory)), player.Eye, player.Health,
+                    shrapnel: ShrapnelFor(held, player.Health));
             // The punch connected, so the swing holds at full extension for a beat (cosmetic: the
             // punch timer above keeps the pace). A client only predicts the connect - a mob was in
             // the cone with a clear line when the swing landed - since the server's verdict comes
@@ -454,9 +658,10 @@ internal sealed class LeftClickAction
 
         foreach (var mob in _mobs)
         {
-            if (!Combat.InPunchCone(origin, direction, mob.Position, out var distance))
+            if (mob.AimPointFrom(origin) is not { } aim) continue;
+            if (!Combat.InPunchCone(origin, direction, aim, out var distance))
                 continue;
-            if (BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
+            if (BlockRaycaster.SegmentHitsBlock(origin, aim, _chunkManager))
                 continue;
             if (!(distance < bestDistance)) continue;
             bestDistance = distance;
@@ -483,6 +688,7 @@ internal sealed class LeftClickAction
         if (justPressed && _sliceCombo.Press())
         {
             Player.StartSlice(_sliceCombo.Direction);
+            _sfx?.Play(SfxLibrary.SwooshGroup);
             _sliceImpactDone = false;
         }
 
@@ -493,24 +699,9 @@ internal sealed class LeftClickAction
         {
             _sliceImpactDone = true;
             var returnSwing = _sliceCombo.ReturnSwing;
-            bool connected;
-            if (_clientMode)
-            {
-                _world.RaiseIntent(WorldIntent.AttackWith(player.Eye, player.ViewDirection,
-                    returnSwing ? NetAttackKind.SliceReturn : NetAttackKind.Slice));
-                // Predicted, like the punch's: the server lands the swing on its own mobs
-                connected = HasSliceTarget(player.Eye, player.ViewDirection, out var predicted);
-                if (predicted != null) Strikes.SpawnHitSparks(predicted, player.Eye);
-            }
-            else
-            {
-                connected = ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(), returnSwing) > 0;
-            }
-            // A connecting swing holds at the impact; it still ends on time, so the combo's next
-            // swing is never delayed
-            if (connected)
-                Player.HitStop(SwingHitStop.SecondsFor(0f));
-                _hitMarker.Show();
+            LandSwing(player, returnSwing ? NetAttackKind.SliceReturn : NetAttackKind.Slice,
+                Combat.SliceDamage(HeldItem(), returnSwing, GearDamage(player.Inventory)), Combat.SliceTargets, cone: false,
+                MobConfig.SlimePunchShoveSpeed, hitStopWeight: 0f);
         }
 
         if (Player.IsSlicing)
@@ -518,7 +709,84 @@ internal sealed class LeftClickAction
 
         if (!_sliceCombo.Advance()) return;
         Player.StartSlice(_sliceCombo.Direction);
+        _sfx?.Play(SfxLibrary.SwooshGroup);
         _sliceImpactDone = false;
+    }
+
+    /// <summary>
+    /// Advances the sword's chain against the player's clicks (<see cref="SwordCombo"/>): a press
+    /// starts the cut, or the next swing of the chain while the window after the last one is open; a
+    /// press while a swing plays buffers the next. Damage lands once per swing at its impact frame
+    /// (<see cref="PlayerModel.SwordImpactProgress"/>) with that swing's reach, power and shove
+    /// (<see cref="SwordSwings"/>); a connected client sends the swing to the server instead of
+    /// striking anything itself. The swing animation lives in <see cref="PlayerModel"/>.
+    /// </summary>
+    private void UpdateSword(bool justPressed, float deltaTime, PlayerContext player)
+    {
+        _swordCombo.Update(deltaTime);
+        if (justPressed && _swordCombo.Press())
+        {
+            Player.StartSword(_swordCombo.Swing);
+            _sfx?.Play(SfxLibrary.SwooshGroup);
+            _swordImpactDone = false;
+        }
+
+        if (!_swordCombo.Active)
+            return;
+
+        var swing = _swordCombo.Swing;
+        if (!_swordImpactDone && Player.SwordProgress >= PlayerModel.SwordImpactProgress(swing))
+        {
+            _swordImpactDone = true;
+            LandSwing(player, NetAttacks.OfSword(swing), Combat.SwordDamage(HeldItem(), swing, GearDamage(player.Inventory)),
+                SwordSwings.MaxTargets(swing), SwordSwings.IsCone(swing),
+                MobConfig.SlimePunchShoveSpeed * SwordSwings.ShoveFactor(swing), SwordSwings.HitStopWeight(swing));
+        }
+
+        if (Player.IsSwordSwinging)
+            return;
+
+        if (!_swordCombo.Advance()) return;
+        Player.StartSword(_swordCombo.Swing);
+        _sfx?.Play(SfxLibrary.SwooshGroup);
+        _swordImpactDone = false;
+    }
+
+    private void ResetCombos()
+    {
+        _sliceCombo.Reset();
+        _sliceImpactDone = false;
+        _swordCombo.Reset();
+        _swordImpactDone = false;
+    }
+
+    /// <summary>
+    /// A blade swing reached its impact frame: lands it on the mobs it reaches, or, on a connected
+    /// client, sends it as <paramref name="kind"/> and predicts the connect (a mob in reach with a clear
+    /// line, since the server's verdict comes back far too late for a freeze that has to start with the
+    /// swing) with its hit sparks. A connecting swing holds at the impact for the hit-stop of
+    /// <paramref name="hitStopWeight"/> and flashes the hit marker; it still ends on time, so the combo's
+    /// next swing is never delayed.
+    /// </summary>
+    private void LandSwing(PlayerContext player, NetAttackKind kind, int damage, int maxTargets, bool cone,
+        float shoveSpeed, float hitStopWeight)
+    {
+        bool connected;
+        if (_clientMode)
+        {
+            _world.RaiseIntent(WorldIntent.AttackWith(player.Eye, player.ViewDirection, kind));
+            connected = HasBladeTarget(player.Eye, player.ViewDirection, cone, out var predicted);
+            if (predicted != null) Strikes.SpawnHitSparks(predicted, player.Eye);
+        }
+        else
+        {
+            connected = StrikeNearest(player.Eye, player.ViewDirection, damage, maxTargets, cone, shoveSpeed, player.Health,
+                ShrapnelFor(HeldItem(), player.Health), HeldItem()) > 0;
+        }
+
+        if (!connected) return;
+        Player.HitStop(SwingHitStop.SecondsFor(hitStopWeight));
+        _hitMarker.Show();
     }
 
     /// <summary>
@@ -527,73 +795,70 @@ internal sealed class LeftClickAction
     /// unobstructed line of sight each take the swing's damage and a knockback shove. The return
     /// swing is at half power (<paramref name="returnSwing"/>). Returns how many were struck.
     /// </summary>
-    private int ApplySliceDamage(Vector3 origin, Vector3 direction, Item? held, bool returnSwing)
+    private int ApplySliceDamage(Vector3 origin, Vector3 direction, Item? held, bool returnSwing, PlayerHealth? striker,
+        float damageFactor = 1f) =>
+        StrikeNearest(origin, direction, Combat.SliceDamage(held, returnSwing, damageFactor), Combat.SliceTargets, cone: false,
+            MobConfig.SlimePunchShoveSpeed, striker, ShrapnelFor(held, striker), held);
+
+    /// <summary>
+    /// Lands one sword swing from <paramref name="origin"/> along <paramref name="direction"/> with
+    /// <paramref name="held"/>: the nearest mobs the swing reaches (<see cref="SwordSwings"/>) with an
+    /// unobstructed line of sight each take its damage and its shove. Returns how many were struck.
+    /// </summary>
+    private int ApplySwordDamage(Vector3 origin, Vector3 direction, Item? held, SwordSwing swing, PlayerHealth? striker,
+        float damageFactor = 1f) =>
+        StrikeNearest(origin, direction, Combat.SwordDamage(held, swing, damageFactor), SwordSwings.MaxTargets(swing),
+            SwordSwings.IsCone(swing), MobConfig.SlimePunchShoveSpeed * SwordSwings.ShoveFactor(swing), striker,
+            ShrapnelFor(held, striker), held);
+
+    /// <summary>
+    /// Strikes the nearest <paramref name="maxTargets"/> mobs a swing from <paramref name="origin"/> along
+    /// <paramref name="direction"/> reaches (the punch cone when <paramref name="cone"/>, else the forward
+    /// hemisphere; see <see cref="Combat"/>) with an unobstructed line of sight: each takes
+    /// <paramref name="damage"/> and a shove at <paramref name="shoveSpeed"/>, and a landed one sprays
+    /// <paramref name="shrapnel"/> and takes <paramref name="weapon"/>'s on-hit effect. Returns how many were struck.
+    /// </summary>
+    private int StrikeNearest(Vector3 origin, Vector3 direction, int damage, int maxTargets, bool cone,
+        float shoveSpeed, PlayerHealth? striker, ShrapnelProfile shrapnel, Item? weapon)
     {
-        var mobs = _mobs;
-        if (mobs.Count == 0)
-            return 0;
-
-        var damage = Combat.SliceDamage(held, returnSwing);
-
-        Mob? first = null;
-        Mob? second = null;
-        var firstDistance = float.PositiveInfinity;
-        var secondDistance = float.PositiveInfinity;
-
-        foreach (var mob in mobs)
-        {
-            if (!Combat.InFrontHemisphere(origin, direction, mob.Position, out var distance))
-                continue;
-            if (BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
-                continue;
-
-            // Keep the two closest, shifting the old nearest down when a closer one arrives.
-            if (distance < firstDistance)
-            {
-                second = first;
-                secondDistance = firstDistance;
-                first = mob;
-                firstDistance = distance;
-            }
-            else if (distance < secondDistance)
-            {
-                second = mob;
-                secondDistance = distance;
-            }
-        }
-
-        var struck = 0;
-        if (first != null)
-        {
-            Strikes.StrikeMob(first, damage, origin);
-            struck++;
-        }
-
-        if (second == null) return struck;
-        Strikes.StrikeMob(second, damage, origin);
-        struck++;
+        GatherReached(origin, direction, cone);
+        var struck = Math.Min(maxTargets, _strikeScratch.Count);
+        for (var i = 0; i < struck; i++)
+            Strikes.StrikeMob(_strikeScratch[i].Mob, damage, origin, striker, shoveSpeed, shrapnel, weapon);
         return struck;
     }
 
-    /// <summary>Whether a slice from <paramref name="origin"/> along <paramref name="direction"/> would
-    /// strike anything: some mob in the forward hemisphere with a clear line of sight, the targets
-    /// <see cref="ApplySliceDamage"/> picks from. <paramref name="first"/> is that mob (null when
+    /// <summary>Whether a blade swing from <paramref name="origin"/> along <paramref name="direction"/> would
+    /// strike anything: some mob it reaches (the punch cone when <paramref name="cone"/>, else the forward
+    /// hemisphere) with a clear line of sight. <paramref name="nearest"/> is the nearest such mob (null when
     /// nothing would be struck), which a client's predicted hit-sparks land on.</summary>
-    private bool HasSliceTarget(Vector3 origin, Vector3 direction, out Mob? first)
+    private bool HasBladeTarget(Vector3 origin, Vector3 direction, bool cone, out Mob? nearest)
     {
-        first = null;
+        GatherReached(origin, direction, cone);
+        nearest = _strikeScratch.Count > 0 ? _strikeScratch[0].Mob : null;
+        return nearest != null;
+    }
+
+    // Fills the scratch list with every mob the swing reaches with a clear line of sight, nearest first.
+    private void GatherReached(Vector3 origin, Vector3 direction, bool cone)
+    {
+        _strikeScratch.Clear();
         foreach (var mob in _mobs)
         {
-            if (!Combat.InFrontHemisphere(origin, direction, mob.Position, out _)
-                || BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager)) continue;
-            first = mob;
-            return true;
+            if (mob.AimPointFrom(origin) is not { } aim) continue;
+            var reached = cone
+                ? Combat.InPunchCone(origin, direction, aim, out var distance)
+                : Combat.InFrontHemisphere(origin, direction, aim, out distance);
+            if (!reached) continue;
+            if (BlockRaycaster.SegmentHitsBlock(origin, aim, _chunkManager))
+                continue;
+            _strikeScratch.Add((distance, mob));
         }
-        return false;
+        _strikeScratch.Sort(static (a, b) => a.Distance.CompareTo(b.Distance));
     }
 
     // One hit, one sound: an unknown or air id falls back to the default group, which is what
     // a block with no authored sfx plays too. A null manager (headless/tests) is silent.
-    private void PlayHitSfx(byte blockId) =>
+    private void PlayHitSfx(ushort blockId) =>
         _sfx?.Play(BlockType.ById[blockId]?.Sfx ?? SfxLibrary.DefaultGroup);
 }

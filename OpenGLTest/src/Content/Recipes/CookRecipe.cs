@@ -3,7 +3,7 @@ namespace VoxelEngine.Content.Recipes;
 /// <summary>One compiled campfire recipe: raw input, cooked result and seconds on the fire.</summary>
 public sealed class CookRecipe
 {
-    public CookRecipe(string name, byte inputId, byte resultId, int resultCount, float cookSeconds)
+    public CookRecipe(string name, ushort inputId, ushort resultId, int resultCount, float cookSeconds)
     {
         Name = name;
         InputId = inputId;
@@ -16,10 +16,10 @@ public sealed class CookRecipe
     public string Name { get; }
 
     /// <summary>Raw id that goes onto the campfire.</summary>
-    public byte InputId { get; }
+    public ushort InputId { get; }
 
     /// <summary>Cooked id it converts into.</summary>
-    public byte ResultId { get; }
+    public ushort ResultId { get; }
 
     /// <summary>How many of the result one cook makes.</summary>
     public int ResultCount { get; }

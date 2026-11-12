@@ -1,0 +1,39 @@
+{
+  "kind": "underground",
+  "weight": 1,
+  "groundLayer": 1,
+  "palette": {
+    "b": "cobblestone",
+    "C": "ruin_chest_underground"
+  },
+  "layers": [
+    [
+      "bbbbb",
+      "bbbbb",
+      "bbbbb",
+      "bbbbb",
+      "bbbbb"
+    ],
+    [
+      "bbbbb",
+      "b...b",
+      "b.C.b",
+      "b...b",
+      "bbbbb"
+    ],
+    [
+      "bbbbb",
+      "b...b",
+      "b...b",
+      "b...b",
+      "bbbbb"
+    ],
+    [
+      "bbbbb",
+      "bbbbb",
+      "bbbbb",
+      "bbbbb",
+      "bbbbb"
+    ]
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  // An axe head, drawn out of three refined vulcanite on the anvil; hafted in recipes/vulcanite_axe.json.
+  "metal": "item/refined_vulcanite",
+  "metalCount": 3,
+  "result": "item/vulcanite_axe_head",
+  "count": 1
+}

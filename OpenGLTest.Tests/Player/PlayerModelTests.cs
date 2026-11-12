@@ -1,8 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Interaction;
 using VoxelEngine.ItemDebugger;
 using VoxelEngine.Items;
 using VoxelEngine.Player;
+using VoxelEngine.Player.Posing;
 using Xunit;
 
 namespace VoxelEngine.Tests.Player;
@@ -589,6 +594,187 @@ public sealed class PlayerModelTests
         Assert.InRange(MathF.Abs(rest - strike), 0f, 0.1f);
     }
 
+    // ---- the sword ----
+
+    private static PlayerModel Swordsman(SwordSwing swing, out Vector3 eye)
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+        eye = new Vector3(0.5f, 70f, 0.5f);
+        player.StartSword(swing);
+        return player;
+    }
+
+    // Steps a sword swing to a progress (its own duration, not the slice's) at frame rate, as the game does, so the
+    // springs that trail the pose (the shoulder pull) see the whole motion rather than one jump.
+    private static void SwordTo(PlayerModel player, float progress)
+    {
+        var duration = PlayerModel.SwordDuration(player.ActiveSwordSwing);
+        while (player.SwordProgress < progress)
+        {
+            var left = duration * (progress - player.SwordProgress);
+            player.Update(MathF.Min(1f / 60f, left), 0f);
+            if (left <= 1f / 60f) break;
+        }
+    }
+
+    private static Vector3 Hand(PlayerModel player, Vector3 eye) =>
+        Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f));
+
+    [Fact]
+    public void EverySwordSwingFinishesAfterItsOwnDurationAndTheFinisherIsTheSlowest()
+    {
+        foreach (var swing in SwordSwings.All)
+        {
+            var player = new PlayerModel();
+            player.StartSword(swing);
+            Assert.True(player.IsSwordSwinging);
+            Assert.Equal(swing, player.ActiveSwordSwing);
+            Assert.Equal(0f, player.SwordProgress, 3);
+
+            var duration = PlayerModel.SwordDuration(swing);
+            player.Update(duration * 0.9f, 0f);
+            Assert.True(player.IsSwordSwinging);
+            player.Update(duration * 0.1f + 1e-3f, 0f);
+            Assert.False(player.IsSwordSwinging);
+            Assert.Equal(1f, player.SwordProgress, 3);
+            // The damage lands inside the swing, after the wind-up
+            Assert.InRange(PlayerModel.SwordImpactProgress(swing), 0.2f, 0.8f);
+        }
+
+        // The chain's pacing: the quick follow-up, the opener, then the heavy finisher
+        Assert.True(PlayerModel.SwordDuration(SwordSwing.BackCut) < PlayerModel.SwordDuration(SwordSwing.Cut));
+        Assert.True(PlayerModel.SwordDuration(SwordSwing.Cut) < PlayerModel.SwordDuration(SwordSwing.Chop));
+        Assert.Equal(PlayerModel.SwordDuration(SwordSwing.BackCut), PlayerModel.ShortestSwordSwingSeconds);
+    }
+
+    [Fact]
+    public void TheCutComesDownFromHighOnTheRightToLowOnTheLeft()
+    {
+        var player = Swordsman(SwordSwing.Cut, out var eye);
+        var rest = Hand(player, eye);
+
+        SwordTo(player, 0.32f);
+        var wound = Hand(player, eye);
+        SwordTo(player, 0.52f);
+        var struck = Hand(player, eye);
+        SwordTo(player, 1f);
+        var settled = Hand(player, eye);
+
+        // Wound up out to the right and above the shoulder, struck through to the left and well below it
+        Assert.True(wound.X > eye.X, $"wound {wound}");
+        Assert.True(struck.X < eye.X, $"struck {struck}");
+        Assert.True(wound.Y > struck.Y + 0.6f, $"wound {wound} struck {struck}");
+        Assert.True(wound.Y > eye.Y - 0.2f, $"the wind-up is not raised: {wound}");
+        Assert.True(struck.Y < eye.Y - 0.6f, $"the cut does not end low: {struck}");
+        // No teleport: the swing ends at the pose it started from
+        Assert.True(Vector3.Distance(settled, rest) < 0.05f);
+    }
+
+    [Fact]
+    public void TheBackCutRisesFromLowOnTheLeftToHighOnTheRight()
+    {
+        var player = Swordsman(SwordSwing.BackCut, out var eye);
+
+        SwordTo(player, 0.28f);
+        var wound = Hand(player, eye);
+        SwordTo(player, 0.48f);
+        var struck = Hand(player, eye);
+
+        Assert.True(wound.X < eye.X, $"wound {wound}");
+        Assert.True(struck.X > eye.X, $"struck {struck}");
+        Assert.True(struck.Y > wound.Y + 0.6f, $"wound {wound} struck {struck}");
+    }
+
+    [Fact]
+    public void TheChopRaisesTheBladeOverheadAndBringsItStraightDownTheMiddle()
+    {
+        TestContent.EnsureLoaded();
+        var item = ItemRegistry.TryGet(ContentRegistry.RequireItem("iron_sword").Id)!;
+        var player = Swordsman(SwordSwing.Chop, out var eye);
+
+        SwordTo(player, 0.42f);
+        var wound = Hand(player, eye);
+        SwordTo(player, 0.56f);
+        var struck = Hand(player, eye);
+        var blade = item.DisplayMatrix(player.HeldItemRotationOffset) * player.GetHandAnchorMatrix(eye, -90f);
+        var tip = Vector3.Normalize(Vector3.TransformNormal(new Vector3(1, 1, 0), blade));
+
+        // The hand goes over the head and comes down in front, never swinging out to a side
+        Assert.True(wound.Y > eye.Y, $"the wind-up is not overhead: {wound}");
+        Assert.True(struck.Y < eye.Y - 0.5f, $"the chop does not come down: {struck}");
+        Assert.True(MathF.Abs(wound.X - eye.X) < 0.4f && MathF.Abs(struck.X - eye.X) < 0.4f, $"the chop swings sideways: {wound} {struck}");
+        Assert.True(struck.Z < eye.Z - 0.3f, $"the blow does not land in front: {struck}");
+        // At the bottom of the blow the blade points down and forward, not up or across
+        Assert.True(tip.Y < -0.3f, $"the blade is not pointed down at the end of the chop ({tip})");
+        Assert.True(MathF.Abs(tip.X) < 0.5f, $"the blade is turned across at the end of the chop ({tip})");
+    }
+
+    [Fact]
+    public void TheChopSinksTheBodyDeeperAndFoldsItFurtherForwardThanACut()
+    {
+        // The deepest the knees bend and the furthest the torso leans forward over a whole swing (knees bend
+        // backward, negative; a forward lean is a negative torso pitch).
+        (float Knee, float Torso) Deepest(SwordSwing swing)
+        {
+            var player = Swordsman(swing, out _);
+            var knee = float.PositiveInfinity;
+            var torso = float.PositiveInfinity;
+            for (var progress = 0.02f; progress < 1f; progress += 0.02f)
+            {
+                SwordTo(player, progress);
+                var pose = player.GetPose();
+                knee = MathF.Min(knee, pose.LeftKnee);
+                torso = MathF.Min(torso, pose.TorsoPitch);
+            }
+            return (knee, torso);
+        }
+
+        var restPlayer = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++) restPlayer.Update(1f / 60f, 0f);
+        var rest = restPlayer.GetPose();
+        var cut = Deepest(SwordSwing.Cut);
+        var chop = Deepest(SwordSwing.Chop);
+
+        Assert.True(cut.Knee < rest.LeftKnee - 0.1f, $"the cut never sinks ({cut.Knee} vs {rest.LeftKnee})");
+        Assert.True(chop.Knee < cut.Knee - 0.05f, $"the chop sinks no deeper than the cut ({chop.Knee} vs {cut.Knee})");
+        Assert.True(chop.Torso < cut.Torso - 0.1f, $"the chop folds no further than the cut ({chop.Torso} vs {cut.Torso})");
+        Assert.True(chop.Torso < rest.TorsoPitch - 0.3f, $"the chop barely folds ({chop.Torso} vs {rest.TorsoPitch})");
+    }
+
+    [Fact]
+    public void EverySwordSwingKeepsTheShoulderOnTheTorso()
+    {
+        foreach (var swing in SwordSwings.All)
+        {
+            var player = Swordsman(swing, out var eye);
+            float ShoulderToTorso() => Vector3.Distance(
+                player.GetPartMatrix("UpperArmR", eye, -90f, 0f).Translation,
+                player.GetPartMatrix("Torso", eye, -90f, 0f).Translation);
+            var rest = ShoulderToTorso();
+            for (var progress = 0.1f; progress < 1f; progress += 0.1f)
+            {
+                SwordTo(player, progress);
+                Assert.InRange(MathF.Abs(rest - ShoulderToTorso()), 0f, 0.12f);
+            }
+        }
+    }
+
+    [Fact]
+    public void OneBladeSwingAtATime()
+    {
+        var player = new PlayerModel();
+        player.StartSlice(1);
+        player.StartSword(SwordSwing.Cut);
+        Assert.True(player.IsSwordSwinging);
+        Assert.False(player.IsSlicing);
+
+        player.StartSlice(-1);
+        Assert.True(player.IsSlicing);
+        Assert.False(player.IsSwordSwinging);
+    }
+
     // World positions with the body at the origin facing -Z (the default look), +X its right.
     private static Vector3 PartOrigin(PlayerModel player, string part) =>
         Vector3.Transform(Vector3.Zero, player.GetPartMatrix(part, new Vector3(0.5f, 70f, 0.5f), -90f, 0f));
@@ -709,5 +895,239 @@ public sealed class PlayerModelTests
         Assert.True(player.IsThrowing);
         Assert.Equal(cocked, player.GetPose().RightShoulder, 4);
         Assert.True(player.GetPose().RightShoulder > rest + 0.5f);
+    }
+
+    [Theory]
+    [InlineData(0.25f)]
+    [InlineData(0.6f)]
+    public void AnAxeChopLastsExactlyTheSecondsItWasGivenAndLandsItsBlowInsideIt(float seconds)
+    {
+        var player = new PlayerModel();
+        player.StartAxeChop(seconds);
+        Assert.True(player.IsSwordSwinging);
+        Assert.Equal(SwordSwing.AxeChop, player.ActiveSwordSwing);
+
+        player.Update(seconds * 0.9f, 0f);
+        Assert.True(player.IsSwordSwinging);
+        player.Update(seconds * 0.1f + 1e-3f, 0f);
+        Assert.False(player.IsSwordSwinging);
+        Assert.InRange(PlayerModel.SwordImpactProgress(SwordSwing.AxeChop), 0.3f, 0.8f);
+    }
+
+    [Fact]
+    public void AnAxeChopSweepsFlatAcrossTheFrontFromTheRightToTheLeft()
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++) player.Update(1f / 60f, 0f);
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        player.StartAxeChop(0.4f);
+
+        var impact = PlayerModel.SwordImpactProgress(SwordSwing.AxeChop);
+        Vector3? wound = null, struck = null;
+        var highest = float.MinValue;
+        var lowest = float.MaxValue;
+        while (player.IsSwordSwinging)
+        {
+            player.Update(1f / 60f, 0f);
+            var hand = Hand(player, eye);
+            if (player.SwordProgress >= 0.3f && player.SwordProgress < impact)
+            {
+                // The hand at its furthest right before the blow
+                if (wound == null || hand.X > wound.Value.X) wound = hand;
+            }
+            if (player.SwordProgress >= impact && struck == null) struck = hand;
+            if (player.SwordProgress < impact + 0.1f)
+            {
+                highest = MathF.Max(highest, hand.Y);
+                lowest = MathF.Min(lowest, hand.Y);
+            }
+        }
+
+        // Wound out to the right, struck across to the left of the body: a swing from the side...
+        Assert.True(wound!.Value.X > eye.X, $"wound {wound}");
+        Assert.True(struck!.Value.X < wound.Value.X - 0.5f, $"wound {wound} struck {struck}");
+        // ...that stays at one height instead of going over the head
+        Assert.True(highest < eye.Y, $"the arm goes over the head: {highest}");
+        Assert.True(highest - lowest < 0.5f, $"the swing is not flat: {lowest}..{highest}");
+    }
+
+    // ---- the bow ----
+
+    private static PlayerModel Archer(float charge, out Vector3 eye)
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++) player.Update(1f / 60f, 0f);
+        eye = new Vector3(0.5f, 70f, 0.5f);
+        player.StartUseCharge(UsePose.Bow);
+        player.UpdateUseCharge(charge);
+        for (var i = 0; i < 120; i++) player.Update(1f / 60f, 0f);
+        return player;
+    }
+
+    private static Vector3 LeftHand(PlayerModel player, Vector3 eye) =>
+        Vector3.Transform(new Vector3(0f, player.HandDepth(), 0f), player.GetPartMatrix("ForearmL", eye, -90f, 0f));
+
+    [Fact]
+    public void TheBowDrawPullsTheStringHandBackAndTurnsTheShouldersMoreWithTheCharge()
+    {
+        var rest = Archer(0f, out var eye);
+        var half = Archer(0.5f, out _);
+        var full = Archer(1f, out _);
+
+        // The string hand comes up to the face as the draw rises
+        float ToHead(PlayerModel m) => Vector3.Distance(LeftHand(m, eye),
+            Vector3.Transform(Vector3.Zero, m.GetPartMatrix("Head", eye, -90f, 0f)));
+        Assert.True(ToHead(half) < ToHead(rest));
+        Assert.True(ToHead(full) < ToHead(half));
+        Assert.True(MathF.Abs(full.Bow.TorsoTwist()) > MathF.Abs(half.Bow.TorsoTwist()));
+        Assert.Equal(0f, rest.Bow.TorsoTwist(), 3);
+    }
+
+    [Fact]
+    public void ReleasingABowSnapsTheStringArmBackFirstThenSettlesTheBody()
+    {
+        var player = Archer(1f, out _);
+        player.CancelUseCharge();
+        Assert.True(player.BowReleaseProgress < 1f);
+
+        // Shortly after the let-go the string arm is already mostly gone while the body still shows the draw
+        player.Update(BowPose.ReleaseSeconds * BowPose.SnapShare, 0f);
+        Assert.True(player.Bow.DrawWeight() < 0.1f);
+        Assert.True(player.Bow.BodyWeight() > player.Bow.DrawWeight() + 0.2f);
+
+        player.Update(BowPose.ReleaseSeconds, 0f);
+        Assert.Equal(1f, player.BowReleaseProgress, 3);
+        Assert.Equal(0f, player.Bow.DrawWeight(), 3);
+        Assert.Equal(0f, player.Bow.BodyWeight(), 3);
+    }
+
+    [Fact]
+    public void ATapThatDrewNothingShowsNoRelease()
+    {
+        var player = new PlayerModel();
+        player.StartUseCharge(UsePose.Bow);
+        player.UpdateUseCharge(BowPose.MinReleaseCharge * 0.5f);
+        player.CancelUseCharge();
+        Assert.Equal(1f, player.BowReleaseProgress);
+    }
+
+    [Fact]
+    public void ARaisedUseIsNotABowDraw()
+    {
+        var player = new PlayerModel();
+        player.StartUseCharge();
+        player.UpdateUseCharge(1f);
+        player.Update(1f / 60f, 0f);
+        Assert.Equal(0f, player.Bow.DrawWeight());
+        Assert.Equal(0f, player.Bow.BodyWeight());
+        player.CancelUseCharge();
+        Assert.Equal(1f, player.BowReleaseProgress);
+    }
+
+    // ---- the staff cast ----
+
+    [Fact]
+    public void TheCastWeightIsZeroAtBothEndsAndItsTargetsAndLeanAreContinuous()
+    {
+        Assert.Equal(0f, CastMotion.Weight(0f), 4);
+        Assert.Equal(0f, CastMotion.Weight(1f), 4);
+        Assert.Equal(1f, CastMotion.Weight((CastMotion.RaiseEnd + CastMotion.ThrustEnd) * 0.5f), 4);
+        Assert.Equal(1f, CastMotion.Weight(CastMotion.ThrustEnd), 4);
+        Assert.Equal(0f, CastMotion.Lean(0f), 4);
+        Assert.Equal(0f, CastMotion.Lean(1f), 4);
+        // The thrust leans the body forward (negative pitch)
+        Assert.True(CastMotion.Lean(CastMotion.ThrustEnd) < 0f);
+
+        foreach (var curve in new Func<float, float>[] { CastMotion.Weight, CastMotion.Shoulder, CastMotion.Elbow, CastMotion.Lean })
+        {
+            const int steps = 400;
+            float min = float.MaxValue, max = float.MinValue, largestStep = 0f;
+            var previous = curve(0f);
+            for (var i = 0; i <= steps; i++)
+            {
+                var value = curve(i / (float)steps);
+                min = MathF.Min(min, value);
+                max = MathF.Max(max, value);
+                largestStep = MathF.Max(largestStep, MathF.Abs(value - previous));
+                previous = value;
+            }
+            Assert.True(max > min);
+            Assert.True(largestStep < (max - min) * 0.1f, $"a jump of {largestStep} over a range of {max - min}");
+        }
+    }
+
+    // Two settled carrying models: one casts, the other is the control stepped the same way, so the idle arm drift
+    // cancels out of every comparison.
+    private static (PlayerModel Caster, PlayerModel Control, Vector3 Eye) Casters()
+    {
+        var caster = new PlayerModel { HoldingItem = true };
+        var control = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+        {
+            caster.Update(1f / 60f, 0f);
+            control.Update(1f / 60f, 0f);
+        }
+        caster.Cast();
+        return (caster, control, new Vector3(0.5f, 70f, 0.5f));
+    }
+
+    // The cast's hand offset from the control's, sampled at fine steps over the whole cast and a margin after it.
+    private static List<(float Progress, Vector3 Offset)> CastOffsets(out bool castingAfter)
+    {
+        var (caster, control, eye) = Casters();
+        var samples = new List<(float, Vector3)> { (caster.CastProgress, Hand(caster, eye) - Hand(control, eye)) };
+        const int steps = 300;
+        var dt = PlayerModel.CastDuration / steps;
+        for (var i = 0; i < steps + 30; i++)
+        {
+            caster.Update(dt, 0f);
+            control.Update(dt, 0f);
+            samples.Add((caster.CastProgress, Hand(caster, eye) - Hand(control, eye)));
+        }
+        castingAfter = caster.IsCasting;
+        return samples;
+    }
+
+    [Fact]
+    public void ACastFinishesAfterItsDurationAndLeavesTheHandWhereItStarted()
+    {
+        var (caster, _, _) = Casters();
+        Assert.True(caster.IsCasting);
+        caster.Update(PlayerModel.CastDuration * 0.9f, 0f);
+        Assert.True(caster.IsCasting);
+
+        var samples = CastOffsets(out var castingAfter);
+        Assert.False(castingAfter);
+        Assert.True(samples[0].Offset.Length() < 1e-4f);
+        Assert.True(samples[^1].Offset.Length() < 1e-4f, $"the hand ends {samples[^1].Offset} off its rest");
+    }
+
+    [Fact]
+    public void ACastDoesNotSnapAtEitherEnd()
+    {
+        var samples = CastOffsets(out _);
+        var largest = 0f;
+        for (var i = 1; i < samples.Count; i++)
+            largest = MathF.Max(largest, Vector3.Distance(samples[i].Offset, samples[i - 1].Offset));
+        var first = Vector3.Distance(samples[1].Offset, samples[0].Offset);
+        var finished = samples.FindIndex(s => s.Progress >= 1f);
+        var last = Vector3.Distance(samples[finished].Offset, samples[finished - 1].Offset);
+        Assert.True(largest > 0f);
+        Assert.True(first < largest * 0.1f, $"first step {first}, largest {largest}");
+        Assert.True(last < largest * 0.1f, $"last step {last}, largest {largest}");
+    }
+
+    [Fact]
+    public void ACastRaisesTheHandThenItsForwardReachPeaksAtTheThrust()
+    {
+        var samples = CastOffsets(out _);
+        // The raise lifts the hand above its rest
+        var raised = samples.First(s => s.Progress >= CastMotion.RaiseEnd).Offset;
+        Assert.True(raised.Y > 0.2f, $"raised {raised}");
+
+        // The model faces -Z at yaw -90: the farthest forward the hand reaches is in the thrust, beyond its rest
+        var peak = samples.MinBy(s => s.Offset.Z);
+        Assert.InRange(peak.Progress, CastMotion.RaiseEnd, CastMotion.RecoilEnd);
+        Assert.True(peak.Offset.Z < -0.1f, $"peak {peak.Offset}");
     }
 }

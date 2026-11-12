@@ -1,0 +1,8 @@
+{
+  // The iron cap: bronze's ring count in wrought iron.
+  // Forged with a smithing hammer from wrought iron stacked on an anvil (see AnvilManager).
+  "metal": "item/wrought_iron",
+  "metalCount": 5,
+  "result": "item/iron_cap",
+  "count": 1
+}

@@ -5,6 +5,7 @@ using VoxelEngine.Saves;
 using VoxelEngine.UI;
 using VoxelEngine.UI.Menus;
 using static VoxelEngine.Rendering.Overlays.UIRenderer;
+using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
 
@@ -53,6 +54,25 @@ internal sealed class MenuRenderer
     }
 
     /// <summary>
+    /// The death screen over the still-rendered world: a red-dark dim, "YOU DIED", the death line
+    /// and one RESPAWN button. The geometry is <see cref="DeathScreenLayout"/>'s, which
+    /// <see cref="DeathScreenHitsRespawn"/> also reads.
+    /// </summary>
+    internal void DrawDeathScreen(string? deathLine)
+    {
+        var screen = _ui.ScreenSize;
+        _ui.DrawRect(screen * 0.5f, screen, new Rgba(70, 0, 0, 170));
+        _ui.DrawTextCentered("YOU DIED", screen.X * 0.5f, DeathScreenLayout.TitleTop(screen), _ui.HeadScale, Rgba.White);
+        if (!string.IsNullOrEmpty(deathLine))
+            _ui.DrawTextCentered(deathLine, screen.X * 0.5f, DeathScreenLayout.MessageTop(screen), _ui.CountScale, TextDim);
+        DrawMenuButton(DeathScreenLayout.ButtonCenter(screen), "RESPAWN");
+    }
+
+    /// <summary>Whether a window-pixel point (top-left origin) is on the death screen's RESPAWN button.</summary>
+    internal bool DeathScreenHitsRespawn(Vector2 point) =>
+        DeathScreenLayout.HitsRespawn(_ui.ToCanvas(point), _ui.ScreenSize);
+
+    /// <summary>
     /// The settings page: title, one tab strip (Display/Graphics/Water/Audio/Controls), the
     /// active tab's widget rows, BACK button. The busiest tab holds six rows, so the whole
     /// page fits without scrolling.
@@ -70,8 +90,8 @@ internal sealed class MenuRenderer
             var active = SettingsRows.Tabs[t] == view.Tab;
             _ui.DrawRect(center, size, active ? SelectedBackground : SlotBackground);
             if (active)
-                _ui.DrawBorder(center, size, SlotBorder, SelectedBorderColor);
-            _ui.DrawTextCentered(SettingsRows.Tabs[t], center.X, center.Y - 8f, _ui.CountScale, Rgba.White);
+                _ui.DrawBorder(center, size, Border.Standard, SelectedBorderColor);
+            _ui.DrawTextMiddle(SettingsRows.Tabs[t], center, _ui.CountScale, Rgba.White);
         }
 
         var rows = SettingsRows.RowsInTab(view.Tab);
@@ -79,8 +99,8 @@ internal sealed class MenuRenderer
         {
             var row = SettingsRows.All[rows[r]];
             var center = SettingsLayout.RowCenter(r, screen);
-            _ui.DrawText(_ui.FitText(row.Label, _ui.CountScale, SettingsLayout.LabelWidth - 16f),
-                new Vector2(left + 8f, center.Y - 8f), _ui.CountScale, Rgba.White);
+            _ui.DrawTextCenteredY(_ui.FitText(row.Label, _ui.CountScale, SettingsLayout.LabelWidth - 16f),
+                left + 8f, center.Y, _ui.CountScale, Rgba.White);
 
             switch (row)
             {
@@ -97,9 +117,8 @@ internal sealed class MenuRenderer
                     var value = ReferenceEquals(row, SettingsRows.GuiScaleRow)
                         ? UiCanvas.ScaleLabel(GameSettings.RequestedGuiScale, _ui.Scale)
                         : SettingsRows.FormatValue(row);
-                    _ui.DrawTextCentered($"< {value} >",
-                        SettingsLayout.TrackRect(r, screen).Center.X,
-                        center.Y - 8f, _ui.CountScale, Rgba.White);
+                    _ui.DrawTextMiddle($"< {value} >",
+                        new Vector2(SettingsLayout.TrackRect(r, screen).Center.X, center.Y), _ui.CountScale, Rgba.White);
                     break;
             }
         }
@@ -117,7 +136,7 @@ internal sealed class MenuRenderer
     private void DrawValueRight(float centerY, string text, Vector2 screen)
     {
         var w = _ui.TextWidth(text, _ui.CountScale);
-        _ui.DrawText(text, new Vector2(SettingsLayout.ValueRight(screen) - w, centerY - 8f),
+        _ui.DrawTextCenteredY(text, SettingsLayout.ValueRight(screen) - w, centerY,
             _ui.CountScale, TextDim);
     }
 
@@ -125,7 +144,7 @@ internal sealed class MenuRenderer
     {
         var size = new Vector2(SettingsLayout.ToggleSize);
         _ui.DrawRect(center, size, SlotBackground);
-        _ui.DrawBorder(center, size, SlotBorder, SlotBorderColor);
+        _ui.DrawBorder(center, size, Border.Standard, SlotBorderColor);
         if (on)
             _ui.DrawSquare(center, SettingsLayout.ToggleSize - 8f, AccentGold);
     }
@@ -152,12 +171,8 @@ internal sealed class MenuRenderer
         return PauseMenuLayout.HitAt(point, _ui.ScreenSize, view.Page);
     }
 
-    private void DrawMenuButton(Vector2 center, string label)
-    {
-        _ui.DrawRect(center, PauseMenuLayout.ButtonSize, SlotBackground);
-        _ui.DrawBorder(center, PauseMenuLayout.ButtonSize, SlotBorder, SelectedBorderColor);
-        _ui.DrawTextCentered(label, center.X, center.Y - 9f, _ui.CountScale, Rgba.White);
-    }
+    private void DrawMenuButton(Vector2 center, string label) =>
+        DrawSmallButton(center, PauseMenuLayout.ButtonSize, label);
 
     /// <summary>
     /// The main menu the game boots to, over an opaque backdrop (no world is rendered behind a
@@ -303,7 +318,7 @@ internal sealed class MenuRenderer
     }
 
     // A scrolled list page (worlds or multiplayer): title, panel, the scissored rows (name and detail
-    // on their own lines, never concatenated since a layout run stops at MaxLayoutChars), the
+    // on their own lines, never concatenated), the
     // empty-state line and the notice. The page draws its bottom buttons after.
     private void DrawListPage(MainMenuView view, Vector2 screen, string title, MainMenuPage page,
         int count, float scrollOffset, string emptyText, ListRowDrawer drawRow)
@@ -316,10 +331,10 @@ internal sealed class MenuRenderer
         var panelCenter = new Vector2(left + MainMenuLayout.PanelWidth * 0.5f, top + listHeight * 0.5f);
         var panelSize = new Vector2(MainMenuLayout.PanelWidth, listHeight);
         _ui.DrawRect(panelCenter, panelSize, SlotBackground);
-        _ui.DrawBorder(panelCenter, panelSize, SlotBorder, SlotBorderColor);
+        _ui.DrawBorder(panelCenter, panelSize, Border.Standard, SlotBorderColor);
         if (count == 0)
         {
-            _ui.DrawTextCentered(emptyText, panelCenter.X, panelCenter.Y - 8f, _ui.CountScale, TextDim);
+            _ui.DrawTextMiddle(emptyText, panelCenter, _ui.CountScale, TextDim);
         }
         else
         {
@@ -382,7 +397,7 @@ internal sealed class MenuRenderer
         // CardBackground rather than the translucent SlotBackground, so the rows under the dim
         // do not show through the box.
         _ui.DrawRect(center, size, CardBackground);
-        _ui.DrawBorder(center, size, SlotBorder, SelectedBorderColor);
+        _ui.DrawBorder(center, size, Border.Standard, SelectedBorderColor);
 
         var top = center.Y - size.Y * 0.5f;
         _ui.DrawTextCentered(question, center.X, top + 32f, _ui.HeadScale, Rgba.White);
@@ -406,9 +421,9 @@ internal sealed class MenuRenderer
     /// <summary>A <see cref="DrawMenuButton"/> of any size, with an optional border color.</summary>
     private void DrawSmallButton(Vector2 center, Vector2 size, string label, Rgba? border = null)
     {
-        _ui.DrawRect(center, size, SlotBackground);
-        _ui.DrawBorder(center, size, SlotBorder, border ?? SelectedBorderColor);
-        _ui.DrawTextCentered(label, center.X, center.Y - 9f, _ui.CountScale, Rgba.White);
+        _ui.DrawRect(center, size, _ui.IsHovered(center, size) ? ButtonHover : SlotBackground);
+        _ui.DrawBorder(center, size, Border.Standard, border ?? SelectedBorderColor);
+        _ui.DrawTextMiddle(label, center, _ui.CountScale, Rgba.White);
     }
 
     /// <summary>Main-menu widget under a window-pixel point (top-left origin).</summary>

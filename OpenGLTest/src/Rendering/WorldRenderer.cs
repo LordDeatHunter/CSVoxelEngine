@@ -15,6 +15,9 @@ using VoxelEngine.Simulation;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
+using VoxelEngine.UI.SpellBuilder;
+using VoxelEngine.UI.Forge;
+using VoxelEngine.UI.Waystone;
 
 namespace VoxelEngine.Rendering;
 
@@ -48,13 +51,19 @@ internal sealed class WorldRenderer
     private readonly FireParticleSystem _lavaFire;
     private readonly FireParticleSystem _torchFire;
     private readonly BubbleParticleSystem _bubbles;
+    private readonly SliceTrailSystem _sliceTrails;
     private readonly PlayerHealth _health;
     private readonly HotbarNameFade _hotbarName;
     private readonly HotbarPickupPop _hotbarPops;
+    private readonly StaffSlotIndicator _staffSlot = new();
 
     private Camera Camera => _world.Camera;
     private PlayerModel Player => _world.Player;
     private Inventory Inventory => _world.Inventory;
+
+    // The armor look is rebuilt only when the worn set changes
+    private int _armorVersion;
+    private bool _armorSeen;
     private HudToast Toast => _world.Toast;
     private IReadOnlyList<Slime> Slimes => _world.Slimes;
     private IReadOnlyList<Goblin> Goblins => _world.Goblins;
@@ -72,8 +81,8 @@ internal sealed class WorldRenderer
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         List<TopplingTree> toppling, List<ThrownProjectile> projectiles, List<RemotePlayer> remotePlayers,
         BlockDebrisSystem debris, LeafParticleSystem leaves, FireParticleSystem fire, FireParticleSystem lavaFire,
-        FireParticleSystem torchFire, BubbleParticleSystem bubbles, PlayerHealth health, HotbarNameFade hotbarName,
-        HotbarPickupPop hotbarPops)
+        FireParticleSystem torchFire, BubbleParticleSystem bubbles, SliceTrailSystem sliceTrails, PlayerHealth health,
+        HotbarNameFade hotbarName, HotbarPickupPop hotbarPops)
     {
         _world = world;
         _window = window;
@@ -96,6 +105,7 @@ internal sealed class WorldRenderer
         _lavaFire = lavaFire;
         _torchFire = torchFire;
         _bubbles = bubbles;
+        _sliceTrails = sliceTrails;
         _health = health;
         _hotbarName = hotbarName;
         _hotbarPops = hotbarPops;
@@ -107,7 +117,10 @@ internal sealed class WorldRenderer
         // times itself as the shadowNear and shadowFar rows.
         renderManager.IcebergPasses.Time = _world.LightingTime;
         renderManager.Shadows.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes,
-            _lodManager.RegionList, goblins: Goblins, icebergs: _world.Icebergs);
+            _lodManager.RegionList, goblins: Goblins, icebergs: _world.Icebergs, hellMobs: _world.HellMobs,
+            skyMobs: _world.SkyMobs, sandworms: _world.Sandworms, skeletons: _world.Skeletons,
+            skeletonKings: _world.SkeletonKings, caveMobs: _world.CaveMobs, wildlife: _world.Wildlife,
+            chestChunks: _chunkManager.ChestChunks, chestLids: _world.ChestLids);
 
         FrameProfiler.Begin(ProfileSection.Reflection);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.Reflection);
@@ -157,11 +170,20 @@ internal sealed class WorldRenderer
         renderManager.Stations.RenderCampfireCooking(Camera, _campfires);
         renderManager.Stations.RenderQuerns(Camera, _querns);
         renderManager.Stations.RenderKilns(Camera, _kilns);
+        renderManager.Stations.RenderSmithing(Camera, _world.Smithing);
         renderManager.Stations.RenderCastings(Camera, _casting);
+        renderManager.Chests.RenderChests(Camera, _chunkManager.ChestChunks, _world.ChestLids);
         renderManager.Objects.RenderPrimedTnt(Camera, _tntManager.Primed);
         renderManager.Objects.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.Mobs.RenderSlimes(Camera, Slimes);
         renderManager.Mobs.RenderGoblins(Camera, Goblins);
+        renderManager.Mobs.RenderRealmMobs(Camera, _world.HellMobs);
+        renderManager.Mobs.RenderRealmMobs(Camera, _world.SkyMobs);
+        renderManager.Mobs.RenderRealmMobs(Camera, _world.Wildlife);
+        renderManager.Mobs.RenderRealmMobs(Camera, _world.Skeletons);
+        renderManager.Mobs.RenderRealmMobs(Camera, _world.SkeletonKings);
+        renderManager.Mobs.RenderRealmMobs(Camera, _world.CaveMobs);
+        renderManager.Mobs.RenderSandworms(Camera, _world.Sandworms);
         renderManager.IcebergPasses.RenderIcebergs(Camera.GetViewProjection(), _world.Icebergs);
         renderManager.Players.RenderRemotePlayers(Camera, _remotePlayers);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.EntityPass);
@@ -179,13 +201,19 @@ internal sealed class WorldRenderer
 
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.EntityPass);
-        renderManager.Billboards.RenderEntityHealthbars(Camera, Mobs);
-        renderManager.Billboards.RenderDamageNumbers(Camera, DamageNumbers);
-        if (_goblins != null)
-            renderManager.Billboards.RenderNoticePips(Camera, _goblins.Goblins);
         renderManager.Objects.RenderBlockDebris(Camera, _debris.Debris);
+        if (_world.CollapseEffects is { } collapse)
+            renderManager.Objects.RenderCollapseDebris(Camera, collapse.Debris);
+        renderManager.Objects.RenderGroundHeave(Camera, _world.Ambient.Heave);
         foreach (var tree in _toppling)
             renderManager.Objects.RenderTopplingTree(Camera, tree);
+        var armorVersion = Inventory.Equipment.Version;
+        if (armorVersion != _armorVersion || !_armorSeen)
+        {
+            renderManager.Players.LocalArmor = ArmorLook.From(Inventory.Equipment);
+            _armorVersion = armorVersion;
+            _armorSeen = true;
+        }
         renderManager.Players.RenderPlayer(Camera, Player);
         renderManager.Players.RenderHeldItem(Camera, Player, LocalPlayer.HeldId, LocalPlayer.HasHeld,
             (float)Now, Compass.HeadingFromYaw(Camera.Yaw));
@@ -210,8 +238,9 @@ internal sealed class WorldRenderer
                 var popGrow = LeftClick.IsBreaking ? LeftClick.BlockPopGrowNow : 0f;
 
                 // The chunk mesh still holds the block at rest size, so the popped cube is only
-                // needed (and only hides it) while it is grown
-                if (popGrow > 0f)
+                // needed (and only hides it) while it is grown; a trunk showing its eaten face keeps the
+                // mesh on screen, since the popped whole cube would cover the bite
+                if (popGrow > 0f && !LeftClick.ShowsEatenFace)
                     renderManager.Selection.RenderBlockPop(Camera, LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId, popGrow,
                         HitboxesAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId));
 
@@ -219,7 +248,8 @@ internal sealed class WorldRenderer
                 renderManager.Selection.RenderBlockSelection(Camera, LeftClick.SelectedBlockPosition, LeftClick.SelectedFaceNormal, popGrow,
                     selectedId, LeftClick.SelectedBoxIndex, HitboxesAt(LeftClick.SelectedBlockPosition, selectedId), mining: LeftClick.IsBreaking);
 
-                if (LeftClick.IsBreaking)
+                // A chopped natural trunk shows its progress as the eaten face instead of the crack overlay
+                if (LeftClick.IsBreaking && !LeftClick.ShowsEatenFace)
                     renderManager.Selection.RenderBlockBreaking(Camera, LeftClick.BreakingBlockPosition, LeftClick.BreakProgress, popGrow, LeftClick.BreakingBlockId,
                         HitboxesAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId));
             }
@@ -259,6 +289,12 @@ internal sealed class WorldRenderer
         // the clouds are skipped anyway) and used to be the only pass drawn at this point.
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.EntityPass);
+        // Healthbars, damage numbers and notice pips are depthless blended billboards too: drawn
+        // before the water and clouds, those would paint over them even when the bar is in front.
+        renderManager.Billboards.RenderEntityHealthbars(Camera, Mobs);
+        renderManager.Billboards.RenderDamageNumbers(Camera, DamageNumbers);
+        if (_goblins != null)
+            renderManager.Billboards.RenderNoticePips(Camera, _goblins.Goblins);
         renderManager.Billboards.RenderLeafParticles(Camera, _leaves.Particles);
         renderManager.Billboards.RenderFireParticles(Camera, _fire.Particles);
         // Lava embers are a second batch; the renderer re-uploads with BufferSubData, so two
@@ -267,6 +303,9 @@ internal sealed class WorldRenderer
         renderManager.Billboards.RenderFireParticles(Camera, _lavaFire.Particles);
         renderManager.Billboards.RenderFireParticles(Camera, _torchFire.Particles);
         renderManager.Billboards.RenderBubbleParticles(Camera, _bubbles.Particles);
+        // Slice trails: additive and depthless like the embers, so they go here after the clouds;
+        // never drawn in the mirror or the shadow pass
+        renderManager.Billboards.RenderSliceTrails(Camera, _sliceTrails.Active, Now);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 
@@ -283,6 +322,9 @@ internal sealed class WorldRenderer
         FrameProfiler.Begin(ProfileSection.GodraysPass);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.GodraysPass);
         renderManager.Screen.RenderGodrays(Camera);
+        // The sun dazzle shares the godrays' row: one more full-screen draw toward the sun, over
+        // the shafts and everything else
+        renderManager.Screen.RenderSunDazzle(Camera);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.GodraysPass);
         FrameProfiler.End(ProfileSection.GodraysPass);
 
@@ -290,27 +332,31 @@ internal sealed class WorldRenderer
         // The UI draws after this, straight onto that gamma framebuffer.
         FrameProfiler.Begin(ProfileSection.PostPass);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.PostPass);
-        renderManager.Screen.RenderPostProcess(_health.DamageFlash);
+        renderManager.Screen.RenderPostProcess(_health.DamageFlash, _world.ConqueredEffects?.Shockwaves);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.PostPass);
         FrameProfiler.End(ProfileSection.PostPass);
     }
 
     /// <summary>
     /// Draws the HUD. <paramref name="showProfiler"/> adds the frame-timing table under the FPS
-    /// counter (the same flag that turns the debug console logging on).
+    /// counter (the same flag that turns the debug console logging on). <paramref name="builder"/> is the
+    /// spell builder panel, <paramref name="waystone"/> the waystone screen and <paramref name="forge"/> the anvil's recipe
+    /// list, each drawn over the HUD while open.
     /// </summary>
     internal void RenderUI(RenderManager renderManager, InventoryView view, float time,
         int fps, bool showProfiler, bool showCoordinates = true, PauseMenuView? menu = null,
-        SettingsMenuView? settings = null)
+        SettingsMenuView? settings = null, SpellBuilderView? builder = null, WaystoneView? waystone = null,
+        ForgeView? forge = null)
     {
         renderManager.UiPasses.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
-            _health.Health, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, LeftClick.Crosshair, LeftClick.LookAt);
+            _health.Health, _health.Breath.Fraction, _health.Mana.Fraction, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, LeftClick.Crosshair, LeftClick.LookAt,
+            _staffSlot.Label(Inventory), _health.Effects.Mask, builder, _health.Max, _world.ChestPanel, waystone, BossSelection.Nearest(Mobs, Camera.Position), forge);
     }
 
     /// <summary>
     /// Hitboxes for the outline, break overlay and mining pop: the cell's drawn shape resolved
     /// from the live world exactly as the raycast aims at it (see <see cref="BlockShape"/>).
     /// </summary>
-    private BlockHitbox[] HitboxesAt(Vector3 blockPos, byte blockId) =>
+    private BlockHitbox[] HitboxesAt(Vector3 blockPos, ushort blockId) =>
         BlockShape.BoxesAt(blockId, _chunkManager, (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
 }

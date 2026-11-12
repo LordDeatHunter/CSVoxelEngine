@@ -6,6 +6,7 @@
   },
   "modelTint": "grass",
   "hardness": 0,
+  "flammable": true,
   "solid": false,
   "occludes": false,
   "castsAO": false,

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Content.Spells;
 using VoxelEngine.Items;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.InventoryPanel;
@@ -17,8 +18,8 @@ public sealed class InventorySaveTests
 {
     public InventorySaveTests() => TestContent.EnsureLoaded();
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
-    private static byte Dirt => ContentRegistry.RequireBlock("dirt").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Dirt => ContentRegistry.RequireBlock("dirt").Id;
 
     private static Item ToolItem(System.Func<Item, bool> predicate) =>
         ItemRegistry.All.First(i => Inventory.CategoryOf(i.Id) == InventoryCategory.Tools && predicate(i));
@@ -26,8 +27,108 @@ public sealed class InventorySaveTests
     private static Item MiscItem() =>
         ItemRegistry.All.First(i => Inventory.CategoryOf(i.Id) == InventoryCategory.Misc);
 
-    private static int InstanceOf(Inventory inventory, byte itemId) =>
+    private static int InstanceOf(Inventory inventory, ushort itemId) =>
         inventory.ToolEntries().Last(t => t.ItemId == itemId).InstanceId;
+
+    private static string[] SortedKnownParts(Inventory inventory) =>
+        inventory.KnownParts.Order(System.StringComparer.Ordinal).ToArray();
+
+    [Fact]
+    public void KnownSpellPartsRoundTripByKey()
+    {
+        var a = Inventory.Empty();
+        a.LearnParts(SpellPartRegistry.All.Take(3).Select(p => p.Key));
+        var b = Inventory.Empty();
+        b.LearnParts(SpellPartRegistry.All.Skip(3).Select(p => p.Key));
+
+        b.Import(a.Export());
+
+        Assert.NotEmpty(a.KnownParts);
+        Assert.Equal(SortedKnownParts(a), SortedKnownParts(b));
+    }
+
+    [Fact]
+    public void AnUnknownSpellPartKeyIsDroppedAndTheRestKept()
+    {
+        var a = Inventory.Empty();
+        a.LearnParts(SpellPartRegistry.All.Take(2).Select(p => p.Key));
+        var data = a.Export();
+        data.KnownParts!.Add("element/no_such_part");
+        data.KnownParts.Add(null!);
+
+        var b = Inventory.Empty();
+        b.Import(data);
+
+        Assert.Equal(SortedKnownParts(a), SortedKnownParts(b));
+        Assert.False(b.KnowsPart("element/no_such_part"));
+    }
+
+    [Fact]
+    public void ReimportingTheSameKnownPartsDoesNotMoveTheVersion()
+    {
+        var a = Inventory.Empty();
+        a.LearnParts(SpellPartRegistry.All.Take(2).Select(p => p.Key));
+        var data = a.Export();
+        var b = Inventory.Empty();
+        b.Import(data);
+        var version = b.KnownPartsVersion;
+
+        b.Import(data);
+
+        Assert.Equal(version, b.KnownPartsVersion);
+    }
+
+    [Fact]
+    public void DiscoveredWaystonesRoundTripWithTheirNames()
+    {
+        var a = Inventory.Empty();
+        a.Waystones.Add(1, 2, 3, "Kafuziro");
+        a.Waystones.Add(-5, 300, 9, "Sky Gate");
+        var b = Inventory.Empty();
+        b.Waystones.Add(7, 7, 7, "Stale");
+
+        b.Import(a.Export());
+
+        Assert.Equal(a.Waystones.Entries, b.Waystones.Entries);
+        Assert.False(b.Waystones.Contains(7, 7, 7));
+    }
+
+    [Fact]
+    public void ASaveFromBeforeWaystonesKnowsNoneAndABrokenEntryIsDropped()
+    {
+        var a = Inventory.Empty();
+        a.Waystones.Add(1, 2, 3, "Kafuziro");
+        var data = a.Export();
+        data.Waystones!.Add(new PlayerSaveData.DiscoveredWaystoneData { Cell = [4, 5], Name = "Bad" });
+        data.Waystones.Add(new PlayerSaveData.DiscoveredWaystoneData { Cell = [4, 5, 6], Name = " \t " });
+        data.Waystones.Add(null!);
+
+        var b = Inventory.Empty();
+        b.Import(data);
+        Assert.Equal(a.Waystones.Entries, b.Waystones.Entries);
+
+        data.Waystones = null;
+        b.Import(data);
+        Assert.Equal(0, b.Waystones.Count);
+    }
+
+    [Fact]
+    public void ReimportingTheSameWaystonesDoesNotMoveTheVersion()
+    {
+        var a = Inventory.Empty();
+        a.Waystones.Add(1, 2, 3, "Kafuziro");
+        var data = a.Export();
+        var b = Inventory.Empty();
+        b.Import(data);
+        var version = b.Waystones.Version;
+
+        b.Import(data);
+        Assert.Equal(version, b.Waystones.Version);
+
+        data.Waystones![0].Name = "Renamed";
+        b.Import(data);
+        Assert.NotEqual(version, b.Waystones.Version);
+    }
 
     [Fact]
     public void ExportImportRoundTripsEveryPoolToolAndSlot()
@@ -44,8 +145,12 @@ public sealed class InventorySaveTests
         var crucibleItem = ToolItem(i => i.CrucibleCapacityMl > 0);
         Assert.True(a.Add(crucibleItem.Id));
         var crucibleInstance = InstanceOf(a, crucibleItem.Id);
-        var material = ContentRegistry.MoltenMaterials.First().Id;
-        a.GetToolStack(crucibleInstance)!.Set(new CrucibleComponent(material, 40, 60, Stone));
+        // Two metals, so every metal the vessel holds survives the trip, not just one
+        a.GetToolStack(crucibleInstance)!.Set(new CrucibleComponent(
+            [
+                new CrucibleMetal(ContentRegistry.MoltenMaterials[0].Id, 40, 60),
+                new CrucibleMetal(ContentRegistry.MoltenMaterials[1].Id, 0, 20),
+            ], Stone));
 
         var durableItem = ToolItem(i => i.MaxDurability > 2);
         Assert.True(a.Add(durableItem.Id));
@@ -180,9 +285,78 @@ public sealed class InventorySaveTests
         var crucible = new ItemStack(2, ToolItem(i => i.CrucibleCapacityMl > 0));
         crucible.Set(new CrucibleComponent(ContentRegistry.MoltenMaterials.First().Id, 10, 10, Stone));
         stacks.Add(crucible);
+        var staff = ItemRegistry.All.OfType<StaffItem>().First();
+        var bound = new ItemStack(3, staff);
+        bound.Set(BoundStaff(staff, 0));
+        stacks.Add(bound);
 
         foreach (var stack in stacks)
             foreach (var type in stack.ComponentTypes)
                 Assert.Contains(type, InventorySaveCodec.HandledComponentTypes);
+    }
+
+    // A valid element + shape recipe the staff's own tags allow, picked by rule, never by name
+    private static SpellPart[] ValidRecipe(StaffItem staff) =>
+    [
+        SpellPartRegistry.All.First(p => p.Kind == SpellPartKind.Element && p.IsAllowedBy(staff.AllowedTags)),
+        SpellPartRegistry.All.First(p => p.Kind == SpellPartKind.Shape && p.IsAllowedBy(staff.AllowedTags)),
+    ];
+
+    private static StaffComponent BoundStaff(StaffItem staff, int slot)
+    {
+        Assert.True(StaffBinding.TryBind(staff, default, slot, ValidRecipe(staff), out var spells, out _));
+        return spells;
+    }
+
+    [Fact]
+    public void AStaffsBoundSpellsRoundTripByPartKey()
+    {
+        var staff = ItemRegistry.All.OfType<StaffItem>().First();
+        var source = Inventory.Empty();
+        Assert.True(source.Add(staff.Id));
+        var stack = source.GetToolStack(InstanceOf(source, staff.Id))!;
+        var spells = StaffBinding.Cycle(staff, BoundStaff(staff, staff.Slots - 1), 1);
+        stack.Set(spells);
+
+        var data = source.Export();
+        var saved = Assert.Single(data.Tools!, t => t.InstanceId == stack.InstanceId).Staff;
+        Assert.NotNull(saved);
+        Assert.NotNull(saved.Slots);
+        Assert.Equal(ValidRecipe(staff).Select(p => p.Key), saved.Slots[staff.Slots - 1]);
+
+        var restored = Inventory.Empty();
+        restored.Import(data);
+        Assert.Equal(spells, restored.GetToolStack(stack.InstanceId)!.Get<StaffComponent>());
+    }
+
+    [Fact]
+    public void AStaffRestoreDropsWhatThisRunCannotBind()
+    {
+        var staff = ItemRegistry.All.OfType<StaffItem>().First(s => s.Slots >= 3);
+        var valid = ValidRecipe(staff).Select(p => p.Key).ToList();
+        var slots = new List<List<string>?>(new List<string>?[staff.Slots + 1]);
+        slots[0] = ["element/no_such_part", valid[1]];
+        slots[1] = [valid[0]];
+        slots[2] = valid;
+        slots[staff.Slots] = valid;
+
+        var restored = Inventory.Empty();
+        restored.Import(new PlayerSaveData.InventoryData
+        {
+            Tools =
+            [
+                new PlayerSaveData.ToolData
+                {
+                    InstanceId = 1, Name = SaveNames.NameOf(staff.Id),
+                    Staff = new PlayerSaveData.StaffData { Slots = slots, Selected = 99 },
+                },
+            ],
+        });
+
+        var spells = restored.GetToolStack(1)!.Get<StaffComponent>();
+        Assert.Equal(1, spells.BoundCount);
+        Assert.Equal(valid, spells.PartsAt(2));
+        Assert.Empty(spells.PartsAt(staff.Slots));
+        Assert.InRange(spells.Selected, 0, staff.Slots - 1);
     }
 }

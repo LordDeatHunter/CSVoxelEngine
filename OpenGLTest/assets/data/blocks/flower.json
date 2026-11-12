@@ -5,6 +5,7 @@
     "textures": { "cross": "flower" }
   },
   "hardness": 0,
+  "flammable": true,
   "solid": false,
   "occludes": false,
   "castsAO": false,

@@ -1,0 +1,28 @@
+{
+  "textures": { "all": "skeleton_pile", "particle": "skeleton_pile" },
+  "elements": [
+    {
+      "from": [2, 0, 2],
+      "to": [14, 3, 14],
+      "faces": {
+        "north": { "texture": "#all" },
+        "south": { "texture": "#all" },
+        "west": { "texture": "#all" },
+        "east": { "texture": "#all" },
+        "up": { "texture": "#all" },
+        "down": { "texture": "#all" }
+      }
+    },
+    {
+      "from": [5, 3, 5],
+      "to": [11, 7, 11],
+      "faces": {
+        "north": { "texture": "#all" },
+        "south": { "texture": "#all" },
+        "west": { "texture": "#all" },
+        "east": { "texture": "#all" },
+        "up": { "texture": "#all" }
+      }
+    }
+  ]
+}

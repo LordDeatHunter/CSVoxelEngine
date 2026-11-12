@@ -1,10 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Numerics;
+using System.Text.Json;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
+using VoxelEngine.Items;
 
 namespace VoxelEngine.Content;
 
@@ -37,9 +42,12 @@ internal static class EntityLoader
                         $"Entity '{path}' names loot table '{lootName}', which does not exist.");
             }
 
+            var blood = ParseBlood(definition.Blood, path);
+            var immune = (definition.Immune ?? []).Select(effect => effect.Trim()).ToHashSet(StringComparer.Ordinal);
+
             if (definition.Variants != null)
             {
-                types[name] = LoadVariants(name, path, definition, hp, loot);
+                types[name] = LoadVariants(name, path, definition, hp, loot, blood, immune);
                 continue;
             }
 
@@ -51,6 +59,7 @@ internal static class EntityLoader
             // Parsed once here, GL-free, so the entity, the renderer and the debugger share one
             // parse; the loader's own errors already name the model file.
             var parsed = BbmodelLoader.Load(model, Array.Empty<string>());
+            var held = ParseHeld(definition.Held, path, [parsed]);
 
             types[name] = new EntityType
             {
@@ -58,19 +67,60 @@ internal static class EntityLoader
                 DisplayName = definition.Name ?? name,
                 MaxHealth = hp,
                 LootTable = loot,
+                BloodColor = blood,
+                Immune = immune,
                 ModelPath = model,
                 Model = parsed,
+                HeldItemId = held.ItemId,
+                HeldPart = held.Part,
+                HeldTransform = held.Transform,
             };
         }
 
         EntityRegistry.Publish(types);
     }
 
+    /// <summary>Matches every entity's <c>immune</c> names against the loaded status effects, so a typo fails
+    /// content load naming the entity.</summary>
+    internal static void ValidateImmunities()
+    {
+        foreach (var type in EntityRegistry.ByName.Values)
+            foreach (var effect in type.Immune)
+                if (!StatusEffectRegistry.TryGet(effect, out _))
+                    throw new InvalidOperationException(
+                        $"Entity '{type.Name}' is immune to unknown status effect '{effect}'.");
+    }
+
+    /// <summary>
+    /// An entity's <c>blood</c>: omitted is <see cref="EntityType.DefaultBloodColor"/>, <c>"none"</c> is null (no
+    /// spray), an object's <c>color</c> is three integers in 0..255 read as sRGB.
+    /// </summary>
+    internal static Vector3? ParseBlood(JsonElement? blood, string path)
+    {
+        if (blood is not { } element) return EntityType.DefaultBloodColor;
+        if (element.ValueKind == JsonValueKind.String && element.GetString() == "none") return null;
+        if (element.ValueKind != JsonValueKind.Object
+            || !element.TryGetProperty("color", out var color)
+            || color.ValueKind != JsonValueKind.Array || color.GetArrayLength() != 3)
+            throw new InvalidOperationException(
+                $"Entity '{path}' has a blood that is neither \"none\" nor {{\"color\": [r, g, b]}}.");
+        var channels = new float[3];
+        var i = 0;
+        foreach (var channel in color.EnumerateArray())
+        {
+            if (channel.ValueKind != JsonValueKind.Number || !channel.TryGetInt32(out var value) || value is < 0 or > 255)
+                throw new InvalidOperationException($"Entity '{path}' has a blood.color that is not three integers in 0..255.");
+            channels[i++] = value / 255f;
+        }
+        return new Vector3(channels[0], channels[1], channels[2]);
+    }
+
     /// <summary>
     /// An entity authored as a list of <c>variants</c>: every project must exist and carry a skin,
     /// and the first one is the kind's <see cref="EntityType.Model"/>.
     /// </summary>
-    private static EntityType LoadVariants(string name, string path, EntityDefinition definition, int hp, LootTable? loot)
+    private static EntityType LoadVariants(string name, string path, EntityDefinition definition, int hp, LootTable? loot,
+        Vector3? blood, IReadOnlySet<string> immune)
     {
         var variants = definition.Variants!;
         if (variants.Length == 0)
@@ -87,6 +137,7 @@ internal static class EntityLoader
             parsed[i] = BbmodelLoader.Load(variant, Array.Empty<string>());
             EntityModel.RequireTexture(parsed[i], variant);
         }
+        var held = ParseHeld(definition.Held, path, parsed);
 
         return new EntityType
         {
@@ -94,10 +145,38 @@ internal static class EntityLoader
             DisplayName = definition.Name ?? name,
             MaxHealth = hp,
             LootTable = loot,
+            BloodColor = blood,
+            Immune = immune,
             ModelPath = variants[0],
             Model = parsed[0],
             VariantPaths = variants,
             Variants = parsed,
+            HeldItemId = held.ItemId,
+            HeldPart = held.Part,
+            HeldTransform = held.Transform,
         };
+    }
+
+    /// <summary>
+    /// An entity's <c>held</c> item: a registered pure item (items load before entities) in a hand that
+    /// every one of its models has, posed by the same <c>display</c> shape and parser as an item file.
+    /// Nothing held is item 0 with an identity transform.
+    /// </summary>
+    private static (ushort ItemId, string? Part, Matrix4x4 Transform) ParseHeld(EntityDefinition.HeldDefinition? held,
+        string path, IReadOnlyList<BbmodelData> models)
+    {
+        if (held == null) return (0, null, Matrix4x4.Identity);
+
+        if (string.IsNullOrEmpty(held.Item) || !ContentRegistry.ItemIds.TryGetValue(held.Item, out var id)
+            || !ItemRegistry.IsItem(id))
+            throw new InvalidOperationException($"Entity '{path}' holds '{held.Item}', which is not a registered item.");
+        if (string.IsNullOrEmpty(held.Part))
+            throw new InvalidOperationException($"Entity '{path}' has a held item without a held.part.");
+        foreach (var model in models)
+            if (!model.Parts.ContainsKey(held.Part))
+                throw new InvalidOperationException(
+                    $"Entity '{path}' holds its item in part '{held.Part}', which its model does not have.");
+
+        return (id, held.Part, ItemLoader.ParseDisplay(held.Display, path).Matrix);
     }
 }

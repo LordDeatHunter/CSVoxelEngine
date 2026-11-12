@@ -20,7 +20,7 @@ internal static class InventoryCrafting
 
     /// <inheritdoc cref="Inventory.CanCraftBatch"/>
     internal static bool CanCraftBatch(Inventory inventory, CraftingRecipe recipe, int batch,
-        Func<int, CraftingRecipe.Ingredient, byte>? pickMember)
+        Func<int, CraftingRecipe.Ingredient, ushort>? pickMember)
     {
         if (batch < 1) return false;
         for (var i = 0; i < recipe.Ingredients.Length; i++)
@@ -41,9 +41,9 @@ internal static class InventoryCrafting
             + recipe.ResultCount * batch <= Inventory.CapacityOf(category.Value);
     }
 
-    /// <inheritdoc cref="Inventory.TryCraft(CraftingRecipe, int, Func{int, CraftingRecipe.Ingredient, byte})"/>
+    /// <inheritdoc cref="Inventory.TryCraft(CraftingRecipe, int, Func{int, CraftingRecipe.Ingredient, ushort})"/>
     internal static bool TryCraft(Inventory inventory, CraftingRecipe recipe, int batch,
-        Func<int, CraftingRecipe.Ingredient, byte>? pickMember)
+        Func<int, CraftingRecipe.Ingredient, ushort>? pickMember)
     {
         if (!CanCraftBatch(inventory, recipe, batch, pickMember)) return false;
         for (var i = 0; i < recipe.Ingredients.Length; i++)
@@ -93,11 +93,14 @@ internal static class InventoryCrafting
         return freed;
     }
 
-    private static void RemoveUnits(Inventory inventory, byte id, int count)
+    private static void RemoveUnits(Inventory inventory, ushort id, int count)
     {
-        if (Inventory.CategoryOf(id) == InventoryCategory.Tools)
+        if (Inventory.CategoryOf(id) is InventoryCategory.Tools or InventoryCategory.Gear)
         {
-            foreach (var instance in inventory.Tools.Where(t => t.DefinitionId == id).Take(count).ToArray())
+            // The least-bound instance goes first (a stable order, so otherwise the pool's own), so
+            // upgrading a staff never eats one carrying spells while an empty one is at hand
+            foreach (var instance in inventory.Tools.Where(t => t.DefinitionId == id)
+                         .OrderBy(t => t.Get<StaffComponent>().BoundCount).Take(count).ToArray())
                 inventory.RemoveTool(instance.InstanceId);
             return;
         }

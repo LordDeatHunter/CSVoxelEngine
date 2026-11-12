@@ -35,6 +35,22 @@ internal sealed class SwimPose
     private const float StrokeThrustEnd = 0.2f;
     private const float StrokeHoldEnd = 0.3f;
 
+    // The swim flutter kick: legs alternating at SwimKickRate (the model's swim clock), full strength
+    // (1) at the burst and decaying to SwimIdleKick (a gentle kick while gliding) by SwimKickFadeEnd
+    // of the stroke
+    internal const float SwimKickRate = 9f;
+    internal const float SwimKickHip = 0.3f;
+    internal const float SwimKickKnee = 0.35f;
+    internal const float SwimIdleKick = 0.25f;
+    internal const float SwimKickFadeEnd = 0.7f;
+
+    /// <summary>
+    /// The flutter kick's strength at stroke progress <paramref name="t"/> (1 at rest): full at the
+    /// burst, easing down to <see cref="SwimIdleKick"/> and holding there until the next stroke.
+    /// </summary>
+    internal static float KickAmount(float t) =>
+        MathUtils.Lerp(1f, SwimIdleKick, MathUtils.SmoothStep(MathUtils.Clamp01(t / SwimKickFadeEnd)));
+
     internal float StrokeOut()
     {
         var t = _model.SwimStrokeProgress;
@@ -65,12 +81,22 @@ internal sealed class SwimPose
         // The surface float replaces the kick: the legs hang nearly straight under the upright body,
         // fluttering faintly out of step, and the body bobs on the swell.
         var f = FloatShare();
+
+        // A scissor flutter rides on the stroke's tuck and straighten: the legs alternate, strongest
+        // in the burst and dying away through the recovery to a gentle idle kick, on the one clock so
+        // the stroke never restarts it
+        var kickAmp = KickAmount(t);
+        var kickPhase = _model.SwimBobTime * SwimKickRate;
+        var kick = MathF.Sin(kickPhase) * kickAmp * (1f - f);
+        var kickKnee = MathF.Sin(kickPhase + MathF.PI / 2f) * kickAmp * (1f - f);
         var flutter = MathF.Sin(_model.SwimBobTime * FloatFlutterRate);
         var flutterKnee = MathF.Sin(_model.SwimBobTime * FloatFlutterRate + 0.9f);
-        var leftHip = MathUtils.Lerp(hip + 0.08f, FloatLegHip + FloatFlutterHip * flutter, f);
-        var rightHip = MathUtils.Lerp(hip - 0.08f, FloatLegHip - FloatFlutterHip * flutter, f);
-        var leftKnee = MathUtils.Lerp(knee, FloatLegKnee - FloatFlutterKnee * (0.5f + 0.5f * flutterKnee), f);
-        var rightKnee = MathUtils.Lerp(knee, FloatLegKnee - FloatFlutterKnee * (0.5f - 0.5f * flutterKnee), f);
+        var leftHip = MathUtils.Lerp(hip + 0.08f + SwimKickHip * kick, FloatLegHip + FloatFlutterHip * flutter, f);
+        var rightHip = MathUtils.Lerp(hip - 0.08f - SwimKickHip * kick, FloatLegHip - FloatFlutterHip * flutter, f);
+        var leftKnee = MathUtils.Lerp(knee - SwimKickKnee * (0.5f + 0.5f * kickKnee),
+            FloatLegKnee - FloatFlutterKnee * (0.5f + 0.5f * flutterKnee), f);
+        var rightKnee = MathUtils.Lerp(knee - SwimKickKnee * (0.5f - 0.5f * kickKnee),
+            FloatLegKnee - FloatFlutterKnee * (0.5f - 0.5f * flutterKnee), f);
         bob = MathUtils.Lerp(bob, MathF.Sin(_model.SwimBobTime * FloatBobRate) * FloatBobAmp, f);
         return new Pose(
             MathUtils.Lerp(pose.LeftHip, leftHip, s), MathUtils.Lerp(pose.RightHip, rightHip, s),

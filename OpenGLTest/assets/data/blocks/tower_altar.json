@@ -1,0 +1,17 @@
+{
+  // The battle tower's roof altar (BT-6): worldgen stamps it in the free center cell the roof's altar
+  // template leaves (TowerSite.AltarCell). Unbreakable and item-less, so only the tower's own collapse
+  // removes it; a right-click on it starts the Skeleton King's ritual once every floor is cleared. It
+  // glows faintly in the default warm color, so it needs no palette slot of its own. The top tile is
+  // placeholder art from tools/generate-tower-lock-textures.py; the sides and bottom are stone bricks.
+  "name": "Tower Altar",
+  "model": {
+    "parent": "block/cube_bottom_top",
+    "textures": { "top": "tower_altar_top", "bottom": "stone_bricks", "side": "stone_bricks" }
+  },
+  "light": { "emission": 7 },
+  "sfx": "hit_rock",
+  "hasItem": false,
+  "loot": "none",
+  "unbreakable": true
+}

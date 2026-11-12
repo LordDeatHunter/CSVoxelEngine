@@ -3,6 +3,7 @@ using System.Numerics;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Models;
+using VoxelEngine.Data;
 using VoxelEngine.Interaction;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
@@ -34,8 +35,8 @@ public enum ItemAnimationMode
 /// </summary>
 public abstract class Item
 {
-    /// <summary>Byte id assigned at load; shares the block id space (air = 0).</summary>
-    public byte Id { get; }
+    /// <summary>Id assigned at load; shares the block id space (air = 0).</summary>
+    public ushort Id { get; }
 
     /// <summary>Display name for inventory rows and preview headings.</summary>
     public string Name { get; }
@@ -55,21 +56,17 @@ public abstract class Item
     public ItemUseAction UseAction { get; internal init; }
 
     /// <summary>Item id this one becomes after a successful use (a bucket becomes a water
-    /// bucket); for <see cref="ItemUseAction.ConvertMultiblock"/> the <em>anchor block</em> id
-    /// the volume becomes, and the item itself never morphs; 0 when the item declares no
-    /// use.</summary>
-    public byte UseResultId { get; internal init; }
+    /// bucket); 0 when the item declares no use or never morphs.</summary>
+    public ushort UseResultId { get; internal init; }
 
     /// <summary>Fluid block id the use picks up or places; 0 when the item declares no use.</summary>
-    public byte UseFluidId { get; internal init; }
+    public ushort UseFluidId { get; internal init; }
 
     /// <summary>
     /// Stackable block id an ignite/place_stack use works on (firepit block for
-    /// <see cref="ItemUseAction.IgniteCampfire"/>), or the <em>source block</em> a
-    /// <see cref="ItemUseAction.ConvertMultiblock"/> volume is built from; 0 for every other
-    /// action.
+    /// <see cref="ItemUseAction.IgniteCampfire"/>); 0 for every other action.
     /// </summary>
-    public byte UseBlockId { get; internal init; }
+    public ushort UseBlockId { get; internal init; }
 
     /// <summary>Per-use success chance 0..1 for ignite uses; 1 for everything else.</summary>
     public float UseChance { get; internal init; } = 1f;
@@ -106,6 +103,23 @@ public abstract class Item
     /// <summary>Attack behavior the left-click drives; see <see cref="AttackPattern"/>.</summary>
     public AttackPattern Attack { get; internal init; } = AttackPattern.Punch;
 
+    /// <summary>sRGB color of the slice trail this blade's swings leave, from its JSON <c>trail</c>
+    /// object; null when it names none (only a slice or sword item may).</summary>
+    public Rgba? TrailColor { get; internal init; }
+
+    /// <summary>The slice trail color a swing of this item is drawn with: its own
+    /// <see cref="TrailColor"/>, else <see cref="ParticleConfig.SliceTrailDefaultColor"/>.</summary>
+    public Rgba TrailColorOrDefault => TrailColor ?? ParticleConfig.SliceTrailDefaultColor;
+
+    /// <summary>The bone fragments a landed hit with this blade sprays (see
+    /// <see cref="ShrapnelProfile"/>), or null when it sprays none. Only a slice or sword item may
+    /// name one.</summary>
+    public ShrapnelProfile? Shrapnel { get; internal init; }
+
+    /// <summary>The status effect a landed hit with this blade puts on the enemy (its JSON <c>onHit</c>), or null.
+    /// Only a slice or sword item may name one.</summary>
+    public GearPassive? OnHit { get; internal init; }
+
     /// <summary>Damage one left-click hit removes from a block's hardness; the bare-hand
     /// baseline by default.</summary>
     public float BlockDamage { get; internal init; } = Mining.DefaultBlockDamage;
@@ -119,6 +133,12 @@ public abstract class Item
     /// <summary>Whether right-click in the air can charge and release this item as a projectile.</summary>
     public bool IsThrowable => ThrowDamage.HasValue;
 
+    /// <summary>Whether a thrown copy flies point first along its velocity (a spear) rather than tumbling.</summary>
+    public bool ThrowAligned { get; internal init; }
+
+    /// <summary>The block whose cube a thrown copy is drawn as instead of this item's sprite, or 0 for the sprite.</summary>
+    public ushort ThrowBlockId { get; internal init; }
+
     /// <summary>Seconds between uses of this item; 0 means the global click rate applies.</summary>
     public float UseDelaySeconds { get; internal init; }
 
@@ -129,8 +149,14 @@ public abstract class Item
     /// </summary>
     public float UseSeconds { get; internal init; }
 
+    /// <summary>The pose held while the timed use charges (<see cref="UseSeconds"/>).</summary>
+    public UsePose UsePose { get; internal init; }
+
     /// <summary>The tree species an <c>plant_tree</c> use plants (an acorn plants an oak), or null.</summary>
     public string? UseTreeName { get; internal init; }
+
+    /// <summary>The entity a <c>summon</c> use wakes (the thumper wakes the sandworm), or null.</summary>
+    public string? UseEntityName { get; internal init; }
 
     /// <summary>Cells across the spritesheet texture; 1 for a plain sprite.</summary>
     public int SpriteCols { get; internal init; } = 1;
@@ -184,12 +210,18 @@ public abstract class Item
     /// the arm swing and the mine pump. <paramref name="rotationOffsetDegrees"/> is what the pose adds to
     /// the display rotation for this frame (<c>PlayerModel.HeldItemRotationOffset</c>, the same
     /// <c>[pitch, yaw, roll]</c> degrees), zero by default.</summary>
-    public Matrix4x4 DisplayMatrix(Vector3 rotationOffsetDegrees = default)
+    public Matrix4x4 DisplayMatrix(Vector3 rotationOffsetDegrees = default) =>
+        ComposeDisplay(DisplayRotation + rotationOffsetDegrees, DisplayTranslation, DisplayScale);
+
+    /// <summary>The one display-transform formula, shared by an item's held pose and an entity's held item
+    /// (<c>EntityType.HeldTransform</c>): scaled, rotated by <paramref name="rotationDegrees"/> as
+    /// <c>[pitch, yaw, roll]</c> (yaw, then pitch, then roll), then translated.</summary>
+    public static Matrix4x4 ComposeDisplay(Vector3 rotationDegrees, Vector3 translation, float scale)
     {
-        var radians = (DisplayRotation + rotationOffsetDegrees) * (MathF.PI / 180f);
-        return Matrix4x4.CreateScale(DisplayScale)
+        var radians = rotationDegrees * (MathF.PI / 180f);
+        return Matrix4x4.CreateScale(scale)
             * Matrix4x4.CreateFromYawPitchRoll(radians.Y, radians.X, radians.Z)
-            * Matrix4x4.CreateTranslation(DisplayTranslation);
+            * Matrix4x4.CreateTranslation(translation);
     }
 
     /// <summary>Frame to draw for this item at this moment.</summary>
@@ -210,7 +242,7 @@ public abstract class Item
     }
 
     /// <summary>Minimal member for synthetic items (see <see cref="BlockItem"/>).</summary>
-    protected Item(byte id, string name)
+    protected Item(ushort id, string name)
     {
         Id = id;
         Name = name;
@@ -235,7 +267,9 @@ public abstract class Item
         CrucibleCapacityMl = spec.CrucibleCapacityMl;
         UseDelaySeconds = spec.UseDelay;
         UseSeconds = spec.UseSeconds;
+        UsePose = spec.UsePose;
         UseTreeName = spec.TreeName;
+        UseEntityName = spec.EntityName;
         SpriteCols = spec.SpriteCols;
         SpriteRows = spec.SpriteRows;
         FrameCount = spec.FrameCount;
@@ -248,8 +282,17 @@ public abstract class Item
         ToolPower = spec.ToolPower;
         HitDelayMs = spec.HitDelayMs;
         Attack = spec.Attack;
+        TrailColor = spec.TrailColor;
+        Shrapnel = spec.Shrapnel;
+        OnHit = spec.OnHit;
         BlockDamage = spec.BlockDamage;
         EntityDamage = spec.EntityDamage;
         ThrowDamage = spec.ThrowDamage;
+        ThrowAligned = spec.ThrowAligned;
+        ThrowBlockId = spec.ThrowBlockId;
+        Rarity = spec.Rarity;
     }
+
+    /// <summary>The item's base rarity (a rolled instance may carry its own, see <c>ModifiersComponent</c>).</summary>
+    public Rarity Rarity { get; internal init; }
 }

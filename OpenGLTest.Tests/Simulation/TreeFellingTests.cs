@@ -155,11 +155,11 @@ public sealed class TreeFellingTests
     }
 
     [Fact]
-    public void TheFelledMeshIsCenteredOnItsPivot()
+    public void EveryCellOfAFelledCrownIsMeshedWhereverItLies()
     {
-        // A crown whose outlying cell pulls the minimum corner more than a chunk from the far
-        // side: the cells around the trunk column must still be meshed, the outlier is the one
-        // that falls outside the scratch chunk
+        // A crown wider than a chunk, with its cells split over several chunks around the pivot:
+        // the trunk-column cell, a cell half a chunk out and an outlier a chunk out the other way
+        // must all be meshed, positioned relative to the pivot
         var leaves = ContentRegistry.RequireBlock("oak_leaves");
         var state = LeafState.Encode(1, false);
         var pivot = new Vector3(100.5f, 40, 100.5f);
@@ -172,8 +172,9 @@ public sealed class TreeFellingTests
             new(outlier, leaves.Id, state),
         ];
 
-        var mesh = TopplingTree.BuildMeshData(blocks, pivot);
-        var positions = mesh.Vertices.Concat(mesh.TranslucentVertices).Select(v => v.Position + pivot).ToList();
+        var meshes = TopplingTree.BuildMeshData(blocks, pivot);
+        var positions = meshes.SelectMany(mesh => mesh.Vertices.Concat(mesh.TranslucentVertices))
+            .Select(v => v.Position + pivot).ToList();
 
         bool Meshed(Vector3 cell) => positions.Any(p =>
             p.X >= cell.X - 1e-4f && p.X <= cell.X + 1 + 1e-4f &&
@@ -182,7 +183,7 @@ public sealed class TreeFellingTests
 
         Assert.True(Meshed(blocks[0].Cell), "the trunk-column cell is missing from the felled mesh");
         Assert.True(Meshed(near), "a cell half a chunk from the pivot is missing from the felled mesh");
-        Assert.False(Meshed(outlier), "a cell beyond half a chunk on the other side was meshed");
+        Assert.True(Meshed(outlier), "a cell a chunk out on the other side is missing from the felled mesh");
     }
 
     /// <summary>A wide-trunk species stamped and loaded with real ground (rock) filled into every
@@ -307,7 +308,7 @@ public sealed class TreeFellingTests
         var otherWood = TreeSpeciesRegistry.All.First(s => s.WoodId != oak.WoodId).WoodId;
         // A lone ring stack whose parent (the core) is gone: only what it stands on can hold it
         var shell = WoodState.Encode(WoodState.FullCube, 2, true);
-        (byte Id, byte State, TreeSupportResult Expected)[] grounds =
+        (ushort Id, byte State, TreeSupportResult Expected)[] grounds =
         [
             (oak.LeavesId, LeafState.Encode(1, false), TreeSupportResult.Unsupported),
             (otherWood, WoodState.Encode(WoodState.FullCube, WoodState.ParentRoot, false), TreeSupportResult.Unsupported),

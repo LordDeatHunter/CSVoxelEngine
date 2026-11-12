@@ -59,9 +59,9 @@ public sealed class TreeSpeciesContentTests
 
         // Nothing but a species' wood ever carries the flag
         var woods = TreeSpeciesRegistry.All.Select(s => s.WoodId).ToHashSet();
-        for (var id = 0; id < 256; id++)
-            if (!woods.Contains((byte)id))
-                Assert.False(BlockType.HasPixelRim((byte)id), BlockType.ById[id]?.Name ?? id.ToString());
+        for (var id = 0; id < BlockType.ById.Length; id++)
+            if (!woods.Contains((ushort)id))
+                Assert.False(BlockType.HasPixelRim((ushort)id), BlockType.ById[id]?.Name ?? id.ToString());
     }
 
     [Fact]

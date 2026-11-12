@@ -43,6 +43,34 @@ public sealed class CraftingTests
         Assert.Equal(baseline, inventory.Craftable());
     }
 
+    [Theory]
+    [InlineData("copper_pickaxe", "copper_pickaxe_head", "pickaxe")]
+    [InlineData("copper_axe", "copper_axe_head", "axe")]
+    public void ACastHeadAndAHandleAssembleIntoTheTool(string tool, string head, string tag)
+    {
+        var toolId = ContentRegistry.RequireItem(tool).Id;
+        var headId = ContentRegistry.RequireItem(head).Id;
+        var handle = ContentRegistry.RequireItem("branch").Id;
+        var vine = ContentRegistry.RequireItem("vine").Id;
+        var recipe = ContentRegistry.RecipeForResult(toolId)!;
+        Assert.NotNull(recipe);
+
+        var inventory = new Inventory();
+        Assert.True(inventory.Add(handle));
+        Assert.True(inventory.Add(vine, 2));
+        Assert.False(inventory.CanCraft(recipe));
+
+        Assert.True(inventory.Add(headId));
+        Assert.True(inventory.CanCraft(recipe));
+        Assert.True(inventory.TryCraft(recipe));
+
+        Assert.Equal(0, inventory.CountFor(headId));
+        Assert.Equal(0, inventory.CountFor(handle));
+        Assert.Equal(0, inventory.CountFor(vine));
+        Assert.Equal(1, inventory.CountFor(toolId));
+        Assert.True(ContentRegistry.IsInTag(tag, toolId));
+    }
+
     [Fact]
     public void TryCraftStillFitsWhenThePoolIsFull()
     {

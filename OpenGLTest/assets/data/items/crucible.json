@@ -11,5 +11,5 @@
   "name": "Crucible",
   "texture": "assets/textures/items/crucible.png",
   "model": "block/crucible",
-  "crucible": { "capacityMl": 400 }
+  "crucible": { "capacityMl": 800 }
 }

@@ -5,7 +5,7 @@ using VoxelEngine.Items;
 namespace VoxelEngine.Saves;
 
 /// <summary>
-/// Namespaced content names for save files. Byte ids are handed out at startup in file-name
+/// Namespaced content names for save files. Ids are handed out at startup in file-name
 /// order (blocks, then items, sharing one id space), so adding, renaming or removing a single
 /// JSON file renumbers everything after it; a save that stored raw ids would silently turn into
 /// different blocks and items on the next run. Player and entity saves therefore reference
@@ -36,7 +36,7 @@ public static class SaveNames
     /// under. A synthetic item with no JSON behind it has no stable name either and also yields
     /// null; callers drop such an entry with a warning.
     /// </summary>
-    public static string? NameOf(byte id)
+    public static string? NameOf(ushort id)
     {
         if (id == 0) return null;
         if (BlockType.ById[id] is { } block) return BlockPrefix + block.Name;
@@ -50,7 +50,7 @@ public static class SaveNames
     /// unprefixed and unknown names — save files are always written prefixed, and refusing a
     /// bare name is what keeps a block and an item sharing a file name apart.
     /// </summary>
-    public static bool TryResolve(string? name, out byte id)
+    public static bool TryResolve(string? name, out ushort id)
     {
         id = 0;
         if (string.IsNullOrEmpty(name)) return false;

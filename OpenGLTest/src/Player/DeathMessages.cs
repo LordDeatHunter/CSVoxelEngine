@@ -17,6 +17,13 @@ public enum DamageSource : byte
 
     /// <summary>Standing against a cactus.</summary>
     Cactus,
+
+    /// <summary>Out of air with the head under water.</summary>
+    Drowning,
+
+    /// <summary>A status effect's damage over time (burning, frostburn); the killer argument of
+    /// <see cref="DeathMessages.For"/> carries the effect's death phrase.</summary>
+    Magic,
 }
 
 /// <summary>
@@ -27,14 +34,18 @@ public enum DamageSource : byte
 public static class DeathMessages
 {
     /// <summary>The line for a death by <paramref name="source"/>; <paramref name="killer"/> is the
-    /// mob's display name when one dealt it.</summary>
+    /// mob's display name when one dealt it, and for <see cref="DamageSource.Magic"/> the status
+    /// effect's death phrase ("burned to death"), which follows the player's name.</summary>
     public static string For(string player, DamageSource source, string? killer) => source switch
     {
+        DamageSource.Magic when !string.IsNullOrEmpty(killer) => $"{player} {killer}",
+        DamageSource.Magic => $"{player} was killed by magic",
         DamageSource.Mob when !string.IsNullOrEmpty(killer) => $"{player} was slain by {killer}",
         DamageSource.Mob => $"{player} was slain",
         DamageSource.Fall => $"{player} fell",
         DamageSource.Lava => $"{player} burned in lava",
         DamageSource.Cactus => $"{player} was pricked to death",
+        DamageSource.Drowning => $"{player} drowned",
         _ => $"{player} died",
     };
 }

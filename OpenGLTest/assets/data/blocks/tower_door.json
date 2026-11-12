@@ -1,0 +1,16 @@
+{
+  // A worldgen-only battle tower gate across each floor's stairwell: unbreakable, so only the
+  // tower's own lock (BT-4, opened once the floor below is cleared) or its collapse removes it.
+  // A see-through iron portcullis that passes light; the tile is placeholder art from
+  // tools/generate-tower-lock-textures.py.
+  "name": "Tower Gate",
+  "model": { "parent": "block/cube_all", "textures": { "all": "tower_door" } },
+  "cutout": true,
+  "cullSelf": true,
+  "castsAO": false,
+  "light": { "passes": true },
+  "sfx": "hit_rock",
+  "hasItem": false,
+  "loot": "none",
+  "unbreakable": true
+}

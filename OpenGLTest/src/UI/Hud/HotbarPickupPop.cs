@@ -14,11 +14,14 @@ namespace VoxelEngine.UI.Hud;
 /// </summary>
 public sealed class HotbarPickupPop
 {
-    private readonly byte[] _ids = new byte[Inventory.SlotCount];
+    private readonly ushort[] _ids = new ushort[Inventory.SlotCount];
     private readonly int[] _counts = new int[Inventory.SlotCount];
     private readonly bool[] _seen = new bool[Inventory.SlotCount];
     private readonly float[] _elapsed = new float[Inventory.SlotCount];
     private readonly float[] _flashElapsed = new float[Inventory.SlotCount];
+
+    /// <summary>The collected drops' icons arcing into their slots; advanced with the pops.</summary>
+    public PickupFlyIcons Flying { get; } = new();
 
     public HotbarPickupPop()
     {
@@ -39,7 +42,7 @@ public sealed class HotbarPickupPop
     /// its pop when it still shows the same (non-empty) item with a higher count than last time.
     /// The first observation of a slot only records it. Returns whether a pop started.
     /// </summary>
-    public bool Observe(int slot, byte id, int count)
+    public bool Observe(int slot, ushort id, int count)
     {
         var pop = _seen[slot] && id != 0 && id == _ids[slot] && count > _counts[slot];
         _seen[slot] = true;
@@ -54,6 +57,7 @@ public sealed class HotbarPickupPop
     public void Advance(float deltaTime)
     {
         var step = MathF.Max(0f, deltaTime);
+        Flying.Advance(step);
         for (var i = 0; i < _elapsed.Length; i++)
         {
             _elapsed[i] = MathF.Min(HudConfig.HotbarPopSeconds, _elapsed[i] + step);

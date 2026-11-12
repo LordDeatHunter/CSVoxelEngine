@@ -28,11 +28,11 @@ internal static class TreeWoodEmitter
     /// keeps the atlas texel density at every thickness.
     /// </summary>
     internal static void EmitTreeWood(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        ushort[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos)
     {
         var state = paddedState[pIdx];
-        Span<byte> nbIds = stackalloc byte[6];
+        Span<ushort> nbIds = stackalloc ushort[6];
         Span<byte> nbStates = stackalloc byte[6];
         Span<FaceLight> lights = stackalloc FaceLight[6];
         var lightBase = LightIdx(x, y, z);
@@ -88,10 +88,10 @@ internal static class TreeWoodEmitter
     /// material), so <paramref name="idx"/> must be a cell whose horizontal neighbors lie inside
     /// the 18^3 snapshot: the meshed cell itself or its vertical neighbors.
     /// </summary>
-    internal static int RimMaskInSnapshot(byte[] padded, byte[] paddedState, int idx, byte id)
+    internal static int RimMaskInSnapshot(ushort[] padded, byte[] paddedState, int idx, ushort id)
     {
         if (!TreeWoodShape.CanBevel(id, paddedState[idx])) return 0;
-        Span<byte> ids = stackalloc byte[6];
+        Span<ushort> ids = stackalloc ushort[6];
         Span<byte> states = stackalloc byte[6];
         for (var i = 0; i < 4; i++)
         {
@@ -111,7 +111,7 @@ internal static class TreeWoodEmitter
     /// neighbor's far side is never read; a cap needs the whole mask, whose horizontal reads
     /// stay inside the snapshot for a vertical neighbor.
     /// </summary>
-    internal static bool RimFaceFull(byte[] padded, byte[] paddedState, int nbIdx, byte id, int side)
+    internal static bool RimFaceFull(ushort[] padded, byte[] paddedState, int nbIdx, ushort id, int side)
     {
         if (!TreeWoodShape.CanBevel(id, paddedState[nbIdx])) return true;
         if (side >= 4) return RimMaskInSnapshot(padded, paddedState, nbIdx, id) == 0;
@@ -131,7 +131,7 @@ internal static class TreeWoodEmitter
     /// face toward this cell is whole (<see cref="RimFaceFull"/>; this cell is rim mass for it,
     /// so a horizontal one always is, and a detached log is never carved).
     /// </summary>
-    internal static bool RimBoundaryHidden(byte[] padded, byte[] paddedState, int pIdx, byte id, int face)
+    internal static bool RimBoundaryHidden(ushort[] padded, byte[] paddedState, int pIdx, ushort id, int face)
     {
         var nbIdx = pIdx + ChunkFaceTables.FaceNeighborDelta[face];
         var nb = padded[nbIdx];
@@ -169,7 +169,7 @@ internal static class TreeWoodEmitter
     /// shell under a narrower one keeps its exposed rim.
     /// </summary>
     internal static void EmitRimWood(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        ushort[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos, int mask)
     {
         if (vertices.Count > ushort.MaxValue - 4 * MaxRimQuads) return;
@@ -292,6 +292,172 @@ internal static class TreeWoodEmitter
             EmitWallRemainder(vertices, indices, ref indexOffset, basePos, far.Min.X, far.Max.X,
                 near.Min.X, near.Max.X, zb, 0, type.Side, shadeMinZ, lights[0]);
         }
+    }
+
+    // The slit of a chopped cell, in pixels of the 16 across a cell: the small band of height it is cut over
+    // (the cells above and below keep their own faces). It always spans the whole face; how far it goes in is
+    // the damage (WoodDamage.BiteDepthPx).
+    private const int BiteBottomPx = 6;
+    private const int BiteTopPx = 10;
+    private const int MaxBiteQuads = 40;
+
+    /// <summary>
+    /// Emits a full-cube wood cell whose side face <paramref name="biteFace"/> (0..3) has a slit cut into it,
+    /// the whole width of the face and <paramref name="depthPx"/> pixels deep (<see cref="WoodDamage"/>): the cube
+    /// minus one low box across the face, every cell face
+    /// kept whole except where the box reaches it (the face is then drawn as the bars around the hole, so a
+    /// cut that runs to a side edge also opens the neighboring face), the box's inner walls in the cut wood's
+    /// own tile (the log's end grain), and a cap where the box meets a face a neighbor hides, so the bite is
+    /// never see-through. The hitboxes stay the whole cube; the bite is cosmetic.
+    /// </summary>
+    internal static void EmitEaten(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        ushort[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        int x, int y, int z, BlockType type, Vector3 basePos, int biteFace, int depthPx)
+    {
+        if (vertices.Count > ushort.MaxValue - 4 * MaxBiteQuads) return;
+        var id = type.Id;
+        Span<FaceLight> lights = stackalloc FaceLight[6];
+        var lightBase = LightIdx(x, y, z);
+        for (var i = 0; i < 6; i++)
+            lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase, lightBase);
+
+        const float Px = 1f / RimPx;
+        var depth = Math.Clamp(depthPx, 1, WoodDamage.MaxDepthPx) * Px;
+        var y0 = BiteBottomPx * Px;
+        var y1 = BiteTopPx * Px;
+        Vector3 bmin, bmax;
+        switch (biteFace)
+        {
+            case 0: bmin = new Vector3(0f, y0, 0f); bmax = new Vector3(1f, y1, depth); break;
+            case 1: bmin = new Vector3(0f, y0, 1f - depth); bmax = new Vector3(1f, y1, 1f); break;
+            case 2: bmin = new Vector3(0f, y0, 0f); bmax = new Vector3(depth, y1, 1f); break;
+            default: bmin = new Vector3(1f - depth, y0, 0f); bmax = new Vector3(1f, y1, 1f); break;
+        }
+
+        var biteLight = lights[biteFace];
+        for (var face = 0; face < 6; face++)
+        {
+            var touches = BoxTouchesFace(bmin, bmax, face);
+            var nbIdx = pIdx + ChunkFaceTables.FaceNeighborDelta[face];
+            var nb = padded[nbIdx];
+            var hidden = BlockType.Occludes(nb) || (nb == id && WoodState.IsFullCube(paddedState[nbIdx]));
+            var tile = face == 4 ? type.Top : face == 5 ? type.Bottom : type.Side;
+            var shade = ChunkFaceTables.ShadeLut[(face << 2) | 3];
+            if (hidden)
+            {
+                // The neighbor hides this face: where the bite reaches it, cap the bite so it is not see-through
+                if (touches)
+                    EmitCap(vertices, indices, ref indexOffset, basePos, bmin, bmax, face, type.Top, biteLight);
+                continue;
+            }
+
+            if (touches)
+                EmitFaceMinusRect(vertices, indices, ref indexOffset, basePos, face, tile, shade, lights[face], bmin, bmax);
+            else
+                ChunkMesher.EmitBoxFace(vertices, indices, ref indexOffset, basePos, Vector3.Zero, Vector3.One, face, tile,
+                    shade, lights[face]);
+        }
+
+        // The walls of the bite that stand inside the cell, facing into the open box
+        if (bmin.X > 0f) EmitWall(vertices, indices, ref indexOffset, basePos, bmin, bmax, 3, type.Top, biteLight);
+        if (bmax.X < 1f) EmitWall(vertices, indices, ref indexOffset, basePos, bmin, bmax, 2, type.Top, biteLight);
+        if (bmin.Z > 0f) EmitWall(vertices, indices, ref indexOffset, basePos, bmin, bmax, 1, type.Top, biteLight);
+        if (bmax.Z < 1f) EmitWall(vertices, indices, ref indexOffset, basePos, bmin, bmax, 0, type.Top, biteLight);
+        if (bmin.Y > 0f) EmitWall(vertices, indices, ref indexOffset, basePos, bmin, bmax, 4, type.Top, biteLight);
+        if (bmax.Y < 1f) EmitWall(vertices, indices, ref indexOffset, basePos, bmin, bmax, 5, type.Top, biteLight);
+    }
+
+    // Whether the box reaches the plane of the cell's face (a box that stops short leaves it whole)
+    private static bool BoxTouchesFace(Vector3 bmin, Vector3 bmax, int face) => face switch
+    {
+        0 => bmin.Z <= 0f,
+        1 => bmax.Z >= 1f,
+        2 => bmin.X <= 0f,
+        3 => bmax.X >= 1f,
+        4 => bmax.Y >= 1f,
+        _ => bmin.Y <= 0f,
+    };
+
+    // One wall of the box with its normal <paramref name="face"/>, sitting at the box side that faces the
+    // other way (the side of the box on the solid material's edge)
+    private static void EmitWall(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        Vector3 basePos, Vector3 bmin, Vector3 bmax, int face, ushort tile, in FaceLight light)
+    {
+        // The normal +X (3) wall is the box's min-X side, -X (2) the max-X side, and so on
+        var min = bmin;
+        var max = bmax;
+        switch (face)
+        {
+            case 3: max.X = bmin.X; break;
+            case 2: min.X = bmax.X; break;
+            case 1: max.Z = bmin.Z; break;
+            case 0: min.Z = bmax.Z; break;
+            case 4: max.Y = bmin.Y; break;
+            default: min.Y = bmax.Y; break;
+        }
+
+        ChunkMesher.EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, face, tile,
+            ChunkFaceTables.ShadeLut[(face << 2) | 3], light);
+    }
+
+    // The bite's wall on the plane of a cell face its neighbor hides: its normal points back into the box
+    private static void EmitCap(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        Vector3 basePos, Vector3 bmin, Vector3 bmax, int cellFace, ushort tile, in FaceLight light)
+    {
+        var min = bmin;
+        var max = bmax;
+        switch (cellFace)
+        {
+            case 0: max.Z = min.Z; break;
+            case 1: min.Z = max.Z; break;
+            case 2: max.X = min.X; break;
+            case 3: min.X = max.X; break;
+            case 4: min.Y = max.Y; break;
+            default: max.Y = min.Y; break;
+        }
+
+        var face = cellFace ^ 1;
+        ChunkMesher.EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, face, tile,
+            ChunkFaceTables.ShadeLut[(face << 2) | 3], light);
+    }
+
+    // A whole cell face minus the rectangle the box leaves on its plane: the (up to four) bars around the hole
+    private static void EmitFaceMinusRect(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        Vector3 basePos, int face, ushort tile, byte shade, in FaceLight light, Vector3 hmin, Vector3 hmax)
+    {
+        // The face's in-plane axes (0 x, 1 y, 2 z) and the plane's own coordinate
+        var (pa, qa, na) = face switch { 0 or 1 => (0, 1, 2), 2 or 3 => (2, 1, 0), _ => (0, 2, 1) };
+        var plane = face is 1 or 3 or 4 ? 1f : 0f;
+        var p0 = Axis(hmin, pa);
+        var p1 = Axis(hmax, pa);
+        var q0 = Axis(hmin, qa);
+        var q1 = Axis(hmax, qa);
+
+        // Below and above the hole across the whole width, then the strips left and right of it
+        Bar(vertices, indices, ref indexOffset, basePos, face, tile, shade, light, pa, qa, na, plane, 0f, 1f, 0f, q0);
+        Bar(vertices, indices, ref indexOffset, basePos, face, tile, shade, light, pa, qa, na, plane, 0f, 1f, q1, 1f);
+        Bar(vertices, indices, ref indexOffset, basePos, face, tile, shade, light, pa, qa, na, plane, 0f, p0, q0, q1);
+        Bar(vertices, indices, ref indexOffset, basePos, face, tile, shade, light, pa, qa, na, plane, p1, 1f, q0, q1);
+    }
+
+    private static void Bar(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset, Vector3 basePos,
+        int face, ushort tile, byte shade, in FaceLight light, int pa, int qa, int na, float plane,
+        float p0, float p1, float q0, float q1)
+    {
+        if (p1 <= p0 || q1 <= q0) return;
+        ChunkMesher.EmitBoxFace(vertices, indices, ref indexOffset, basePos,
+            WithAxes(pa, p0, qa, q0, na, plane), WithAxes(pa, p1, qa, q1, na, plane), face, tile, shade, light);
+    }
+
+    private static float Axis(Vector3 v, int axis) => axis == 0 ? v.X : axis == 1 ? v.Y : v.Z;
+
+    private static Vector3 WithAxes(int a, float av, int b, float bv, int c, float cv)
+    {
+        Span<float> s = stackalloc float[3];
+        s[a] = av;
+        s[b] = bv;
+        s[c] = cv;
+        return new Vector3(s[0], s[1], s[2]);
     }
 
     // A Z wall at depth zb spanning [x0, x1) minus the span [c0, c1) the adjacent box covers:

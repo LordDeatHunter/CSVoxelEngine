@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
+using VoxelEngine.Items;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
@@ -50,7 +51,7 @@ internal sealed class DropPickup
     // Inventory is assigned in its own initializer and never replaced, so the method group is the
     // same closed delegate every frame; passing `Inventory.CanAccept` inline at the DropManager call
     // allocated a fresh one per frame (PERF_TODO C7).
-    private readonly Func<byte, bool> _canAcceptDrop;
+    private readonly Func<ushort, bool> _canAcceptDrop;
 
     // Scratch for the server's per-player pickup, rebuilt each frame from ServerPlayers
     private readonly List<DropCollector> _dropCollectors = [];
@@ -58,6 +59,19 @@ internal sealed class DropPickup
     // Whether a drop in reach was refused last frame, so the "Inventory full" warning fires on
     // the transition into the blocked state only
     private bool _pickupBlocked;
+
+    // The hotbar slot a collected item's icon flies to: the first slot showing it, else the selected one
+    private int FlySlot(ushort id)
+    {
+        for (var slot = 0; slot < Inventory.SlotCount; slot++)
+            if (Inventory.IdAt(slot) == id) return slot;
+        return Inventory.SelectedIndex;
+    }
+
+    /// <summary>How far a player wearing <paramref name="equipment"/> attracts drops from: wider with the magnet ability.</summary>
+    private static float RangeFor(Equipment equipment) => equipment.Has(GearAbility.Magnet)
+        ? DropManager.PickupRange * GearConfig.MagnetRangeFactor
+        : DropManager.PickupRange;
 
     /// <summary>Runs this tick's drop pickup: gathers the collectors, updates the drops and credits what they collected.</summary>
     internal void Update(double deltaTime)
@@ -72,11 +86,12 @@ internal sealed class DropPickup
         {
             var players = ServerPlayers;
             foreach (var serverPlayer in players)
-                _dropCollectors.Add(new DropCollector(serverPlayer.Position, serverPlayer.CanAcceptDrop));
+                _dropCollectors.Add(new DropCollector(serverPlayer.Position, serverPlayer.CanAcceptDrop,
+                    RangeFor(serverPlayer.Inventory.Equipment)));
         }
         else
         {
-            _dropCollectors.Add(new DropCollector(Camera.Position, _canAcceptDrop));
+            _dropCollectors.Add(new DropCollector(Camera.Position, _canAcceptDrop, RangeFor(Inventory.Equipment)));
         }
 
         // A client's goblins are mirrors whose ammo is the server's (EntityList): never scavenge
@@ -88,6 +103,7 @@ internal sealed class DropPickup
         var pickedUp = false;
         var collected = _dropManager.Collected;
         var collectors = _dropManager.CollectedBy;
+        var collectedAt = _dropManager.CollectedAt;
         for (var i = 0; i < collected.Length; i++)
         {
             if (collectors[i] >= goblinCollectors)
@@ -105,7 +121,10 @@ internal sealed class DropPickup
             }
 
             var known = Inventory.Knows(collected[i]);
-            pickedUp |= Inventory.Add(collected[i]);
+            var added = Inventory.Add(collected[i]);
+            pickedUp |= added;
+            if (added)
+                _world.HotbarPops.Flying.Spawn(collected[i], collectedAt[i], FlySlot(collected[i]));
             // A first find toasts its name: Add marks the id obtained, so read it before
             if (!known)
                 Toast.Show($"New: {Inventory.DisplayName(collected[i])}");

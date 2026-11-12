@@ -1,0 +1,64 @@
+{
+  // Baseline of the list-based inventory UIs: run with VOXEL_SCRIPT=visual-examples/inventory-ui.json
+  // VOXEL_TIME=147 from OpenGLTest/. Shots land in visual/inventory-ui/. Film it before and after a UI
+  // change and compare: the [E] panel on every tab, a search, a picked row, the craft card, a hovered row's
+  // tooltip and the spell builder.
+  // Survival player in the open forest clearing (ground y 9..10): the panel rows only pick, and hover only
+  // reads a row, in survival (creative rows are buttons).
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 62.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "give", "block": "cobblestone", "count": 20 },
+    { "op": "give", "block": "glass", "count": 10 },
+    { "op": "give", "block": "oak_planks", "count": 8 },
+    { "op": "give", "block": "item/branch", "count": 6 },
+    { "op": "give", "block": "item/primitive_pickaxe", "count": 1 },
+    { "op": "give", "block": "item/primitive_axe", "count": 1 },
+    { "op": "wait", "seconds": 0.5 },
+
+    // The [E] panel on each tab (the fade and slide take 0.18 s, so wait it out)
+    { "op": "panel", "open": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "blocks" },
+    { "op": "tab", "tab": "tools" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "tools" },
+    { "op": "tab", "tab": "misc" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "misc" },
+
+    // The craft tab with a recipe open: the card and its controls
+    { "op": "tab", "tab": "crafting" },
+    { "op": "row", "row": 1 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "crafting-card" },
+
+    // A picked row and its preview, then a hovered row's tooltip
+    { "op": "tab", "tab": "blocks" },
+    { "op": "row", "row": 2 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "picked-row" },
+    { "op": "hover", "pos": [200, 240] },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "hover-row" },
+    { "op": "hover", "clear": true },
+
+    // The search field: owned items and the recipes that make or use a match
+    { "op": "search", "text": "stone" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "search" },
+    { "op": "panel", "open": false },
+    { "op": "wait", "seconds": 0.4 },
+
+    // The spell builder with a staff in hand
+    { "op": "give", "block": "item/wooden_staff", "count": 1 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "spellbuilder", "open": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "spell-builder" },
+    { "op": "spellbuilder", "open": false },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "closed" }
+  ]
+}

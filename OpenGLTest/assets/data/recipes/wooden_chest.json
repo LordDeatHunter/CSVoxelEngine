@@ -1,0 +1,10 @@
+{
+  "result": "block/wooden_chest",
+  "count": 1,
+  "ingredients": [
+    {
+      "item": "block/oak_planks",
+      "count": 8
+    }
+  ]
+}

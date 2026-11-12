@@ -1,0 +1,7 @@
+{
+  // A boar's haunch takes a little longer than venison.
+  "input": "item/raw_boar_meat",
+  "result": "item/cooked_boar_meat",
+  "count": 1,
+  "cookSeconds": 14
+}

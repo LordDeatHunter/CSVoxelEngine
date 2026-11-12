@@ -21,40 +21,40 @@ public static class TerrainGenerator
 {
     // The terrain palette: the generator owns the choice of which blocks natural ground is made
     // of, and Chunk only fills its columns with them. Resolved once here so the per-voxel fill
-    // and the far LOD both read a byte instead of hitting the registry.
+    // and the far LOD both read a cached id instead of hitting the registry.
 
     /// <summary>Block the top of a dry column is made of.</summary>
-    public static readonly byte SurfaceBlock;
+    public static readonly ushort SurfaceBlock;
 
     /// <summary>Block filling the soil band under the surface (and the top of a sea floor).</summary>
-    public static readonly byte SoilBlock;
+    public static readonly ushort SoilBlock;
 
     /// <summary>Block everything below the soil band is made of.</summary>
-    public static readonly byte RockBlock;
+    public static readonly ushort RockBlock;
 
     /// <summary>The frozen tundra's top and shallow soil under its snow, over stone.</summary>
-    public static readonly byte PermafrostBlock;
+    public static readonly ushort PermafrostBlock;
 
     /// <summary>Fluid the sea is filled with, up to and including sea level.</summary>
-    public static readonly byte SeaBlock;
+    public static readonly ushort SeaBlock;
 
     /// <summary>Block dirt touching fresh sea water rots into on the spot.</summary>
-    public static readonly byte MudBlock;
+    public static readonly ushort MudBlock;
 
     /// <summary>Block beach columns (see <see cref="IsBeachHeight"/>) are built from.</summary>
-    public static readonly byte SandBlock;
+    public static readonly ushort SandBlock;
 
     /// <summary>Block capping beach columns where <see cref="IsGravelPatch"/> holds.</summary>
-    public static readonly byte GravelBlock;
+    public static readonly ushort GravelBlock;
 
     /// <summary>Block a desert column's soil band is made of, under its surface sand.</summary>
-    public static readonly byte SandstoneBlock;
+    public static readonly ushort SandstoneBlock;
 
     /// <summary>Frozen water surface and the frozen biome's ice; the ice-sheet block.</summary>
-    public static readonly byte IceBlock;
+    public static readonly ushort IceBlock;
 
     /// <summary>Layered snow block; the snow accumulation pass stamps it.</summary>
-    public static readonly byte SnowBlock;
+    public static readonly ushort SnowBlock;
 
     static TerrainGenerator()
     {

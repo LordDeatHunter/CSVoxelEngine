@@ -12,18 +12,16 @@ using Xunit;
 namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
-/// A felled tree is meshed by the real chunk mesher inside a scratch chunk that stands far from
-/// the tree, so its biome tint must come from the tree's own footprint
-/// (<see cref="BiomeTint.FieldsAt"/> at the scratch origin centered on the pivot,
-/// <see cref="TopplingTree.ScratchOrigin"/>), never from the scratch chunk's position, and its
-/// wood stays untinted.
+/// A felled tree is meshed by the real chunk mesher with each chunk at the cells' real position,
+/// so its biome tint must come from the field of the chunk column each cell stood in
+/// (<see cref="BiomeTint.FieldsFor"/>), never from some other place, and its wood stays untinted.
 /// </summary>
 public sealed class TopplingTreeTintTests
 {
     public TopplingTreeTintTests() => TestContent.EnsureLoaded();
 
-    /// <summary>The chunk position <c>TopplingTree.BuildMeshData</c> meshes its scratch chunk at.</summary>
-    private const int ScratchChunk = 256;
+    /// <summary>A chunk column far from the test trees, whose climate a wrongly placed mesh would wear.</summary>
+    private const int FarChunk = 256;
 
     private static BlockType Leaves => ContentRegistry.RequireBlock("oak_leaves");
 
@@ -56,20 +54,19 @@ public sealed class TopplingTreeTintTests
     private const int CornerOffset = 5;
 
     /// <summary>
-    /// A pivot cell (off the 16-block lattice, a few blocks past a lattice line so the tree's
-    /// minimum corner lies in the lattice cell before it) whose centered scratch origin's foliage
-    /// field differs clearly from the scratch chunk's own.
+    /// A pivot cell (a few blocks past a chunk border, so the tree's minimum corner lies in the
+    /// chunk column before it) whose column's foliage field differs clearly from the far
+    /// column's.
     /// </summary>
     private static bool TryFindDiscriminatingPivot(out Vector3 pivotCell)
     {
-        var scratchField = BiomeTint.FieldsFor(ScratchChunk, ScratchChunk).Foliage;
+        var farField = BiomeTint.FieldsFor(FarChunk, FarChunk).Foliage;
         for (var cx = -200; cx <= 200; cx += 8)
         for (var cz = -200; cz <= 200; cz += 8)
         {
             var wx = cx * Chunk.Size + CornerOffset - 2;
             var wz = cz * Chunk.Size + CornerOffset - 2;
-            var origin = TopplingTree.ScratchOrigin(new Vector3(wx + 0.5f, 40, wz + 0.5f), 40);
-            if (MaxCornerDiff(BiomeTint.FieldsAt((int)origin.X, (int)origin.Z).Foliage, scratchField) <= 8f / 255f)
+            if (MaxCornerDiff(BiomeTint.FieldsFor(wx >> Chunk.SizeShift, wz >> Chunk.SizeShift).Foliage, farField) <= 8f / 255f)
                 continue;
             pivotCell = new Vector3(wx, 40, wz);
             return true;
@@ -79,19 +76,19 @@ public sealed class TopplingTreeTintTests
         return false;
     }
 
-    private static IEnumerable<Vertex> AllVertices(ChunkMeshData mesh) =>
-        mesh.Vertices.Concat(mesh.TranslucentVertices);
+    private static IEnumerable<Vertex> AllVertices(IEnumerable<ChunkMeshData> meshes) =>
+        meshes.SelectMany(mesh => mesh.Vertices.Concat(mesh.TranslucentVertices));
 
     [Fact]
-    public void FelledLeavesWearTheFieldOfTheTreesFootprint()
+    public void FelledLeavesWearTheFieldOfTheChunkColumnTheyStoodIn()
     {
         Assert.True(TryFindDiscriminatingPivot(out var pivotCell),
-            "no pivot within +-200 chunks has a foliage field distinct from the scratch chunk's");
+            "no pivot within +-200 chunks has a foliage field distinct from the far column's");
 
         var leaves = Leaves;
         var bt = leaves.BiomeTint ?? throw new InvalidOperationException("leaves declare no biomeTint");
-        // The minimum corner sits across a lattice line from the pivot column, so the footprint
-        // the field is read over is the one centered on the pivot, not the one from the corner
+        // The minimum corner sits across a chunk border from the pivot column, so the tree spans
+        // two columns and each cell must wear its own column's field
         var corner = pivotCell - new Vector3(CornerOffset, 0, CornerOffset);
         List<TopplingTree.FellBlock> blocks =
         [
@@ -102,17 +99,12 @@ public sealed class TopplingTreeTintTests
         ];
 
         var pivot = new Vector3(pivotCell.X + 0.5f, pivotCell.Y, pivotCell.Z + 0.5f);
-        var mesh = TopplingTree.BuildMeshData(blocks, pivot);
+        var meshes = TopplingTree.BuildMeshData(blocks, pivot);
 
-        // A vertex position is pivot-relative; its offset into the footprint the field is
-        // sampled over is measured from the centered origin
-        var origin = TopplingTree.ScratchOrigin(pivot, pivotCell.Y);
-        var toLocal = pivot - origin;
-        var footprint = BiomeTint.FieldsAt((int)origin.X, (int)origin.Z).Foliage;
-        var scratchField = BiomeTint.FieldsFor(ScratchChunk, ScratchChunk).Foliage;
+        var farField = BiomeTint.FieldsFor(FarChunk, FarChunk).Foliage;
         var checkedCount = 0;
         var discriminated = 0;
-        foreach (var v in AllVertices(mesh))
+        foreach (var v in AllVertices(meshes))
         {
             var face = v.Normal & 7;
             if (v.Layer != bt.Tinted[face])
@@ -121,9 +113,13 @@ public sealed class TopplingTreeTintTests
             checkedCount++;
             Assert.True(v.IsBiomeTinted, $"felled leaf vertex at {v.Position} lacks the biome-tint flag");
 
-            var local = v.Position + toLocal;
-            var expected = footprint.Sample(local.X, local.Z);
-            var wrong = scratchField.Sample(local.X, local.Z);
+            // A vertex position is pivot-relative; the field it must wear is its world column's,
+            // sampled at its offset into that column
+            var world = v.Position + pivot;
+            int cx = (int)MathF.Floor(world.X) >> Chunk.SizeShift, cz = (int)MathF.Floor(world.Z) >> Chunk.SizeShift;
+            var local = world - new Vector3(cx * Chunk.Size, 0f, cz * Chunk.Size);
+            var expected = BiomeTint.FieldsFor(cx, cz).Foliage.Sample(local.X, local.Z);
+            var wrong = farField.Sample(local.X, local.Z);
             var matched = false;
             for (var ao = 0; ao < 4; ao++)
             {
@@ -131,22 +127,22 @@ public sealed class TopplingTreeTintTests
                     continue;
                 matched = true;
 
-                // At this very shade, the scratch chunk's field would have baked visibly other
+                // At this very shade, the far column's field would have baked visibly other
                 // bytes: the vertex must not carry them.
                 var wrongShade = ShadeOf(face, ao, wrong);
                 if (Near(ShadeOf(face, ao, expected), wrongShade, 2))
                     continue;
                 discriminated++;
                 Assert.False(Near(Rgb(v), wrongShade, 1),
-                    $"felled leaf vertex at {v.Position} wears the scratch chunk's tint");
+                    $"felled leaf vertex at {v.Position} wears the far column's tint");
             }
 
             Assert.True(matched,
-                $"felled leaf vertex at {v.Position} rgb {Rgb(v)} is not shade * the footprint's foliage tint");
+                $"felled leaf vertex at {v.Position} rgb {Rgb(v)} is not shade * its own column's foliage tint");
         }
 
         Assert.True(checkedCount > 0, "the felled leaves emitted no tinted vertex");
-        Assert.True(discriminated > 0, "no vertex could tell the footprint's field from the scratch chunk's");
+        Assert.True(discriminated > 0, "no vertex could tell its own column's field from the far one's");
     }
 
     [Fact]
@@ -162,9 +158,9 @@ public sealed class TopplingTreeTintTests
             new(pivotCell + Vector3.UnitY, log.Id, WoodState.Detached),
             new(pivotCell + Vector3.UnitY * 2, log.Id, WoodState.Detached),
         ];
-        var mesh = TopplingTree.BuildMeshData(blocks, new Vector3(pivotCell.X + 0.5f, pivotCell.Y, pivotCell.Z + 0.5f));
+        var meshes = TopplingTree.BuildMeshData(blocks, new Vector3(pivotCell.X + 0.5f, pivotCell.Y, pivotCell.Z + 0.5f));
 
-        var vertices = AllVertices(mesh).ToList();
+        var vertices = AllVertices(meshes).ToList();
         Assert.NotEmpty(vertices);
         foreach (var v in vertices)
         {

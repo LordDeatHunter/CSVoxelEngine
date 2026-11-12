@@ -12,6 +12,7 @@ using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.LeafDecay;
+using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;
 
@@ -46,7 +47,7 @@ internal sealed class BlockEditor
 
     private bool IsPlaying => _world.IsPlaying;
     private Camera Camera => _world.Camera;
-    private Action<int, int, int, byte, byte>? BlockEdited => _world.BlockEdited;
+    private Action<int, int, int, ushort, byte>? BlockEdited => _world.BlockEdited;
 
     internal BlockEditor(World world, ChunkManager chunkManager, BlockDebrisSystem debris, DropManager dropManager,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
@@ -77,14 +78,15 @@ internal sealed class BlockEditor
     /// cell of a multiblock reverts the structure, loot drops unless the player is creative, a
     /// station hands back what it held, fragile blocks above pop and sand above topples, and the
     /// fluid, leaf-decay, far-LOD and canopy hooks all run. A server calls it once a player's mining
-    /// was judged complete. Returns whether the cell was cleared; false for an unloaded chunk, air
-    /// or a fluid (never mined), or while the world is not playing.
+    /// was judged complete. Returns whether the cell was cleared; false for an unloaded chunk, air,
+    /// a fluid or an unbreakable block (never mined), or while the world is not playing.
     /// </summary>
     internal bool BreakBlockFor(PlayerContext player, Vector3 cell)
     {
         if (!IsPlaying) return false;
         int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
-        if (!_chunkManager.TryGetCell(x, y, z, out var id, out _) || id == 0 || BlockType.IsFluid(id))
+        if (!_chunkManager.TryGetCell(x, y, z, out var id, out _) || id == 0 || BlockType.IsFluid(id)
+            || BlockType.IsUnbreakable(id))
             return false;
         RemoveBlock(cell, player);
         return _chunkManager.TryGetCell(x, y, z, out var after, out _) && after == 0;
@@ -93,7 +95,7 @@ internal sealed class BlockEditor
     /// <summary>
     /// Block id at a world position; 0 (air) for unloaded chunks.
     /// </summary>
-    internal byte BlockIdAt(Vector3 blockPos)
+    internal ushort BlockIdAt(Vector3 blockPos)
     {
         // blockPos components are floored floats, so the int casts are exact
         return _chunkManager.GetBlockGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
@@ -120,6 +122,10 @@ internal sealed class BlockEditor
         // Water is not mineable: only a bucket takes it out (and its hardness of 0 would
         // otherwise pop it on first contact)
         if (BlockType.IsFluid(brokenId)) return;
+
+        // Nothing removes an unbreakable block, creative and a client's prediction included: no
+        // debris, no hooks, no BlockEdited
+        if (BlockType.IsUnbreakable(brokenId)) return;
 
         _debris.Burst(blockPos, brokenId, ParticleConfig.BlockDebrisOnBreak,
             columns: _chunkManager.ColumnSource);
@@ -157,11 +163,21 @@ internal sealed class BlockEditor
                 _campfires.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, stationDrops);
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.Quern)
                 _querns.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, stationDrops);
+            // A broken chest spills what it holds (a ruin chest nobody opened rolls its loot first)
+            if (BlockType.ById[brokenId]?.Chest is { } chest)
+                _world.Chests.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, chest, brokenState,
+                    stationDrops);
             // A mined mold throws out a cast that had already set, even in creative - the mold
             // block itself is what creative withholds, not the metal someone poured into it
             if (ContentRegistry.IsCastMold(brokenId))
                 _casting.NotifyBlockRemoved(blockPos, stationDrops);
         }
+
+        // A mined waystone (either half: the pair came down together above) stays in its discoverers' lists, marked
+        // lost once under its lower half's cell. A client keeps no registry; the server's answer to the break decides.
+        if (!_clientMode && BlockIdAt(blockPos) == 0
+            && WaystoneManager.TryGetWaystoneCell(brokenId, (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, out var waystone))
+            _world.Waystones.NotifyBlockRemoved(waystone.X, waystone.Y, waystone.Z);
 
         // Water beside or above the hole pours into it on the next fluid tick
         _fluidManager.ScheduleAround(blockPos);
@@ -239,7 +255,7 @@ internal sealed class BlockEditor
     /// The tree tips away from <paramref name="feller"/>, the eye of whoever cut it, and anything
     /// the felled cells held up (a torch on the trunk) pops for <paramref name="player"/>.
     /// </summary>
-    private void FellWood(Vector3 blockPos, byte brokenId, byte brokenState, Chunk chunk, bool creative,
+    private void FellWood(Vector3 blockPos, ushort brokenId, byte brokenState, Chunk chunk, bool creative,
         Vector3 feller, PlayerContext player)
     {
         var x = (int)blockPos.X;
@@ -281,6 +297,7 @@ internal sealed class BlockEditor
 
             // A player-built extension felled with the tree stops counting as placed
             _chunkManager.UnmarkPlayerPlaced((int)block.Cell.X, (int)block.Cell.Y, (int)block.Cell.Z);
+            _chunkManager.ChopDamage.Clear((int)block.Cell.X, (int)block.Cell.Y, (int)block.Cell.Z);
             touchedChunks.Add(chunkPos);
             _fluidManager.ScheduleAround(block.Cell);
             min = Vector3.Min(min, block.Cell);
@@ -301,6 +318,14 @@ internal sealed class BlockEditor
             if (_chunkManager.Chunks.TryGetValue(chunkPos, out var touched))
                 touched.RemeshAfterBatchEdit(_chunkManager);
         }
+
+        // The falling copy shows at once, so the chunks that lost cells rebuild now too (nearest
+        // first, capped against a hitch): left to the dirty queue behind every light-radius
+        // neighbor, the standing tree stayed drawn beside its falling copy for seconds.
+        foreach (var chunkPos in touchedChunks
+                     .OrderBy(c => Vector3.DistanceSquared((c + new Vector3(0.5f)) * Chunk.Size, feller))
+                     .Take(SimulationConfig.TreeFellSyncRemeshChunks))
+            _chunkManager.ImmediateRemesh(chunkPos);
 
         // Sand stacked on the felled wood loses its support with it
         foreach (var block in collected)
@@ -345,31 +370,45 @@ internal sealed class BlockEditor
     }
 
     /// <summary>
-    /// Converts the 2x2x2 volume of <paramref name="sourceId"/> that the clicked face belongs
+    /// Converts the volume (the anchor's size) of <paramref name="sourceId"/> that the clicked face belongs
     /// to into the <paramref name="anchorId"/> multiblock, opening toward the player
     /// (see <see cref="MultiblockPlacement.TryFindVolume"/>). The clicked cell's chunk remeshes
     /// synchronously so the click frame already shows the structure; the rest of the touched
-    /// chunks rebuild asynchronously, exactly as a felled tree's do. Returns whether a volume
-    /// was converted.
+    /// chunks rebuild asynchronously, exactly as a felled tree's do. A source block built into the
+    /// volume's interior (<see cref="Multiblock.IsInterior"/>) is handed back as a drop in front of
+    /// the clicked face, since a revert leaves the interior empty. Returns whether a volume was
+    /// converted.
     /// </summary>
-    internal bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, byte sourceId, byte anchorId,
+    internal bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, ushort sourceId, ushort anchorId,
         Vector3 viewDirection)
     {
         if (BlockType.ById[anchorId] is not { } anchorType) return false;
-        if (!MultiblockPlacement.TryFindVolume(_chunkManager.GetBlockGlobal, sourceId, hitCell,
+        if (!MultiblockPlacement.TryFindVolume(_chunkManager.GetBlockGlobal, sourceId, anchorType.MultiblockSize, hitCell,
                 hitNormal, viewDirection, out var anchor, out var facing))
             return false;
 
         // A live falling cube owns its cell: never bury one inside the structure
-        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(anchorType.MultiblockSize))
         {
             if (_falling.OverlapsAny((int)anchor.X + dx, (int)anchor.Y + dy, (int)anchor.Z + dz))
                 return false;
         }
 
+        // A client's convert is a prediction and drops nothing; the server hands the brick back
+        if (!_clientMode)
+        {
+            var size = anchorType.MultiblockSize;
+            foreach (var (dx, dy, dz) in Multiblock.Offsets(size))
+            {
+                if (Multiblock.IsInterior(dx, dy, dz, size)
+                    && _chunkManager.GetBlockGlobal((int)anchor.X + dx, (int)anchor.Y + dy, (int)anchor.Z + dz) == sourceId)
+                    _dropManager.Spawn(sourceId, hitCell + hitNormal);
+            }
+        }
+
         var touchedChunks = new HashSet<Vector3>();
         Multiblock.Convert(_chunkManager, anchor, facing, anchorType, touchedChunks);
-        NotifyLodEditMultiblock(anchor);
+        NotifyLodEditMultiblock(anchor, anchorType);
 
         _chunkManager.ImmediateRemeshWithBorders(VoxelCoords.ChunkPosOf(hitCell), hitCell);
         foreach (var chunkPos in touchedChunks)
@@ -379,29 +418,29 @@ internal sealed class BlockEditor
         }
 
         OnMultiblockConverted(anchor, facing, anchorType);
-        // A client forwards all eight cells (the anchor and its parts, each with the facing and
+        // A client forwards every cell (the anchor and its parts, each with the facing and
         // offset in its state byte), so the server holds the same structure
-        RaiseBlockEditedMultiblock(anchor);
+        RaiseBlockEditedMultiblock(anchor, anchorType);
         return true;
     }
 
-    /// <summary><see cref="RaiseBlockEdited"/> over every cell of the 2x2x2 structure at
+    /// <summary><see cref="RaiseBlockEdited"/> over every cell of the structure at
     /// <paramref name="anchor"/>.</summary>
-    private void RaiseBlockEditedMultiblock(Vector3 anchor)
+    private void RaiseBlockEditedMultiblock(Vector3 anchor, BlockType anchorType)
     {
         if (BlockEdited == null)
             return;
-        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(anchorType.MultiblockSize))
             RaiseBlockEdited(anchor + new Vector3(dx, dy, dz));
     }
 
     /// <summary>
-    /// Mining any cell of a multiblock takes the whole structure down: the other seven cells go
+    /// Mining any cell of a multiblock takes the whole structure down: the other cells go
     /// back to the source block in one batch and the mined cell rolls the structure's loot when
     /// <paramref name="dropsLoot"/> (not for a creative break, and never on a client, whose break
     /// is a prediction). An orphaned cell (its anchor already blasted away) just pops on its own.
     /// </summary>
-    private void RevertMultiblock(Vector3 blockPos, byte brokenId, Chunk chunk, bool dropsLoot)
+    private void RevertMultiblock(Vector3 blockPos, ushort brokenId, Chunk chunk, bool dropsLoot)
     {
         if (!Multiblock.TryResolveAnchor(_chunkManager, (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z,
                 out var anchor, out _, out var anchorType) || anchorType == null)
@@ -413,7 +452,7 @@ internal sealed class BlockEditor
 
         var touchedChunks = new HashSet<Vector3>();
         Multiblock.Revert(_chunkManager, anchor, anchorType, blockPos, touchedChunks);
-        NotifyLodEditMultiblock(anchor);
+        NotifyLodEditMultiblock(anchor, anchorType);
 
         _chunkManager.ImmediateRemeshWithBorders(VoxelCoords.ChunkPosOf(blockPos), blockPos);
         foreach (var chunkPos in touchedChunks)
@@ -426,9 +465,9 @@ internal sealed class BlockEditor
             _dropManager.SpawnLoot(brokenId, blockPos);
 
         OnMultiblockBroken(anchor, anchorType, blockPos);
-        // The other seven cells went back to the source block: a client forwards them too, or
+        // The other cells went back to the source block: a client forwards them too, or
         // the server would keep invisible part cells standing (RemoveBlock reports the mined one)
-        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(anchorType.MultiblockSize))
         {
             var cell = anchor + new Vector3(dx, dy, dz);
             if (cell != blockPos)
@@ -443,7 +482,7 @@ internal sealed class BlockEditor
     /// schedules, the far LOD, the blocks it held up, a falls block above it, the client's
     /// prediction report) without dropping anything of its own.
     /// </summary>
-    private void RemoveTallBlock(Vector3 blockPos, byte brokenId, Vector3 partnerCell, byte partnerId, Chunk chunk,
+    private void RemoveTallBlock(Vector3 blockPos, ushort brokenId, Vector3 partnerCell, ushort partnerId, Chunk chunk,
         bool dropsLoot, PlayerContext player)
     {
         if (!chunk.RemoveBlockAt(blockPos, _chunkManager)) return;
@@ -467,8 +506,10 @@ internal sealed class BlockEditor
     /// can start tracking it.</summary>
     private void OnMultiblockConverted(Vector3 anchor, int facing, BlockType anchorType)
     {
-        if (anchorType.Kiln)
+        if (anchorType.Kiln != null)
             _kilns.Ensure(anchor, facing, anchorType.Id);
+        if (anchorType.Bloomery != null)
+            _world.Smithing.Bloomeries.Ensure(anchor, facing, anchorType.Id);
     }
 
     /// <summary>Runs right after a structure came down, so the managers that owned it can hand
@@ -477,8 +518,10 @@ internal sealed class BlockEditor
     private void OnMultiblockBroken(Vector3 anchor, BlockType anchorType, Vector3 blockPos)
     {
         // A client's kiln is a mirror of the server's: it forgets the structure but drops nothing
-        if (anchorType.Kiln)
+        if (anchorType.Kiln != null)
             _kilns.NotifyBlockRemoved(anchor, blockPos, _clientMode ? null : _dropManager);
+        if (anchorType.Bloomery != null)
+            _world.Smithing.Bloomeries.NotifyBlockRemoved(anchor, blockPos, _clientMode ? null : _dropManager);
     }
 
     // Scratch for ThudTree: the landed blocks, split into canopy and trunk
@@ -570,11 +613,20 @@ internal sealed class BlockEditor
             _lodManager.MarkEditedColumn(x, z);
     }
 
-    /// <summary>Runs <see cref="NotifyLodEdit"/> over every cell of the 2x2x2 structure at
+    /// <summary>
+    /// Pops every support-fragile block the emptied cell (x, y, z) was holding up, for a writer that
+    /// cleared the cell itself (the battle tower's <c>TowerBlockWriter</c>). The pops run for the local
+    /// player's context, so they roll loot only while it is not creative. Known gap: a dedicated server's
+    /// camera hovers in creative, so a pop beside a cell it clears there drops nothing. Main thread only.
+    /// </summary>
+    internal void PopUnsupportedAt(int x, int y, int z) =>
+        PopUnsupportedAround(new Vector3(x, y, z), _world.LocalPlayer.LocalContext());
+
+    /// <summary>Runs <see cref="NotifyLodEdit"/> over every cell of the structure at
     /// <paramref name="anchor"/>, after a convert or a revert rewrote them.</summary>
-    private void NotifyLodEditMultiblock(Vector3 anchor)
+    private void NotifyLodEditMultiblock(Vector3 anchor, BlockType anchorType)
     {
-        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(anchorType.MultiblockSize))
             NotifyLodEdit((int)anchor.X + dx, (int)anchor.Y + dy, (int)anchor.Z + dz);
     }
 }

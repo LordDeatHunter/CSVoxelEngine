@@ -5,7 +5,7 @@ description: How to measure CSVoxelEngine framerate and frame-time honestly - Re
 
 # Performance capture
 
-Tracking lives in repo-root `PERF_TODO.md` (ranked items with their measurements) and `TODO.md`. Read the next open item before starting.
+Tracking lives in `plans/PERF.md` (ranked items with their measurements) and `plans/TODO.md`. Read the next open item before starting.
 
 ## Ground rules
 - **Release only.** Debug is several times slower in the voxel loops and says nothing. `Directory.Build.props` defaults project builds to Release, but a solution build needs `-c Release`. The startup line `Build: Release | ...` confirms it.
@@ -23,7 +23,7 @@ Worker-thread costs (meshing, worldgen) never show in the per-frame profiler.
 3. Run **both** exes the same way, interleaved, so they share GPU clock state:
    `Start-Process <root>/OpenGLTest/bin/Release/net9.0/VoxelEngine.exe -WorkingDirectory <root>/OpenGLTest` with `VOXEL_SPAWN=0,30,0 VOXEL_TIME=60 VOXEL_LOOK=...` (spawn high so the player lands on loaded terrain), stdout redirected to a file.
 4. Wait until `chunks N/M` stops changing (~20 s), then read the last 3 `perf` lines. For a fly capture, use a scenario with `fly` (`perf-fly.json`, `tree-perf.json`, `lod-horizon.json` exist) rather than injected keys.
-5. Report both numbers per pair plus GPU/CPU ms, GC/s and frame ms. Record the numbers on the item in `PERF_TODO.md`.
+5. Report both numbers per pair plus GPU/CPU ms, GC/s and frame ms. Record the numbers on the item in `plans/PERF.md`.
 6. `git worktree remove --force <scratchpad>/before` afterwards.
 
 ## Allocation / worker-side numbers

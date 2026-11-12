@@ -50,6 +50,10 @@ public sealed class AnimationClock
     /// <summary>Whether to start over at the end (on) or hold the final pose there (off).</summary>
     public bool Loop { get; set; } = true;
 
+    /// <summary>True while playback is paused (the space bar): time stops advancing, the speed setting is kept,
+    /// and scrubbing or seeking still works.</summary>
+    public bool Paused { get; set; }
+
     /// <summary>True while the progress slider is held: time stops advancing and the slider owns it.</summary>
     public bool Scrubbing { get; set; }
 
@@ -93,7 +97,7 @@ public sealed class AnimationClock
     /// <summary>Advances by <paramref name="deltaTime"/> real seconds at the current speed (nothing while scrubbing or paused).</summary>
     public void Update(float deltaTime)
     {
-        if (_driver is null || Scrubbing || deltaTime <= 0f || _speed <= 0f) return;
+        if (_driver is null || Scrubbing || Paused || deltaTime <= 0f || _speed <= 0f) return;
 
         // Whole fixed slices only: the remainder waits for the next frame, so the driver never sees an odd step.
         _carry += deltaTime * _speed;

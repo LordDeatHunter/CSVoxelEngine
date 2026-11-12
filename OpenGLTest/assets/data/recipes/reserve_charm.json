@@ -1,0 +1,8 @@
+{
+  "result": "item/reserve_charm",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/tin_ring", "count": 2 },
+    { "item": "item/vine", "count": 1 }
+  ]
+}

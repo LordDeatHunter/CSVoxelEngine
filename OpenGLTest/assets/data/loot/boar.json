@@ -1,0 +1,25 @@
+{
+  // Meat always, a hide half the time, a tusk now and then.
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/raw_boar_meat", "weight": 1, "count": { "min": 1, "max": 2 } }
+      ]
+    },
+    {
+      "rolls": 1,
+      "chance": 0.5,
+      "entries": [
+        { "item": "item/hide", "weight": 1, "count": 1 }
+      ]
+    },
+    {
+      "rolls": 1,
+      "chance": 0.35,
+      "entries": [
+        { "item": "item/boar_tusk", "weight": 1, "count": 1 }
+      ]
+    }
+  ]
+}

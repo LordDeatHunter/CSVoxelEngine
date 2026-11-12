@@ -8,6 +8,7 @@ using VoxelEngine.Content.Stations;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Effects.Lighting;
+using VoxelEngine.Interaction;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features.Underground;
@@ -21,16 +22,16 @@ namespace VoxelEngine.Chunks.Meshing;
 /// <summary>The per-chunk mesh build behind <see cref="Chunk.GenerateMeshData(ChunkManager)"/>: neighborhood resolve, padded and light snapshots, the light flood (<see cref="ChunkLighting"/>) and the per-voxel emitter loop after <see cref="ChunkMesher.EmitGreedyFaces"/>. Runs on mesh pool threads and on the main thread; allocation-free apart from the result, with every scratch array rented or thread-static.</summary>
 internal static class ChunkMeshBuilder
 {
-    /// <inheritdoc cref="Chunk.GenerateMeshData(ChunkManager, bool, BiomeTintFields?)"/>
-    internal static ChunkMeshData? GenerateMeshData(Chunk chunk, ChunkManager chunkManager, bool greedy,
-        BiomeTintFields? tintFields)
+    /// <inheritdoc cref="Chunk.GenerateMeshData(ChunkManager, bool)"/>
+    internal static ChunkMeshData? GenerateMeshData(Chunk chunk, ChunkManager chunkManager, bool greedy)
     {
         // Resolve before renting or touching anything: an abandoned build should cost nothing.
         // The neighborhood lives in the thread's mesh scratch, not in two fresh arrays.
         var scratch = MeshScratch.Current;
         var neighbors = scratch.Neighbors;
+        var neighborBlocks = scratch.NeighborBlocks;
         var neighborStates = scratch.NeighborStates;
-        if (!TryResolveNeighbors(chunk, chunkManager, neighbors, neighborStates))
+        if (!TryResolveNeighbors(chunk, chunkManager, neighbors, neighborBlocks, neighborStates))
         {
             scratch.ClearNeighbors();
             return null;
@@ -39,7 +40,7 @@ internal static class ChunkMeshBuilder
         // Nothing to draw: either all air, or a solid block of occluders whose six neighbors
         // seal every boundary face. The second case is most of the deep terrain in the load
         // sphere, and skipping it saves the light flood and the per-voxel walk below.
-        if (chunk.SolidCount == 0 || IsFullyEnclosed(chunk, neighbors))
+        if (chunk.SolidCount == 0 || IsFullyEnclosed(chunk, neighborBlocks))
         {
             // The resolve fills only the slots it finds, so a stale neighbor left here would let
             // this thread's next build pass the missing-face-neighbor check
@@ -58,23 +59,26 @@ internal static class ChunkMeshBuilder
             return null;
         }
 
-        var padded = ArrayPool<byte>.Shared.Rent(PaddedCount);
+        var padded = ArrayPool<ushort>.Shared.Rent(PaddedCount);
         var paddedState = ArrayPool<byte>.Shared.Rent(PaddedCount);
         // Rented arrays arrive dirty: the light snapshot is fully overwritten by the fill,
         // but the outputs must start at zero. Oversized rents are fine — everything below
         // only touches the first LightCount entries.
-        var lightBlocks = ArrayPool<byte>.Shared.Rent(LightCount);
+        var lightBlocks = ArrayPool<ushort>.Shared.Rent(LightCount);
         var sunLight = ArrayPool<byte>.Shared.Rent(LightCount);
         var blockLight = ArrayPool<byte>.Shared.Rent(LightCount);
         var queue = ArrayPool<int>.Shared.Rent(LightCount);
         try
         {
-            FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates);
-            FillLightSnapshot(lightBlocks, neighbors);
+            FillPaddedSnapshot(padded, paddedState, neighborBlocks, neighborStates);
+            FillLightSnapshot(lightBlocks, neighborBlocks);
+            // Read before the neighbors are cleared: a tower brick anywhere in the volume's chunks turns the
+            // sky-cover rule on (27 field reads; nothing more for a plain neighborhood)
+            var skyCover = AnySkyCover(neighbors);
             scratch.ClearNeighbors();
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
-            var anyTinted = ComputeLight(chunk, lightBlocks, sunLight, blockLight, queue);
+            var anyTinted = ComputeLight(chunk, lightBlocks, sunLight, blockLight, queue, skyCover);
             // Keep the chunk's own cells of the flood for entity lighting: a fresh array owned
             // by this build alone, published by UpdateMesh with the mesh it belongs to. A chunk
             // lit by colored light appends a second half holding each cell's color slot.
@@ -88,15 +92,14 @@ internal static class ChunkMeshBuilder
                 packed[Idx(x, y, z)] = (byte)(sunLight[li] << 4 | (b & BlockLevelMask));
                 if (anyTinted) packed[BlockCount + Idx(x, y, z)] = (byte)(b >> 4);
             }
-            return GenerateMeshDataFromSnapshot(chunk, padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy,
-                    tintFields)
+            return GenerateMeshDataFromSnapshot(chunk, padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy, chunkManager.ChopDamage)
                 with { Light = packed };
         }
         finally
         {
-            ArrayPool<byte>.Shared.Return(padded);
+            ArrayPool<ushort>.Shared.Return(padded);
             ArrayPool<byte>.Shared.Return(paddedState);
-            ArrayPool<byte>.Shared.Return(lightBlocks);
+            ArrayPool<ushort>.Shared.Return(lightBlocks);
             ArrayPool<byte>.Shared.Return(sunLight);
             ArrayPool<byte>.Shared.Return(blockLight);
             ArrayPool<int>.Shared.Return(queue);
@@ -115,9 +118,12 @@ internal static class ChunkMeshBuilder
     /// neighbor that exists but has no block data yet counts as absent, exactly like one that
     /// was never loaded. Returns false when any of the six FACE neighbors is missing, which
     /// makes the mesh unbuildable (see <see cref="GenerateMeshData"/>); edge and corner
-    /// neighbors are allowed to stay null and read as air.
+    /// neighbors are allowed to stay null and read as air. Each chunk's block storage
+    /// and state array are read once into <paramref name="neighborBlocks"/> and <paramref name="neighborStates"/>,
+    /// so every reader of this build sees the same object even when an edit upgrades a storage meanwhile.
     /// </summary>
-    private static bool TryResolveNeighbors(Chunk chunk, ChunkManager chunkManager, Chunk?[] neighbors, byte[]?[] neighborStates)
+    private static bool TryResolveNeighbors(Chunk chunk, ChunkManager chunkManager, Chunk?[] neighbors,
+        ChunkBlocks?[] neighborBlocks, byte[]?[] neighborStates)
     {
         // Hoisted out of the 26 probes below, and FLOORED rather than truncated so this path
         // into the chunk key matches VoxelCoords.ChunkPosOf's convention on the negative side
@@ -133,16 +139,18 @@ internal static class ChunkMeshBuilder
             if (ni == 13)
             {
                 neighbors[ni] = chunk;
+                neighborBlocks[ni] = chunk.Storage;
                 neighborStates[ni] = chunk.StateArray;
                 continue;
             }
 
-            // Each neighbor's state array is read once into the array: the field is volatile
-            // and may be allocated by a main-thread fluid edit while the snapshot is filled
+            // Each neighbor's storage and state array are read once into the arrays: both fields are
+            // volatile, and a main-thread edit may upgrade the one or allocate the other mid-build
             if (chunkManager.Chunks.TryGetValue(px + cx - 1, py + cy - 1, pz + cz - 1, out var neighbor)
                 && neighbor.IsBlockDataReady)
             {
                 neighbors[ni] = neighbor;
+                neighborBlocks[ni] = neighbor.Storage;
                 neighborStates[ni] = neighbor.StateArray;
                 continue;
             }
@@ -150,6 +158,7 @@ internal static class ChunkMeshBuilder
             // The scratch is thread-static: a slot an earlier build filled must not survive as
             // a stale neighbor of this one
             neighbors[ni] = null;
+            neighborBlocks[ni] = null;
             neighborStates[ni] = null;
         }
 
@@ -166,47 +175,71 @@ internal static class ChunkMeshBuilder
     /// True when every cell of this chunk occludes and the 16x16 plane of each face
     /// neighbor that touches this chunk occludes too, so no face of any block can be seen.
     /// An air pocket anywhere inside (<c>_solidCount &lt; BlockCount</c>) has real faces around
-    /// it and fails the test. Reads neighbor block arrays directly, the same tolerated race as
-    /// the snapshot fills: an edit's own remesh of both chunks wins afterwards.
+    /// it and fails the test. A storage whose ids all occlude answers at once (O(1) for a Uniform
+    /// chunk, one palette walk for an Indexed one); otherwise the cells decide, since a palette can
+    /// keep a stale entry (the air of a chunk filled by edits). Reads the storages captured by
+    /// <see cref="TryResolveNeighbors"/>, the same tolerated race as the snapshot fills: an edit's
+    /// own remesh of both chunks wins afterwards.
     /// </summary>
-    private static bool IsFullyEnclosed(Chunk chunk, Chunk?[] neighbors)
+    private static bool IsFullyEnclosed(Chunk chunk, ChunkBlocks?[] blocks)
     {
         if (chunk.SolidCount != BlockCount) return false;
 
         var occludes = BlockType.OccludesById;
-        for (var i = 0; i < BlockCount; i++)
+        var own = blocks[13]!;
+        if (!AllIdsOcclude(own, occludes))
         {
-            if (!occludes[chunk.Blocks[i]]) return false;
+            for (var i = 0; i < BlockCount; i++)
+            {
+                if (!occludes[own.Get(i)]) return false;
+            }
         }
 
         // Face neighbors (slot = (cx*3+cy)*3+cz): the plane that faces this chunk is the
-        // neighbor's far plane along that axis.
-        var negX = neighbors[4]!.Blocks;
-        var posX = neighbors[22]!.Blocks;
-        var negY = neighbors[10]!.Blocks;
-        var posY = neighbors[16]!.Blocks;
-        var negZ = neighbors[12]!.Blocks;
-        var posZ = neighbors[14]!.Blocks;
+        // neighbor's far plane along that axis, walked as origin + a * strideA + b * strideB.
+        const int strideX = 1 << (2 * SizeShift), strideY = 1 << SizeShift, strideZ = 1;
+        return SealsFace(blocks[4]!, occludes, Idx(Size - 1, 0, 0), strideY, strideZ)
+            && SealsFace(blocks[22]!, occludes, Idx(0, 0, 0), strideY, strideZ)
+            && SealsFace(blocks[10]!, occludes, Idx(0, Size - 1, 0), strideX, strideZ)
+            && SealsFace(blocks[16]!, occludes, Idx(0, 0, 0), strideX, strideZ)
+            && SealsFace(blocks[12]!, occludes, Idx(0, 0, Size - 1), strideX, strideY)
+            && SealsFace(blocks[14]!, occludes, Idx(0, 0, 0), strideX, strideY);
+    }
+
+    // Whether every id a storage may hold occludes. Never claimed for Direct, whose id span is its
+    // cells: the exact cell walk costs the same and stops at the first open cell.
+    private static bool AllIdsOcclude(ChunkBlocks storage, bool[] occludes)
+    {
+        if (storage.Mode == ChunkBlocks.StorageMode.Direct) return false;
+        foreach (var id in storage.IdSpan)
+        {
+            if (!occludes[id]) return false;
+        }
+        return true;
+    }
+
+    // Whether the 16x16 plane of a face neighbor that touches this chunk occludes in every cell.
+    private static bool SealsFace(ChunkBlocks neighbor, bool[] occludes, int origin, int strideA, int strideB)
+    {
+        if (AllIdsOcclude(neighbor, occludes)) return true;
         for (var a = 0; a < Size; a++)
         for (var b = 0; b < Size; b++)
         {
-            if (!occludes[negX[Idx(Size - 1, a, b)]] || !occludes[posX[Idx(0, a, b)]]) return false;
-            if (!occludes[negY[Idx(a, Size - 1, b)]] || !occludes[posY[Idx(a, 0, b)]]) return false;
-            if (!occludes[negZ[Idx(a, b, Size - 1)]] || !occludes[posZ[Idx(a, b, 0)]]) return false;
+            if (!occludes[neighbor.Get(origin + a * strideA + b * strideB)]) return false;
         }
-
         return true;
     }
 
     /// <summary>
-    /// Copies this chunk plus a 1-block border from the 26 surrounding chunks into a flat
-    /// snapshot, so meshing does zero dictionary lookups. <paramref name="paddedState"/> is
+    /// Copies this chunk plus a 1-block border from the 26 surrounding chunks' storages into a flat
+    /// snapshot, so meshing does zero dictionary lookups: each padded row is one cell of the -z
+    /// neighbor, one 16-cell <see cref="ChunkBlocks.CopyRun"/> and one cell of the +z neighbor. <paramref name="paddedState"/> is
     /// filled the same way with the per-block state bytes the fluid emitter needs (0 where the
     /// neighbor chunk is missing or has no state array yet). The arrays come pre-resolved from
     /// <see cref="TryResolveNeighbors"/>, so the 6 face neighbors are always present; a null
     /// edge or corner slot reads as air, which only affects fluid corner heights.
     /// </summary>
-    private static void FillPaddedSnapshot(byte[] padded, byte[] paddedState, Chunk?[] neighbors, byte[]?[] neighborStates)
+    private static void FillPaddedSnapshot(ushort[] padded, byte[] paddedState, ChunkBlocks?[] blocks, byte[]?[] neighborStates)
     {
         for (var px = 0; px < Padded; px++)
         {
@@ -219,15 +252,18 @@ internal static class ChunkMeshBuilder
                 var ly = (py - 1) & SizeMask;
                 var rowBase = px * PaddedSq + py * Padded;
                 var neighborRow = (cx * 3 + cy) * 3;
+                var blockRow = Idx(lx, ly, 0);
+
+                padded[rowBase] = blocks[neighborRow]?.Get(blockRow | SizeMask) ?? BlockType.Air;
+                var middle = padded.AsSpan(rowBase + 1, Size);
+                if (blocks[neighborRow + 1] is { } run) run.CopyRun(blockRow, Size, middle);
+                else middle.Clear();
+                padded[rowBase + Padded - 1] = blocks[neighborRow + 2]?.Get(blockRow) ?? BlockType.Air;
 
                 for (var pz = 0; pz < Padded; pz++)
                 {
                     var cz = pz == 0 ? 0 : pz == Padded - 1 ? 2 : 1;
-                    var ni = neighborRow + cz;
-                    var neighbor = neighbors[ni];
-                    var blockIndex = Idx(lx, ly, (pz - 1) & SizeMask);
-                    padded[rowBase + pz] = neighbor?.Blocks[blockIndex] ?? 0;
-                    paddedState[rowBase + pz] = neighborStates[ni]?[blockIndex] ?? 0;
+                    paddedState[rowBase + pz] = neighborStates[neighborRow + cz]?[blockRow | ((pz - 1) & SizeMask)] ?? 0;
                 }
             }
         }
@@ -241,19 +277,18 @@ internal static class ChunkMeshBuilder
     /// (tree wood, pebbles, branch piles) build their geometry from tiles, everything else
     /// replays its baked model's quads.
     /// </summary>
-    private static ChunkMeshData GenerateMeshDataFromSnapshot(Chunk chunk, byte[] padded, byte[] paddedState,
-        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy, BiomeTintFields? tintFields)
+    private static ChunkMeshData GenerateMeshDataFromSnapshot(Chunk chunk, ushort[] padded, byte[] paddedState,
+        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy, WoodDamage chopDamage)
     {
         // Rented, not allocated: ChunkManager returns them once the mesh is on the GPU
         var vertices = pool.RentVertices();
         var indices = pool.RentIndices();
         ushort indexOffset = 0;
 
-        // Fluids build a second, blended mesh drawn after the opaque world, so whatever sits
-        // behind the water shows through it. Rented like the opaque lists; chunks without
-        // fluid or glass return them untouched (see MeshBufferPool.Return).
-        var tVertices = pool.RentTranslucentVertices();
-        var tIndices = pool.RentTranslucentIndices();
+        // Rent blended output only at its first emission. A dry chunk must not consume pooled
+        // wet buffers: empty translucent lists are deliberately not retained by the chunk pool.
+        List<Vertex>? tVertices = null;
+        List<ushort>? tIndices = null;
         ushort tIndexOffset = 0;
 
         // Glass shares the translucent lists, so "has a translucent mesh" is not "has water";
@@ -265,6 +300,8 @@ internal static class ChunkMeshBuilder
         List<ushort>? springVents = null;
         // Chunk-local flame points of the blocks that burn one (torches), likewise lazy
         List<Vector3>? flames = null;
+        // The chest cells, which the chest pass draws instead of the chunk, likewise lazy
+        List<ushort>? chests = null;
 
         // World origin of this chunk, for the procedural emitters' per-cell world position; a
         // submerged face whose column leaves the padded snapshot reads its water level from the
@@ -272,12 +309,12 @@ internal static class ChunkMeshBuilder
         var chunkBaseY = chunk.LowerBoundY;
         var worldX0 = (int)chunk.Position.X * Size;
         var worldZ0 = (int)chunk.Position.Z * Size;
+        var worldY0 = (int)chunk.Position.Y * Size;
         var columns = MeshScratch.Current.Columns;
 
         // Biome tint of grass and leaves, both palettes from the stored corner climate of the
-        // four lattice columns (no noise evaluation). A scratch build away from its blocks' real
-        // position (a felled tree) passes the field of the real footprint instead.
-        var fields = tintFields ?? BiomeTint.FieldsFromNeighborhood(columns);
+        // four lattice columns (no noise evaluation)
+        var fields = BiomeTint.FieldsFromNeighborhood(columns);
         // Corner scratch of a biome-tinted face in the per-voxel loop below
         Span<byte> tShade = stackalloc byte[4];
         Span<float> tSun = stackalloc float[4];
@@ -286,13 +323,16 @@ internal static class ChunkMeshBuilder
 
         if (greedy)
             ChunkMesher.EmitGreedyFaces(MeshScratch.Current, padded, paddedState, chunkBaseY,
-                sunLight, blockLight, vertices, indices, ref indexOffset, tVertices, tIndices, ref tIndexOffset, in fields);
+                sunLight, blockLight, vertices, indices, ref indexOffset, pool,
+                ref tVertices, ref tIndices, ref tIndexOffset, in fields);
 
         for (var x = 0; x < Size; x++)
         for (var y = 0; y < Size; y++)
         for (var z = 0; z < Size; z++)
         {
-            var blockId = chunk.Blocks[Idx(x, y, z)];
+            // The chunk's own cells from the padded snapshot: one consistent picture per build
+            var pIdx = (x + 1) * PaddedSq + (y + 1) * Padded + (z + 1);
+            var blockId = padded[pIdx];
             if (blockId == 0) continue;
             // Already emitted (merged) by the greedy pass above
             if (greedy && BlockType.IsGreedy(blockId)) continue;
@@ -301,7 +341,6 @@ internal static class ChunkMeshBuilder
             if (type == null) continue;
 
             var basePos = new Vector3(x, y, z);
-            var pIdx = (x + 1) * PaddedSq + (y + 1) * Padded + (z + 1);
 
             // Tree wood thinner than a full cube is a node box plus a tube toward every
             // connected neighbor (see EmitTreeWood); a full-thickness or detached cell falls
@@ -314,6 +353,18 @@ internal static class ChunkMeshBuilder
                 {
                     TreeWoodEmitter.EmitTreeWood(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
                         x, y, z, type, basePos);
+                    continue;
+                }
+
+                // A natural trunk cell that has been chopped is drawn with its hit face eaten away (the shell
+                // bevel, if any, is not drawn for it); a placed, detached log never is
+                if (WoodState.IsFullCube(paddedState[pIdx]) && !WoodState.IsDetached(paddedState[pIdx])
+                    && chopDamage.TryGet(worldX0 + x, worldY0 + y, worldZ0 + z, out var chop)
+                    && chop.Face != WoodDamage.NoFace)
+                {
+                    var biteDepth = WoodDamage.BiteDepthPx(chop.Damage, Mining.HardnessOf(blockId, paddedState[pIdx]));
+                    TreeWoodEmitter.EmitEaten(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight,
+                        blockLight, x, y, z, type, basePos, chop.Face, biteDepth);
                     continue;
                 }
 
@@ -362,7 +413,7 @@ internal static class ChunkMeshBuilder
             // translucent lists; see EmitFluid
             if (type.Renderer == BlockRenderer.Fluid)
             {
-                FluidEmitter.EmitFluid(tVertices, tIndices, ref tIndexOffset, padded, paddedState, pIdx,
+                FluidEmitter.EmitFluid(pool, ref tVertices, ref tIndices, ref tIndexOffset, padded, paddedState, pIdx,
                     sunLight, blockLight, x, y, z, type, basePos);
                 hasWater = true;
                 if (IsHotFluidVent(padded[pIdx], padded[pIdx + FaceNeighborDelta[4]]))
@@ -382,8 +433,12 @@ internal static class ChunkMeshBuilder
             if (type.Renderer == BlockRenderer.Pane)
             {
                 if (type.Translucent)
+                {
+                    tVertices ??= pool.RentTranslucentVertices();
+                    tIndices ??= pool.RentTranslucentIndices();
                     PaneEmitter.EmitPane(tVertices, tIndices, ref tIndexOffset, padded, paddedState, pIdx,
                         sunLight, blockLight, x, y, z, type, basePos);
+                }
                 else
                     PaneEmitter.EmitPane(vertices, indices, ref indexOffset, padded, paddedState, pIdx,
                         sunLight, blockLight, x, y, z, type, basePos);
@@ -391,8 +446,16 @@ internal static class ChunkMeshBuilder
             }
 
             // A multiblock part is a solid, occluding cell that draws nothing: the anchor's
-            // model already covers the whole 2x2x2 volume it belongs to.
+            // model already covers the whole volume it belongs to.
             if (type.Renderer == BlockRenderer.MultiblockPart) continue;
+
+            // A chest's lid swings, so it is drawn from the shared chest model by the chest pass (ChestPasses):
+            // the chunk draws none of its static model and only records where it stands
+            if (type.Chest != null)
+            {
+                (chests ??= []).Add((ushort)Idx(x, y, z));
+                continue;
+            }
 
             // ...and the anchor draws that whole model, pre-rotated to the facing its state
             // byte's low two bits carry (see MultiblockShape), as does a facing block such as a
@@ -416,8 +479,6 @@ internal static class ChunkMeshBuilder
 
             // Translucent blocks (glass) replay the same baked quads into the blended
             // lists drawn after the opaque world; culling, AO and lighting below are shared.
-            var dstVertices = type.Translucent ? tVertices : vertices;
-            var dstIndices = type.Translucent ? tIndices : indices;
             ref var dstOffset = ref (type.Translucent ? ref tIndexOffset : ref indexOffset);
 
             for (var q = 0; q < quads.Length; q++)
@@ -478,6 +539,8 @@ internal static class ChunkMeshBuilder
 
                 // Meshes are indexed with ushort (mirrors EmitFluid): stop emitting into a
                 // list that is full instead of wrapping the offset
+                var dstVertices = type.Translucent ? tVertices ??= pool.RentTranslucentVertices() : vertices;
+                var dstIndices = type.Translucent ? tIndices ??= pool.RentTranslucentIndices() : indices;
                 if (dstVertices.Count > ushort.MaxValue - 3) continue;
 
                 var sun = sunLight[lightCell] / 15f;
@@ -589,7 +652,10 @@ internal static class ChunkMeshBuilder
             }
         }
 
-        return new ChunkMeshData(vertices, indices, tVertices, tIndices, hasWater)
-            { HotFluidVents = vents?.ToArray(), SpringVents = springVents?.ToArray(), FlamePoints = flames?.ToArray() };
+        return new ChunkMeshData(vertices, indices, tVertices ?? new List<Vertex>(), tIndices ?? new List<ushort>(), hasWater)
+        {
+            HotFluidVents = vents?.ToArray(), SpringVents = springVents?.ToArray(), FlamePoints = flames?.ToArray(),
+            ChestCells = chests?.ToArray(),
+        };
     }
 }

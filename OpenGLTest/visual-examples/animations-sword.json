@@ -1,0 +1,62 @@
+{
+  // The iron sword's three swings from the shoulder camera, then the cut and the chop in first
+  // person: run with VOXEL_SCRIPT=visual-examples/animations-sword.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/animations-sword/. The player drops (creative, so for free) onto the
+  // open meadow beside the slice scenario's bank and faces its open side. The cut lasts 0.85 s (wind-up to ~0.27 s,
+  // impact at ~0.36 s, strike over at ~0.44 s), the back cut 0.75 s (~0.21 / ~0.29 / ~0.36 s) and
+  // the chop 1.1 s (the arm is overhead from ~0.35 s, the wind-up ends at ~0.46 s, the blow lands
+  // at ~0.58 s, the bottom is held to ~0.75 s). Each shot lands a frame or two after its wait, so
+  // they are approximate.
+  "steps": [
+    { "op": "creative" },
+    { "op": "teleport", "pos": [-43.5, 16.5, 60.5], "yaw": 90, "pitch": -10 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "give", "block": "item/iron_sword", "count": 1 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "ready" },
+    { "op": "player", "action": "cut" },
+    { "op": "wait", "seconds": 0.27 },
+    { "op": "screenshot", "name": "cut_windup", "hideHud": true },
+    { "op": "wait", "seconds": 0.09 },
+    { "op": "screenshot", "name": "cut_impact", "hideHud": true },
+    { "op": "wait", "seconds": 0.08 },
+    { "op": "screenshot", "name": "cut_through", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "player", "action": "backcut" },
+    { "op": "wait", "seconds": 0.21 },
+    { "op": "screenshot", "name": "backcut_windup", "hideHud": true },
+    { "op": "wait", "seconds": 0.08 },
+    { "op": "screenshot", "name": "backcut_impact", "hideHud": true },
+    { "op": "wait", "seconds": 0.07 },
+    { "op": "screenshot", "name": "backcut_through", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "player", "action": "chop" },
+    { "op": "wait", "seconds": 0.44 },
+    { "op": "screenshot", "name": "chop_overhead", "hideHud": true },
+    { "op": "wait", "seconds": 0.14 },
+    { "op": "screenshot", "name": "chop_impact", "hideHud": true },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "chop_bottom", "hideHud": true },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "chop_recovery", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "view", "mode": "first" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "player", "action": "cut" },
+    { "op": "wait", "seconds": 0.27 },
+    { "op": "screenshot", "name": "fp_cut_windup" },
+    { "op": "wait", "seconds": 0.09 },
+    { "op": "screenshot", "name": "fp_cut_impact" },
+    { "op": "wait", "seconds": 0.08 },
+    { "op": "screenshot", "name": "fp_cut_through" },
+    { "op": "wait", "seconds": 1 },
+    { "op": "player", "action": "chop" },
+    { "op": "wait", "seconds": 0.44 },
+    { "op": "screenshot", "name": "fp_chop_overhead" },
+    { "op": "wait", "seconds": 0.14 },
+    { "op": "screenshot", "name": "fp_chop_impact" },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "fp_chop_bottom" }
+  ]
+}

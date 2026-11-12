@@ -60,11 +60,12 @@ public class ItemDrop
     private const float PickupDelaySeconds = 0.4f;
 
     /// <summary>Block or item id this drop collects as (see <see cref="ItemRegistry.IsItem"/>).</summary>
-    public byte BlockId { get; }
+    public ushort BlockId { get; }
     public Vector3 Position { get; private set; }
 
     private Vector3 _velocity;
     private float _age;
+    private readonly float _pickupDelay;
     private float _attractElapsed;
     private bool _attracted;
 
@@ -83,10 +84,13 @@ public class ItemDrop
     // Collision stays at the shared Size: the item boost is visual only
     private float VisualSize => Size * (ItemRegistry.IsItem(BlockId) ? ItemSizeMultiplier : 1f);
 
-    public ItemDrop(byte blockId, Vector3 position, Vector3? toss = null)
+    /// <param name="pickupDelaySeconds">How long the drop waits before it can be collected; null keeps the
+    /// short default grace (see <see cref="PickupDelaySeconds"/>).</param>
+    public ItemDrop(ushort blockId, Vector3 position, Vector3? toss = null, float? pickupDelaySeconds = null)
     {
         BlockId = blockId;
         Position = position;
+        _pickupDelay = pickupDelaySeconds ?? PickupDelaySeconds;
 
         // Small random pop so the drop visibly ejects instead of appearing dead still, with an
         // upward bias so a surface-mined block lands back on top rather than inside the floor.
@@ -107,12 +111,13 @@ public class ItemDrop
     /// pickup grace period, so a drop saved before it could be collected still waits out the
     /// rest of it.
     /// </summary>
-    internal ItemDrop(byte blockId, Vector3 position, Vector3 velocity, float age)
+    internal ItemDrop(ushort blockId, Vector3 position, Vector3 velocity, float age)
     {
         BlockId = blockId;
         Position = position;
         _velocity = velocity;
         _age = age;
+        _pickupDelay = PickupDelaySeconds;
     }
 
     /// <summary>Current velocity in blocks per second (what an entity save records).</summary>
@@ -157,7 +162,7 @@ public class ItemDrop
         if (!_attracted)
         {
             ApplyPhysics(deltaTime, chunks);
-            if (!inRange || _age < PickupDelaySeconds) return false;
+            if (!inRange || _age < _pickupDelay) return false;
             _attracted = true;
         }
 

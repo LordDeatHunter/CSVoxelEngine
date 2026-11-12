@@ -1,0 +1,30 @@
+{
+  // A broken stone shell on the surface (WorldGen/Structures, the surface ruin): supplies, now and then a piece of
+  // basic gear (common to uncommon) and a rare scroll. Rolled lazily when the chest is first opened or broken.
+  "pools": [
+    { "rolls": 1, "entries": [ { "table": "ruin_supplies" } ] },
+    {
+      "chance": 0.45,
+      "rolls": 1,
+      "entries": [
+        { "item": "item/leather_cap", "rarity": { "min": "common", "max": "uncommon" } },
+        { "item": "item/leather_tunic", "rarity": { "min": "common", "max": "uncommon" } },
+        { "item": "item/leather_pants", "rarity": { "min": "common", "max": "uncommon" } },
+        { "item": "item/leather_boots", "rarity": { "min": "common", "max": "uncommon" } },
+        { "item": "item/leather_gloves", "rarity": { "min": "common", "max": "uncommon" } },
+        { "item": "item/reserve_charm", "rarity": { "min": "common", "max": "uncommon" } },
+        { "item": "item/gill_charm", "weight": 1, "rarity": { "min": "common", "max": "uncommon" } }
+      ]
+    },
+    {
+      "chance": 0.15,
+      "rolls": 1,
+      "entries": [
+        { "item": "item/scroll_frost" },
+        { "item": "item/scroll_nature" },
+        { "item": "item/scroll_self" },
+        { "item": "item/mana_draught" }
+      ]
+    }
+  ]
+}

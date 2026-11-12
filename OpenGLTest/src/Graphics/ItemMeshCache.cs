@@ -17,7 +17,7 @@ namespace VoxelEngine.Graphics;
 public class ItemMeshCache : IDisposable
 {
     private readonly GL _gl;
-    private readonly Dictionary<byte, (Mesh Mesh, Dictionary<int, uint> Textures)> _entries = new();
+    private readonly Dictionary<ushort, (Mesh Mesh, Dictionary<int, uint> Textures)> _entries = new();
 
     /// <param name="gl">The GL context the meshes and textures are created on.</param>
     /// <param name="srgb">Upload every texture this cache builds as <c>SRGB8_ALPHA8</c>, for
@@ -44,7 +44,7 @@ public class ItemMeshCache : IDisposable
     internal Action? GlStateChanged { get; set; }
 
     /// <summary>The mesh and texture for an item id, or false for non-item ids.</summary>
-    public bool TryGet(byte itemId, out Mesh mesh, out uint texture) =>
+    public bool TryGet(ushort itemId, out Mesh mesh, out uint texture) =>
         TryGetFrame(itemId, 0, out mesh, out texture);
 
     /// <summary>
@@ -52,7 +52,7 @@ public class ItemMeshCache : IDisposable
     /// changes over time (the held compass tracks its heading). Geometry is identical for
     /// every frame, so one mesh is shared and only the per-frame texture is cached.
     /// </summary>
-    public bool TryGetFrame(byte itemId, int frame, out Mesh mesh, out uint texture)
+    public bool TryGetFrame(ushort itemId, int frame, out Mesh mesh, out uint texture)
     {
         mesh = null!;
         texture = 0;

@@ -25,12 +25,28 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
     /// <summary>Dirty-set size, for tests asserting the scan cap paces the drain.</summary>
     internal int DirtyCount => _dirtyChunks.Count;
 
+    internal bool IsDirty(long key) => _dirtyChunks.ContainsKey(key);
+
     /// <summary>Mesh-dispatcher state, for MeshSchedulingTests.</summary>
     internal int PendingMeshWorkCount => _pendingMeshWork.Count;
 
     internal int ActiveMeshRunnerCount => Volatile.Read(ref _activeMeshRunners);
 
     internal int GeneratingMeshCount => _generatingMeshes.Count;
+
+    /// <summary>Completed output count for deterministic scheduler tests.</summary>
+    internal int CompletedMeshCount => _completedMeshQueue.Count;
+
+    /// <summary>Observes result payloads before the main-thread apply path in headless tests.</summary>
+    internal Action<Chunk, ChunkMeshData>? MeshBeforeApplyForTests { get; set; }
+
+    /// <summary>Pauses after a worker has produced its snapshot result but before publication.</summary>
+    internal Action<Chunk, ChunkMeshData>? MeshGeneratedForTests { get; set; }
+
+    // Deterministic worker barriers for the unload/reload regression tests.
+    internal Action<Chunk>? BeforeBuildForTests { get; set; }
+    internal Action<Chunk>? BuildAcceptedForTests { get; set; }
+    internal Action<Chunk>? BuildFinishedForTests { get; set; }
 
     /// <summary>
     /// Finished meshes <see cref="ApplyCompletedMeshes"/> uploads per frame (the rest wait for the
@@ -50,7 +66,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
     // sorts by distance, and two results for the same chunk (an older one re-queued by the
     // upload budget, plus a newer rebuild) tie there, so without it the unstable sort could
     // apply them newest-first and leave the stale mesh on screen.
-    private readonly ConcurrentQueue<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long seq)> _completedMeshQueue = new();
+    private readonly ConcurrentQueue<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long revision, long seq)> _completedMeshQueue = new();
     private long _meshSequence;
     // Keyed on ChunkKey.Pack rather than the Vector3 chunk position: every probe here sits on a
     // hot path (the dirty scan, QueueChunk's six-neighbor fan-out, NeedsChunk on the generation
@@ -59,8 +75,9 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
     // same 21-bit bit math at block scale.
     private readonly ConcurrentDictionary<long, byte> _dirtyChunks = new();
 
-    // Track active mesh generation to avoid duplicates. Packed keys, like _dirtyChunks above.
-    private readonly ConcurrentDictionary<long, byte> _generatingMeshes = new();
+    // The value owns the claim. An unloaded chunk's old worker must not remove a replacement's
+    // claim for the same packed position when it eventually leaves its finally block.
+    private readonly ConcurrentDictionary<long, Chunk> _generatingMeshes = new();
 
     // Mesh builds are dispatched as plain thread-pool work items rather than one
     // Task.Run(async ...) per chunk: at up to MaxDirtyChunksPerFrame starts a frame, the closure +
@@ -93,7 +110,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
         // closure allocated every frame the queue was non-empty.
         while (_completedMeshQueue.TryDequeue(out var item))
         {
-            _applyScratch.Add((item.pos, item.chunk, item.meshData, item.seq,
+            _applyScratch.Add((item.pos, item.chunk, item.meshData, item.revision, item.seq,
                 StreamingFocus.MinDistanceSquared(foci, item.pos)));
         }
 
@@ -112,7 +129,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
 
             var appliedCount = 0;
 
-            foreach (var (pos, chunk, meshData, seq, distSq) in _applyScratch)
+            foreach (var (pos, chunk, meshData, revision, seq, distSq) in _applyScratch)
             {
                 // Skip chunks that moved out of range of every focus, were unloaded, or were
                 // replaced by a freshly generated chunk at the same position while this build ran:
@@ -120,6 +137,14 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
                 // removes
                 if (distSq > StreamingConfig.ChunkRadiusSq ||
                     !manager.Chunks.TryGetValue(pos, out var live) || !ReferenceEquals(live, chunk))
+                {
+                    manager.MeshBuffers.Return(meshData);
+                    continue;
+                }
+
+                // A synchronous remesh request superseded this worker snapshot. Return the old
+                // payload instead of replacing the edit's mesh (or a later dirty retry).
+                if (revision != chunk.MeshRevision)
                 {
                     manager.MeshBuffers.Return(meshData);
                     continue;
@@ -134,7 +159,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
                 {
                     // Re-queue for next frame, keeping the original sequence so a rebuild that
                     // finishes in the meantime still sorts after it
-                    _completedMeshQueue.Enqueue((pos, chunk, meshData, seq));
+                    _completedMeshQueue.Enqueue((pos, chunk, meshData, revision, seq));
                 }
             }
         }
@@ -154,7 +179,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
 
     // Reused across frames: finished mesh builds waiting for upload, with the distance the
     // upload budget sorts on. Same clear-after-pass contract as _dirtyCandidates.
-    private readonly List<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long seq, float distSq)> _applyScratch = new(64);
+    private readonly List<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long revision, long seq, float distSq)> _applyScratch = new(64);
 
     internal void ProcessDirtyChunks(Vector3[] foci)
     {
@@ -251,6 +276,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
     /// </summary>
     private void ApplyMesh(Chunk chunk, ChunkMeshData meshData)
     {
+        MeshBeforeApplyForTests?.Invoke(chunk, meshData);
         var wasMeshed = chunk.IsMeshed;
         if (manager.Headless)
             chunk.MarkMeshedHeadless(meshData);
@@ -270,7 +296,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
     /// </summary>
     private void StartMeshGeneration(long key, Vector3 pos, Chunk chunk)
     {
-        if (!_generatingMeshes.TryAdd(key, 0))
+        if (!_generatingMeshes.TryAdd(key, chunk))
             return;
 
         _pendingMeshWork.Enqueue((pos, chunk));
@@ -367,9 +393,13 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
 
         try
         {
-            if (!manager.Chunks.ContainsPacked(key))
+            BeforeBuildForTests?.Invoke(chunk);
+            if (!manager.Chunks.TryGetPacked(key, out var live) || !ReferenceEquals(live, chunk))
                 return;
 
+            BuildAcceptedForTests?.Invoke(chunk);
+
+            var revision = chunk.MeshRevision;
             var meshData = chunk.GenerateMeshData(manager);
             if (meshData == null)
             {
@@ -377,11 +407,14 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
                 // snapshot, or one of the nine streamed columns is missing; meshing across
                 // that hole would bake border artifacts (or dark light and no water), so the
                 // build is dropped and the chunk retried once the world settles
-                _dirtyChunks.TryAdd(key, 0);
+                if (manager.Chunks.TryGetPacked(key, out live) && ReferenceEquals(live, chunk))
+                    _dirtyChunks.TryAdd(key, 0);
                 return;
             }
 
-            _completedMeshQueue.Enqueue((pos, chunk, meshData, Interlocked.Increment(ref _meshSequence)));
+            MeshGeneratedForTests?.Invoke(chunk, meshData);
+
+            _completedMeshQueue.Enqueue((pos, chunk, meshData, revision, Interlocked.Increment(ref _meshSequence)));
         }
         catch (Exception ex)
         {
@@ -389,7 +422,9 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
         }
         finally
         {
-            _generatingMeshes.TryRemove(key, out _);
+            ((ICollection<KeyValuePair<long, Chunk>>)_generatingMeshes)
+                .Remove(new KeyValuePair<long, Chunk>(key, chunk));
+            BuildFinishedForTests?.Invoke(chunk);
         }
     }
 
@@ -443,6 +478,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
 
         if (!manager.Chunks.TryGetPacked(key, out var chunk)) return;
         if (!chunk.IsBlockDataReady) return;
+        chunk.AdvanceMeshRevision();
         if (!HasAllNeighbors(pos)) return;
 
         // A streamed column is missing: mesh once it arrives instead of baking dark light and

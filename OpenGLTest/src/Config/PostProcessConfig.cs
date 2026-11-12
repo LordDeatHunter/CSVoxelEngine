@@ -1,8 +1,11 @@
+using System.Numerics;
+using VoxelEngine.Effects.Post;
+
 namespace VoxelEngine.Config;
 
 /// <summary>
 /// Post and screen-space tuning: the biome grade, damage fringe, underwater wobble, FXAA, contact
-/// AO, godrays and the per-pass GPU timer gate.
+/// AO, godrays, the sun dazzle and lens flare and the per-pass GPU timer gate.
 /// </summary>
 public static class PostProcessConfig
 {
@@ -157,4 +160,64 @@ public static class PostProcessConfig
     public const float GodraysBlurDecay = 0.95f;
     /// <summary>Radial blur samples per full-resolution pixel.</summary>
     public const int GodraysBlurSamples = 24;
+
+    // Sun dazzle (SunDazzle, SunDazzleRenderer, dazzle-fragment.glsl): the blinding bloom of looking
+    // straight at the sun, added over the whole frame (the foreground included) after the godrays.
+    // Radii and reaches are shares of the screen height.
+    /// <summary>Master switch for the dazzle's glow; with it and <see cref="LensFlareEnabled"/> both off the pass costs nothing.</summary>
+    public const bool SunDazzleEnabled = true;
+    /// <summary>Linear HDR light the dazzle adds right at the sun at its peak, times the sun color.</summary>
+    public const float SunDazzleStrength = 1.5f;
+    /// <summary>Angle between the view and the sun within which the dazzle is at full strength.</summary>
+    public const float SunDazzleFullDegrees = 4f;
+    /// <summary>Angle between the view and the sun beyond which there is no dazzle.</summary>
+    public const float SunDazzleFacingDegrees = 34f;
+    /// <summary>Radius of the bright core around the sun (a Gaussian).</summary>
+    public const float SunDazzleCoreRadius = 0.09f;
+    /// <summary>Share of the peak that is the soft veil reaching out across the view, rather than the core.</summary>
+    public const float SunDazzleVeilShare = 0.3f;
+    /// <summary>Distance from the sun over which the veil falls to 1/e.</summary>
+    public const float SunDazzleVeilReach = 0.3f;
+    /// <summary>Brightness of the fan of rays round the core, as a share of the peak.</summary>
+    public const float SunDazzleRayShare = 0.3f;
+    /// <summary>Distance from the sun over which the rays fall to 1/e.</summary>
+    public const float SunDazzleRayReach = 0.3f;
+    /// <summary>Depth taps across the sun's disc that measure how much of it is in open sky.</summary>
+    public const int SunDazzleTaps = 32;
+    /// <summary>Rate (per second) at which the dazzle follows the share of the disc in open sky, so
+    /// a leaf or a block edge crossing the sun fades it instead of stepping it.</summary>
+    public const float SunDazzleEaseRate = 12f;
+
+    // Lens flare (LensFlare, drawn by the sun dazzle's pass): the row of tinted circles a lens
+    // throws across the picture with the sun in view, on the line from the sun through the screen
+    // center.
+    /// <summary>Master switch for the lens flare's circles; off, the dazzle pass draws none.</summary>
+    public const bool LensFlareEnabled = true;
+    /// <summary>Light a circle adds at the flare's full strength, per unit of its brightness, times the sun color.</summary>
+    public const float LensFlareLight = 1.6f;
+    /// <summary>How much of the picture behind it a circle covers at the flare's full strength, per unit
+    /// of its brightness: a circle is a faint film of its tint rather than pure light, so its color
+    /// still reads over a bright sky or a white cloud, where added light alone would wash out to white.</summary>
+    public const float LensFlareCover = 2f;
+    /// <summary>Angle between the view and the sun within which there is no flare: the circles would all sit on the sun.</summary>
+    public const float LensFlareStartDegrees = 2f;
+    /// <summary>Angle between the view and the sun from which the flare is at full strength.</summary>
+    public const float LensFlareFullDegrees = 9f;
+    /// <summary>Angle between the view and the sun up to which the flare stays at full strength.</summary>
+    public const float LensFlareFadeDegrees = 30f;
+    /// <summary>Angle between the view and the sun beyond which there is no flare.</summary>
+    public const float LensFlareGoneDegrees = 58f;
+    /// <summary>The flare's circles, from the sun's side of the screen center to the far side: warm
+    /// gold and orange, with a few greenish ones. At most <see cref="LensFlare.MaxGhosts"/>.</summary>
+    public static readonly LensFlareGhost[] LensFlareGhosts =
+    [
+        new(0.62f, 0.030f, 0.2f, 0.35f, new Vector3(1.00f, 0.80f, 0.40f), 0.16f),
+        new(0.38f, 0.055f, 0.5f, 0.25f, new Vector3(0.45f, 1.00f, 0.35f), 0.17f),
+        new(0.15f, 0.022f, 0.0f, 0.50f, new Vector3(1.00f, 0.55f, 0.20f), 0.20f),
+        new(-0.18f, 0.075f, 0.35f, 0.20f, new Vector3(1.00f, 0.72f, 0.22f), 0.14f),
+        new(-0.42f, 0.045f, 0.4f, 0.30f, new Vector3(0.50f, 1.00f, 0.25f), 0.20f),
+        new(-0.70f, 0.120f, 1.0f, 0.15f, new Vector3(1.00f, 0.60f, 0.25f), 0.10f),
+        new(-0.95f, 0.050f, 0.2f, 0.40f, new Vector3(1.00f, 0.85f, 0.50f), 0.12f),
+        new(-1.30f, 0.180f, 0.5f, 0.50f, new Vector3(0.50f, 0.95f, 0.50f), 0.06f),
+    ];
 }

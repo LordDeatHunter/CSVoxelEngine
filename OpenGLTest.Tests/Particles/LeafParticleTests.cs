@@ -11,8 +11,8 @@ public sealed class LeafParticleTests
 {
     public LeafParticleTests() => TestContent.EnsureLoaded();
 
-    private static byte LeavesId => ContentRegistry.RequireBlock("oak_leaves").Id;
-    private static byte StoneId => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort LeavesId => ContentRegistry.RequireBlock("oak_leaves").Id;
+    private static ushort StoneId => ContentRegistry.RequireBlock("stone").Id;
 
     private static (ChunkManager Chunks, Chunk Center) Setup()
     {

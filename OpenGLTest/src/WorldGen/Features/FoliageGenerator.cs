@@ -20,14 +20,14 @@ public static class FoliageGenerator
     private static FastNoiseLite ShrubPatchNoise;
 
     /// <summary>Forest grass tuft this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte GrassTuftBlock;
+    public static readonly ushort GrassTuftBlock;
 
     /// <summary>Desert and tundra dead shrub this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte DeadShrubBlock;
+    public static readonly ushort DeadShrubBlock;
 
-    private static readonly byte GrassGroundBlock;
-    private static readonly byte SandGroundBlock;
-    private static readonly byte PermafrostGroundBlock;
+    private static readonly ushort GrassGroundBlock;
+    private static readonly ushort SandGroundBlock;
+    private static readonly ushort PermafrostGroundBlock;
 
     static FoliageGenerator()
     {
@@ -77,7 +77,7 @@ public static class FoliageGenerator
     /// Whether a dead shrub grows over <paramref name="ground"/> at (x, z): sand only in a desert
     /// column and permafrost only in a frozen one, so neither ground grows one in the other biome.
     /// </summary>
-    private static bool TryGetDeadShrubOn(byte ground, int x, int z)
+    private static bool TryGetDeadShrubOn(ushort ground, int x, int z)
     {
         Biome biome;
         if (ground == SandGroundBlock) biome = Biome.Desert;
@@ -101,7 +101,7 @@ public static class FoliageGenerator
     /// taken. The snow cell's state byte is 0 (untouched), so nothing else needs clearing. Runs on
     /// a generation worker thread, after the flowers.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

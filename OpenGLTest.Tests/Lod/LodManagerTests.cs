@@ -322,6 +322,40 @@ public sealed class LodManagerTests
         Assert.Null(lods.TakeDirtyRegion());
     }
 
+    /// <summary>After a long teleport only a coarse shell may stand under the camera, and it stays drawn until its
+    /// finer children are loaded: the scan must hand out the regions under the camera on every level first (finest
+    /// first at equal distance), and finish a coarse region's children long before the whole finest ring.</summary>
+    [Fact]
+    public void TheScanReplacesTheCoarseShellUnderTheCameraBeforeFillingTheFinestRing()
+    {
+        var lods = new LodManager(null!);
+        var cam = new Camera(null, null);
+        cam.TestTeleport(new Vector3(1500.5f, 80f, -700.5f), 0f, 0f);
+        lods.AttachCamera(cam);
+
+        var (coarseX, coarseZ) = lods.CameraRegion(2);
+        var children = new HashSet<(int Level, int X, int Z)>
+        {
+            (1, coarseX * 2, coarseZ * 2), (1, coarseX * 2 + 1, coarseZ * 2),
+            (1, coarseX * 2, coarseZ * 2 + 1), (1, coarseX * 2 + 1, coarseZ * 2 + 1),
+        };
+        var finest = 0;
+        for (var level = 0; level < LodRegion.Levels.Length; level++)
+        {
+            var (x, z) = lods.CameraRegion(level);
+            Assert.Equal((level, x, z), lods.FindClosestNeededRegion());
+            children.Remove((level, x, z));
+        }
+        while (children.Count > 0 && lods.FindClosestNeededRegion() is { } key)
+        {
+            children.Remove(key);
+            if (key.Level == 0) finest++;
+        }
+
+        Assert.Empty(children);
+        Assert.True(finest < 60, $"{finest} finest regions came before the coarse shell's children");
+    }
+
     /// <summary>Covers item C11's common case: the LodGen worker calls TakeDirtyRegion on every
     /// spin and the set is empty for nearly all of them, so the empty walk must stay correct (and,
     /// unobservably from here, allocate nothing). Behavior only — the fact cannot see whether a

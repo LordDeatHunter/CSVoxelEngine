@@ -1,0 +1,53 @@
+{
+  // Archer vantage check (VantageSeeker): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/skeleton-vantage.json
+  // Shots land in visual/skeleton-vantage/. The camera hovers (creative flight, so it is immune and the archer still
+  // aims at it) at standing height over the open, flat forest clearing skeletons.json uses (ground at y 9..10 over
+  // x -56..-32, z 32..68, no trunks), facing -Z. A stone pillar 3 wide and 6 tall (x -44..-42, y 9..14, z 51) stands
+  // 6 blocks in front of it, and an archer spawns 3.5 blocks behind the pillar, 10 blocks from the camera: inside its
+  // 5..14 bow band but with no line. Instead of pushing into the pillar it walks around the camera to one side
+  // until it has a line, then shoots. `hidden` is taken just after the spawn (the pillar hides it), `stepping_out`
+  // while it walks clear, `drawing` once it stands beside the pillar with its bow drawn, and `arrow` from the
+  // shoulder camera turned slightly toward the archer's side, so the arrow crosses the frame.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-42.5, 12.6, 57.5], "yaw": -90, "pitch": -4 },
+    // Chunks must be loaded before anything can be set or stand on them
+    { "op": "wait", "seconds": 8 },
+
+    { "op": "setblock", "pos": [-44, 9, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-43, 9, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-42, 9, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-44, 10, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-43, 10, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-42, 10, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-44, 11, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-43, 11, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-42, 11, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-44, 12, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-43, 12, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-42, 12, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-44, 13, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-43, 13, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-42, 13, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-44, 14, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-43, 14, 51], "block": "stone" },
+    { "op": "setblock", "pos": [-42, 14, 51], "block": "stone" },
+    { "op": "wait", "seconds": 0.5 },
+
+    { "op": "spawn", "entity": "skeleton", "pos": [-42.5, 11, 47.5] },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "hidden", "hideHud": true },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "screenshot", "name": "stepping_out", "hideHud": true },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "drawing", "hideHud": true },
+    // From the shoulder, turned a little toward the +X side the archer stepped out to (yaw -90 faces -Z, so +X is
+    // screen right), so the player and the archer are both in frame and the arrow crosses it instead of coming head-on
+    { "op": "view", "mode": "shoulder" },
+    { "op": "look", "yaw": -80, "pitch": -6 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "arrow", "hideHud": true }
+  ]
+}

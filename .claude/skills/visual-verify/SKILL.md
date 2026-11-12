@@ -10,6 +10,8 @@ skill (modes, timeline, env vars, how to tune a pose from the sliders). Use a `V
 (below) only to see them in the real world, with the camera, terrain and lighting around them. When you add
 or change an animation, give it a debugger mode.
 
+Full scenario-op reference, every `VOXEL_*` variable and the profiler overlay: `docs/agents/dev-tools.md` (grep it, do not read it whole).
+
 Build/test cannot prove a rendering or feel change. Use a scripted scenario, not ad-hoc input injection.
 
 ## Run recipe (PowerShell, Release)

@@ -1,5 +1,7 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Interaction;
 using VoxelEngine.Juice;
 using VoxelEngine.Particles;
 using VoxelEngine.Player.Posing;
@@ -30,13 +32,27 @@ public class PlayerModel
     /// <summary>Progress through a slice swing at which it crosses the aim and the damage lands.</summary>
     public const float SliceImpactProgress = 0.375f;
 
-    // On top of that, through the main part of the cut the held blade is drawn with this much added to its own display
-    // rotation (HeldItemRotationOffset): the same [pitch, yaw, roll] degrees the item JSON's display.rotation and the item
-    // debugger's Rot sliders use, so a value found by sliding them at a mid-cut frame transfers here as is. The blade's
-    // rest display is yaw -90 / roll 45; mid-cut it reads right at yaw -145 / roll 70. The yaw part mirrors for the
-    // return swing (for a display yaw of -90 the mirror image of yaw -90 + d is yaw -90 - d), the roll does not.
-    private const float SliceBladeDisplayYawDegrees = -55f;
-    private const float SliceBladeDisplayRollDegrees = 25f;
+    // Sword attack (items with AttackPattern.Sword): the cut, back cut and chop chain. Each swing has its
+    // own length and impact (SwordMotion), and like the slice is a wind-up, a strike and a recovery
+    // that equal the idle hold at both ends.
+
+    /// <summary>Seconds one sword swing of <paramref name="swing"/> lasts.</summary>
+    public static float SwordDuration(SwordSwing swing) => SwordMotion.Duration(swing);
+
+    /// <summary>Progress through <paramref name="swing"/> at which its damage lands.</summary>
+    public static float SwordImpactProgress(SwordSwing swing) => SwordMotion.ImpactProgress(swing);
+
+    /// <summary>The shortest sword swing's length, the least gap any sword swing can follow another at.</summary>
+    public static float ShortestSwordSwingSeconds
+    {
+        get
+        {
+            var shortest = float.PositiveInfinity;
+            foreach (var swing in SwordSwings.All)
+                shortest = MathF.Min(shortest, SwordDuration(swing));
+            return shortest;
+        }
+    }
 
     // Charged throw (right-click in the air with a throwable). While held, the right arm
     // rises forward-up overhead into a cocked pre-throw with the elbow extending on the
@@ -47,6 +63,9 @@ public class PlayerModel
     // exact release pose through a follow-through, then settles slowly back to rest —
     // one direction change, which reads as follow-through rather than a bounce.
     public const float ThrowDuration = 0.55f;
+    // A staff cast (cosmetic): the right arm raises the staff over the head-front, thrusts it forward with
+    // a small lean, recoils a little and eases back to rest (CastMotion).
+    public const float CastDuration = 0.45f;
     // First-person framing: straight-hanging arms sit ~66 degrees below the view center,
     // invisible until you pitch well down, and hide behind the chest when you do. Resting
     // them slightly forward with bent elbows and a touch of inward yaw parks the hands in
@@ -72,10 +91,21 @@ public class PlayerModel
     private float _mineWeight;
     private float _sliceT = 1f;
     private int _sliceDir;
-    // Hit-stop of the punch and slice clocks: a swing that connected holds at its impact pose
+    private float _swordT = 1f;
+    private SwordSwing _swordSwing;
+    // Seconds the swing in progress lasts: its own length, or an axe chop's, set to the axe's hit pace
+    private float _swordSeconds = 1f;
+    // The pose the timed use in progress (or the last one) holds, and a bow's release: the charge it was
+    // let go at and its progress (1 = no release playing)
+    private UsePose _usePose;
+    private float _bowReleaseT = 1f;
+    private float _bowReleaseCharge;
+    // Hit-stop of the punch, slice and sword clocks: a swing that connected holds at its impact pose
     private readonly SwingHitStop _mineStop = new();
     private readonly SwingHitStop _sliceStop = new();
+    private readonly SwingHitStop _swordStop = new();
     private float _throwT = 1f;
+    private float _castT = 1f;
     private float? _throwCharge01;
     private float? _useCharge01;
     private float _throwReleaseCharge;
@@ -98,6 +128,9 @@ public class PlayerModel
     public const float MaxShoulderPullBlocks = ShoulderReach.MaxShoulderPull;
     private float _crouchBlend;
     private float _swimBlend;
+    // Smoothed 0..1 flight amount (flying in Update) and the smoothed flight speed in blocks/s
+    private float _flightBlend;
+    private float _flightSpeed;
     // Smoothed 0..1 surface-float amount (floating in Update), at most the swim amount
     private float _floatBlend;
     // Seconds since the last swim stroke began; the stroke is over (the arms rest in front) once it
@@ -121,8 +154,6 @@ public class PlayerModel
     internal float AirRun => _airRun;
     /// <summary>The current punch's weight, 0 light to 1 heavy (see Punch).</summary>
     internal float MineWeight => _mineWeight;
-    /// <summary>The slice swing's direction: +1 right-to-left, -1 the return.</summary>
-    internal int SliceDir => _sliceDir;
     /// <summary>The charge the last throw was released at, 0..1.</summary>
     internal float ThrowReleaseCharge => _throwReleaseCharge;
     /// <summary>Seconds of Update time, driving the idle arm drift.</summary>
@@ -151,6 +182,12 @@ public class PlayerModel
     /// <summary>The swim stroke shape and the swim and float leg pose.</summary>
     internal SwimPose Swim { get; }
 
+    /// <summary>The creative-flight leg sway, trail and lean.</summary>
+    internal FlightPose Flight { get; }
+
+    /// <summary>A bow's two-handed draw.</summary>
+    internal BowPose Bow { get; }
+
     /// <summary>The throw and timed-use arm overrides.</summary>
     internal ThrowPose ThrowArm { get; }
 
@@ -172,6 +209,8 @@ public class PlayerModel
     public PlayerModel()
     {
         Swim = new SwimPose(this);
+        Flight = new FlightPose(this);
+        Bow = new BowPose(this);
         ThrowArm = new ThrowPose(this);
         Secondary = new SecondaryMotion(this);
         Jab = new PunchPose(this);
@@ -196,11 +235,32 @@ public class PlayerModel
     /// <summary>Whether a slice swing is currently playing.</summary>
     public bool IsSlicing => _sliceT < 1f;
 
+    /// <summary>Whether a sword swing is currently playing.</summary>
+    public bool IsSwordSwinging => _swordT < 1f;
+
+    /// <summary>Progress of the active sword swing: 0 at the wind-up, 1 when it has finished.</summary>
+    public float SwordProgress => _swordT;
+
+    /// <summary>The sword swing playing, or the last one played.</summary>
+    public SwordSwing ActiveSwordSwing => _swordSwing;
+
+    /// <summary>What the right arm, the body and the held blade do this frame for the blade swing in progress (the
+    /// slice's or the sword's), or <see cref="BladeSwingFrame.None"/> with neither playing.</summary>
+    internal BladeSwingFrame Blade => IsSlicing
+        ? SliceMotion.FrameAt(_sliceT, _sliceDir)
+        : IsSwordSwinging ? SwordMotion.FrameAt(_swordT, _swordSwing) : BladeSwingFrame.None;
+
     /// <summary>Whether a throw swing is currently playing.</summary>
     public bool IsThrowing => _throwT < 1f;
 
     /// <summary>Progress of the active throw swing: 0 at release, 1 when it has finished.</summary>
     public float ThrowProgress => _throwT;
+
+    /// <summary>Whether a staff cast's gesture is currently playing.</summary>
+    public bool IsCasting => _castT < 1f;
+
+    /// <summary>Progress of the cast gesture: 0 as it starts, 1 when it has finished (also with none playing).</summary>
+    public float CastProgress => _castT;
 
     /// <summary>Charge the arm is cocked to, or null when no throw is being aimed.</summary>
     public float? ThrowCharge => _throwCharge01;
@@ -213,11 +273,11 @@ public class PlayerModel
     public float SliceProgress => _sliceT;
 
     /// <summary>True while a swing that connected is held at its impact pose (see <see cref="HitStop"/>).</summary>
-    public bool IsHitStopped => _mineStop.IsHolding || _sliceStop.IsHolding;
+    public bool IsHitStopped => _mineStop.IsHolding || _sliceStop.IsHolding || _swordStop.IsHolding;
 
     /// <summary>
-    /// The swing in progress (the slice if one plays, else the punch) connected with a mob: it holds at
-    /// its impact pose for <paramref name="seconds"/> once it gets there, then replays the rest faster so
+    /// The swing in progress (the slice or sword swing if one plays, else the punch) connected with a mob: it
+    /// holds at its impact pose for <paramref name="seconds"/> once it gets there, then replays the rest faster so
     /// it still ends on time (<see cref="SwingHitStop"/>). Ignored with no swing in progress, so a call
     /// can never freeze a later swing; a new swing drops any hold the last one had.
     /// </summary>
@@ -225,6 +285,8 @@ public class PlayerModel
     {
         if (IsSlicing)
             _sliceStop.Request(seconds);
+        else if (IsSwordSwinging)
+            _swordStop.Request(seconds);
         else if (_mineT < 1f)
             _mineStop.Request(seconds);
     }
@@ -232,13 +294,12 @@ public class PlayerModel
     /// <summary>
     /// Degrees the pose adds to the held item's own display rotation, in the item JSON's <c>[pitch, yaw, roll]</c>
     /// order (what <c>Item.DisplayMatrix</c> and the item debugger's Rot sliders take), so a value found by sliding
-    /// them at a frame of an animation transfers here unchanged. Zero at rest; through the main part of a slice it is
-    /// the blade's mid-cut turn (<see cref="SliceBladeDisplayYawDegrees"/>, <see cref="SliceBladeDisplayRollDegrees"/>),
-    /// the yaw mirrored for the return swing.
+    /// them at a frame of an animation transfers here unchanged. Zero at rest; through the main part of a blade swing
+    /// it is that swing's mid-cut turn (<see cref="SliceMotion.SliceBladeDisplayYawDegrees"/>,
+    /// <see cref="SliceMotion.SliceBladeDisplayRollDegrees"/> for the slice, the yaw mirrored for the return swing;
+    /// <see cref="SwordMotion"/>'s for the sword).
     /// </summary>
-    public Vector3 HeldItemRotationOffset => IsSlicing
-        ? new Vector3(0f, SliceBladeDisplayYawDegrees * _sliceDir, SliceBladeDisplayRollDegrees) * SliceMotion.SliceMainWeight(_sliceT)
-        : Vector3.Zero;
+    public Vector3 HeldItemRotationOffset => Blade.DisplayOffset;
 
     /// <summary>Smoothed 0..1 movement amount driving the swing amplitude.</summary>
     public float MoveBlend => _moveBlend;
@@ -254,6 +315,13 @@ public class PlayerModel
 
     /// <summary>Smoothed 0..1 swimming amount (<c>swimming</c> in <see cref="Update"/>).</summary>
     public float SwimBlend => _swimBlend;
+
+    /// <summary>Smoothed 0..1 flying amount (<c>flying</c> in <see cref="Update"/>).</summary>
+    public float FlightBlend => _flightBlend;
+
+    /// <summary>The smoothed flight speed as a 0..1 share of the speed the pose is fully trailed at
+    /// (see <see cref="FlightPose.SpeedShare"/>).</summary>
+    public float FlightSpeedShare => FlightPose.SpeedShare(_flightSpeed);
 
     /// <summary>
     /// Smoothed 0..1 surface-float amount: eases in while <c>floating</c> in <see cref="Update"/> with no
@@ -305,6 +373,13 @@ public class PlayerModel
     public float BodyYaw => BodyYawLags && _lookKnown ? _bodyYaw : _lookYaw;
 
     /// <summary>
+    /// The yaw (degrees) the body, and so the hand anchor, is posed at for the look yaw
+    /// <paramref name="yawDeg"/> passed to <see cref="GetPartMatrix"/>: the trailing body's own yaw
+    /// while <see cref="BodyYawLags"/> holds and a look is known, the passed yaw otherwise.
+    /// </summary>
+    internal float DrawnBodyYaw(float yawDeg) => BodyYawLags && _lookKnown ? _bodyYaw : yawDeg;
+
+    /// <summary>
     /// Reports the current look. The change since the last call lags the arms behind the turn (the
     /// viewmodel sway) and, with <see cref="BodyYawLags"/>, drives the body-yaw follow. Call once a
     /// frame before <see cref="Update"/>.
@@ -354,11 +429,14 @@ public class PlayerModel
     /// knees, falling extends toward landing. <paramref name="floating"/> (with
     /// <paramref name="swimming"/>) is a body at rest at the top of deep water
     /// (<see cref="WaterPhase.Float"/>): the upright surface-float pose eases in over the swim pose,
-    /// except while a stroke is under way.
+    /// except while a stroke is under way. <paramref name="flying"/> is creative flight, whose pose
+    /// (the legs trailing, the lean) follows <paramref name="flightSpeed"/>, the body's whole speed in
+    /// blocks/s.
     /// </summary>
     public void Update(float deltaTime, float horizontalSpeed, bool sprinting = false, bool grounded = true,
         float verticalVelocity = 0f, bool sneaking = false, bool swimming = false,
-        float swimForward = 0f, float swimSide = 0f, bool floating = false)
+        float swimForward = 0f, float swimSide = 0f, bool floating = false,
+        bool flying = false, float flightSpeed = 0f)
     {
         if (deltaTime <= 0f) return;
         _time += deltaTime;
@@ -382,6 +460,8 @@ public class PlayerModel
         }
         _crouchBlend = MathUtils.Damp(_crouchBlend, sneaking ? 1f : 0f, 12f, deltaTime);
         _swimBlend = MathUtils.Damp(_swimBlend, swimming ? 1f : 0f, 6f, deltaTime);
+        _flightBlend = MathUtils.Damp(_flightBlend, flying ? 1f : 0f, PlayerConfig.FlightBlendRate, deltaTime);
+        _flightSpeed = MathUtils.Damp(_flightSpeed, flying ? flightSpeed : 0f, PlayerConfig.FlightSpeedEaseRate, deltaTime);
         _swimBobTime += deltaTime;
         _swimT += deltaTime;
         if (swimming && AutoSwimStroke && _swimT >= PlayerPhysics.SwimStrokeSeconds && horizontalSpeed > 0.8f)
@@ -425,8 +505,17 @@ public class PlayerModel
         if (_sliceT < 1f)
             _sliceT = _sliceStop.Advance(_sliceT, deltaTime, 1f / SliceDuration, SliceImpactProgress);
 
+        if (_swordT < 1f)
+            _swordT = _swordStop.Advance(_swordT, deltaTime, 1f / _swordSeconds, SwordImpactProgress(_swordSwing));
+
         if (_throwT < 1f)
             _throwT = Math.Min(1f, _throwT + deltaTime / ThrowDuration);
+
+        if (_castT < 1f)
+            _castT = Math.Min(1f, _castT + deltaTime / CastDuration);
+
+        if (_bowReleaseT < 1f)
+            _bowReleaseT = Math.Min(1f, _bowReleaseT + deltaTime / BowPose.ReleaseSeconds);
     }
 
     /// <summary>
@@ -452,12 +541,57 @@ public class PlayerModel
         _sliceDir = direction;
         _sliceT = 0f;
         _sliceStop.Reset();
+        // One blade swing at a time: a slice cuts short a sword swing still playing (the item changed)
+        _swordT = 1f;
     }
+
+    /// <summary>
+    /// Starts one swing of the sword's chain (<see cref="SwordSwing"/>). Its arm, body and blade ride
+    /// <see cref="SwordProgress"/> through <see cref="SwordMotion"/>; a slice still playing is cut short.
+    /// </summary>
+    public void StartSword(SwordSwing swing)
+    {
+        _swordSwing = swing;
+        _swordSeconds = SwordDuration(swing);
+        _swordT = 0f;
+        _swordStop.Reset();
+        _sliceT = 1f;
+    }
+
+    /// <summary>
+    /// Starts an axe's chop (<see cref="SwordSwing.AxeChop"/>) lasting <paramref name="seconds"/>, the
+    /// pace of the axe's hits, so the blow comes down as a hit lands and the next wind-up follows at once.
+    /// </summary>
+    public void StartAxeChop(float seconds)
+    {
+        StartSword(SwordSwing.AxeChop);
+        _swordSeconds = MathF.Max(seconds, 0.05f);
+    }
+
+    /// <summary>Starts the staff cast's gesture (<see cref="CastMotion"/>): the staff raised and thrust forward. Cosmetic.</summary>
+    public void Cast() => _castT = 0f;
 
     public void StartThrowCharge() => _throwCharge01 = 0f;
 
     /// <summary>Starts the timed-use pose (see <see cref="VoxelEngine.Interaction.RightClickAction.TryBeginUseCharge"/>).</summary>
-    public void StartUseCharge() => _useCharge01 = 0f;
+    public void StartUseCharge(UsePose pose = UsePose.Raise)
+    {
+        _usePose = pose;
+        _useCharge01 = 0f;
+        _bowReleaseT = 1f;
+    }
+
+    /// <summary>The pose the timed use in progress (or the last one) holds.</summary>
+    internal UsePose UsePoseActive => _usePose;
+
+    /// <summary>The charge a bow is drawn to (the use charge of a <see cref="UsePose.Bow"/> use), or null with no draw.</summary>
+    public float? BowCharge => _usePose == UsePose.Bow ? _useCharge01 : null;
+
+    /// <summary>Progress of a bow's release, 0 at the let-go to 1 when it has settled (also with none playing).</summary>
+    public float BowReleaseProgress => _bowReleaseT;
+
+    /// <summary>The charge the last bow release was let go at, 0..1.</summary>
+    public float BowReleaseCharge => _bowReleaseCharge;
 
     /// <summary>Advances the timed-use pose; <paramref name="charge01"/> is the hold's share.</summary>
     public void UpdateUseCharge(float charge01)
@@ -467,7 +601,16 @@ public class PlayerModel
     }
 
     /// <summary>Lets the timed-use pose go; the arm eases back to whatever it was doing.</summary>
-    public void CancelUseCharge() => _useCharge01 = null;
+    public void CancelUseCharge()
+    {
+        // A bow let go from a real draw snaps back instead of just dropping the pose
+        if (_usePose == UsePose.Bow && _useCharge01 is > BowPose.MinReleaseCharge)
+        {
+            _bowReleaseCharge = _useCharge01.Value;
+            _bowReleaseT = 0f;
+        }
+        _useCharge01 = null;
+    }
 
     public void UpdateThrowCharge(float charge01)
     {

@@ -19,11 +19,20 @@ public static class DayCycle
     /// turn), about 147 s; noon recurs every <see cref="SkyConfig.DayLengthSeconds"/>.</summary>
     public static double NoonTime => (MathF.PI / 2f - StartAngle) / MathF.Tau * SkyConfig.DayLengthSeconds;
 
+    /// <summary>The sun's orbit angle at <paramref name="time"/>, in radians: one turn per
+    /// <see cref="SkyConfig.DayLengthSeconds"/> about the +Z axis the whole sky turns around, wrapped into
+    /// one turn (in double, before the float cast) so the angle keeps its precision however long the clock runs.</summary>
+    public static float OrbitAngle(double time)
+    {
+        var turns = time / SkyConfig.DayLengthSeconds;
+        return (float)(turns - Math.Floor(turns)) * MathF.Tau + StartAngle;
+    }
+
     /// <summary>The unit direction toward the sun: one orbit per
     /// <see cref="SkyConfig.DayLengthSeconds"/>, phased to start mid-morning.</summary>
     public static Vector3 SunDirection(double time)
     {
-        var angle = (float)(time / SkyConfig.DayLengthSeconds) * MathF.Tau + StartAngle;
+        var angle = OrbitAngle(time);
         return Vector3.Normalize(new Vector3(MathF.Cos(angle), MathF.Sin(angle), 0.35f));
     }
 

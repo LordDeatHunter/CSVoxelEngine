@@ -1,0 +1,78 @@
+{
+  // The sky waystone (plans/WAYSTONES.md): a frost-stone arch on the same island as a sky ruin (WaystonePlacement). A round
+  // frost-stone plaza with a crystal heart, the waystone under an arch of two pillars and a crystal-keyed lintel.
+  "kind": "sky",
+  "satellite": true,
+  "groundLayer": 0,
+  "palette": {
+    "f": "frost_stone",
+    "k": "crystal_block",
+    "W": "waystone_sky",
+    "U": "waystone_sky_upper"
+  },
+  "layers": [
+    [
+      " fffff ",
+      "fffffff",
+      "fffffff",
+      "fffkfff",
+      "fffffff",
+      "fffffff",
+      " fffff "
+    ],
+    [
+      "       ",
+      "       ",
+      "       ",
+      "f..W..f",
+      "       ",
+      "       ",
+      "       "
+    ],
+    [
+      "       ",
+      "       ",
+      "       ",
+      "f..U..f",
+      "       ",
+      "       ",
+      "       "
+    ],
+    [
+      "       ",
+      "       ",
+      "       ",
+      "f.....f",
+      "       ",
+      "       ",
+      "       "
+    ],
+    [
+      "       ",
+      "       ",
+      "       ",
+      "f.....f",
+      "       ",
+      "       ",
+      "       "
+    ],
+    [
+      "       ",
+      "       ",
+      "       ",
+      "fffkfff",
+      "       ",
+      "       ",
+      "       "
+    ],
+    [
+      "       ",
+      "       ",
+      "       ",
+      "   k   ",
+      "       ",
+      "       ",
+      "       "
+    ]
+  ]
+}

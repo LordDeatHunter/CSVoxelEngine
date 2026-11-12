@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace VoxelEngine.Player.Posing;
 
-/// <summary>Where each shoulder is pulled toward its reaching arm (jump, swim stroke, cocked throw, slice sweep, punch), the target the owner's pull springs chase.</summary>
+/// <summary>Where each shoulder is pulled toward its reaching arm (jump, swim stroke, cocked throw, a blade swing, punch), the target the owner's pull springs chase.</summary>
 internal sealed class ShoulderReach
 {
     private readonly PlayerModel _model;
@@ -31,8 +31,8 @@ internal sealed class ShoulderReach
         {
             // A cocked throw reaches out to the right and back and lifts the shoulder.
             pull += new Vector3(0.035f, 0.025f, 0.035f) * _model.ThrowArm.ThrowArmWeight();
-            // A slice drags the shoulder across with the sweep.
-            pull += new Vector3(-0.035f * SliceMotion.SliceBodySweep(_model.SliceProgress, _model.SliceDir), 0f, 0f);
+            // A blade swing drags the shoulder with the sweep (across for a slice, up and over for a chop).
+            pull += _model.Blade.ShoulderPull;
             if (_model.MineT < 1f)
             {
                 var w = PunchPose.PunchWeights(_model.MineT);

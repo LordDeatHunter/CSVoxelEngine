@@ -35,7 +35,7 @@ internal sealed class OrphanWoodCheck
     }
 
     /// <summary>Whether a wood cell with a parent cell has lost every path to an anchor: its parent chain first, the full search only when the chain broke, both answers memoized for the frame. False as well when a read hit an unloaded chunk, which freezes the cell.</summary>
-    internal bool IsOrphaned(int x, int y, int z, byte id, byte state)
+    internal bool IsOrphaned(int x, int y, int z, ushort id, byte state)
     {
         if (!_unsupported.Contains(CellKey.Pack(x, y, z)))
         {
@@ -67,7 +67,7 @@ internal sealed class OrphanWoodCheck
     /// when a read hit an unloaded chunk, and <see cref="TreeSupportResult.Unsupported"/> when the
     /// chain broke or ran past the cap, which only means the full search has to decide.
     /// </summary>
-    private TreeSupportResult WalkParentChain(int x, int y, int z, byte id, byte state)
+    private TreeSupportResult WalkParentChain(int x, int y, int z, ushort id, byte state)
     {
         _chain.Clear();
         for (var step = 0; step < SimulationConfig.TreeFellWoodCap; step++)

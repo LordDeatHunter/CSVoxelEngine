@@ -1,0 +1,8 @@
+{
+  // Ring of Focus: placeholder gear. Wearable in the accessory slot; its
+  // fixed stats are the equip object, and a piece found in loot may also roll modifiers on its stack.
+  "name": "Ring of Focus",
+  "texture": "assets/textures/items/focus_ring.png",
+  "rarity": "uncommon",
+  "equip": { "slot": "accessory", "modifiers": { "manaRegen": 0.15 },  "visible": false }
+}

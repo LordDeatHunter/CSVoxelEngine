@@ -70,6 +70,27 @@ public sealed class ServerWorldTests : IDisposable
     }
 
     [Fact]
+    public void AServerModeWorldFeedsNoSliceTrail()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null, serverMode: true);
+        var blade = ContentRegistry.RequireItem("obsidian_blade").Id;
+        _world.Inventory.Add(blade, 1);
+        Assert.True(_world.Inventory.PickBlock(blade));
+
+        // The server camera holds a blade and swings it, yet a headless server draws nothing
+        _world.Player.StartSlice(1);
+        var swung = false;
+        for (var i = 0; i < 20; i++)
+        {
+            _world.Update(1.0 / 60.0, null);
+            swung |= _world.Player.IsSlicing;
+            Assert.Empty(_world.SliceTrails.Active);
+        }
+        Assert.True(swung);
+    }
+
+    [Fact]
     public void APlacementNeverBuriesAConnectedPlayerButTheServerCameraIsNobody()
     {
         WorldSeed.Apply(WorldSeed.Default);
@@ -104,7 +125,7 @@ public sealed class ServerWorldTests : IDisposable
         {
             var chunk = manager.ChunkAt(x, y, fz)!;
             var (lx, ly, lz) = VoxelCoords.LocalOf(x, y, fz);
-            chunk.SetBlockRaw(lx, ly, lz, y == fy - 1 ? dirt : (byte)0, 0);
+            chunk.SetBlockRaw(lx, ly, lz, y == fy - 1 ? dirt : BlockType.Air, 0);
         }
 
         // The builder stands at the eye, another player two blocks along +X
@@ -338,7 +359,7 @@ public sealed class ServerWorldTests : IDisposable
             for (var y = fy - 1; y <= fy + 1; y++)
             {
                 var (lx, ly, lz) = VoxelCoords.LocalOf(x, y, fz);
-                manager.ChunkAt(x, y, fz)!.SetBlockRaw(lx, ly, lz, y == fy - 1 ? stone : (byte)0, 0);
+                manager.ChunkAt(x, y, fz)!.SetBlockRaw(lx, ly, lz, y == fy - 1 ? stone : BlockType.Air, 0);
             }
 
             player.Inventory.Add(dirt, 1);

@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using VoxelEngine.Chunks;
 
@@ -31,12 +32,93 @@ public static class PlayerBodyProbe
     /// <summary>
     /// Whether the body stands on something: the body box lowered by
     /// <see cref="NetworkConfig.NetGroundProbeBlocks"/> collides under the player-body rule
-    /// (<see cref="BodyCollision.BodyCollides"/>). A body already inside a solid reads grounded
-    /// too, so a buried player is never billed a fall. <paramref name="solids"/> adds the non-block
-    /// solids (the server's icebergs), so a rider stands on its berg.
+    /// (<see cref="BodyCollision.BodyCollides"/>), or its feet stand in a sink block's soft layer
+    /// (<see cref="SinkLayerTop"/>), which the client's physics treats as ground while the body
+    /// sinks through it. A body already inside a solid reads grounded too, so a buried player is
+    /// never billed a fall. <paramref name="solids"/> adds the non-block solids (the server's
+    /// icebergs), so a rider stands on its berg.
     /// </summary>
     public static bool Grounded(Vector3 eye, ChunkManager chunks, IBodySolids? solids = null) =>
-        BodyCollision.BodyCollides(eye - new Vector3(0f, NetworkConfig.NetGroundProbeBlocks, 0f), chunks, solids);
+        BodyCollision.BodyCollides(eye - new Vector3(0f, NetworkConfig.NetGroundProbeBlocks, 0f), chunks, solids)
+        || SinkLayerTop(eye, chunks) != null;
+
+    /// <summary>
+    /// Whether the body could have touched down within <paramref name="reach"/> blocks below this
+    /// eye: the body box lowered by that much (plus <see cref="NetworkConfig.NetGroundProbeBlocks"/>)
+    /// collides, so it straddles any ground top within that distance. The server reads it at the
+    /// low point of a descent-then-rise, whose landing fell between two states.
+    /// </summary>
+    public static bool GroundedWithin(Vector3 eye, float reach, ChunkManager chunks, IBodySolids? solids = null) =>
+        BodyCollision.BodyCollides(eye - new Vector3(0f, reach + NetworkConfig.NetGroundProbeBlocks, 0f), chunks, solids);
+
+    /// <summary>
+    /// Whether a bounce block (a slime block) lies under the body's footprint within
+    /// <paramref name="depth"/> blocks below the feet (at least the cell just under them). An
+    /// unloaded cell reads as air, so it bounces nothing.
+    /// </summary>
+    public static bool BounceWithin(Vector3 eye, float depth, ChunkManager chunks)
+    {
+        var feet = eye.Y - Camera.EyeHeight;
+        var top = MathUtils.FloorToInt(feet - SinkLayer.FeetTolerance);
+        var bottom = Math.Min(top, MathUtils.FloorToInt(feet - depth));
+        FootprintCells(eye, out var minX, out var minZ, out var maxX, out var maxZ);
+        for (var y = top; y >= bottom; y--)
+        for (var x = minX; x <= maxX; x++)
+        for (var z = minZ; z <= maxZ; z++)
+        {
+            if (BlockType.BouncesAt(chunks.GetBlockGlobal(x, y, z)))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// The top of the sink block's soft layer the feet stand in (<see cref="SinkLayer.FeetIn"/>), read
+    /// over the body's footprint in the cell just under the feet, or null when they stand in none.
+    /// An unloaded cell reads as air, so it holds no layer.
+    /// </summary>
+    public static float? SinkLayerTop(Vector3 eye, ChunkManager chunks)
+    {
+        var feet = eye.Y - Camera.EyeHeight;
+        var y = MathUtils.FloorToInt(feet - SinkLayer.FeetTolerance);
+        FootprintCells(eye, out var minX, out var minZ, out var maxX, out var maxZ);
+        for (var x = minX; x <= maxX; x++)
+        for (var z = minZ; z <= maxZ; z++)
+        {
+            if (SinkLayer.FeetIn(feet, y, BlockType.SinkOf(chunks.GetBlockGlobal(x, y, z))))
+                return y + 1f;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Whether a landing here is cushioned and bills no fall damage: a bounce block (a slime block)
+    /// or a soft-landing block (a cloud) lies under any part of the body's footprint, in the cell
+    /// just under the feet (which, for a body sunk into a soft layer, is that block's own cell).
+    /// The fall tracker reads it in singleplayer and on the server alike.
+    /// </summary>
+    public static bool LandingCushioned(Vector3 eye, ChunkManager chunks)
+    {
+        var y = MathUtils.FloorToInt(eye.Y - Camera.EyeHeight - SinkLayer.FeetTolerance);
+        FootprintCells(eye, out var minX, out var minZ, out var maxX, out var maxZ);
+        for (var x = minX; x <= maxX; x++)
+        for (var z = minZ; z <= maxZ; z++)
+        {
+            var id = chunks.GetBlockGlobal(x, y, z);
+            if (BlockType.BouncesAt(id) || BlockType.SoftLandingAt(id))
+                return true;
+        }
+        return false;
+    }
+
+    // The block columns the body's footprint covers
+    private static void FootprintCells(Vector3 eye, out int minX, out int minZ, out int maxX, out int maxZ)
+    {
+        minX = MathUtils.FloorToInt(eye.X - PlayerPhysics.PlayerRadius);
+        maxX = MathUtils.FloorToInt(eye.X + PlayerPhysics.PlayerRadius);
+        minZ = MathUtils.FloorToInt(eye.Z - PlayerPhysics.PlayerRadius);
+        maxZ = MathUtils.FloorToInt(eye.Z + PlayerPhysics.PlayerRadius);
+    }
 
     /// <summary>
     /// Whether the body swims: a fluid surface over its footprint reaches above the feet, within
@@ -58,6 +140,22 @@ public static class PlayerBodyProbe
                 return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Whether the eye is under a fluid surface (the eye cell's own fluid height, so a one-block
+    /// pool's 8/9 surface leaves a standing eye dry), and whether that fluid burns
+    /// (<paramref name="inLava"/>). The one eye rule <see cref="PlayerPhysics.UpdateWaterState"/>,
+    /// the shoulder camera's eye and the server's drowning all read.
+    /// </summary>
+    public static bool EyeInFluid(Vector3 eye, ChunkManager chunks, out bool inLava)
+    {
+        inLava = false;
+        var (x, y, z) = eye.BlockCell();
+        if (eye.Y >= chunks.GetFluidSurfaceGlobal(x, y, z))
+            return false;
+        inLava = chunks.TryGetCell(x, y, z, out var id, out _) && BlockType.IsFluid(id) && BlockType.Emission[id] > 0;
+        return true;
     }
 
     /// <summary>

@@ -1,6 +1,10 @@
+using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Spells;
 using VoxelEngine.Player;
+using VoxelEngine.Saves;
 using VoxelEngine.UI;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
 namespace VoxelEngine.Tests.Player;
@@ -16,6 +20,23 @@ public sealed class PlayerRestoreTests
     {
         TestContent.EnsureLoaded();
         if (GameSettings.FieldOfView <= 0f) GameSettings.ResetToDefaults();
+    }
+
+    [Fact]
+    public void SavedManaAboveTheStartingMaxSurvivesBecauseKnownPartsApplyFirst()
+    {
+        var source = Inventory.Empty();
+        source.LearnParts(SpellPartRegistry.All.Select(p => p.Key));
+        var full = PlayerMana.MaxFor(source.KnownPartCount);
+        Assert.True(full > new PlayerMana().Max);
+        var saved = new PlayerSaveData { Inventory = source.Export(), Mana = full };
+
+        var inventory = Inventory.Empty();
+        var health = new PlayerHealth();
+        SavedPlayerPools.Apply(saved, inventory, health);
+
+        Assert.Equal(full, health.Mana.Max);
+        Assert.Equal(full, health.Mana.Current);
     }
 
     [Fact]

@@ -31,6 +31,23 @@ public sealed class SfxTests
         Assert.Single(groups[SfxLibrary.DefaultGroup]);
     }
 
+    [Theory]
+    [InlineData(SfxLibrary.SpellCastGroup)]
+    [InlineData(SfxLibrary.SpellImpactGroup)]
+    [InlineData(SfxLibrary.SpellFizzleGroup)]
+    public void EverySpellGroupExistsAndEachOfItsClipsLoads(string group)
+    {
+        var groups = SfxLibrary.Scan(Path.Combine(TestContent.FindAssetsRoot(), "sfx"));
+
+        Assert.True(groups.TryGetValue(group, out var clips));
+        Assert.NotEmpty(clips);
+        Assert.All(clips, path =>
+        {
+            Assert.True(SfxManager.TryLoad(path, out var samples), path);
+            Assert.NotEmpty(samples);
+        });
+    }
+
     [Fact]
     public void ConfiguredAmbiencePathsExist()
     {
@@ -49,7 +66,7 @@ public sealed class SfxTests
     [Fact]
     public void StoneAndWoodFamiliesMapToTheirGroups()
     {
-        foreach (var name in new[] { "stone", "cobblestone", "mud_bricks", "malachite_ore", "gravel", "pebble", "quern" })
+        foreach (var name in new[] { "stone", "cobblestone", "mud_bricks", "malachite_ore", "hematite_ore", "gravel", "pebble", "quern" })
             Assert.Equal(SfxLibrary.StoneGroup, ContentRegistry.RequireBlock(name).Sfx);
         foreach (var name in new[] { "oak_log", "spruce_log", "cactus", "branch_pile" })
             Assert.Equal(SfxLibrary.WoodGroup, ContentRegistry.RequireBlock(name).Sfx);

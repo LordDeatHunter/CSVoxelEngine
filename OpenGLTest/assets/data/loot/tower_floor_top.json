@@ -1,0 +1,33 @@
+{
+  // A battle tower chest on floors 6-7: wrought iron, one or two epic to legendary trinkets,
+  // and often a scroll or a mana draught.
+  "pools": [
+    { "rolls": 1, "entries": [ { "table": "tower_supplies" } ] },
+    {
+      "chance": 0.9,
+      "rolls": 1,
+      "entries": [
+        { "item": "item/wrought_iron", "weight": 3, "count": { "min": 2, "max": 4 } },
+        { "item": "item/bronze_ingot", "weight": 1, "count": { "min": 2, "max": 4 } }
+      ]
+    },
+    {
+      "chance": 0.9,
+      "rolls": { "min": 1, "max": 2 },
+      "entries": [
+        { "item": "item/focus_ring", "rarity": { "min": "epic", "max": "legendary" } },
+        { "item": "item/ember_charm", "rarity": { "min": "epic", "max": "legendary" } },
+        { "item": "item/amulet_of_vigor", "rarity": { "min": "epic", "max": "legendary" } }
+      ]
+    },
+    {
+      "chance": 0.4,
+      "rolls": 1,
+      "entries": [
+        { "item": "item/scroll_modifiers" },
+        { "item": "item/scroll_self" },
+        { "item": "item/mana_draught", "weight": 2 }
+      ]
+    }
+  ]
+}

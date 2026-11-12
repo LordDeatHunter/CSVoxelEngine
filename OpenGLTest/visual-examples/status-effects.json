@@ -1,0 +1,60 @@
+{
+  // Status effects: run with VOXEL_SCRIPT=visual-examples/status-effects.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/status-effects/.
+  // `effect` applies a status effect by name (checked when the step runs) to every live mob, or with
+  // "target": "player" to the local player's own pool; the optional "scale" multiplies its duration.
+  // The camera hovers over goblins.json's flat, dry forest clearing (ground at y 9..10) facing -Z, so the
+  // mobs stand in plain view. Flight keeps the camera immune while the mobs are filmed: an immune player
+  // refuses an effect (and clears one it has), so creative is turned off before the player's own shots.
+  // A long scale keeps the mobs burning (and frozen) through the waits.
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -12 },
+    { "op": "fly" },
+    // Chunks must be loaded before anything can stand on them.
+    { "op": "wait", "seconds": 5 },
+    { "op": "spawn", "entity": "slime", "pos": [-46.5, 53.5], "size": 2 },
+    { "op": "spawn", "entity": "slime", "pos": [-40.5, 54.5], "size": 2 },
+    { "op": "spawn", "entity": "goblin", "pos": [-43.5, 51.5] },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "plain" },
+    // Burning: the orange tint and embers (each damage tick also flashes the hit red). The slimes'
+    // small pools may not outlast it.
+    { "op": "effect", "effect": "burning" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "burning" },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "burning_later" },
+    // Let burning run out (the tint shown is the lowest-id tinted effect, so a mob that still burned
+    // would stay orange), then bring fresh mobs in for frostburn: the blue tint, steam and the slowed
+    // hop and walk.
+    { "op": "wait", "seconds": 5 },
+    { "op": "spawn", "entity": "slime", "pos": [-46.5, 53.5], "size": 2 },
+    { "op": "spawn", "entity": "goblin", "pos": [-40.5, 52.5] },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "effect", "effect": "frostburn", "scale": 2 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "frostburn" },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "frostburn_later" },
+    // Kill the mobs off so the player's shots are quiet.
+    { "op": "damage", "amount": 1000 },
+    { "op": "wait", "seconds": 1.5 },
+    // Land: creative off ends flight too, and the drop to the clearing is about two blocks.
+    { "op": "creative", "on": false },
+    { "op": "wait", "seconds": 1.5 },
+    // Best effort: an ice block one cell ahead at foot level, which burning's thaw melts to water.
+    { "op": "look", "yaw": -90, "pitch": -60 },
+    { "op": "give", "block": "ice", "count": 1 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "ice" },
+    { "op": "effect", "effect": "burning", "target": "player" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "player_hud" },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "thaw" },
+    { "op": "effect", "effect": "frostburn", "target": "player" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "player_both" }
+  ]
+}

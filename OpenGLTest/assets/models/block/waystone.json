@@ -1,0 +1,44 @@
+{
+  // A waystone's lower half (the upper half, block/waystone_upper, stands in the cell above): a two-step plinth and the
+  // foot of the rune-carved obelisk shaft, which runs on through the top of the cell into the upper half. Symmetric
+  // about the cell's center, so it reads the same from every side; the shaft's default uv crops the lower part of the
+  // rune panel (#runes: tile columns 10..21, rows 0..21). Every box is
+  // narrower than the cell, so only the plinth's underside culls against the block below. The realm blocks fill
+  // #stone and #runes, and their hitboxes are these boxes.
+  "textures": { "particle": "#stone" },
+  "elements": [
+    {
+      "from": [1, 0, 1],
+      "to": [15, 3, 15],
+      "faces": {
+        "down": { "texture": "#stone", "cullface": "down" },
+        "up": { "texture": "#stone" },
+        "north": { "texture": "#stone" },
+        "south": { "texture": "#stone" },
+        "west": { "texture": "#stone" },
+        "east": { "texture": "#stone" }
+      }
+    },
+    {
+      "from": [3, 3, 3],
+      "to": [13, 5, 13],
+      "faces": {
+        "up": { "texture": "#stone" },
+        "north": { "texture": "#stone" },
+        "south": { "texture": "#stone" },
+        "west": { "texture": "#stone" },
+        "east": { "texture": "#stone" }
+      }
+    },
+    {
+      "from": [5, 5, 5],
+      "to": [11, 16, 11],
+      "faces": {
+        "north": { "texture": "#runes" },
+        "south": { "texture": "#runes" },
+        "west": { "texture": "#runes" },
+        "east": { "texture": "#runes" }
+      }
+    }
+  ]
+}

@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Player;
+using VoxelEngine.Saves;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Simulation;
@@ -75,7 +78,7 @@ public sealed class CastingManager
 
     private readonly Dictionary<(int X, int Y, int Z), CastState> _casts = new();
     private readonly List<(int X, int Y, int Z)> _stale = new();
-    private readonly List<byte> _collected = new();
+    private readonly List<ushort> _collected = new();
 
     /// <summary>Whether any mold cell holds a pour, for render early-out.</summary>
     public bool HasAny => _casts.Count > 0;
@@ -85,29 +88,27 @@ public sealed class CastingManager
 
     /// <summary>
     /// Binds <paramref name="crucible"/> to the mold at <paramref name="cell"/> and starts (or
-    /// resumes) the pour. Refuses anything that is not a crucible holding molten metal, a mold
-    /// with no recipe for that metal, a cell already filled with a different cast, and a mold that
-    /// is cooling or waiting to be collected — a refusal never disturbs the state standing there.
+    /// resumes) the pour. A half-filled mold takes more of the metal it was started with; an empty
+    /// one takes, of the crucible's molten metals that cast in this mold, the one with the most ml
+    /// (the lowest material id on a tie). Refuses anything that is not a crucible, a crucible with
+    /// no molten metal this mold casts, and a mold that is cooling or waiting to be collected — a
+    /// refusal never disturbs the state standing there.
     /// <paramref name="source"/> binds the pour to a player other than the one <see cref="Update"/>
     /// is handed (a server's connected player, see <see cref="CastState.PourSource"/>).
     /// </summary>
-    public bool TryStartPour(Vector3 cell, byte moldId, ItemStack crucible, PlayerContext? source = null)
+    public bool TryStartPour(Vector3 cell, ushort moldId, ItemStack crucible, PlayerContext? source = null)
     {
         if (crucible.Item is not CrucibleItem) return false;
         var contents = crucible.Get<CrucibleComponent>();
-        if (contents.MoltenMl <= 0) return false;
-
-        var recipe = ContentRegistry.CastRecipeFor(moldId, contents.MaterialId);
-        if (recipe == null) return false;
-
         var key = VoxelCoords.BlockCellOf(cell);
         if (_casts.TryGetValue(key, out var state))
         {
-            // A half-filled mold only takes more of the same cast, and never once it is set
-            if (state.Recipe != recipe || state.Cooling || state.Done) return false;
+            // A half-filled mold only takes more of the same metal, and never once it is set
+            if (state.Cooling || state.Done || contents.MoltenOf(state.Recipe.MaterialId) <= 0) return false;
         }
         else
         {
+            if (PourRecipe(moldId, contents) is not { } recipe) return false;
             state = new CastState(recipe);
             _casts[key] = state;
         }
@@ -115,6 +116,23 @@ public sealed class CastingManager
         state.PourInstance = crucible.InstanceId;
         state.PourSource = source;
         return true;
+    }
+
+    /// <summary>The cast recipe an empty mold <paramref name="moldId"/> takes from a crucible holding
+    /// <paramref name="contents"/>: the molten metal with the most ml among those it casts (the lowest
+    /// material id on a tie), or null when it casts none of them.</summary>
+    public static CastRecipe? PourRecipe(ushort moldId, CrucibleComponent contents)
+    {
+        CastRecipe? best = null;
+        var bestMl = 0;
+        foreach (var metal in contents.Metals)
+        {
+            if (metal.MoltenMl <= bestMl) continue;
+            if (ContentRegistry.CastRecipeFor(moldId, metal.MaterialId) is not { } recipe) continue;
+            best = recipe;
+            bestMl = metal.MoltenMl;
+        }
+        return best;
     }
 
     /// <summary>
@@ -187,12 +205,12 @@ public sealed class CastingManager
     {
         var stack = inventory.GetToolStack(state.PourInstance);
         var contents = stack?.Get<CrucibleComponent>() ?? default;
+        var material = state.Recipe.MaterialId;
         var center = new Vector3(key.X + 0.5f, key.Y + 0.5f, key.Z + 0.5f);
         if (stack == null
             || state.PourInstance != selectedInstance
             || Vector3.Distance(playerPos, center) > reach
-            || contents.MaterialId != state.Recipe.MaterialId
-            || contents.MoltenMl <= 0)
+            || contents.MoltenOf(material) <= 0)
         {
             state.PourInstance = 0;
             return;
@@ -200,17 +218,14 @@ public sealed class CastingManager
 
         state.PourCarry += PourMlPerSecond * dt;
         var ml = Math.Min((int)state.PourCarry,
-            Math.Min(state.Recipe.AmountMl - state.FilledMl, contents.MoltenMl));
+            Math.Min(state.Recipe.AmountMl - state.FilledMl, contents.MoltenOf(material)));
         state.PourCarry -= ml;
         state.FilledMl += ml;
 
-        var leftMolten = contents.MoltenMl - ml;
-        stack.Set(contents with
-        {
-            MoltenMl = leftMolten,
-            // An emptied vessel forgets its metal, so it will take any charge next
-            MaterialId = leftMolten + contents.PendingMl == 0 ? (byte)0 : contents.MaterialId,
-        });
+        // An emptied metal leaves the vessel's books, so an empty vessel takes any charge next
+        var left = contents.With(material, -ml, 0);
+        stack.Set(left);
+        var leftMolten = left.MoltenOf(material);
 
         if (state.FilledMl >= state.Recipe.AmountMl)
         {
@@ -239,7 +254,7 @@ public sealed class CastingManager
     /// filling, pouring or cooling. The list is reused between calls, so a caller must consume it
     /// before the next one.
     /// </summary>
-    public IReadOnlyList<byte> Collect(Vector3 cell)
+    public IReadOnlyList<ushort> Collect(Vector3 cell)
     {
         _collected.Clear();
         var key = VoxelCoords.BlockCellOf(cell);
@@ -265,12 +280,67 @@ public sealed class CastingManager
     }
 
     /// <summary>Every mold cell holding a pour, for the molten/cooling render pass.</summary>
-    public IEnumerable<(Vector3 Cell, byte MaterialId, float Fill01, float Cool01, bool Done, byte ResultId)>
+    public IEnumerable<(Vector3 Cell, byte MaterialId, float Fill01, float Cool01, bool Done, ushort ResultId)>
         CastingView()
     {
         foreach (var (key, state) in _casts)
             yield return (new Vector3(key.X, key.Y, key.Z), state.Recipe.MaterialId,
                 state.Fill01, state.Cool01, state.Done, state.Recipe.ResultId);
+    }
+
+    /// <summary>Every mold cell holding a pour by content name, for <c>stations.json</c> (at most
+    /// <see cref="StationNetCodec.MaxEntries"/>). A pour in progress is saved paused: the crucible
+    /// binding is transient and a right-click resumes it.</summary>
+    internal List<StationSaveData.CastData> Capture()
+    {
+        var result = new List<StationSaveData.CastData>();
+        foreach (var ((x, y, z), state) in _casts)
+        {
+            if (result.Count >= StationNetCodec.MaxEntries) break;
+            if (SaveNames.NameOf(state.Recipe.MoldId) is not { } mold
+                || SaveNames.MaterialNameOf(state.Recipe.MaterialId) is not { } material)
+                continue;
+            result.Add(new StationSaveData.CastData
+            {
+                Cell = [x, y, z],
+                Mold = mold,
+                Material = material,
+                FilledMl = state.FilledMl,
+                Cooling = state.Cooling,
+                CoolLeft = state.CoolLeft,
+                Done = state.Done,
+            });
+        }
+        return result;
+    }
+
+    /// <summary>Adds the casts saved by <see cref="Capture"/> to an empty registry, all paused. An
+    /// entry with a bad cell, a name that no longer resolves or no cast recipe for its mold and
+    /// metal is dropped; returns how many were.</summary>
+    internal int Restore(IReadOnlyList<StationSaveData.CastData>? saved)
+    {
+        var skipped = 0;
+        if (saved == null) return 0;
+        foreach (var data in saved.Take(StationNetCodec.MaxEntries))
+        {
+            if (!StationSaveCodec.TryCell(data.Cell, out var key)
+                || !SaveNames.TryResolve(data.Mold, out var mold)
+                || !SaveNames.TryResolveMaterial(data.Material, out var material)
+                || ContentRegistry.CastRecipeFor(mold, material) is not { } recipe
+                || data.FilledMl < 0 || !float.IsFinite(data.CoolLeft))
+            {
+                skipped++;
+                continue;
+            }
+            _casts[key] = new CastState(recipe)
+            {
+                FilledMl = Math.Min(data.FilledMl, recipe.AmountMl),
+                Cooling = data.Cooling,
+                CoolLeft = Math.Clamp(data.CoolLeft, 0f, recipe.CoolSeconds),
+                Done = data.Done,
+            };
+        }
+        return skipped;
     }
 
     /// <summary>Writes every mold cell holding a pour (its recipe by mold and metal, fill, cooling),
@@ -284,8 +354,8 @@ public sealed class CastingManager
         {
             if (leftCasts-- == 0) break;
             StationNetCodec.WriteCell(writer, x, y, z);
-            writer.Write(state.Recipe.MoldId);
-            writer.Write(state.Recipe.MaterialId);
+            writer.WriteId(state.Recipe.MoldId);
+            writer.WriteMaterial(state.Recipe.MaterialId);
             writer.Write(state.FilledMl);
             writer.Write(state.Pouring);
             writer.Write(state.Cooling);
@@ -306,8 +376,8 @@ public sealed class CastingManager
         for (var i = 0; i < count; i++)
         {
             var key = StationNetCodec.ReadCell(reader);
-            var moldId = reader.ReadByte();
-            var materialId = reader.ReadByte();
+            var moldId = BlockTables.RequireAssigned(reader.ReadId());
+            var materialId = reader.ReadMaterial();
             var filled = reader.ReadInt();
             var pouring = reader.ReadBool();
             var cooling = reader.ReadBool();

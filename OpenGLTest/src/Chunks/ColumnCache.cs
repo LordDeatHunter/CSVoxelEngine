@@ -28,8 +28,9 @@ public static class ColumnCache
         };
 
     /// <summary>
-    /// Drops every cached column. Only <see cref="WorldSeed.Apply"/> calls it: the columns are a
-    /// function of the seed, so a swap makes all of them wrong.
+    /// Drops every cached column. <see cref="WorldSeed.Apply"/> calls it for a seed/world swap;
+    /// <see cref="WorldSeed.EndWorld"/> also calls it after the last quiesced world releases its
+    /// ownership. Both callers require lifecycle transitions and direct readers to be serialized.
     /// </summary>
     internal static void Reset() => Cache.Clear();
 
@@ -65,7 +66,7 @@ public static class ColumnCache
     /// (ravines cut in) decides how deep to fill; <paramref name="bed"/> (ravines not cut) decides
     /// whether the column is water.
     /// </summary>
-    internal static void GenerateColumn(byte[] blocks, int chunkX, int chunkZ, int x, int z,
+    internal static void GenerateColumn(ushort[] blocks, int chunkX, int chunkZ, int x, int z,
         int terrainHeight, int bed, int dirtDepth, int lowerBoundY, Biome biome)
     {
         var worldX = chunkX * Size + x;

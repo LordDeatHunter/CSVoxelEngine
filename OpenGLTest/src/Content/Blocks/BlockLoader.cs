@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Text.Json;
@@ -16,7 +17,7 @@ namespace VoxelEngine.Content.Blocks;
 internal static class BlockLoader
 {
     /// <summary>The <c>light.color</c> a block's JSON declared, or null when it declared none.</summary>
-    internal static float[]? DeclaredLightColor(byte id) =>
+    internal static float[]? DeclaredLightColor(ushort id) =>
         ContentRegistry.BlockDefinitions.TryGetValue(id, out var definition) ? definition.Light?.Color : null;
 
     /// <summary>
@@ -42,7 +43,7 @@ internal static class BlockLoader
 
     internal static void LoadBlocks(List<(string Name, string Path)> files)
     {
-        var types = new Dictionary<byte, BlockType>();
+        var types = new Dictionary<ushort, BlockType>();
         var links = new BlockLinkResolver();
 
         foreach (var (name, path) in files)
@@ -65,10 +66,19 @@ internal static class BlockLoader
             ContentRegistry.BlockDefinitions[id] = definition;
             types[id] = type;
             RegisterTables(type, stackSolidAt);
+            if (definition.Spritesheet != null)
+                TextureSheetRegistry.Add(BlockSchemaParser.ParseSpritesheet(definition.Spritesheet, path));
         }
 
         links.Resolve(types);
         BlockType.Types = types;
+
+        // The vectorized set of covering ids, built once every block's tables are written: every
+        // covering id as a char, since the search runs over the id span reinterpreted as chars
+        var coverChars = new List<char>();
+        for (var id = 1; id < BlockTables.IdCount; id++)
+            if (BlockType.CoversSkyById[id]) coverChars.Add((char)id);
+        BlockType.SkyCoverChars = SearchValues.Create(coverChars.ToArray());
     }
 
     /// <summary>
@@ -77,12 +87,16 @@ internal static class BlockLoader
     /// <paramref name="stackSolidAt"/> is the stack count at which the block turns solid, which
     /// the per-id tables carry but the type does not.
     /// </summary>
-    private static BlockType BuildType(BlockDefinition definition, string name, byte id, string path,
+    private static BlockType BuildType(BlockDefinition definition, string name, ushort id, string path,
         out int stackSolidAt)
     {
         var renderer = BlockFieldRules.ParseRenderer(definition, path);
         var paneProfile = BlockFieldRules.ParsePane(definition, renderer, path);
         BlockFieldRules.ValidateMultiblock(definition, renderer, path);
+        var multiblockSize = BlockSchemaParser.ParseMultiblockSize(definition.Multiblock, path);
+        BlockFieldRules.ValidateStatusFlags(definition, path);
+        BlockFieldRules.ValidateUnbreakable(definition, renderer, path);
+        BlockFieldRules.ValidateCoversSky(definition, renderer, path);
         var onBreak = BlockFieldRules.ParseOnBreak(definition, path);
         var (tipHardness, woodLootBands) = BlockFieldRules.ParseWood(definition, renderer, path);
 
@@ -123,6 +137,8 @@ internal static class BlockLoader
             hitboxes = paneProfile!.Boxes(0);
             collidesByHitbox = solid;
         }
+        var bodySurface = BlockFieldRules.ParseBodySurface(definition, renderer, fluid, solid, ground.MovementSpeed,
+            collidesByHitbox, stack.StackMax, path);
 
         var type = new BlockType
         {
@@ -139,6 +155,8 @@ internal static class BlockLoader
             PebbleWeight = ground.PebbleWeight,
             FootstepDust = ground.FootstepDust,
             Bounces = definition.Bounce ?? false,
+            SoftLanding = bodySurface.SoftLanding,
+            Sink = bodySurface.Sink,
             BlocksSight = definition.BlocksSight ?? true,
             ContactDamage = ground.ContactDamage,
             CullSelf = definition.CullSelf ?? false,
@@ -154,13 +172,20 @@ internal static class BlockLoader
             FlamePoints = flamePoints,
             Renderer = renderer,
             Pane = paneProfile,
-            Kiln = definition.Kiln ?? false,
+            MultiblockSize = multiblockSize,
+            Kiln = BlockSchemaParser.ParseKiln(definition.Kiln, path, multiblockSize),
+            Bloomery = BlockSchemaParser.ParseBloomery(definition.Bloomery, path),
+            Anvil = BlockSchemaParser.ParseAnvil(definition.Anvil, renderer, path),
+            SpellBuilder = definition.SpellBuilder ?? false,
+            Waystone = definition.Waystone ?? false,
+            Chest = BlockSchemaParser.ParseChest(definition.Chest, renderer, path),
             StackMax = (byte)stack.StackMax,
             TipHardness = tipHardness,
             WoodLootBands = woodLootBands ?? [new WoodLootBand(0, null, true)],
             HasItem = !fluid && (definition.HasItem ?? true),
             NeedsSupport = support.NeedsSupport,
             FlowResistant = support.FlowResistant,
+            SupportFullFace = support.FullFace,
             SupportAttached = supportAttached,
             SupportAbove = supportAbove,
             HasHorizontalFacing = horizontalFacing,
@@ -177,7 +202,10 @@ internal static class BlockLoader
             Hitboxes = hitboxes ?? [BlockHitbox.FullCube],
             CollidesByHitbox = collidesByHitbox,
             HardensToId = 0,
-            HardensTouchingId = 0
+            HardensTouchingId = 0,
+            Flammable = definition.Flammable ?? false,
+            Unbreakable = definition.Unbreakable ?? false,
+            CoversSky = definition.CoversSky ?? false
         };
         // A facing block's selection boxes turn with it, exactly like its model will in BakeModels
         if (horizontalFacing)
@@ -206,6 +234,8 @@ internal static class BlockLoader
         BlockType.PebbleWeightById[id] = type.PebbleWeight;
         BlockType.FootstepDustById[id] = type.FootstepDust;
         BlockType.BounceById[id] = type.Bounces;
+        BlockType.SoftLandingById[id] = type.SoftLanding;
+        BlockType.SinkById[id] = type.Sink;
         BlockType.BlocksSightById[id] = type.BlocksSight;
         BlockType.ContactDamageById[id] = type.ContactDamage;
         BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;
@@ -218,6 +248,11 @@ internal static class BlockLoader
         BlockType.FluidInfiniteById[id] = type.FluidInfinite;
         BlockType.HardensToById[id] = type.HardensToId;
         BlockType.HardensTouchingById[id] = type.HardensTouchingId;
+        BlockType.FlammableById[id] = type.Flammable;
+        BlockType.UnbreakableById[id] = type.Unbreakable;
+        BlockType.CoversSkyById[id] = type.CoversSky;
+        BlockType.FreezesToById[id] = type.FreezesToId;
+        BlockType.MeltsToById[id] = type.MeltsToId;
         BlockType.FallsById[id] = type.Falls;
         // Fragile blocks are washed away by a flow instead of stopping it; a flow-resistant
         // one (a cave formation) is rock and stays standing

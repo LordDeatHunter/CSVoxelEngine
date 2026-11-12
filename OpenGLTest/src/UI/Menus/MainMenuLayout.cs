@@ -187,6 +187,14 @@ public static class MainMenuLayout
     public static float TitleTop(Vector2 screenSize, MainMenuPage page) =>
         page == MainMenuPage.Main ? MainTitleTop(screenSize) : TitleTopY;
 
+    /// <summary>The center of the text field a field hit stands for, on the page that shows it (the address sits in the second slot on the add-server page and the first on direct connect).</summary>
+    public static Vector2 FieldCenter(MainMenuPage page, MainMenuHitKind kind, Vector2 screenSize) => kind switch
+    {
+        MainMenuHitKind.SeedField => SeedFieldCenter(screenSize),
+        MainMenuHitKind.AddressField when page == MainMenuPage.AddServer => SeedFieldCenter(screenSize),
+        _ => NameFieldCenter(screenSize),
+    };
+
     public static MainMenuHit HitAt(Vector2 point, Vector2 screenSize, MainMenuView view)
     {
         switch (view.Page)

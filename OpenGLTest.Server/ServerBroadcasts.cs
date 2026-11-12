@@ -2,8 +2,16 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.Sandworms;
+using VoxelEngine.Entities.CaveMobs;
+using VoxelEngine.Entities.SkyMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.Crawlers;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Networking;
 
 namespace VoxelEngine.Server;
@@ -15,11 +23,9 @@ internal sealed class ServerBroadcasts
 
     // Long-lived, coalesced cell changes the server's own simulation produced (explosions, fluid
     // flow, decay, felling), drained and broadcast in batches.
-    private readonly ConcurrentQueue<CellChange> _cellJournal = new();
-    private readonly Dictionary<(int X, int Y, int Z), (byte Id, byte State)> _cellCoalesce = new();
+    private readonly ConcurrentQueue<NetCellChange> _cellJournal = new();
+    private readonly Dictionary<(int X, int Y, int Z), (ushort Id, byte State)> _cellCoalesce = new();
     private const int MaxCellChangesPerBroadcast = 8192;
-
-    private readonly record struct CellChange(int X, int Y, int Z, byte Id, byte State);
 
     // Whether the last station broadcast carried anything, so the one after the last station went
     // away still goes out and clears the clients' mirrors
@@ -58,40 +64,67 @@ internal sealed class ServerBroadcasts
         _entitySeen.Clear();
 
         using var writer = new PacketWriter(NetMessage.EntityList);
-        writer.Write(mobs.Count + drops.Count + primed.Count + falling.Count + icebergs.Count);
+        // A digging sandworm also sends the point it will surface at, one extra entry sharing its id
+        var wormTargets = 0;
+        for (var i = 0; i < mobs.Count; i++)
+            if (mobs[i] is Sandworm { Phase: SandwormPhase.Dig, Telegraph: > 0f }) wormTargets++;
+        writer.Write(mobs.Count + wormTargets + drops.Count + primed.Count + falling.Count + icebergs.Count);
         for (var i = 0; i < mobs.Count; i++)
         {
             var mob = mobs[i];
-            var kind = mob is Slime ? NetEntityKind.Slime : NetEntityKind.Goblin;
-            // The int field is a goblin's ammo and a slime's size (NetEntity)
+            var kind = mob switch
+            {
+                Slime => NetEntityKind.Slime,
+                Hellbrute => NetEntityKind.Hellbrute,
+                Cinderwitch => NetEntityKind.Cinderwitch,
+                Galeraptor => NetEntityKind.Galeraptor,
+                Cloudgolem => NetEntityKind.Cloudgolem,
+                Sandworm => NetEntityKind.Sandworm,
+                Skeleton => NetEntityKind.Skeleton,
+                SkeletonKing => NetEntityKind.SkeletonKing,
+                Shardling => NetEntityKind.Shardling,
+                Sporeling => NetEntityKind.Sporeling,
+                Magmaborn => NetEntityKind.Magmaborn,
+                Spider { IsBroodmother: true } => NetEntityKind.SpiderBroodmother,
+                Spider => NetEntityKind.Spider,
+                Scorpion => NetEntityKind.Scorpion,
+                Animal animal => NetEntity.KindOf(animal.Kind),
+                _ => NetEntityKind.Goblin,
+            };
+            // The int field is a goblin's ammo, a slime's size and a realm mob's attack count (NetEntity)
             var ammo = mob switch
             {
                 Goblin goblin => goblin.Ammo,
                 Slime slime => slime.Size,
+                RealmMob realm => realm.AttackCount,
+                Sandworm worm => (int)worm.Phase,
                 _ => 0,
             };
-            writer.Write((byte)kind);
-            writer.Write(IdFor(mob));
-            writer.Write(mob.Position);
-            writer.Write(mob.Facing);
-            writer.Write(mob.Health);
-            writer.Write(ammo);
-            // The byte field is a goblin's torch count (a slime carries none)
-            writer.Write(mob is Goblin torchGoblin ? (byte)torchGoblin.Torches : (byte)0);
-            writer.Write(mob.Velocity);
+            // The item field is a goblin's torch count, a skeleton's tier, role and outfit, a cave mob's tier (a crawler's
+            // with the face it clings to above it), a wild animal's posture or the Skeleton King's phase (0 for the
+            // rest); every entry ends with a status-effect mask (NetEntity.Effects), a mob's own
+            ushort itemField = mob switch
+            {
+                Goblin goblin => (byte)goblin.Torches,
+                Skeleton skeleton => Skeleton.PackLook(skeleton.Tier, skeleton.Role, skeleton.Outfit),
+                SkeletonKing king => (byte)king.Phase,
+                CrawlerMob crawler => crawler.PackStance(),
+                CaveMob cave => (byte)cave.Tier,
+                Animal animal => animal.Posture,
+                _ => 0,
+            };
+            NetEntityCodec.Write(writer, new NetEntity(kind, IdFor(mob), mob.Position, mob.Facing, mob.Health, ammo,
+                itemField, mob.Velocity, mob.Effects.Mask));
+            if (mob is Sandworm { Phase: SandwormPhase.Dig, Telegraph: > 0f } digging)
+                NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.SandwormTarget, IdFor(mob), digging.SurfacePoint, 0f,
+                    (int)MathF.Round(digging.Telegraph * 1000f), 0, 0, Vector3.Zero));
         }
 
         for (var i = 0; i < drops.Count; i++)
         {
             var drop = drops[i];
-            writer.Write((byte)NetEntityKind.Drop);
-            writer.Write(IdFor(drop));
-            writer.Write(drop.Position);
-            writer.Write(0f);
-            writer.Write(0);
-            writer.Write(0);
-            writer.Write(drop.BlockId);
-            writer.Write(drop.Velocity);
+            NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.Drop, IdFor(drop), drop.Position, 0f, 0, 0,
+                drop.BlockId, drop.Velocity));
         }
 
         // The fuse travels in milliseconds in the two int fields, so the client's flash and swell
@@ -99,27 +132,16 @@ internal sealed class ServerBroadcasts
         for (var i = 0; i < primed.Count; i++)
         {
             var tnt = primed[i];
-            writer.Write((byte)NetEntityKind.PrimedTnt);
-            writer.Write(IdFor(tnt));
-            writer.Write(tnt.Position);
-            writer.Write(0f);
-            writer.Write((int)MathF.Round(tnt.FuseRemaining * 1000f));
-            writer.Write((int)MathF.Round(tnt.FuseDuration * 1000f));
-            writer.Write(tnt.BlockId);
-            writer.Write(Vector3.Zero);
+            NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.PrimedTnt, IdFor(tnt), tnt.Position, 0f,
+                (int)MathF.Round(tnt.FuseRemaining * 1000f), (int)MathF.Round(tnt.FuseDuration * 1000f), tnt.BlockId,
+                Vector3.Zero));
         }
 
         for (var i = 0; i < falling.Count; i++)
         {
             var block = falling[i];
-            writer.Write((byte)NetEntityKind.FallingBlock);
-            writer.Write(IdFor(block));
-            writer.Write(block.Position);
-            writer.Write(0f);
-            writer.Write(0);
-            writer.Write(0);
-            writer.Write(block.BlockId);
-            writer.Write(Vector3.Zero);
+            NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.FallingBlock, IdFor(block), block.Position, 0f, 0,
+                0, block.BlockId, Vector3.Zero));
         }
 
         // An iceberg's fields are packed as NetEntity documents: turns in the yaw, the seed in the
@@ -127,14 +149,9 @@ internal sealed class ServerBroadcasts
         for (var i = 0; i < icebergs.Count; i++)
         {
             var berg = icebergs[i];
-            writer.Write((byte)NetEntityKind.Iceberg);
-            writer.Write(IdFor(berg));
-            writer.Write(berg.Center);
-            writer.Write(NetEntity.YawFromTurns(berg.Turns));
-            writer.Write(berg.Seed);
-            writer.Write(NetEntity.PackIcebergAmmo(berg.Scale, berg.Sink01));
-            writer.Write((byte)berg.Variant);
-            writer.Write(berg.Velocity);
+            NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.Iceberg, IdFor(berg), berg.Center,
+                NetEntity.YawFromTurns(berg.Turns), berg.Seed, NetEntity.PackIcebergAmmo(berg.Scale, berg.Sink01),
+                (byte)berg.Variant, berg.Velocity));
         }
 
         _state.Broadcast(writer.ToArray());
@@ -161,8 +178,8 @@ internal sealed class ServerBroadcasts
             _entityIds.Remove(key);
     }
 
-    internal void OnCellWritten(int x, int y, int z, byte id, byte state) =>
-        _cellJournal.Enqueue(new CellChange(x, y, z, id, state));
+    internal void OnCellWritten(int x, int y, int z, ushort id, byte state) =>
+        _cellJournal.Enqueue(new NetCellChange(x, y, z, id, state));
 
     /// <summary>
     /// Broadcasts every campfire, quern, kiln and cast mold the server runs, which the clients draw
@@ -200,13 +217,7 @@ internal sealed class ServerBroadcasts
         using var writer = new PacketWriter(NetMessage.BlockChanges);
         writer.Write(_cellCoalesce.Count);
         foreach (var (cell, value) in _cellCoalesce)
-        {
-            writer.Write(cell.X);
-            writer.Write(cell.Y);
-            writer.Write(cell.Z);
-            writer.Write(value.Id);
-            writer.Write(value.State);
-        }
+            NetCellChangeCodec.Write(writer, new NetCellChange(cell.X, cell.Y, cell.Z, value.Id, value.State));
 
         _state.Broadcast(writer.ToArray());
         _cellCoalesce.Clear();

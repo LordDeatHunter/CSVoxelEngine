@@ -171,4 +171,36 @@ internal static class TerrainSites
 
         return false;
     }
+
+    /// <summary>
+    /// <see cref="YieldsToNeighbor"/> for sites of rolled size: true when another cell's successful roll has a
+    /// lower hash and a center closer than the two sites' radii plus <paramref name="gap"/>, each radius
+    /// being <see cref="MathUtils.Lerp"/> of <paramref name="minRadius"/>..<paramref name="maxRadius"/> by its
+    /// rolled size. Symmetric like the fixed-spacing rule, so of two crowding candidates exactly one survives,
+    /// and two survivors' nominal discs always stay <paramref name="gap"/> apart.
+    /// </summary>
+    internal static bool YieldsToSizedNeighbor(int gx, int gz, ulong hash, float centerX, float centerZ,
+        float radius, float minRadius, float maxRadius, float gap, int cellBlocks, int salt, float chance,
+        float sizeSkew)
+    {
+        var reach = radius + maxRadius + gap;
+        CellRange(centerX, cellBlocks, reach, out var minX, out var maxX);
+        CellRange(centerZ, cellBlocks, reach, out var minZ, out var maxZ);
+        for (var ox = minX; ox <= maxX; ox++)
+        for (var oz = minZ; oz <= maxZ; oz++)
+        {
+            if (ox == gx && oz == gz) continue;
+            if (!TryRoll(ox, oz, cellBlocks, salt, chance, sizeSkew, out var otherHash, out var otherX,
+                    out var otherZ, out var otherSize))
+                continue;
+            if (otherHash >= hash) continue;
+
+            var spacing = radius + MathUtils.Lerp(minRadius, maxRadius, otherSize) + gap;
+            var dx = otherX - centerX;
+            var dz = otherZ - centerZ;
+            if (dx * dx + dz * dz < spacing * spacing) return true;
+        }
+
+        return false;
+    }
 }

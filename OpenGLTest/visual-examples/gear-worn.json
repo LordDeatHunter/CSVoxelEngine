@@ -1,0 +1,23 @@
+{
+  // Worn armor: run with VOXEL_SCRIPT=visual-examples/gear-worn.json VOXEL_TIME=147 from OpenGLTest/. Shots land in
+  // visual/gear-worn/. The shoulder camera sees the full set (bronze cap, tunic, pants, boots, gloves) drawn as tinted shells
+  // over the body, then the first-person view shows the sleeves and gloves.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 62.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "bare", "hideHud": true },
+    { "op": "give", "block": "item/bronze_cap", "count": 1 },
+    { "op": "give", "block": "item/bronze_tunic", "count": 1 },
+    { "op": "give", "block": "item/bronze_pants", "count": 1 },
+    { "op": "give", "block": "item/bronze_boots", "count": 1 },
+    { "op": "give", "block": "item/bronze_gloves", "count": 1 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "worn", "hideHud": true },
+    { "op": "view", "mode": "first" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "first-person" }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "kind": "hell",
+  "weight": 1,
+  "groundLayer": 0,
+  "palette": {
+    "b": "basalt",
+    "C": "ruin_chest_hell"
+  },
+  "layers": [
+    [
+      "bbbbbbb",
+      "b.....b",
+      "b.....b",
+      "b..C..b",
+      "b.....b",
+      "b.....b",
+      "bbb.bbb"
+    ],
+    [
+      "bbbbbbb",
+      "b.....b",
+      "b.....b",
+      "b.....b",
+      "b.....b",
+      "b.....b",
+      "bbb.bbb"
+    ],
+    [
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb"
+    ]
+  ]
+}

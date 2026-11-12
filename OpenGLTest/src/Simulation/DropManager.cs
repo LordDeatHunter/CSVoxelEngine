@@ -26,13 +26,18 @@ public class DropManager
     internal const float CollectHeightOffset = 0.35f;
 
     private readonly List<ItemDrop> _drops = [];
-    private readonly List<byte> _collected = [];
+    private readonly List<ushort> _collected = [];
     // Parallel to _collected after a multi-collector Update: the index of the collector each went to
     private readonly List<int> _collectedBy = [];
+    // Parallel to _collected: where each collected drop was when it was taken
+    private readonly List<Vector3> _collectedAt = [];
     // Reused by SpawnLoot so a break does not allocate; main thread only, like the rest
-    private readonly List<byte> _loot = [];
+    private readonly List<ushort> _loot = [];
 
     public IReadOnlyList<ItemDrop> Drops => _drops;
+
+    /// <summary>Takes <paramref name="drop"/> out of the world uncollected (a thief's grab); false if it is gone.</summary>
+    public bool Remove(ItemDrop drop) => _drops.Remove(drop);
 
     /// <summary>Drops every tracked drop (a client rebuilds its list from a server snapshot).</summary>
     public void Clear() => _drops.Clear();
@@ -50,7 +55,7 @@ public class DropManager
     /// <summary>
     /// Block ids collected during the most recent <c>Update</c>. Valid until the next one.
     /// </summary>
-    public ReadOnlySpan<byte> Collected => CollectionsMarshal.AsSpan(_collected);
+    public ReadOnlySpan<ushort> Collected => CollectionsMarshal.AsSpan(_collected);
 
     /// <summary>
     /// After the multi-collector <see cref="Update(float, IReadOnlyList{DropCollector}, ChunkManager)"/>:
@@ -59,11 +64,14 @@ public class DropManager
     /// </summary>
     public ReadOnlySpan<int> CollectedBy => CollectionsMarshal.AsSpan(_collectedBy);
 
+    /// <summary>World position of each entry of <see cref="Collected"/> when it was collected. Valid until the next update.</summary>
+    public ReadOnlySpan<Vector3> CollectedAt => CollectionsMarshal.AsSpan(_collectedAt);
+
     /// <summary>
     /// Drops a block or item at the center of the cell it occupied. Air and unknown ids drop
     /// nothing.
     /// </summary>
-    public void Spawn(byte blockId, Vector3 blockPosition)
+    public void Spawn(ushort blockId, Vector3 blockPosition)
     {
         if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return;
 
@@ -72,13 +80,14 @@ public class DropManager
 
     /// <summary>
     /// Drops a block or item at an exact world position (no cell-center snap), for throws.
-    /// Air and unknown ids drop nothing.
+    /// <paramref name="pickupDelaySeconds"/> is how long it waits before it can be collected (null
+    /// keeps the short default). Air and unknown ids drop nothing.
     /// </summary>
-    public void SpawnAt(byte blockId, Vector3 position, Vector3? toss = null)
+    public void SpawnAt(ushort blockId, Vector3 position, Vector3? toss = null, float? pickupDelaySeconds = null)
     {
         if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return;
 
-        _drops.Add(new ItemDrop(blockId, position, toss));
+        _drops.Add(new ItemDrop(blockId, position, toss, pickupDelaySeconds));
     }
 
     /// <summary>
@@ -86,7 +95,7 @@ public class DropManager
     /// False (and nothing added) for an id that is neither a block nor an item, the same guard
     /// as <see cref="SpawnAt"/>.
     /// </summary>
-    public bool SpawnRestored(byte blockId, Vector3 position, Vector3 velocity, float age)
+    public bool SpawnRestored(ushort blockId, Vector3 position, Vector3 velocity, float age)
     {
         if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return false;
 
@@ -101,7 +110,7 @@ public class DropManager
     /// depends on how the block came down. Unknown ids (air, items) roll nothing. Tree wood
     /// rolls the band its thickness (read from <see cref="LootContext.State"/>) falls in.
     /// </summary>
-    public static void RollLoot(byte blockId, LootContext context, List<byte> into)
+    public static void RollLoot(ushort blockId, LootContext context, List<ushort> into)
     {
         var type = BlockType.ById[blockId];
         if (type == null) return;
@@ -131,7 +140,7 @@ public class DropManager
     /// <paramref name="secondary"/> carries the obsidian share of a player-built pebble pile,
     /// <paramref name="state"/> the destroyed cell's state byte (tree wood's thickness band).
     /// </summary>
-    public void SpawnLoot(byte blockId, Vector3 blockPosition, int count = 0, int secondary = 0, byte state = 0)
+    public void SpawnLoot(ushort blockId, Vector3 blockPosition, int count = 0, int secondary = 0, byte state = 0)
     {
         _loot.Clear();
         RollLoot(blockId,
@@ -147,7 +156,7 @@ public class DropManager
     /// player-built pile, else 0 meaning "derive from the world". Callers must read the state
     /// before the block is cleared, and pass 0 straight through for ordinary blocks.
     /// </summary>
-    public static int PileCount(byte blockId, byte state)
+    public static int PileCount(ushort blockId, byte state)
     {
         var max = BlockType.ById[blockId]?.StackMax ?? 0;
         if (BlockType.ById[blockId]?.Renderer == BlockRenderer.Pebbles)
@@ -159,7 +168,7 @@ public class DropManager
     /// Obsidian share for a destroyed pebble pile: the packed count for a player pile, else 0
     /// meaning "derive it from the world hash". Other blocks always read 0.
     /// </summary>
-    public static int PileSecondary(byte blockId, byte state)
+    public static int PileSecondary(ushort blockId, byte state)
     {
         if (BlockType.ById[blockId]?.Renderer != BlockRenderer.Pebbles)
             return 0;
@@ -168,7 +177,7 @@ public class DropManager
     }
 
     /// <summary>
-    /// Whether the last <see cref="Update(float, Vector3, ChunkManager, Func{byte, bool})"/> saw a
+    /// Whether the last <see cref="Update(float, Vector3, ChunkManager, Func{ushort, bool}, float)"/> saw a
     /// drop within pickup range that the pool refused (a full inventory). The HUD's "Inventory
     /// full" warning fires on this turning true and stays silent while it stays true; a drop the
     /// pool has room for again clears it.
@@ -188,18 +197,20 @@ public class DropManager
     /// <summary>
     /// Advances the drops, collecting what reaches the player. A drop whose id
     /// <paramref name="canCollect"/> refuses is never attracted and stays on the ground,
-    /// so a full inventory pool ignores pickups instead of sucking them up.
+    /// so a full inventory pool ignores pickups instead of sucking them up. A drop is attracted once within
+    /// <paramref name="range"/> (<see cref="PickupRange"/> by default).
     /// </summary>
     public void Update(float deltaTime, Vector3 playerPosition, ChunkManager chunks,
-        Func<byte, bool>? canCollect = null)
+        Func<ushort, bool>? canCollect = null, float range = PickupRange)
     {
         _collected.Clear();
         _collectedBy.Clear();
+        _collectedAt.Clear();
         _blockedCollectors.Clear();
         if (_drops.Count == 0) return;
 
         var target = playerPosition - Vector3.UnitY * CollectHeightOffset;
-        var rangeSquared = PickupRange * PickupRange;
+        var rangeSquared = range * range;
 
         // Back to front so removing a collected drop doesn't skip the next one
         for (var i = _drops.Count - 1; i >= 0; i--)
@@ -217,13 +228,16 @@ public class DropManager
             if (!wanted && !(canCollect?.Invoke(drop.BlockId) ?? true)) continue;
 
             _collected.Add(drop.BlockId);
+            _collectedAt.Add(drop.Position);
             _drops.RemoveAt(i);
         }
     }
 
     /// <summary>
     /// The multiplayer server's pickup: every drop flies to the nearest collector whose pool has
-    /// room for it (attracted once within <see cref="PickupRange"/>, as in single player), and a
+    /// room for it (attracted once within that collector's <see cref="DropCollector.Range"/>, by default
+    /// <see cref="PickupRange"/>; a nearer collector whose own range does not hold the drop never keeps it from one
+    /// whose range does), and a
     /// collected drop is reported in <see cref="Collected"/> with its collector's index in
     /// <see cref="CollectedBy"/>, so each player's own inventory is credited. A drop whose chunk is
     /// not loaded is left untouched (neither collected nor simulated, so it cannot fall through the
@@ -234,10 +248,10 @@ public class DropManager
     {
         _collected.Clear();
         _collectedBy.Clear();
+        _collectedAt.Clear();
         _blockedCollectors.Clear();
         if (_drops.Count == 0) return;
 
-        var rangeSquared = PickupRange * PickupRange;
         var lift = Vector3.UnitY * CollectHeightOffset;
 
         // Back to front so removing a collected drop doesn't skip the next one
@@ -247,14 +261,20 @@ public class DropManager
             var (cx, cy, cz) = drop.Position.BlockCell();
             if (chunks.ChunkAt(cx, cy, cz) == null) continue;
 
+            // The nearest wanting collector whose own range holds the drop wins; failing that, the nearest wanting
+            // one overall, toward which the drop only simulates (or keeps flying, once latched)
             var nearest = -1;
             var nearestSquared = float.MaxValue;
             var target = Vector3.Zero;
+            var inRangeIndex = -1;
+            var inRangeSquared = float.MaxValue;
+            var inRangeTarget = Vector3.Zero;
             for (var c = 0; c < collectors.Count; c++)
             {
                 var collector = collectors[c];
                 var aim = collector.Eye - lift;
                 var distanceSquared = Vector3.DistanceSquared(drop.Position, aim);
+                var rangeSquared = collector.Range * collector.Range;
                 // A collector within reach that refuses the drop is a blocked pool (see
                 // BlockedCollectors), and is not a candidate to fly it in
                 if (!(collector.CanCollect?.Invoke(drop.BlockId) ?? true))
@@ -262,6 +282,12 @@ public class DropManager
                     if (distanceSquared <= rangeSquared && !_blockedCollectors.Contains(c))
                         _blockedCollectors.Add(c);
                     continue;
+                }
+                if (distanceSquared <= rangeSquared && distanceSquared < inRangeSquared)
+                {
+                    inRangeIndex = c;
+                    inRangeSquared = distanceSquared;
+                    inRangeTarget = aim;
                 }
                 if (distanceSquared >= nearestSquared) continue;
                 nearest = c;
@@ -276,9 +302,16 @@ public class DropManager
                 continue;
             }
 
-            if (!drop.Update(deltaTime, target, nearestSquared <= rangeSquared, chunks)) continue;
+            var inRange = inRangeIndex >= 0;
+            if (inRange)
+            {
+                nearest = inRangeIndex;
+                target = inRangeTarget;
+            }
+            if (!drop.Update(deltaTime, target, inRange, chunks)) continue;
 
             _collected.Add(drop.BlockId);
+            _collectedAt.Add(drop.Position);
             _collectedBy.Add(nearest);
             _drops.RemoveAt(i);
         }

@@ -1,0 +1,8 @@
+{
+  "name": "Sporeling",
+  // The fungal caves' spore walker (plans/CAVE_BIOMES.md CB-4). The base pool at depth tier 0;
+  // CaveDifficulty scales it with the tier the mob spawned at
+  "hp": 32,
+  "loot": "sporeling",
+  "model": "assets/models/entity/sporeling.bbmodel"
+}

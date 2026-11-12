@@ -26,8 +26,8 @@ public static class InventoryPanelLayout
     public const float PanelTop = 80f;
     public const float PanelGap = 16f;
     public const float PanelRightMargin = 24f;
-    public const float PanelWidthMin = 480f;
-    public const float PanelWidthMax = 660f;
+    public const float PanelWidthMin = 560f;
+    public const float PanelWidthMax = 760f;
     public const float PanelPad = 10f;
     public const float TabHeight = 60f;
     public const float RowHeight = 42f;
@@ -55,7 +55,8 @@ public static class InventoryPanelLayout
 
     public static readonly InventoryCategory[] Tabs =
     [
-        InventoryCategory.Blocks, InventoryCategory.Tools, InventoryCategory.Misc, InventoryCategory.Crafting,
+        InventoryCategory.Blocks, InventoryCategory.Tools, InventoryCategory.Misc, InventoryCategory.Gear,
+        InventoryCategory.Crafting,
     ];
 
     public static float PanelWidth(Vector2 screen) =>
@@ -89,8 +90,13 @@ public static class InventoryPanelLayout
     /// <summary>Left edge of the search field box.</summary>
     public static float SearchLeft => PanelLeft + PanelPad;
 
-    /// <summary>Width of the search field box: the panel inside its pads.</summary>
-    public static float SearchWidth(Vector2 screen) => PanelWidth(screen) - PanelPad * 2f;
+    // The search scope's cycle button sits right of the field, on the field's row.
+    public const float ScopeButtonWidth = 140f;
+    public const float ScopeButtonGap = 6f;
+
+    /// <summary>Width of the search field box: the panel inside its pads, less the scope button beside it.</summary>
+    public static float SearchWidth(Vector2 screen) =>
+        PanelWidth(screen) - PanelPad * 2f - ScopeButtonWidth - ScopeButtonGap;
 
     public static (Vector2 Center, Vector2 Size) SearchBoxRect(Vector2 screen) =>
         (new Vector2(SearchLeft + SearchWidth(screen) * 0.5f, SearchTop + SearchHeight * 0.5f),
@@ -99,6 +105,15 @@ public static class InventoryPanelLayout
     /// <summary>Whether a canvas point is over the search field box.</summary>
     public static bool SearchBoxAt(Vector2 point, Vector2 screen) =>
         InBox(point, SearchBoxRect(screen));
+
+    /// <summary>The search scope's cycle button: right of the field, a gap away, flush with the panel's inner edge.</summary>
+    public static (Vector2 Center, Vector2 Size) ScopeButtonRect(Vector2 screen) =>
+        (new Vector2(PanelLeft + PanelWidth(screen) - PanelPad - ScopeButtonWidth * 0.5f, SearchTop + SearchHeight * 0.5f),
+            new Vector2(ScopeButtonWidth, SearchHeight));
+
+    /// <summary>Whether a canvas point is over the search scope's cycle button.</summary>
+    public static bool ScopeButtonAt(Vector2 point, Vector2 screen) =>
+        InBox(point, ScopeButtonRect(screen));
 
     // The creative catalog row's four action buttons, right-aligned: +1, +10, +100, X.
     public const int CatalogButtonCount = 4;
@@ -150,15 +165,36 @@ public static class InventoryPanelLayout
             ? ScrollbarHitLeft(screen)
             : PanelLeft + PanelWidth(screen) - PanelPad;
 
-    /// <summary>Panel tab under a canvas point, if any.</summary>
+    /// <summary>Gap between neighboring tab rectangles; the draw and the hit-test both leave it out.</summary>
+    public const float TabGap = 4f;
+
+    /// <summary>The drawn (and hit) rectangle of tab <paramref name="t"/>: its strip cell minus the gap.</summary>
+    public static (Vector2 Center, Vector2 Size) TabRect(int t, Vector2 screen) =>
+        (TabCenter(t, screen), new Vector2(TabWidth(screen) - TabGap, TabHeight));
+
+    /// <summary>Panel tab under a canvas point, if any. Matches <see cref="TabRect"/>, so the gap hits nothing.</summary>
     public static InventoryCategory? TabAt(Vector2 point, Vector2 screen)
     {
-        var width = PanelWidth(screen);
-        if (point.X < PanelLeft || point.X > PanelLeft + width) return null;
-        if (point.Y < PanelTop + PanelPad || point.Y > PanelTop + PanelPad + TabHeight) return null;
+        for (var t = 0; t < Tabs.Length; t++)
+            if (InBox(point, TabRect(t, screen))) return Tabs[t];
+        return null;
+    }
 
-        var t = (int)((point.X - PanelLeft - PanelPad) / TabWidth(screen));
-        return t >= 0 && t < Tabs.Length ? Tabs[t] : null;
+    /// <summary>Gap between the list panel and the detail card on its right.</summary>
+    public const float DetailGap = PanelGap;
+
+    /// <summary>Width and height of the detail card (the picked item's preview, later equipment and chest cards).</summary>
+    public static readonly Vector2 DetailCardSize = new(270f, 270f);
+
+    /// <summary>
+    /// The detail card's rectangle: right of the list panel, a gap away, its top level with the panel's.
+    /// Falls back to hugging the screen's right edge when the window is too narrow for both.
+    /// </summary>
+    public static (Vector2 Center, Vector2 Size) DetailCardRect(Vector2 screen)
+    {
+        var left = PanelLeft + PanelWidth(screen) + DetailGap;
+        left = MathF.Min(left, screen.X - PanelRightMargin - DetailCardSize.X);
+        return (new Vector2(left + DetailCardSize.X * 0.5f, PanelTop + DetailCardSize.Y * 0.5f), DetailCardSize);
     }
 
     /// <summary>List row under a canvas point for a list scrolled by <paramref name="offset"/>, if any.</summary>

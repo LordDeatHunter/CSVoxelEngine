@@ -571,6 +571,36 @@ public sealed class MeshingTests
     }
 
     [Fact]
+    public void DryBuildPreservesPooledTranslucentBuffersForNextWetBuild()
+    {
+        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+        var glass = ContentRegistry.RequireBlock("glass").Id;
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        center.SetBlockRaw(8, 8, 8, glass, 0);
+
+        var wet = Assert.IsType<ChunkMeshData>(center.GenerateMeshData(manager));
+        Assert.NotEmpty(wet.TranslucentVertices);
+        var wetVertices = wet.TranslucentVertices;
+        var wetIndices = wet.TranslucentIndices;
+        manager.MeshBuffers.Return(wet);
+        Assert.Equal(1, manager.MeshBuffers.PooledTranslucentVertexLists);
+
+        center.SetBlockRaw(8, 8, 8, stone, 0);
+        var dry = Assert.IsType<ChunkMeshData>(center.GenerateMeshData(manager));
+        Assert.NotEmpty(dry.Vertices); // Exercise the full mesh path, not the all-air shortcut.
+        Assert.Empty(dry.TranslucentVertices);
+        Assert.Empty(dry.TranslucentIndices);
+        manager.MeshBuffers.Return(dry);
+        Assert.Equal(1, manager.MeshBuffers.PooledTranslucentVertexLists);
+
+        center.SetBlockRaw(8, 8, 8, glass, 0);
+        var reused = Assert.IsType<ChunkMeshData>(center.GenerateMeshData(manager));
+        Assert.Same(wetVertices, reused.TranslucentVertices);
+        Assert.Same(wetIndices, reused.TranslucentIndices);
+        manager.MeshBuffers.Return(reused);
+    }
+
+    [Fact]
     public void LeavesAndThinWoodPassLightAndCastNoAO()
     {
         var leafIds = TreeSpeciesRegistry.All.Where(s => s.HasLeaves).Select(s => s.LeavesId).ToList();
@@ -613,7 +643,7 @@ public sealed class MeshingTests
         // Ring the top-face AO neighborhood with canopy and thin wood: every side/corner
         // sample around the +Y face sits on leaves or a branch. A full-cube neighbor here
         // would drag corners to AO 0 (black); these must leave it at full brightness.
-        var ring = new (int x, int z, byte id)[]
+        var ring = new (int x, int z, ushort id)[]
         {
             (7, 7, leaves), (7, 8, branch), (7, 9, leaves),
             (8, 7, branch), (8, 9, leaves),

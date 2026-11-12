@@ -1,0 +1,5 @@
+{
+  // A giant scorpion's stinger; nothing consumes it yet. The sprite is placeholder art.
+  "name": "Scorpion Stinger",
+  "texture": "assets/textures/items/scorpion_stinger.png"
+}

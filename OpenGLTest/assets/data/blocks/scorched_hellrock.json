@@ -1,0 +1,10 @@
+{
+  // Burnt hellrock: the Ashlands walls, ceilings and pool beds, the Magma Caverns soil. Softer than
+  // hellrock, so any pickaxe mines it. Tile is committed art.
+  "name": "Scorched Hellrock",
+  "model": { "parent": "block/cube_all", "textures": { "all": "scorched_hellrock" } },
+  "sfx": "hit_rock",
+  "hardness": 10,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 }
+}

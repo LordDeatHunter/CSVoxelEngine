@@ -1,0 +1,8 @@
+{
+  // Lodestone Charm: a loot-only accessory (never crafted; ruin chests and mob drops, see AGENTS.md "Gear and equipment") that pulls item drops in from farther away (the magnet ability).
+  // Committed placeholder sprite.
+  "name": "Lodestone Charm",
+  "texture": "assets/textures/items/magnet_charm.png",
+  "rarity": "rare",
+  "equip": { "slot": "accessory", "abilities": ["magnet"] }
+}

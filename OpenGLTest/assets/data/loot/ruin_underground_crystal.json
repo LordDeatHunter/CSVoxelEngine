@@ -1,0 +1,21 @@
+{
+  // An abandoned mining base in a crystal cave: the plain underground haul, plus amethyst ore, crystal blocks and now and then
+  // a Ring of Focus (uncommon to rare, the underground band).
+  "pools": [
+    { "rolls": 1, "entries": [ { "table": "ruin_underground" } ] },
+    {
+      "rolls": { "min": 1, "max": 2 },
+      "entries": [
+        { "item": "block/amethyst_ore", "weight": 3, "count": { "min": 1, "max": 3 } },
+        { "item": "block/crystal_block", "weight": 2, "count": { "min": 1, "max": 2 } }
+      ]
+    },
+    {
+      "chance": 0.25,
+      "rolls": 1,
+      "entries": [
+        { "item": "item/focus_ring", "rarity": { "min": "uncommon", "max": "rare" } }
+      ]
+    }
+  ]
+}

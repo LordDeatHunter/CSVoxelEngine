@@ -96,7 +96,7 @@ public sealed class SceneryTests
     /// cell's center along the log's axis misses every box (the hole is open end to end), while the
     /// horizontal line across it runs into a wall.
     /// </summary>
-    private static bool ShellIsOpenAlong(byte block, byte state, bool alongX)
+    private static bool ShellIsOpenAlong(ushort block, byte state, bool alongX)
     {
         var shapes = BlockType.ById[block]!.RotatedHitboxes!;
         var boxes = shapes[BlockType.ShapeIndex(state, shapes.Length)];

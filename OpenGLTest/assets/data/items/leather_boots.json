@@ -1,0 +1,8 @@
+{
+  // Leather Boots: placeholder gear. Wearable in the feet slot; its
+  // fixed stats are the equip object, and a piece found in loot may also roll modifiers on its stack.
+  "name": "Leather Boots",
+  "texture": "assets/textures/items/leather_boots.png",
+  "rarity": "common",
+  "equip": { "slot": "feet", "armor": 1, "modifiers": { "moveSpeed": 0.03 }, "set": "leather", "visible": true }
+}

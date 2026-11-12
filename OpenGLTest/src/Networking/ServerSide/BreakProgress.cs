@@ -19,6 +19,9 @@ public enum BreakVerdict
     ToolRefused,
     /// <summary>Not enough hits fit into the time since mining started.</summary>
     TooFast,
+    /// <summary>The block is unbreakable (<see cref="BlockType.IsUnbreakable"/>): it can never be
+    /// broken, not even in creative.</summary>
+    Unbreakable,
 }
 
 /// <summary>
@@ -30,7 +33,8 @@ public enum BreakVerdict
 /// the first hit lands the moment mining starts and one more every
 /// <see cref="Mining.HitGapSeconds"/>, each removing <see cref="Mining.BlockDamage"/>. A changed
 /// target or held item restarts the break, a refused tool never completes it, and a creative
-/// player breaks at once. Any verdict ends the current break. GL-free; main thread only.
+/// player breaks at once, except an unbreakable block, which nobody breaks. Any verdict ends the
+/// current break. GL-free; main thread only.
 /// </summary>
 public sealed class BreakProgress
 {
@@ -41,8 +45,8 @@ public sealed class BreakProgress
     private int _x;
     private int _y;
     private int _z;
-    private byte _blockId;
-    private byte _heldId;
+    private ushort _blockId;
+    private ushort _heldId;
     private int _heldInstance;
     private bool _allowed;
     private double _startedAt;
@@ -57,8 +61,8 @@ public sealed class BreakProgress
     /// with <paramref name="held"/> in hand (identified by <paramref name="heldId"/> and, for a tool,
     /// its <paramref name="heldInstance"/>), at server time <paramref name="now"/>.
     /// </summary>
-    public void Start(int x, int y, int z, byte blockId, byte state, Item? held, byte heldId, int heldInstance,
-        double now)
+    public void Start(int x, int y, int z, ushort blockId, byte state, Item? held, ushort heldId, int heldInstance,
+        double now, float speedFactor = 1f)
     {
         _active = true;
         (_x, _y, _z) = (x, y, z);
@@ -68,7 +72,7 @@ public sealed class BreakProgress
         _allowed = Mining.CanMine(blockId, held);
         _startedAt = now;
         _requiredSeconds = RequiredSeconds(Mining.HardnessOf(blockId, state), Mining.BlockDamage(held),
-            Mining.HitGapSeconds(held));
+            Mining.HitGapSeconds(held, speedFactor));
     }
 
     /// <summary>
@@ -77,7 +81,7 @@ public sealed class BreakProgress
     /// <paramref name="now"/>. <paramref name="slackSeconds"/> forgives the start arriving later
     /// than the completion relative to when the client sent them (network jitter).
     /// </summary>
-    public BreakVerdict Complete(int x, int y, int z, byte blockId, byte heldId, int heldInstance, bool creative,
+    public BreakVerdict Complete(int x, int y, int z, ushort blockId, ushort heldId, int heldInstance, bool creative,
         double now, double slackSeconds)
     {
         var verdict = Judge(x, y, z, blockId, heldId, heldInstance, creative, now, slackSeconds);
@@ -88,9 +92,10 @@ public sealed class BreakProgress
     /// <summary>Abandons any break in progress.</summary>
     public void Reset() => _active = false;
 
-    private BreakVerdict Judge(int x, int y, int z, byte blockId, byte heldId, int heldInstance, bool creative,
+    private BreakVerdict Judge(int x, int y, int z, ushort blockId, ushort heldId, int heldInstance, bool creative,
         double now, double slackSeconds)
     {
+        if (BlockType.IsUnbreakable(blockId)) return BreakVerdict.Unbreakable;
         if (creative) return BreakVerdict.Break;
         if (!_active) return BreakVerdict.NotStarted;
         if (x != _x || y != _y || z != _z || blockId != _blockId) return BreakVerdict.OtherTarget;

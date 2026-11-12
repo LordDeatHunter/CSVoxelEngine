@@ -22,7 +22,7 @@ public static class CrucibleInventory
     /// onto the new instance. Returns that stack, or null when the tools pool is full — in which
     /// case nothing was added and the caller must keep the vessel where it was.
     /// </summary>
-    public static ItemStack? Add(Inventory inventory, byte crucibleId, CrucibleComponent contents)
+    public static ItemStack? Add(Inventory inventory, ushort crucibleId, CrucibleComponent contents)
     {
         if (!inventory.Add(crucibleId)) return null;
 

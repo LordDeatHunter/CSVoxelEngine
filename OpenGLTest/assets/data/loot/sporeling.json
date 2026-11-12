@@ -1,0 +1,23 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "block/jade_ore", "weight": 1, "count": { "min": 0, "max": 2 } }
+      ]
+    },
+    {
+      "rolls": 1,
+      "chance": 0.25,
+      "entries": [
+        { "item": "block/fungal_glow", "weight": 1, "count": 1 }
+      ]
+    },
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/bone", "weight": 1, "count": { "min": 0, "max": 1 } }
+      ]
+    }
+  ]
+}

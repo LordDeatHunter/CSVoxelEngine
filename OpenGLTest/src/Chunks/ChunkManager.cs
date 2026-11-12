@@ -63,8 +63,14 @@ public class ChunkManager
     /// <inheritdoc cref="ChunkRenderLists.TranslucentRenderable"/>
     public List<Chunk> TranslucentRenderable => _renderLists.TranslucentRenderable;
 
+    /// <inheritdoc cref="ChunkRenderLists.ChestChunks"/>
+    public List<Chunk> ChestChunks => _renderLists.ChestChunks;
+
     /// <summary>Recycled opaque mesh buffers; see <see cref="MeshBufferPool"/>.</summary>
     public MeshBufferPool MeshBuffers { get; } = new();
+
+    /// <summary>The permanent chop damage of natural trunk cells, which the mesher reads (see <see cref="WoodDamage"/>).</summary>
+    public WoodDamage ChopDamage { get; } = new();
 
     /// <inheritdoc cref="ChunkRenderLists.MeshVersion"/>
     public int MeshVersion => _renderLists.MeshVersion;
@@ -100,12 +106,16 @@ public class ChunkManager
     /// <summary>Dirty-set size, for tests asserting the scan cap paces the drain.</summary>
     internal int DirtyCount => _meshScheduler.DirtyCount;
 
+    internal bool IsChunkDirty(long key) => _meshScheduler.IsDirty(key);
+
     /// <summary>Mesh-dispatcher state, for MeshSchedulingTests.</summary>
     internal int PendingMeshWorkCount => _meshScheduler.PendingMeshWorkCount;
 
     internal int ActiveMeshRunnerCount => _meshScheduler.ActiveMeshRunnerCount;
 
     internal int GeneratingMeshCount => _meshScheduler.GeneratingMeshCount;
+
+    internal ChunkMeshScheduler MeshSchedulerForTests => _meshScheduler;
 
     /// <inheritdoc cref="ChunkMeshScheduler.MeshUploadBudget"/>
     public int MeshUploadBudget { get => _meshScheduler.MeshUploadBudget; set => _meshScheduler.MeshUploadBudget = value; }
@@ -340,6 +350,7 @@ public class ChunkManager
         // Belt and braces: every renderable chunk was in Chunks, so both lists are empty already
         Renderable.Clear();
         TranslucentRenderable.Clear();
+        ChestChunks.Clear();
 
         _meshScheduler.Release();
         _placedIndex.Release();
@@ -493,12 +504,12 @@ public class ChunkManager
     /// <summary>
     /// Reads a block at world coordinates. Unloaded chunks read as air.
     /// </summary>
-    public byte GetBlockGlobal(int x, int y, int z)
+    public ushort GetBlockGlobal(int x, int y, int z)
     {
         return Chunks.TryGetValue(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift,
             out var chunk)
             ? chunk.GetLocalBlock(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask)
-            : (byte)0;
+            : BlockType.Air;
     }
 
     /// <summary>
@@ -517,7 +528,7 @@ public class ChunkManager
     /// loaded. The fluid simulation must use this rather than <see cref="GetBlockGlobal"/>:
     /// "unloaded" reads as air there, which would make water pour into unloaded space.
     /// </summary>
-    public bool TryGetCell(int x, int y, int z, out byte id, out byte state)
+    public bool TryGetCell(int x, int y, int z, out ushort id, out byte state)
     {
         var chunk = ChunkAt(x, y, z);
         if (chunk == null)

@@ -1,0 +1,8 @@
+{
+  // Leather Cap: placeholder gear. Wearable in the head slot; its
+  // fixed stats are the equip object, and a piece found in loot may also roll modifiers on its stack.
+  "name": "Leather Cap",
+  "texture": "assets/textures/items/leather_cap.png",
+  "rarity": "common",
+  "equip": { "slot": "head", "armor": 1, "set": "leather", "visible": true }
+}

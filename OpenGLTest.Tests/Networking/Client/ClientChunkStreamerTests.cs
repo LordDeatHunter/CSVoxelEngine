@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Saves;
@@ -14,7 +16,8 @@ namespace VoxelEngine.Tests.Networking.Client;
 /// The client's streamed-chunk path: an applied snapshot becomes readable blocks, the streamer
 /// asks for the chunks around the camera and the 3x3 columns around each without duplicating a
 /// request, re-asks an unanswered column like a chunk, and a streamed column (heights, water levels
-/// and climate) is served as the client's column source.
+/// and climate) is served as the client's column source. A chunk naming an id outside the client's content is
+/// refused before anything is stored.
 /// </summary>
 public sealed class ClientChunkStreamerTests
 {
@@ -25,12 +28,69 @@ public sealed class ClientChunkStreamerTests
     {
         var manager = new ChunkManager(null!);
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        var blocks = new byte[Chunk.BlockCount];
+        var blocks = new ushort[Chunk.BlockCount];
         blocks[Chunk.Idx(0, 0, 0)] = stone;
 
-        manager.ApplyStreamedChunk(Vector3.Zero, new ChunkSnapshot(blocks, null, null));
+        manager.ApplyStreamedChunk(Vector3.Zero, new ChunkSnapshot(blocks, null, playerPlaced: null));
 
         Assert.Equal(stone, manager.GetBlockGlobal(0, 0, 0));
+    }
+
+    [Fact]
+    public void AChunkNamingAnIdPastTheLoadedContentIsRefusedAndAnAllAssignedOneApplies()
+    {
+        var manager = new ChunkManager(null!);
+        var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (_, _) => { });
+        var highestBlock = BlockType.Types.Keys.Max();
+        var blocks = new ushort[Chunk.BlockCount];
+        blocks[Chunk.Idx(1, 2, 3)] = highestBlock;
+
+        streamer.ApplyChunk(0, 0, 0, ChunkNetCodec.Encode(new ChunkSnapshot(blocks, null, playerPlaced: null)));
+        Assert.Equal(highestBlock, manager.GetBlockGlobal(1, 2, 3));
+
+        // One cell past the loaded content poisons the whole payload: nothing of it is stored
+        Assert.True(BlockTables.IdCount <= ushort.MaxValue, "the loaded content fills every id the id type holds");
+        blocks[Chunk.Idx(4, 5, 6)] = (ushort)BlockTables.IdCount;
+        var bad = ChunkNetCodec.Encode(new ChunkSnapshot(blocks, null, playerPlaced: null));
+        Assert.Throws<InvalidDataException>(() => streamer.ApplyChunk(0, 1, 0, bad));
+        Assert.False(manager.Chunks.ContainsKey(new Vector3(0, 1, 0)));
+    }
+
+    /// <summary>
+    /// The id check covers every payload layout: a Uniform chunk whose one id is past the loaded content, and an
+    /// Indexed chunk with one such id in its palette, are both refused before anything is stored. Negative control:
+    /// a check that read only the cells of one layout (or skipped the Uniform id) would store one of them.
+    /// </summary>
+    [Fact]
+    public void AUniformChunkOfAnUnknownIdIsRefusedAndNothingIsStored()
+    {
+        var manager = new ChunkManager(null!);
+        var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (_, _) => { });
+        Assert.True(BlockTables.IdCount <= ushort.MaxValue, "the loaded content fills every id the id type holds");
+        var unknown = (ushort)BlockTables.IdCount;
+
+        var uniform = new ushort[Chunk.BlockCount];
+        Array.Fill(uniform, unknown);
+        var indexed = new ushort[Chunk.BlockCount];
+        Array.Fill(indexed, ContentRegistry.RequireBlock("stone").Id);
+        indexed[Chunk.Idx(7, 8, 9)] = unknown;
+
+        var cases = new (string Name, ushort[] Cells, ChunkBlocks.StorageMode Mode, int Cy)[]
+        {
+            ("uniform", uniform, ChunkBlocks.StorageMode.Uniform, 0),
+            ("indexed", indexed, ChunkBlocks.StorageMode.Indexed, 1),
+        };
+        foreach (var (name, cells, mode, cy) in cases)
+        {
+            var payload = ChunkNetCodec.Encode(new ChunkSnapshot(cells, null, playerPlaced: null));
+            // The payload really travels in the layout under test
+            Assert.True(mode == ChunkNetCodec.Decode(payload).Storage.Mode, name);
+
+            Assert.Throws<InvalidDataException>(() => streamer.ApplyChunk(0, cy, 0, payload));
+            Assert.False(manager.Chunks.ContainsKey(new Vector3(0, cy, 0)), name);
+        }
+
+        Assert.Equal(0, manager.Chunks.Count);
     }
 
     [Fact]
@@ -189,6 +249,42 @@ public sealed class ClientChunkStreamerTests
         }
     }
 
+    [Fact]
+    public void ChangedNegativeColumnRedirtiesEveryYInItsNineColumnNeighborhood()
+    {
+        var manager = new ChunkManager(null!);
+        var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (_, _) => { });
+        var before = Terrain(12);
+        var after = Terrain(13);
+        Assert.True(streamer.ApplyColumn(-2, -3, ChunkNetCodec.EncodeColumn(before)));
+
+        // All nine neighboring XZ columns, at multiple Y levels, plus same-Y chunks outside
+        // the neighborhood. Negative coordinates exercise floor-based chunk key packing.
+        var expected = new HashSet<(int X, int Y, int Z)>();
+        for (var x = -3; x <= -1; x++)
+        for (var z = -4; z <= -2; z++)
+        foreach (var y in new[] { -7, -1, 0, 4 })
+        {
+            var pos = new Vector3(x, y, z);
+            manager.Chunks.SetPacked(ChunkKey.Pack(pos), new Chunk(null!, pos, generateBlockData: false));
+            expected.Add((x, y, z));
+        }
+
+        foreach (var pos in new[] { new Vector3(-4, 0, -3), new Vector3(0, 0, -3), new Vector3(-2, 2, -5), new Vector3(-2, 2, -1) })
+            manager.Chunks.SetPacked(ChunkKey.Pack(pos), new Chunk(null!, pos, generateBlockData: false));
+
+        Assert.True(streamer.ApplyColumn(-2, -3, ChunkNetCodec.EncodeColumn(after)));
+        Assert.Equal(expected.Count, manager.DirtyCount);
+        foreach (var pos in expected)
+            Assert.True(manager.IsChunkDirty(ChunkKey.Pack(pos.X, pos.Y, pos.Z)), $"missing dirty chunk {pos}");
+        Assert.False(manager.IsChunkDirty(ChunkKey.Pack(-4, 0, -3)));
+        Assert.False(manager.IsChunkDirty(ChunkKey.Pack(0, 0, -3)));
+        Assert.False(manager.IsChunkDirty(ChunkKey.Pack(-2, 2, -5)));
+        Assert.False(manager.IsChunkDirty(ChunkKey.Pack(-2, 2, -1)));
+        Assert.True(streamer.TryGet(-2, -3, out var served));
+        Assert.True(served.ContentEquals(after));
+    }
+
     // A column of one height and one water level everywhere, with the given corner climate
     private static ColumnTerrain Terrain(int height, int water = TerrainGenerator.NoWater, float warmth = 0.5f, float wetness = 0.5f)
     {
@@ -205,7 +301,7 @@ public sealed class ClientChunkStreamerTests
         // The wake queue is only drained by FluidManager.WakeLoadedChunks, which a client never
         // runs; a streamed chunk left in it would stay referenced for the whole session.
         var manager = new ChunkManager(null!);
-        manager.ApplyStreamedChunk(Vector3.Zero, new ChunkSnapshot(new byte[Chunk.BlockCount], null, null));
+        manager.ApplyStreamedChunk(Vector3.Zero, new ChunkSnapshot(new ushort[Chunk.BlockCount], null, playerPlaced: null));
 
         Assert.False(manager.TryDequeueLoaded(out _));
     }

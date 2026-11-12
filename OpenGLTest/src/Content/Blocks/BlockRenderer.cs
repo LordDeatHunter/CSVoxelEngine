@@ -16,10 +16,10 @@ namespace VoxelEngine.Content.Blocks;
 /// <see cref="Quern"/> replays only its model's base quads: the plate and handle spin as a
 /// dynamic entity (see <see cref="QuernRenderer"/>), so the chunk never holds them.
 /// <see cref="Multiblock"/> and <see cref="MultiblockPart"/> are the two halves of a structure
-/// that spans a 2x2x2 volume of cells: the anchor (the volume's minimum corner) emits its whole
-/// baked model — authored in 0..32 model units and pre-rotated to each facing, see
+/// that spans a cubic volume of cells (2x2x2 for the kiln, <c>multiblock.size</c>): the anchor (the volume's minimum corner) emits its whole
+/// baked model — authored in 0..16 * size model units and pre-rotated to each facing, see
 /// <see cref="MultiblockShape"/> — turned to the facing in the cell's state byte, while each of
-/// the other seven cells is a part that draws nothing at all and only exists so the volume is
+/// the other cells is a part that draws nothing at all and only exists so the volume is
 /// solid, occludes and can be mined.
 /// <see cref="Pane"/> is a glass pane: a thin center post plus an arm toward every neighboring
 /// pane or solid full cube, derived from the neighbors at mesh time (see <see cref="PaneShape"/>);

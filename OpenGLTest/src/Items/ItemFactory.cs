@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Data;
 
 namespace VoxelEngine.Items;
 
@@ -16,13 +17,13 @@ public static class ItemFactory
 {
     /// <summary>Parsed <c>assets/data/items/&lt;name&gt;.json</c>: everything a subclass needs.</summary>
     public sealed record ItemSpec(
-        byte Id,
+        ushort Id,
         string Name,
         string TexturePath,
         ItemUseAction Action,
-        byte ResultId,
-        byte FluidId,
-        byte BlockId,
+        ushort ResultId,
+        ushort FluidId,
+        ushort BlockId,
         float Chance,
         int Durability,
         float UseDelay,
@@ -46,7 +47,22 @@ public static class ItemFactory
         float FuelSeconds = 0f,
         int CrucibleCapacityMl = 0,
         float UseSeconds = 0f,
-        string? TreeName = null);
+        string? TreeName = null,
+        string? EntityName = null,
+        Rgba? TrailColor = null,
+        bool ThrowAligned = false,
+        ushort ThrowBlockId = 0,
+        UsePose UsePose = UsePose.Raise,
+        int StaffSlots = 0,
+        int StaffTier = 0,
+        IReadOnlySet<string>? StaffTags = null,
+        IReadOnlyList<string>? Teaches = null,
+        float RestoresMana = 0f,
+        int Heals = 0,
+        Rarity Rarity = Rarity.Common,
+        GearInfo? Equip = null,
+        ShrapnelProfile? Shrapnel = null,
+        GearPassive? OnHit = null);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,
@@ -71,6 +87,12 @@ public static class ItemFactory
         // Tools pool whatever use action (usually none) its JSON declares.
         if (spec.CrucibleCapacityMl > 0)
             return new CrucibleItem(spec);
+        // A staff's bound spells live on its stack, so like a vessel it needs the Tools pool
+        if (spec.StaffSlots > 0)
+            return new StaffItem(spec);
+        // Wearable gear has a pool of its own: its rolled modifiers ride on each instance's stack
+        if (spec.Equip != null)
+            return new GearItem(spec);
         return spec.Action switch
         {
             ItemUseAction.PickupFluid => new BucketPickupItem(spec),
@@ -81,6 +103,9 @@ public static class ItemFactory
             ItemUseAction.Heal => new HealItem(spec),
             ItemUseAction.GrowTree => new GrowTreeItem(spec),
             ItemUseAction.PlantTree => new PlantTreeItem(spec),
+            ItemUseAction.LearnParts => new LearnPartsItem(spec),
+            ItemUseAction.RestoreMana => new RestoreManaItem(spec),
+            ItemUseAction.Summon => new SummonItem(spec),
             _ => new PlainItem(spec),
         };
     }

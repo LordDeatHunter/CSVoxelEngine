@@ -13,6 +13,8 @@ using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
+using VoxelEngine.UI.SpellBuilder;
+using VoxelEngine.UI.Waystone;
 using VoxelEngine.VisualTest;
 
 namespace VoxelEngine;
@@ -52,16 +54,21 @@ public static class Program
     private static bool visualScriptFailed;
     private static ConnectTarget pendingConnect;
     private static readonly InventoryView inventoryView = new();
+    private static readonly SpellBuilderView spellBuilderView = new();
+    private static readonly WaystoneView waystoneView = new();
     private static readonly ChatView chatView = new();
     private static readonly PauseMenuView pauseMenuView = new();
     private static readonly SettingsMenuView settingsMenuView = new();
     private static DevDiagnostics diagnostics = null!;
     private static ClientSession session = null!;
     private static InventoryPanelInput panelInput = null!;
+    private static SpellBuilderInput builderInput = null!;
+    private static WaystoneInput waystoneInput = null!;
     private static ChatInput chatInput = null!;
     private static MenuInput menuInput = null!;
     private static GameplayInput gameplay = null!;
     private static InputEvents inputEvents = null!;
+    private static FieldPointer fieldPointer = null!;
     private static double fpsTimer;
     private static int fpsFrames;
     private static int shownFps;
@@ -127,10 +134,13 @@ public static class Program
         diagnostics = new DevDiagnostics();
         session = new ClientSession(windowManager, inputManager, renderManager, sfx, loadingView, chatView, diagnostics);
         panelInput = new InventoryPanelInput(inputManager, renderManager, inventoryView, pauseMenuView, session);
-        chatInput = new ChatInput(chatView, session);
-        menuInput = new MenuInput(windowManager, inputManager, renderManager, menu, pauseMenuView, settingsMenuView, panelInput, inventoryView);
-        gameplay = new GameplayInput(inputManager, renderManager, inventoryView, chatView, pauseMenuView, panelInput, menuInput, session, diagnostics);
-        inputEvents = new InputEvents(inputManager, renderManager, menu, inventoryView, chatView, pauseMenuView, settingsMenuView, panelInput, menuInput, chatInput, gameplay);
+        builderInput = new SpellBuilderInput(inputManager, renderManager, spellBuilderView, session);
+        waystoneInput = new WaystoneInput(inputManager, renderManager, waystoneView, session);
+        chatInput = new ChatInput(chatView, session, inputManager);
+        menuInput = new MenuInput(windowManager, inputManager, renderManager, menu, pauseMenuView, settingsMenuView, panelInput, inventoryView, builderInput, waystoneInput);
+        gameplay = new GameplayInput(inputManager, renderManager, inventoryView, chatView, pauseMenuView, panelInput, builderInput, waystoneInput, menuInput, session, diagnostics);
+        fieldPointer = new FieldPointer(inputManager, renderManager, menu, chatView, inventoryView, pauseMenuView, waystoneView, new TextFieldKeys(inputManager));
+        inputEvents = new InputEvents(inputManager, renderManager, menu, inventoryView, chatView, pauseMenuView, settingsMenuView, panelInput, builderInput, waystoneInput, menuInput, chatInput, gameplay, fieldPointer);
 
         // A dev override (VOXEL_SCRIPT/SPAWN/LOOK) takes the old path unchanged: a storeless world
         // built right here, no seed change, no persistence and no menu, so scripted runs stay
@@ -180,7 +190,7 @@ public static class Program
 
         try
         {
-            visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world!);
+            visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world!, new ScenarioUi(panelInput, builderInput, waystoneInput, gameplay.Forge));
         }
         catch (Exception e)
         {
@@ -408,6 +418,8 @@ public static class Program
         pauseMenuView.Page = PauseMenuPage.Closed;
         settingsMenuView.DragRow = null;
         inventoryView.ResetForNewWorld();
+        spellBuilderView.ResetForNewWorld();
+        waystoneView.ResetForNewWorld();
         chatView.Reset();
         gameplay.ResetEdges();
     }
@@ -441,6 +453,8 @@ public static class Program
                 PerformPending();
             return;
         }
+
+        fieldPointer.Update();
 
         switch (screen)
         {
@@ -509,7 +523,7 @@ public static class Program
             FrameProfiler.Begin(ProfileSection.RenderShell);
             renderManager.UiPasses.RenderMenuFrame(windowManager.Window,
                 screen == AppScreen.Menu ? menu.View : null, settingsMenuView,
-                screen == AppScreen.Menu ? null : loadingView, windowManager.Window.Time);
+                screen == AppScreen.Menu ? null : loadingView, windowManager.Window.Time, panelInput.PointerWindow());
             ambience?.Update(renderManager.Lighting.Dayness, (float)MathUtils.Clamp(deltaTime, 0.0, 0.25));
             sfx?.Update();
             if (pending != PendingWork.None)
@@ -532,9 +546,10 @@ public static class Program
         FrameProfiler.Begin(ProfileSection.Lighting);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.Lighting);
         renderManager.Lighting.SetLighting(world.LightingTime, world.Camera, world.PrimedTnt,
-            world.Camera.IsEyeInWater, world.Camera.IsEyeInLava, world.FireCells);
+            world.Camera.IsEyeInWater, world.Camera.IsEyeInLava, world.FireCells, eyeCaveBiome: world.EyeCaveBiome);
         ambience?.Update(renderManager.Lighting.Dayness, (float)MathUtils.Clamp(deltaTime, 0.0, 0.25));
         sfx?.Update();
+        renderManager.WaterRipples.Pack(world.Ambient.Ripples.Ripples, world.Camera.RenderEye);
         renderManager.BeginFrame(world.Camera);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.Lighting);
         FrameProfiler.End(ProfileSection.Lighting);
@@ -556,10 +571,12 @@ public static class Program
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.UiPass);
         var hideHud = !gameplay.HudVisible
             || (visualDirector?.TakeScreenshot == true && visualDirector.ScreenshotHideHud);
+        inventoryView.HoverCanvas = panelInput.PointerCanvas();
+        renderManager.Ui.Pointer = panelInput.UiPointerCanvas();
         if (!hideHud)
             world.Renderer.RenderUI(renderManager, inventoryView,
                 (float)world.LightingTime, shownFps, diagnostics.DebugEnabled,
-                showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView);
+                showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView, builder: spellBuilderView, waystone: waystoneView, forge: gameplay.Forge.View);
         // The chat log and input draw over the HUD; hidden with the HUD and behind the pause menu.
         if (!hideHud && !pauseMenuView.IsOpen)
             renderManager.UiPasses.RenderChat(windowManager.Window, chatView, windowManager.Window.Time);
@@ -568,7 +585,12 @@ public static class Program
             renderManager.UiPasses.RenderPlayerList(windowManager.Window, chatInput.PlayerListNames());
         // A hover tooltip over the [E] panel's rows and the hotbar slots
         if (!hideHud && !pauseMenuView.IsOpen)
-            renderManager.UiPasses.RenderTooltip(windowManager.Window, panelInput.HoveredTooltip());
+            renderManager.UiPasses.RenderTooltip(windowManager.Window, panelInput.HoveredTooltip(), (float)world.LightingTime);
+        // The death screen covers the HUD and the world until the player asks to respawn; a
+        // client has no death line (the server's chat carries it)
+        if (!hideHud && gameplay.DeathScreenUp(world))
+            renderManager.UiPasses.RenderDeathScreen(windowManager.Window,
+                session.Client == null ? world.LocalPlayer.DeathLine : null);
         // The loading screen fades out over the world's first playing frames
         if (!loadingView.IsFinished)
             renderManager.UiPasses.RenderLoadingOverlay(windowManager.Window, loadingView, windowManager.Window.Time);

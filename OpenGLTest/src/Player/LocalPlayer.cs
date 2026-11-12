@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
 using VoxelEngine.Interaction;
@@ -10,7 +11,9 @@ using VoxelEngine.Particles;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.UI.Menus;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.Player;
 
@@ -46,7 +49,7 @@ internal sealed class LocalPlayer
         _mobs = mobs;
         _serverMode = serverMode;
         _clientMode = clientMode;
-        _localContext = new PlayerContext(Inventory) { Camera = Camera };
+        _localContext = new PlayerContext(Inventory) { Camera = Camera, Health = _health };
     }
 
     /// <summary>Whether the player rests on real ground at the spawn (or a saved pose placed it).</summary>
@@ -59,7 +62,7 @@ internal sealed class LocalPlayer
     internal Vector3 RespawnEye => _respawnEye;
 
     /// <summary>The item in hand this frame, as the body model last read it.</summary>
-    internal byte HeldId => _heldId;
+    internal ushort HeldId => _heldId;
 
     /// <summary>Whether the hand holds anything this frame (a stack or a tool instance).</summary>
     internal bool HasHeld => _hasHeld;
@@ -79,6 +82,9 @@ internal sealed class LocalPlayer
     /// <summary>Marks the spawn settled (a client starts at its server's spawn).</summary>
     internal void MarkSpawnSettled() => _spawnSettled = true;
 
+    /// <summary>Forgets the fall in progress, so a teleport (a waystone arrival) lands as a teleport, never a drop.</summary>
+    internal void ResetFall(float feet) => _fall.Reset(feet, grounded: false);
+
     /// <summary>Forgets the walk cycle's previous position, so a whole load never reads as one step.</summary>
     internal void ForgetPreloadPosition() => _hasPrevCamPos = false;
 
@@ -86,7 +92,7 @@ internal sealed class LocalPlayer
 
     private Vector3 _prevCamPos;
     private bool _hasPrevCamPos;
-    private byte _heldId;
+    private ushort _heldId;
     private bool _hasHeld;
 
     // The local player as a PlayerContext: this world's own inventory, aimed by its camera.
@@ -126,8 +132,9 @@ internal sealed class LocalPlayer
     /// <summary>
     /// Applies a parsed <see cref="PlayerSaveCodec.FileName"/> field by field: a saved position
     /// restores the pose and marks the spawn settled (a restored player is never relocated to the
-    /// surface), and without one the modes still apply at the current pose. The respawn eye,
-    /// health and inventory are restored when present. The lighting clock waits for the
+    /// surface), and without one the modes still apply at the current pose. The respawn eye is
+    /// restored when present, and the inventory, health and mana through
+    /// <see cref="SavedPlayerPools.Apply"/> (known parts before mana). The lighting clock waits for the
     /// Loading -> Playing flip (<see cref="World.FinishLoading"/>).
     /// </summary>
     internal void ApplySavedPlayer(PlayerSaveData saved)
@@ -149,10 +156,7 @@ internal sealed class LocalPlayer
             _hasRespawnEye = true;
         }
 
-        if (saved.Health is { } hp)
-            _health.Restore(hp);
-        if (saved.Inventory is { } inventory)
-            Inventory.Import(inventory);
+        SavedPlayerPools.Apply(saved, Inventory, _health);
     }
 
     // Standing against a cactus pricks: one tick per ContactDamage.TickSeconds while the body box
@@ -168,6 +172,19 @@ internal sealed class LocalPlayer
             !(Camera.IsCreative || Camera.IsFlying));
         if (tick > 0)
             _health.TakeDamage(tick, DamageSource.Cactus);
+    }
+
+    /// <summary>
+    /// Applies what the worn gear changes to this player: the health pool (every mode, so a client's hearts
+    /// scale), the mana pool where it is simulated (<paramref name="simulatesMana"/>; a client mirrors its server's),
+    /// the walk speed and the air jump. Called every frame, cheap: the stats and abilities are cached until the
+    /// worn set changes.
+    /// </summary>
+    internal void ApplyGear(bool simulatesMana)
+    {
+        _health.ApplyGear(Inventory.Equipment, simulatesMana);
+        Camera.GearMoveFactor = Inventory.Equipment.Stats.MoveFactor;
+        Camera.GearAirJump = Inventory.Equipment.Has(GearAbility.AirJump);
     }
 
     internal void EnsureSpawnSettled(ChunkManager chunkManager)
@@ -272,10 +289,12 @@ internal sealed class LocalPlayer
         var horizontalSpeed = 0f;
         var headingForward = 0f;
         var headingSide = 0f;
+        var totalSpeed = 0f;
         if (_hasPrevCamPos && deltaTime > 0.0)
         {
             var step = camPos - _prevCamPos;
             horizontalSpeed = new Vector3(step.X, 0f, step.Z).Length() / (float)deltaTime;
+            totalSpeed = step.Length() / (float)deltaTime;
             // The velocity along and across the body's facing, which tips a swimmer toward its heading.
             var yaw = MathUtils.ToRadians(Camera.PlayerYaw);
             var fx = MathF.Cos(yaw);
@@ -307,11 +326,13 @@ internal sealed class LocalPlayer
         _lastSwimStrokes = strokes;
         Player.Update((float)deltaTime, animSpeed, Camera.IsSprinting, supported,
             Camera.VerticalVelocity, Camera.IsSneaking, waterPhase >= WaterPhase.Float,
-            headingForward, headingSide, floating: waterPhase == WaterPhase.Float);
+            headingForward, headingSide, floating: waterPhase == WaterPhase.Float,
+            flying: Camera.IsFlying, flightSpeed: totalSpeed);
         // A hit-stop holds the punch pinch with the arm (read by the camera's next update)
         Camera.HoldPunchFov = Player.IsHitStopped;
         // The throw being wound up narrows the view with the arm (ThrowZoom, the camera's next update)
-        Camera.ThrowCharge = Player.ThrowCharge;
+        // (a drawn bow narrows it the same way)
+        Camera.ThrowCharge = Player.ThrowCharge ?? Player.BowCharge;
         // The dust a landing or a sprinting footfall kicks up: cosmetic, so a headless server spawns none
         if (!_serverMode)
             _dust.UpdatePlayer(Camera, Player.WalkPhase, horizontalSpeed, chunkManager, _debris);
@@ -333,25 +354,63 @@ internal sealed class LocalPlayer
             case "hurt": NotifyPlayerHurt(fromMob: false); break;
             case "punch": PunchSwing(); break;
             case "slice": Player.StartSlice(1); break;
+            case "slicereturn": Player.StartSlice(-1); break;
+            case "cut": Player.StartSword(SwordSwing.Cut); break;
+            case "backcut": Player.StartSword(SwordSwing.BackCut); break;
+            case "chop": Player.StartSword(SwordSwing.Chop); break;
+            case "axechop": Player.StartAxeChop(AxeChopSeconds(Mining.HitGapSeconds(ItemRegistry.TryGet(Inventory.SelectedBlockId)))); break;
             case "equip": Player.NotifyEquip(); break;
             case "charge": Player.StartThrowCharge(); Player.UpdateThrowCharge(1f); break;
             case "release": Player.ReleaseThrow(1f); break;
+            // A bow drawn to full and held, then let go (the world drives the same through RightClickAction)
+            case "draw": Player.StartUseCharge(UsePose.Bow); Player.UpdateUseCharge(1f); break;
+            case "loose": Player.CancelUseCharge(); break;
+            // The staff cast's gesture only (the scenario's cast op fires a real bolt)
+            case "cast": CastSwing(); break;
+            // Launches the selected throwable at full charge (the model plays its own release separately)
+            case "throw": _world.Throws.ThrowFor(LocalContext(), 1f); Player.ReleaseThrow(1f); break;
             case "die": Player.DeathFall = 1f; Camera.DeathProgress = 1f; break;
             case "revive": Player.DeathFall = 0f; Camera.DeathProgress = 0f; break;
         }
     }
 
+    /// <summary>How long an axe's chop lasts for a hit gap of <paramref name="hitGapSeconds"/>: the gap
+    /// itself, held between the shortest swing that still reads and the longest that stays crisp.</summary>
+    internal static float AxeChopSeconds(float hitGapSeconds) =>
+        Math.Clamp(hitGapSeconds, PlayerConfig.AxeChopMinSeconds, PlayerConfig.AxeChopMaxSeconds);
+
     // A swing of the fist: the arm throws the jab and the view pinches in for a beat. Returns the
     // swing's weight, which a connecting punch's hit-stop reads.
-    internal float PunchSwing()
+    internal float PunchSwing(bool chopStarted = false)
     {
         // A slower tool swings heavier: from the bare hand's pace (no weight) up to a tool with
         // a long hit gap.
-        var gap = Mining.HitGapSeconds(ItemRegistry.TryGet(Inventory.SelectedBlockId));
-        var weight = MathUtils.InverseLerp(Mining.HitGapSeconds(null), Mining.HitGapSeconds(null) + 0.5f, gap);
-        Player.Punch(weight);
+        // A slowing status effect lengthens the swing's pace (an axe chop takes longer) but not its
+        // weight, which stays the tool's own.
+        var held = ItemRegistry.TryGet(Inventory.SelectedBlockId);
+        var toolGap = Mining.HitGapSeconds(held);
+        var gap = Mining.HitGapSeconds(held,
+            (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
+        var weight = MathUtils.InverseLerp(Mining.HitGapSeconds(null), Mining.HitGapSeconds(null) + 0.5f, toolGap);
+        // An axe chops: one swing paced to its hits (the click loop starts it early, so the blow comes
+        // down as the hit lands, and says so with chopStarted)
+        if (Mining.IsAxe(held))
+        {
+            if (!chopStarted) Player.StartAxeChop(AxeChopSeconds(gap));
+        }
+        else
+        {
+            Player.Punch(weight);
+        }
         Camera.PunchFov(-0.8f - 0.8f * weight);
         return weight;
+    }
+
+    /// <summary>The staff cast's gesture: the staff raised and thrust forward, with a light view pinch.</summary>
+    internal void CastSwing()
+    {
+        Player.Cast();
+        Camera.PunchFov(SpellConfig.CastFovKickDegrees);
     }
 
     /// <summary>
@@ -400,19 +459,36 @@ internal sealed class LocalPlayer
         Camera.AddHitKick(-toMob);
     }
 
-    // Seconds the player's death plays (the view tips over, the body falls) before the respawn.
-    private const float DeathPlaySeconds = 0.9f;
-    private float _deathTimer;
+    /// <summary>The death screen's state: the death plays, then the player stays down until they ask to respawn.</summary>
+    internal RespawnPrompt RespawnPrompt { get; } = new();
+
+    /// <summary>The line the death screen shows ("Player fell from a high place"); null while alive.</summary>
+    internal string? DeathLine { get; private set; }
+
+    // The eye's cave biome probe, memoized per cell (singleplayer only)
+    private readonly EyeCaveBiomeProbe _caveProbe = new();
+
+    /// <summary>The cave biome at the eye (CB-3): computed in singleplayer by <see cref="UpdateHealth"/>,
+    /// mirrored from the server's status on a client (<see cref="MirrorCaveBiome"/>), plain otherwise.</summary>
+    internal CaveBiome EyeCaveBiome { get; private set; }
+
+    /// <summary>A client takes the eye's cave biome the server's status reports.</summary>
+    internal void MirrorCaveBiome(CaveBiome biome) => EyeCaveBiome = biome;
 
     /// <summary>
     /// First-cut survival tick, after <see cref="Camera.Update"/> so grounded state is fresh:
     /// tracks the fall from its highest feet position, burns in lava, decays the damage
-    /// flash, and respawns at spawn keeping the inventory. A multi-block jump in one frame
+    /// flash, and, once the death screen's RESPAWN is chosen, respawns at the respawn eye keeping
+    /// the inventory. A multi-block jump in one frame
     /// is a teleport (spawn settle, scripts), never a fall. Landing in water cushions the
     /// fall; creative and flight skip every damage source.
     /// </summary>
     internal void UpdateHealth(float deltaTime, ChunkManager chunkManager)
     {
+        ApplyGear(simulatesMana: true);
+        // The eye's cave biome (CB-3), even while dead. UpdateHealth never runs on a client or a server, so no
+        // worldgen is read there: a client mirrors the byte from its status
+        EyeCaveBiome = _caveProbe.Update(chunkManager.WorldSource, Camera.Position);
         if (_spawnSettled && !_hasRespawnEye)
         {
             _respawnEye = Camera.Position;
@@ -421,16 +497,23 @@ internal sealed class LocalPlayer
 
         var beforeHp = _health.Health;
         var feet = Camera.Position.Y - Camera.EyeHeight;
-        // A bounce block under the feet cushioned the landing (PlayerPhysics sprang the body back
-        // up): it still counts as a landing, but bills no damage
+        // A bounce block (PlayerPhysics sprang the body back up) or a soft-landing block under the
+        // feet cushioned the landing: it still counts as a landing, but bills no damage
         var damage = _fall.Observe(feet, Camera.IsGrounded, Camera.IsFlying, Camera.IsInWater, Camera.IsCreative,
-            FallTracker.DefaultMaxStepBlocks, cushioned: PlayerPhysics.BounceBelow(Camera, chunkManager));
+            FallTracker.DefaultMaxStepBlocks, cushioned: PlayerBodyProbe.LandingCushioned(Camera.Position, chunkManager));
+        // Worn no_fall_damage gear negates the blow inside PlayerHealth.TakeDamage; the landing still counts
         if (damage > 0)
             _health.TakeDamage(damage, DamageSource.Fall);
 
         _health.UpdateLava(deltaTime, Camera.IsInLava, Camera.IsCreative || Camera.IsFlying);
+        _health.UpdateBreath(deltaTime, Camera.IsEyeInWater && !Camera.IsEyeInLava, Camera.IsCreative || Camera.IsFlying);
         UpdateCactusContact(deltaTime, chunkManager);
         _health.Update(deltaTime);
+        _health.UpdateRegen(deltaTime, Camera.IsSprinting, Camera.IsCreative || Camera.IsFlying);
+        // Singleplayer only: a client mirrors its server's mana and a server ticks ServerPlayer.TickStatus
+        _health.UpdateMana(deltaTime);
+        // Singleplayer only, like the mana: a client's effects are the server's mirror
+        _health.UpdateEffects(deltaTime, Camera.IsCreative || Camera.IsFlying);
 
         // The day toast: the line appears the moment the sun rises through dawn, once a day
         var elevation = DayCycle.SunDirection(LightingTime).Y;
@@ -445,28 +528,35 @@ internal sealed class LocalPlayer
             NotifyPlayerHurt(fromMob: false);
         }
 
+        RespawnPrompt.Update(deltaTime, _health.IsDead);
+        Camera.IsDead = _health.IsDead;
         if (!_health.IsDead)
         {
-            _deathTimer = 0f;
             _pendingDeathMessage = null;
+            DeathLine = null;
             return;
         }
 
         // The first dead frame posts the death line once; GameplayInput drains it into the chat
-        _pendingDeathMessage ??= DeathMessages.For("Player", _health.LastSource, _health.LastKiller);
+        if (DeathLine == null)
+        {
+            DeathLine = DeathMessages.For("Player", _health.LastSource, _health.LastKiller);
+            _pendingDeathMessage = DeathLine;
+        }
 
-        // The death plays first: the view tips over and the body falls, then the respawn.
-        _deathTimer += deltaTime;
-        var progress = MathUtils.Clamp01(_deathTimer / DeathPlaySeconds);
+        // The death plays first: the view tips over and the body falls. Then the player stays down
+        // under the death screen until they ask to respawn.
+        var progress = MathUtils.Clamp01(RespawnPrompt.DeadSeconds / RespawnPrompt.DelaySeconds);
         Camera.DeathProgress = progress;
         Player.DeathFall = progress;
-        if (progress < 1f)
+        if (!RespawnPrompt.Requested)
             return;
 
-        _deathTimer = 0f;
+        RespawnPrompt.Reset();
         Camera.DeathProgress = 0f;
         Player.DeathFall = 0f;
         _health.Respawn();
+        Camera.IsDead = false;
         var home = _hasRespawnEye ? _respawnEye : Camera.Position;
         Camera.TestTeleport(home, Camera.Yaw, Camera.Pitch);
         _fall.Reset(home.Y - Camera.EyeHeight, grounded: false);

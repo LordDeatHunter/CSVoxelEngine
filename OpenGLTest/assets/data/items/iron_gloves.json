@@ -1,0 +1,7 @@
+{
+  // Iron Gloves: placeholder gear.
+  "name": "Iron Gloves",
+  "texture": "assets/textures/items/iron_gloves.png",
+  "rarity": "uncommon",
+  "equip": { "slot": "gloves", "armor": 2, "modifiers": { "attackDamage": 0.07 }, "set": "iron", "visible": true }
+}

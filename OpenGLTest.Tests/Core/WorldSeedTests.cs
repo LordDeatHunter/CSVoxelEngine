@@ -147,6 +147,9 @@ public class WorldSeedTests
             var (cx, cz) = FindCanopyColumn();
             TreeGenerator.PoisonCanopy(cx, cz, TreeGenerator.SingleEditPoisonRadius);
             Assert.False(TreeGenerator.TryGetCanopy(cx, cz, out _, out _));
+            // ...and a grown crown a reactive growth added back over it
+            TreeGenerator.SetCanopyAdded(cx, cz, y + 10, TerrainGenerator.RockBlock);
+            Assert.True(TreeGenerator.TryGetCanopy(cx, cz, out _, out _));
 
             // (3) A surface override on another column of the same far region.
             var (x3, z3) = (fx + 20, fz + 20);
@@ -173,9 +176,9 @@ public class WorldSeedTests
         return max >> Chunk.SizeShift;
     }
 
-    private static byte[] BlocksOf(Chunk chunk)
+    private static ushort[] BlocksOf(Chunk chunk)
     {
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         var i = 0;
         for (var x = 0; x < Chunk.Size; x++)
         for (var y = 0; y < Chunk.Size; y++)

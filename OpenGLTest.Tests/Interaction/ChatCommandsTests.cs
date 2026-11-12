@@ -1,3 +1,6 @@
+using System;
+using System.Globalization;
+using System.Numerics;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Interaction;
 using VoxelEngine.UI.Hud;
@@ -8,7 +11,8 @@ namespace VoxelEngine.Tests.Interaction;
 /// <summary>
 /// The chat command table (<see cref="ChatCommands"/>): plain lines are not commands, the words
 /// parse case-insensitively with their arguments, the time arguments resolve to cycle points and
-/// seconds, and the operator commands are the ones that need rights.
+/// seconds, the operator commands are the ones that need rights, and a suggested teleport parses
+/// back to its eye whatever the culture.
 /// </summary>
 public sealed class ChatCommandsTests
 {
@@ -37,6 +41,10 @@ public sealed class ChatCommandsTests
         Assert.Equal(["block/cobblestone", "12"], give.Args);
 
         Assert.Equal(ChatCommands.CommandKind.Help, ChatCommands.Parse("/help").Kind);
+
+        var locate = ChatCommands.Parse("/LOCATE Tower");
+        Assert.Equal(ChatCommands.CommandKind.Locate, locate.Kind);
+        Assert.Equal(["Tower"], locate.Args);
     }
 
     [Fact]
@@ -77,6 +85,33 @@ public sealed class ChatCommandsTests
         Assert.True(ChatCommands.RequiresOperator(ChatCommands.CommandKind.Give));
         Assert.False(ChatCommands.RequiresOperator(ChatCommands.CommandKind.Time));
         Assert.False(ChatCommands.RequiresOperator(ChatCommands.CommandKind.Help));
+        Assert.False(ChatCommands.RequiresOperator(ChatCommands.CommandKind.Locate));
         Assert.False(ChatCommands.RequiresOperator(ChatCommands.CommandKind.Unknown));
+    }
+
+    [Fact]
+    public void TheSuggestedTeleportParsesBackToItsEyeUnderAnyCulture()
+    {
+        var culture = CultureInfo.CurrentCulture;
+        try
+        {
+            // A culture whose decimal separator is a comma must not leak into the command
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+            Vector3[] eyes = [new(2875.5f, 12.62f, -1410.5f), new(-0.25f, 300f, 7.75f), new(0.5f, -401.38f, -9999.5f)];
+            foreach (var eye in eyes)
+            {
+                var parsed = ChatCommands.Parse(ChatCommands.TeleportCommand(eye));
+                Assert.Equal(ChatCommands.CommandKind.Teleport, parsed.Kind);
+                var target = ChatCommands.TeleportTarget(parsed.Args);
+                Assert.NotNull(target);
+                Assert.InRange(MathF.Abs(target!.Value.X - eye.X), 0f, 0.006f);
+                Assert.InRange(MathF.Abs(target.Value.Y - eye.Y), 0f, 0.006f);
+                Assert.InRange(MathF.Abs(target.Value.Z - eye.Z), 0f, 0.006f);
+            }
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = culture;
+        }
     }
 }

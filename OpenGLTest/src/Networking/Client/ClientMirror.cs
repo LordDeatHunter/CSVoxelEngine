@@ -5,14 +5,24 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
+using VoxelEngine.Entities.Sandworms;
+using VoxelEngine.Entities.SkyMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.Crawlers;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Interaction;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Caves;
 using VoxelEngine.Simulation.Icebergs;
+using VoxelEngine.Simulation.Tower;
+using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.Networking.Client;
 
@@ -31,6 +41,13 @@ internal sealed class ClientMirror
     private readonly FallingBlockManager _falling;
     private readonly SlimeManager? _slimes;
     private readonly GoblinManager? _goblins;
+    private readonly HellMobManager? _hellMobs;
+    private readonly SkyMobManager? _skyMobs;
+    private readonly WildlifeManager? _wildlife;
+    private readonly CaveMobManager? _caveMobs;
+    private readonly SkeletonManager? _skeletons;
+    private readonly SkeletonKingManager? _kings;
+    private readonly SandwormManager? _sandworms;
     private readonly CampfireManager _campfires;
     private readonly QuernManager _querns;
     private readonly KilnManager _kilns;
@@ -48,7 +65,9 @@ internal sealed class ClientMirror
     private LocalPlayer LocalPlayer => _world.LocalPlayer;
 
     internal ClientMirror(World world, ChunkManager chunkManager, DropManager dropManager, TntManager tntManager,
-        FallingBlockManager falling, SlimeManager? slimes, GoblinManager? goblins, IcebergManager? icebergs,
+        FallingBlockManager falling, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
+        SkyMobManager? skyMobs, WildlifeManager? wildlife, CaveMobManager? caveMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms,
+        IcebergManager? icebergs,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         BlockDebrisSystem debris, PlayerHealth health, List<RemotePlayer> remotePlayers, bool clientMode,
         bool serverMode)
@@ -60,6 +79,13 @@ internal sealed class ClientMirror
         _falling = falling;
         _slimes = slimes;
         _goblins = goblins;
+        _hellMobs = hellMobs;
+        _skyMobs = skyMobs;
+        _wildlife = wildlife;
+        _caveMobs = caveMobs;
+        _skeletons = skeletons;
+        _kings = kings;
+        _sandworms = sandworms;
         _icebergs = icebergs;
         _campfires = campfires;
         _querns = querns;
@@ -88,8 +114,8 @@ internal sealed class ClientMirror
     private readonly Dictionary<int, PrimedTnt> _netTnt = [];
     private readonly HashSet<int> _netTntSeen = [];
     private readonly List<int> _netTntRemovals = [];
-    private readonly List<(Vector3 Center, byte BlockId)> _netFalling = [];
-    private readonly List<(Vector3 Center, byte BlockId)> _netFallingPrevious = [];
+    private readonly List<(Vector3 Center, ushort BlockId)> _netFalling = [];
+    private readonly List<(Vector3 Center, ushort BlockId)> _netFallingPrevious = [];
     // Multiplayer client: the server's icebergs by network id, mirrored without simulation
     private readonly IcebergManager? _icebergs;
     private readonly Dictionary<int, Iceberg> _netIcebergs = [];
@@ -103,7 +129,8 @@ internal sealed class ClientMirror
     /// the same dirtying a local batch edit uses, so a remote lamp or roof edit relights the edge
     /// and corner chunks too), each chunk once however many of its cells changed. A cell that
     /// already holds the value is skipped, so a correction confirming a prediction costs nothing. A
-    /// quern that arrives registers its block entity so it draws. Never raises
+    /// quern that arrives registers its block entity so it draws, and a defeated tower's falling cells
+    /// play its collapse show (<see cref="World.CollapseEffects"/>). Never raises
     /// <see cref="World.BlockEdited"/>, so it cannot loop.
     /// </summary>
     internal void ApplyNetworkBlockChanges(IReadOnlyList<NetCellChange> changes)
@@ -131,6 +158,9 @@ internal sealed class ClientMirror
             // The server's lava hardening into its rock: steam, like a local hardening
             if (_clientMode && change.Id != 0 && BlockType.IsFluid(id) && BlockType.HardensToById[id] == change.Id)
                 _netHardened.Add(new Vector3(change.X, change.Y, change.Z));
+            // A defeated tower's collapse falling in: the same chips, thrown blocks and rumble as singleplayer's
+            if (_clientMode)
+                _world.CollapseEffects?.OnCellChanged(change.X, change.Y, change.Z, id, change.Id);
             if (BlockType.ById[change.Id]?.Renderer == BlockRenderer.Quern)
                 _querns.Ensure(change.X, change.Y, change.Z);
         }
@@ -167,6 +197,13 @@ internal sealed class ClientMirror
                 // two snapshots, and that drop is what its damage number floats
                 var before = existing.Health;
                 existing.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
+                existing.Effects.SetMirrorMask(entry.Effects);
+                // A realm mob's attack count moving means the server started an attack: play its clip
+                if (existing is RealmMob realm) realm.MirrorAttackCount(entry.Ammo);
+                if (existing is Animal animal) animal.MirrorPosture((byte)entry.ItemId);
+                if (existing is CrawlerMob crawling) crawling.MirrorSurface(CrawlerMob.SurfaceOf(entry.ItemId));
+                if (existing is Sandworm worm) worm.MirrorPhase(PhaseOf(entry.Ammo));
+                if (existing is SkeletonKing king) king.MirrorPhase(KingPhaseOf((byte)entry.ItemId));
                 if (!_serverMode && existing.Health < before)
                     Strikes.ShowDamageNumber(existing, before - existing.Health);
                 continue;
@@ -194,11 +231,13 @@ internal sealed class ClientMirror
             RemoveNetMob(id);
         }
 
+        ApplySandwormTargets(entities);
+
         _dropManager.Clear();
         foreach (var netEntity in entities)
         {
             if (netEntity.Kind == NetEntityKind.Drop)
-                _dropManager.SpawnRestored(netEntity.ItemId, netEntity.Position, netEntity.Velocity, 0f);
+                _dropManager.SpawnRestored(BlockTables.RequireAssigned(netEntity.ItemId), netEntity.Position, netEntity.Velocity, 0f);
         }
 
         if (_clientMode)
@@ -226,7 +265,7 @@ internal sealed class ClientMirror
         {
             if (netEntity.Kind == NetEntityKind.FallingBlock)
             {
-                _netFalling.Add((netEntity.Position, netEntity.ItemId));
+                _netFalling.Add((netEntity.Position, BlockTables.RequireAssigned(netEntity.ItemId)));
                 continue;
             }
             if (netEntity.Kind != NetEntityKind.PrimedTnt)
@@ -240,7 +279,8 @@ internal sealed class ClientMirror
             if (_netTnt.TryGetValue(netEntity.Id, out var existing))
                 existing.MirrorSetState(netEntity.Position, remaining);
             else
-                _netTnt[netEntity.Id] = VoxelEngine.Entities.PrimedTnt.Mirror(netEntity.Position, netEntity.ItemId, duration, remaining);
+                _netTnt[netEntity.Id] = VoxelEngine.Entities.PrimedTnt.Mirror(netEntity.Position,
+                    BlockTables.RequireAssigned(netEntity.ItemId), duration, remaining);
         }
 
         _netTntRemovals.Clear();
@@ -300,7 +340,7 @@ internal sealed class ClientMirror
     /// <summary>Whether a falling-cube mirror of <paramref name="blockId"/> from the newest or the
     /// previous snapshot sat within a block and a half of cell (x, y, z): the cube that just wrote
     /// itself back there.</summary>
-    private bool NearMirroredFallingCube(int x, int y, int z, byte blockId)
+    private bool NearMirroredFallingCube(int x, int y, int z, ushort blockId)
     {
         var center = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
         const float reach = 1.5f * 1.5f;
@@ -313,8 +353,13 @@ internal sealed class ClientMirror
     /// A client replaces its station mirrors with the server's snapshot: the fires, quern tops,
     /// kilns and pours it draws are the server's, which alone runs them.
     /// </summary>
-    internal void ApplyNetworkStations(PacketReader reader) =>
+    internal void ApplyNetworkStations(PacketReader reader)
+    {
         StationNetCodec.Read(reader, _campfires, _querns, _kilns, _casting);
+        _world.Smithing.ReadNet(reader);
+        _world.Towers.ReadNet(reader);
+        _world.ChestLids.ReadNet(reader);
+    }
 
     /// <summary>
     /// A client mirrors the health the server's <see cref="NetMessage.PlayerStatus"/> reports: the
@@ -326,6 +371,8 @@ internal sealed class ClientMirror
     {
         if (!_clientMode)
             return;
+        // The pool's size follows the mirrored gear, so the server's health is not clamped below it
+        LocalPlayer.ApplyGear(simulatesMana: false);
         var current = _health.Health;
         if (health < current)
         {
@@ -340,11 +387,91 @@ internal sealed class ClientMirror
         }
     }
 
-    // A slime mirror also has to be the reported size (the ammo field), since a size is fixed for life
-    private static bool KindMatches(Mob mob, NetEntity entry) =>
-        entry.Kind == NetEntityKind.Slime
-            ? mob is Slime slime && slime.Size == SlimeSize.Clamp(entry.Ammo)
-            : entry.Kind == NetEntityKind.Goblin && mob is Goblin;
+    /// <summary>A client shows the air the server's status reports; the server alone drains and
+    /// refills it, so nothing is simulated here.</summary>
+    internal void ApplyNetworkAir(int airStep)
+    {
+        if (_clientMode)
+            _health.Breath.SetNetStep(airStep);
+    }
+
+    /// <summary>A client shows the mana the server's status reports; the server alone regenerates
+    /// and spends it, so nothing is simulated here.</summary>
+    internal void ApplyNetworkMana(int mana, int maxMana)
+    {
+        if (_clientMode)
+            _health.Mana.SetNet(mana, maxMana);
+    }
+
+    /// <summary>A client shows the status effects the server's status reports (an effect bitmask,
+    /// unknown bits dropped); the server alone ticks them, so a mirrored effect never deals damage
+    /// here, while the physics and the attack pace still read its factors.</summary>
+    internal void ApplyNetworkEffects(byte mask)
+    {
+        if (_clientMode)
+            _health.Effects.SetMirrorMask(mask);
+    }
+
+    /// <summary>A client takes the eye's cave biome the server's status reports (CB-3): the server alone
+    /// reads it, since a client has no seed and its streamed columns carry no surface biome.</summary>
+    internal void ApplyNetworkCaveBiome(CaveBiome biome)
+    {
+        if (_clientMode)
+            _world.LocalPlayer.MirrorCaveBiome(biome);
+    }
+
+    // A worm's phase rides the ammo field; an out-of-range byte reads as the first phase
+    private static SandwormPhase PhaseOf(int ammo) =>
+        Enum.IsDefined((SandwormPhase)ammo) ? (SandwormPhase)ammo : SandwormPhase.Thump;
+
+    // The point each digging worm is about to surface at: a target entry shares its worm's id; a worm with none
+    // this snapshot has nothing to telegraph
+    private void ApplySandwormTargets(IReadOnlyList<NetEntity> entities)
+    {
+        foreach (var mob in _netMobs.Values)
+            if (mob is Sandworm worm) worm.ClearMirrorTarget();
+        foreach (var entry in entities)
+        {
+            if (entry.Kind != NetEntityKind.SandwormTarget) continue;
+            if (_netMobs.TryGetValue(entry.Id, out var mob) && mob is Sandworm worm)
+                worm.MirrorTarget(entry.Position, Math.Clamp(entry.Health / 1000f, 0f, 1f));
+        }
+    }
+
+    // A slime mirror also has to be the reported size (the ammo field) and a skeleton or cave mob the reported tier (the
+    // item id), since each is fixed for life
+    private static bool KindMatches(Mob mob, NetEntity entry) => entry.Kind switch
+    {
+        NetEntityKind.Slime => mob is Slime slime && slime.Size == SlimeSize.Clamp(entry.Ammo),
+        NetEntityKind.Goblin => mob is Goblin,
+        NetEntityKind.Hellbrute => mob is Hellbrute,
+        NetEntityKind.Cinderwitch => mob is Cinderwitch,
+        NetEntityKind.Galeraptor => mob is Galeraptor,
+        NetEntityKind.Cloudgolem => mob is Cloudgolem,
+        NetEntityKind.Sandworm => mob is Sandworm,
+        NetEntityKind.Skeleton => mob is Skeleton skeleton
+                                  && Skeleton.PackLook(skeleton.Tier, skeleton.Role, skeleton.Outfit) == SkeletonLookOf((byte)entry.ItemId),
+        NetEntityKind.SkeletonKing => mob is SkeletonKing,
+        NetEntityKind.Shardling => mob is Shardling shardling && shardling.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
+        NetEntityKind.Sporeling => mob is Sporeling sporeling && sporeling.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
+        NetEntityKind.Magmaborn => mob is Magmaborn magmaborn && magmaborn.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
+        NetEntityKind.Spider => mob is Spider { IsBroodmother: false } spider
+                                && spider.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
+        NetEntityKind.SpiderBroodmother => mob is Spider { IsBroodmother: true } brood
+                                           && brood.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
+        NetEntityKind.Scorpion => mob is Scorpion scorpion && scorpion.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
+        _ => NetEntity.TryGetWildlife(entry.Kind, out var species) && mob is Animal animal && animal.Kind == species,
+    };
+
+    // A skeleton's look byte as a mirror built from it would pack it again (its tier clamped)
+    private static byte SkeletonLookOf(byte itemId)
+    {
+        Skeleton.UnpackLook(itemId, out var tier, out var role, out var outfit);
+        return Skeleton.PackLook(tier, role, outfit);
+    }
+
+    // The Skeleton King's fight phase rides the item id, clamped to its three phases
+    private static int KingPhaseOf(byte itemId) => Math.Clamp((int)itemId, 1, 3);
 
     private Mob? SpawnNetMob(NetEntity entry)
     {
@@ -352,11 +479,47 @@ internal sealed class ClientMirror
         {
             // A slime's size rides the goblin-only ammo field (NetEntity)
             NetEntityKind.Slime => _slimes?.Spawn(entry.Position, entry.Ammo),
-            NetEntityKind.Goblin => _goblins?.Spawn(entry.Position, entry.Ammo, entry.ItemId),
-            _ => null,
+            NetEntityKind.Goblin => _goblins?.Spawn(entry.Position, entry.Ammo, (byte)entry.ItemId),
+            // A hell mob's layer, and so its pool, follows from where it is first seen, as on the server
+            NetEntityKind.Hellbrute => _hellMobs?.Spawn(Hellbrute.EntityName, entry.Position),
+            NetEntityKind.Cinderwitch => _hellMobs?.Spawn(Cinderwitch.EntityName, entry.Position),
+            // Likewise a sky mob's zone tier, from the column it is first seen over
+            NetEntityKind.Galeraptor => _skyMobs?.Spawn(Galeraptor.EntityName, entry.Position),
+            NetEntityKind.Cloudgolem => _skyMobs?.Spawn(Cloudgolem.EntityName, entry.Position),
+            // The boss mirrors with its chain laid behind its heading, then drags it after the head
+            NetEntityKind.Sandworm => _sandworms?.SpawnMirror(entry.Position, entry.Yaw),
+            // A skeleton's tower tier, role and outfit ride the item id, since a mirror cannot derive them from where it stands
+            NetEntityKind.Skeleton => SpawnSkeletonMirror(entry),
+            // The boss mirrors unbound: its leash, summons and altar bookkeeping stay the server's
+            NetEntityKind.SkeletonKing => _kings?.SpawnMirror(entry.Position),
+            // A cave mob's depth tier rides the item id too: it was fixed where it spawned, not where it is first seen
+            NetEntityKind.Shardling => _caveMobs?.Spawn(Shardling.EntityName, entry.Position, (byte)entry.ItemId),
+            NetEntityKind.Sporeling => _caveMobs?.Spawn(Sporeling.EntityName, entry.Position, (byte)entry.ItemId),
+            NetEntityKind.Magmaborn => _caveMobs?.Spawn(Magmaborn.EntityName, entry.Position, (byte)entry.ItemId),
+            NetEntityKind.Spider => _caveMobs?.Spawn(Spider.EntityName, entry.Position, (byte)entry.ItemId),
+            NetEntityKind.SpiderBroodmother =>
+                _caveMobs?.Spawn(Spider.BroodmotherEntityName, entry.Position, (byte)entry.ItemId),
+            NetEntityKind.Scorpion => _caveMobs?.Spawn(Scorpion.EntityName, entry.Position, (byte)entry.ItemId),
+            // A wild animal's kind names its species
+            _ => NetEntity.TryGetWildlife(entry.Kind, out var species)
+                ? _wildlife?.Spawn(WildlifeSpecies.NameOf(species), entry.Position)
+                : null,
         };
         mob?.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
+        mob?.Effects.SetMirrorMask(entry.Effects);
+        // The first count only sets it: an attack already under way when first seen is not replayed
+        if (mob is RealmMob realm) realm.MirrorAttackCount(entry.Ammo);
+        if (mob is Animal spawned) spawned.MirrorPosture((byte)entry.ItemId);
+        if (mob is CrawlerMob crawler) crawler.MirrorSurface(CrawlerMob.SurfaceOf(entry.ItemId));
+        if (mob is Sandworm worm) worm.MirrorPhase(PhaseOf(entry.Ammo));
+        if (mob is SkeletonKing king) king.MirrorPhase(KingPhaseOf((byte)entry.ItemId));
         return mob;
+    }
+
+    private Skeleton? SpawnSkeletonMirror(NetEntity entry)
+    {
+        Skeleton.UnpackLook((byte)entry.ItemId, out var tier, out var role, out var outfit);
+        return _skeletons?.Spawn(entry.Position, tier, role, outfit);
     }
 
     private void RemoveNetMob(int id)
@@ -367,6 +530,13 @@ internal sealed class ClientMirror
         {
             case Slime slime: _slimes?.Remove(slime); break;
             case Goblin goblin: _goblins?.Remove(goblin); break;
+            case HellMob hellMob: _hellMobs?.Remove(hellMob); break;
+            case SkyMob skyMob: _skyMobs?.Remove(skyMob); break;
+            case Animal animal: _wildlife?.Remove(animal); break;
+            case CaveMob caveMob: _caveMobs?.Remove(caveMob); break;
+            case Skeleton skeleton: _skeletons?.Remove(skeleton); break;
+            case SkeletonKing king: _kings?.Remove(king); break;
+            case Sandworm sandworm: _sandworms?.Remove(sandworm); break;
         }
     }
 
@@ -386,14 +556,14 @@ internal sealed class ClientMirror
             if (index < 0)
             {
                 var remote = new RemotePlayer(entry.Id, entry.Name, Player.Rig);
-                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq);
+                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq, entry.Armor);
                 _remotePlayers.Add(remote);
             }
             else
             {
                 var remote = _remotePlayers[index];
                 remote.Name = entry.Name;
-                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq);
+                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq, entry.Armor);
             }
         }
 

@@ -10,11 +10,11 @@ public sealed class QuernTests
 {
     public QuernTests() => TestContent.EnsureLoaded();
 
-    private static byte MalachiteChunk => ContentRegistry.RequireItem("malachite_ore").Id;
-    private static byte CrushedCopper => ContentRegistry.RequireItem("crushed_copper").Id;
-    private static byte Quern => ContentRegistry.RequireBlock("quern").Id;
-    private static byte Cobblestone => ContentRegistry.RequireBlock("cobblestone").Id;
-    private static byte Branch => ContentRegistry.RequireItem("branch").Id;
+    private static ushort MalachiteChunk => ContentRegistry.RequireItem("malachite_ore").Id;
+    private static ushort CrushedCopper => ContentRegistry.RequireItem("crushed_copper").Id;
+    private static ushort Quern => ContentRegistry.RequireBlock("quern").Id;
+    private static ushort Cobblestone => ContentRegistry.RequireBlock("cobblestone").Id;
+    private static ushort Branch => ContentRegistry.RequireItem("branch").Id;
 
     private static (ChunkManager Manager, QuernManager Querns, DropManager Drops) QuernSetup()
     {

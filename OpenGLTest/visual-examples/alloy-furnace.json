@@ -1,0 +1,113 @@
+{
+  // Alloy furnace check: run with VOXEL_TIME=147 (noon) and VOXEL_SCRIPT=visual-examples/alloy-furnace.json.
+  // Shots land in visual/alloy-furnace/.
+  //
+  // The flat desert patch of torches.json (sand at y 11). Hovering straight over each of nine
+  // columns, three placements stack a 3x3x3 cube of alloy bricks at x 156..158, y 12..14,
+  // z 277..279 (its center a brick, which the conversion hands back). From the eye
+  // (157.5, 13.62, 283.5), looking north at the middle of the cube's south face:
+  //   cube         the brick cube from the front right
+  //   furnace      the multiblock converter pressed it into an alloy furnace opening south
+  //   loaded       eight coal along the back of the hearth, a crucible in front charged with three
+  //                copper and one tin ingot (the tin's lump over the rim)
+  //   melting      a fire bolt lit it: the flame between the bowl and the fuel, the pool rising
+  //   bronze       later: the full set alloyed into bronze, the pool near the rim
+  //   lit_oblique  the lit furnace from the front right
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [157.5, 32, 283.5], "yaw": -90, "pitch": -39 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "give", "block": "alloy_bricks", "count": 27 },
+    { "op": "teleport", "pos": [156.5, 19.5, 277.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "teleport", "pos": [157.5, 19.5, 277.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "teleport", "pos": [158.5, 19.5, 277.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "teleport", "pos": [156.5, 19.5, 278.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "teleport", "pos": [157.5, 19.5, 278.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "teleport", "pos": [158.5, 19.5, 278.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "teleport", "pos": [156.5, 19.5, 279.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "teleport", "pos": [157.5, 19.5, 279.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "teleport", "pos": [158.5, 19.5, 279.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+
+    { "op": "teleport", "pos": [160.5, 15.2, 284.5], "yaw": -118, "pitch": -12 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "cube" },
+
+    { "op": "teleport", "pos": [157.5, 13.62, 283.5], "yaw": -90, "pitch": -2 },
+    { "op": "give", "block": "multiblock_converter", "count": 1 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 1 },
+    { "op": "teleport", "pos": [160.5, 15.2, 284.5], "yaw": -118, "pitch": -12 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "furnace" },
+
+    { "op": "teleport", "pos": [157.5, 13.62, 283.5], "yaw": -90, "pitch": -2 },
+    { "op": "give", "block": "coal", "count": 8 },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "give", "block": "crucible", "count": 1 },
+    { "op": "place" },
+    { "op": "give", "block": "copper_ingot", "count": 3 },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "give", "block": "tin_ingot", "count": 1 },
+    { "op": "place" },
+    { "op": "teleport", "pos": [157.5, 13.9, 282.2], "yaw": -90, "pitch": -12 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "loaded", "hideHud": true },
+
+    { "op": "teleport", "pos": [157.5, 13.62, 283.5], "yaw": -90, "pitch": -2 },
+    { "op": "cast", "parts": ["element/fire", "shape/projectile"] },
+    { "op": "wait", "seconds": 4 },
+    { "op": "teleport", "pos": [157.5, 13.9, 282.2], "yaw": -90, "pitch": -12 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "melting", "hideHud": true },
+    { "op": "wait", "seconds": 12 },
+    { "op": "screenshot", "name": "bronze", "hideHud": true },
+    { "op": "teleport", "pos": [161.5, 14.6, 283.0], "yaw": -128, "pitch": -8 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "lit_oblique", "hideHud": true }
+  ]
+}

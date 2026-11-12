@@ -1,6 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
+using VoxelEngine.Config;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Interaction;
+using VoxelEngine.Particles;
 using VoxelEngine.Player;
+using VoxelEngine.Player.Posing;
 
 namespace VoxelEngine.ItemDebugger;
 
@@ -9,7 +15,7 @@ namespace VoxelEngine.ItemDebugger;
 /// <see cref="PlayerModel"/> is showing and the synthetic inputs that drive it, so every pose the game
 /// can put the player in can be looked at without a world. The modes are data (<see cref="AllModes"/>):
 /// <b>continuous</b> poses (idle, walk, run, sneak, a jump loop, swimming) feed the model the speed and
-/// state the game would, and <b>one-shots</b> (punch, slice, throw, hurt, equip, landing, death) fire
+/// state the game would, and <b>one-shots</b> (punch, slice, the sword's cut, back cut and chop, throw, a staff cast, hurt, equip, landing, death) fire
 /// the model's own trigger, wait for it to finish, rest <see cref="RestBetweenPlays"/> and fire again,
 /// so a swing can be watched repeatedly. Nothing here is a second implementation of an animation: it only
 /// calls <see cref="PlayerModel.Update"/> and the triggers the world calls, with the same inputs.
@@ -26,12 +32,19 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public const string Swim = "swim";
     public const string SwimIdle = "swim idle";
     public const string Surface = "surface";
+    public const string Fly = "fly";
     public const string Punch = "punch";
     public const string HeavyPunch = "heavy punch";
     public const string Slice = "slice";
     public const string SliceBack = "slice back";
+    public const string Cut = "cut";
+    public const string BackCut = "back cut";
+    public const string Chop = "chop";
+    public const string Axe = "axe";
     public const string Throw = "throw";
     public const string Use = "use";
+    public const string Bow = "bow";
+    public const string Cast = "cast";
     public const string Hurt = "hurt";
     public const string Equip = "equip";
     public const string Death = "death";
@@ -39,8 +52,8 @@ public sealed class PlayerPreviewState : IPreviewDriver
     /// <summary>Every mode, in the order the debugger lists them.</summary>
     public static readonly IReadOnlyList<string> AllModes =
     [
-        Idle, Walk, Run, Sneak, Jump, SprintJump, Land, Swim, SwimIdle, Surface,
-        Punch, HeavyPunch, Slice, SliceBack, Throw, Use, Hurt, Equip, Death,
+        Idle, Walk, Run, Sneak, Jump, SprintJump, Land, Swim, SwimIdle, Surface, Fly,
+        Punch, HeavyPunch, Slice, SliceBack, Cut, BackCut, Chop, Axe, Throw, Use, Bow, Cast, Hurt, Equip, Death,
     ];
 
     /// <summary>Seconds a one-shot rests between the end of one play and the next.</summary>
@@ -53,6 +66,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
         SwimIdle => "FLOAT",
         HeavyPunch => "HEAVY",
         SliceBack => "BACK",
+        BackCut => "B-CUT",
         _ => mode.ToUpperInvariant(),
     };
 
@@ -65,12 +79,15 @@ public sealed class PlayerPreviewState : IPreviewDriver
     private const float Gravity = 34f;
     private const float LandingFallSpeed = 15f;
     private const float SwimSpeedAhead = 4f;
+    private const float FlyCycleSeconds = 4f;
     // How long the throw charge takes to build, how long it is held cocked, how long death holds the body down.
     private const float ThrowChargeSeconds = 0.8f;
     private const float ThrowHoldSeconds = 0.35f;
     // How long the timed-use pose takes to rise and how long it is held before letting go
     private const float UseChargeSeconds = 1.0f;
     private const float UseHoldSeconds = 0.3f;
+    // A bow holds its full draw longer, to be looked at, before the release
+    private const float BowHoldSeconds = 0.8f;
     private const float DeathHoldSeconds = 0.7f;
     private const float DeathFallSeconds = 0.9f;
 
@@ -100,8 +117,20 @@ public sealed class PlayerPreviewState : IPreviewDriver
     /// holds; the <see cref="AnimationClock"/> turns it off and owns the replay.</summary>
     public bool Replay { get; set; } = true;
 
+    /// <summary>
+    /// The slice trail the previewed blade leaves. It is fed once per <see cref="Update"/> step on the
+    /// preview's own clock (<see cref="Elapsed"/>), never per rendered frame, so an
+    /// <see cref="AnimationClock.Seek"/> (restart, then step) rebuilds exactly the trail playing produced;
+    /// a paused or finished clock holds the trail as it stands. <see cref="Restart"/> and
+    /// <see cref="SetMode"/> clear it.
+    /// </summary>
+    public SliceTrail Trail { get; } = new();
+
+    /// <summary>Poses the previewed blade for <see cref="Trail"/>; null (the default) feeds no trail.</summary>
+    public SliceTrailSampler? TrailSampler { get; set; }
+
     /// <summary>True for the poses with no start or end (idle, walk, run, sneak, swim): a clock wraps them.</summary>
-    public bool IsContinuous => Mode is Idle or Walk or Run or Sneak or Swim or SwimIdle or Surface;
+    public bool IsContinuous => Mode is Idle or Walk or Run or Sneak or Swim or SwimIdle or Surface or Fly;
 
     /// <summary>Seconds one play of the active mode lasts (a cycle for a continuous pose).</summary>
     public float Duration => Mode switch
@@ -109,14 +138,22 @@ public sealed class PlayerPreviewState : IPreviewDriver
         Walk or Run or Sneak or Idle or SwimIdle => 2f,
         // About two slow sculls of the surface float
         Surface => 3f,
+        // One slow ramp from hovering up to the full-speed trail and back
+        Fly => FlyCycleSeconds,
         Swim => PlayerPhysics.SwimStrokeSeconds * 2f,
         Jump or SprintJump => 2f * JumpSpeed / Gravity + 0.9f,
         Land => 0.25f + 0.9f,
         Punch => PlayerModel.MineDuration + 0.1f,
         HeavyPunch => PlayerModel.MineDuration / 0.7f + 0.1f,
         Slice or SliceBack => PlayerModel.SliceDuration + 0.1f,
+        Cut => PlayerModel.SwordDuration(SwordSwing.Cut) + 0.1f,
+        BackCut => PlayerModel.SwordDuration(SwordSwing.BackCut) + 0.1f,
+        Chop => PlayerModel.SwordDuration(SwordSwing.Chop) + 0.1f,
+        Axe => PlayerModel.SwordDuration(SwordSwing.AxeChop) + 0.1f,
         Throw => ThrowChargeSeconds + ThrowHoldSeconds + PlayerModel.ThrowDuration + 0.1f,
         Use => UseChargeSeconds + UseHoldSeconds + 0.4f,
+        Bow => UseChargeSeconds + BowHoldSeconds + BowPose.ReleaseSeconds + 0.5f,
+        Cast => PlayerModel.CastDuration + 0.1f,
         Hurt => 1f,
         Equip => 1.2f,
         Death => DeathFallSeconds + DeathHoldSeconds,
@@ -140,7 +177,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public float Elapsed => _clock;
 
     /// <summary>True for the modes that replay a swing or reaction (everything after the swim poses).</summary>
-    public bool IsOneShot => Mode is Punch or HeavyPunch or Slice or SliceBack or Throw or Hurt or Equip or Death or Land;
+    public bool IsOneShot => Mode is Punch or HeavyPunch or Slice or SliceBack or Cut or BackCut or Chop or Axe or Throw or Cast or Hurt or Equip or Death or Land;
 
     /// <summary>Switches to <paramref name="mode"/> (any case); false when there is no such mode.</summary>
     public bool SetMode(string mode)
@@ -171,6 +208,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
         _model.CancelThrowCharge();
         _model.CancelUseCharge();
         _model.DeathFall = 0f;
+        Trail.Clear();
     }
 
     /// <summary>Advances the model by <paramref name="deltaTime"/> seconds in the active mode.</summary>
@@ -207,6 +245,9 @@ public sealed class PlayerPreviewState : IPreviewDriver
                 // At rest at the top of deep water (WaterPhase.Float), exactly as the world feeds it
                 _model.Update(deltaTime, 0f, grounded: true, swimming: true, floating: true);
                 break;
+            case Fly:
+                Flying(deltaTime);
+                break;
             case Land:
                 Landing(deltaTime);
                 break;
@@ -214,6 +255,11 @@ public sealed class PlayerPreviewState : IPreviewDriver
             case HeavyPunch:
             case Slice:
             case SliceBack:
+            case Cut:
+            case BackCut:
+            case Chop:
+            case Axe:
+            case Cast:
             case Hurt:
             case Equip:
                 OneShot(deltaTime);
@@ -222,7 +268,10 @@ public sealed class PlayerPreviewState : IPreviewDriver
                 Throwing(deltaTime);
                 break;
             case Use:
-                Using(deltaTime);
+                Using(deltaTime, UsePose.Raise, UseHoldSeconds);
+                break;
+            case Bow:
+                Using(deltaTime, UsePose.Bow, BowHoldSeconds);
                 break;
             case Death:
                 Dying(deltaTime);
@@ -231,6 +280,18 @@ public sealed class PlayerPreviewState : IPreviewDriver
                 _model.Update(deltaTime, 0f);
                 break;
         }
+
+        SampleTrail();
+    }
+
+    // Feeds the trail the blade as this step posed it; a mode that swings no blade only lets it fade.
+    private void SampleTrail()
+    {
+        if (TrailSampler is null) return;
+        var blade = Matrix4x4.Identity;
+        var owner = Matrix4x4.Identity;
+        var swinging = SliceTrail.IsBladeSwing(_model) && TrailSampler(_model, out blade, out owner);
+        Trail.Update(_clock, swinging, SliceTrail.SwingProgress(_model), _model.IsHitStopped, blade, owner);
     }
 
     // A jump loop: stand for a beat, launch, and let the model's own landing detection do the rest.
@@ -289,6 +350,14 @@ public sealed class PlayerPreviewState : IPreviewDriver
 
     // Swimming: a stroke starts as soon as the last one is over, exactly as holding forward would in
     // the game (idle: the arms rest in front and only the floating bob shows).
+    // Creative flight as the world feeds it: no walk speed, the whole speed as the flight speed, ramping
+    // from a hover to the speed the legs are fully trailed at and back so one cycle shows the whole range
+    private void Flying(float dt)
+    {
+        var ramp = 0.5f * (1f - MathF.Cos(_clock / FlyCycleSeconds * MathF.Tau));
+        _model.Update(dt, 0f, grounded: true, flying: true, flightSpeed: PlayerConfig.FlightFullSpeed * ramp);
+    }
+
     private void Swimming(float dt, float speed)
     {
         if (speed > 0f && _model.SwimStrokeProgress >= 1f)
@@ -322,6 +391,8 @@ public sealed class PlayerPreviewState : IPreviewDriver
     {
         Punch or HeavyPunch => _model.MineT < 1f,
         Slice or SliceBack => _model.IsSlicing,
+        Cut or BackCut or Chop or Axe => _model.IsSwordSwinging,
+        Cast => _model.IsCasting,
         Hurt => MathF.Abs(_model.Flinch) > 0.02f,
         Equip => MathF.Abs(_model.EquipLowering) > 0.02f,
         _ => false,
@@ -335,6 +406,11 @@ public sealed class PlayerPreviewState : IPreviewDriver
             case HeavyPunch: _model.Punch(1f); break;
             case Slice: _model.StartSlice(1); break;
             case SliceBack: _model.StartSlice(-1); break;
+            case Cut: _model.StartSword(SwordSwing.Cut); break;
+            case BackCut: _model.StartSword(SwordSwing.BackCut); break;
+            case Chop: _model.StartSword(SwordSwing.Chop); break;
+            case Axe: _model.StartAxeChop(PlayerModel.SwordDuration(SwordSwing.AxeChop)); break;
+            case Cast: _model.Cast(); break;
             case Hurt: _model.Hurt(1f); break;
             case Equip: _model.NotifyEquip(); break;
         }
@@ -367,14 +443,14 @@ public sealed class PlayerPreviewState : IPreviewDriver
     }
 
     // A timed use: raise the held item over the use time, hold the pose a beat, let it down.
-    private void Using(float dt)
+    private void Using(float dt, UsePose pose, float holdSeconds)
     {
         _model.Update(dt, 0f);
         if (!_useCharging)
         {
             _rest -= dt;
             if (_rest > 0f) return;
-            _model.StartUseCharge();
+            _model.StartUseCharge(pose);
             _useCharging = true;
             _useTimer = 0f;
             return;
@@ -386,7 +462,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
             _model.UpdateUseCharge(MathUtils.Clamp01(_useTimer / UseChargeSeconds));
             return;
         }
-        if (_useTimer <= UseChargeSeconds + UseHoldSeconds)
+        if (_useTimer <= UseChargeSeconds + holdSeconds)
         {
             _model.UpdateUseCharge(1f);
             return;

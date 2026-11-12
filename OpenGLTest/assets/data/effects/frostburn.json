@@ -1,0 +1,13 @@
+{
+  "name": "Frostburn",
+  "durationSeconds": 8,
+  "tickSeconds": 2,
+  "damageShare": 0.02,
+  "moveFactor": 0.5,
+  "attackFactor": 0.6,
+  "blocks": { "freeze": true },
+  "tint": [120, 180, 255],
+  "particle": "steam",
+  "icon": "assets/textures/ui/effect_frostburn.png",
+  "deathMessage": "froze to death"
+}

@@ -1,0 +1,18 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "chance": 0.6,
+      "entries": [
+        { "item": "item/cloud_shard", "weight": 1, "count": 1 }
+      ]
+    },
+    {
+      "rolls": 1,
+      "chance": 0.04,
+      "entries": [
+        { "item": "item/feather_charm", "weight": 1, "count": 1 }
+      ]
+    }
+  ]
+}

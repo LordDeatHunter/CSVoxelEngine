@@ -79,7 +79,7 @@ internal static class BodyCollision
 
     /// <summary>
     /// Whether the body box at <paramref name="eyePosition"/> overlaps a solid or collidesByHitbox
-    /// cell. Player body only: drops, slimes and falling blocks still see the full cell. The rule
+    /// cell, or the solid part of a sink block below its soft layer (<see cref="SinkLayer"/>). Player body only: drops, slimes and falling blocks still see the full cell. The rule
     /// has no simulation state, so the server can judge a connected player's body
     /// (<see cref="PlayerBodyProbe"/>) by the very rule the client's own physics moves it under.
     /// An unloaded cell reads as air. <paramref name="solids"/> adds the non-block solids (the
@@ -103,6 +103,14 @@ internal static class BodyCollision
             // A pass-through block (leaves) never blocks the body; it only scales the walk
             // while the body overlaps it (see BlockMoveFactor).
             if (BlockType.MovementSpeedOf(blockId) > 0f) continue;
+            // A sink block (a cloud) collides only below its soft top layer, which the body sinks
+            // into (SinkLayer)
+            var sink = BlockType.SinkOf(blockId);
+            if (sink > 0f)
+            {
+                if (min.Y < y + SinkLayer.SolidHeight(sink) && max.Y > y) return true;
+                continue;
+            }
             // Tree wood collides with its drawn node-and-tubes shape and a collidesByHitbox
             // block (a mold slab) with its declared hitboxes, so the body slips past thin limbs,
             // under high branches and onto a low slab; every other solid block keeps the

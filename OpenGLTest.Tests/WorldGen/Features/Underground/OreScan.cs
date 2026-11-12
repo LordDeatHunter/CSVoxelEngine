@@ -28,7 +28,7 @@ internal static class OreScan
     /// (called with the buffer and the chunk's world origin).
     /// </summary>
     public static HashSet<(int x, int y, int z)> StampedCells(
-        Action<byte[], int, int, int> stamp, byte host, byte ore) =>
+        Action<ushort[], int, int, int> stamp, ushort host, ushort ore) =>
         StampedCells(stamp, host, block => block == ore);
 
     /// <summary>
@@ -37,10 +37,10 @@ internal static class OreScan
     /// <paramref name="stamp"/>.
     /// </summary>
     public static HashSet<(int x, int y, int z)> StampedCells(
-        Action<byte[], int, int, int> stamp, byte host, Func<byte, bool> became)
+        Action<ushort[], int, int, int> stamp, ushort host, Func<ushort, bool> became)
     {
         var cells = new HashSet<(int x, int y, int z)>();
-        var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
+        var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         for (var cx = 0; cx < ChunksX; cx++)
         for (var cy = 0; cy < ChunksY; cy++)
         for (var cz = 0; cz < ChunksZ; cz++)
@@ -55,8 +55,8 @@ internal static class OreScan
         return cells;
     }
 
-    private static void CollectChunk(HashSet<(int x, int y, int z)> cells, byte[] blocks,
-        int x0, int y0, int z0, Func<byte, bool> became)
+    private static void CollectChunk(HashSet<(int x, int y, int z)> cells, ushort[] blocks,
+        int x0, int y0, int z0, Func<ushort, bool> became)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var y = 0; y < Chunk.Size; y++)

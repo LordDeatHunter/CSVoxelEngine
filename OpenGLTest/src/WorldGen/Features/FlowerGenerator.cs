@@ -5,15 +5,17 @@ using VoxelEngine.Content;
 namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
-/// Meadow flowers in clumps: one X-shaped cross block sitting on the surface, placed through
+/// Meadow flowers: one X-shaped cross block sitting on the surface. A meadow is a clump placed through
 /// <see cref="PlantClumps"/> over <see cref="Clumps"/> and gated at the clump's center by
-/// <see cref="IsOpenMeadow"/> (open forest or steppe), so a meadow grows whole or not at all. A pure
-/// function of (x, z) and the seed, so chunks agree without shared state. Only dry grass columns
-/// qualify (no beaches, no sea floors), and the cell above the ground must be air over grass.
+/// <see cref="IsOpenMeadow"/> (open forest or steppe), so a meadow grows whole or not at all; inside it
+/// the flowers are spread out (<see cref="IsSpreadSpot"/>), never bunched. A pure function of (x, z) and
+/// the seed, so chunks agree without shared state. Only dry grass columns qualify (no beaches, no sea
+/// floors), and the cell above the ground must be air over grass.
 /// </summary>
 public static class FlowerGenerator
 {
     private const int ClumpSalt = 0x7A3B1E;
+    private const int SpreadSalt = 0x5B4EAD;
 
     /// <summary>The clump shape every meadow flower is placed by.</summary>
     public static readonly PlantClumpSpec Clumps = new(
@@ -29,9 +31,9 @@ public static class FlowerGenerator
     private static readonly Func<int, int, bool> OpennessGate = IsOpenMeadow;
 
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
-    public static readonly byte FlowerBlock;
+    public static readonly ushort FlowerBlock;
 
-    private static readonly byte GrassBlock;
+    private static readonly ushort GrassBlock;
 
     static FlowerGenerator()
     {
@@ -51,16 +53,36 @@ public static class FlowerGenerator
 
     /// <summary>Whether the surface column (x, z) grows a flower, before the terrain checks.</summary>
     public static bool TryGetFlower(int x, int z) =>
-        // An oasis disc is a dense meadow whatever the clump rule says
-        OasisGenerator.IsDisc(x, z)
-        || PlantClumps.TryGetMember(Clumps, WorldGenerationConfig.Seed, x, z, OpennessGate, out _, out _);
+        // The spread hash runs first: it rejects most columns before any clump or oasis lookup
+        IsSpreadSpot(x, z)
+        // An oasis disc is a full meadow whatever the clump rule says
+        && (OasisGenerator.IsDisc(x, z)
+            || PlantClumps.TryGetMember(Clumps, WorldGenerationConfig.Seed, x, z, OpennessGate, out _, out _));
+
+    /// <summary>
+    /// Whether (x, z) is the one spot of its <see cref="WorldFeatureConfig.MeadowFlowerSpacing"/>-square
+    /// patch that may hold a flower: each patch rolls <see cref="WorldFeatureConfig.MeadowFlowerChance"/> and
+    /// a hashed spot off its last row and column, so two flowers never touch, not even diagonally.
+    /// </summary>
+    internal static bool IsSpreadSpot(int x, int z)
+    {
+        const int spacing = WorldFeatureConfig.MeadowFlowerSpacing;
+        var patchX = MathUtils.FloorDiv(x, spacing);
+        var patchZ = MathUtils.FloorDiv(z, spacing);
+        var h = SplitMix64.Hash(patchX, patchZ, WorldGenerationConfig.Seed ^ SpreadSalt);
+        if (SplitMix64.Unit(h, 0) >= WorldFeatureConfig.MeadowFlowerChance) return false;
+
+        const int span = spacing - 1;
+        return x - patchX * spacing == (int)(SplitMix64.Unit(h, 1) * span)
+               && z - patchZ * spacing == (int)(SplitMix64.Unit(h, 2) * span);
+    }
 
     /// <summary>
     /// Stamps flowers onto the surface: one block above the heightmap, into air only, and
     /// only over grass inside this chunk (a carve below leaves the cell empty instead of
     /// floating). Runs on a generation worker thread, after the pebbles.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

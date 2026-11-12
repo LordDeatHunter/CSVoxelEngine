@@ -475,7 +475,8 @@ src/**/build/
 *.gen.txt
 
 # Silk.NET Website Generation Output
-/docs/
+/docs/*
+!/docs/agents/
 src/Website/Silk.NET.Statiq/temp
 src/Website/Silk.NET.Statiq/cache
 
@@ -490,3 +491,22 @@ version.txt
 
 # Tests
 OpenGLTest/visual
+
+# Irrelevant
+reference
+
+# wiki (generated)
+wiki/node_modules/
+wiki/dist/
+wiki/.vitepress/cache/
+wiki/.vitepress/data/
+wiki/public/assets/
+wiki/game/blocks/
+wiki/game/items/
+wiki/game/mobs/
+
+wiki/credits.md
+wiki/public/data/
+wiki/.vitepress/dist/
+wiki/game/reference/
+wiki/game/trees/

@@ -11,7 +11,7 @@ public sealed class WaterRavineTests
 {
     public WaterRavineTests() => TestContent.EnsureLoaded();
 
-    private static byte Water() => ContentRegistry.RequireBlock("water").Id;
+    private static ushort Water() => ContentRegistry.RequireBlock("water").Id;
 
     [Fact]
     public void ARavineOnDryLandHoldsNoWater()
@@ -180,7 +180,7 @@ public sealed class WaterRavineTests
     /// of the right chunk, at the same Y and Z, which is where the water can only arrive through
     /// the wake-up path.
     /// </summary>
-    private static byte WakeAcrossBorder(int cx, int cz, int z, int worldY, bool targetCarved)
+    private static ushort WakeAcrossBorder(int cx, int cz, int z, int worldY, bool targetCarved)
     {
         var manager = new ChunkManager(null!);
         var left = new Vector3(cx, 0, cz);

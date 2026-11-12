@@ -18,7 +18,7 @@ public static class TallBlock
     /// cell above a lower half or below an upper one, and the block that belongs there. False for
     /// every block that is not a half.
     /// </summary>
-    public static bool TryGetPartner(byte id, Vector3 cell, out Vector3 partnerCell, out byte partnerId)
+    public static bool TryGetPartner(ushort id, Vector3 cell, out Vector3 partnerCell, out ushort partnerId)
     {
         switch (BlockType.ById[id])
         {
@@ -38,6 +38,6 @@ public static class TallBlock
     }
 
     /// <summary>The block a half drops and is picked as: the lower half, for either half.</summary>
-    public static byte LowerOf(byte id) =>
+    public static ushort LowerOf(ushort id) =>
         BlockType.ById[id] is { LowerHalfId: not 0 } upper ? upper.LowerHalfId : id;
 }

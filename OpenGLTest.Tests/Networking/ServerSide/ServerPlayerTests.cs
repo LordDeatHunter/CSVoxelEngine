@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Numerics;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
@@ -33,15 +35,34 @@ public sealed class ServerPlayerTests : IDisposable
         }
     }
 
-    private static byte Stone => ContentRegistry.RequireBlock("stone").Id;
+    private static ushort Stone => ContentRegistry.RequireBlock("stone").Id;
 
     [Fact]
-    public void APlayerComesBackWithItsInventoryAndPose()
+    public void ANewcomerGetsTheHintScrollAndAReturningPlayerDoesNot()
+    {
+        var newcomer = new ServerPlayer(1, "Alice", Vector3.Zero);
+        Assert.False(newcomer.Restore(null, allowCreative: false));
+        var scroll = Assert.IsType<LearnPartsItem>(newcomer.Inventory.HeldItem);
+        Assert.Equal(1, newcomer.Inventory.CountFor(scroll.Id));
+
+        // The scroll read: its parts are known and the scroll is gone, so the save holds neither scroll
+        newcomer.Inventory.LearnParts(scroll.Teaches);
+        newcomer.Inventory.ConsumeSelected();
+        var back = new ServerPlayer(2, "Alice", Vector3.Zero);
+        back.Restore(newcomer.Capture(), allowCreative: false);
+
+        Assert.Equal(0, back.Inventory.CountFor(scroll.Id));
+        Assert.All(scroll.Teaches, k => Assert.True(back.Inventory.KnowsPart(k)));
+    }
+
+    [Fact]
+    public void APlayerComesBackWithItsInventoryPoseAndDiscoveredWaystones()
     {
         var store = new ChunkSaveStore(_dir);
         var player = new ServerPlayer(1, "Alice", new Vector3(10.5f, 70f, -3.25f)) { Yaw = 30f, Pitch = -12f };
         player.Inventory.Add(Stone, 7);
         player.Inventory.Select(4);
+        player.Inventory.Waystones.Add(400, 11, -2, "Kafuziro");
         ServerPlayerSaves.Save(store, player);
         Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
 
@@ -56,11 +77,13 @@ public sealed class ServerPlayerTests : IDisposable
             Assert.Equal(player.Pitch, back.Pitch);
             Assert.Equal(player.Inventory.CountFor(Stone), back.Inventory.CountFor(Stone));
             Assert.Equal(player.Inventory.SelectedIndex, back.Inventory.SelectedIndex);
+            Assert.Equal(player.Inventory.Waystones.Entries, back.Inventory.Waystones.Entries);
 
             // Somebody else's name loads nothing of Alice's
             var stranger = new ServerPlayer(10, "Bob", Vector3.Zero);
             Assert.False(stranger.Restore(ServerPlayerSaves.Load(reopened, "Bob"), allowCreative: false));
             Assert.Equal(0, stranger.Inventory.CountFor(Stone));
+            Assert.Equal(0, stranger.Inventory.Waystones.Count);
         }
         finally
         {
@@ -118,10 +141,12 @@ public sealed class ServerPlayerTests : IDisposable
         };
         hurt.Status.TakeDamage(PlayerHealth.MaxHealth / 3);
         Assert.True(hurt.Health < PlayerHealth.MaxHealth);
+        Assert.True(hurt.Status.Mana.TrySpend(hurt.Status.Mana.Max / 3f, creative: false));
 
         var back = new ServerPlayer(2, "Alice", Vector3.Zero);
         back.Restore(PlayerSaveCodec.TryParse(PlayerSaveCodec.ToBytes(hurt.Capture())), allowCreative: false);
         Assert.Equal(hurt.Health, back.Health);
+        Assert.Equal(hurt.Status.Mana.Current, back.Status.Mana.Current);
         Assert.Equal(hurt.RespawnEye, back.RespawnEye);
 
         // A player who never had a respawn eye comes back without one, so it respawns at the spawn
@@ -149,18 +174,50 @@ public sealed class ServerPlayerTests : IDisposable
     public void AttacksLandNoFasterThanTheirPace()
     {
         var player = new ServerPlayer(1, "Alice", Vector3.Zero);
-        var punchGap = AttackPacing.MinGapSeconds(NetAttackKind.Punch, null);
+        var punchGap = AttackPacing.MinGapSeconds(NetAttackKind.Punch, NetAttackKind.Punch, null);
         Assert.True(player.TryAttack(NetAttackKind.Punch, null, 10.0, 0.0));
         // A second punch inside the held item's pace is refused, and the refusal records nothing
         Assert.False(player.TryAttack(NetAttackKind.Punch, null, 10.0 + punchGap * 0.5, 0.0));
         Assert.True(player.TryAttack(NetAttackKind.Punch, null, 10.0 + punchGap, 0.0));
 
         // A slice swing paces by the swing, which a buffered return swing cannot beat either
-        var sliceGap = AttackPacing.MinGapSeconds(NetAttackKind.Slice, null);
+        var sliceGap = AttackPacing.MinGapSeconds(NetAttackKind.Punch, NetAttackKind.Slice, null);
         var start = 20.0;
         Assert.True(player.TryAttack(NetAttackKind.Slice, null, start, 0.0));
         Assert.False(player.TryAttack(NetAttackKind.SliceReturn, null, start + sliceGap * 0.5, 0.0));
         Assert.True(player.TryAttack(NetAttackKind.SliceReturn, null, start + sliceGap, 0.0));
+    }
+
+    [Fact]
+    public void ASwordSwingWaitsForTheSwingBeforeItInTheChain()
+    {
+        var player = new ServerPlayer(1, "Alice", Vector3.Zero);
+        var cut = PlayerModel.SwordDuration(SwordSwing.Cut);
+        var backCut = PlayerModel.SwordDuration(SwordSwing.BackCut);
+        var chop = PlayerModel.SwordDuration(SwordSwing.Chop);
+        // The chain's swings differ in length, so each one is paced by the one before it, not by itself
+        Assert.NotEqual(cut, backCut);
+        Assert.NotEqual(backCut, chop);
+
+        var start = 30.0;
+        Assert.True(player.TryAttack(NetAttackKind.SwordCut, null, start, 0.0));
+        // The back cut cannot start before the cut has played out ...
+        Assert.False(player.TryAttack(NetAttackKind.SwordBackCut, null, start + cut * 0.9, 0.0));
+        Assert.True(player.TryAttack(NetAttackKind.SwordBackCut, null, start + cut, 0.0));
+        // ... nor the chop before the back cut, which is the quicker swing ...
+        var backCutAt = start + cut;
+        Assert.False(player.TryAttack(NetAttackKind.SwordChop, null, backCutAt + backCut * 0.9, 0.0));
+        Assert.True(player.TryAttack(NetAttackKind.SwordChop, null, backCutAt + backCut, 0.0));
+        // ... and a fresh cut waits out the whole slow chop.
+        var chopAt = backCutAt + backCut;
+        Assert.False(player.TryAttack(NetAttackKind.SwordCut, null, chopAt + backCut, 0.0));
+        Assert.True(player.TryAttack(NetAttackKind.SwordCut, null, chopAt + chop, 0.0));
+
+        // After some other attack (the item was switched), a sword swing waits for the shortest swing at least
+        var other = new ServerPlayer(2, "Bob", Vector3.Zero);
+        Assert.True(other.TryAttack(NetAttackKind.Punch, null, 40.0, 0.0));
+        Assert.False(other.TryAttack(NetAttackKind.SwordChop, null, 40.0 + PlayerModel.ShortestSwordSwingSeconds * 0.5, 0.0));
+        Assert.True(other.TryAttack(NetAttackKind.SwordChop, null, 40.0 + PlayerModel.ShortestSwordSwingSeconds, 0.0));
     }
 
     [Fact]

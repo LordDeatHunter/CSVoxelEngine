@@ -54,16 +54,19 @@ namespace VoxelEngine.Simulation;
 /// <see cref="LeafDecayManager.ScheduleBox"/>, so the hydration rule stays single-sourced.</para>
 ///
 /// <para><b>Remeshing.</b> Every mesh-affecting write marks its own chunk plus the face-adjacent
-/// chunk on each axis where it sits on a border through <see cref="ChunkManager.MarkDirty"/>, the
-/// <see cref="LeafDecayManager"/> idiom. <c>Chunk.RemeshAfterBatchEdit</c> is avoided: it dirties
+/// chunk on each axis where it sits on a border (and the edge-diagonal chunk of a Y-and-horizontal
+/// corner, which a beveled shell's cap reads) through <see cref="ChunkManager.MarkDirty"/>, the
+/// <see cref="LeafDecayManager"/> idiom, sharing <c>ChunkCellCache.AddTouchedChunks</c>. <c>Chunk.RemeshAfterBatchEdit</c> is avoided: it dirties
 /// the whole light radius around each touched chunk, and leaves and tree wood pass light, cast no
 /// ambient occlusion and occlude nothing, so no other cell's light changes.</para>
 ///
 /// <para><b>Hooks.</b> <see cref="FluidManager.ScheduleAround(int, int, int)"/> for every cell
 /// whose id changed; one <see cref="LeafDecayManager.ScheduleBox"/> over the written box; per
 /// deduplicated column with a mesh-affecting write, <see cref="TreeGenerator.PoisonCanopy"/> with
-/// radius 0 and <see cref="LodManager.MarkEditedColumn"/>. That far-LOD hook only removes the
-/// column's stale canopy bump; there is no path that adds the grown tree to the far LOD.</para>
+/// radius 0 and <see cref="LodManager.MarkEditedColumn"/>. The poison removes the column's stale
+/// canopy bump; the crown that now stands over it (the highest leaf cell the loaded column holds)
+/// goes straight back through <see cref="TreeGenerator.SetCanopyAdded"/>, so the far LOD draws a
+/// grown tree at once and a later mine, fell or decay (which poison again) takes it away.</para>
 ///
 /// <para><b>RNG.</b> Each call seeds its stream from <see cref="GrowSeed"/>: the tree's
 /// <see cref="TreeGrower.SeedFor"/> seed (root cell, world seed, species), the rebuilt graph's
@@ -120,7 +123,8 @@ public sealed class TreeGrowthWriter
         // would stand on should the column hold no tree
         var rootY = int.MinValue;
         var groundY = int.MinValue;
-        byte groundId = 0, groundState = 0;
+        ushort groundId = BlockType.Air;
+        byte groundState = 0;
         for (var y = top; y >= bottom; y--)
         {
             if (!chunks.TryGetCell(x, y, z, out var id, out var state))
@@ -164,7 +168,7 @@ public sealed class TreeGrowthWriter
     /// rules are worldgen placement rules and are not applied.
     /// </summary>
     private TreeGrowthResult Plant(ChunkManager chunks, TreeSpecies species, int x, int z, int groundY,
-        byte groundId, byte groundState, int yHint, int steps, int worldSeed, FluidManager? fluids,
+        ushort groundId, byte groundState, int yHint, int steps, int worldSeed, FluidManager? fluids,
         LeafDecayManager? leafDecay, LodManager? lod, Func<int, int, int, bool>? reserved)
     {
         if (groundY == int.MinValue || !IsSaplingGround(species, groundId, groundState))
@@ -185,7 +189,7 @@ public sealed class TreeGrowthWriter
 
     // A cell the ground scan stops at: anything but air, leaves, attached tree wood (a canopy or
     // another tree's branch over the column) and a cover a placement would take over
-    private static bool IsGroundCandidate(byte id, byte state) =>
+    private static bool IsGroundCandidate(ushort id, byte state) =>
         id != 0
         && !TreeGenerator.IsLeaf(id)
         && !(BlockType.IsTreeWood(id) && !WoodState.IsDetached(state))
@@ -196,7 +200,7 @@ public sealed class TreeGrowthWriter
     /// worldgen needs soil (<see cref="TreeWorldgenRules.MinSoil"/> above 0) the surface or soil
     /// block.
     /// </summary>
-    private static bool IsSaplingGround(TreeSpecies species, byte id, byte state)
+    private static bool IsSaplingGround(TreeSpecies species, ushort id, byte state)
     {
         if (!BlockType.IsSolidCell(id, state) || BlockType.IsFluid(id))
             return false;
@@ -381,25 +385,29 @@ public sealed class TreeGrowthWriter
             }
         }
 
-        FireHooks(chunks, log, fluids, leafDecay, lod);
+        FireHooks(chunks, log, fluids, leafDecay, lod, ry + TreeRasterizer.ReachOf(species).Up);
         return new TreeGrowthResult(status, rx, ry, rz, added, woodWritten, leavesPlaced, hydrationRaised);
     }
 
     // Air or a non-persistent leaf of the species: the cells a new node may take
-    private static bool IsOwnGrowable(TreeSpecies species, byte id, byte state) =>
+    private static bool IsOwnGrowable(TreeSpecies species, ushort id, byte state) =>
         id == 0 || (species.HasLeaves && id == species.LeavesId && !LeafState.IsPersistent(state));
 
     /// <summary>One raw cell write plus its bookkeeping.</summary>
-    private static void Write(ChunkManager chunks, int x, int y, int z, byte id, byte state, WriteLog log,
+    private static void Write(ChunkManager chunks, int x, int y, int z, ushort id, byte state, WriteLog log,
         bool idChanged, bool mesh)
     {
         chunks.ChunkAt(x, y, z)!.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, id, state);
         log.Record(x, y, z, idChanged, mesh);
     }
 
-    /// <summary>Runs every edit hook once for the call's writes.</summary>
+    /// <summary>
+    /// Runs every edit hook once for the call's writes. <paramref name="scanTop"/> is the highest
+    /// world Y a leaf of this tree can stand at, where the far-LOD crown scan of each written
+    /// column starts.
+    /// </summary>
     private static void FireHooks(ChunkManager chunks, WriteLog log, FluidManager? fluids,
-        LeafDecayManager? leafDecay, LodManager? lod)
+        LeafDecayManager? leafDecay, LodManager? lod, int scanTop)
     {
         if (!log.Any)
             return;
@@ -412,18 +420,44 @@ public sealed class TreeGrowthWriter
         // Decay prunes the leaves the old tips fed, and is the only pruner
         leafDecay?.ScheduleBox(log.Min, log.Max);
 
-        foreach (var (cx, cy, cz) in log.Chunks)
-            chunks.MarkDirty(new Vector3(cx, cy, cz));
+        foreach (var key in log.Chunks)
+            chunks.MarkDirty(ChunkKey.ToVector3(key));
 
+        // Each written column's old canopy bump is stale (poison), and the crown that now stands
+        // over it goes back to the far LOD (add), in that order: poisoning clears an added crown
         foreach (var (x, z) in log.Columns)
         {
             TreeGenerator.PoisonCanopy(x, z, 0);
+            if (TryFindCrownTop(chunks, x, z, scanTop, (int)log.Min.Y, out var crownTop, out var crownLeaf))
+                TreeGenerator.SetCanopyAdded(x, z, crownTop, crownLeaf);
             lod?.MarkEditedColumn(x, z);
         }
 
         // No FallingBlockManager.TryTopple and no LodSurface edit (NotifyLodEdit): growth only
         // fills air, leaves or cover and never removes or writes a surface solid, so nothing
         // above can lose its support and no column's surface height changes.
+    }
+
+    /// <summary>
+    /// The highest leaf cell of column (x, z) between <paramref name="scanTop"/> and
+    /// <paramref name="scanBottom"/>, read from the loaded world (an unloaded cell reads as no
+    /// leaf), and the leaf block standing there: the crown the far LOD should draw over the column.
+    /// </summary>
+    private static bool TryFindCrownTop(ChunkManager chunks, int x, int z, int scanTop, int scanBottom,
+        out int top, out ushort leaf)
+    {
+        for (var y = scanTop; y >= scanBottom; y--)
+        {
+            if (!chunks.TryGetCell(x, y, z, out var id, out _) || !TreeGenerator.IsLeaf(id))
+                continue;
+            top = y;
+            leaf = id;
+            return true;
+        }
+
+        top = 0;
+        leaf = BlockType.Air;
+        return false;
     }
 
     /// <summary>
@@ -437,7 +471,7 @@ public sealed class TreeGrowthWriter
         public Vector3 Max = new(float.MinValue);
         public bool Any;
         public readonly List<(int X, int Y, int Z)> IdChanged = [];
-        public readonly HashSet<(int X, int Y, int Z)> Chunks = [];
+        public readonly HashSet<long> Chunks = [];
         public readonly HashSet<(int X, int Z)> Columns = [];
 
         public void Record(int x, int y, int z, bool idChanged, bool mesh)
@@ -452,15 +486,7 @@ public sealed class TreeGrowthWriter
                 return;
 
             Columns.Add((x, z));
-            int cx = x >> Chunk.SizeShift, cy = y >> Chunk.SizeShift, cz = z >> Chunk.SizeShift;
-            Chunks.Add((cx, cy, cz));
-            int lx = x & Chunk.SizeMask, ly = y & Chunk.SizeMask, lz = z & Chunk.SizeMask;
-            if (lx == 0) Chunks.Add((cx - 1, cy, cz));
-            else if (lx == Chunk.SizeMask) Chunks.Add((cx + 1, cy, cz));
-            if (ly == 0) Chunks.Add((cx, cy - 1, cz));
-            else if (ly == Chunk.SizeMask) Chunks.Add((cx, cy + 1, cz));
-            if (lz == 0) Chunks.Add((cx, cy, cz - 1));
-            else if (lz == Chunk.SizeMask) Chunks.Add((cx, cy, cz + 1));
+            ChunkCellCache.AddTouchedChunks(x, y, z, Chunks);
         }
     }
 }

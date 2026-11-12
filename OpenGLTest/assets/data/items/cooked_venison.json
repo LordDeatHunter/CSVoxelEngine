@@ -1,0 +1,8 @@
+{
+  // Venison off the campfire: food that restores health like a bandage does, by its own amount (use.action
+  // "heal" with heals; HealItem), refused at full health and spent one per use.
+  "name": "Cooked Venison",
+  "texture": "assets/textures/items/cooked_venison.png",
+  "use": { "action": "heal", "seconds": 1.4 },
+  "heals": 30
+}

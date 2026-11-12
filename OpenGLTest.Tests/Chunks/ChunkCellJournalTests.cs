@@ -17,7 +17,7 @@ public sealed class ChunkCellJournalTests
     [Fact]
     public void RawWritesFireTheJournalInWorldCoordinates()
     {
-        var seen = new ConcurrentQueue<(int X, int Y, int Z, byte Id, byte State)>();
+        var seen = new ConcurrentQueue<(int X, int Y, int Z, ushort Id, byte State)>();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var chunk = new Chunk(null!, new Vector3(2f, 3f, 4f), generateBlockData: false);
 
@@ -34,6 +34,6 @@ public sealed class ChunkCellJournalTests
 
         // Chunk (2,3,4) starts at world (32,48,64).
         Assert.Contains((33, 50, 67, stone, (byte)4), seen);
-        Assert.Contains((33, 50, 67, (byte)0, (byte)0), seen);
+        Assert.Contains((33, 50, 67, BlockType.Air, (byte)0), seen);
     }
 }

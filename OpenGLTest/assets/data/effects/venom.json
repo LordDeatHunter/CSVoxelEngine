@@ -1,0 +1,11 @@
+{
+  // A spider's bite (Spider, CaveMobManager): a short poison that saps health and slows the legs. No HUD icon yet.
+  "name": "Venom",
+  "durationSeconds": 5,
+  "tickSeconds": 1.25,
+  "damageShare": 0.025,
+  "moveFactor": 0.85,
+  "tint": [150, 80, 190],
+  "particle": "smoke",
+  "deathMessage": "succumbed to venom"
+}

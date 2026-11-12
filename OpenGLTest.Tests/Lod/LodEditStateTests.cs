@@ -36,9 +36,14 @@ public sealed class LodEditStateTests
     private static int LocalIndex(int x, int z) =>
         ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
 
-    private static int[] Bucket(int fill) => Enumerable.Repeat(fill, BucketSize).ToArray();
+    private static T[] Bucket<T>(T fill) => Enumerable.Repeat(fill, BucketSize).ToArray();
 
-    private static LodEditState Roundtrip(LodEditState state, Func<byte, string?> nameOf, Func<string, byte?> idOf)
+    // A content-free name mapping, so the palette is exercised without the registry
+    private static string NameOf(ushort id) => "b" + id;
+
+    private static ushort? IdOf(string name) => ushort.Parse(name[1..]);
+
+    private static LodEditState Roundtrip(LodEditState state, Func<ushort, string?> nameOf, Func<string, ushort?> idOf)
     {
         using var stream = new MemoryStream();
         state.Write(stream, nameOf);
@@ -46,8 +51,15 @@ public sealed class LodEditStateTests
         return LodEditState.Read(stream, idOf);
     }
 
-    private static void AssertSameBuckets((int CX, int CZ, int[] Values)[] expected, LodEditState actual,
-        Func<LodEditState, System.Collections.Generic.IReadOnlyList<(int CX, int CZ, int[] Values)>> section)
+    // The same top wearing another block
+    private static long Retile(long packed, ushort block)
+    {
+        LodSurface.Unpack(packed, out var top, out _);
+        return LodSurface.Pack(top, block);
+    }
+
+    private static void AssertSameBuckets<T>((int CX, int CZ, T[] Values)[] expected, LodEditState actual,
+        Func<LodEditState, System.Collections.Generic.IReadOnlyList<(int CX, int CZ, T[] Values)>> section)
     {
         var got = section(actual);
         Assert.Equal(expected.Length, got.Count);
@@ -78,22 +90,21 @@ public sealed class LodEditStateTests
         ovrB[10] = LodSurface.Pack(65, 7);
         var overrides = new[] { (-8, -9, ovrA), (4, 4, ovrB) };
 
-        // A content-free name mapping, so the palette is exercised without the registry.
         var state = new LodEditState(caps, overrides, []);
-        var read = Roundtrip(state, id => "b" + id, name => byte.Parse(name[1..]));
+        var read = Roundtrip(state, NameOf, IdOf);
 
         AssertSameBuckets(caps, read, s => s.Caps);
         AssertSameBuckets(overrides, read, s => s.Overrides);
         Assert.Empty(read.Disturbed);
 
         var withDisturbed = new LodEditState([], [], [(-5, 7), (int.MaxValue, int.MinValue)]);
-        var readDisturbed = Roundtrip(withDisturbed, id => "b" + id, name => byte.Parse(name[1..]));
+        var readDisturbed = Roundtrip(withDisturbed, NameOf, IdOf);
         Assert.Equal(withDisturbed.Disturbed, readDisturbed.Disturbed);
 
         // Through the real registry names too, since that is what ToBytes / TryParse use.
         var real = new LodEditState(caps, [(4, 4, ovrB.Select(v => v == LodSurface.None
             ? v
-            : LodSurface.Pack(v >> 8, TerrainGenerator.RockBlock)).ToArray())], [(1, 2)]);
+            : Retile(v, TerrainGenerator.RockBlock)).ToArray())], [(1, 2)]);
         var parsed = LodEditState.TryParse(real.ToBytes());
         Assert.NotNull(parsed);
         AssertSameBuckets([.. real.Overrides], parsed, s => s.Overrides);
@@ -106,6 +117,65 @@ public sealed class LodEditStateTests
     }
 
     [Fact]
+    public void GrownCrownsRoundTripThroughBlockNames()
+    {
+        var crowns = Bucket(LodSurface.None);
+        crowns[4] = LodSurface.Pack(120, 9);
+        crowns[250] = LodSurface.Pack(-3, 11);
+        var state = new LodEditState([], [], [], [(6, -7, crowns)]);
+
+        var read = Roundtrip(state, NameOf, IdOf);
+        AssertSameBuckets([(6, -7, crowns)], read, s => s.CanopyAdded);
+
+        // A leaf block this run no longer knows reads back as air, which the canopy ignores
+        var unknown = Roundtrip(state, NameOf, name => name == "b9" ? null : IdOf(name));
+        LodSurface.Unpack(unknown.CanopyAdded.Single().Values[4], out var top, out var leaf);
+        Assert.Equal((120, BlockType.Air), (top, leaf));
+    }
+
+    [Fact]
+    public void OverridesAndCrownsRoundTripTheHighestIdThroughNames()
+    {
+        // Distinct ids counting down from the highest, spread over enough override buckets that
+        // the palette outgrows a byte whenever ids do, each on a top near an int extreme
+        var distinct = Math.Min((int)ushort.MaxValue, 3 * BucketSize);
+        var overrides = new System.Collections.Generic.List<(int CX, int CZ, long[] Values)>();
+        for (var n = 0; n < distinct; n++)
+        {
+            if (n % BucketSize == 0) overrides.Add((n / BucketSize, -1, Bucket(LodSurface.None)));
+            var top = n % 2 == 0 ? int.MaxValue - n : int.MinValue + n;
+            overrides[^1].Values[n % BucketSize] = LodSurface.Pack(top, (ushort)(ushort.MaxValue - n));
+        }
+
+        var crowns = Bucket(LodSurface.None);
+        crowns[0] = LodSurface.Pack(int.MaxValue, ushort.MaxValue);
+        crowns[BucketSize - 1] = LodSurface.Pack(int.MinValue, ushort.MaxValue);
+        var state = new LodEditState([], overrides, [], [(2, 3, crowns)]);
+
+        var read = Roundtrip(state, NameOf, IdOf);
+
+        AssertSameBuckets([.. overrides], read, s => s.Overrides);
+        AssertSameBuckets([(2, 3, crowns)], read, s => s.CanopyAdded);
+        LodSurface.Unpack(read.CanopyAdded.Single().Values[0], out var crownTop, out var crownLeaf);
+        Assert.Equal((int.MaxValue, ushort.MaxValue), (crownTop, crownLeaf));
+    }
+
+    [Fact]
+    public void AnOlderVersionFileIsRefused()
+    {
+        var state = new LodEditState([], [], [(3, 4)]);
+        var bytes = state.ToBytes();
+        Assert.NotNull(LodEditState.TryParse(bytes));   // control: the current version reads
+
+        // The version byte follows the 4-byte magic
+        Assert.Equal(LodEditState.Version, bytes[4]);
+        bytes[4] = LodEditState.Version - 1;
+
+        Assert.Throws<InvalidDataException>(() => LodEditState.Read(new MemoryStream(bytes)));
+        Assert.Null(LodEditState.TryParse(bytes));
+    }
+
+    [Fact]
     public void AnUnknownOverrideBlockKeepsItsHeightAndFallsBackToTheGeneratedTile()
     {
         var bucket = Bucket(LodSurface.None);
@@ -114,13 +184,13 @@ public sealed class LodEditStateTests
         var state = new LodEditState([], [(0, 0, bucket)], []);
 
         // Block 3 has no name when written and block 4's name is unknown when read.
-        var read = Roundtrip(state, id => id == 3 ? null : "b" + id, name => name == "b4" ? null : byte.Parse(name[1..]));
+        var read = Roundtrip(state, id => id == 3 ? null : NameOf(id), name => name == "b4" ? null : IdOf(name));
 
         var values = read.Overrides.Single().Values;
         LodSurface.Unpack(values[5], out var top5, out var block5);
         LodSurface.Unpack(values[6], out var top6, out var block6);
-        Assert.Equal((90, (byte)0), (top5, block5));
-        Assert.Equal((91, (byte)0), (top6, block6));
+        Assert.Equal((90, BlockType.Air), (top5, block5));
+        Assert.Equal((91, BlockType.Air), (top6, block6));
         Assert.All(values.Where((_, i) => i != 5 && i != 6), v => Assert.Equal(LodSurface.None, v));
     }
 
@@ -167,10 +237,13 @@ public sealed class LodEditStateTests
         var v2 = LodEditState.CombinedVersion;
         TreeGenerator.PoisonCanopy(x + 2, z, TreeGenerator.SingleEditPoisonRadius);
         var v3 = LodEditState.CombinedVersion;
+        TreeGenerator.SetCanopyAdded(x + 3, z, 90, TerrainGenerator.RockBlock);
+        var v4 = LodEditState.CombinedVersion;
 
         Assert.NotEqual(v0, v1);
         Assert.NotEqual(v1, v2);
         Assert.NotEqual(v2, v3);
+        Assert.NotEqual(v3, v4);
     }
 
     [Fact]
@@ -200,8 +273,8 @@ public sealed class LodEditStateTests
         CapBucket(x1 >> Chunk.SizeShift)[LocalIndex(x1, z)] = y + 10;
         CapBucket(x2 >> Chunk.SizeShift)[LocalIndex(x2, z)] = c;
 
-        var ovrs = new System.Collections.Generic.Dictionary<int, int[]>();
-        int[] OvrBucket(int cx) => ovrs.TryGetValue(cx, out var b) ? b : ovrs[cx] = Bucket(LodSurface.None);
+        var ovrs = new System.Collections.Generic.Dictionary<int, long[]>();
+        long[] OvrBucket(int cx) => ovrs.TryGetValue(cx, out var b) ? b : ovrs[cx] = Bucket(LodSurface.None);
         OvrBucket(x3 >> Chunk.SizeShift)[LocalIndex(x3, z)] = LodSurface.Pack(t + 20, importedBlock4);
         OvrBucket(x4 >> Chunk.SizeShift)[LocalIndex(x4, z)] = LodSurface.Pack(importedTop4, importedBlock4);
 

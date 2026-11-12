@@ -1,0 +1,8 @@
+{
+  // The iron ring: iron is never molten, so it is forged where copper, tin and bronze rings are cast.
+  // Forged with a smithing hammer from wrought iron stacked on an anvil (see AnvilManager).
+  "metal": "item/wrought_iron",
+  "metalCount": 2,
+  "result": "item/iron_ring",
+  "count": 1
+}

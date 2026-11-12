@@ -1,0 +1,7 @@
+{
+  // The Fungal Grove floor surface and the top of its dry pools. Tile from
+  // committed art.
+  "name": "Fungal Moss",
+  "model": { "parent": "block/cube_all", "textures": { "all": "fungal_moss" } },
+  "hardness": 4
+}

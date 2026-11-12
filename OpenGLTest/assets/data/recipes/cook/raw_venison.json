@@ -1,0 +1,7 @@
+{
+  // Venison roasted on a lit campfire.
+  "input": "item/raw_venison",
+  "result": "item/cooked_venison",
+  "count": 1,
+  "cookSeconds": 10
+}

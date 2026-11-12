@@ -14,7 +14,7 @@ public sealed class ContactDamageTests
 {
     public ContactDamageTests() => TestContent.EnsureLoaded();
 
-    private static ChunkManager Floor(byte topId)
+    private static ChunkManager Floor(ushort topId)
     {
         var manager = new ChunkManager(null!);
         var chunk = new Chunk(null!, Vector3.Zero, generateBlockData: false);

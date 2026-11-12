@@ -8,6 +8,8 @@ using VoxelEngine.Data;
 using VoxelEngine.Graphics;
 using VoxelEngine.Items;
 using VoxelEngine.UI;
+using VoxelEngine.UI.Widgets;
+using static VoxelEngine.UI.UiTheme;
 using VoxelEngine.UI.Menus;
 
 namespace VoxelEngine.Rendering.Overlays;
@@ -32,8 +34,8 @@ namespace VoxelEngine.Rendering.Overlays;
 /// their original points) and the shared draw primitives every page and the item debugger use.
 /// The pages are the components it builds and exposes as internal properties -
 /// <see cref="HudRenderer"/>, <see cref="TopStripRenderer"/>, <see cref="InventoryPanelRenderer"/>,
-/// <see cref="CraftCardRenderer"/>, <see cref="MenuRenderer"/>, <see cref="LoadingScreenRenderer"/>
-/// and <see cref="ChatRenderer"/> - each drawing through these primitives and reading the per-pass
+/// <see cref="CraftCardRenderer"/>, <see cref="SpellBuilderRenderer"/>, <see cref="WaystoneRenderer"/>, <see cref="MenuRenderer"/>,
+/// <see cref="LoadingScreenRenderer"/> and <see cref="ChatRenderer"/> - each drawing through these primitives and reading the per-pass
 /// state live. Render thread only.</para>
 /// </summary>
 public class UIRenderer : IDisposable
@@ -42,25 +44,9 @@ public class UIRenderer : IDisposable
     // kept generous since nothing here depends on depth precision.
     private const float DepthRange = 512f;
 
-    internal const float SlotBorder = 2f;
-
     // Hotbar count text, in pixels. Counts sit in the slot's bottom-right corner, sized
     // by digit cap-height so the size survives swapping the font file.
     private const string CountFontPath = "assets/fonts/kongtext.ttf";
-    internal const float CountCapHeight = 14f;
-    private static readonly Rgba CountShadow = new(0, 0, 0, 180);
-
-    // Title text cap height, and the translucent fill every HUD and menu panel shares
-    private const float HeadCapHeight = 22f;
-    internal static readonly Rgba PanelBackground = Rgba.Gray(0.03f, 0.72f);
-
-    // Inventory prettify palette: warm gold accents, green ready states, muted dims
-    internal static readonly Rgba AccentGold = new(232, 184, 72);
-    internal static readonly Rgba ReadyGreen = new(126, 217, 87);
-    internal static readonly Rgba DangerRed = new(230, 110, 110);
-    internal static readonly Rgba TextDim = Rgba.Gray(0.55f, 1f);
-    internal static readonly Rgba CardBackground = Rgba.Gray(0.07f, 0.85f);
-    internal static readonly Rgba ChipBackground = Rgba.Gray(0.12f, 0.9f);
 
     // Durability bar under a tool icon: fraction of the slot width, a few px tall.
     internal const float DurabilityHeight = 5f;
@@ -79,11 +65,6 @@ public class UIRenderer : IDisposable
     // and divided by this, so retuning the angles above never changes how much room they take.
     private static readonly float IconExtent = UnitCubeExtent(IconRotation);
 
-    internal static readonly Rgba SlotBackground = Rgba.Gray(0.08f, 0.55f);
-    internal static readonly Rgba SlotBorderColor = Rgba.Gray(0.65f, 0.45f);
-    internal static readonly Rgba SelectedBackground = Rgba.Gray(0.18f, 0.65f);
-    internal static readonly Rgba SelectedBorderColor = Rgba.White;
-
     private readonly GL _gl;
     private readonly Shader _shader;
     private readonly uint _atlasTexture;
@@ -92,11 +73,11 @@ public class UIRenderer : IDisposable
 
     // Flat sprite textures for the list rows; the hotbar and the preview draw the same ids
     // as extruded 3D meshes through DrawItemIcon instead
-    private readonly Dictionary<byte, uint> _itemIcons = new();
+    private readonly Dictionary<ushort, uint> _itemIcons = new();
     // One unit square per sheet frame, UV'd to that frame's array slice (see UvRect.Tile):
     // the icon texture of a spritesheet item holds one slice per frame, so picking a frame
     // is picking a mesh, and every frame mipmaps without bleeding into its neighbors.
-    private readonly Dictionary<byte, Mesh[]> _itemFrames = new();
+    private readonly Dictionary<ushort, Mesh[]> _itemFrames = new();
     private readonly int _locAlphaCutoff;
     private readonly int _locSrgbTex;
     // Whether the shared block atlas is SRGB8_ALPHA8 (the game) or linear (the ItemDebugger);
@@ -116,12 +97,10 @@ public class UIRenderer : IDisposable
     // every frame (PERF_TODO R8).
     private readonly UITextCache _textCache = new();
 
-    // Longest run DrawText draws. BitmapFont.Layout clamps its output to the scratch span it
-    // is handed, so this single constant bounds all three text buffers at once — the glyph
-    // scratch, the vertex scratch and the static index buffer — and a longer string is
-    // truncated by layout rather than overrunning any of them.
-    // Must agree with BitmapFont.MaxLayoutChars (layout stops there anyway), so it is defined from it.
-    private const int MaxTextGlyphs = BitmapFont.MaxLayoutChars;
+    // Longest run one text batch holds: the glyph scratch, the vertex scratch and the static index
+    // buffer are all sized from it (the 16-bit indices allow far more). It is a buffer bound far above
+    // any UI string (the longest field is 200 characters), not a layout limit; a longer run is cut here.
+    private const int MaxTextGlyphs = 2048;
 
     // Scratch for one DrawText call; reused so text layout allocates nothing per frame.
     // Safe to share: all UI drawing happens on the main thread.
@@ -148,6 +127,10 @@ public class UIRenderer : IDisposable
     // HUD toast and the hotbar item name lower it and restore 1 afterwards, and Begin resets it to 1.
     private float _textFade = 1f;
 
+    // The fade and slide of the panel being drawn (SetOverlay); Begin resets them to none.
+    private Vector2 _overlayOffset;
+    private int _locFade = -1;
+
     // Main-menu and loading-screen string caches, render thread only, so an idle menu allocates
     // nothing per frame: FitText allocates a Substring per trial length, and the seed
     // strings would otherwise be formatted every frame. Fitted strings are keyed by
@@ -156,18 +139,22 @@ public class UIRenderer : IDisposable
     private readonly Dictionary<(string Text, float Scale, float Width), string> _fittedTexts = new();
     private Vector2 _fitCacheScreen;
 
-    // The opaque backdrop behind every menu and loading frame: nothing is rendered behind those.
-    internal static readonly Rgba MenuBackdrop = Rgba.Gray(0.08f);
-
     // The pages, built in the constructor; each draws through this renderer's primitives and reads
     // its per-pass state through the accessors below ToCanvas.
     internal ChatRenderer Chat { get; }
     internal LoadingScreenRenderer LoadingScreen { get; }
     internal MenuRenderer Menu { get; }
     internal CraftCardRenderer CraftCard { get; }
+    internal EquipmentCardRenderer EquipmentCard { get; }
+    internal ChestCardRenderer ChestCard { get; }
     internal InventoryPanelRenderer Panel { get; }
+    internal SpellBuilderRenderer SpellBuilder { get; }
+    internal WaystoneRenderer Waystone { get; }
+    internal ForgeRenderer Forge { get; }
     internal TopStripRenderer TopStrip { get; }
     internal HudRenderer Hud { get; }
+    /// <summary>The rarity chrome over list rows and the hover tooltip.</summary>
+    internal RarityChromeRenderer Chrome { get; }
 
     /// <param name="gl">The GL context every UI resource is created on.</param>
     /// <param name="atlasTexture">The block atlas array texture the block icons sample.</param>
@@ -208,20 +195,24 @@ public class UIRenderer : IDisposable
             _itemFrames[id] = frames;
         }
         _locAlphaCutoff = _shader.GetUniformLocation("uAlphaCutoff");
+        _locFade = _shader.GetUniformLocation("uFade");
         _unitSquare = Primitives.CreateSquare(gl, 1f);
 
         try
         {
             _font = new BitmapFont(gl, CountFontPath);
-            _countScale = _font.ScaleForCapHeight(CountCapHeight);
-            _headScale = _font.ScaleForCapHeight(HeadCapHeight);
+            _countScale = _font.ScaleForCapHeight(TextSize.Body);
+            _headScale = _font.ScaleForCapHeight(TextSize.Head);
         }
         catch (Exception e) when (e is IOException or InvalidOperationException)
         {
             Log.WriteLine($"Warning: count font '{CountFontPath}' not loaded ({e.Message}); hotbar counts hidden.");
         }
 
+        Chrome = new RarityChromeRenderer(this);
         CraftCard = new CraftCardRenderer(gl, this);
+        EquipmentCard = new EquipmentCardRenderer(this);
+        ChestCard = new ChestCardRenderer(gl, this);
 
         // Text batch buffers: a dynamic VBO refilled per run (DrawTextBatch) and a static EBO
         // whose indices never change — quad q always draws vertices [4q, 4q+4) — exactly the
@@ -249,6 +240,9 @@ public class UIRenderer : IDisposable
         LoadingScreen = new LoadingScreenRenderer(this);
         Menu = new MenuRenderer(gl, this);
         Panel = new InventoryPanelRenderer(gl, this);
+        SpellBuilder = new SpellBuilderRenderer(this);
+        Waystone = new WaystoneRenderer(gl, this);
+        Forge = new ForgeRenderer(this);
         TopStrip = new TopStripRenderer(gl, this);
     }
 
@@ -276,6 +270,7 @@ public class UIRenderer : IDisposable
             _fitCacheScreen = _screenSize;
         }
         _textFade = 1f;
+        _overlayOffset = Vector2.Zero;
         _projection = Matrix4x4.CreateOrthographicOffCenter(
             0f, _screenSize.X, _screenSize.Y, 0f, -DepthRange, DepthRange);
 
@@ -288,7 +283,27 @@ public class UIRenderer : IDisposable
 
         _shader.Use();
         _shader.SetUniform("uProjection", _projection);
+        _shader.SetUniform(_locFade, 1f);
     }
+
+    /// <summary>
+    /// Draws everything until <see cref="ClearOverlay"/> shifted by <paramref name="offset"/> canvas
+    /// units and with its alpha multiplied by <paramref name="alpha"/> (a panel's open and close
+    /// easing). Scissor rects must add <see cref="OverlayOffset"/> themselves.
+    /// </summary>
+    internal void SetOverlay(Vector2 offset, float alpha)
+    {
+        _overlayOffset = offset;
+        _shader.Use();
+        _shader.SetUniform("uProjection", Matrix4x4.CreateTranslation(offset.X, offset.Y, 0f) * _projection);
+        _shader.SetUniform(_locFade, alpha);
+    }
+
+    /// <summary>Ends <see cref="SetOverlay"/>: no shift, full alpha.</summary>
+    internal void ClearOverlay() => SetOverlay(Vector2.Zero, 1f);
+
+    /// <summary>Canvas shift of the overlay being drawn, zero outside one.</summary>
+    internal Vector2 OverlayOffset => _overlayOffset;
 
     public void End()
     {
@@ -307,6 +322,13 @@ public class UIRenderer : IDisposable
     /// <summary>Window pixels -> the canvas every layout constant is measured in; valid after the
     /// first <see cref="Begin(Vector2D{int}, Vector2D{int}, float)"/>.</summary>
     public Vector2 ToCanvas(Vector2 windowPoint) => UiCanvas.WindowToCanvas(windowPoint, _scale);
+
+    /// <summary>The pointer in canvas units, set once per frame before the UI pass (null with no pointer); what
+    /// <see cref="IsHovered"/> tests, so every button lights up the same way.</summary>
+    internal Vector2? Pointer { get; set; }
+
+    /// <summary>Whether the pointer is over the box of this center and size.</summary>
+    internal bool IsHovered(Vector2 center, Vector2 size) => Pointer is { } p && new UiRect(center, size).Contains(p);
 
     // The per-pass state and shared resources the page renderers draw with. They read it live,
     // never as copies: Begin rewrites the canvas and the text fade every pass.
@@ -343,6 +365,18 @@ public class UIRenderer : IDisposable
         DrawMesh(_unitSquare, RectTransform(center, size), tint, texture);
 
     /// <summary>An outline drawn as four rectangles just inside the given bounds.</summary>
+    /// <summary>
+    /// The frame every panel and card shares (<see cref="PanelFrameLayout"/>): the fill, a border just inside
+    /// the outer rectangle and the thin gold accent bar under its top edge.
+    /// </summary>
+    internal void DrawPanelFrame(UiRect outer, Rgba fill)
+    {
+        var frame = PanelFrameLayout.Standard(outer);
+        DrawRect(outer.Center, outer.Size, fill);
+        DrawBorder(outer.Center, outer.Size, frame.BorderWidth, SlotBorderColor);
+        DrawRect(frame.AccentBar.Center, frame.AccentBar.Size, AccentGold);
+    }
+
     public void DrawBorder(Vector2 center, Vector2 size, float thickness, Rgba color)
     {
         var half = size * 0.5f;
@@ -353,7 +387,7 @@ public class UIRenderer : IDisposable
         DrawRect(center with { Y = center.Y - half.Y + inset }, horizontal, color);
         DrawRect(center with { Y = center.Y + half.Y - inset }, horizontal, color);
         DrawRect(center with { X = center.X - half.X + inset }, vertical, color);
-        DrawRect(center with { X = center.X + half.X + inset }, vertical, color);
+        DrawRect(center with { X = center.X + half.X - inset }, vertical, color);
     }
 
     internal void DrawDurabilityBar(Vector2 center, float width, float fraction)
@@ -379,6 +413,16 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>
+    /// Clears the depth buffer again, so the next 3D icon draws over every icon already drawn this pass: icons never
+    /// overlap except one riding the pointer (a dragged row). Never while a scissor is on, like the first clear.
+    /// </summary>
+    internal void ClearDepthForOverlay()
+    {
+        _gl.Clear(ClearBufferMask.DepthBufferBit);
+        _depthCleared = true;
+    }
+
+    /// <summary>
     /// A block drawn as a rotated 3D cube. Air (id 0) and unknown ids draw nothing.
     /// </summary>
     /// <param name="center">Center of the icon, in canvas pixels.</param>
@@ -387,7 +431,7 @@ public class UIRenderer : IDisposable
     /// Width and height of the box the icon fits in, in pixels — not the cube's edge length,
     /// which is derived from the viewing angle.
     /// </param>
-    public void DrawBlockIcon(Vector2 center, float size, byte blockId)
+    public void DrawBlockIcon(Vector2 center, float size, ushort blockId)
     {
         var mesh = _blockCubes.Get(blockId);
         if (mesh == null) return;
@@ -421,7 +465,7 @@ public class UIRenderer : IDisposable
     /// <summary>
     /// Screen-space text with its top-left corner at <paramref name="topLeft"/> (pixels, Y
     /// down). A one-pixel dark shadow is drawn under each glyph so the text reads over
-    /// bright icons. Strings longer than 64 characters are truncated.
+    /// bright icons.
     ///
     /// Every glyph of the run — shadow copies and face copies alike — is written into one
     /// dynamic vertex buffer and drawn with a single <c>GL.DrawElements</c> call
@@ -430,17 +474,73 @@ public class UIRenderer : IDisposable
     /// order, so a glyph's face still draws over every shadow, exactly as separate draw
     /// calls in that order would.
     /// </summary>
-    public void DrawText(string text, Vector2 topLeft, float scale, Rgba color)
+    public void DrawText(string text, Vector2 topLeft, float scale, Rgba color) =>
+        DrawText(text.AsSpan(), topLeft, scale, color);
+
+    /// <summary>The same text draw over a slice of a string, so a run of a line (a chat link) draws without a
+    /// substring.</summary>
+    public void DrawText(ReadOnlySpan<char> text, Vector2 topLeft, float scale, Rgba color)
+    {
+        if (_font == null || text.IsEmpty)
+            return;
+        DrawGlyphs(_font.Layout(text, topLeft, scale, _glyphScratch), color);
+    }
+
+    /// <summary>
+    /// One-line text starting at <paramref name="left"/> with the digit cap box centered on
+    /// <paramref name="centerY"/>: the shared vertical-centering rule for labels in a box, independent
+    /// of the glyphs in the string (see <see cref="BitmapFont.LayoutCentered"/>).
+    /// </summary>
+    public void DrawTextCenteredY(string text, float left, float centerY, float scale, Rgba color)
     {
         if (_font == null || string.IsNullOrEmpty(text))
             return;
-        var instances = _glyphScratch.AsSpan();
-        var n = _font.Layout(text.AsSpan(), topLeft, scale, instances);
+        DrawGlyphs(_font.LayoutCentered(text.AsSpan(), left, centerY, scale, _glyphScratch), color);
+    }
+
+    /// <summary>
+    /// One-line text centered vertically on <paramref name="centerY"/> from <paramref name="left"/>, clipped to
+    /// <paramref name="clip"/>. A text that fits its clip draws as <see cref="DrawTextCenteredY"/>; a wider one
+    /// scrolls back and forth inside the clip (see <see cref="TextMarquee"/>) so no part of it is ever cut off.
+    /// </summary>
+    public void DrawTextMarqueeY(string text, UiRect clip, float left, float centerY, float scale, Rgba color,
+        float time)
+    {
+        if (_font == null || string.IsNullOrEmpty(text))
+            return;
+        var width = MeasureTextWidth(text, scale);
+        if (width <= clip.Size.X)
+        {
+            DrawTextCenteredY(text, left, centerY, scale, color);
+            return;
+        }
+
+        // The pass's one full-screen depth clear must happen before the scissor goes on (a clear honors it)
+        EnsureDepthCleared();
+        var shift = TextMarquee.Offset(width, clip.Size.X, time);
+        var (sx, sy, sw, sh) = UiCanvas.ScissorRect(new Vector2(clip.Left, clip.Top) + _overlayOffset, clip.Size,
+            _scale, _windowSize, _framebufferSize);
+        _gl.Enable(EnableCap.ScissorTest);
+        _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
+        try
+        {
+            DrawTextCenteredY(text, left - shift, centerY, scale, color);
+        }
+        finally
+        {
+            _gl.Disable(EnableCap.ScissorTest);
+        }
+    }
+
+    // Writes the laid-out glyphs in _glyphScratch as shadow quads then face quads and draws them.
+    private void DrawGlyphs(int n, Rgba color)
+    {
         if (n == 0)
             return;
+        var instances = _glyphScratch.AsSpan();
 
         // _textFade is 1 outside the fading draws, so ordinary text keeps its exact colors.
-        var shadow = _textFade >= 1f ? CountShadow : Faded(CountShadow, _textFade);
+        var shadow = _textFade >= 1f ? TextShadow : Faded(TextShadow, _textFade);
         var face = _textFade >= 1f ? color : Faded(color, _textFade);
         for (var i = 0; i < n; i++)
             WriteGlyphQuad(_textVerts.AsSpan(i * 4, 4), instances[i],
@@ -555,38 +655,87 @@ public class UIRenderer : IDisposable
     /// box's length cap.
     /// </summary>
     public void DrawInputField(Vector2 center, Vector2 size, TextFieldState field, bool focused,
-        string placeholder, float time, bool showTail = false)
+        string placeholder, float time)
     {
-        const float pad = 12f;
+        var box = new TextBoxLayout(new UiRect(center, size));
         DrawRect(center, size, SlotBackground);
-        DrawBorder(center, size, SlotBorder, focused ? SelectedBorderColor : SlotBorderColor);
+        DrawBorder(center, size, Border.Standard, focused ? SelectedBorderColor : SlotBorderColor);
 
-        var textLeft = center.X - size.X * 0.5f + pad;
-        var textTop = center.Y - 9f;
-        // A field whose cap exceeds what fits (the chat line) shows the tail being typed, so the
-        // caret and the newest characters never leave the box; the short fields show it all.
-        var shown = showTail ? TailThatFits(field.Text, _countScale, size.X - pad * 2f - 6f) : field.Text;
         if (field.IsEmpty)
-            DrawText(placeholder, new Vector2(textLeft, textTop), _countScale, TextDim);
-        else
-            DrawText(shown, new Vector2(textLeft, textTop), _countScale, Rgba.White);
+        {
+            DrawTextCenteredY(placeholder, box.TextLeft, box.CenterY, _countScale, TextDim);
+            if (focused && ((int)(time * 2f)) % 2 == 0)
+            {
+                var emptyCaret = box.Caret(0f);
+                DrawRect(emptyCaret.Center, emptyCaret.Size, Rgba.White);
+            }
+            return;
+        }
+
+        // A field wider than its box scrolls to keep the caret in view; the visible slice is
+        // what fits after the view start.
+        var text = field.Text;
+        var start = KeepCaretVisible(field, box.TextBudget);
+        var end = text.Length;
+        while (end > start + 1 && TextWidth(text[start..end], _countScale) > box.TextBudget) end--;
+        var shown = text[start..end];
+
+        if (focused && field.HasSelection)
+        {
+            var from = Math.Clamp(field.SelectionStart, start, end);
+            var to = Math.Clamp(field.SelectionEnd, start, end);
+            if (to > from)
+            {
+                var x0 = box.TextLeft + TextWidth(text[start..from], _countScale);
+                var x1 = box.TextLeft + TextWidth(text[start..to], _countScale);
+                DrawRect(new Vector2((x0 + x1) * 0.5f, box.CenterY), new Vector2(x1 - x0, TextBoxLayout.CaretHeight),
+                    Faded(SelectedBorderColor, 0.55f));
+            }
+        }
+        DrawTextCenteredY(shown, box.TextLeft, box.CenterY, _countScale, Rgba.White);
 
         if (focused && ((int)(time * 2f)) % 2 == 0)
         {
-            var caretX = textLeft + (field.IsEmpty ? 0f : TextWidth(shown, _countScale)) + 3f;
-            DrawRect(new Vector2(caretX, center.Y), new Vector2(2f, 22f), Rgba.White);
+            var caretEnd = Math.Clamp(field.Caret, start, end);
+            var caret = box.Caret(TextWidth(text[start..caretEnd], _countScale));
+            DrawRect(caret.Center, caret.Size, Rgba.White);
         }
     }
 
-    /// <summary>The longest suffix of <paramref name="text"/> that fits <paramref name="maxWidth"/>
-    /// and one text run (<see cref="BitmapFont.MaxLayoutChars"/>).</summary>
-    private string TailThatFits(string text, float scale, float maxWidth)
+    /// <summary>
+    /// Moves <see cref="TextFieldState.ViewStart"/> the least that keeps the caret inside
+    /// <paramref name="budget"/> and shows as much text as fits after a delete; returns it.
+    /// </summary>
+    private int KeepCaretVisible(TextFieldState field, float budget)
     {
-        if (_font == null || string.IsNullOrEmpty(text)) return text;
-        var start = Math.Max(0, text.Length - BitmapFont.MaxLayoutChars);
-        while (start < text.Length - 1 && _font.MeasureSize(text.AsSpan(start), scale).X > maxWidth)
-            start++;
-        return start == 0 ? text : text[start..];
+        var text = field.Text;
+        var start = Math.Clamp(field.ViewStart, 0, field.Caret);
+        while (start < field.Caret && TextWidth(text[start..field.Caret], _countScale) > budget) start++;
+        while (start > 0 && TextWidth(text[(start - 1)..], _countScale) <= budget) start--;
+        field.ViewStart = start;
+        return start;
+    }
+
+    /// <summary>
+    /// The character boundary of <paramref name="field"/> nearest to the canvas x
+    /// <paramref name="canvasX"/> when drawn in the box at <paramref name="center"/>/<paramref name="size"/>
+    /// (the mouse's caret placement).
+    /// </summary>
+    public int CaretIndexAt(Vector2 center, Vector2 size, TextFieldState field, float canvasX)
+    {
+        var local = canvasX - new TextBoxLayout(new UiRect(center, size)).TextLeft;
+        var text = field.Text;
+        var start = Math.Clamp(field.ViewStart, 0, text.Length);
+        var best = start;
+        var bestDistance = float.MaxValue;
+        for (var i = start; i <= text.Length; i++)
+        {
+            var distance = MathF.Abs(TextWidth(text[start..i], _countScale) - local);
+            if (distance >= bestDistance) break;
+            best = i;
+            bestDistance = distance;
+        }
+        return best;
     }
 
     // A color with its alpha multiplied by factor (clamped to 0..1).
@@ -603,7 +752,7 @@ public class UIRenderer : IDisposable
         return fitted;
     }
 
-    internal void DrawIdIcon(Vector2 center, float size, byte id, float headingDegrees, float timeSeconds)
+    internal void DrawIdIcon(Vector2 center, float size, ushort id, float headingDegrees, float timeSeconds)
     {
         if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
             DrawItemSprite(center, new Vector2(size), id, icon, headingDegrees, timeSeconds);
@@ -616,7 +765,7 @@ public class UIRenderer : IDisposable
     /// texture for a plain one. Falls back to the whole texture when the frame meshes are
     /// missing, so an icon never vanishes over a cache mismatch.
     /// </summary>
-    internal void DrawItemSprite(Vector2 center, Vector2 size, byte id, uint texture,
+    internal void DrawItemSprite(Vector2 center, Vector2 size, ushort id, uint texture,
         float headingDegrees, float timeSeconds)
     {
         if (_itemFrames.TryGetValue(id, out var frames)
@@ -635,7 +784,7 @@ public class UIRenderer : IDisposable
     /// inventory rows show; the item debugger uses it for its grid so icons read as sprites.
     /// Air, blocks and unknown ids draw nothing.
     /// </summary>
-    public void DrawItemSprite(Vector2 center, float pixels, byte itemId, float headingDegrees,
+    public void DrawItemSprite(Vector2 center, float pixels, ushort itemId, float headingDegrees,
         float timeSeconds)
     {
         if (!ItemRegistry.IsItem(itemId) || !_itemIcons.TryGetValue(itemId, out var texture)) return;
@@ -646,7 +795,7 @@ public class UIRenderer : IDisposable
     /// A pure item as its extruded world-drop sprite, yawed like the block icons. Only the
     /// preview uses this; rows and hotbar draw the flat sprite.
     /// </summary>
-    public void DrawItemIcon(Vector2 center, float size, byte itemId, float yaw)
+    public void DrawItemIcon(Vector2 center, float size, ushort itemId, float yaw)
     {
         if (!_itemMeshes.TryGet(itemId, out var mesh, out var texture)) return;
 
@@ -670,7 +819,7 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>A block cube yawed by <paramref name="yaw"/> instead of the fixed icon angle.</summary>
-    public void DrawBlockIconSpinning(Vector2 center, float size, byte blockId, float yaw)
+    public void DrawBlockIconSpinning(Vector2 center, float size, ushort blockId, float yaw)
     {
         var mesh = _blockCubes.Get(blockId);
         if (mesh == null) return;
@@ -710,36 +859,29 @@ public class UIRenderer : IDisposable
             ? 0f
             : _font.MeasureSize(text.AsSpan(), scale).X;
 
-    // Truncates text with "..." to fit maxWidth at scale. ASCII dots because the font
-    // only covers printable ASCII (U+2026 would vanish).
-    internal string FitText(string text, float scale, float maxWidth)
-    {
-        if (_font == null || string.IsNullOrEmpty(text)) return text;
-        if (maxWidth <= 0f) return "";
-        if (_font.MeasureSize(text.AsSpan(), scale).X <= maxWidth) return text;
-        const string dots = "...";
-        for (var len = text.Length - 1; len > 0; len--)
-        {
-            var sub = text.Substring(0, len) + dots;
-            if (_font.MeasureSize(sub.AsSpan(), scale).X <= maxWidth) return sub;
-        }
-        return dots;
-    }
-
-    private float FitScale(string text, float scale, float maxWidth)
-    {
-        if (_font == null || string.IsNullOrEmpty(text) || maxWidth <= 0f) return scale;
-        var w = _font.MeasureSize(text.AsSpan(), scale).X;
-        if (w <= maxWidth || w <= 0f) return scale;
-        return Math.Max(scale * 0.7f, scale * maxWidth / w);
-    }
+    // Cuts text with an ellipsis to fit maxWidth at scale (no shrinking: see TextFit.SingleLine).
+    internal string FitText(string text, float scale, float maxWidth) =>
+        _font == null ? text : TextFit.SingleLine(text, scale, maxWidth, Measure, minScaleShare: 1f).Text;
 
     internal void DrawTextCenteredFitted(string text, float centerX, float topY, float scale,
         Rgba color, float maxWidth)
     {
         if (_font == null || string.IsNullOrEmpty(text)) return;
-        var s = FitScale(text, scale, maxWidth);
-        DrawTextCentered(FitText(text, s, maxWidth), centerX, topY, s, color);
+        var fitted = TextFit.SingleLine(text, scale, maxWidth, Measure);
+        DrawTextCentered(fitted.Text, centerX, topY, fitted.Scale, color);
+    }
+
+    // The measure TextFit runs against: the baked font at a given draw scale.
+    private float MeasureAt(ReadOnlySpan<char> text, float scale) => _font!.MeasureSize(text, scale).X;
+    private TextFit.ScaledMeasure? _measure;
+    private TextFit.ScaledMeasure Measure => _measure ??= MeasureAt;
+
+    /// <summary>One-line text centered on <paramref name="center"/> both ways (the cap box vertically,
+    /// see <see cref="DrawTextCenteredY"/>).</summary>
+    internal void DrawTextMiddle(string text, Vector2 center, float scale, Rgba color)
+    {
+        if (_font == null || string.IsNullOrEmpty(text)) return;
+        DrawTextCenteredY(text, center.X - _font.MeasureSize(text.AsSpan(), scale).X * 0.5f, center.Y, scale, color);
     }
 
     /// <summary>

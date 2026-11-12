@@ -1,0 +1,6 @@
+{
+  // A crow's flight feather: fletching that makes more arrows than a bone does
+  // (recipes/flint_arrow_from_crow_feather.json). The sprite is placeholder art.
+  "name": "Crow Feather",
+  "texture": "assets/textures/items/crow_feather.png"
+}

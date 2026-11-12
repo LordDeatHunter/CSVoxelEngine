@@ -8,7 +8,7 @@ public sealed class ItemHierarchyTests
 {
     public ItemHierarchyTests() => TestContent.EnsureLoaded();
 
-    private static byte ItemId(string name) => ContentRegistry.RequireItem(name).Id;
+    private static ushort ItemId(string name) => ContentRegistry.RequireItem(name).Id;
 
     [Fact]
     public void FactoryMapsActionsToBehaviorFamilies()

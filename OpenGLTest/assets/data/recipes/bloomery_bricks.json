@@ -1,0 +1,8 @@
+{
+  "result": "block/bloomery_bricks",
+  "count": 2,
+  "ingredients": [
+    { "item": "block/mud_bricks", "count": 1 },
+    { "item": "block/cobblestone", "count": 2 }
+  ]
+}
