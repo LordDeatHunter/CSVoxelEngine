@@ -122,7 +122,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       SkyMobManager.cs         # the sky mobs: the galeraptor's strike at its dive impact, the golem's shockwave at its
                                #   slam impact, the sky-band ring spawn on island tops (tier-scaled packs, big-zone golems)
       SandwormGround.cs        # what the worm reads of the ground: the surface height, sand or not, desert or not
-      SandwormManager.cs       # the sandworm boss: one at a time, summoned (the thumper), hunts, bites, loot, retreat; client mirrors
+      SandwormManager.cs       # the sandworm boss: one at a time, summoned (by a dragonfly wing), hunts, bites, loot, retreat; client mirrors
       SlimeManager.cs          # slimes: hop AI tick, contact damage, loot, ring spawning (surface, and caves but the magma deep)
       Caves/                   # cave spawning by cave biome, namespace VoxelEngine.Simulation.Caves (see "Cave mobs")
         CaveSpawnSearch.cs     # the cave spawn search's parameters: ring radii, tries, heights, light limits, allowed biomes

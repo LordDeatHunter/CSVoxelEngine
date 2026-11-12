@@ -3,12 +3,11 @@
 Writes, under OpenGLTest/assets:
   models/entity/sandworm.bbmodel + sandworm.png   the desert boss (plans/SANDWORM.md)
   textures/items/sandworm_fang.png                 the fang it drops
-  textures/items/thumper.png                       the item that wakes it (use.action "summon")
 
 The rig, UV, PNG, JSON and clip machinery is the hell mobs' generator's (tools/generate-hell-mob-models.py),
 loaded from that file, so every generated project is written the same way: no randomness and no image
 library, so re-running reproduces every file byte for byte. Run from the repo root:
-    python -I tools/generate-sandworm-model.py           (writes the four files)
+    python -I tools/generate-sandworm-model.py           (writes the three files)
     python -I tools/generate-sandworm-model.py --check   (exit 1 if any file differs)
 
 This is NOT a humanoid rig. The worm is a chain of rigid segments (SandwormChain), and the renderer draws the
@@ -203,43 +202,6 @@ def fang_texel(x, y):
     return color + (255,)
 
 
-# ---- the thumper sprite --------------------------------------------------------------------------
-
-THUMPER_SIZE = 32
-THUMPER_OUTLINE = (58, 38, 26)
-THUMPER_WOOD, THUMPER_WOOD_DARK = (150, 106, 62), (110, 76, 44)
-THUMPER_COPPER, THUMPER_COPPER_DARK, THUMPER_COPPER_LIGHT = (200, 120, 70), (150, 84, 48), (238, 170, 110)
-# A stake driven by a heavy copper head, at half resolution ('#' outline, 'w' wood, 'd' dark wood, 'c' copper,
-# 'k' dark copper, 'l' bright copper); each character covers 2x2 texels of the 32x32 sprite.
-THUMPER = [
-    "                ",
-    "    ########    ",
-    "   #lllcccck#   ",
-    "   #lcccccckk#  ",
-    "   #cccccckkk#  ",
-    "   #ccccckkkk#  ",
-    "    ########    ",
-    "       #wd#     ",
-    "       #wd#     ",
-    "       #wd#     ",
-    "       #wd#     ",
-    "       #wd#     ",
-    "       #wd#     ",
-    "        #w#     ",
-    "         ##     ",
-    "                ",
-]
-
-
-def thumper_texel(x, y):
-    c = THUMPER[y // 2][x // 2]
-    if c == " ":
-        return (0, 0, 0, 0)
-    color = {"#": THUMPER_OUTLINE, "w": THUMPER_WOOD, "d": THUMPER_WOOD_DARK, "c": THUMPER_COPPER,
-             "k": THUMPER_COPPER_DARK, "l": THUMPER_COPPER_LIGHT}[c]
-    return color + (255,)
-
-
 # ---- outputs -------------------------------------------------------------------------------------
 
 def outputs():
@@ -248,7 +210,6 @@ def outputs():
         (os.path.join(hell.ENTITY_DIR, "sandworm.bbmodel"), text.encode("utf-8"), True),
         (os.path.join(hell.ENTITY_DIR, "sandworm.png"), hell.skin(SANDWORM), False),
         (os.path.join(hell.ITEM_DIR, "sandworm_fang.png"), hell.png_bytes(FANG_SIZE, fang_texel), False),
-        (os.path.join(hell.ITEM_DIR, "thumper.png"), hell.png_bytes(THUMPER_SIZE, thumper_texel), False),
     ]
 
 

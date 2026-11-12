@@ -7,15 +7,15 @@ using Xunit;
 namespace VoxelEngine.Tests.Items;
 
 /// <summary>
-/// The thumper (<see cref="ItemUseAction.Summon"/> / <see cref="SummonItem"/>): using it on a cell the world
+/// The summon item (<see cref="ItemUseAction.Summon"/> / <see cref="SummonItem"/>), here the dragonfly wing: using it on a cell the world
 /// accepts wakes the boss it names and spends one unit; a cell the world refuses, or aiming at nothing, spends
-/// nothing; creative spends none; the content ties the item to a real entity and a way to craft it.
+/// nothing; creative spends none; the content ties the item to a real entity.
 /// </summary>
 public sealed class SummonItemTests
 {
     public SummonItemTests() => TestContent.EnsureLoaded();
 
-    private static Item Thumper => ContentRegistry.RequireItem("thumper");
+    private static Item Wing => ContentRegistry.RequireItem("dragonfly_wing");
 
     private static StubItemUseWorld AimedAt(int x, int y, int z) => new()
     {
@@ -25,12 +25,12 @@ public sealed class SummonItemTests
     };
 
     [Fact]
-    public void ThumpingAnAcceptedCellWakesTheBossAndSpendsOneUnit()
+    public void UsingAnAcceptedCellWakesTheBossAndSpendsOneUnit()
     {
         var world = AimedAt(4, 5, 6);
         world.Summonable.Add((4, 5, 6));
 
-        var result = Thumper.OnUse(new ItemUseContext(world, 4f, 0), null);
+        var result = Wing.OnUse(new ItemUseContext(world, 4f, 0), null);
 
         Assert.True(result.Applied);
         Assert.Equal(1, world.Consumed);
@@ -42,7 +42,7 @@ public sealed class SummonItemTests
     {
         var world = AimedAt(4, 5, 6);
 
-        var result = Thumper.OnUse(new ItemUseContext(world, 4f, 0), null);
+        var result = Wing.OnUse(new ItemUseContext(world, 4f, 0), null);
 
         Assert.False(result.Applied);
         Assert.Equal(0, world.Consumed);
@@ -53,7 +53,7 @@ public sealed class SummonItemTests
     {
         var world = new StubItemUseWorld { RaycastHits = false };
 
-        Assert.False(Thumper.OnUse(new ItemUseContext(world, 4f, 0), null).Applied);
+        Assert.False(Wing.OnUse(new ItemUseContext(world, 4f, 0), null).Applied);
         Assert.Empty(world.SummonCalls);
         Assert.Equal(0, world.Consumed);
     }
@@ -65,16 +65,15 @@ public sealed class SummonItemTests
         world.Summonable.Add((1, 2, 3));
         world.IsCreative = true;
 
-        Assert.True(Thumper.OnUse(new ItemUseContext(world, 4f, 0), null).Applied);
+        Assert.True(Wing.OnUse(new ItemUseContext(world, 4f, 0), null).Applied);
         Assert.Equal(0, world.Consumed);
     }
 
     [Fact]
-    public void TheThumperNamesARealEntityAndCanBeCrafted()
+    public void TheWingNamesARealEntity()
     {
-        var item = (SummonItem)Thumper;
+        var item = (SummonItem)Wing;
         Assert.Equal(ItemUseAction.Summon, item.UseAction);
         Assert.NotNull(EntityRegistry.TryGet(item.UseEntityName!));
-        Assert.NotNull(ContentRegistry.RecipeByName("thumper"));
     }
 }

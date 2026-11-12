@@ -5,7 +5,7 @@
 ## Status
 
 All phases shipped: the model, content and chain/brain (`SandwormChain`, `SandwormBrain`), the mob, manager and
-segment-aware hit testing, the thumper summon item, rendering and the sand/boom/earthquake effects, the client mirror,
+segment-aware hit testing, the dragonfly-wing summon item, rendering and the sand/boom/earthquake effects, the client mirror,
 protocol 23 and saves, and the scenario. How it works lives in AGENTS.md "Sandworm"; this file keeps only the
 decisions and what is left for later.
 Last updated 2026-11-07.
@@ -35,7 +35,7 @@ Decisions made while planning:
   particles and a boom sell it.
 - **Chain of 14 rigid segments, one health pool.** Head hits full damage, body hits `BodyDamageShare` of it; a segment
   is hittable when a quarter of it is above the sand.
-- **Summoned, never spawned.** The thumper on desert sand, one worm at a time, no altar or worldgen.
+- **Summoned, never spawned.** A dragonfly wing on desert sand, one worm at a time, no altar or worldgen.
 - **Server-authoritative from the start**, saved in `entities.json`, mirrored on clients.
 - **Chomp** about 30 damage plus an upward launch (the fall tracker bills the landing); creative, flying and dead players
   are immune like any mob's target.

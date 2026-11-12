@@ -91,7 +91,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       PlantTreeItem.cs         # plants a sapling of the item's Item.UseTreeName species
                                #   on the aimed ground (an acorn on dirt or grass)
       StarterKit.cs            # the hint scroll a new survival player (and a server newcomer) starts with
-      SummonItem.cs            # the thumper: wakes the boss use.entity names at the aimed cell (the sandworm), desert sand only
+      SummonItem.cs            # the summon item (a dragonfly wing for the sandworm): wakes the boss use.entity names at the aimed cell, desert sand only
       StaffBinding.cs          # GL-free staff slot rules: bind a recipe valid against the staff's tags, clear,
                                #   cycle (wrapping), select, resolve saved part keys
       StaffItem.cs             # a spell staff: slots, tier and allowed part tags; its spells ride its ItemStack

@@ -60,8 +60,6 @@ body wears.
 - [ ] **Bow** — `bow.png`. No shot yet; the two-handed draw pose (`UsePose.Bow`) already uses the
   held sprite.
 - [ ] **Smithing hammer** — `smithing_hammer.png`.
-- [ ] **Thumper** — `thumper.png`. Made by `tools/generate-sandworm-model.py`: re-running puts the
-  placeholder back (`--check` compares).
 - [ ] **Spear** — `spear.png`. `throwAligned`: the sprite's tip must sit on its (1, 1) diagonal
   (up-right), or the thrown copy does not fly point first.
 

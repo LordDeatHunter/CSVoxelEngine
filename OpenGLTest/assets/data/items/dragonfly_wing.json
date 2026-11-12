@@ -1,5 +1,8 @@
 {
-  // A giant dragonfly's wing; nothing consumes it yet. The sprite is placeholder art.
+  // A giant dragonfly's wing: right-clicked on desert sand it wakes the sandworm (use.action "summon";
+  // ItemUseAction.Summon, SummonItem). Refused, and not spent, anywhere but desert sand or while a worm is alive.
+  // The sprite is placeholder art.
   "name": "Dragonfly Wing",
-  "texture": "assets/textures/items/dragonfly_wing.png"
+  "texture": "assets/textures/items/dragonfly_wing.png",
+  "use": { "action": "summon", "entity": "sandworm" }
 }

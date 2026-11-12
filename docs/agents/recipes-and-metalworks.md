@@ -42,7 +42,7 @@ to the same ml) and no crafting recipe takes one (`MetalworksRecipeTests.NoCraft
 Metal reaches an item by being cast (iron, never molten, by being forged on the anvil instead): the heads (pickaxe, axe, sword), the ring (`copper_ring`, `tin_ring`, `bronze_ring`,
 200 ml each, one `mold_ring` for all three metals) and `copper_dagger` (`mold_dagger`, 200 ml). The ring doubles as the
 generic metal part for everything else made of copper, tin or bronze: the bronze armor (cap 5, tunic 8, pants 7, boots 4,
-gloves 4 rings), `bronze_chest` (8 rings and 4 planks), `clock` (4 copper rings and a mud brick), `lantern`, `thumper`,
+gloves 4 rings), `bronze_chest` (8 rings and 4 planks), `clock` (4 copper rings and a mud brick), `lantern`,
 `crystal_staff`, `alloy_bricks` (a copper and a tin ring) and the `focus_ring` / `reserve_charm` (2 rings and a vine).
 
 **Tin** (`tin_ore`, `TinGenerator`) is the second, weaker metal: commoner than malachite, in the

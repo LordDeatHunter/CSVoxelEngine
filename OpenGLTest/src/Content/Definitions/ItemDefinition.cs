@@ -348,7 +348,7 @@ public sealed class ItemDefinition
         public string? Tree { get; set; }
 
         /// <summary>
-        /// The entity a <c>summon</c> use wakes (the thumper wakes the sandworm): the entity file name under
+        /// The entity a <c>summon</c> use wakes (a dragonfly wing wakes the sandworm): the entity file name under
         /// <c>assets/data/entities/</c>, checked when the use runs.
         /// </summary>
         public string? Entity { get; set; }

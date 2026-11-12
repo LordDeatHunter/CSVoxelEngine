@@ -5,7 +5,7 @@ using VoxelEngine.UI.InventoryPanel;
 namespace VoxelEngine.Items;
 
 /// <summary>
-/// Wakes the boss named by <see cref="Item.UseEntityName"/> at the aimed cell (the thumper's sandworm),
+/// Wakes the boss named by <see cref="Item.UseEntityName"/> at the aimed cell (the dragonfly wing's sandworm),
 /// spending one unit from its own stack (creative uses it without spending it). Refused, and not spent, where
 /// the boss cannot be summoned (the aimed cell is not desert sand, or one is alive already). On a server the
 /// Use intent summons for the sending player; a client only predicts the same rule.
