@@ -63,7 +63,8 @@ public static class WildlifeConfig
     public const float DeerHeight = 1.5f;
     public const float DeerHalfExtent = 0.4f;
     public const float DeerWalkSpeed = 2.4f;
-    public const float DeerRunSpeed = 9.5f;
+    // 1.2x the player's sprint (PlayerPhysics.BaseSpeed 8 * SprintMultiplier 1.5 = 12)
+    public const float DeerRunSpeed = 14.4f;
     public const float DeerJumpSpeed = 9f;
     public const float DeerShoveSpeed = 3f;
     public const float DeerAlertRangeBlocks = 14f;
