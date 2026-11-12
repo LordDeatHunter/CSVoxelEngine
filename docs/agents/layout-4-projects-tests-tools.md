@@ -101,7 +101,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Crawlers/                  # the leg contract and solver, climbing a cliff, rounding a ledge, the knock off a wall,
                                #   footholds, the wire stance, the cave spawn share, the venom bite; the scorpion's
                                #   sting and pinch and its desert-only spawns
-    TowerMobs/                 # the skeleton's contract, tier scaling, bow band and line of sight, melee, undead, the ambient rattle's timer and range gate; the
+    TowerMobs/                 # the skeleton's contract, bow band and line of sight, melee, undead, the ambient rattle's timer and range gate; the
                                #   Skeleton King's contract, leash, shockwave and volley fan, its brain's phases and choices
     Sandworms/                 # the sandworm's chain, brain and pose, its melee through the real punch path
     Icebergs/                  # iceberg shape, motion, wobble, spawn band, contact, the berg (mirrors src/Entities/Icebergs)
@@ -149,7 +149,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Caves/                     # the cave spawn filter and rules, the cave mob manager (spawns by biome, tier, caps, attacks)
     Chests/                    # chests, tower chests, the underground ruin chests' cave biome tables (CaveChestTests) and
                                #   the lid: open while viewed, the wobble, the model's facing, no chunk quads (ChestLidTests)
-    Tower/                     # the skeleton manager: forced spawn and the hard cap, tier, no natural spawn, rake, arrows,
+    Tower/                     # the skeleton manager: forced spawn and the hard cap, no natural spawn, rake, arrows,
                                #   despawn reports; the floor locks (TowerRulesTests, SkeletonPileManagerTests,
                                #   TowerBlockWriterTests, TowerManagerTests, TowerManagerSaveTests: stations.json); the
                                #   altar and the king (TowerAltarTests, TowerAltarWorldTests, SkeletonKingManagerTests);

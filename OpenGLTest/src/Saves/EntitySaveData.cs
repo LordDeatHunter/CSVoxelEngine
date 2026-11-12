@@ -51,10 +51,8 @@ public sealed class EntitySaveData
         /// goblin. Absent, as in a file saved before goblins carried torches, restores none.</summary>
         public int? Torches { get; set; }
 
-        /// <summary>The tower floor tier (<see cref="Skeleton.Tier"/>) of a skeleton, or the tier a Skeleton King
-        /// summons its skeletons at (<see cref="SkeletonKingHome.SummonTier"/>, informational: a restored king takes it
-        /// from its tower). Absent restores tier 0. Saved explicitly because, unlike a hell mob's layer, it cannot be
-        /// read back from the position.</summary>
+        /// <summary>The depth tier of a cave mob, fixed where it spawned. Absent restores tier 0. Saved explicitly
+        /// because, unlike a hell mob's layer, it cannot be read back from the position.</summary>
         public int? Tier { get; set; }
 
         /// <summary>The placement cell (cellX, cellZ) of the tower whose floor lock this skeleton counts toward

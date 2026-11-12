@@ -490,7 +490,7 @@ OpenGLTest/
         Sporeling.cs           # the fungal caves' walker: the melee clip's impact event as a spore burst (InBurst)
         Magmaborn.cs           # the magma deep's brute: the melee clip's impact event, a burning blow
       TowerMobs/               # the battle tower's mobs (see "Skeleton" and "Battle tower"): the skeleton, the Skeleton
-                               #   King and the floor-tier difficulty
+                               #   King and the floor-tier pile waves and limits
         Skeleton.cs            # the undead archer or warrior (a RealmMob, Role by kind): melee stab or punch at its impact
                                #   event, the archer's bow shot at its release event inside its band with a clear line (it
                                #   backs away nearer), two attack clips over one count, its tier, outfit and wire look byte
@@ -507,8 +507,8 @@ OpenGLTest/
                                #   the attack choice by range, sight and cooldown with an injected roll, the phase-3 enrage
         SkeletonKingAttack.cs  # None / Slam / Volley / Summon
         BoneBurst.cs           # GL-free: the king's volley as a burst, its bones due one after another over a window
-        SkeletonKingHome.cs    # where a king is leashed: its tower (or none), the altar-top feet, the leash radius, the summon tier
-        TowerDifficulty.cs     # GL-free: the floor tier's multiplier (health, damage), clamp and pack size (a pile's wave)
+        SkeletonKingHome.cs    # where a king is leashed: its tower (or none), the altar-top feet, the leash radius
+        TowerDifficulty.cs     # GL-free: the floor tier's pile wave size (PackSize), the living-skeleton limit near a pile (PileNearLimit), clamp
         TowerFloorRef.cs       # the tower (by placement cell) and floor whose lock a bound skeleton counts toward
       Sandworms/               # the desert boss (see "Sandworm"): the mob, its chain, its brain and its pose
         Sandworm.cs            # the mob: the head is its position, the exposed segments by the sand surface, the segment hit tests and

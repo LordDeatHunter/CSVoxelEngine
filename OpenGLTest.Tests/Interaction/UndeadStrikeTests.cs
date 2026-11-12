@@ -36,7 +36,7 @@ public sealed class UndeadStrikeTests
     }
 
     private static Skeleton NewSkeleton() =>
-        new(EntityRegistry.Require(Skeleton.EntityName), new Vector3(8.5f, 2f, 8.5f), tier: 0, spawnIn: false);
+        new(EntityRegistry.Require(Skeleton.EntityName), new Vector3(8.5f, 2f, 8.5f), spawnIn: false);
 
     private static Hellbrute NewBrute() =>
         new(EntityRegistry.Require(Hellbrute.EntityName), new Vector3(8.5f, 2f, 8.5f), spawnIn: false);

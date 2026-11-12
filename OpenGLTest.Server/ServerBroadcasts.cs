@@ -100,13 +100,13 @@ internal sealed class ServerBroadcasts
                 Sandworm worm => (int)worm.Phase,
                 _ => 0,
             };
-            // The item field is a goblin's torch count, a skeleton's tier, role and outfit, a cave mob's tier (a crawler's
+            // The item field is a goblin's torch count, a skeleton's role and outfit, a cave mob's tier (a crawler's
             // with the face it clings to above it), a wild animal's posture or the Skeleton King's phase (0 for the
             // rest); every entry ends with a status-effect mask (NetEntity.Effects), a mob's own
             ushort itemField = mob switch
             {
                 Goblin goblin => (byte)goblin.Torches,
-                Skeleton skeleton => Skeleton.PackLook(skeleton.Tier, skeleton.Role, skeleton.Outfit),
+                Skeleton skeleton => Skeleton.PackLook(skeleton.Role, skeleton.Outfit),
                 SkeletonKing king => (byte)king.Phase,
                 CrawlerMob crawler => crawler.PackStance(),
                 CaveMob cave => (byte)cave.Tier,

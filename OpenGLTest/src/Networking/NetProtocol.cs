@@ -248,8 +248,11 @@ public static class NetFraming
     /// 41: the chest moves <see cref="Simulation.Chests.ChestMoveKind.LootAll"/> and
     /// <see cref="Simulation.Chests.ChestMoveKind.QuickStack"/>; an older server would refuse them as malformed.
     /// 42: the hotbar's own drags, the <see cref="NetInventoryAction.MoveSlot"/> and <see cref="NetInventoryAction.ClearSlot"/>
-    /// inventory actions; an older server would refuse them as malformed.</summary>
-    public const int ProtocolVersion = 42;
+    /// inventory actions; an older server would refuse them as malformed.
+    /// 43: a <see cref="NetEntityKind.Skeleton"/>'s item byte packs only its role and outfit (<see cref="Entities.TowerMobs.Skeleton.PackLook"/>),
+    /// since a skeleton no longer has a floor tier; an older client would read a warrior or an armored skeleton as a
+    /// different look.</summary>
+    public const int ProtocolVersion = 43;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

@@ -62,7 +62,6 @@ public sealed class SkeletonPileManagerTests
         Assert.All(skeletons.Mobs, s =>
         {
             Assert.Equal(floor.Ref, s.Floor);
-            Assert.Equal(Tier, s.Tier);
         });
         Assert.Equal(MobConfig.SkeletonPileWaves - 1, floor.Piles[0].WavesLeft);
     }
@@ -110,7 +109,7 @@ public sealed class SkeletonPileManagerTests
         var skeletons = new SkeletonManager(Type, caps);
         var floor = FloorWithPile(LoadedPile);
         while (caps.ForcedRoom > 0)
-            Assert.NotNull(skeletons.Spawn(new Vector3(2.5f, 2f, 2.5f), 0, spawnIn: false));
+            Assert.NotNull(skeletons.Spawn(new Vector3(2.5f, 2f, 2.5f), spawnIn: false));
 
         new SkeletonPileManager().Update(floor, Dt, chunks, skeletons, [PlayerAt(8.5f, 11.5f)]);
 
@@ -155,7 +154,7 @@ public sealed class SkeletonPileManagerTests
     private static void CrowdPile(SkeletonManager skeletons, int count)
     {
         for (var i = 0; i < count; i++)
-            Assert.NotNull(skeletons.Spawn(new Vector3(LoadedPile.X + 0.5f, 1.95f, LoadedPile.Z + 3.5f), 0));
+            Assert.NotNull(skeletons.Spawn(new Vector3(LoadedPile.X + 0.5f, 1.95f, LoadedPile.Z + 3.5f)));
     }
 
     [Fact]

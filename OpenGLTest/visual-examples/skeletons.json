@@ -19,7 +19,7 @@
     { "op": "wait", "seconds": 8 },
 
     { "op": "spawn", "entity": "skeleton", "pos": [-45.0, 11, 49.5] },
-    { "op": "spawn", "entity": "skeleton", "pos": [-41.0, 11, 49.5], "tier": 5 },
+    { "op": "spawn", "entity": "skeleton", "pos": [-41.0, 11, 49.5] },
     { "op": "wait", "seconds": 0.4 },
     { "op": "screenshot", "name": "idle", "hideHud": true },
     { "op": "wait", "seconds": 1.2 },

@@ -184,7 +184,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   sword swing it names, the NetPlayerAction it is rebroadcast as
       NetCellChangeCodec.cs    # one BlockChanges/BlockCorrection cell on the wire (the server writes, the client reads)
       NetEntity.cs             # NetEntityKind/NetEntity (ItemId: a drop's, TNT's or falling block's id, or a goblin's
-                               #   torches or a skeleton's tower tier) and NetCellChange
+                               #   torches or a skeleton's role and outfit) and NetCellChange
       NetEntityCodec.cs        # one EntityList entry on the wire (the server writes, the client reads)
       NetPlayerAction.cs       # the swing a player just made, as the server rebroadcasts it in each
                                #   player list entry (with a counter that moves on every new one)

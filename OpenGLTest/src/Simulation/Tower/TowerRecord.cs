@@ -69,9 +69,9 @@ public sealed class TowerRecord
     public (int X, int Y, int Z) AltarCell => (CenterX, Floors[^1].TopY + 1, CenterZ);
 
     /// <summary>Where this tower's Skeleton King lives: its feet on top of the altar block, leashed to the footprint
-    /// disc, summoning skeletons of the top floor's tier.</summary>
+    /// disc.</summary>
     public SkeletonKingHome KingHome => new(Key, new Vector3(CenterX + 0.5f, AltarCell.Y + 1, CenterZ + 0.5f),
-        OuterRadius, TowerDifficulty.Clamp(Floors.Length - 1));
+        OuterRadius);
 
     /// <summary>Whether the column (<paramref name="x"/>, <paramref name="z"/>) lies in the tower's footprint disc.</summary>
     public bool Contains(int x, int z)
