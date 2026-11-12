@@ -29,11 +29,39 @@ public static class SimulationConfig
     // How far a spreading fluid looks for a hole to fall into before spreading evenly
     public const int FluidSlopeSearchDistance = 4;
 
-    // --- Tree felling (TopplingTree) ---
-    // Seconds for a felled tree to swing from upright to flat (cubic ease-in: slow tip,
-    // accelerating slam), then rest before its wood pops out as item drops
-    public const float TreeToppleSeconds = 1.2f;
-    public const float TreeFellRestSeconds = 2f;
+    // --- Tree felling (TopplingTree, FellBody) ---
+    // A felled tree is a rigid body: it rests TreeFellRestSeconds after it stops, then its wood
+    // pops out as item drops
+    public const float TreeFellRestSeconds = 0.6f;
+    // A tree whose wood centers above the cut within this of straight up is still pinned to the
+    // stump and tips over it; anything leaning further out (a limb, a branch set) just falls
+    public const float TreeFlatSnapRadians = 1.4f;
+    // The pin lets go once the tree has leaned this far from vertical (nearly flat), or sooner when it comes to a stop
+    public const float TreeHingeReleaseRadians = 1.45f;
+    // The shove (rad/s) that starts a tree tipping or a loose limb tumbling
+    public const float TreeFellKickRadiansPerSecond = 0.6f;
+    // Wood is heavier toward the root: a block's mass is 1 + this * (1 - height / tree height), so
+    // a trunk base outweighs its crown and a canopy cannot stand the tree back up on its branches
+    public const float TreeFellRootWeightBoost = 5f;
+    // A side branch whose block hits the ground faster than this (blocks/s) snaps off the tree
+    public const float TreeFellDetachSpeed = 3.5f;
+    // Leaves weigh this much against a wood block (1)
+    public const float TreeFellLeafMass = 0.3f;
+    // Contact feel: bounce (below TreeFellBounceSpeed an impact does not bounce), ground friction,
+    // and damping per second
+    public const float TreeFellBounce = 0.15f;
+    public const float TreeFellBounceSpeed = 2f;
+    public const float TreeFellFriction = 0.8f;
+    public const float TreeFellLinearDamping = 0.05f;
+    public const float TreeFellAngularDamping = 0.8f;
+    // At rest: under this speed (blocks/s, rad/s) for this long, or after the time cap
+    public const float TreeFellRestSpeed = 0.3f;
+    public const float TreeFellRestHoldSeconds = 0.25f;
+    public const float TreeFellMaxSimSeconds = 8f;
+    // Whatever is still shifting this long after the first hard impact is frozen where it lies
+    public const float TreeFellSettleCapSeconds = 2.5f;
+    // A block hitting the ground faster than this (blocks/s) is the thud
+    public const float TreeFellImpactSpeed = 3f;
     // Collection bounds: the wood cap covers a fell's nodes plus a wide trunk's shells and is
     // also the TreeSupport search cap (felling and the orphan crumble share it), then the
     // overall cap including the canopy. Sized to bound a mature wide trunk's nodes, shells and

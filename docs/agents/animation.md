@@ -324,8 +324,8 @@ overshoot or jiggle.
   since a waking cave pocket hardens dozens a frame far below; a client puffs where a `BlockChanges`
   entry turns a fluid into its own `hardensTo` block (a flow crusting against lava is missed there)
   (`SteamPuffTests`). A felled tree hitting the ground thuds: `TopplingTree.TryTakeLanding` is true
-  exactly once, on the update its swing reaches flat, and `BlockEditor.ThudTree` then takes the blocks'
-  rest cells (`TopplingTree.GatherLanded`, the cells `TakeDrops` drops at), bursts
+  exactly once, on the update its first hard impact lands (or it comes to rest), and `BlockEditor.ThudTree` then takes the cells the blocks
+  are in (`TopplingTree.GatherLanded`, the cells `TakeDrops` drops at), bursts
   `LeafParticleBurstThud` leaves off the landed canopy, kicks the ground's dust up under at most
   `TreeThudDustPoints` points of the landed trunk (`GroundDust.TreeThud`) and shakes the camera by its
   distance to the trunk (`ShakeFalloff`, `TreeThudShakeStrength` scaled by the wood that fell over

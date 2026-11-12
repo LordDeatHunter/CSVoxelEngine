@@ -171,7 +171,11 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   chest and tells the replaced hook, the collapse show); TowerWriteResult.cs is its answer
         TowerReadout.cs        # the look-at status line of a pile, a sealed door or the altar, and the altar's toasts
       TopplingTree.cs          # a felled tree: the wood TreeSupport finds cut off plus its canopy, meshed once by
-                               #   CellBatchMesher (one mesh per chunk it spans), swung flat around the cut, then popped out as drops
+                               #   CellBatchMesher (one mesh per chunk it spans), dropped as a rigid body (FellBody), then popped out as drops
+      FellContacts.cs          # GL-free: per block, the points that touch the ground (thin wood reaches half its diameter)
+      FellBranches.cs          # GL-free: a felled tree's main stem and side branches (which blocks snap off together)
+      FellPart.cs              # one rigid piece of a felled tree: its blocks, FellBody and meshes (a branch snaps off into its own)
+      FellBody.cs              # GL-free rigid body of a felled tree: point masses, gravity, stump pin, terrain contacts, settle
       TreeGrowthResult.cs      # the outcome of one TreeGrowthWriter call: its status,
                                #   the root cell, the added nodes and the written cells
       TreeGrowthStatus.cs      # what one TreeGrowthWriter.Grow call did

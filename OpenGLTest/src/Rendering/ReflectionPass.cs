@@ -418,9 +418,9 @@ internal sealed class ReflectionPass
         // A berg's waterline center feeds the reuse motion signal, so a drifting berg refreshes it
         foreach (var berg in entities.Icebergs)
             if (KeepForMirror(eye, berg.Center)) _mirrorIcebergs.Add(berg);
-        // A felled tree's base stays put while it swings, so its crown stands in for it.
+        // A felled tree's base stays put while it tips, so its crown stands in for it.
         foreach (var tree in entities.Toppling)
-            if (KeepForMirror(eye, Vector3.Transform(new Vector3(0f, 4f, 0f), tree.Model)))
+            if (KeepForMirror(eye, Vector3.Transform(new Vector3(0f, 4f, 0f), tree.Parts[0].Model)))
                 _mirrorToppling.Add(tree);
     }
 

@@ -108,7 +108,7 @@
 
     // LEG 4 — the tree fall thud: the forest oak trees.json fells, cut at its base from trees.json's
     // own base_aim pose (a single-frame creative mine), tips east, away from the cut; the side view
-    // from the south catches it as it hits the ground TreeToppleSeconds (1.2 s) later: a leaf burst
+    // from the south catches it as it hits the ground a second or two later: a leaf burst
     // off the landed crown, dust kicked up under the trunk, and the camera shaken.
     { "op": "teleport", "pos": [-67.4, 21.0, 3.1], "yaw": -157.5, "pitch": -4.8 },
     { "op": "wait", "seconds": 8 },

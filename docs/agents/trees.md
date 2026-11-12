@@ -201,6 +201,23 @@ within Chebyshev 2 of the falling wood come along. The search is capped at `Tree
 real chunk mesher through `CellBatchMesher.Build` (`TopplingTree.BuildMeshData`: one mesh per chunk
 the felled cells span, so a crown of any size is drawn whole) and drops through
 `TopplingTree.TakeDrops`.
+It falls as a rigid body (`FellBody`, GL-free, fixed 1/120 s substeps): the blocks are point masses with
+the shape's inertia, `BodyMotion.Gravity` pulls, and each block touches the terrain (`isSolid`, the felled
+cells already gone) through its real extremities (`FellContacts`: a thin wood block reaches only half its
+diameter from the cell center, except along its tubes) with impulse contacts (restitution, friction) and a depenetration
+push. A tree standing on its stump (ground under the cut, wood mostly above it) starts pinned to the cut by
+a ball joint and tips over it from a small kick, so "fall forward" is the physics of a pinned body; the pin
+lets go when it is nearly flat or has been stopped short. A limb or branch set (no ground under the cut or
+wood leaning out) is free from the start, so it drops and tumbles to the ground. The first hard impact is
+the thud (`TryTakeLanding`, shake, leaf burst, dust at the cells the blocks are in then); once the body has
+been still for `TreeFellRestHoldSeconds` (or `TreeFellSettleCapSeconds` passed since the first hard impact) it freezes, and `TreeFellRestSeconds`
+later the drops pop out at the blocks' resting cells. Tuning: the `TreeFell*` and `TreeHinge*` constants.
+Wood is heavier toward the root (`TreeFellRootWeightBoost`) so the base outweighs the crown and a canopy
+cannot prop the tree up on its branches. A side branch (`FellBranches`: the wood walked from the cut over
+`TreeSupport.Links`, the main stem going up at each fork) whose block hits the ground faster than
+`TreeFellDetachSpeed` snaps off whole, leaves included, into its own `FellPart` that carries on from the
+parent's pose and speed; the rest is rebuilt and remeshed without it (`TopplingTree.Parts`, one model matrix
+and mesh set per part). Only the original part sheds branches. Walls are not collided with, only ground.
 
 **Reactive growth** (`World.TryGrowTree(species, x, yHint, z, steps)`, refused while loading or
 for an unknown species; the `grow` scenario op calls it). `TreeGrowthWriter` (`Simulation/`, GL-free,

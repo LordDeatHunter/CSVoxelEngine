@@ -312,15 +312,18 @@ internal sealed class ObjectPasses
     internal void DrawTopplingTree(TopplingTree tree, in Matrix4x4 viewProj, bool mirror)
     {
         tree.EnsureMesh(_gl);
-        if (tree.Meshes.Count == 0) return;
 
         _owner.WorldShader.Use();
         _owner.BindEntityTextures(mirror);
 
-        var model = tree.Model;
-        _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(model.Translation));
+        foreach (var part in tree.Parts)
+        {
+            if (part.Meshes.Count == 0) continue;
 
-        foreach (var mesh in tree.Meshes)
-            mesh.Render();
+            var model = part.Model;
+            _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(model.Translation));
+            foreach (var mesh in part.Meshes)
+                mesh.Render();
+        }
     }
 }

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
 using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks;
@@ -16,8 +15,8 @@ namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// A felled tree: the wood a mined tree-wood cell held up (see <see cref="Collect"/>) and the
-/// canopy around it, swinging from upright to flat around the cut and popping out item drops
-/// after coming to rest. The mesh is baked
+/// canopy around it, falling as one rigid body (<see cref="FellBody"/>: gravity, a tip over the
+/// cut, terrain contacts, a tumble and a settle) and popping out item drops after coming to rest. The mesh is baked
 /// once from the real chunk mesher (correct node and tube boxes, AO and crop UVs), one mesh per
 /// chunk the tree's cells span, rebased to pivot-relative coords; only the GPU upload waits for
 /// a GL context on first render.
@@ -35,24 +34,35 @@ public class TopplingTree : IDisposable
     private readonly Vector3 _pivot;
     private readonly Vector3 _axis;
     private readonly bool _drops;
-    private float _elapsed;
     private bool _dropsTaken;
+    // The physics: the tree is one rigid body (see FellBody), pinned to the stump at the cut while
+    // it tips over like a trunk, or simply dropped when it is a limb. A side branch that hits the
+    // ground snaps off into a part of its own (see FellBranches), so there can be several.
+    private readonly List<FellPart> _parts = [];
+    private readonly FellPart?[] _partOf;
+    private readonly FellBranches _branches;
+    private readonly Vector3[] _centers;
+    private readonly Vector3[][] _contacts;
+    private readonly float[] _masses;
+    private readonly Func<int, int, int, bool> _isSolid;
+    // Seconds every part has been at rest
+    private float _restElapsed;
     // Set by the update the swing reaches flat, cleared by TryTakeLanding
     private bool _landingPending;
+    private bool _landed;
+    private float _sinceLanding;
 
-    /// <summary>CPU-side meshes, one per chunk the tree's cells touch, pivot-relative, daylight-baked. Built in the constructor.</summary>
-    public IReadOnlyList<ChunkMeshData> MeshData { get; }
-
-    /// <summary>GPU meshes, uploaded lazily by <see cref="EnsureMesh"/> on first render; empty until then.</summary>
-    public IReadOnlyList<Mesh> Meshes => _meshes;
-
-    private readonly List<Mesh> _meshes = [];
-    private bool _meshUploaded;
+    /// <summary>The rigid pieces the tree is in now: one at first, more as branches snap off. Each
+    /// carries its own meshes and model matrix.</summary>
+    public IReadOnlyList<FellPart> Parts => _parts;
 
     /// <summary>True once the tree has lain still for <see cref="SimulationConfig.TreeFellRestSeconds"/>.</summary>
     public bool IsDone { get; private set; }
 
-    public TopplingTree(List<FellBlock> blocks, Vector3 pivot, Vector3 fallDirection, bool drops = true)
+    /// <param name="isSolid">Whether the world cell at (x, y, z) stops a falling tree (the felled
+    /// cells are already gone from it); without it nothing stops the tree.</param>
+    public TopplingTree(List<FellBlock> blocks, Vector3 pivot, Vector3 fallDirection, bool drops = true,
+        Func<int, int, int, bool>? isSolid = null)
     {
         _blocks = blocks;
         _pivot = pivot;
@@ -62,7 +72,86 @@ public class TopplingTree : IDisposable
         // Tipping the +Y axis toward the fall direction rotates around Y x fallDir
         _axis = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, flat));
 
-        MeshData = BuildMeshData(blocks, pivot);
+        _isSolid = isSolid ?? ((_, _, _) => false);
+        _centers = new Vector3[blocks.Count];
+        _contacts = FellContacts.Build(blocks);
+        _masses = new float[blocks.Count];
+        var top = pivot.Y + 1f;
+        foreach (var block in blocks)
+            top = MathF.Max(top, block.Cell.Y + 1f);
+        for (var i = 0; i < blocks.Count; i++)
+        {
+            _centers[i] = blocks[i].Cell + new Vector3(0.5f);
+            _masses[i] = BlockMass(blocks[i], pivot.Y, top);
+        }
+        // Still attached when the cut stands on ground and the wood mostly rises above it; a limb
+        // or a set of branches has no such base and just falls
+        var pinned = isSolid != null
+                     && isSolid((int)MathF.Floor(pivot.X), (int)MathF.Floor(pivot.Y) - 1, (int)MathF.Floor(pivot.Z))
+                     && StandsAboveCut(blocks, pivot);
+
+        var all = new List<int>(blocks.Count);
+        for (var i = 0; i < blocks.Count; i++)
+            all.Add(i);
+        var body = NewBody(all, pinned, null);
+        _partOf = new FellPart?[blocks.Count];
+        _branches = new FellBranches(blocks, pivot);
+        var part = new FellPart(pivot, all, body, BuildMeshData(blocks, pivot));
+        _parts.Add(part);
+        foreach (var i in all)
+            _partOf[i] = part;
+    }
+
+    /// <summary>
+    /// A block's mass: leaves are light, wood is heavier toward the root (1 at the crown, up to
+    /// 1 + <see cref="SimulationConfig.TreeFellRootWeightBoost"/> at the cut) so the base of a
+    /// falling tree outweighs its branches.
+    /// </summary>
+    private static float BlockMass(FellBlock block, float baseY, float topY)
+    {
+        if (TreeGenerator.IsLeaf(block.Id))
+            return SimulationConfig.TreeFellLeafMass;
+        var up = MathUtils.Clamp01((block.Cell.Y + 0.5f - baseY) / MathF.Max(topY - baseY, 1f));
+        return 1f + SimulationConfig.TreeFellRootWeightBoost * (1f - up);
+    }
+
+    private FellBody NewBody(List<int> indices, bool hinged, FellBody? inherit)
+    {
+        var centers = new Vector3[indices.Count];
+        var masses = new float[indices.Count];
+        var contacts = new Vector3[indices.Count][];
+        for (var k = 0; k < indices.Count; k++)
+        {
+            centers[k] = _centers[indices[k]];
+            masses[k] = _masses[indices[k]];
+            contacts[k] = _contacts[indices[k]];
+        }
+        return new FellBody(centers, masses, contacts, _pivot, _axis, hinged, _isSolid, inherit);
+    }
+
+    /// <summary>
+    /// Whether the wood is mostly above the cut and not leaning far out sideways: the tree is
+    /// still standing on its stump (an upright trunk) rather than a limb sticking out of it.
+    /// </summary>
+    private static bool StandsAboveCut(List<FellBlock> blocks, Vector3 pivot)
+    {
+        // Measured from the center of the cut cell (the pivot is its underside), so a limb that
+        // leaves the cut level reads as level
+        var origin = pivot + new Vector3(0f, 0.5f, 0f);
+        var sum = Vector3.Zero;
+        var count = 0;
+        foreach (var block in blocks)
+        {
+            if (!BlockType.IsTreeWood(block.Id)) continue;
+            sum += block.Cell + new Vector3(0.5f) - origin;
+            count++;
+        }
+        if (count == 0) return false;
+
+        var center = sum / count;
+        if (center.Y <= 0f) return false;
+        var sideways = new Vector3(center.X, 0f, center.Z).Length();
+        return MathF.Atan2(center.Y, sideways) >= SimulationConfig.TreeFlatSnapRadians;
     }
 
     /// <summary>
@@ -208,38 +297,106 @@ public class TopplingTree : IDisposable
         }
     }
 
-    /// <summary>Current swing angle: cubic ease-in from upright to flat over the topple time.</summary>
-    public float AngleNow
-    {
-        get
-        {
-            var t = MathUtils.Clamp01(_elapsed / SimulationConfig.TreeToppleSeconds);
-            return MathF.PI * 0.5f * MathUtils.EaseInCubic(t);
-        }
-    }
-
-    /// <summary>Model matrix swinging the pivot-relative mesh around its base. Row-vector
-    /// convention like the other world draws (see SelectionPasses.RenderBlockPop): rotate first,
-    /// then move to the pivot.</summary>
-    public Matrix4x4 Model =>
-        Matrix4x4.CreateFromAxisAngle(_axis, AngleNow) * Matrix4x4.CreateTranslation(_pivot);
-
-    /// <summary>Advances the swing, then the rest timer; <see cref="IsDone"/> fires once the
-    /// tree has lain still for <see cref="SimulationConfig.TreeFellRestSeconds"/>.</summary>
+    /// <summary>Advances the fall; <see cref="IsDone"/> fires once every piece has lain still for
+    /// <see cref="SimulationConfig.TreeFellRestSeconds"/>.</summary>
     public void Update(float deltaTime)
     {
         if (IsDone) return;
 
-        var falling = _elapsed < SimulationConfig.TreeToppleSeconds;
-        _elapsed += deltaTime;
-        if (falling && _elapsed >= SimulationConfig.TreeToppleSeconds)
+        var impact = false;
+        var atRest = true;
+        // Pieces added by a snap-off during this loop are advanced from the next update
+        var count = _parts.Count;
+        for (var i = 0; i < count; i++)
+        {
+            var part = _parts[i];
+            part.Body.Advance(deltaTime);
+            impact |= part.Body.LastImpactSpeed >= SimulationConfig.TreeFellImpactSpeed;
+            if (i == 0)
+                SnapOffBranches(part);
+        }
+        // Whatever still shifts a while after the first hard impact is frozen where it lies
+        if (_landed)
+            _sinceLanding += deltaTime;
+        if (_sinceLanding >= SimulationConfig.TreeFellSettleCapSeconds)
+        {
+            foreach (var part in _parts)
+                part.Body.Freeze();
+        }
+        foreach (var part in _parts)
+            atRest &= part.Body.AtRest;
+
+        if (!_landed && (impact || atRest))
+        {
+            _landed = true;
             _landingPending = true;
-        if (_elapsed >= SimulationConfig.TreeToppleSeconds + SimulationConfig.TreeFellRestSeconds)
+        }
+        if (!atRest) return;
+
+        _restElapsed += deltaTime;
+        if (_restElapsed >= SimulationConfig.TreeFellRestSeconds)
             IsDone = true;
     }
 
-    /// <summary>True exactly once: on the first call after the update that swung the tree flat, the
-    /// moment it hits the ground (the world's thud: shake, leaf burst and dust).</summary>
+    // A side branch that struck the ground hard breaks off whole and carries on as its own body
+    // with the speed it had; the rest of the tree is rebuilt without it
+    private void SnapOffBranches(FellPart part)
+    {
+        if (part.Body.HardImpacts.Count == 0) return;
+
+        var roots = new List<int>();
+        foreach (var local in part.Body.HardImpacts)
+        {
+            var root = _branches.BranchRootOf(part.Blocks[local]);
+            if (root >= 0 && !roots.Contains(root) && _partOf[root] == part)
+                roots.Add(root);
+        }
+        if (roots.Count == 0) return;
+
+        var parentBody = part.Body;
+        var remaining = part.Blocks;
+        var broken = new List<List<int>>();
+        foreach (var root in roots)
+        {
+            var members = new List<int>();
+            _branches.Members(root, members);
+            members.RemoveAll(i => _partOf[i] != part);
+            if (members.Count == 0) continue;
+            foreach (var i in members)
+                _partOf[i] = null;
+            broken.Add(members);
+        }
+        if (broken.Count == 0) return;
+
+        remaining = remaining.FindAll(i => _partOf[i] == part);
+        if (remaining.Count == 0)
+        {
+            foreach (var members in broken)
+                foreach (var i in members)
+                    _partOf[i] = part;
+            return;
+        }
+
+        foreach (var members in broken)
+        {
+            var child = new FellPart(_pivot, members, NewBody(members, false, parentBody), MeshOf(members));
+            _parts.Add(child);
+            foreach (var i in members)
+                _partOf[i] = child;
+        }
+        part.Rebuild(remaining, NewBody(remaining, parentBody.Hinged, parentBody), MeshOf(remaining));
+    }
+
+    private List<ChunkMeshData> MeshOf(List<int> indices)
+    {
+        var blocks = new List<FellBlock>(indices.Count);
+        foreach (var i in indices)
+            blocks.Add(_blocks[i]);
+        return BuildMeshData(blocks, _pivot);
+    }
+
+    /// <summary>True exactly once: on the first call after the update in which the tree first hit the
+    /// ground hard (or came to rest without having), the world's thud: shake, leaf burst and dust.</summary>
     public bool TryTakeLanding()
     {
         if (!_landingPending) return false;
@@ -248,20 +405,21 @@ public class TopplingTree : IDisposable
     }
 
     /// <summary>
-    /// Appends every collected block to <paramref name="into"/> at the cell it lies in once the tree
-    /// is flat (the same rest cells <see cref="TakeDrops"/> drops its loot at), keeping its id and
-    /// state, so the thud knows where the trunk and the canopy came down.
+    /// Appends every collected block to <paramref name="into"/> at the cell it lies in now (at rest,
+    /// the cells <see cref="TakeDrops"/> drops its loot at), keeping its id and state, so the thud
+    /// knows where the trunk and the canopy came down.
     /// </summary>
     public void GatherLanded(List<FellBlock> into)
     {
-        var landed = Matrix4x4.CreateFromAxisAngle(_axis, MathF.PI * 0.5f);
-        foreach (var block in _blocks)
-            into.Add(block with { Cell = RestCell(block, landed) });
+        foreach (var part in _parts)
+        {
+            for (var k = 0; k < part.Blocks.Count; k++)
+                into.Add(_blocks[part.Blocks[k]] with { Cell = RestCell(part, k) });
+        }
     }
 
-    // The floored cell a block's center comes to rest in after the swing
-    private Vector3 RestCell(FellBlock block, Matrix4x4 landed) =>
-        (_pivot + Vector3.Transform(block.Cell + new Vector3(0.5f) - _pivot, landed)).Floor();
+    // The floored cell the part's k-th block has its center in now
+    private static Vector3 RestCell(FellPart part, int k) => part.Body.PointNow(k).Floor();
 
     /// <summary>
     /// Item drops for the landed tree, each at the floored cell its block came to rest in.
@@ -279,46 +437,38 @@ public class TopplingTree : IDisposable
         if (!_drops)
             return drops;
 
-        var landed = Matrix4x4.CreateFromAxisAngle(_axis, MathF.PI * 0.5f);
         var rolled = new List<ushort>();
-        foreach (var block in _blocks)
+        foreach (var part in _parts)
         {
-            var cell = RestCell(block, landed);
+            for (var k = 0; k < part.Blocks.Count; k++)
+            {
+                var block = _blocks[part.Blocks[k]];
+                var cell = RestCell(part, k);
 
-            // The resting cell is the loot context too, so position-dependent rolls see where
-            // the block landed rather than where it grew
-            rolled.Clear();
-            DropManager.RollLoot(block.Id, new LootContext((int)cell.X, (int)cell.Y, (int)cell.Z, State: block.State), rolled);
+                // The resting cell is the loot context too, so position-dependent rolls see where
+                // the block landed rather than where it grew
+                rolled.Clear();
+                DropManager.RollLoot(block.Id, new LootContext((int)cell.X, (int)cell.Y, (int)cell.Z, State: block.State), rolled);
 
-            foreach (var id in rolled)
-                drops.Add((id, cell));
+                foreach (var id in rolled)
+                    drops.Add((id, cell));
+            }
         }
 
         return drops;
     }
 
-    /// <summary>Uploads the baked meshes on first render (GL is only legal on the main thread).</summary>
+    /// <summary>Uploads the baked meshes of every piece on first render (GL is only legal on the main thread).</summary>
     public void EnsureMesh(GL gl)
     {
-        if (_meshUploaded)
-            return;
-        _meshUploaded = true;
-
-        foreach (var data in MeshData)
-        {
-            if (data.Vertices.Count == 0)
-                continue;
-            _meshes.Add(new Mesh(gl,
-                CollectionsMarshal.AsSpan(data.Vertices),
-                CollectionsMarshal.AsSpan(data.Indices)));
-        }
+        foreach (var part in _parts)
+            part.EnsureMesh(gl);
     }
 
     public void Dispose()
     {
-        foreach (var mesh in _meshes)
-            mesh.Dispose();
-        _meshes.Clear();
+        foreach (var part in _parts)
+            part.Dispose();
         GC.SuppressFinalize(this);
     }
 }
