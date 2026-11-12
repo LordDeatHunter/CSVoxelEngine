@@ -125,7 +125,7 @@ public sealed class LanternTests : IDisposable
         drops.SpawnInstance(stack, _test.Player.Position - Vector3.UnitY * DropManager.CollectHeightOffset,
             Vector3.Zero, delay: 0f);
         var pickup = new DropPickup(World, drops, _test.Manager, null, new VoxelEngine.Particles.FireParticleSystem(),
-            null, serverMode: true, clientMode: false);
+            serverMode: true, clientMode: false);
         pickup.Update(1d / 60);
         var refused = Assert.Single(drops.Drops);
         Assert.Equal(fuel.Remaining, LanternState.Of(refused.Instance)!.Remaining);

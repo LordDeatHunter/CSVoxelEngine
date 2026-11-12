@@ -110,7 +110,7 @@ public sealed class TowerManagerTests
 
     private static Skeleton Bound(Rig rig, TowerFloorState floor, Vector3 at)
     {
-        var skeleton = rig.Skeletons.Spawn(at, floor.Floor, spawnIn: false)!;
+        var skeleton = rig.Skeletons.Spawn(at, spawnIn: false)!;
         skeleton.Floor = floor.Ref;
         return skeleton;
     }
@@ -271,7 +271,7 @@ public sealed class TowerManagerTests
         var at = new Vector3(CenterX + 0.5f, 2f, CenterZ + 0.5f);
         var mine = Bound(rig, rig.Floor0, at);
         var above = Bound(rig, rig.Floor1, at + Vector3.UnitY * 6f);
-        var unbound = rig.Skeletons.Spawn(at, 0, spawnIn: false)!;
+        var unbound = rig.Skeletons.Spawn(at, spawnIn: false)!;
         rig.Floor0.Owed = 2;
 
         Assert.True(rig.Towers.ClearFloor(at, 0, rig.Skeletons.Mobs));

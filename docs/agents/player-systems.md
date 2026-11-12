@@ -258,7 +258,7 @@ writes every skin and cuts the twin's three tiles from the same faces; the skin 
 were mapped to in Blockbench.
 **A chest is open while it has at least one viewer** (`ChestLids`, GL-free, owned by `World`): its lid plays `open` the
 moment its viewers go above zero and holds the last frame, and plays `close` the moment they drop back to zero; a lid
-turned around mid-swing picks the other clip up at the matching point instead of its first frame. Each swing that starts raises `ChestLids.LidStarted` (true for open), which `World` wires to `SfxManager` as the `chest_open` / `chest_close` sfx groups (`SfxLibrary`); the wobble and the server world stay silent (a server has no sfx). The viewers are the
+turned around mid-swing picks the other clip up at the matching point instead of its first frame. Each swing that starts raises `ChestLids.LidStarted` (true for open), which `World` wires to `World.Sounds` as the `chest_open` / `chest_close` sfx groups (`SfxLibrary`) played at the chest; the wobble and the server world stay silent (each client sounds the lids it sees swing). The viewers are the
 local player's own panel (`ChestView.OpenCell`, handed to `ChestLids.Update`, so singleplayer and a client's own chest
 answer at once) and, in multiplayer, every chest some player has open: `ChestSessions.Tick` hands those cells to the
 server world's `ChestLids.SetViewed`, they ride the end of every `StationState` frame (protocol 38, which also keeps the

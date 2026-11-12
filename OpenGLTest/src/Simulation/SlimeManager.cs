@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Effects.Sky;
@@ -46,6 +47,11 @@ public sealed class SlimeManager : IMobPopulation
         _caps = caps ?? new MobCaps();
         _caps.Register(this);
     }
+
+    /// <summary>Plays a sound group at a position (set by <c>World</c> where the slimes are simulated: singleplayer,
+    /// and a server, which sends it to the players near it); a slime's hop and landing call it with their groups at
+    /// the slime. Null on a client, whose mirrors hear the server's.</summary>
+    public Action<string, Vector3>? PlaySound { get; set; }
 
     /// <summary>Every slime still drawn: the living ones plus any playing their death
     /// (<see cref="Mob.IsDying"/>), which are no longer targets and do not count toward the cap.</summary>
@@ -101,6 +107,8 @@ public sealed class SlimeManager : IMobPopulation
     {
         if (_caps.ForcedRoom <= 0) return null;
         var slime = new Slime(_type, position, size);
+        slime.Hopped += () => PlaySound?.Invoke(SfxLibrary.SlimeJumpGroup, slime.Position);
+        slime.Landed += () => PlaySound?.Invoke(SfxLibrary.SlimeLandGroup, slime.Position);
         _slimes.Add(slime);
         return slime;
     }
@@ -288,7 +296,8 @@ public sealed class SlimeManager : IMobPopulation
         if (!_caps.AllowsNaturalSpawn) return;
 
         _spawnTimer += deltaTime * _caps.SpawnHaste;
-        if (_spawnTimer < MobConfig.SlimeSpawnIntervalSeconds) return;
+        var interval = MathUtils.Lerp(MobConfig.SlimeSpawnIntervalDaySeconds, MobConfig.SlimeSpawnIntervalSeconds, night);
+        if (_spawnTimer < interval) return;
         _spawnTimer = 0f;
 
         if (targets.Count == 0) return;

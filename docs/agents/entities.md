@@ -130,11 +130,11 @@ in `MobPasses.SlimeTransform`, multiplied over the squash spring, the collision 
 over the JSON `hp`; the save and net clamps read it), the contact damage and the loot rolls (the table
 rolled `LootRolls` times). The size is saved (`EntitySaveData.MobData.Size`, absent = 1) and sent (a
 slime entry's `NetEntity.Ammo`). A ring spawn rolls its size (`SlimeSize.Roll`, a pure function of the
-night, an underground flag and one uniform roll): each size past 1 is reached with the large-size
-chance again, which eases from `SlimeLargeChanceDay` to `SlimeLargeChanceNight` with
+night, an underground flag and one uniform roll): size 2 is reached with the large-size
+chance, which eases from `SlimeLargeChanceDay` to `SlimeLargeChanceNight` with
 `DayCycle.NightFactor(World.LightingTime)` — the same sun `FrameLighting.SetLighting` lights the world
 by — and is the night value for ground at least `SlimeUndergroundDepthBlocks` under its column's
-surface (`SlimeSize.IsUnderground`; the surface-only ring never finds such a spot today). A rolled body
+surface (`SlimeSize.IsUnderground`; the surface-only ring never finds such a spot today). Sizes past 2 are reached only in the dark, so by day a ring spawn is size 1 or rarely size 2, and the ring's timer waits `SlimeSpawnIntervalDaySeconds` in full day instead of `SlimeSpawnIntervalSeconds` (eased by the same night factor). A rolled body
 that would overlap a block beside the cleared column steps down a size until it fits. A slime larger
 than the smallest **splits** on the transition, never on being low (`SlimeSize.SplitsOnHit`): a hit that
 takes it from above half its health to at or below half while it survives marks it in
@@ -173,7 +173,7 @@ and the squash spring's windup; `SlimeHopTests`). The largest size (`SlimeMaxSiz
 **giant**: `SlimeSize.Roll` takes the last step into it with only `SlimeMaxSizeChanceFactor` of the
 usual threshold, so it is rarer than the size below it in every light (`GiantSlimeTests`), and it
 splits into that size like any other; `visual-examples/slime-sizes.json` stands it beside the other
-three. **Cave slimes**: slimes also spawn on dark cave floors in the same ring
+three. **Slime sounds**: a hop plays `slime_jump` (a random clip of `slime_jump_1`/`_2`) through `SlimeManager.PlaySound` at the slime (set where the slimes are simulated: singleplayer plays it, a server sends it to the players near it, and a client's mirrors never sound, see "World sounds"); a landing plays `slime_land`; a landed hit plays `slime_hit` and a killing one `slime_death`, through the slime's `HitSoundGroup`/`DeathSoundGroup`. **Cave slimes**: slimes also spawn on dark cave floors in the same ring
 (`MobSpawner.TryFindCaveSpawn`, any biome): each try scans a column down from a random height within
 `SlimeCaveSearchHalfHeight` of the player's feet for at most `SlimeCaveScanDepth` cells and takes the
 first solid floor under two clear, dry cells, if it lies at least `SlimeUndergroundDepthBlocks` under
@@ -332,7 +332,7 @@ debugger take a new species from it instead of naming it; adding one means a cla
   `FlyerPerchSeekSeconds`). It soars on its `glide` clip and pecks the dirt or caws while resting.
   Its hits and kills play `crow_hit` and `crow_death` clips (`Mob.HitSoundGroup`/`DeathSoundGroup`). Separately, `CrowCaws`
   (`src/Entities/Wildlife/`, ticked by `World`) plays a random `crow_caw` clip every `CrowCawMinSeconds`..`Max` (`AudioConfig`)
-  while a live crow is within `CrowCawRangeBlocks` of the camera; the sound is not positional.
+  from the nearest live crow within `CrowCawRangeBlocks` of the camera, positionally.
 - **Dragonfly** (`Dragonfly`): the man-sized hunter of the waterside. A player within `DragonflyNoticeRangeBlocks` is
   prey: it holds itself over their head and darts in its `bite` clip, biting whoever is within `DragonflyBiteReach`
   at the impact. On the ground it plays `perch`. Riding one is a later task (`plans/TODO.md`).

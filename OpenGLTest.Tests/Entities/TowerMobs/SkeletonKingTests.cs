@@ -22,7 +22,7 @@ public sealed class SkeletonKingTests
 
     private static readonly Vector3 HomeFeet = new(8.5f, 1f, 8.5f);
 
-    private static SkeletonKingHome Home => new((3, 4), HomeFeet, 6f, 2);
+    private static SkeletonKingHome Home => new((3, 4), HomeFeet, 6f);
 
     private static Vector3 CenterAt(Vector3 feet) => feet + new Vector3(0f, MobConfig.SkeletonKingHeight * 0.5f, 0f);
 

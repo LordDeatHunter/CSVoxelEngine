@@ -38,6 +38,9 @@ public static class GameSettings
     // Audio
     public static float AmbienceVolume { get; set; }
     public static float SfxVolume { get; set; }
+    /// <summary>3D audio: OpenAL Soft's HRTF, which places positional sounds in front, behind, above or below
+    /// over headphones (plain left/right panning when off, better on speakers).</summary>
+    public static bool Hrtf { get; set; }
 
     // Controls
     public static float MouseSensitivity { get; set; }
@@ -84,6 +87,7 @@ public static class GameSettings
         WaterSunShafts = WaterRenderConfig.WaterRayStrength;
         AmbienceVolume = AudioConfig.AmbienceVolume;
         SfxVolume = AudioConfig.SfxVolume;
+        Hrtf = AudioConfig.Hrtf;
         MouseSensitivity = 0.2f;
         FieldOfView = 70f;
         SprintToggle = false;
@@ -128,6 +132,7 @@ public static class GameSettings
         if (dto.WaterSunShafts is { } shafts) WaterSunShafts = Math.Clamp(shafts, 0f, SettingsRows.WaterSunShaftsMax);
         if (dto.AmbienceVolume is { } ambience) AmbienceVolume = Math.Clamp(ambience, 0f, 1f);
         if (dto.SfxVolume is { } sfx) SfxVolume = Math.Clamp(sfx, 0f, 1f);
+        if (dto.Hrtf is { } hrtf) Hrtf = hrtf;
         if (dto.MouseSensitivity is { } sensitivity) MouseSensitivity = Math.Clamp(sensitivity, SettingsRows.SensitivityMin, SettingsRows.SensitivityMax);
         if (dto.FieldOfView is { } fov) FieldOfView = Math.Clamp(fov, SettingsRows.FovMin, SettingsRows.FovMax);
         if (dto.SprintToggle is { } sprintToggle) SprintToggle = sprintToggle;
@@ -155,6 +160,7 @@ public static class GameSettings
             WaterSunShafts = WaterSunShafts,
             AmbienceVolume = AmbienceVolume,
             SfxVolume = SfxVolume,
+            Hrtf = Hrtf,
             MouseSensitivity = MouseSensitivity,
             FieldOfView = FieldOfView,
             SprintToggle = SprintToggle,
@@ -191,6 +197,7 @@ public static class GameSettings
         public float? WaterSunShafts { get; set; }
         public float? AmbienceVolume { get; set; }
         public float? SfxVolume { get; set; }
+        public bool? Hrtf { get; set; }
         public float? MouseSensitivity { get; set; }
         public float? FieldOfView { get; set; }
         public bool? SprintToggle { get; set; }

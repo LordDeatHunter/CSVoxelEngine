@@ -185,7 +185,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   sword swing it names, the NetPlayerAction it is rebroadcast as
       NetCellChangeCodec.cs    # one BlockChanges/BlockCorrection cell on the wire (the server writes, the client reads)
       NetEntity.cs             # NetEntityKind/NetEntity (ItemId: a drop's, TNT's or falling block's id, or a goblin's
-                               #   torches or a skeleton's tower tier) and NetCellChange
+                               #   torches or a skeleton's role and outfit) and NetCellChange
       NetEntityCodec.cs        # one EntityList entry on the wire (the server writes, the client reads)
       NetPlayerAction.cs       # the swing a player just made, as the server rebroadcasts it in each
                                #   player list entry (with a counter that moves on every new one)
@@ -193,6 +193,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       NetProtocol.cs           # NetMessage ids, length-prefixed framing, PacketWriter/PacketReader
       PlayerStatusCodec.cs     # PlayerStatusData (modes, health, dead, knockback) and its bounds-checked wire form
       ServerAddress.cs         # host[:port] parsing and formatting (the default port)
+      SoundEventCodec.cs       # the SoundEvents frame (group, position per sound), bounds-checked, and which
+                               #   queued sounds one player is sent (in earshot, not its own)
       StationNetCodec.cs       # the StationState snapshot: campfires, querns, kilns, cast molds
       WaystoneNetCodec.cs      # the waystone messages: the rename request, a player's rows (WaystoneNetRow) and the
                                #   activation answer (WaystoneOpened), bounds-checked

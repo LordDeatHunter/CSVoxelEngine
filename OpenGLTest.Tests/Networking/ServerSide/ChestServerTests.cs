@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using System.Net.Sockets;
 using System.Threading;
+using VoxelEngine.Audio;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
@@ -60,6 +61,7 @@ public sealed class ChestServerTests : IDisposable
         public int Answers;
         public LanternState? Lantern;
         public int LanternAnswers;
+        public readonly List<SoundEvent> Sounds = [];
         public Dictionary<string, (ushort Id, bool Lit)> Held = new();
         public PlayerSaveData.InventoryData? Inventory;
 
@@ -83,6 +85,12 @@ public sealed class ChestServerTests : IDisposable
                         for (var slot = 0; slot < GearConfig.ArmorSlotCount; slot++) reader.ReadId();
                         Held[name] = (reader.ReadId(), reader.ReadBool());
                     }
+                }
+                if (message == NetMessage.SoundEvents)
+                {
+                    var sounds = new List<SoundEvent>();
+                    SoundEventCodec.Read(reader, sounds);
+                    Sounds.AddRange(sounds);
                 }
                 if (message == NetMessage.LanternContents)
                 {
@@ -222,8 +230,10 @@ public sealed class ChestServerTests : IDisposable
 
     [Theory]
     [InlineData(42)] // Both published 42 layouts lack part of the combined contract.
-    [InlineData(43)] // Historical bridge.
-    [InlineData(45)] // Independent bridge integration.
+    [InlineData(43)] // Upstream skeleton layout and historical bridge.
+    [InlineData(44)] // Both published upstream audio and lantern/hotbar layouts.
+    [InlineData(45)] // Historical bridge integration.
+    [InlineData(47)] // Planned separate bridge integration.
     public void IncompatibleLayoutsAreRejectedBeforeJoining(int version)
     {
         using var raw = new TcpClient();
@@ -281,6 +291,12 @@ public sealed class ChestServerTests : IDisposable
         Assert.Equal(5, PlayerOf(b).Inventory.CountFor(coal));
         Assert.Equal(2, player.Inventory.CountFor(Flint));
         Assert.True(LanternManager.Emits(player.Inventory));
+        // The same current-version connection carries fuel answers and upstream positional world sounds.
+        var soundAt = player.Position + Vector3.UnitX;
+        _world.Sounds.PlayAt(SfxLibrary.StoneGroup, soundAt, exceptPlayerId: player.Id);
+        TickUntil(() => _inboxes[b].Sounds.Count > 0, "world sound was lost beside the lantern answers");
+        Assert.Equal(new SoundEvent(SfxLibrary.StoneGroup, soundAt), Assert.Single(_inboxes[b].Sounds));
+        Assert.Empty(_inboxes[a].Sounds); // The maker already predicted it locally.
         TickUntil(() => _inboxes[b].Held.TryGetValue("Alice", out var held) && held.Id == lantern && held.Lit,
             "authoritative held light never reached the other client");
         var snapshot = Inventory.Empty(); snapshot.Import(_inboxes[a].Inventory!);

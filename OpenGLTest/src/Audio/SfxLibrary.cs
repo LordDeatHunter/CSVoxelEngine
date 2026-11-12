@@ -59,6 +59,18 @@ public static class SfxLibrary
     /// <summary>Group played ambiently from time to time by a skeleton near the camera.</summary>
     public const string SkeletonRattleGroup = "skeleton_rattle";
 
+    /// <summary>Group played when a hit lands on a slime.</summary>
+    public const string SlimeHitGroup = "slime_hit";
+
+    /// <summary>Group played when a hit kills a slime.</summary>
+    public const string SlimeDeathGroup = "slime_death";
+
+    /// <summary>Group played when a slime launches a hop (a random clip: slime_jump_1 or _2).</summary>
+    public const string SlimeJumpGroup = "slime_jump";
+
+    /// <summary>Group played when a slime lands on the ground after a hop or a fall.</summary>
+    public const string SlimeLandGroup = "slime_land";
+
     /// <summary>Group played when a hit lands on a bug (spider, scorpion, dragonfly), and when it dies: a squish.</summary>
     public const string BugSquishGroup = "squish";
 
@@ -73,6 +85,10 @@ public static class SfxLibrary
 
     /// <summary>Group played when a blade (slice, sword or axe chop) starts a swing: a swoosh.</summary>
     public const string SwooshGroup = "swoosh";
+
+    /// <summary>The group a hit on (or the mining of) a block plays: its authored <c>sfx</c>, the default for an
+    /// unknown or air id, which is also what a block with no authored sfx plays.</summary>
+    public static string HitGroupOf(ushort blockId) => BlockType.ById[blockId]?.Sfx ?? DefaultGroup;
 
     /// <summary>
     /// Every group directly under <paramref name="root"/> (subfolders are ignored, so the

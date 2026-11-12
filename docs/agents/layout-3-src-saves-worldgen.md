@@ -140,7 +140,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       TntManager.cs            # owns the live primed TNT: spawns cubes where firestarter
                                #   strikes and blasts light TNT, ticks their fuses
       Tower/                   # the battle tower's simulation, namespace VoxelEngine.Simulation.Tower
-        SkeletonManager.cs     # the skeletons: forced spawn only (Spawn(position, tier), under the hard cap), the rake at
+        SkeletonManager.cs     # the skeletons: forced spawn only (Spawn(position), under the hard cap), the rake at
                                #   its impact, the arrows (MobMissiles), loot, despawn, client mirrors; no ring spawn; reports a
                                #   bound skeleton's despawn, leash release or idle crumble back to its piles (TakeReleased)
                                #   so its floor owes it

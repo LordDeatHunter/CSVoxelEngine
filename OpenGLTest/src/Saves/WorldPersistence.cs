@@ -423,12 +423,12 @@ internal sealed class WorldPersistence
         || (_sandworms != null && string.Equals(name, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase));
 
     // A forced spawn of a saved mob of a known kind (null at a full hard cap); a hell mob's layer and a sky
-    // mob's zone tier, and so its pool, follow from its saved position, while a skeleton's tower tier and a cave
-    // mob's depth tier are saved (a cave mob saved without one takes the depth tier of its saved position)
+    // mob's zone tier, and so its pool, follow from its saved position, while a cave mob's depth tier is saved
+    // (a cave mob saved without one takes the depth tier of its saved position)
     private Mob? SpawnSaved(string name, Vector3 center, EntitySaveData.MobData mob)
     {
-        // Before the skeleton and hell fall-throughs: a Skeleton King comes back bound to its tower (its home, leash
-        // and summon tier follow from the site), with no ritual and no rise; the restored health then sets the
+        // Before the skeleton and hell fall-throughs: a Skeleton King comes back bound to its tower (its home and leash
+        // follow from the site), with no ritual and no rise; the restored health then sets the
         // brain's phase silently on its first observation, so a reload never re-summons
         if (SkeletonKingManager.HeightOf(name) > 0f)
         {
@@ -449,7 +449,7 @@ internal sealed class WorldPersistence
         // Before the hell fall-through, which would otherwise take the skeleton
         if (SkeletonManager.HeightOf(name) > 0f)
         {
-            var skeleton = _skeletons!.Spawn(center, mob.Tier ?? 0, Skeleton.RoleOf(name),
+            var skeleton = _skeletons!.Spawn(center, Skeleton.RoleOf(name),
                 SkeletonOutfit.FromCode(mob.Outfit ?? 0));
             if (skeleton != null) skeleton.Floor = TowerFloorOf(mob);
             return skeleton;
@@ -470,7 +470,7 @@ internal sealed class WorldPersistence
     /// <summary>
     /// The live mobs and drops as <see cref="EntitySaveCodec"/> writes them: every living slime,
     /// goblin, hell, sky and cave mob, skeleton, Skeleton King (not one fading out) and sandworm (kind by <see cref="EntityType.Name"/>, body center, health,
-    /// facing, velocity, a goblin's ammo and torches, a slime's size, a skeleton's tower tier, a cave mob's depth tier, a king's tower and summon tier) and the item drops nearest the player first, capped at
+    /// facing, velocity, a goblin's ammo and torches, a slime's size, a cave mob's depth tier, a king's tower) and the item drops nearest the player first, capped at
     /// <see cref="SaveConfig.MaxSavedDrops"/>, by <see cref="SaveNames"/> name (an id
     /// with no name is skipped with one warning). Entries still pending a restore are appended, so a
     /// flush during loading, or before a far entity's chunk arrived, never loses them.
@@ -486,10 +486,10 @@ internal sealed class WorldPersistence
         mobs.AddRange(from t in _world.Wildlife where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(from t in CaveMobs where !t.IsDead select MobSaveCodec.Capture(t, null, tier: t.Tier));
         mobs.AddRange(from t in Skeletons where !t.IsDead
-            select MobSaveCodec.Capture(t, null, tier: t.Tier, floor: t.Floor, outfit: t.Outfit.Code));
+            select MobSaveCodec.Capture(t, null, floor: t.Floor, outfit: t.Outfit.Code));
         // A fading king is not saved: a reload never brings back a king its tower already let go
         mobs.AddRange(from t in SkeletonKings where !t.IsDead && !t.IsDying
-            select MobSaveCodec.Capture(t, null, tier: t.Home.SummonTier, tower: t.Home.Tower));
+            select MobSaveCodec.Capture(t, null, tower: t.Home.Tower));
         mobs.AddRange(from t in Sandworms where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(_pendingMobs);
 

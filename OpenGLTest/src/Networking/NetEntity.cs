@@ -47,9 +47,7 @@ public enum NetEntityKind : byte
 /// (<see cref="Slime.Size"/>; a 0 from an older server reads as the smallest size) or a hell or sky mob's
 /// attack count (<c>RealmMob.AttackCount</c>: a client's mirror plays its attack clip whenever the count moves,
 /// the count's remainder modulo the kind's attack variants naming the clip, and an older server's 0 never moves it);
-/// <see cref="ItemId"/> is a goblin's torches or a skeleton's tower tier (0..<c>MobConfig.TowerMaxTier</c>, clamped on
-/// read, since a mirror cannot derive it from where it stands) with its role and outfit packed above it
-/// (<c>Skeleton.PackLook</c>) or the Skeleton King's fight phase (1..3, clamped on read;
+/// <see cref="ItemId"/> is a goblin's torches or a skeleton's role and outfit (<c>Skeleton.PackLook</c>) or the Skeleton King's fight phase (1..3, clamped on read;
 /// its <see cref="Ammo"/> is its attack count, naming slam, volley and summon by its remainder modulo 3) or a cave mob's
 /// depth tier (0..<c>MobConfig.CaveMaxTier</c>, clamped on read, fixed at its spawn; its <see cref="Ammo"/> is its attack
 /// count; a spider or scorpion packs the face it clings to above the tier, <c>CrawlerMob.PackStance</c>, and its <see cref="Yaw"/> is its

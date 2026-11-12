@@ -38,8 +38,8 @@ public sealed class VisualStep
     /// kinds ignore it).</summary>
     public int Size { get; init; } = 1;
 
-    /// <summary>The tower floor tier a <c>spawn</c> step gives a skeleton (0 when the step names none;
-    /// other kinds ignore it).</summary>
+    /// <summary>The depth tier a <c>spawn</c> step gives a cave mob (0 when the step names none, and the mob then
+    /// takes the depth tier of its feet; other kinds ignore it).</summary>
     public int Tier { get; init; }
 
     /// <summary>True when a <c>spawn</c> step gave only <c>[x, z]</c>, and always for a <c>grow</c>
@@ -455,7 +455,7 @@ public sealed class VisualScenario
     /// registry only when the step runs, so parsing stays content-free), <c>pos</c> is either
     /// <c>[x, z]</c> (feet snapped onto the terrain) or <c>[x, y, z]</c> (an exact feet position),
     /// the optional <c>size</c> (an integer from 1, default 1) is a slime's size and the optional
-    /// <c>tier</c> (an integer from 0, default 0) a skeleton's tower floor tier.</summary>
+    /// <c>tier</c> (an integer from 0, default 0) a cave mob's depth tier.</summary>
     private static VisualStep ReadSpawn(JsonElement element, int index)
     {
         if (!element.TryGetProperty("entity", out var entity)

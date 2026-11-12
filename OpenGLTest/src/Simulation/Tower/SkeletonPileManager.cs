@@ -12,9 +12,9 @@ namespace VoxelEngine.Simulation.Tower;
 /// Raises a tower floor's skeletons from its piles. A pile whose cell is loaded and still holds the pile block wakes
 /// when a non-immune target stands within <see cref="MobConfig.SkeletonPileTriggerBlocks"/> on its floor
 /// (<see cref="TowerRules.PileTriggers"/>), and then raises a wave of up to <see cref="TowerDifficulty.PackSize"/>
-/// skeletons of the floor's tier every <see cref="MobConfig.SkeletonPileWaveSeconds"/>, each bound to the floor, until
+/// skeletons every <see cref="MobConfig.SkeletonPileWaveSeconds"/>, each bound to the floor, until
 /// its waves run out. A pile never raises past <see cref="TowerDifficulty.PileNearLimit"/> living skeletons within
-/// <see cref="MobConfig.SkeletonPileNearRadiusBlocks"/> of it (5 on the ground floor, 2 more per floor), so a wave
+/// <see cref="MobConfig.SkeletonPileNearRadiusBlocks"/> of it (5 on the ground floor, 1 more per floor), so a wave
 /// that would overfill the pile's surroundings is trimmed or waits for kills. A wave counts only when at least one
 /// skeleton rose, so a full near limit, a full hard cap or a walled-in pile keeps it. A pile a chest has alarmed
 /// (<see cref="PileState.Alarmed"/>) raises its next wave at once, past its trigger range, cooldown and near limit (the
@@ -114,7 +114,7 @@ public sealed class SkeletonPileManager
         var risen = 0;
         for (var i = 0; i < points.Count; i++)
         {
-            var skeleton = skeletons.Spawn(points[i], floor.Ref.Floor);
+            var skeleton = skeletons.Spawn(points[i]);
             if (skeleton == null) break;
             skeleton.Floor = floor.Ref;
             risen++;

@@ -29,18 +29,16 @@ internal sealed class SpellEffects
     private readonly ChunkManager _chunks;
     private readonly SpellBlockImpact _blocks;
     private readonly BlockDebrisSystem _debris;
-    private readonly SfxManager? _sfx;
     private readonly bool _serverMode;
     private readonly List<SpellProjectile> _projectiles = [];
 
     internal SpellEffects(World world, ChunkManager chunks, StatusEffectBlockWriter writer, WorldItemUse itemUse,
-        BlockDebrisSystem debris, SfxManager? sfx, bool serverMode)
+        BlockDebrisSystem debris, bool serverMode)
     {
         _world = world;
         _chunks = chunks;
         _blocks = new SpellBlockImpact(chunks, writer, itemUse);
         _debris = debris;
-        _sfx = sfx;
         _serverMode = serverMode;
     }
 
@@ -94,13 +92,15 @@ internal sealed class SpellEffects
                 HitMob(bolt, bolt.HitMob!);
             else if (flight == SpellFlight.HitCell)
                 _blocks.ApplyAt(bolt.Element, bolt.ImpactCell, bolt.ImpactNormal);
-            if (flight == SpellFlight.Spent || _serverMode) continue;
-            SpellSparks.Impact(_debris, bolt.Position, bolt.SparkColor);
-            // One impact sound per update, so a volley landing together does not stack clips
-            if (heard || Vector3.Distance(bolt.Position, _world.Camera.Position) > SpellConfig.ImpactSoundRangeBlocks)
-                continue;
-            heard = true;
-            _sfx?.Play(SfxLibrary.SpellImpactGroup);
+            if (flight == SpellFlight.Spent) continue;
+            // One impact sound per update, so a volley landing together does not stack clips; a server sends it to
+            // the players near it except the caster, whose client heard its own preview bolt land
+            if (!heard)
+            {
+                heard = true;
+                _world.Sounds.PlayAt(SfxLibrary.SpellImpactGroup, bolt.Position, bolt.Caster.PlayerId);
+            }
+            if (!_serverMode) SpellSparks.Impact(_debris, bolt.Position, bolt.SparkColor);
         }
     }
 

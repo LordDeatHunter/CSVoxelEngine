@@ -1,4 +1,5 @@
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Interaction;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
@@ -39,6 +40,32 @@ public sealed class RemotePlayerAnimationTests
 
         remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Punch, 2);
         Assert.True(remote.Model.MineT < 1f);
+    }
+
+    [Fact]
+    public void ABroadcastReportsTheSwingItStartedOnlyWhenTheCounterMoves()
+    {
+        var remote = new RemotePlayer(1, "Other", PlayerRig.BuiltIn());
+        var eye = new Vector3(0f, 1.62f, 0f);
+        // The first sighting only records the counter
+        Assert.Equal(NetPlayerAction.None, remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Slice, 4));
+        Assert.Equal(NetPlayerAction.None, remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Slice, 4));
+        Assert.Equal(NetPlayerAction.Cast, remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Cast, 5));
+    }
+
+    [Fact]
+    public void BladeSwingsAndCastsSoundForOthersWhilePunchesAndThrowsAreSilent()
+    {
+        foreach (var blade in new[]
+                 {
+                     NetPlayerAction.Slice, NetPlayerAction.SliceReturn, NetPlayerAction.SwordCut,
+                     NetPlayerAction.SwordBackCut, NetPlayerAction.SwordChop,
+                 })
+            Assert.Equal(SfxLibrary.SwooshGroup, RemotePlayer.SoundOf(blade));
+        Assert.Equal(SfxLibrary.SpellCastGroup, RemotePlayer.SoundOf(NetPlayerAction.Cast));
+        Assert.Null(RemotePlayer.SoundOf(NetPlayerAction.Punch));
+        Assert.Null(RemotePlayer.SoundOf(NetPlayerAction.Throw));
+        Assert.Null(RemotePlayer.SoundOf(NetPlayerAction.None));
     }
 
     [Fact]

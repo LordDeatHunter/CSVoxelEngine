@@ -12,7 +12,7 @@ namespace VoxelEngine.Tests.Simulation.Tower;
 /// <summary>
 /// The Skeleton King's manager (<see cref="SkeletonKingManager"/>): one king per tower and none past the hard cap, a
 /// kill reads as killed before the next update while a king that is left alone (everyone far off, or nobody in play)
-/// fades out without loot and never reads as killed, a summon raises skeletons of the king's tier and never more
+/// fades out without loot and never reads as killed, a summon raises skeletons and never more
 /// living than its minion cap, a volley fans several bones, the slam's shockwave reaches only nearby targets, and the
 /// slam throws bone shrapnel that flies through the king and its skeletons and hurts only the target it touches.
 /// </summary>
@@ -35,10 +35,10 @@ public sealed class SkeletonKingManagerTests
     private static Vector3 FeetAt(float x, float z) => new(x, 1f, z);
     private static Vector3 CenterAt(Vector3 feet) => feet + new Vector3(0f, MobConfig.SkeletonKingHeight * 0.5f, 0f);
 
-    private static SkeletonKingHome HomeAt(Vector3 feet, (int, int)? tower, int tier = 0) => new(tower, feet, Leash, tier);
+    private static SkeletonKingHome HomeAt(Vector3 feet, (int, int)? tower) => new(tower, feet, Leash);
 
-    private static SkeletonKing SpawnBound(SkeletonKingManager manager, Vector3 feet, (int, int) tower, int tier = 0) =>
-        manager.Spawn(CenterAt(feet), HomeAt(feet, tower, tier), spawnIn: false)!;
+    private static SkeletonKing SpawnBound(SkeletonKingManager manager, Vector3 feet, (int, int) tower) =>
+        manager.Spawn(CenterAt(feet), HomeAt(feet, tower), spawnIn: false)!;
 
     private static StubTarget PlayerAt(float x, float z, float feetY = 1f) =>
         new(StubTarget.EyeAt(new Vector3(x, feetY, z)));
@@ -150,15 +150,14 @@ public sealed class SkeletonKingManagerTests
     }
 
     [Fact]
-    public void ASummonRaisesTieredSkeletonsUnderTheMinionCap()
+    public void ASummonRaisesSkeletonsUnderTheMinionCap()
     {
         var chunks = StoneFloor();
         var caps = new MobCaps();
         var manager = new SkeletonKingManager(KingType, caps);
         var minions = new SkeletonManager(SkeletonType, caps);
         var drops = new DropManager();
-        const int tier = 2;
-        var king = SpawnBound(manager, FeetAt(4.5f, 8.5f), TowerA, tier);
+        var king = SpawnBound(manager, FeetAt(4.5f, 8.5f), TowerA);
         // Out of slam reach, so the king's first decisions only walk
         IMobTarget[] targets = [PlayerAt(10.5f, 8.5f)];
 
@@ -174,7 +173,6 @@ public sealed class SkeletonKingManagerTests
         Assert.Equal(minions.LivingCount, manager.LivingMinions);
         foreach (var skeleton in minions.Mobs)
         {
-            Assert.Equal(tier, skeleton.Tier);
             Assert.Null(skeleton.Floor);
         }
 
@@ -288,7 +286,7 @@ public sealed class SkeletonKingManagerTests
         var drops = new DropManager();
         // The king, a skeleton and the target in a line, out of slam reach and before the king's first volley
         var king = SpawnBound(manager, FeetAt(2.5f, 8.5f), TowerA);
-        var skeleton = minions.Spawn(new Vector3(6.5f, 1f + MobConfig.SkeletonHeight * 0.5f, 8.5f), tier: 0,
+        var skeleton = minions.Spawn(new Vector3(6.5f, 1f + MobConfig.SkeletonHeight * 0.5f, 8.5f),
             spawnIn: false)!;
         var target = PlayerAt(10.5f, 8.5f);
 

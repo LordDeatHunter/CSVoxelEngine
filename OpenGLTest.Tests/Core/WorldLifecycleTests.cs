@@ -449,10 +449,10 @@ public sealed class WorldLifecycleTests : IDisposable
         // One of each wild animal
         foreach (var (name, i) in WildlifeSpecies.Names.Select((name, i) => (name, i)))
             Assert.True(first.SpawnEntity(name, new Vector3(-8f + 3f * i, High - 1f, 8f)));
-        // A tower skeleton above the first floor: its tier cannot be read back from the position
-        Assert.True(first.SpawnEntity(Skeleton.EntityName, new Vector3(5f, High - 1f, -5f), tier: 4));
+        // A tower skeleton above the first floor
+        Assert.True(first.SpawnEntity(Skeleton.EntityName, new Vector3(5f, High - 1f, -5f)));
         // A second, first-floor skeleton left unbound, beside the first one bound to a tower floor
-        Assert.True(first.SpawnEntity(Skeleton.EntityName, new Vector3(-5f, High - 1f, -5f), tier: 0));
+        Assert.True(first.SpawnEntity(Skeleton.EntityName, new Vector3(-5f, High - 1f, -5f)));
         // The three cave kinds beside the surface player (their chunks load with it), one at a scenario tier its
         // position (far above the caves, depth tier 0) cannot give back
         Assert.True(first.SpawnEntity(Shardling.EntityName, new Vector3(6f, High - 1f, 6f)));
@@ -460,7 +460,7 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.True(first.SpawnEntity(Magmaborn.EntityName, new Vector3(6f, High - 1f, -6f)));
         var tieredCave = Assert.Single(first.CaveMobs, m => m.Tier > 0);
         var boundFloor = new TowerFloorRef(7, -3, 4);
-        var bound = Assert.Single(first.Skeletons, s => s.Tier > 0);
+        var bound = Assert.Single(first.Skeletons, s => s.Position.X > 0f);
         bound.Floor = boundFloor;
         var slime = Assert.Single(first.Slimes);
         var goblin = Assert.Single(first.Goblins);
@@ -489,7 +489,6 @@ public sealed class WorldLifecycleTests : IDisposable
         var caveTier = tieredCave.Tier;
         var caveCenter = tieredCave.Position;
         var cavePool = tieredCave.MaxHealth;
-        var skeletonTier = bound.Tier;
         var boundCenter = bound.Position;
         var unboundCenter = Assert.Single(first.Skeletons, s => s != bound).Position;
 
@@ -528,10 +527,8 @@ public sealed class WorldLifecycleTests : IDisposable
             Assert.Equal(health, restored.Health);
             Assert.Equal(facing, restored.Facing);
         }
-        // The bound skeleton came back at its saved tier, so its wounded health fits a pool above the first floor's,
-        // and bound to the same tower floor; the unbound one came back bound to none
+        // The bound skeleton came back bound to the same tower floor; the unbound one came back bound to none
         var restoredSkeleton = Assert.Single(second.Skeletons, s => s.Position == boundCenter);
-        Assert.Equal(skeletonTier, restoredSkeleton.Tier);
         Assert.Equal(boundFloor, restoredSkeleton.Floor);
         Assert.Null(Assert.Single(second.Skeletons, s => s.Position == unboundCenter).Floor);
         // The tiered cave mob came back at its saved tier with the same, tier-scaled pool, not its position's tier 0
@@ -619,7 +616,6 @@ public sealed class WorldLifecycleTests : IDisposable
         var restored = Assert.Single(second.SkeletonKings, k => k.Home.Tower != null);
         Assert.Equal(boundHealth, restored.Health);
         Assert.Equal(home.Tower, restored.Home.Tower);
-        Assert.Equal(home.SummonTier, restored.Home.SummonTier);
         Assert.Equal(home.Feet, restored.Home.Feet);
         Assert.Contains(restored, second.Mobs);
 

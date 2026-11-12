@@ -47,6 +47,7 @@ internal sealed class ClientSession
     // The server values a message lets through to the world (the rest wait behind a prediction)
     private readonly List<NetCellChange> netApplyScratch = new();
     private readonly List<WaystoneNetRow> waystoneRowsScratch = new();
+    private readonly List<SoundEvent> soundsScratch = new();
     // What this client predicted and the server has not answered yet; one per connection
     private ClientPrediction prediction = new();
     private double netStateTimer;
@@ -426,6 +427,12 @@ internal sealed class ClientSession
                     panel.SetLantern(answer.State);
                 break;
             }
+            case NetMessage.SoundEvents:
+                // The world sounds the server's simulation made near this player, heard from where they happened
+                SoundEventCodec.Read(reader, soundsScratch);
+                foreach (var sound in soundsScratch)
+                    w.Sounds.PlayAt(sound.Group, sound.Position);
+                break;
             case NetMessage.ChestContents:
                 ApplyChestContents(w, reader);
                 break;

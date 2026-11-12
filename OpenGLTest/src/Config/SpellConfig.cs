@@ -90,12 +90,6 @@ public static class SpellConfig
     /// <summary>The sRGB color of the cast burst when the cast fizzles (cosmetic).</summary>
     public static readonly Vector3 FizzleSparkColor = new(0.55f, 0.55f, 0.55f);
 
-    /// <summary>
-    /// How close to the camera a bolt must land, in blocks, for its impact to be heard (the sound effects are
-    /// not positional, so a far landing stays silent).
-    /// </summary>
-    public const float ImpactSoundRangeBlocks = 32f;
-
     /// <summary>The view's brief pinch on a cast, in degrees as <c>Camera.PunchFov</c> takes them (negative narrows;
     /// gentler than a light punch's -0.8, cosmetic).</summary>
     public const float CastFovKickDegrees = -0.5f;

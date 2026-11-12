@@ -68,30 +68,36 @@ public static class SlimeSize
     /// </summary>
     public static float LargeChance(float night, bool underground) =>
         MathUtils.Lerp(MobConfig.SlimeLargeChanceDay, MobConfig.SlimeLargeChanceNight,
-            underground ? 1f : MathUtils.Clamp01(night));
+            DarkShare(night, underground));
 
     /// <summary>
     /// The size a ring spawn gets from one uniform <paramref name="roll"/> in [0, 1): it grows one
-    /// size past <see cref="Min"/> while the roll stays under <c>chance^k</c> (k = 1, 2, ...), so
-    /// size <c>s + 1</c> or larger has probability <c>chance^s</c>, mostly small by day and larger
-    /// more often at night or underground. The last step, into <see cref="Max"/> (the giant), takes
-    /// <see cref="MobConfig.SlimeMaxSizeChanceFactor"/> of that threshold on top, so the
-    /// giant is rarer still. A pure function: for one roll, a higher chance never gives a smaller slime.
+    /// size past <see cref="Min"/> while the roll stays under the step's threshold. Size 2 has the
+    /// <see cref="LargeChance"/>; each size past 2 multiplies that threshold by the chance again and by
+    /// the dark share (<see cref="DarkShare"/>), so by day (no dark share) a spawn stays size 1 or,
+    /// rarely, size 2. The last step, into <see cref="Max"/> (the giant), takes
+    /// <see cref="MobConfig.SlimeMaxSizeChanceFactor"/> of its threshold on top. A pure function: for
+    /// one roll, a higher chance or a darker spawn never gives a smaller slime.
     /// </summary>
     public static int Roll(float night, bool underground, float roll)
     {
         var chance = LargeChance(night, underground);
+        var dark = DarkShare(night, underground);
         var size = Min;
         var threshold = chance;
         while (size < Max)
         {
             var step = size + 1 == Max ? threshold * MobConfig.SlimeMaxSizeChanceFactor : threshold;
+            if (size >= Min + 1) step *= dark;
             if (roll >= step) break;
             size++;
             threshold *= chance;
         }
         return size;
     }
+
+    /// <summary>The share of full dark a ring spawn counts: 1 underground, else the night factor (0..1).</summary>
+    public static float DarkShare(float night, bool underground) => underground ? 1f : MathUtils.Clamp01(night);
 
     /// <summary>
     /// Whether a hit splits a slime of <paramref name="size"/>: the rule is on the transition, not on

@@ -45,7 +45,7 @@ public sealed class ServerPlayer : IMobTarget
         Position = position;
         // Cached once, so the per-frame pickup loop never allocates a delegate
         CanAcceptDrop = Inventory.CanAccept;
-        Context = new PlayerContext(Inventory) { Name = name, Eye = position, Health = Status };
+        Context = new PlayerContext(Inventory) { Name = name, PlayerId = id, Eye = position, Health = Status };
     }
 
     /// <summary>

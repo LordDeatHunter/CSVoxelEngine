@@ -12,8 +12,7 @@ namespace VoxelEngine.Tests.Entities.TowerMobs;
 
 /// <summary>
 /// The skeleton's own rules, driven headless: its shipped model satisfies its contract (and a model that does
-/// not names its file), the tower difficulty never eases with the floor tier and stays capped, a higher-tier
-/// skeleton is tougher and hits harder, it shoots only inside its bow band with a clear line (and rakes a target
+/// not names its file), it shoots only inside its bow band with a clear line (and rakes a target
 /// in reach instead), an archer hidden behind a pillar walks around it to shoot, each clip's event is taken once per attack, the band stays inside the arrow's range, the
 /// replicated attack count names the clip it started, and it is undead.
 /// </summary>
@@ -77,50 +76,22 @@ public sealed class SkeletonTests
     }
 
     [Fact]
-    public void TowerDifficultyNeverEasesWithTierAndStaysCapped()
+    public void TheBonePilesRaiseMoreAndTolerateMoreAsTheFloorRises()
     {
-        Assert.Equal(1f, TowerDifficulty.Multiplier(0));
         for (var tier = 1; tier <= MobConfig.TowerMaxTier; tier++)
         {
-            Assert.True(TowerDifficulty.Multiplier(tier) >= TowerDifficulty.Multiplier(tier - 1), $"tier {tier} eases");
-            Assert.True(TowerDifficulty.Multiplier(tier) <= MobConfig.TowerDifficultyMaxMultiplier);
             Assert.True(TowerDifficulty.PackSize(tier) >= TowerDifficulty.PackSize(tier - 1));
-            Assert.True(TowerDifficulty.PackSize(tier) <= MobConfig.TowerPackMaxSize);
-            Assert.True(TowerDifficulty.Scale(10, tier) >= TowerDifficulty.Scale(10, tier - 1));
-            Assert.True(TowerDifficulty.Scale(10, tier) >= 10);
+            Assert.True(TowerDifficulty.PileNearLimit(tier) > TowerDifficulty.PileNearLimit(tier - 1));
         }
-        Assert.True(TowerDifficulty.Multiplier(MobConfig.TowerMaxTier) > TowerDifficulty.Multiplier(0));
 
         // Out of range clamps to the end floors
         Assert.Equal(0, TowerDifficulty.Clamp(-3));
         Assert.Equal(MobConfig.TowerMaxTier, TowerDifficulty.Clamp(MobConfig.TowerMaxTier + 9));
-        Assert.Equal(TowerDifficulty.Multiplier(0), TowerDifficulty.Multiplier(-3));
-        Assert.Equal(TowerDifficulty.Multiplier(MobConfig.TowerMaxTier), TowerDifficulty.Multiplier(MobConfig.TowerMaxTier + 9));
+        Assert.Equal(TowerDifficulty.PackSize(0), TowerDifficulty.PackSize(-3));
         Assert.Equal(TowerDifficulty.PackSize(MobConfig.TowerMaxTier), TowerDifficulty.PackSize(MobConfig.TowerMaxTier + 9));
-    }
-
-    [Fact]
-    public void AHigherTierSkeletonHitsHarderButKeepsItsHealth()
-    {
-        Skeleton? previous = null;
-        for (var tier = 0; tier <= MobConfig.TowerMaxTier; tier++)
-        {
-            var skeleton = new Skeleton(Type, Vector3.Zero, tier, spawnIn: false);
-            Assert.Equal(skeleton.MaxHealth, skeleton.Health);
-            if (previous != null)
-            {
-                Assert.Equal(previous.MaxHealth, skeleton.MaxHealth);
-                Assert.True(skeleton.MeleeDamage >= previous.MeleeDamage);
-                Assert.True(skeleton.ArrowDamage >= previous.ArrowDamage);
-            }
-            previous = skeleton;
-        }
-
-        var ground = new Skeleton(Type, Vector3.Zero, 0, spawnIn: false);
-        var top = new Skeleton(Type, Vector3.Zero, MobConfig.TowerMaxTier, spawnIn: false);
-        Assert.True(top.MeleeDamage > ground.MeleeDamage);
-        Assert.True(top.ArrowDamage > ground.ArrowDamage);
-        Assert.Equal(MobConfig.TowerMaxTier, new Skeleton(Type, Vector3.Zero, MobConfig.TowerMaxTier + 5).Tier);
+        Assert.Equal(TowerDifficulty.PileNearLimit(0), TowerDifficulty.PileNearLimit(-3));
+        Assert.Equal(TowerDifficulty.PileNearLimit(MobConfig.TowerMaxTier),
+            TowerDifficulty.PileNearLimit(MobConfig.TowerMaxTier + 9));
     }
 
     [Fact]
@@ -128,7 +99,7 @@ public sealed class SkeletonTests
     {
         var chunks = StoneFloor();
         var band = (MobConfig.SkeletonBowMinRange + MobConfig.SkeletonBowMaxRange) * 0.5f;
-        var skeleton = new Skeleton(Type, OnFloor(1.5f, 8.5f), 0, spawnIn: false);
+        var skeleton = new Skeleton(Type, OnFloor(1.5f, 8.5f), spawnIn: false);
         var target = PlayerAt(1.5f + band, 8.5f);
 
         var starts = 0;
@@ -155,7 +126,7 @@ public sealed class SkeletonTests
         for (var y = 1; y <= 4; y++)
         for (var z = 0; z < Chunk.Size; z++)
             walled.Chunks[Vector3.Zero].SetBlockRaw(8, y, z, stone, 0);
-        var blind = new Skeleton(Type, OnFloor(2.5f, 8.5f), 0, spawnIn: false);
+        var blind = new Skeleton(Type, OnFloor(2.5f, 8.5f), spawnIn: false);
         var hidden = PlayerAt(14.5f, 8.5f);
         for (var i = 0; i < (int)(6f / Dt); i++)
         {
@@ -165,7 +136,7 @@ public sealed class SkeletonTests
         }
 
         // A target in melee reach is raked, never shot
-        var close = new Skeleton(Type, OnFloor(6.5f, 8.5f), 0, spawnIn: false);
+        var close = new Skeleton(Type, OnFloor(6.5f, 8.5f), spawnIn: false);
         var beside = PlayerAt(6.5f + MobConfig.SkeletonMeleeReach * 0.5f, 8.5f);
         var raked = false;
         for (var i = 0; i < (int)(4f / Dt); i++)
@@ -181,7 +152,7 @@ public sealed class SkeletonTests
     public void TheMeleeImpactIsTakenOnlyAtItsEventOncePerSwing()
     {
         var chunks = StoneFloor();
-        var skeleton = new Skeleton(Type, OnFloor(6.5f, 8.5f), 0, spawnIn: false);
+        var skeleton = new Skeleton(Type, OnFloor(6.5f, 8.5f), spawnIn: false);
         var target = PlayerAt(6.5f + MobConfig.SkeletonMeleeReach * 0.5f, 8.5f);
 
         var swings = 0;
@@ -210,7 +181,7 @@ public sealed class SkeletonTests
         Assert.True(MobConfig.SkeletonBowMinRange < MobConfig.SkeletonBowMaxRange);
         Assert.True(MobConfig.SkeletonMeleeReach < MobConfig.SkeletonBowMinRange);
 
-        var skeleton = new Skeleton(Type, OnFloor(0.5f, 0.5f), 0, spawnIn: false);
+        var skeleton = new Skeleton(Type, OnFloor(0.5f, 0.5f), spawnIn: false);
         var chest = RealmMob.ChestOf(StubTarget.EyeAt(new Vector3(0.5f + MobConfig.SkeletonBowMaxRange, 1f, 0.5f)));
         Assert.True(GoblinAim.TryLaunchVelocity(skeleton.ShotOrigin, chest, MobConfig.SkeletonArrowSpeed,
             ThrownProjectile.Gravity, out _), "an arrow cannot reach a chest at the band's far edge");
@@ -223,7 +194,7 @@ public sealed class SkeletonTests
 
         // A shot, then a rake once the target steps into reach
         var band = (MobConfig.SkeletonBowMinRange + MobConfig.SkeletonBowMaxRange) * 0.5f;
-        var skeleton = new Skeleton(Type, OnFloor(1.5f, 8.5f), 0, spawnIn: false);
+        var skeleton = new Skeleton(Type, OnFloor(1.5f, 8.5f), spawnIn: false);
         var target = PlayerAt(1.5f + band, 8.5f);
         for (var i = 0; i < (int)(6f / Dt) && !skeleton.Animation.IsPlaying(Skeleton.ShootClip); i++)
             skeleton.Update(Dt, chunks, target);
@@ -243,7 +214,7 @@ public sealed class SkeletonTests
     [Fact]
     public void ASkeletonIsUndead()
     {
-        Assert.True(new Skeleton(Type, Vector3.Zero, 0, spawnIn: false).IsUndead);
+        Assert.True(new Skeleton(Type, Vector3.Zero, spawnIn: false).IsUndead);
     }
 
     private static EntityType WarriorType => EntityRegistry.Require(Skeleton.WarriorEntityName);
@@ -254,7 +225,7 @@ public sealed class SkeletonTests
         Skeleton.ValidateContent(WarriorType);
         var chunks = StoneFloor();
         var band = (MobConfig.SkeletonBowMinRange + MobConfig.SkeletonBowMaxRange) * 0.5f;
-        var warrior = new Skeleton(WarriorType, OnFloor(1.5f, 8.5f), 0, spawnIn: false, SkeletonRole.Warrior);
+        var warrior = new Skeleton(WarriorType, OnFloor(1.5f, 8.5f), spawnIn: false, SkeletonRole.Warrior);
         var target = PlayerAt(1.5f + band, 8.5f);
 
         var stabbed = false;
@@ -267,7 +238,7 @@ public sealed class SkeletonTests
         }
         Assert.True(stabbed, "the warrior never closed in to stab");
 
-        var archer = new Skeleton(Type, Vector3.Zero, 0, spawnIn: false);
+        var archer = new Skeleton(Type, Vector3.Zero, spawnIn: false);
         Assert.True(warrior.MeleeDamage > archer.MeleeDamage);
         Assert.True(warrior.MeleeKnockbackSpeed > archer.MeleeKnockbackSpeed);
     }
@@ -276,7 +247,7 @@ public sealed class SkeletonTests
     public void AnArcherBacksAwayFromATargetInsideItsBandButOutOfReach()
     {
         var chunks = StoneFloor();
-        var archer = new Skeleton(Type, OnFloor(8.5f, 8.5f), 0, spawnIn: false);
+        var archer = new Skeleton(Type, OnFloor(8.5f, 8.5f), spawnIn: false);
         var near = (MobConfig.SkeletonMeleeReach + MobConfig.SkeletonBowMinRange) * 0.5f;
         var target = PlayerAt(8.5f + near, 8.5f);
         var start = archer.Position.X;
@@ -297,7 +268,7 @@ public sealed class SkeletonTests
         for (var y = 1; y <= 4; y++)
         for (var z = 6; z <= 10; z++)
             chunks.Chunks[Vector3.Zero].SetBlockRaw(6, y, z, stone, 0);
-        var archer = new Skeleton(Type, OnFloor(2.5f, 8.5f), 0, spawnIn: false);
+        var archer = new Skeleton(Type, OnFloor(2.5f, 8.5f), spawnIn: false);
         var target = PlayerAt(12.5f, 8.5f);
         var chest = RealmMob.ChestOf(target.Eye);
         Assert.True(BlockRaycaster.SegmentHitsBlock(archer.ShotOrigin, chest, chunks), "the pillar does not hide the target");
@@ -317,15 +288,14 @@ public sealed class SkeletonTests
     }
 
     [Fact]
-    public void TheLookByteRoundTripsEveryTierRoleAndOutfit()
+    public void TheLookByteRoundTripsEveryRoleAndOutfit()
     {
         foreach (var role in Enum.GetValues<SkeletonRole>())
-        for (var tier = 0; tier <= MobConfig.TowerMaxTier; tier++)
         for (var code = 0; code < SkeletonOutfit.Count; code++)
         {
             var outfit = SkeletonOutfit.FromCode(code);
-            Skeleton.UnpackLook(Skeleton.PackLook(tier, role, outfit), out var readTier, out var readRole, out var readOutfit);
-            Assert.Equal((tier, role, outfit), (readTier, readRole, readOutfit));
+            Skeleton.UnpackLook(Skeleton.PackLook(role, outfit), out var readRole, out var readOutfit);
+            Assert.Equal((role, outfit), (readRole, readOutfit));
         }
     }
 
@@ -333,7 +303,7 @@ public sealed class SkeletonTests
     public void ArmorSoftensEveryBlowMoreWithMoreAndHarderPiecesButNeverToNothing()
     {
         int Blow(int code, int amount) =>
-            new Skeleton(Type, Vector3.Zero, 0, spawnIn: false, outfit: SkeletonOutfit.FromCode(code)).ScaleDamage(amount, Vector3.Zero);
+            new Skeleton(Type, Vector3.Zero, spawnIn: false, outfit: SkeletonOutfit.FromCode(code)).ScaleDamage(amount, Vector3.Zero);
 
         var bare = Blow(0, 40);
         var leatherCap = Blow(1, 40);
