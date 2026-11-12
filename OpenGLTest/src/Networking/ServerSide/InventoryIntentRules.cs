@@ -30,6 +30,8 @@ namespace VoxelEngine.Networking.ServerSide;
 /// <item>A staff clear needs a staff in hand and a bound slot (<see cref="HeldStaff.TryClear"/>).</item>
 /// <item>Wearing gear needs an owned gear instance and an equipment slot of its kind
 /// (<see cref="Equipment.TryEquip"/>); taking it off needs a worn slot.</item>
+/// <item>A hotbar move needs two slots and a source that shows something (<see cref="Inventory.MoveSlot"/>); a
+/// hotbar clear needs a slot it has.</item>
 /// </list>
 /// </summary>
 public static class InventoryIntentRules
@@ -79,6 +81,14 @@ public static class InventoryIntentRules
 
             case NetInventoryAction.UnequipGear:
                 return inventory.Equipment.Unequip(intent.Slot);
+
+            case NetInventoryAction.MoveSlot:
+                return IsSlot(intent.Slot) && IsSlot(intent.Id) && inventory.MoveSlot(intent.Slot, intent.Id);
+
+            case NetInventoryAction.ClearSlot:
+                if (!IsSlot(intent.Slot)) return false;
+                inventory.ClearSlot(intent.Slot);
+                return true;
 
             default:
                 return false;

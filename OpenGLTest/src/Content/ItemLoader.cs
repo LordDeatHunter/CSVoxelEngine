@@ -120,8 +120,9 @@ internal static class ItemLoader
             if (!float.IsFinite(power) || power <= 0f)
                 throw new InvalidOperationException(
                     $"Item '{path}' has tool.power {tool?.Power}; expected a positive number.");
-            var hitDelay = tool?.HitDelayMs ?? Mining.DefaultHitGapMs;
-            if (!float.IsFinite(hitDelay) || hitDelay < 1f || hitDelay > 60000f)
+            // Null when the tool declares no pace: punches and block hits then use their own defaults
+            var hitDelay = tool?.HitDelayMs;
+            if (hitDelay is { } ms && (!float.IsFinite(ms) || ms < 1f || ms > 60000f))
                 throw new InvalidOperationException(
                     $"Item '{path}' has tool.hitDelayMs {tool?.HitDelayMs}; expected 1..60000 milliseconds.");
 

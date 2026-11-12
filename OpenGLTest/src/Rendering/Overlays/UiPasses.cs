@@ -115,13 +115,14 @@ internal sealed class UiPasses
         // The day/first-pickup/full-inventory toast rides above the item-name row
         if (toast is { Alpha: > 0f, Text.Length: > 0 })
             _owner.Ui.Hud.DrawToast(toast.Text, toast.Alpha);
+        // The vitals stay up under a panel or the pause menu, so health and mana can be read while one is open
+        if (camera?.IsCreative != true)
+            _owner.Ui.Hud.DrawHearts(health, maxHealth);
+        _owner.Ui.Hud.DrawAir(airShare, health);
+        _owner.Ui.Hud.DrawMana(manaShare, health, camera?.IsCreative == true);
+        _owner.Ui.Hud.DrawEffects(effectMask, health);
         if (!panelUp && (menu == null || !menu.IsOpen))
         {
-            if (camera?.IsCreative != true)
-                _owner.Ui.Hud.DrawHearts(health, maxHealth);
-            _owner.Ui.Hud.DrawAir(airShare, health);
-            _owner.Ui.Hud.DrawMana(manaShare, health, camera?.IsCreative == true);
-            _owner.Ui.Hud.DrawEffects(effectMask, health);
             if (staffSlot != null)
                 _owner.Ui.Hud.DrawStaffSlot(staffSlot);
             if (hotbarName != null)

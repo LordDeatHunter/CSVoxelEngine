@@ -119,7 +119,7 @@ internal sealed class LeftClickAction
     private float _breakDamage;
     private float _breakHardness;
     private float _breakPower;
-    private float _breakHitSeconds = Mining.DefaultHitGapMs / 1000f;
+    private float _breakHitSeconds = Mining.DefaultBlockHitGapMs / 1000f;
     private bool _breakAllowed;
     private float _hitTimer;
     // An axe's chop already started ahead of the coming hit, so the blow lands with it
@@ -179,10 +179,11 @@ internal sealed class LeftClickAction
             if (!_hasSelectedBlock) return null;
             var cellId = Edits.BlockIdAt(_selectedBlockPosition);
             var (x, y, z) = _selectedBlockPosition.BlockCell();
-            // Any cell of a multiblock shows the whole structure, not its plain part block
+            // Any cell of a multiblock shows the whole structure, not its plain part block; either half of a
+            // two-cell block (a waystone) names its lower half, which the label draws stacked with the upper
             var blockId = Multiblock.TryResolveAnchor(_chunkManager, x, y, z, out var anchorPos, out _, out var anchorType)
                 ? anchorType!.Id
-                : cellId;
+                : TallBlock.LowerOf(cellId);
             var state = LookLabel.For(blockId, Camera.IsCreative, Inventory.Knows, HeldItem());
             if (state.Text.Length == 0) return null;
             return new LookLabelState(state.Text, state.Known, state.Mineable, _selectedBlockPosition,
@@ -381,7 +382,7 @@ internal sealed class LeftClickAction
             _breakHardness = Mining.HardnessOf(_breakingBlockId, _breakState);
             _breakAllowed = Mining.CanMine(_breakingBlockId, held);
             _breakPower = Mining.BlockDamage(held);
-            _breakHitSeconds = Mining.HitGapSeconds(held,
+            _breakHitSeconds = Mining.BlockHitGapSeconds(held,
                 (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
             // A natural tree's wood keeps the damage it took (only here: a connected client's server counts
             // its own break from zero, and a placed log never keeps any)
@@ -576,7 +577,7 @@ internal sealed class LeftClickAction
         _breakDamage = 0f;
         _breakHardness = 0f;
         _breakAllowed = false;
-        _breakHitSeconds = Mining.DefaultHitGapMs / 1000f;
+        _breakHitSeconds = Mining.DefaultBlockHitGapMs / 1000f;
         _hitTimer = 0f;
         _popElapsed = BlockPopSeconds;
     }

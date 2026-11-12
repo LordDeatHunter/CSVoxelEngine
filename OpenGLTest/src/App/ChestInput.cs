@@ -167,11 +167,12 @@ internal sealed class ChestInput
     /// the scenario runner's click on a chest row.</summary>
     internal void Withdraw(World world, int slot, bool all) => Send(world, ChestMove.Withdraw(slot, all ? 0 : 1));
 
-    /// <summary>Moves a stackable (one unit, or all with shift) from the inventory into the open chest.</summary>
-    internal void DepositStack(ushort id)
+    /// <summary>Moves a stackable from the inventory into the open chest: one unit, or all of it with shift or when
+    /// <paramref name="wholeStack"/> asks (a hotbar drag).</summary>
+    internal void DepositStack(ushort id, bool wholeStack = false)
     {
         if (ActiveWorld is not { } world || !world.ChestPanel.IsOpen) return;
-        Send(world, ChestMove.DepositStack(id, ShiftHeld ? 0 : 1));
+        Send(world, ChestMove.DepositStack(id, wholeStack || ShiftHeld ? 0 : 1));
     }
 
     /// <summary>Moves a tool or piece of gear from the inventory into the open chest.</summary>

@@ -37,7 +37,7 @@ public static class ItemFactory
         float Scale,
         bool IsTool,
         float ToolPower,
-        float HitDelayMs,
+        float? HitDelayMs,
         AttackPattern Attack,
         float BlockDamage,
         float EntityDamage,

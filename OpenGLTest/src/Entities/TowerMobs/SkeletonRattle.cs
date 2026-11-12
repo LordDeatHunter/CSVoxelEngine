@@ -14,7 +14,7 @@ namespace VoxelEngine.Entities.TowerMobs;
 /// </summary>
 internal sealed class SkeletonRattle(Action<string> play, Random random)
 {
-    private float _timer = NextInterval(random);
+    private readonly AmbientCallTimer _timer = new(random, AudioConfig.SkeletonRattleMinSeconds, AudioConfig.SkeletonRattleMaxSeconds);
 
     /// <summary>One frame: ticks the timer against the skeletons currently near <paramref name="listener"/>.</summary>
     public void Tick(float deltaSeconds, IReadOnlyList<Skeleton> skeletons, Vector3 listener) =>
@@ -26,10 +26,7 @@ internal sealed class SkeletonRattle(Action<string> play, Random random)
     /// </summary>
     public void Update(float deltaSeconds, bool skeletonNearby)
     {
-        _timer -= deltaSeconds;
-        if (_timer > 0f) return;
-        _timer = NextInterval(random);
-        if (skeletonNearby)
+        if (_timer.Tick(deltaSeconds) && skeletonNearby)
             play(SfxLibrary.SkeletonRattleGroup);
     }
 
@@ -44,8 +41,4 @@ internal sealed class SkeletonRattle(Action<string> play, Random random)
         }
         return false;
     }
-
-    private static float NextInterval(Random random) =>
-        AudioConfig.SkeletonRattleMinSeconds
-        + random.NextSingle() * (AudioConfig.SkeletonRattleMaxSeconds - AudioConfig.SkeletonRattleMinSeconds);
 }

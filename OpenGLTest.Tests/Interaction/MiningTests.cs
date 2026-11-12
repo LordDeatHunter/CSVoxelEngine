@@ -24,11 +24,14 @@ public sealed class MiningTests
         Assert.True(axe.IsTool);
         Assert.False(flint.IsTool);
 
-        // A declared pace drives the hit gap; an item without one falls back to the baseline.
-        Assert.True(pickaxe.HitDelayMs > 0f);
-        Assert.Equal(pickaxe.HitDelayMs / 1000f, Mining.HitGapSeconds(pickaxe), precision: 5);
-        Assert.Equal(Mining.DefaultHitGapMs, Mining.HitGapMs(flint), precision: 4);
-        Assert.Equal(Mining.DefaultHitGapMs / 1000f, Mining.HitGapSeconds(null), precision: 5);
+        // A declared pace drives both the punch and the block hit gap; an item without one falls back to
+        // the bare hand's paces, and mining is quicker than punching.
+        Assert.True(pickaxe.HitDelayMs is > 0f);
+        Assert.Equal(pickaxe.HitDelayMs!.Value / 1000f, Mining.HitGapSeconds(pickaxe), precision: 5);
+        Assert.Equal(pickaxe.HitDelayMs!.Value / 1000f, Mining.BlockHitGapSeconds(pickaxe), precision: 5);
+        Assert.Equal(Mining.HitGapSeconds(null), Mining.HitGapSeconds(flint), precision: 5);
+        Assert.Equal(Mining.BlockHitGapSeconds(null), Mining.BlockHitGapSeconds(flint), precision: 5);
+        Assert.True(Mining.BlockHitGapSeconds(null) < Mining.HitGapSeconds(null));
 
         // Same split for power and damage: tools carry their own numbers, the hand falls back.
         Assert.Equal(Mining.DefaultPower, Mining.Power(flint), precision: 5);

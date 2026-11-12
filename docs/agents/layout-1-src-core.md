@@ -36,7 +36,7 @@ OpenGLTest/
       TextFieldKeys.cs         # maps key events (and the Ctrl/Shift state and clipboard) onto TextFieldEditing for the focused field
       InventoryPanelInput.cs   # the [E] panel's input: clicks, the right-click equip, scrollbar, search keys and scope button,
                                #   creative buttons, hovered row, tooltip
-      RowDragInput.cs          # dragging a listed [E] row onto a hotbar or equipment slot: press, per-frame lift, drop
+      RowDragInput.cs          # dragging a listed [E] row or a hotbar slot onto a hotbar slot, equipment slot, chest or the panel: press, per-frame lift, drop
       MenuInput.cs             # the pause menu's and shared settings page's input, and applying the window-level settings
       ScenarioUi.cs            # the app's IScenarioUi: lets a VOXEL_SCRIPT run open the [E] panel and the spell builder, pick a tab or row,
                                #   type a search, hold the pointer and drive the waystone screen and the anvil's recipe list through the
@@ -51,7 +51,8 @@ OpenGLTest/
       AudioDevice.cs           # the shared OpenAL Soft device and context (refcounted; natives for Windows, Linux, macOS)
       AudioOutput.cs           # streams a 16-bit PCM IWaveProvider to an OpenAL source on its own refill thread
       SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups (and names the
-                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle, skeleton_hit, skeleton_death)
+                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle, skeleton_hit, skeleton_death, crow_hit, crow_death, crow_caw)
+      AmbientCallTimer.cs      # a randomized repeat timer for ambient calls (skeleton rattle, crow caw); Tick fires once per interval
       SfxManager.cs            # one-shot sound effects, decoded and mixed like AmbienceManager's, through one AudioOutput
       SfxMixer.cs              # mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline
     Chunks/                    # chunk storage and lifecycle, the column cache and column terrain, the light
@@ -477,6 +478,7 @@ OpenGLTest/
                                #   WildlifeSpecies table, Deer (watches, bolts, grazes), Boar (neutral until crowded or
                                #   hurt, then charges and gores; the dire boar is the same class oversized), FlyingAnimal
                                #   (lands, rests, takes off; posture for mirrors), Crow (flock pest: swoops, pecks, caws),
+                               #   CrowCaws (the flock's ambient caw: a randomized timer, played when a crow is in earshot),
                                #   Dragonfly (waterside hunter: darts and bites)
         SkyMob.cs              # abstract sky mob (a RealmMob): the zone tier it spawned in and its tier-scaled pool
         Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event

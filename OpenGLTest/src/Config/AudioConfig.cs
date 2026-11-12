@@ -37,4 +37,11 @@ public static class AudioConfig
     // Seconds between rattles are drawn uniformly from this range; kept long so it stays an occasional accent
     public const float SkeletonRattleMinSeconds = 12f;
     public const float SkeletonRattleMaxSeconds = 35f;
+
+    // --- Crow caw ---
+    // A crow within this many blocks of the camera can be heard cawing
+    public const float CrowCawRangeBlocks = 24f;
+    // Seconds between ambient caws are drawn uniformly from this range; a flock calls more often than one skeleton rattles
+    public const float CrowCawMinSeconds = 6f;
+    public const float CrowCawMaxSeconds = 20f;
 }

@@ -125,7 +125,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       SkyMobManager.cs         # the sky mobs: the galeraptor's strike at its dive impact, the golem's shockwave at its
                                #   slam impact, the sky-band ring spawn on island tops (tier-scaled packs, big-zone golems)
       SandwormGround.cs        # what the worm reads of the ground: the surface height, sand or not, desert or not
-      SandwormManager.cs       # the sandworm boss: one at a time, summoned (the thumper), hunts, bites, loot, retreat; client mirrors
+      SandwormManager.cs       # the sandworm boss: one at a time, summoned (by a dragonfly wing), hunts, bites, loot, retreat; client mirrors
       SlimeManager.cs          # slimes: hop AI tick, contact damage, loot, ring spawning (surface, and caves but the magma deep)
       Caves/                   # cave spawning by cave biome, namespace VoxelEngine.Simulation.Caves (see "Cave mobs")
         CaveSpawnSearch.cs     # the cave spawn search's parameters: ring radii, tries, heights, light limits, allowed biomes
@@ -268,7 +268,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         RowEquip.cs            # equipping a listed row: the right-click (gear worn or taken off, a tool or a stackable into
                                #   the selected hotbar slot), a drop onto a hotbar or equipment slot, and whether a row is
                                #   on the hotbar or worn; returns the intent that mirrors a change
-        RowDrag.cs             # a pressed [E] row that lifts into a drag once the pointer leaves the press
+        RowDrag.cs             # a pressed [E] row or hotbar slot that lifts into a drag once the pointer leaves the press
         EquippedMark.cs        # how a listed row shows it is equipped: the hotbar key chip, "worn", the green bar
         StaffComponent.cs      # a staff's bound spells (part keys per slot) and selected slot, immutable
         PanelTransition.cs     # the [E] panel's open/close easing: eased alpha and slide from a self-clocked progress

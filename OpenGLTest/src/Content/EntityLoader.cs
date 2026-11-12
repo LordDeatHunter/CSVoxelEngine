@@ -43,11 +43,12 @@ internal static class EntityLoader
             }
 
             var blood = ParseBlood(definition.Blood, path);
+            var bloodSize = ParseBloodSize(definition.Blood, path);
             var immune = (definition.Immune ?? []).Select(effect => effect.Trim()).ToHashSet(StringComparer.Ordinal);
 
             if (definition.Variants != null)
             {
-                types[name] = LoadVariants(name, path, definition, hp, loot, blood, immune);
+                types[name] = LoadVariants(name, path, definition, hp, loot, blood, bloodSize, immune);
                 continue;
             }
 
@@ -68,6 +69,7 @@ internal static class EntityLoader
                 MaxHealth = hp,
                 LootTable = loot,
                 BloodColor = blood,
+                BloodSizeScale = bloodSize,
                 Immune = immune,
                 ModelPath = model,
                 Model = parsed,
@@ -89,6 +91,19 @@ internal static class EntityLoader
                 if (!StatusEffectRegistry.TryGet(effect, out _))
                     throw new InvalidOperationException(
                         $"Entity '{type.Name}' is immune to unknown status effect '{effect}'.");
+    }
+
+    /// <summary>
+    /// An entity's <c>blood.size</c>: the multiplier on each droplet's size, 1 when omitted (or when the blood is
+    /// <c>"none"</c>, or a bare color isn't an object). Zero or negative is refused naming the file.
+    /// </summary>
+    internal static float ParseBloodSize(JsonElement? blood, string path)
+    {
+        if (blood is not { ValueKind: JsonValueKind.Object } element || !element.TryGetProperty("size", out var size))
+            return 1f;
+        if (size.ValueKind != JsonValueKind.Number || !size.TryGetSingle(out var scale) || !(scale > 0f))
+            throw new InvalidOperationException($"Entity '{path}' has a blood.size that is not a positive number.");
+        return scale;
     }
 
     /// <summary>
@@ -120,7 +135,7 @@ internal static class EntityLoader
     /// and the first one is the kind's <see cref="EntityType.Model"/>.
     /// </summary>
     private static EntityType LoadVariants(string name, string path, EntityDefinition definition, int hp, LootTable? loot,
-        Vector3? blood, IReadOnlySet<string> immune)
+        Vector3? blood, float bloodSize, IReadOnlySet<string> immune)
     {
         var variants = definition.Variants!;
         if (variants.Length == 0)
@@ -146,6 +161,7 @@ internal static class EntityLoader
             MaxHealth = hp,
             LootTable = loot,
             BloodColor = blood,
+            BloodSizeScale = bloodSize,
             Immune = immune,
             ModelPath = variants[0],
             Model = parsed[0],

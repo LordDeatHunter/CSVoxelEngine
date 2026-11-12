@@ -91,7 +91,7 @@ internal sealed class MobStrikes
         if (mob.Type.BloodColor is not { } color) return;
         var count = mob.IsDead ? JuiceConfig.GoreKillCount : JuiceConfig.GoreHitCount;
         _debris.Gore(contact + new Vector3(0f, mob.BodyHalfHeight * 0.2f, 0f), away, color, count,
-            JuiceConfig.GoreSpeed, JuiceConfig.GoreSize);
+            JuiceConfig.GoreSpeed, JuiceConfig.GoreSize * mob.Type.BloodSizeScale);
     }
 
     // Floats the damage of a hit over the mob and plays its hit (or, when it killed, death) sound when

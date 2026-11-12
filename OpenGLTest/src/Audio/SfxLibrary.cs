@@ -62,6 +62,15 @@ public static class SfxLibrary
     /// <summary>Group played when a hit lands on a bug (spider, scorpion, dragonfly), and when it dies: a squish.</summary>
     public const string BugSquishGroup = "squish";
 
+    /// <summary>Group played when a hit lands on a crow.</summary>
+    public const string CrowHitGroup = "crow_hit";
+
+    /// <summary>Group played when a hit kills a crow.</summary>
+    public const string CrowDeathGroup = "crow_death";
+
+    /// <summary>Group played ambiently from time to time by a crow near the camera.</summary>
+    public const string CrowCawGroup = "crow_caw";
+
     /// <summary>Group played when a blade (slice, sword or axe chop) starts a swing: a swoosh.</summary>
     public const string SwooshGroup = "swoosh";
 

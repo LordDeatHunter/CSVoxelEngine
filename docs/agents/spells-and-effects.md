@@ -74,7 +74,7 @@ and every error names its file. Tests compile in-memory effects through the pure
 | `tickSeconds` | none | finite and > 0, required exactly when the effect deals damage or has a block flag, refused otherwise: the pulse interval |
 | `damageShare` | none | in (0, 1]: damage per pulse as a share of the target's max health, at least 1 (`StatusEffectSet.DamagePerTick`) |
 | `moveFactor` | 1 | in (0, 1]: scales the walk and swim speed (the player's `PlayerPhysics`, a goblin's walk, a slime's hop clock) |
-| `attackFactor` | 1 | in (0, 1]: slows the local player's hit gap (`Mining.HitGapSeconds(held, factor)`: punch cadence, mining hits, the axe chop), a goblin's throw and melee cooldowns and a slime's contact cooldown |
+| `attackFactor` | 1 | in (0, 1]: slows the local player's hit gap (`Mining.HitGapSeconds(held, factor)` for the punch cadence, `Mining.BlockHitGapSeconds(held, factor)` for mining hits and the axe chop), a goblin's throw and melee cooldowns and a slime's contact cooldown |
 | `blocks.ignite` / `blocks.freeze` / `blocks.thaw` | false | what each pulse does to the cells around the body (`StatusEffectBlockAction`): burn `flammable` blocks to air, freeze a fluid source under the feet into its `freezesTo`, thaw a block into its `meltsTo` fluid source |
 | `tint` | none | sRGB `[r, g, b]`, 0..255 each: the mob tint (`uStatusTint`, decoded to linear) |
 | `particle` | none | a `FireParticleKind` name (`ember`, `smoke`, `steam`, ...), matched case-insensitively: what an affected mob sheds |

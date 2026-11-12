@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using Silk.NET.Input;
 using VoxelEngine.Platform;
@@ -12,7 +13,7 @@ namespace VoxelEngine.App;
 
 /// <summary>
 /// The mouse's side of text fields: a left press on a field focuses it and puts the caret under
-/// the pointer (Shift extends the selection), and holding the button drags the selection. Covers
+/// the pointer (Shift extends the selection), and holding the button drags the selection; a right press empties the field. Covers
 /// the main-menu fields, the chat line (the cursor is free while the chat is open), the [E] search field, the chest search
 /// and the waystone screen's rename and search fields. The click-up focus rules stay where they were.
 /// Owned by Program; main thread only.
@@ -24,13 +25,16 @@ internal sealed class FieldPointer(InputManager inputManager, RenderManager rend
     private TextFieldState? _field;
     private Vector2 _center;
     private Vector2 _size;
+    private bool _clear;
 
     private World? ActiveWorld => Program.ActiveWorld;
 
-    /// <summary>A pressed left button: starts a caret placement and drag when it landed on a field.</summary>
-    internal void Press()
+    /// <summary>A pressed left button starts a caret placement and drag when it landed on a field; a pressed right
+    /// button (<paramref name="clear"/>) empties the field instead.</summary>
+    internal void Press(bool clear = false)
     {
         _field = null;
+        _clear = clear;
         if (inputManager.Mouse is not { } mouse) return;
         var position = mouse.Position;
         var ui = renderManager.Ui;
@@ -68,7 +72,7 @@ internal sealed class FieldPointer(InputManager inputManager, RenderManager rend
                 if (!InventoryPanelLayout.SearchBoxAt(point, screen)) return;
                 var (center, size) = InventoryPanelLayout.SearchBoxRect(screen);
                 inventoryView.Focus = InventoryFocus.Search;
-                Begin(inventoryView.Search.Text, center, size, position);
+                Begin(inventoryView.Search.Text, center, size, position, inventoryView.Search.Clear);
                 return;
             }
         }
@@ -101,8 +105,13 @@ internal sealed class FieldPointer(InputManager inputManager, RenderManager rend
         MoveCaret(mouse.Position, extend: true);
     }
 
-    private void Begin(TextFieldState field, Vector2 center, Vector2 size, Vector2 windowPosition)
+    private void Begin(TextFieldState field, Vector2 center, Vector2 size, Vector2 windowPosition, Action? clear = null)
     {
+        if (_clear)
+        {
+            (clear ?? field.Clear)();
+            return;
+        }
         _field = field;
         _center = center;
         _size = size;

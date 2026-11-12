@@ -247,6 +247,15 @@ public sealed class PlayerHealth
         }
     }
 
+    /// <summary>Catches the <c>burning</c> status effect while the body stands in a lit campfire, unless
+    /// <paramref name="immune"/> (creative and flight). Unlike lava it deals no damage of its own: the effect's damage
+    /// over time does.</summary>
+    public void UpdateCampfire(bool onFire, bool immune)
+    {
+        if (!onFire || immune) return;
+        StatusEffects.Apply(this, immune: false, "burning");
+    }
+
     /// <summary>The air under water; <see cref="UpdateBreath"/> advances it.</summary>
     public Breath Breath { get; } = new();
 

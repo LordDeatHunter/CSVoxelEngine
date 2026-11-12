@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 
 namespace VoxelEngine.Entities.Wildlife;
@@ -48,6 +49,7 @@ public sealed class Crow : FlyingAnimal
     private float _strikeCooldown = WildlifeConfig.CrowStrikeMinSeconds;
     private float _angerLeft;
     private float _thiefCooldown;
+    private float _flapIn = Roll(WildlifeConfig.CrowFlapMinSeconds, WildlifeConfig.CrowFlapMaxSeconds);
     private ItemDrop? _prize;
     private float _habitIn = Roll(WildlifeConfig.CrowHabitMinSeconds, WildlifeConfig.CrowHabitMaxSeconds);
 
@@ -57,6 +59,12 @@ public sealed class Crow : FlyingAnimal
 
     /// <inheritdoc />
     public override WildlifeKind Kind => WildlifeKind.Crow;
+
+    /// <inheritdoc />
+    public override string? HitSoundGroup => SfxLibrary.CrowHitGroup;
+
+    /// <inheritdoc />
+    public override string? DeathSoundGroup => SfxLibrary.CrowDeathGroup;
 
     /// <inheritdoc />
     public override float BodyHeight => WildlifeConfig.CrowHeight;
@@ -250,7 +258,25 @@ public sealed class Crow : FlyingAnimal
             return;
         }
 
-        Fly(goal, chasing: false, (goal == null ? 1f : MobConfig.MobWanderSpeedFactor) * MoveFactor, deltaTime, chunks);
+        // Idle with nowhere to go it sinks, and each flap lifts it a little instead of holding a hover height
+        if (goal == null)
+        {
+            TickFlaps(deltaTime);
+            Fly(null, chasing: false, MoveFactor, deltaTime, chunks, WildlifeConfig.CrowIdleSinkSpeed);
+            return;
+        }
+
+        Fly(goal, chasing: false, MobConfig.MobWanderSpeedFactor * MoveFactor, deltaTime, chunks);
+    }
+
+    // Each flap, when its timer runs out, beats the wings and boosts the crow upward; the steering then eases it
+    // back into its sink
+    private void TickFlaps(float deltaTime)
+    {
+        _flapIn -= deltaTime;
+        if (_flapIn > 0f) return;
+        _flapIn = Roll(WildlifeConfig.CrowFlapMinSeconds, WildlifeConfig.CrowFlapMaxSeconds);
+        SetVelocity(Velocity with { Y = Velocity.Y + WildlifeConfig.CrowFlapBoostSpeed });
     }
 
     /// <inheritdoc />

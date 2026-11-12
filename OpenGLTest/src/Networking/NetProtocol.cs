@@ -124,6 +124,10 @@ public enum NetInventoryAction : byte
     EquipGear = 11,
     /// <summary>Takes off the gear worn in an equipment slot: <c>Slot</c>.</summary>
     UnequipGear = 12,
+    /// <summary>Moves a hotbar slot's contents into another: <c>Slot</c> is the source, <c>Id</c> the destination slot.</summary>
+    MoveSlot = 13,
+    /// <summary>Empties a hotbar slot: <c>Slot</c>. The item stays in its pool.</summary>
+    ClearSlot = 14,
 }
 
 /// <summary>
@@ -249,9 +253,14 @@ public static class NetFraming
     /// count names pinch (even) and sting (odd). An older client would not draw it.
     /// 41: the chest moves <see cref="Simulation.Chests.ChestMoveKind.LootAll"/> and
     /// <see cref="Simulation.Chests.ChestMoveKind.QuickStack"/>; an older server would refuse them as malformed.
-    /// 42: lantern requests, placed lanterns in StationState, drop instance payloads,
-    /// and authoritative held id/light in PlayerList.</summary>
-    public const int ProtocolVersion = 42;
+    /// 42: the hotbar's own drags, the <see cref="NetInventoryAction.MoveSlot"/> and <see cref="NetInventoryAction.ClearSlot"/>
+    /// inventory actions; an older server would refuse them as malformed. The earlier lantern branch also published an
+    /// incompatible 42 with lantern requests, placed lanterns in StationState, drop instance payloads and held id/light.
+    /// 43: the independent historical bridge branch; not compatible with the lantern layout.
+    /// 44: combines upstream 42's hotbar actions with the lantern requests, placed lanterns in StationState,
+    /// drop instance payloads and authoritative held id/light in PlayerList. Both historical 42 layouts and bridge 43
+    /// are refused by the handshake. The separate bridge integration reserves 45.</summary>
+    public const int ProtocolVersion = 44;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

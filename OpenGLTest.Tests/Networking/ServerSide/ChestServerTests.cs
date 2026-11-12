@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
+using System.Net.Sockets;
 using System.Threading;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Networking;
@@ -219,6 +220,37 @@ public sealed class ChestServerTests : IDisposable
         Assert.Empty(_world.Drops);
     }
 
+    [Theory]
+    [InlineData(42)] // Both published 42 layouts lack part of the combined contract.
+    [InlineData(43)] // Historical bridge.
+    [InlineData(45)] // Independent bridge integration.
+    public void IncompatibleLayoutsAreRejectedBeforeJoining(int version)
+    {
+        using var raw = new TcpClient();
+        raw.Connect("127.0.0.1", _server.BoundPort);
+        var stream = raw.GetStream();
+        using var hello = new PacketWriter(NetMessage.ClientHello);
+        hello.Write(version).Write("Incompatible");
+        NetFraming.WriteFrame(stream, hello.ToArray());
+        var sw = Stopwatch.StartNew();
+        while (!raw.Client.Poll(0, SelectMode.SelectRead) && sw.Elapsed.TotalSeconds < 15)
+        {
+            _server.Pump(0.01);
+            Thread.Sleep(5);
+        }
+        stream.ReadTimeout = 2000;
+        int received;
+        try { received = stream.ReadByte(); }
+        catch (System.IO.IOException e) when (e.InnerException is SocketException { SocketErrorCode: not SocketError.TimedOut })
+        {
+            received = -1; // A reset also closes the rejected connection.
+        }
+        Assert.Equal(-1, received); // No ServerHello or inventory may reach an incompatible peer.
+        Assert.Equal(0, _server.ClientCount);
+        using var current = Connect("Compatible");
+        Assert.Equal(1, _server.ClientCount);
+    }
+
     [Fact]
     public void LanternMovesAreAuthoritativeAndSelectionInvalidatesTheSession()
     {
@@ -255,8 +287,17 @@ public sealed class ChestServerTests : IDisposable
         Assert.True(LanternState.Held(snapshot)!.Remaining > 0);
         Assert.Equal(1, LanternState.Held(snapshot)!.Storage.CountOf(coal));
 
-        // A queued move after switching cannot keep spending from a stored lantern.
-        player.Inventory.ClearSlot(player.Inventory.SelectedIndex);
+        // A hotbar drag is replayed on the server before a queued fuel transfer. It moves the instance,
+        // closes the now-unselected session and keeps both its fuel and the replaced item's pool intact.
+        var source = player.Inventory.SelectedIndex;
+        var destination = (source + 1) % Inventory.SlotCount;
+        player.Inventory.EquipStackable(destination, Flint);
+        Send(a, NetMessage.InventoryRequest, w =>
+        {
+            w.Write(1);
+            InventoryIntentCodec.Write(w, InventoryIntent.MoveSlot(source, destination));
+        });
+        TickUntil(() => player.Inventory.ToolInstanceAt(destination) == instance, "hotbar drag never moved the lantern");
         var remaining = fuel.Remaining;
         Send(a, NetMessage.LanternMove, w => ChestNetCodec.WriteMove(w, ChestMove.Withdraw(0, 0)));
         TickUntil(() => player.OpenLantern == null, "changed selection kept the lantern session open");
@@ -265,6 +306,22 @@ public sealed class ChestServerTests : IDisposable
         Assert.False(LanternManager.Emits(player.Inventory));
         TickUntil(() => _inboxes[b].Held.TryGetValue("Alice", out var held) && held.Id == 0 && !held.Lit,
             "switching away left a remote held light behind");
+        Assert.Equal(0, player.Inventory.IdAt(source));
+        Assert.Equal(2, player.Inventory.CountFor(Flint));
+        TickUntil(() => _inboxes[a].Inventory?.Hotbar?[destination].ToolInstance == instance,
+            "moved lantern never reached the inventory mirror");
+        snapshot.Import(_inboxes[a].Inventory!);
+        Assert.Equal(remaining, LanternState.Of(snapshot.GetToolStack(instance))!.Remaining);
+        Assert.Equal(1, LanternState.Of(snapshot.GetToolStack(instance))!.Storage.CountOf(coal));
+
+        Send(a, NetMessage.InventoryRequest, w =>
+        {
+            w.Write(2);
+            InventoryIntentCodec.Write(w, InventoryIntent.ClearSlot(destination));
+        });
+        TickUntil(() => player.Inventory.IdAt(destination) == 0, "hotbar clear never reached the server");
+        Assert.Equal(remaining, LanternState.Of(player.Inventory.GetToolStack(instance))!.Remaining);
+        Assert.Equal(1, LanternState.Of(player.Inventory.GetToolStack(instance))!.Storage.CountOf(coal));
     }
 
     [Fact]

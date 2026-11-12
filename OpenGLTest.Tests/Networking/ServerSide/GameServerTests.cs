@@ -419,7 +419,7 @@ public sealed class GameServerTests : IDisposable
 
     /// <summary>Seconds of server time the bare hand needs to mine <paramref name="block"/>.</summary>
     private static double BareHandSeconds(ushort block) =>
-        BreakProgress.RequiredSeconds(Mining.HardnessOf(block, 0), Mining.BlockDamage(null), Mining.HitGapSeconds(null));
+        BreakProgress.RequiredSeconds(Mining.HardnessOf(block, 0), Mining.BlockDamage(null), Mining.BlockHitGapSeconds(null));
 
     [Fact]
     public void EachPlayerHasAnInventoryOfItsOwn()
