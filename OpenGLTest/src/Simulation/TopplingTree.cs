@@ -51,6 +51,8 @@ public class TopplingTree : IDisposable
     private bool _landingPending;
     private bool _landed;
     private float _sinceLanding;
+    private readonly float[] _hitHalf;
+    private readonly Dictionary<object, float> _struck = [];
 
     /// <summary>The rigid pieces the tree is in now: one at first, more as branches snap off. Each
     /// carries its own meshes and model matrix.</summary>
@@ -75,6 +77,14 @@ public class TopplingTree : IDisposable
         _isSolid = isSolid ?? ((_, _, _) => false);
         _centers = new Vector3[blocks.Count];
         _contacts = FellContacts.Build(blocks);
+        // How far a wood block reaches from its center when it hits something; leaves are soft
+        _hitHalf = new float[blocks.Count];
+        for (var i = 0; i < blocks.Count; i++)
+        {
+            _hitHalf[i] = BlockType.IsTreeWood(blocks[i].Id)
+                ? MathF.Max(WoodState.DiameterPx(blocks[i].State) / (2f * WoodState.PixelsPerBlock), 0.2f)
+                : 0f;
+        }
         _masses = new float[blocks.Count];
         var top = pivot.Y + 1f;
         foreach (var block in blocks)
@@ -303,6 +313,13 @@ public class TopplingTree : IDisposable
     {
         if (IsDone) return;
 
+        foreach (var victim in new List<object>(_struck.Keys))
+        {
+            var left = _struck[victim] - deltaTime;
+            if (left <= 0f) _struck.Remove(victim);
+            else _struck[victim] = left;
+        }
+
         var impact = false;
         var atRest = true;
         // Pieces added by a snap-off during this loop are advanced from the next update
@@ -337,6 +354,64 @@ public class TopplingTree : IDisposable
         if (_restElapsed >= SimulationConfig.TreeFellRestSeconds)
             IsDone = true;
     }
+
+    /// <summary>A blow the falling tree deals: which way it was moving (horizontally) and how fast.</summary>
+    public readonly record struct Strike(Vector3 Direction, float Speed);
+
+    /// <summary>
+    /// Whether moving wood of the tree overlaps the box <paramref name="min"/>..<paramref name="max"/>
+    /// fast enough to hurt (<see cref="SimulationConfig.TreeHitMinSpeed"/>), and the fastest such blow.
+    /// A <paramref name="victim"/> that was just hit is skipped until
+    /// <see cref="SimulationConfig.TreeHitCooldownSeconds"/> has passed, so one fall hits once per
+    /// swing. Pieces at rest hurt nobody.
+    /// </summary>
+    public bool TryStrike(object victim, Vector3 min, Vector3 max, out Strike strike)
+    {
+        strike = default;
+        if (IsDone || _struck.ContainsKey(victim)) return false;
+
+        var middle = (min + max) * 0.5f;
+        var best = SimulationConfig.TreeHitMinSpeed;
+        var found = false;
+        foreach (var part in _parts)
+        {
+            var body = part.Body;
+            if (body.AtRest) continue;
+            var nearest = Vector3.Clamp(body.Center, min, max);
+            if (Vector3.DistanceSquared(nearest, body.Center) > body.Radius * body.Radius) continue;
+
+            for (var k = 0; k < part.Blocks.Count; k++)
+            {
+                var half = _hitHalf[part.Blocks[k]];
+                if (half <= 0f) continue;
+                var at = body.PointNow(k);
+                if (at.X < min.X - half || at.X > max.X + half || at.Y < min.Y - half || at.Y > max.Y + half
+                    || at.Z < min.Z - half || at.Z > max.Z + half)
+                    continue;
+
+                var velocity = body.VelocityAt(at);
+                var speed = velocity.Length();
+                if (speed < best) continue;
+                best = speed;
+                found = true;
+                var sideways = new Vector3(velocity.X, 0f, velocity.Z);
+                if (sideways.LengthSquared() < 1e-4f)
+                    sideways = new Vector3(middle.X - at.X, 0f, middle.Z - at.Z);
+                strike = new Strike(sideways.NormalizeHorizontalOr(Vector3.UnitX), speed);
+            }
+        }
+
+        if (found)
+            _struck[victim] = SimulationConfig.TreeHitCooldownSeconds;
+        return found;
+    }
+
+    /// <summary>Health a blow of <paramref name="speed"/> (blocks/s) takes off: grows with speed up to
+    /// <see cref="SimulationConfig.TreeHitMaxDamage"/>, 0 below the minimum speed.</summary>
+    public static int StrikeDamage(float speed) =>
+        speed < SimulationConfig.TreeHitMinSpeed
+            ? 0
+            : Math.Min(SimulationConfig.TreeHitMaxDamage, (int)MathF.Ceiling(speed * SimulationConfig.TreeHitDamagePerSpeed));
 
     // A side branch that struck the ground hard breaks off whole and carries on as its own body
     // with the speed it had; the rest of the tree is rebuilt without it

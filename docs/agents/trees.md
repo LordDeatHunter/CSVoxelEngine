@@ -217,7 +217,12 @@ cannot prop the tree up on its branches. A side branch (`FellBranches`: the wood
 `TreeSupport.Links`, the main stem going up at each fork) whose block hits the ground faster than
 `TreeFellDetachSpeed` snaps off whole, leaves included, into its own `FellPart` that carries on from the
 parent's pose and speed; the rest is rebuilt and remeshed without it (`TopplingTree.Parts`, one model matrix
-and mesh set per part). Only the original part sheds branches. Walls are not collided with, only ground.
+and mesh set per part). Only the original part sheds branches. Falling wood hurts: each update `BlockEditor.StrikeWithTree` (singleplayer and server, never a client)
+asks `TopplingTree.TryStrike` per player (`IMobTarget.TakeHit`, skipped when immune or dead) and per mob
+(`MobStrikes.StrikeMob`) whether moving wood overlaps its body box faster than `TreeHitMinSpeed`; damage is
+`TopplingTree.StrikeDamage` (`TreeHitDamagePerSpeed` per block/s, capped at `TreeHitMaxDamage`), the victim
+is shoved along the wood's motion and not hit again for `TreeHitCooldownSeconds`. Leaves and pieces at rest
+hurt nobody. Walls are not collided with, only ground.
 
 **Reactive growth** (`World.TryGrowTree(species, x, yHint, z, steps)`, refused while loading or
 for an unknown species; the `grow` scenario op calls it). `TreeGrowthWriter` (`Simulation/`, GL-free,

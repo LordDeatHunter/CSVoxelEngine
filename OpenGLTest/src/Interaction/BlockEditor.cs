@@ -5,6 +5,7 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Entities;
 using VoxelEngine.Juice;
 using VoxelEngine.Lod;
 using VoxelEngine.Particles;
@@ -576,12 +577,51 @@ internal sealed class BlockEditor
     }
 
     /// <summary>Swings falling trees, then pops their wood out as item drops once rested.</summary>
+    /// <summary>
+    /// Hurts every player and mob the falling <paramref name="tree"/> is hitting (see
+    /// <see cref="TopplingTree.TryStrike"/>): damage by the speed of the wood, a shove along its motion.
+    /// </summary>
+    private void StrikeWithTree(TopplingTree tree)
+    {
+        if (_serverMode)
+        {
+            foreach (var player in _world.ServerPlayers)
+                StrikePlayer(tree, player);
+        }
+        else
+        {
+            StrikePlayer(tree, _world.Camera);
+        }
+
+        foreach (var mob in _world.Mobs)
+        {
+            if (mob.IsDying) continue;
+            var half = new Vector3(mob.BodyHalfExtent, mob.BodyHalfHeight, mob.BodyHalfExtent);
+            if (!tree.TryStrike(mob, mob.Position - half, mob.Position + half, out var strike)) continue;
+            _world.Strikes.StrikeMob(mob, TopplingTree.StrikeDamage(strike.Speed), mob.Position - strike.Direction,
+                shoveSpeed: SimulationConfig.TreeHitShoveSpeed);
+        }
+    }
+
+    private static void StrikePlayer(TopplingTree tree, IMobTarget player)
+    {
+        if (player.IsImmune || player.IsDead) return;
+        var min = player.Eye - new Vector3(PlayerPhysics.PlayerRadius, Camera.EyeHeight, PlayerPhysics.PlayerRadius);
+        var max = min + new Vector3(2f * PlayerPhysics.PlayerRadius, PlayerPhysics.PlayerHeight, 2f * PlayerPhysics.PlayerRadius);
+        if (!tree.TryStrike(player, min, max, out var strike)) return;
+        player.TakeHit(TopplingTree.StrikeDamage(strike.Speed), strike.Direction, SimulationConfig.TreeHitShoveSpeed,
+            SimulationConfig.TreeHitShoveLift, "a falling tree");
+    }
+
     internal void UpdateToppling(float deltaTime)
     {
         for (var i = _toppling.Count - 1; i >= 0; i--)
         {
             var tree = _toppling[i];
             tree.Update(deltaTime);
+            // A client's mobs and body are mirrors: only the authoritative simulation hurts
+            if (!_clientMode)
+                StrikeWithTree(tree);
             // The moment it hits the ground: cosmetic, so a server's trees land in silence
             if (tree.TryTakeLanding() && !_serverMode)
                 ThudTree(tree);

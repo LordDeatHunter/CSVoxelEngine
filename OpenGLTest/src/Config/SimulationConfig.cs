@@ -60,6 +60,15 @@ public static class SimulationConfig
     public const float TreeFellMaxSimSeconds = 8f;
     // Whatever is still shifting this long after the first hard impact is frozen where it lies
     public const float TreeFellSettleCapSeconds = 2.5f;
+    // Falling wood hurts what it hits: nothing below TreeHitMinSpeed (blocks/s at the point of
+    // contact), then TreeHitDamagePerSpeed per block/s up to TreeHitMaxDamage; a victim is not hit
+    // again for TreeHitCooldownSeconds, and is shoved (horizontal speed and lift)
+    public const float TreeHitMinSpeed = 3f;
+    public const float TreeHitDamagePerSpeed = 2.5f;
+    public const int TreeHitMaxDamage = 45;
+    public const float TreeHitCooldownSeconds = 0.8f;
+    public const float TreeHitShoveSpeed = 6f;
+    public const float TreeHitShoveLift = 3f;
     // A block hitting the ground faster than this (blocks/s) is the thud
     public const float TreeFellImpactSpeed = 3f;
     // Collection bounds: the wood cap covers a fell's nodes plus a wide trunk's shells and is

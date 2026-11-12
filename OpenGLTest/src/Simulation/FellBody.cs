@@ -108,6 +108,10 @@ internal sealed class FellBody
             xz -= m * r.X * r.Z;
             yz -= m * r.Y * r.Z;
         }
+        var reach = 0f;
+        foreach (var offset in _offsets)
+            reach = MathF.Max(reach, offset.Length());
+        Radius = reach + 1f;
         var inertia = new Matrix4x4(xx, xy, xz, 0, xy, yy, yz, 0, xz, yz, zz, 0, 0, 0, 0, 1);
         _invInertiaBody = Matrix4x4.Invert(inertia, out var inverse) ? inverse : Matrix4x4.Identity;
 
@@ -145,6 +149,13 @@ internal sealed class FellBody
         Hinged = inherit.Hinged;
         Elapsed = inherit.Elapsed;
     }
+
+    /// <summary>The farthest any block center is from <see cref="Center"/>, plus a block: a sphere
+    /// around the center that holds the whole body in any pose.</summary>
+    public float Radius { get; }
+
+    /// <summary>How fast the body's material moves at the world point <paramref name="point"/> now.</summary>
+    public Vector3 VelocityAt(Vector3 point) => _velocity + Vector3.Cross(_angular, point - Center);
 
     /// <summary>World position of block <paramref name="index"/>'s center now.</summary>
     public Vector3 PointNow(int index) => Center + Vector3.Transform(_offsets[index], Rotation);

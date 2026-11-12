@@ -148,6 +148,42 @@ public sealed class TreeThudTests
     }
 
     [Fact]
+    public void AFallingTrunkHurtsWhatItSweepsThroughOnceAndNothingBeforeItMoves()
+    {
+        var tree = Trunk(8);
+        var victim = new object();
+        // Where the trunk's upper half swings through on its way to the ground (east of the stump, 5 up)
+        var min = new Vector3(8f, GroundTop + 0.5f, 4f);
+        var max = new Vector3(8.6f, GroundTop + 2.3f, 5f);
+        Assert.False(tree.TryStrike(victim, min, max, out _), "a standing tree hurts nobody");
+
+        var hits = new List<TopplingTree.Strike>();
+        for (var i = 0; i < 60 * 6 && !tree.IsDone; i++)
+        {
+            tree.Update(Dt);
+            if (tree.TryStrike(victim, min, max, out var strike))
+                hits.Add(strike);
+        }
+        tree.Dispose();
+
+        Assert.NotEmpty(hits);
+        Assert.All(hits, h => Assert.True(h.Speed >= SimulationConfig.TreeHitMinSpeed));
+        // The blow pushes along the way the tree falls (+X)
+        Assert.All(hits, h => Assert.True(h.Direction.X > 0.5f));
+        Assert.True(hits.Count <= 2, "one swing hits a victim once per cooldown");
+    }
+
+    [Fact]
+    public void StrikeDamageGrowsWithSpeedAndIsCapped()
+    {
+        Assert.Equal(0, TopplingTree.StrikeDamage(SimulationConfig.TreeHitMinSpeed - 0.1f));
+        var slow = TopplingTree.StrikeDamage(SimulationConfig.TreeHitMinSpeed);
+        var fast = TopplingTree.StrikeDamage(SimulationConfig.TreeHitMinSpeed * 2f);
+        Assert.True(slow > 0 && fast > slow);
+        Assert.Equal(SimulationConfig.TreeHitMaxDamage, TopplingTree.StrikeDamage(1000f));
+    }
+
+    [Fact]
     public void ALimbCutOffInMidAirFallsToTheGroundInsteadOfHoveringWhereItWasCut()
     {
         const int height = 16;
