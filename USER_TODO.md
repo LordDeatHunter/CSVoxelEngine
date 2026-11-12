@@ -19,7 +19,6 @@ transparency around the shape.
   `bronze_boots.png`, `bronze_gloves.png`.
 - [ ] **Iron set** — `iron_cap.png`, `iron_tunic.png`, `iron_pants.png`, `iron_boots.png`,
   `iron_gloves.png`.
-- [ ] **Cloud boots** — `cloud_boots.png`.
 
 A set's five pieces share one silhouette and bevel, dressed per material (stitching on leather,
 rivets on metal), so keep a replacement consistent with its set. A worn piece's shell is tinted by
