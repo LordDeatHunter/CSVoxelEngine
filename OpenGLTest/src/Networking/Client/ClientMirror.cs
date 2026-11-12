@@ -438,8 +438,8 @@ internal sealed class ClientMirror
         }
     }
 
-    // A slime mirror also has to be the reported size (the ammo field) and a skeleton or cave mob the reported tier (the
-    // item id), since each is fixed for life
+    // A slime mirror also has to be the reported size (the ammo field) and a skeleton its reported look or a cave mob
+    // its reported tier (the item id), since each is fixed for life
     private static bool KindMatches(Mob mob, NetEntity entry) => entry.Kind switch
     {
         NetEntityKind.Slime => mob is Slime slime && slime.Size == SlimeSize.Clamp(entry.Ammo),
@@ -450,7 +450,7 @@ internal sealed class ClientMirror
         NetEntityKind.Cloudgolem => mob is Cloudgolem,
         NetEntityKind.Sandworm => mob is Sandworm,
         NetEntityKind.Skeleton => mob is Skeleton skeleton
-                                  && Skeleton.PackLook(skeleton.Tier, skeleton.Role, skeleton.Outfit) == SkeletonLookOf((byte)entry.ItemId),
+                                  && Skeleton.PackLook(skeleton.Role, skeleton.Outfit) == SkeletonLookOf((byte)entry.ItemId),
         NetEntityKind.SkeletonKing => mob is SkeletonKing,
         NetEntityKind.Shardling => mob is Shardling shardling && shardling.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
         NetEntityKind.Sporeling => mob is Sporeling sporeling && sporeling.Tier == CaveDifficulty.Clamp((byte)entry.ItemId),
@@ -463,11 +463,11 @@ internal sealed class ClientMirror
         _ => NetEntity.TryGetWildlife(entry.Kind, out var species) && mob is Animal animal && animal.Kind == species,
     };
 
-    // A skeleton's look byte as a mirror built from it would pack it again (its tier clamped)
+    // A skeleton's look byte as a mirror built from it would pack it again
     private static byte SkeletonLookOf(byte itemId)
     {
-        Skeleton.UnpackLook(itemId, out var tier, out var role, out var outfit);
-        return Skeleton.PackLook(tier, role, outfit);
+        Skeleton.UnpackLook(itemId, out var role, out var outfit);
+        return Skeleton.PackLook(role, outfit);
     }
 
     // The Skeleton King's fight phase rides the item id, clamped to its three phases
@@ -488,7 +488,7 @@ internal sealed class ClientMirror
             NetEntityKind.Cloudgolem => _skyMobs?.Spawn(Cloudgolem.EntityName, entry.Position),
             // The boss mirrors with its chain laid behind its heading, then drags it after the head
             NetEntityKind.Sandworm => _sandworms?.SpawnMirror(entry.Position, entry.Yaw),
-            // A skeleton's tower tier, role and outfit ride the item id, since a mirror cannot derive them from where it stands
+            // A skeleton's role and outfit ride the item id, since a mirror cannot derive them from where it stands
             NetEntityKind.Skeleton => SpawnSkeletonMirror(entry),
             // The boss mirrors unbound: its leash, summons and altar bookkeeping stay the server's
             NetEntityKind.SkeletonKing => _kings?.SpawnMirror(entry.Position),
@@ -518,8 +518,8 @@ internal sealed class ClientMirror
 
     private Skeleton? SpawnSkeletonMirror(NetEntity entry)
     {
-        Skeleton.UnpackLook((byte)entry.ItemId, out var tier, out var role, out var outfit);
-        return _skeletons?.Spawn(entry.Position, tier, role, outfit);
+        Skeleton.UnpackLook((byte)entry.ItemId, out var role, out var outfit);
+        return _skeletons?.Spawn(entry.Position, role, outfit);
     }
 
     private void RemoveNetMob(int id)
@@ -542,7 +542,8 @@ internal sealed class ClientMirror
 
     /// <summary>
     /// Reconciles the remote player set with a server broadcast: upserts each entry (skipping the
-    /// client's own id), then removes anyone no longer listed.
+    /// client's own id), sounding a swing one of them just started from where they stand, then removes
+    /// anyone no longer listed.
     /// </summary>
     internal void SyncRemotePlayers(IReadOnlyList<RemotePlayerSnapshot> snapshot, int selfId)
     {
@@ -553,18 +554,21 @@ internal sealed class ClientMirror
                 continue;
             _remoteIdsSeen.Add(entry.Id);
             var index = IndexOfRemote(entry.Id);
+            RemotePlayer remote;
             if (index < 0)
             {
-                var remote = new RemotePlayer(entry.Id, entry.Name, Player.Rig);
-                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq, entry.Armor);
+                remote = new RemotePlayer(entry.Id, entry.Name, Player.Rig);
                 _remotePlayers.Add(remote);
             }
             else
             {
-                var remote = _remotePlayers[index];
+                remote = _remotePlayers[index];
                 remote.Name = entry.Name;
-                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq, entry.Armor);
             }
+            var started = remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq,
+                entry.Armor);
+            if (RemotePlayer.SoundOf(started) is { } sound)
+                _world.Sounds.PlayAt(sound, entry.Eye);
         }
 
         for (var i = _remotePlayers.Count - 1; i >= 0; i--)

@@ -83,7 +83,7 @@ public sealed class SandwormManager : IMobPopulation
     public bool HasLiving => LivingCount > 0;
 
     /// <summary>
-    /// Whether the thumper may wake a worm at the solid cell (<paramref name="x"/>, <paramref name="y"/>,
+    /// Whether a dragonfly wing may wake a worm at the solid cell (<paramref name="x"/>, <paramref name="y"/>,
     /// <paramref name="z"/>): none alive, room under the hard cap, the cell loaded desert sand or sandstone.
     /// </summary>
     public bool CanSummonAt(ChunkManager chunks, int x, int y, int z) =>

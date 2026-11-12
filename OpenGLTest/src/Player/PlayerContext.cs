@@ -28,6 +28,10 @@ public sealed class PlayerContext(Inventory inventory)
     /// <summary>The player's name, for logs; empty for the local player.</summary>
     public string Name { get; init; } = "";
 
+    /// <summary>The server's id of the connected player this context acts for, 0 for the local player: the one a
+    /// sound its own client already predicted is not sent back to (<see cref="Audio.WorldSounds.PlayAt"/>).</summary>
+    public int PlayerId { get; init; }
+
     /// <summary>The player's eye: where raycasts, throws and attacks leave from.</summary>
     public Vector3 Eye { get; set; }
 

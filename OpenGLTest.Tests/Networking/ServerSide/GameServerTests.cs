@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Audio;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
@@ -111,6 +112,9 @@ public sealed class GameServerTests : IDisposable
         /// <summary>Every chat line received, decoded by the client's own reader.</summary>
         public readonly List<ChatMessage> Chat = [];
 
+        /// <summary>Every world sound received, decoded by the client's own reader.</summary>
+        public readonly List<SoundEvent> Sounds = [];
+
         public void Drain(NetworkClient client)
         {
             while (client.Inbound.TryDequeue(out var payload))
@@ -189,6 +193,13 @@ public sealed class GameServerTests : IDisposable
                     case NetMessage.ChatMessage:
                         Chat.Add(ChatMessageCodec.Read(reader));
                         break;
+                    case NetMessage.SoundEvents:
+                    {
+                        var sounds = new List<SoundEvent>();
+                        SoundEventCodec.Read(reader, sounds);
+                        Sounds.AddRange(sounds);
+                        break;
+                    }
                 }
             }
         }
@@ -417,7 +428,7 @@ public sealed class GameServerTests : IDisposable
 
     /// <summary>Seconds of server time the bare hand needs to mine <paramref name="block"/>.</summary>
     private static double BareHandSeconds(ushort block) =>
-        BreakProgress.RequiredSeconds(Mining.HardnessOf(block, 0), Mining.BlockDamage(null), Mining.HitGapSeconds(null));
+        BreakProgress.RequiredSeconds(Mining.HardnessOf(block, 0), Mining.BlockDamage(null), Mining.BlockHitGapSeconds(null));
 
     [Fact]
     public void EachPlayerHasAnInventoryOfItsOwn()
@@ -1431,24 +1442,23 @@ public sealed class GameServerTests : IDisposable
     }
 
     [Fact]
-    public void SkeletonsReachTheClientsEntityListByKindWithTheirTier()
+    public void SkeletonsReachTheClientsEntityListByKindWithTheirLook()
     {
         using var client = Connect("Archer");
         var spawn = client.Server!.Value.Spawn;
         // Straight under the player (the despawn rule is horizontal) and far below it, so it never reaches the player
         var deep = new Vector3(spawn.X, spawn.Y - 200f, spawn.Z + 3f);
-        Assert.True(_world.SpawnEntity(Skeleton.EntityName, deep, tier: 5));
+        Assert.True(_world.SpawnEntity(Skeleton.EntityName, deep));
         var skeleton = Assert.Single(_world.Skeletons);
-        Assert.Equal(5, skeleton.Tier);
         skeleton.RestoreState(skeleton.MaxHealth - 3, 0.5f, Vector3.Zero);
         // Stands in for the attacks the server simulated: the counter its entry carries
         skeleton.MirrorAttackCount(3);
 
         var inbox = InboxOf(client);
         WaitForEntities(inbox, entities => entities.Exists(e => e.Kind == NetEntityKind.Skeleton && e.Ammo == 3));
-        // Sent as a skeleton (never under the switch's goblin default), its tier, role and outfit in the item id
+        // Sent as a skeleton (never under the switch's goblin default), its role and outfit in the item id
         var carried = Assert.Single(inbox.Entities!, e => e.Kind == NetEntityKind.Skeleton);
-        Assert.Equal(Skeleton.PackLook(skeleton.Tier, skeleton.Role, skeleton.Outfit), carried.ItemId);
+        Assert.Equal(Skeleton.PackLook(skeleton.Role, skeleton.Outfit), carried.ItemId);
         Assert.Equal(skeleton.Health, carried.Health);
 
         var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
@@ -1457,7 +1467,6 @@ public sealed class GameServerTests : IDisposable
             mirror.GetChunkManager().Headless = true;
             mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
             var mirrored = Assert.Single(mirror.Skeletons);
-            Assert.Equal(skeleton.Tier, mirrored.Tier);
             Assert.Equal(skeleton.Role, mirrored.Role);
             Assert.Equal(skeleton.Outfit, mirrored.Outfit);
             Assert.Equal(skeleton.MaxHealth, mirrored.MaxHealth);
@@ -2117,5 +2126,25 @@ public sealed class GameServerTests : IDisposable
         SendIntent(client, InventoryIntent.SelectStaffSlot(staff.Slots));
         Assert.Equal(1, HeldStaff.SelectedSlot(Answer()));
         Assert.Equal(1, HeldStaff.SelectedSlot(player.Inventory));
+    }
+
+    [Fact]
+    public void AWorldSoundReachesThePlayersInEarshotButNotTheOneWhoMadeIt()
+    {
+        var maker = Connect("Maker");
+        var listener = Connect("Listener");
+        var eye = PlayerOf(maker).Position;
+        DrainAll();
+
+        // A slime hopping beside both, the maker's own mining blow, and a sound far out of everyone's earshot
+        _world.Sounds.PlayAt(SfxLibrary.SlimeJumpGroup, eye + new Vector3(3f, 0f, 0f));
+        _world.Sounds.PlayAt(SfxLibrary.StoneGroup, eye + new Vector3(1f, 0f, 0f), PlayerOf(maker).Id);
+        _world.Sounds.PlayAt(SfxLibrary.SlimeLandGroup, eye + new Vector3(AudioConfig.SfxRangeBlocks * 3f, 0f, 0f));
+        PumpFor(0.2);
+        DrainAll();
+
+        Assert.Equal([SfxLibrary.SlimeJumpGroup], InboxOf(maker).Sounds.Select(s => s.Group));
+        Assert.Equal([SfxLibrary.SlimeJumpGroup, SfxLibrary.StoneGroup], InboxOf(listener).Sounds.Select(s => s.Group));
+        Assert.Empty(_world.Sounds.Pending);
     }
 }

@@ -16,8 +16,12 @@ namespace VoxelEngine.Interaction;
 /// </summary>
 public static class Mining
 {
-    /// <summary>Gap between hits for a bare hand or any item that declares no tool pace.</summary>
+    /// <summary>Gap between punches for a bare hand or any item that declares no tool pace.</summary>
     public const float DefaultHitGapMs = 600f;
+
+    /// <summary>Gap between block hits for a bare hand or an item that declares no tool pace. Mining is
+    /// quicker than punching: a punch stays on <see cref="DefaultHitGapMs"/>.</summary>
+    public const float DefaultBlockHitGapMs = 300f;
 
     /// <summary>Mining tier a bare hand counts as when a block's <c>tools</c> gate is checked.</summary>
     public const float DefaultPower = 0.5f;
@@ -86,8 +90,16 @@ public static class Mining
     /// admits any member of the tag).</summary>
     public static bool MeetsRequired(float heldPower, float requiredPower) => heldPower >= requiredPower;
 
-    /// <summary>Seconds between hits for the held item; a bare hand uses the baseline.</summary>
+    /// <summary>Seconds between punches for the held item; a bare hand uses the baseline.</summary>
     public static float HitGapSeconds(Item? held) => HitGapMs(held) / 1000f;
+
+    /// <summary>Seconds between block hits for the held item (mining); a bare hand uses its own baseline.</summary>
+    public static float BlockHitGapSeconds(Item? held) => BlockHitGapMs(held) / 1000f;
+
+    /// <summary>The effect-slowed mining pace: <see cref="BlockHitGapSeconds(Item?)"/> divided by
+    /// <paramref name="attackFactor"/>, as <see cref="HitGapSeconds(Item?, float)"/> does for punches.</summary>
+    public static float BlockHitGapSeconds(Item? held, float attackFactor) =>
+        BlockHitGapSeconds(held) / MathF.Max(attackFactor, 0.05f);
 
     /// <summary>The effect-slowed pace: seconds between hits for the held item while a status
     /// effect scales the attacker's pace by <paramref name="attackFactor"/> (1 = unslowed, lower =
@@ -97,9 +109,13 @@ public static class Mining
     public static float HitGapSeconds(Item? held, float attackFactor) =>
         HitGapSeconds(held) / MathF.Max(attackFactor, 0.05f);
 
-    /// <summary>Milliseconds between hits for the held item; a bare hand uses the baseline.</summary>
-    public static float HitGapMs(Item? held) =>
-        held is { HitDelayMs: > 0f } ? held.HitDelayMs : DefaultHitGapMs;
+    /// <summary>Milliseconds between punches for the held item; a bare hand or an item with no declared
+    /// <c>hitDelayMs</c> uses <see cref="DefaultHitGapMs"/>.</summary>
+    public static float HitGapMs(Item? held) => held?.HitDelayMs ?? DefaultHitGapMs;
+
+    /// <summary>Milliseconds between block hits for the held item; a bare hand or an item with no declared
+    /// <c>hitDelayMs</c> uses <see cref="DefaultBlockHitGapMs"/>.</summary>
+    public static float BlockHitGapMs(Item? held) => held?.HitDelayMs ?? DefaultBlockHitGapMs;
 
     private static bool Refused(BlockType block, Item? held)
     {

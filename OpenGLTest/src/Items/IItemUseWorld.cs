@@ -150,7 +150,7 @@ public interface IItemUseWorld
     bool PlantTree(string species, Vector3 hit, Vector3 normal);
 
     /// <summary>
-    /// Wakes the boss <paramref name="entity"/> at the aimed solid <paramref name="cell"/> (the thumper's
+    /// Wakes the boss <paramref name="entity"/> at the aimed solid <paramref name="cell"/> (a dragonfly wing's
     /// sandworm: the cell must be desert sand, and only one may be alive). A world that simulates spawns it, a
     /// client only judges the same rule as a prediction. False where it cannot be woken, so the use is never
     /// spent for nothing.

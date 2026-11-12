@@ -31,7 +31,7 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
     private SkeletonRole _nextRole = SkeletonRole.Archer;
     // The floors of bound skeletons that despawned or were released since the last TakeReleased
     private readonly List<TowerFloorRef> _released = [];
-    // Each arrow carries its archer's damage, scaled by the archer's tier
+    // Each arrow carries its archer's damage
     private readonly MobMissiles _arrows = new();
     private readonly ushort _arrowItemId;
 
@@ -75,28 +75,27 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
 
     /// <summary>
     /// The only way a new skeleton appears (a scenario, a BT-4 bone pile, the Skeleton King's summons): a forced spawn
-    /// at an exact body-center position on tower floor <paramref name="tier"/> (clamped), which may pass the natural cap
-    /// but never the hard cap. Skeletons never spawn naturally. Archers and warriors take turns, and each rolls its
+    /// at an exact body-center position, which may pass the natural cap but never the hard cap. Skeletons never spawn naturally. Archers and warriors take turns, and each rolls its
     /// outfit (<see cref="SkeletonOutfit.Roll"/>). Null when the kind is not registered or the hard cap is full.
     /// </summary>
-    public Skeleton? Spawn(Vector3 position, int tier, bool spawnIn = true)
+    public Skeleton? Spawn(Vector3 position, bool spawnIn = true)
     {
         var role = _warriorType == null ? SkeletonRole.Archer : _nextRole;
-        var skeleton = Spawn(position, tier, role,
+        var skeleton = Spawn(position, role,
             SkeletonOutfit.Roll(role, Random.Shared.NextSingle(), Random.Shared.NextSingle()), spawnIn);
         if (skeleton != null) _nextRole = role == SkeletonRole.Archer ? SkeletonRole.Warrior : SkeletonRole.Archer;
         return skeleton;
     }
 
     /// <summary>A skeleton of a known <paramref name="role"/> and <paramref name="outfit"/> (a save restore, a client's
-    /// mirror, a scenario naming the kind), under the same caps as <see cref="Spawn(Vector3, int, bool)"/>. A warrior
+    /// mirror, a scenario naming the kind), under the same caps as <see cref="Spawn(Vector3, bool)"/>. A warrior
     /// with no warrior kind registered comes back as an archer.</summary>
-    public Skeleton? Spawn(Vector3 position, int tier, SkeletonRole role, SkeletonOutfit outfit, bool spawnIn = true)
+    public Skeleton? Spawn(Vector3 position, SkeletonRole role, SkeletonOutfit outfit, bool spawnIn = true)
     {
         if (_type == null || Caps.ForcedRoom <= 0) return null;
         if (role == SkeletonRole.Warrior && _warriorType == null) role = SkeletonRole.Archer;
         var type = role == SkeletonRole.Warrior ? _warriorType! : _type;
-        return Track(new Skeleton(type, position, tier, spawnIn, role, outfit));
+        return Track(new Skeleton(type, position, spawnIn, role, outfit));
     }
 
     /// <inheritdoc />
@@ -105,7 +104,7 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
         if (_type == null || HeightOf(kind) <= 0f) return null;
         var role = Skeleton.RoleOf(kind);
         if (role == SkeletonRole.Warrior && _warriorType == null) return null;
-        return new Skeleton(role == SkeletonRole.Warrior ? _warriorType! : _type, position, 0, spawnIn, role);
+        return new Skeleton(role == SkeletonRole.Warrior ? _warriorType! : _type, position, spawnIn, role);
     }
 
     /// <summary>

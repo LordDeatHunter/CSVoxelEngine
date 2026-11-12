@@ -19,7 +19,7 @@ internal sealed class FloorConqueredEffects
 {
     private readonly Camera _camera;
     private readonly FireParticleSystem _fire;
-    private readonly SfxManager? _sfx;
+    private readonly WorldSounds _sounds;
     private readonly Random _random;
     private readonly List<Show> _shows = [];
     private readonly List<Wave> _waves = [];
@@ -46,12 +46,12 @@ internal sealed class FloorConqueredEffects
         public float Age;
     }
 
-    internal FloorConqueredEffects(Camera camera, FireParticleSystem fire, TowerManager towers, SfxManager? sfx,
+    internal FloorConqueredEffects(Camera camera, FireParticleSystem fire, TowerManager towers, WorldSounds sounds,
         Random? random = null)
     {
         _camera = camera;
         _fire = fire;
-        _sfx = sfx;
+        _sounds = sounds;
         _random = random ?? Random.Shared;
         towers.FloorConquered += OnConquered;
     }
@@ -68,7 +68,7 @@ internal sealed class FloorConqueredEffects
         var state = tower.Floors[floor];
         var center = new Vector3(tower.CenterX + 0.5f, state.BottomY, tower.CenterZ + 0.5f);
         if (Vector3.Distance(_camera.Position, center) < JuiceConfig.FloorConqueredSoundRangeBlocks)
-            _sfx?.Play(SfxLibrary.FloorClearGroup);
+            _sounds.Play(SfxLibrary.FloorClearGroup);
         _shows.Add(new Show
         {
             Center = center, BottomY = state.BottomY + 1f, TopY = state.TopY, Radius = InteriorRadius(tower),

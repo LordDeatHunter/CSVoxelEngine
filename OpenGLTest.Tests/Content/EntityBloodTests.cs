@@ -27,6 +27,27 @@ public sealed class EntityBloodTests
         Assert.Equal(0.2f, color.Value.Z, 3);
     }
 
+    [Fact]
+    public void OmittedOrUnsizedBloodKeepsDropletsAtTheirSize()
+    {
+        Assert.Equal(1f, EntityLoader.ParseBloodSize(null, "x.json"));
+        Assert.Equal(1f, EntityLoader.ParseBloodSize(Json("{\"color\":[255,0,51]}"), "x.json"));
+    }
+
+    [Fact]
+    public void ABloodSizeScalesItsDroplets()
+    {
+        Assert.Equal(2.5f, EntityLoader.ParseBloodSize(Json("{\"color\":[1,2,3],\"size\":2.5}"), "x.json"));
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("\"big\"")]
+    public void MalformedBloodSizeIsRefused(string size) =>
+        Assert.Throws<InvalidOperationException>(() =>
+            EntityLoader.ParseBloodSize(Json("{\"color\":[1,2,3],\"size\":" + size + "}"), "x.json"));
+
     [Theory]
     [InlineData("\"red\"")]
     [InlineData("{\"color\":[1,2]}")]

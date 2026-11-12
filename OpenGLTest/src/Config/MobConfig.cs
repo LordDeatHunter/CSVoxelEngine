@@ -143,6 +143,9 @@ public static class MobConfig
     // is airborne; a grounded touch shoves it instead. Combat values live here so a future
     // player-attack pass reads one place.
     public const float SlimeSpawnIntervalSeconds = 8f;
+    // The ring's timer waits this long in full day instead (eased by the night factor), so
+    // slimes are a bit rarer on the surface by day.
+    public const float SlimeSpawnIntervalDaySeconds = 14f;
     public const float SlimeSpawnMinRadiusBlocks = 40f;
     public const float SlimeSpawnMaxRadiusBlocks = 64f;
     public const float SlimeDespawnRadiusBlocks = 100f;
@@ -173,11 +176,12 @@ public static class MobConfig
     public const float SlimeHopLiftExponent = 0.4f;
     public const float SlimeHopReachExponent = 0.4f;
     public const float SlimeHopWindupExponent = 0.6f;
-    // The size a ring spawn rolls (SlimeSize.Roll): each size past 1 is reached with the large-size
-    // chance again (so size s+1 has chance^s), and that chance eases from the day value to the night
-    // value with DayCycle.NightFactor. A spawn whose ground lies at least SlimeUndergroundDepthBlocks
-    // below its column's surface counts as full night, whatever the hour.
-    public const float SlimeLargeChanceDay = 0.1f;
+    // The size a ring spawn rolls (SlimeSize.Roll): size 2 is reached with the large-size chance, and
+    // each size past 2 with the chance again (so size s+1 has chance^(s-1) times the dark share), and
+    // that chance eases from the day value to the night value with DayCycle.NightFactor. Sizes past 2
+    // are reached only in the dark, so by day a spawn is size 1 or, very rarely, size 2. A spawn whose
+    // ground lies at least SlimeUndergroundDepthBlocks below its column's surface counts as full night.
+    public const float SlimeLargeChanceDay = 0.02f;
     public const float SlimeLargeChanceNight = 0.4f;
     // The last step, into the largest size (the giant), is taken with this share of the usual chance,
     // so a giant is rarer than the geometric falloff alone would make it.
@@ -545,7 +549,7 @@ public static class MobConfig
     public const float SkeletonShoveSpeed = 3f;
     /// <summary>How far a skeleton's melee blow reaches (MobTargets.InMeleeReach).</summary>
     public const float SkeletonMeleeReach = 2f;
-    /// <summary>The damage one warrior's dagger stab deals on the first floor (TowerDifficulty scales it).</summary>
+    /// <summary>The damage one warrior's dagger stab deals.</summary>
     public const int SkeletonMeleeDamage = 14;
     /// <summary>Seconds between two dagger stabs.</summary>
     public const float SkeletonMeleeCooldownSeconds = 0.85f;
@@ -553,7 +557,7 @@ public static class MobConfig
     public const float SkeletonMeleeKnockbackSpeed = 5f;
     /// <summary>The upward lift of a landed melee blow (a stab or a punch).</summary>
     public const float SkeletonMeleeKnockbackLift = 2.5f;
-    /// <summary>The damage one archer's punch deals on the first floor (TowerDifficulty scales it).</summary>
+    /// <summary>The damage one archer's punch deals.</summary>
     public const int SkeletonArcherPunchDamage = 5;
     /// <summary>Seconds between two punches.</summary>
     public const float SkeletonArcherPunchCooldownSeconds = 1.2f;
@@ -571,7 +575,7 @@ public static class MobConfig
     public const float SkeletonShotCooldownJitter = 0.27f;
     /// <summary>An arrow's launch speed (its level range v^2/g must clear SkeletonBowMaxRange).</summary>
     public const float SkeletonArrowSpeed = 24f;
-    /// <summary>The damage one arrow deals on the first floor (TowerDifficulty scales it).</summary>
+    /// <summary>The damage one arrow deals.</summary>
     public const int SkeletonArrowDamage = 10;
     /// <summary>The knockback speed of an arrow hit.</summary>
     public const float SkeletonArrowKnockbackSpeed = 2f;
@@ -595,14 +599,8 @@ public static class MobConfig
     // --- Tower difficulty (TowerDifficulty) ---
     /// <summary>The highest tower floor tier (floors 0..TowerMaxTier).</summary>
     public const int TowerMaxTier = 7;
-    /// <summary>How much harder a tower mob gets per floor tier.</summary>
-    public const float TowerDifficultyPerTier = 0.25f;
-    /// <summary>The most a tower mob's difficulty multiplier ever reaches.</summary>
-    public const float TowerDifficultyMaxMultiplier = 2.5f;
-    /// <summary>One more mob in a pile's wave every this many tiers.</summary>
-    public const int TowerPackTiersPerExtra = 2;
-    /// <summary>The most mobs one pile wave raises.</summary>
-    public const int TowerPackMaxSize = 4;
+    /// <summary>One more mob in a pile's wave every this many floor tiers.</summary>
+    public const int TowerPackTiersPerExtra = 3;
 
     // --- Battle tower locks (TowerBlockWriter, SkeletonPileManager, TowerManager) ---
     /// <summary>The most cells the tower block writer clears in one frame (opened doors, spent piles).</summary>
@@ -618,7 +616,7 @@ public static class MobConfig
     /// <summary>How many living skeletons may stand near a pile on the ground floor before it raises another.</summary>
     public const int SkeletonPileNearLimitBase = 5;
     /// <summary>How many more living skeletons each floor above the ground floor allows near a pile.</summary>
-    public const int SkeletonPileNearLimitPerTier = 2;
+    public const int SkeletonPileNearLimitPerTier = 1;
     /// <summary>How close, in blocks, a living skeleton must stand to a pile to count against its limit.</summary>
     public const float SkeletonPileNearRadiusBlocks = 16f;
     /// <summary>Seconds between the tower manager's looks for a tower under each target.</summary>

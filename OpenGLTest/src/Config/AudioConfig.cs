@@ -22,6 +22,18 @@ public static class AudioConfig
     // Peak volume of one-shot gameplay sfx (block hits, pickups) mixed by SfxManager
     public const float SfxVolume = 0.7f;
 
+    // --- Positional sfx (SpatialVoices, SoundFalloff) ---
+    // A sound in the world plays at full volume within this many blocks of the listener's eye...
+    public const float SfxFullVolumeBlocks = 3f;
+    // ...and fades out (quadratically) to silence at this many; a server sends a player only the
+    // sounds inside this range
+    public const float SfxRangeBlocks = 40f;
+    // How many positional sounds can play at once; one more takes over the oldest
+    public const int SfxVoices = 32;
+    // Whether 3D audio (OpenAL Soft's HRTF: in front, behind, above, below over headphones) is on by
+    // default; the Audio settings tab toggles it live
+    public const bool Hrtf = true;
+
     // --- Output ---
     // Each output streams through this many OpenAL buffers of this many sample frames (1024 is
     // ~23 ms at 44.1 kHz), so a new one-shot is heard within about count * frames of queue; fewer
@@ -37,4 +49,11 @@ public static class AudioConfig
     // Seconds between rattles are drawn uniformly from this range; kept long so it stays an occasional accent
     public const float SkeletonRattleMinSeconds = 12f;
     public const float SkeletonRattleMaxSeconds = 35f;
+
+    // --- Crow caw ---
+    // A crow within this many blocks of the camera can be heard cawing
+    public const float CrowCawRangeBlocks = 24f;
+    // Seconds between ambient caws are drawn uniformly from this range; a flock calls more often than one skeleton rattles
+    public const float CrowCawMinSeconds = 6f;
+    public const float CrowCawMaxSeconds = 20f;
 }

@@ -5,7 +5,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
 ```
     Graphics/                  # GL resource wrappers: Mesh, Shader, textures and the atlases,
                                #   the block/item mesh caches, cutout mips, tile materials
-      BlockCubeCache.cs        # lazily built cube meshes, one per block type
+      BlockCubeCache.cs        # lazily built cube meshes, one per block type (`GetWhole`: the look-at label's mesh, a two-cell block's halves stacked)
       CutoutMipmap.cs          # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
       ItemMeshCache.cs         # lazily built extruded-sprite meshes plus their GL textures, one per Item
       Mesh.cs                  # an indexed triangle mesh in the shared Vertex layout
@@ -91,7 +91,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       PlantTreeItem.cs         # plants a sapling of the item's Item.UseTreeName species
                                #   on the aimed ground (an acorn on dirt or grass)
       StarterKit.cs            # the hint scroll a new survival player (and a server newcomer) starts with
-      SummonItem.cs            # the thumper: wakes the boss use.entity names at the aimed cell (the sandworm), desert sand only
+      SummonItem.cs            # the summon item (a dragonfly wing for the sandworm): wakes the boss use.entity names at the aimed cell, desert sand only
       StaffBinding.cs          # GL-free staff slot rules: bind a recipe valid against the staff's tags, clear,
                                #   cycle (wrapping), select, resolve saved part keys
       StaffItem.cs             # a spell staff: slots, tier and allowed part tags; its spells ride its ItemStack
@@ -184,7 +184,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   sword swing it names, the NetPlayerAction it is rebroadcast as
       NetCellChangeCodec.cs    # one BlockChanges/BlockCorrection cell on the wire (the server writes, the client reads)
       NetEntity.cs             # NetEntityKind/NetEntity (ItemId: a drop's, TNT's or falling block's id, or a goblin's
-                               #   torches or a skeleton's tower tier) and NetCellChange
+                               #   torches or a skeleton's role and outfit) and NetCellChange
       NetEntityCodec.cs        # one EntityList entry on the wire (the server writes, the client reads)
       NetPlayerAction.cs       # the swing a player just made, as the server rebroadcasts it in each
                                #   player list entry (with a counter that moves on every new one)
@@ -192,6 +192,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       NetProtocol.cs           # NetMessage ids, length-prefixed framing, PacketWriter/PacketReader
       PlayerStatusCodec.cs     # PlayerStatusData (modes, health, dead, knockback) and its bounds-checked wire form
       ServerAddress.cs         # host[:port] parsing and formatting (the default port)
+      SoundEventCodec.cs       # the SoundEvents frame (group, position per sound), bounds-checked, and which
+                               #   queued sounds one player is sent (in earshot, not its own)
       StationNetCodec.cs       # the StationState snapshot: campfires, querns, kilns, cast molds
       WaystoneNetCodec.cs      # the waystone messages: the rename request, a player's rows (WaystoneNetRow) and the
                                #   activation answer (WaystoneOpened), bounds-checked

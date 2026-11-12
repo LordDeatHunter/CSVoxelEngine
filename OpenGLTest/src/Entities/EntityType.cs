@@ -36,6 +36,10 @@ public sealed class EntityType
     /// <summary>Red blood: what an entity file that omits <c>blood</c> sprays.</summary>
     public static readonly Vector3 DefaultBloodColor = new(0.6f, 0.04f, 0.04f);
 
+    /// <summary>Multiplier on the size of each droplet a hit sprays (the entity file's <c>blood.size</c>); 1 when
+    /// omitted, so a chunkier spray is authored in data rather than by kind.</summary>
+    public float BloodSizeScale { get; init; } = 1f;
+
     /// <summary>Status effect names this kind is immune to (the entity file's <c>immune</c>); empty by default.</summary>
     public IReadOnlySet<string> Immune { get; init; } = new HashSet<string>();
 

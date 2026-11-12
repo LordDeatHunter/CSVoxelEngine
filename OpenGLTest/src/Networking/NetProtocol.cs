@@ -92,6 +92,10 @@ public enum NetMessage : byte
     /// <summary>Server to one client: the sequence id of an intent and whether it was accepted.
     /// Every intent gets exactly one, in order, after its correction and inventory snapshot.</summary>
     IntentResult = 81,
+    /// <summary>Server to one client: the world sounds made near that player since the last pump (a slime's hop, a
+    /// mob's hit or death, another player's mining or spell impact), each a group and a position the client plays
+    /// positionally (<see cref="SoundEventCodec"/>). Sent only when there is one.</summary>
+    SoundEvents = 90,
 }
 
 /// <summary>
@@ -118,6 +122,10 @@ public enum NetInventoryAction : byte
     EquipGear = 11,
     /// <summary>Takes off the gear worn in an equipment slot: <c>Slot</c>.</summary>
     UnequipGear = 12,
+    /// <summary>Moves a hotbar slot's contents into another: <c>Slot</c> is the source, <c>Id</c> the destination slot.</summary>
+    MoveSlot = 13,
+    /// <summary>Empties a hotbar slot: <c>Slot</c>. The item stays in its pool.</summary>
+    ClearSlot = 14,
 }
 
 /// <summary>
@@ -242,8 +250,16 @@ public static class NetFraming
     /// 40: the scorpion (<see cref="NetEntityKind.Scorpion"/>), a crawler on the wire like the spiders; its attack
     /// count names pinch (even) and sting (odd). An older client would not draw it.
     /// 41: the chest moves <see cref="Simulation.Chests.ChestMoveKind.LootAll"/> and
-    /// <see cref="Simulation.Chests.ChestMoveKind.QuickStack"/>; an older server would refuse them as malformed.</summary>
-    public const int ProtocolVersion = 41;
+    /// <see cref="Simulation.Chests.ChestMoveKind.QuickStack"/>; an older server would refuse them as malformed.
+    /// 42: the hotbar's own drags, the <see cref="NetInventoryAction.MoveSlot"/> and <see cref="NetInventoryAction.ClearSlot"/>
+    /// inventory actions; an older server would refuse them as malformed.
+    /// 43: a <see cref="NetEntityKind.Skeleton"/>'s item byte packs only its role and outfit (<see cref="Entities.TowerMobs.Skeleton.PackLook"/>),
+    /// since a skeleton no longer has a floor tier; an older client would read a warrior or an armored skeleton as a
+    /// different look.
+    /// 44: the <see cref="NetMessage.SoundEvents"/> message, the world sounds the server's simulation made near a
+    /// player (<see cref="SoundEventCodec"/>); an older client would not know the message and an older server would
+    /// leave its clients deaf to every mob.</summary>
+    public const int ProtocolVersion = 44;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

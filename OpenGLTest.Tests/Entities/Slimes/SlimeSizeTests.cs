@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
@@ -144,6 +145,18 @@ public sealed class SlimeSizeTests
         Assert.True(day > 0f, "by day a larger slime must still be possible");
         Assert.True(night > day, $"night {night:P0} vs day {day:P0}");
         Assert.True(cave > day, $"underground {cave:P0} vs day {day:P0}");
+    }
+
+    [Fact]
+    public void ByDayARingSpawnIsSizeOneOrRarelySizeTwoNeverLarger()
+    {
+        var sizes = new HashSet<int>();
+        foreach (var roll in EvenRolls(10_000))
+            sizes.Add(SlimeSize.Roll(night: 0f, underground: false, roll));
+
+        Assert.Subset(new HashSet<int> { SlimeSize.Min, SlimeSize.Min + 1 }, sizes);
+        Assert.Contains(SlimeSize.Min, sizes);
+        Assert.True(LargeShare(night: 0f, underground: false) < 0.05f, "a size-2 day spawn must stay very rare");
     }
 
     [Fact]

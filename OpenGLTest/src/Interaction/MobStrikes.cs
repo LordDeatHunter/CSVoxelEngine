@@ -20,16 +20,16 @@ internal sealed class MobStrikes
 {
     private readonly World _world;
     private readonly BlockDebrisSystem _debris;
-    private readonly SfxManager? _sfx;
+    private readonly WorldSounds _sounds;
     private readonly bool _serverMode;
 
     private DamageNumberPool DamageNumbers => _world.DamageNumbers;
 
-    internal MobStrikes(World world, BlockDebrisSystem debris, SfxManager? sfx, bool serverMode)
+    internal MobStrikes(World world, BlockDebrisSystem debris, WorldSounds sounds, bool serverMode)
     {
         _world = world;
         _debris = debris;
-        _sfx = sfx;
+        _sounds = sounds;
         _serverMode = serverMode;
     }
 
@@ -91,17 +91,18 @@ internal sealed class MobStrikes
         if (mob.Type.BloodColor is not { } color) return;
         var count = mob.IsDead ? JuiceConfig.GoreKillCount : JuiceConfig.GoreHitCount;
         _debris.Gore(contact + new Vector3(0f, mob.BodyHalfHeight * 0.2f, 0f), away, color, count,
-            JuiceConfig.GoreSpeed, JuiceConfig.GoreSize);
+            JuiceConfig.GoreSpeed, JuiceConfig.GoreSize * mob.Type.BloodSizeScale);
     }
 
-    // Floats the damage of a hit over the mob and plays its hit (or, when it killed, death) sound when
-    // TakeDamage accepted the hit (its hit count moved). A headless server draws and plays nothing.
+    // Plays the mob's hit (or, when it killed, death) sound at the mob and floats the damage of the hit over it
+    // when TakeDamage accepted the hit (its hit count moved). A headless server draws nothing, but sends the
+    // sound to the players near the mob (a client's mirrors are never struck, so it hears only the server's).
     internal void ShowLandedHit(Mob mob, int hitsBefore)
     {
-        if (_serverMode || mob.HitsTaken == hitsBefore) return;
-        ShowDamageNumber(mob, mob.LastHitDamage);
+        if (mob.HitsTaken == hitsBefore) return;
         var sound = mob.IsDead ? mob.DeathSoundGroup : mob.HitSoundGroup;
-        if (sound != null) _sfx?.Play(sound);
+        if (sound != null) _sounds.PlayAt(sound, mob.Position);
+        if (!_serverMode) ShowDamageNumber(mob, mob.LastHitDamage);
     }
 
     internal void ShowDamageNumber(Mob mob, int amount) =>

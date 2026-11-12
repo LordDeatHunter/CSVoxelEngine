@@ -35,7 +35,6 @@ internal sealed class LeftClickAction
     private readonly List<Vector3> _shudderCells = [];
     private readonly HitMarker _hitMarker;
     private readonly List<Mob> _mobs;
-    private readonly SfxManager? _sfx;
     private readonly bool _clientMode;
 
     private bool IsPlaying => _world.IsPlaying;
@@ -47,7 +46,7 @@ internal sealed class LeftClickAction
     private MobStrikes Strikes => _world.Strikes;
 
     internal LeftClickAction(World world, ChunkManager chunkManager, BlockDebrisSystem debris, LeafParticleSystem leaves,
-        HitMarker hitMarker, List<Mob> mobs, SfxManager? sfx, bool clientMode)
+        HitMarker hitMarker, List<Mob> mobs, bool clientMode)
     {
         _leaves = leaves;
         _world = world;
@@ -55,7 +54,6 @@ internal sealed class LeftClickAction
         _debris = debris;
         _hitMarker = hitMarker;
         _mobs = mobs;
-        _sfx = sfx;
         _clientMode = clientMode;
     }
 
@@ -119,7 +117,7 @@ internal sealed class LeftClickAction
     private float _breakDamage;
     private float _breakHardness;
     private float _breakPower;
-    private float _breakHitSeconds = Mining.DefaultHitGapMs / 1000f;
+    private float _breakHitSeconds = Mining.DefaultBlockHitGapMs / 1000f;
     private bool _breakAllowed;
     private float _hitTimer;
     // An axe's chop already started ahead of the coming hit, so the blow lands with it
@@ -179,10 +177,11 @@ internal sealed class LeftClickAction
             if (!_hasSelectedBlock) return null;
             var cellId = Edits.BlockIdAt(_selectedBlockPosition);
             var (x, y, z) = _selectedBlockPosition.BlockCell();
-            // Any cell of a multiblock shows the whole structure, not its plain part block
+            // Any cell of a multiblock shows the whole structure, not its plain part block; either half of a
+            // two-cell block (a waystone) names its lower half, which the label draws stacked with the upper
             var blockId = Multiblock.TryResolveAnchor(_chunkManager, x, y, z, out var anchorPos, out _, out var anchorType)
                 ? anchorType!.Id
-                : cellId;
+                : TallBlock.LowerOf(cellId);
             var state = LookLabel.For(blockId, Camera.IsCreative, Inventory.Knows, HeldItem());
             if (state.Text.Length == 0) return null;
             return new LookLabelState(state.Text, state.Known, state.Mineable, _selectedBlockPosition,
@@ -357,7 +356,7 @@ internal sealed class LeftClickAction
             _creativeBreakTimer = 0f;
             var creativeTarget = Edits.BlockIdAt(_selectedBlockPosition);
             LocalPlayer.PunchSwing();
-            PlayHitSfx(creativeTarget);
+            PlayHitSfx(creativeTarget, _selectedBlockPosition);
             // Creative swings at an unbreakable block like at any other, but it never breaks
             if (!BlockType.IsUnbreakable(creativeTarget))
                 BreakMined(_selectedBlockPosition, player);
@@ -381,7 +380,7 @@ internal sealed class LeftClickAction
             _breakHardness = Mining.HardnessOf(_breakingBlockId, _breakState);
             _breakAllowed = Mining.CanMine(_breakingBlockId, held);
             _breakPower = Mining.BlockDamage(held);
-            _breakHitSeconds = Mining.HitGapSeconds(held,
+            _breakHitSeconds = Mining.BlockHitGapSeconds(held,
                 (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
             // A natural tree's wood keeps the damage it took (only here: a connected client's server counts
             // its own break from zero, and a placed log never keeps any)
@@ -407,7 +406,7 @@ internal sealed class LeftClickAction
             if (BlockType.ById[_breakingBlockId] != null)
             {
                 LocalPlayer.PunchSwing();
-                PlayHitSfx(_breakingBlockId);
+                PlayHitSfx(_breakingBlockId, _breakingBlockPosition);
                 if (_breakAllowed)
                     BreakMined(_selectedBlockPosition, player);
             }
@@ -438,7 +437,7 @@ internal sealed class LeftClickAction
             _punchTimer = _hitTimer;
             LocalPlayer.PunchSwing(_chopStarted);
             _chopStarted = false;
-            PlayHitSfx(_breakingBlockId);
+            PlayHitSfx(_breakingBlockId, _breakingBlockPosition);
 
             // Start the pop from where the hit actually landed inside this frame, not from
             // the frame boundary, so the animation stays in step with the hit rhythm
@@ -506,7 +505,7 @@ internal sealed class LeftClickAction
         Camera.NotifyPlayerAction();
         LocalPlayer.PunchSwing();
         var anvilId = Edits.BlockIdAt(cell);
-        PlayHitSfx(anvilId);
+        PlayHitSfx(anvilId, cell);
         _debris.Burst(cell, anvilId, ParticleConfig.BlockDebrisPerHit, columns: _chunkManager.ColumnSource);
         Camera.AddHitKick(Vector3.Zero, BreakKick.Strength(AnvilKickHardness, false));
         _world.RaiseIntent(WorldIntent.Hammer(Camera.Position, _selectedAimDirection, cell));
@@ -576,7 +575,7 @@ internal sealed class LeftClickAction
         _breakDamage = 0f;
         _breakHardness = 0f;
         _breakAllowed = false;
-        _breakHitSeconds = Mining.DefaultHitGapMs / 1000f;
+        _breakHitSeconds = Mining.DefaultBlockHitGapMs / 1000f;
         _hitTimer = 0f;
         _popElapsed = BlockPopSeconds;
     }
@@ -688,7 +687,7 @@ internal sealed class LeftClickAction
         if (justPressed && _sliceCombo.Press())
         {
             Player.StartSlice(_sliceCombo.Direction);
-            _sfx?.Play(SfxLibrary.SwooshGroup);
+            _world.Sounds.Play(SfxLibrary.SwooshGroup);
             _sliceImpactDone = false;
         }
 
@@ -709,7 +708,7 @@ internal sealed class LeftClickAction
 
         if (!_sliceCombo.Advance()) return;
         Player.StartSlice(_sliceCombo.Direction);
-        _sfx?.Play(SfxLibrary.SwooshGroup);
+        _world.Sounds.Play(SfxLibrary.SwooshGroup);
         _sliceImpactDone = false;
     }
 
@@ -727,7 +726,7 @@ internal sealed class LeftClickAction
         if (justPressed && _swordCombo.Press())
         {
             Player.StartSword(_swordCombo.Swing);
-            _sfx?.Play(SfxLibrary.SwooshGroup);
+            _world.Sounds.Play(SfxLibrary.SwooshGroup);
             _swordImpactDone = false;
         }
 
@@ -748,7 +747,7 @@ internal sealed class LeftClickAction
 
         if (!_swordCombo.Advance()) return;
         Player.StartSword(_swordCombo.Swing);
-        _sfx?.Play(SfxLibrary.SwooshGroup);
+        _world.Sounds.Play(SfxLibrary.SwooshGroup);
         _swordImpactDone = false;
     }
 
@@ -857,8 +856,7 @@ internal sealed class LeftClickAction
         _strikeScratch.Sort(static (a, b) => a.Distance.CompareTo(b.Distance));
     }
 
-    // One hit, one sound: an unknown or air id falls back to the default group, which is what
-    // a block with no authored sfx plays too. A null manager (headless/tests) is silent.
-    private void PlayHitSfx(ushort blockId) =>
-        _sfx?.Play(BlockType.ById[blockId]?.Sfx ?? SfxLibrary.DefaultGroup);
+    // One hit, one sound, from the block's cell (SfxLibrary.HitGroupOf)
+    private void PlayHitSfx(ushort blockId, Vector3 cell) =>
+        _world.Sounds.PlayAt(SfxLibrary.HitGroupOf(blockId), cell + new Vector3(0.5f));
 }

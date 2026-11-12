@@ -16,7 +16,7 @@ namespace VoxelEngine.Simulation.Tower;
 /// throws bone shrapnel all round, from the volley's release it throws a burst of bones, each strayed a little off the
 /// aimed throw (both <see cref="MobMissiles"/>,
 /// which hurt only targets, never the king or a skeleton), and at the summon it raises a ring of
-/// skeletons of the king's tier through the <see cref="SkeletonManager"/>, never more living than
+/// skeletons through the <see cref="SkeletonManager"/>, never more living than
 /// <see cref="MobConfig.SkeletonKingMaxMinions"/>. A king never spawns on its own: only through
 /// <see cref="Spawn(Vector3, SkeletonKingHome, bool)"/> (the altar's ritual, a scenario, a save restore, a client's
 /// mirror), judged by the global <see cref="MobCaps"/>, and at most one per tower. A king fades out past every
@@ -217,7 +217,7 @@ public sealed class SkeletonKingManager : RealmMobManager<SkeletonKing>
     // Uniform in [-1, 1)
     private static float Signed() => Random.Shared.NextSingle() * 2f - 1f;
 
-    // Raises up to SummonCount skeletons of the king's tier on a ring around its feet, never past the minion cap or
+    // Raises up to SummonCount skeletons on a ring around its feet, never past the minion cap or
     // the hard cap; a ring spot needs solid ground under two free body cells (an unloaded cell refuses it)
     private void Summon(SkeletonKing king, SkeletonManager minions, ChunkManager chunks)
     {
@@ -237,7 +237,7 @@ public sealed class SkeletonKingManager : RealmMobManager<SkeletonKing>
                 feet.Z + sin * MobConfig.SkeletonKingSummonRadius);
             if (!TryStandingSpot(chunks, ref at)) continue;
 
-            var skeleton = minions.Spawn(at + new Vector3(0f, MobConfig.SkeletonHeight * 0.5f, 0f), king.Home.SummonTier);
+            var skeleton = minions.Spawn(at + new Vector3(0f, MobConfig.SkeletonHeight * 0.5f, 0f));
             if (skeleton == null) return;
             _minions.Add(skeleton);
             wanted--;

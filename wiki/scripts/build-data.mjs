@@ -55,12 +55,20 @@ for (const { id, file } of listJson(path.join(assets, 'data/blocks'))) {
     hardness: d.hardness ?? 5, requiresTool: !!d.requiresTool, tools: d.tools ?? null, solid: d.solid !== false,
     fluid: !!d.fluid, emission: d.light?.emission ?? 0, facing: d.facing ?? null, loot: d.loot ?? id,
     size: d.multiblock ? d.multiblock.size ?? 2 : 1,
+    upperHalf: d.upperHalf ? String(d.upperHalf).replace(/^block\//, '') : null,
     biomeTint: d.biomeTint ? Object.values(d.biomeTint.faces ?? {}).map((f) => f.tile ?? f.overlay).filter(Boolean) : null,
     sheet: sheetOf(d.spritesheet), sheetTexture: d.spritesheet?.texture ?? null,
     model
   }
   const st = structureFrom(id, d)
   if (st) structures[id] = st
+}
+
+// A block two cells tall (a waystone, a door) carries its upper half's model, so a viewer shows the whole block
+for (const b of Object.values(blocks)) {
+  if (!b.upperHalf) continue
+  b.upperModel = blocks[b.upperHalf]?.model ?? null
+  if (!b.upperModel) warn(`block ${b.id}: upper half '${b.upperHalf}' has no model`)
 }
 
 const items = {}

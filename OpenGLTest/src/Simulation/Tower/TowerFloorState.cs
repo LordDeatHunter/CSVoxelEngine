@@ -23,7 +23,7 @@ public sealed class TowerFloorState
         PilesLeft = CountPilesLeft();
     }
 
-    /// <summary>The floor's index (0 = the ground floor), also its skeletons' tier.</summary>
+    /// <summary>The floor's index (0 = the ground floor).</summary>
     public int Floor { get; }
 
     /// <summary>The slab the floor stands on: the band is above it.</summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 
 namespace VoxelEngine.Entities.Slimes;
@@ -78,6 +79,18 @@ public sealed class Slime : Mob
 
     /// <summary>The slime's size, fixed for its life; a split spawns smaller slimes instead.</summary>
     public int Size { get; }
+
+    /// <summary>Raised when the slime launches a hop (the windup is over); the manager plays its jump sound.</summary>
+    public event Action? Hopped;
+
+    /// <summary>Raised when the slime comes down onto the ground; the manager plays its land sound.</summary>
+    public event Action? Landed;
+
+    /// <inheritdoc />
+    public override string? HitSoundGroup => SfxLibrary.SlimeHitGroup;
+
+    /// <inheritdoc />
+    public override string? DeathSoundGroup => SfxLibrary.SlimeDeathGroup;
 
     /// <summary>How much larger than a size-1 slime the body is drawn and collides.</summary>
     public float SizeScale { get; }
@@ -269,6 +282,7 @@ public sealed class Slime : Mob
         {
             _squash.Impulse(-MathF.Min(fallSpeed, 20f) * LandKickPerSpeed);
             NoteLanding(fallSpeed, BodyMotion.Gravity, _inWater);
+            Landed?.Invoke();
         }
 
         float target;
@@ -291,6 +305,7 @@ public sealed class Slime : Mob
 
         // The model faces -Z at yaw 0, so this rotation points -Z at the player.
         Facing = MathF.Atan2(-toPlayer.X, -toPlayer.Z);
+        Hopped?.Invoke();
     }
 
     /// <summary>

@@ -14,6 +14,9 @@ public static class NetworkConfig
     public const double NetTimeSyncSeconds = 1.0;
     // How often the server broadcasts the live mobs and drops.
     public const double NetEntitySyncSeconds = 0.1;
+    // The most world sounds the server queues between two sound broadcasts (one per pump), and the
+    // most one SoundEvents frame may carry; a louder burst drops the rest.
+    public const int NetSoundEventsPerBroadcast = 128;
     // The largest speed the server accepts from a client (blocks/s) before clamping a state toward
     // it. Sprint flight moves PlayerPhysics.BaseSpeed * FlyBoostMultiplier = 8 * 10 = 80 b/s
     // horizontally and the same 80 b/s vertically (Space/Ctrl reuse the move speed), so the

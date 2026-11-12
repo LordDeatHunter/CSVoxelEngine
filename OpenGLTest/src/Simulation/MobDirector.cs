@@ -446,8 +446,7 @@ internal sealed class MobDirector
     /// (the scripted visual tests' <c>spawn</c> op), a forced spawn under the hard mob cap. False
     /// for an unknown name, a kind whose manager does not exist because its content is not
     /// registered, or a full hard cap. <paramref name="size"/> is a slime's size and
-    /// <paramref name="tier"/> a skeleton's tower floor tier or a cave mob's depth tier (other kinds have neither and
-    /// ignore them); a cave mob given no tier (0) takes the depth tier of its feet (<see cref="CaveDifficulty.TierAt"/>).
+    /// <paramref name="tier"/> a cave mob's depth tier (other kinds ignore it); a cave mob given no tier (0) takes the depth tier of its feet (<see cref="CaveDifficulty.TierAt"/>).
     /// </summary>
     internal bool SpawnEntity(string name, Vector3 feet, int size = SlimeSize.Min, int tier = 0)
     {
@@ -487,7 +486,7 @@ internal sealed class MobDirector
         }
         if (_caveMobs != null && CaveMobManager.HeightOf(name) > 0f)
         {
-            // A scenario's tier overrides the depth tier, as it does a skeleton's floor tier
+            // A scenario's tier overrides the depth tier
             var caveTier = tier > 0 ? tier : CaveDifficulty.TierAt(feet.Y);
             if (_caveMobs.Spawn(name, feet + new Vector3(0f, CaveMobManager.HeightOf(name) * 0.5f, 0f), caveTier) == null)
                 return false;
@@ -499,7 +498,7 @@ internal sealed class MobDirector
             // The named kind's role, in an outfit rolled like a pile's
             var role = Skeleton.RoleOf(name);
             var outfit = SkeletonOutfit.Roll(role, Random.Shared.NextSingle(), Random.Shared.NextSingle());
-            if (_skeletons.Spawn(feet + new Vector3(0f, SkeletonManager.HeightOf(name) * 0.5f, 0f), tier, role, outfit) == null)
+            if (_skeletons.Spawn(feet + new Vector3(0f, SkeletonManager.HeightOf(name) * 0.5f, 0f), role, outfit) == null)
                 return false;
             RefreshMobs();
             return true;
@@ -528,7 +527,7 @@ internal sealed class MobDirector
     }
 
     /// <summary>Whether the boss <paramref name="entity"/> could be woken at the solid <paramref name="cell"/> now
-    /// (the thumper's rule, the same a client predicts).</summary>
+    /// (the summon item's rule, the same a client predicts).</summary>
     internal bool CanSummonBoss(string entity, Vector3 cell) =>
         _sandworms != null && string.Equals(entity, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase)
         && _sandworms.CanSummonAt(_chunkManager, (int)cell.X, (int)cell.Y, (int)cell.Z);

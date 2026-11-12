@@ -38,6 +38,8 @@ public sealed class InventoryIntentTests
         Assert.Equal(InventoryIntent.Drop(true), RoundTrip(InventoryIntent.Drop(true)));
         Assert.Equal(InventoryIntent.EquipStackable(4, 200), RoundTrip(InventoryIntent.EquipStackable(4, 200)));
         Assert.Equal(InventoryIntent.EquipTool(9, 31), RoundTrip(InventoryIntent.EquipTool(9, 31)));
+        Assert.Equal(InventoryIntent.MoveSlot(2, 7), RoundTrip(InventoryIntent.MoveSlot(2, 7)));
+        Assert.Equal(InventoryIntent.ClearSlot(4), RoundTrip(InventoryIntent.ClearSlot(4)));
         Assert.Equal(InventoryIntent.CreativeGrant(17, 100), RoundTrip(InventoryIntent.CreativeGrant(17, 100)));
         Assert.Equal(InventoryIntent.CreativeClear(17), RoundTrip(InventoryIntent.CreativeClear(17)));
         Assert.Equal(InventoryIntent.PickBlock(42), RoundTrip(InventoryIntent.PickBlock(42)));

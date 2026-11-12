@@ -160,7 +160,7 @@ public sealed class SlimeTests
         for (var i = 0; i < MobConfig.MobNaturalCap; i++)
             manager.Spawn(new Vector3(0.5f, 1f + Slime.HalfExtent, 0.5f));
 
-        manager.Update(MobConfig.SlimeSpawnIntervalSeconds + 0.01f, chunks, drops, camera);
+        manager.Update(MobConfig.SlimeSpawnIntervalSeconds + 0.01f, chunks, drops, camera, night: 1f);
 
         Assert.Equal(MobConfig.MobNaturalCap, manager.Slimes.Count);
     }

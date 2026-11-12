@@ -4,8 +4,8 @@ The skeleton, the battle tower with its king, the sandworm boss and the icebergs
 
 ### Skeleton
 
-Ambiently, `SkeletonRattle` (`src/Entities/TowerMobs/`, ticked by `World`) plays a random `skeleton_rattle_N` clip every
-12-35 s (`AudioConfig`) while a live skeleton is within 24 blocks of the camera; the sound is not positional. A landed hit plays a `skeleton_hit` clip and a killing one a `skeleton_death` clip, via
+Ambiently, `SkeletonRattle` (`src/Entities/TowerMobs/`, ticked by `World`, its timer an `AmbientCallTimer`) plays a random `skeleton_rattle_N` clip every
+12-35 s (`AudioConfig`) from the nearest live skeleton within 24 blocks of the camera, positionally. A landed hit plays a `skeleton_hit` clip and a killing one a `skeleton_death` clip, via
 `Mob.HitSoundGroup`/`DeathSoundGroup` (null for silence on other mobs) read by `MobStrikes.ShowLandedHit`.
 
 The battle tower's undead (plans/BATTLE_TOWER.md `BT-3`): one `Skeleton` class (`src/Entities/TowerMobs/`), a
@@ -38,7 +38,7 @@ share `MobConfig.SkeletonHeight` as their body box.
   with a clear line from its shot height to the chest; with none it strafes toward the farthest standable one, and one
   that moved less than `VantageMinProgressBlocks` between picks tries the other side first. No standable spot at all
   falls back to walking in. The goal is dropped as soon as the line clears or it leaves the band.
-- **Half and half, and armored** (`SkeletonManager.Spawn(position, tier)`, every pile wave and king summon): archers and
+- **Half and half, and armored** (`SkeletonManager.Spawn(position)`, every pile wave and king summon): archers and
   warriors take turns, so a tower's waves are half each, and each rolls an **outfit** (`SkeletonOutfit.Roll`, one of 16
   head/chest/legs combinations of `SkeletonArmor` None/Leather/Copper): a warrior wears leather with
   `SkeletonWarriorLeatherChance` and a copper piece with `SkeletonWarriorCopperChance`, an archer a single leather piece
@@ -47,20 +47,19 @@ share `MobConfig.SkeletonHeight` as their body box.
   `MobPasses.DrawArmorShell` on `PlayerRig.BuildArmorMesh`, the player's own shells: leather in the leather piece's
   sprite color, copper in the copper ingot's; a helmet leaves its front open so the skull shows; the arms stay bare). The
   pieces are a look, not items (no copper armor exists): they never drop. The outfit is saved
-  (`MobData.Outfit`) and rides the wire with the role in the tier byte (`Skeleton.PackLook`, protocol 31), so a mirror
+  (`MobData.Outfit`) and rides the wire with the role in the item byte (`Skeleton.PackLook`, protocol 43), so a mirror
   draws the same skeleton. A scenario's `spawn` names the kind (`skeleton` or `skeleton_warrior`) and rolls the outfit.
 - **Arrows** are `ThrownProjectile`s of the `arrow` item (`throwAligned`, so they fly point first like the spear, which
   a player may also hand-throw; `recipes/arrow.json` makes four from a branch, a flint and a bone), flown by the shared
   `MobMissiles` (`SkeletonManager.Arrows`, merged into `ThrowAction.RefreshProjectiles`): a non-immune target touched
   takes the skeleton's `ArrowDamage` and a small shove, an immune one stops the arrow unhurt.
-- **Tower difficulty** (`TowerDifficulty`, GL-free): the tier is the tower floor index (0..`MobConfig.TowerMaxTier`,
-  `TowerSite.Tier(k)`), and `1 + tier * TowerDifficultyPerTier`, capped at `TowerDifficultyMaxMultiplier`, scales its
-  pool and both damages through `LayerDifficulty.ScaleBy`; `PackSize(tier)` is the pile's wave hook for `BT-4`. The tier
-  is a constructor argument fixed for life: a mirror cannot derive it from where it stands, so it is saved
-  (`EntitySaveData.MobData.Tier`, absent reads as 0) and sent (the low bits of the entry's `ItemId`, see protocols 25 and
-  31), clamped on both.
-- **Forced spawn only**: `SkeletonManager.Spawn(position, tier)` is the one way a skeleton appears (the `spawn`
-  scenario op's `tier`, a save restore, a client mirror, a tower's skeleton piles) and returns null at the hard cap
+- **Tower difficulty** (`TowerDifficulty`, GL-free): a floor's tier (the floor index, 0..`MobConfig.TowerMaxTier`,
+  `TowerSite.Tier(k)`) changes only its piles, never a skeleton: `PackSize(tier)` is the wave size, `1 + tier /
+  TowerPackTiersPerExtra` (one more mob every 3 floors), and `PileNearLimit(tier)` is `SkeletonPileNearLimitBase` plus
+  `SkeletonPileNearLimitPerTier` per floor (1 more per floor). A skeleton's health and melee and arrow damage are the
+  fixed numbers of its kind on every floor; it carries no tier, so none is saved or sent.
+- **Forced spawn only**: `SkeletonManager.Spawn(position)` is the one way a skeleton appears (a scenario's `spawn` op,
+  a save restore, a client mirror, a tower's skeleton piles) and returns null at the hard cap
   (`MobCaps.ForcedRoom`); there is no ring spawn. It keeps the shared distance and idle despawn, past a generous
   `SkeletonDespawnRadiusBlocks`; a pile's skeleton is **bound** to its floor (`Skeleton.Floor`, a `TowerFloorRef`, saved,
   never sent), and its despawn is reported so the floor owes it; one idle too long crumbles back into its floor's piles
@@ -72,13 +71,13 @@ share `MobConfig.SkeletonHeight` as their body box.
 - **Two attack clips over one count**: `AttackVariants` 2 (0 the rake, 1 the shot), so a mirror plays the right clip
   from the replicated count (see "A mirror's attack clip").
 - **Plumbing**: `World.Skeletons`, `MobDirector` (update, damage billing, status block actions, `RefreshMobs`, the
-  `spawn` op name `skeleton` with its optional `tier`), `ThrowAction` (the arrows), `MobPasses.RenderRealmMobs` and the
-  near shadow cascade (`ShadowPass.RenderShadows`' `skeletons`), `entities.json` by kind name with the tier, the
-  `EntityList` kind (protocol 25) and `ClientMirror`'s reconcile, and the item debugger's ENTITIES tab (tier 0). Tests:
+  `spawn` op name `skeleton`), `ThrowAction` (the arrows), `MobPasses.RenderRealmMobs` and the
+  near shadow cascade (`ShadowPass.RenderShadows`' `skeletons`), `entities.json` by kind name, the
+  `EntityList` kind (protocol 25) and `ClientMirror`'s reconcile, and the item debugger's ENTITIES tab. Tests:
   `SkeletonTests`, `SkeletonManagerTests`, `UndeadStrikeTests`, the realm round trip in
   `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`, `RealmMobMirrorTests`,
-  `NetworkEntitySyncTests.ASkeletonMirrorTakesItsTierFromTheSnapshotAndIsReplacedWhenTheTierDiffers` and the loopback
-  `GameServerTests.SkeletonsReachTheClientsEntityListByKindWithTheirTier` (tier, role and outfit); the variants'
+  `NetworkEntitySyncTests.ASkeletonMirrorTakesItsLookFromTheSnapshotAndIsReplacedWhenTheLookDiffers` and the loopback
+  `GameServerTests.SkeletonsReachTheClientsEntityListByKindWithTheirLook` (role and outfit); the variants'
   rules in `SkeletonTests` (a warrior never draws a bow and stabs harder, an archer backs away, an archer behind a
   pillar walks around it to a clear line and shoots, the look byte round trip, armor softening, the outfit rolls by
   role) and `SkeletonManagerTests.OrdinarySpawnsAreHalfArchersAndHalfWarriorsEachOfItsOwnKind`.
@@ -134,11 +133,11 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
   eye chunk is loaded and who stands in no record asks `TowerPlacement.TryFindAt` (the generation workers have usually
   cached the verdict already). `TowerRecord.Build` takes explicit floor data, which is the test and loopback seam.
 - **Piles** (`SkeletonPileManager`): on an awake floor (floor 0, or the floor below's door open), a pile whose cell holds
-  the pile block raises a wave of `TowerDifficulty.PackSize(k)` skeletons at tier `k` (`SkeletonManager.Spawn`, around the
+  the pile block raises a wave of `TowerDifficulty.PackSize(k)` skeletons (`SkeletonManager.Spawn`, around the
   pile by `TowerRules.SpawnPoints`) when a **non-immune** target stands within `SkeletonPileTriggerBlocks` on that floor's
   band, every `SkeletonPileWaveSeconds`, for `SkeletonPileWaves` waves, then it is depleted. A pile never raises past `TowerDifficulty.PileNearLimit(k)` living skeletons within
   `SkeletonPileNearRadiusBlocks` of it (`SkeletonManager.LivingCountNear`; `SkeletonPileNearLimitBase` 5 on floor 0, plus
-  `SkeletonPileNearLimitPerTier` 2 per floor): a wave is trimmed to the room left and waits for kills when there is none, and
+  `SkeletonPileNearLimitPerTier` 1 per floor): a wave is trimmed to the room left and waits for kills when there is none, and
   owed respawns obey the same limit. **Opening a chest alarms the nearby piles** (`TowerManager.AlarmPilesNear`, called where the chest opens: `ChestInput.Open` in singleplayer, `ChestSessions.OnOpen` on the server): every pile with a wave left on the chest's awake floor within `SkeletonChestAlarmBlocks` is `PileState.Alarmed` (never saved) and raises its next wave at once, ignoring its trigger range, its cooldown and the near limit (only the hard cap still holds). A wave counts only if one
   skeleton rose (the near limit and the hard cap keep it for later). A pile in an unloaded chunk freezes; a loaded cell without the pile
   block counts as depleted.
@@ -225,8 +224,7 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
   server): the same ritual start as a right-click on the altar, so it begins only on a Dormant altar with every door open.
 - **The ritual and the rise** (`TowerManager.UpdateAltars`, called by `MobDirector.Update` right after the king manager on
   authoritative worlds): a Ritual record counts `MobConfig.SkeletonKingRitualSeconds` down, then spawns one king through
-  `SkeletonKingManager.Spawn` at `TowerRecord.KingHome` (feet on top of the altar, leash `OuterRadius`, summon tier
-  `TowerDifficulty.Clamp(Floors.Length - 1)`) with its rise clip, and turns Awake; a full hard cap retries next frame.
+  `SkeletonKingManager.Spawn` at `TowerRecord.KingHome` (feet on top of the altar, leash `OuterRadius`) with its rise clip, and turns Awake; a full hard cap retries next frame.
   While a record is in Ritual, `AmbientEffects.UpdateKingEffects` (its ritual half) puffs sparks over the altar and pulses
   a small camera shake by distance (singleplayer and a client, from the mirrored state; never a server).
 - **Settling** (`TowerManager.SettleAltars(kings, pendingKing)`, after every `UpdateAltars` and right before the stations
@@ -273,7 +271,7 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
   at random within `SkeletonKingBurstSpreadDegrees`, `SkeletonKingBurstPitchDegrees` and `SkeletonKingBurstSpeedJitter`
   (`SkeletonKing.ScatterVelocity`), through the same `MobMissiles`
   (merged into `ThrowAction`'s projectile list; a hit by either knocks back `SkeletonKingBoneKnockbackSpeed`), and
-  the summon as a ring of skeletons at the home's summon tier (`SkeletonManager.Spawn`, standing spots at the feet level,
+  the summon as a ring of skeletons (`SkeletonManager.Spawn`, standing spots at the feet level,
   a cell below or a cell above, so a king on the altar raises them on the roof), never more living than
   `SkeletonKingMaxMinions`; summoned skeletons have no floor, so the lock recount ignores them. The king is leashed to its
   home: past its leash it walks back (`SkeletonKing.HomeMove`), and knocked far past it or below the roof it is put back on
@@ -283,7 +281,7 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
   singleplayer and from a client's mirrors alike, limited by the king's `Mob.BossBarRange`
   (`SkeletonKingBossBarRangeBlocks`; the sandworm's is unlimited).
 - **Saves and the wire (BT-6)**: `stations.json`'s `TowerData.Altar` (the state's name, absent = Dormant; a Ritual restores
-  with a full timer) and `entities.json`'s king (a `MobData` with `TowerCell` its tower and `Tier` its summon tier; a
+  with a full timer) and `entities.json`'s king (a `MobData` with `TowerCell` its tower; a
   fading king is not saved): a restore re-binds it through `TowerPlacement.TryGetSite` and `Towers.Track(site).KingHome`
   and spawns it with no rise and no ritual, resuming the fight, and the tower stays Awake while the entry is pending.
   Protocol 27: each tower's altar state byte at the end of its `StationState` record, and `NetEntityKind.SkeletonKing` (14),
@@ -363,14 +361,14 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
 ### Sandworm
 
 The desert boss (plans/SANDWORM.md, tuning in `SandwormConfig`): a chain of 14 rigid segments sharing one health pool, summoned
-with the **thumper** (`use.action: "summon"`, `use.entity: "sandworm"`, `SummonItem`, crafted from copper, branches, vines and
-sandstone), never spawned naturally. Right-clicking desert sand or sandstone (`SandwormManager.CanSummonAt`: loaded sand cell,
+with a **dragonfly wing** (`use.action: "summon"`, `use.entity: "sandworm"`, `SummonItem`, a drop of the dragonfly, never crafted),
+never spawned naturally. Right-clicking desert sand or sandstone (`SandwormManager.CanSummonAt`: loaded sand cell,
 desert column, none alive, room under the hard cap; a client judges the same rule to predict) starts a thump and then the hunt.
 It burrows **virtually**: it never edits a block, so the edit-path hooks, saves, LOD and the journal never see it; a segment under
 the sand surface is simply not exposed.
 
 - **Content.** `assets/data/entities/sandworm.json` (hp 300, loot `sandworm`: fangs and sandstone) and its Blockbench project
-  `sandworm.bbmodel`, generated by `tools/generate-sandworm-model.py` (also the skin, the `sandworm_fang` and `thumper` sprites;
+  `sandworm.bbmodel`, generated by `tools/generate-sandworm-model.py` (also the skin and the `sandworm_fang` sprite;
   `--check`). It is not a humanoid rig: the groups are `Head` (with `Jaw` nested under it, hinged at the back of the mouth), `Body`
   (one ring) and `Tail`, each authored around its own origin facing -Z, drawn once per chain segment.
 - **The chain** (`SandwormChain`, GL-free): `Follow(head)` drags every segment to its fixed link distance behind the one ahead, so

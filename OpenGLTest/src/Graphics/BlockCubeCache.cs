@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using VoxelEngine.Chunks.Meshing;
@@ -28,6 +29,7 @@ public class BlockCubeCache : IDisposable
     private readonly Dictionary<ushort, Mesh> _meshes = new();
     private readonly Dictionary<ushort, Mesh> _tintedMeshes = new();
     private readonly Dictionary<ushort, Mesh> _surfaceMeshes = new();
+    private readonly Dictionary<ushort, Mesh> _tallMeshes = new();
     private Mesh? _colorChip;
 
     public BlockCubeCache(GL gl) => _gl = gl;
@@ -53,6 +55,32 @@ public class BlockCubeCache : IDisposable
         _meshes[blockId] = mesh;
         return mesh;
     }
+
+    /// <summary>
+    /// The mesh the look-at label spins for a block: <see cref="Get"/>, except a lower half of a two-cell block
+    /// (a waystone, a door) shows both halves stacked, shrunk to the one-cell footprint like a multiblock anchor's
+    /// volume. Null for air and unknown ids.
+    /// </summary>
+    public Mesh? GetWhole(ushort blockId)
+    {
+        if (BlockType.ById[blockId] is not { UpperHalfId: not 0 } lower
+            || lower.BakedModel is not { } lowerModel
+            || BlockType.ById[lower.UpperHalfId]?.BakedModel is not { } upperModel)
+            return Get(blockId);
+        if (_tallMeshes.TryGetValue(blockId, out var mesh))
+            return mesh;
+
+        // Each half moves half a cell toward its own end, so the stack is centered on the cell center
+        var quads = new List<BakedQuad>(lowerModel.Quads.Length + upperModel.Quads.Length);
+        quads.AddRange(lowerModel.Quads.Select(q => Shifted(q, -0.5f)));
+        quads.AddRange(upperModel.Quads.Select(q => Shifted(q, 0.5f)));
+        mesh = Primitives.CreateBlockModel(_gl, quads, 0.5f);
+        _tallMeshes[blockId] = mesh;
+        return mesh;
+    }
+
+    private static BakedQuad Shifted(BakedQuad quad, float dy) =>
+        quad with { Positions = quad.Positions.Select(p => p + new Vector3(0f, dy, 0f)).ToArray() };
 
     /// <summary>
     /// The cube a standalone world copy of the block draws (the break debris): the same as
@@ -194,6 +222,9 @@ public class BlockCubeCache : IDisposable
         foreach (var mesh in _tintedMeshes.Values)
             mesh.Dispose();
         _tintedMeshes.Clear();
+        foreach (var mesh in _tallMeshes.Values)
+            mesh.Dispose();
+        _tallMeshes.Clear();
         foreach (var mesh in _surfaceMeshes.Values)
             mesh.Dispose();
         _surfaceMeshes.Clear();

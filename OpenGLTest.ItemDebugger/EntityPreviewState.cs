@@ -34,7 +34,7 @@ namespace VoxelEngine.ItemDebugger;
 /// <para>
 /// A goblin, a hell, sky or tower mob or a slime is previewed as the real <see cref="RiggedMob"/> (<see cref="Goblin"/>,
 /// <see cref="Hellbrute"/>, <see cref="Cinderwitch"/>, <see cref="Galeraptor"/>, <see cref="Cloudgolem"/>,
-/// <see cref="Skeleton"/> at tier 0, the <see cref="SkeletonKing"/> unbound, its modes reading IDLE WALK SLAM VOLLEY
+/// <see cref="Skeleton"/>, the <see cref="SkeletonKing"/> unbound, its modes reading IDLE WALK SLAM VOLLEY
 /// SUMMON HURT DEATH SPAWN, the cave mobs <see cref="Shardling"/>, <see cref="Sporeling"/> and
 /// <see cref="Magmaborn"/> at tier 0, reading IDLE WALK THROW (or MELEE) HURT DEATH SPAWN) or
 /// <see cref="Slime"/> object, driven
@@ -536,7 +536,7 @@ public sealed class EntityPreviewState : IPreviewDriver
         if (string.Equals(type.Name, Cloudgolem.EntityName, StringComparison.OrdinalIgnoreCase))
             return new Cloudgolem(type, Vector3.Zero, spawnIn);
         if (string.Equals(type.Name, Skeleton.EntityName, StringComparison.OrdinalIgnoreCase))
-            return new Skeleton(type, Vector3.Zero, tier: 0, spawnIn);
+            return new Skeleton(type, Vector3.Zero, spawnIn);
         if (string.Equals(type.Name, SkeletonKing.EntityName, StringComparison.OrdinalIgnoreCase))
             return new SkeletonKing(type, Vector3.Zero, SkeletonKingHome.Unbound(Vector3.Zero), spawnIn);
         if (string.Equals(type.Name, Shardling.EntityName, StringComparison.OrdinalIgnoreCase))

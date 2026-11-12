@@ -5,8 +5,8 @@ namespace VoxelEngine.Saves;
 
 /// <summary>
 /// Serializes a live <see cref="Mob"/> into its <see cref="EntitySaveData"/> form. Extracted
-/// from <see cref="World"/> so the per-kind fields (a goblin's ammo, a slime's size, a skeleton's tier, tower floor and
-/// outfit, a Skeleton King's summon tier and tower) are a pure function of the mob, not a detail of the world's save loop.
+/// from <see cref="World"/> so the per-kind fields (a goblin's ammo, a slime's size, a skeleton's tower floor and
+/// outfit, a Skeleton King's tower) are a pure function of the mob, not a detail of the world's save loop.
 /// </summary>
 internal static class MobSaveCodec
 {

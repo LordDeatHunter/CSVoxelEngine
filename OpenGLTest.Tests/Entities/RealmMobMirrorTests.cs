@@ -28,7 +28,7 @@ public sealed class RealmMobMirrorTests
             Hellbrute.EntityName => new Hellbrute(type, position, spawnIn: false),
             Cinderwitch.EntityName => new Cinderwitch(type, position, spawnIn: false),
             Galeraptor.EntityName => new Galeraptor(type, position, spawnIn: false),
-            Skeleton.EntityName => new Skeleton(type, position, tier: 0, spawnIn: false),
+            Skeleton.EntityName => new Skeleton(type, position, spawnIn: false),
             Shardling.EntityName => new Shardling(type, position, tier: 0, spawnIn: false),
             Sporeling.EntityName => new Sporeling(type, position, tier: 0, spawnIn: false),
             Magmaborn.EntityName => new Magmaborn(type, position, tier: 0, spawnIn: false),

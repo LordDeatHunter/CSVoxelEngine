@@ -251,7 +251,7 @@ public sealed class SandwormManagerTests
     }
 
     [Fact]
-    public void TheThumperWakesAWormOnlyOnDesertSandWithNoneAlive()
+    public void TheSummonWakesAWormOnlyOnDesertSandWithNoneAlive()
     {
         var desert = Desert();
         var forest = Desert(Biome.Forest);

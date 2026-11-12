@@ -7,7 +7,7 @@ The vertex layout and texture arrays, the material atlas, the greedy chunk meshe
 `assets/textures/blocks/*.png` in sorted file-name order (`TextureAtlas.TileOf(name)` returns the
 slice as a `ushort`, `BlockType.FaceTiles/Top/Bottom/Side` hold it), and item sprites, the font,
 the crosshair and the sun are single-slice arrays on layer 0. **Item sprites are authored at 32x32** (and so are the block
-tiles); the only exception is the eight large sword sprites at 42x42, whose blade is longer than a 32px frame. The
+tiles); the only exception is the six large sword sprites at 42x42 (iron, tin and bronze, swords and heads), whose blade is longer than a 32px frame. The
 extruded sprite is built from the file's own pixel size (its thickness is `size / width * 2`, `SpritePose.HalfThickness`),
 so one sprite's size never depends on another's. All eight world/shadow/UI/sun
 shaders therefore declare `sampler2DArray` and read `vec3(fTexCoord, float(fLayer))`; there is
