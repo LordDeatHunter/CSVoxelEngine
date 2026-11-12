@@ -49,7 +49,7 @@ public sealed class SlimeManager : IMobPopulation
     }
 
     /// <summary>Plays a sound group by name (singleplayer and the client only, set by <c>World</c>); a
-    /// slime's hop calls it with its jump group. Null on a headless server, so nothing plays there.</summary>
+    /// slime's hop and landing call it with their groups. Null on a headless server, so nothing plays there.</summary>
     public Action<string>? PlaySound { get; set; }
 
     /// <summary>Every slime still drawn: the living ones plus any playing their death
@@ -107,11 +107,14 @@ public sealed class SlimeManager : IMobPopulation
         if (_caps.ForcedRoom <= 0) return null;
         var slime = new Slime(_type, position, size);
         slime.Hopped += OnSlimeHopped;
+        slime.Landed += OnSlimeLanded;
         _slimes.Add(slime);
         return slime;
     }
 
     private void OnSlimeHopped() => PlaySound?.Invoke(SfxLibrary.SlimeJumpGroup);
+
+    private void OnSlimeLanded() => PlaySound?.Invoke(SfxLibrary.SlimeLandGroup);
 
     /// <summary>Ticks the slimes against the one local player (singleplayer and the tests); see
     /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget}, float, BlockDebrisSystem)"/>.</summary>

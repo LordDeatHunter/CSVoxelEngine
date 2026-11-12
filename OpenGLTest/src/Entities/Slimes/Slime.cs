@@ -83,6 +83,9 @@ public sealed class Slime : Mob
     /// <summary>Raised when the slime launches a hop (the windup is over); the manager plays its jump sound.</summary>
     public event Action? Hopped;
 
+    /// <summary>Raised when the slime comes down onto the ground; the manager plays its land sound.</summary>
+    public event Action? Landed;
+
     /// <inheritdoc />
     public override string? HitSoundGroup => SfxLibrary.SlimeHitGroup;
 
@@ -279,6 +282,7 @@ public sealed class Slime : Mob
         {
             _squash.Impulse(-MathF.Min(fallSpeed, 20f) * LandKickPerSpeed);
             NoteLanding(fallSpeed, BodyMotion.Gravity, _inWater);
+            Landed?.Invoke();
         }
 
         float target;

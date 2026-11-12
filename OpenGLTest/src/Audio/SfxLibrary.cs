@@ -65,8 +65,11 @@ public static class SfxLibrary
     /// <summary>Group played when a hit kills a slime.</summary>
     public const string SlimeDeathGroup = "slime_death";
 
-    /// <summary>Group played when a slime launches a hop.</summary>
+    /// <summary>Group played when a slime launches a hop (a random clip: slime_jump_1 or _2).</summary>
     public const string SlimeJumpGroup = "slime_jump";
+
+    /// <summary>Group played when a slime lands on the ground after a hop or a fall.</summary>
+    public const string SlimeLandGroup = "slime_land";
 
     /// <summary>Group played when a hit lands on a bug (spider, scorpion, dragonfly), and when it dies: a squish.</summary>
     public const string BugSquishGroup = "squish";

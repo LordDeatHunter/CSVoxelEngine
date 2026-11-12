@@ -40,9 +40,26 @@ public sealed class SlimeSoundTests
         var target = new Target(new Vector3(6.5f, 1f + Camera.EyeHeight, 6.5f));
         manager.Spawn(new Vector3(2.5f, 1.02f + Slime.HalfExtent, 2.5f));
 
-        for (var t = 0f; t < 6f && played.Count == 0; t += Dt)
+        for (var t = 0f; t < 6f && !played.Contains(SfxLibrary.SlimeJumpGroup); t += Dt)
             manager.Update(Dt, chunks, drops, [target]);
 
         Assert.Contains(SfxLibrary.SlimeJumpGroup, played);
+    }
+
+    [Fact]
+    public void ASlimeComingDownOntoTheGroundPlaysTheLandGroup()
+    {
+        var chunks = MobTestWorld.Floor(Stone);
+        var played = new List<string>();
+        var manager = new SlimeManager(EntityRegistry.Require("slime")) { PlaySound = played.Add };
+        var drops = new DropManager();
+        var target = new Target(new Vector3(6.5f, 1f + Camera.EyeHeight, 6.5f));
+        // Dropped from well above the floor, so its first touchdown is a landing
+        manager.Spawn(new Vector3(2.5f, 5f, 2.5f));
+
+        for (var t = 0f; t < 3f && !played.Contains(SfxLibrary.SlimeLandGroup); t += Dt)
+            manager.Update(Dt, chunks, drops, [target]);
+
+        Assert.Contains(SfxLibrary.SlimeLandGroup, played);
     }
 }
