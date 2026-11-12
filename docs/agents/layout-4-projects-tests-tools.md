@@ -80,6 +80,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   recipes, status effects and the status block flags, the tower lock blocks (flat);
                                #   Blocks/ holds the per-id tables and WideIdRegistryTests (a registry past
                                #   the byte range, meshed, saved and streamed)
+                               #   ColumnCacheGenerationTests compares material-query gating with the legacy column fill
   Core/                        # the Core utilities and the src-root types (World lifecycle, WorldSeed, WorldLoadGate)
   Effects/                     # mirrors src/Effects: one folder per sub-domain of shader twins
     Climate/                   # the biome tint field and its chunk, LOD, pop and texture consumers
