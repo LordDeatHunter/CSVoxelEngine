@@ -1,0 +1,430 @@
+// PR13 comment345, seed1337, VOXEL_TIME=147. Only lamps are scene edits.
+// Original shallow corridor shots retain close-wall context; final shallow_open shots show a clearer site.
+{
+  "steps": [
+    {
+      "op": "creative"
+    },
+    {
+      "op": "fly"
+    },
+    {
+      "op": "wait",
+      "seconds": 16
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        -242.5,
+        -120.5,
+        -163.5
+      ],
+      "yaw": -62,
+      "pitch": -58
+    },
+    {
+      "op": "wait",
+      "seconds": 8
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        -243,
+        -122,
+        -162
+      ],
+      "block": "lamp"
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "screenshot",
+      "name": "shallow_wide",
+      "hideHud": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        -242.5,
+        -124.5,
+        -163.5
+      ],
+      "yaw": -62,
+      "pitch": -24
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "screenshot",
+      "name": "shallow_floor",
+      "hideHud": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        -220.5,
+        -334.5,
+        111.5
+      ],
+      "yaw": -124,
+      "pitch": -48
+    },
+    {
+      "op": "wait",
+      "seconds": 16
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        -219,
+        -335,
+        113
+      ],
+      "block": "lamp"
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        -233,
+        -337,
+        110
+      ],
+      "block": "lamp"
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "screenshot",
+      "name": "deep_wide",
+      "hideHud": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        -222.8,
+        -338.5,
+        116.5
+      ],
+      "yaw": -90,
+      "pitch": -10
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "screenshot",
+      "name": "deep_floor",
+      "hideHud": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        615.5,
+        -95.5,
+        1109.5
+      ],
+      "yaw": 0,
+      "pitch": -6
+    },
+    {
+      "op": "wait",
+      "seconds": 18
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        615,
+        -93,
+        1110
+      ],
+      "block": "lamp"
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        625,
+        -93,
+        1108
+      ],
+      "block": "lamp"
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        636,
+        -93,
+        1110
+      ],
+      "block": "lamp"
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        604,
+        -93,
+        1108
+      ],
+      "block": "lamp"
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "screenshot",
+      "name": "desert_room_1",
+      "hideHud": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        615.5,
+        -95.5,
+        1109.5
+      ],
+      "yaw": 180,
+      "pitch": -4
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "screenshot",
+      "name": "desert_wall_1",
+      "hideHud": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        628.5,
+        -95.5,
+        1297.5
+      ],
+      "yaw": 180,
+      "pitch": -6
+    },
+    {
+      "op": "wait",
+      "seconds": 18
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        628,
+        -93,
+        1298
+      ],
+      "block": "lamp"
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        618,
+        -93,
+        1297
+      ],
+      "block": "lamp"
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        607,
+        -93,
+        1296
+      ],
+      "block": "lamp"
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        636,
+        -93,
+        1298
+      ],
+      "block": "lamp"
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "screenshot",
+      "name": "desert_room_2",
+      "hideHud": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        628.5,
+        -95.5,
+        1297.5
+      ],
+      "yaw": 90,
+      "pitch": -4
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "wait",
+      "seconds": 2
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "screenshot",
+      "name": "desert_wall_2",
+      "hideHud": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        -482.5,
+        -73.5,
+        -84.5
+      ],
+      "yaw": -90,
+      "pitch": -68
+    },
+    {
+      "op": "wait",
+      "seconds": 18
+    },
+    {
+      "op": "select",
+      "slot": 9
+    },
+    {
+      "op": "setblock",
+      "pos": [
+        -483,
+        -75,
+        -81
+      ],
+      "block": "lamp"
+    },
+    {
+      "op": "wait",
+      "seconds": 3
+    },
+    {
+      "op": "screenshot",
+      "name": "shallow_open_wide",
+      "hideHud": true
+    },
+    {
+      "op": "teleport",
+      "pos": [
+        -482.5,
+        -77.5,
+        -84.5
+      ],
+      "yaw": 0,
+      "pitch": -12
+    },
+    {
+      "op": "wait",
+      "seconds": 3
+    },
+    {
+      "op": "damage",
+      "amount": 999
+    },
+    {
+      "op": "select",
+      "slot": 9
+    },
+    {
+      "op": "wait",
+      "seconds": 1
+    },
+    {
+      "op": "screenshot",
+      "name": "shallow_open_floor",
+      "hideHud": true
+    }
+  ]
+}

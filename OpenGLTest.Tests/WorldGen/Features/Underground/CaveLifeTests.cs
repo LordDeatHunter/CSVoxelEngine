@@ -67,6 +67,28 @@ public sealed class CaveLifeTests
         Assert.True(standing > 0, "no cave column carried a mushroom");
     }
 
+    [Theory]
+    [InlineData("water")]
+    [InlineData("lava")]
+    public void CaveSceneryNeverUsesAFluidAsItsSupportingFloor(string fluidName)
+    {
+        var column = Column();
+        var blocks = new ushort[Chunk.BlockCount];
+        var fluid = ContentRegistry.RequireBlock(fluidName).Id;
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var z = 0; z < Chunk.Size; z++)
+        {
+            blocks[Chunk.Idx(x, 4, z)] = fluid;
+            blocks[Chunk.Idx(x, 12, z)] = stone;
+        }
+        GlowMushroomGenerator.Stamp(blocks, column, 0, 0, 0);
+        Assert.DoesNotContain(GlowMushroomGenerator.MushroomBlock, blocks);
+        CaveFormationGenerator.Stamp(blocks, column, 0, 0, 0);
+        Assert.Contains(CaveFormationGenerator.StalactiteBlock, blocks);
+        Assert.DoesNotContain(CaveFormationGenerator.StalagmiteBlock, blocks);
+    }
+
     [Fact]
     public void AStalactiteDripsAStalagmiteOntoTheFloorBelow()
     {

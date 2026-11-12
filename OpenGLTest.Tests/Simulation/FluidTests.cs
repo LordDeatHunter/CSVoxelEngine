@@ -5,6 +5,7 @@ using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features.Underground;
 using Xunit;
 
 namespace VoxelEngine.Tests.Simulation;
@@ -139,6 +140,44 @@ public sealed class FluidTests
         Assert.True(manager.TryGetCell(3, 1, 8, out var middle, out var middleState));
         Assert.Equal(water, middle);
         Assert.True(FluidState.IsSource(middleState));
+    }
+
+    [Fact]
+    public void GeneratedCaveWaterWakesWithoutAnyBlockEditAndClientsStayReadOnly()
+    {
+        Chunk? found = null;
+        for (var cx = -20; cx <= 20 && found is null; cx++)
+        for (var cz = -20; cz <= 20 && found is null; cz++)
+        {
+            var site = CaveFluidSources.SiteAt(cx, -1, cz);
+            if (!UndergroundPoolGenerator.HasPool(site.X, site.Y, site.Z, 80)) continue;
+            var column = ColumnCache.Get(site.X >> Chunk.SizeShift, site.Z >> Chunk.SizeShift);
+            var col = VoxelCoords.ColumnIndex(site.X & Chunk.SizeMask, site.Z & Chunk.SizeMask);
+            if (column.WaterLevel[col] != TerrainGenerator.NoWater) continue;
+            var chunk = new Chunk(null!, VoxelCoords.ChunkPosOf(site.X, site.Y, site.Z), true);
+            var index = Chunk.Idx(site.X & Chunk.SizeMask, site.Y & Chunk.SizeMask, site.Z & Chunk.SizeMask);
+            if (chunk.Storage.Get(index) != UndergroundPoolGenerator.WaterBlock) continue;
+            if (chunk.FluidFrontier is null || !Array.Exists(chunk.FluidFrontier, i => i == index)) continue;
+            found = chunk;
+        }
+        Assert.NotNull(found);
+        var manager = new ChunkManager(null!);
+        manager.QueueChunk(found.Position);
+        var live = manager.Chunks[found.Position];
+        Assert.False(live.ModifiedSinceSave);
+        var original = live.Storage.ToDense();
+        var drops = new DropManager();
+        var client = new FluidManager { Enabled = false };
+        client.WakeLoadedChunks(manager);
+        client.Update(1f, manager, drops);
+        Assert.Equal(0, client.PendingCells);
+        Assert.Equal(original, live.Storage.ToDense());
+        var authority = new FluidManager();
+        authority.WakeLoadedChunks(manager);
+        Assert.True(authority.PendingCells > 0);
+        for (var i = 0; i < 8; i++) authority.Update(SimulationConfig.FluidTickSeconds, manager, drops);
+        Assert.True(live.ModifiedSinceSave, "generated water did not flow without a block edit");
+        Assert.NotEqual(original, live.Storage.ToDense());
     }
 
     [Fact]

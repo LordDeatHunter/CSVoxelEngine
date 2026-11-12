@@ -24,7 +24,7 @@ public sealed class SkyMobManagerTests
     private const int IslandTop = WorldGenerationConfig.SkyIslandBottomY + 36;
     private const int CloudSeaFloor = SkyIslandConfig.CloudSeaBottomY + 4;
     private const int OverworldFloor = 64;
-    private const int HellFloor = WorldGenerationConfig.HellTopY - 40;
+    private const int HellFloor = ((WorldGenerationConfig.HellTopY - 40) >> Chunk.SizeShift) * Chunk.Size + 4;
 
     // A flat stone slab whose top is `floor`, filling the one chunk layer that holds it over 7x7 chunks
     // around `center`, air above it inside that layer; nothing else is loaded

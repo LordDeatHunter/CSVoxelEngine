@@ -31,7 +31,8 @@ namespace VoxelEngine.WorldGen.Caves;
 /// seam. <see cref="Fill"/> classifies a chunk once into a <see cref="CaveBiomeMap"/> (CB-2) that every
 /// cave consumer reads (the noise cave shape, the ore richness, the exclusive ores) and that
 /// <see cref="Stamp(ushort[], CaveBiomeMap, int, int, int)"/> dresses the caves from. A pure function of
-/// position, the column's stored biome and height, and the seed; thread-safe: the noises are read-only
+/// position, the column's stored biome and height, and the seed. CaveEchoVolumes then extends echo
+/// materials laterally and vertically with the same point/map containment; thread-safe: the noises are read-only
 /// after their reseed, and all scratch lives on the stack or in the caller's map.
 /// </summary>
 public static class CaveBiomes
@@ -125,10 +126,11 @@ public static class CaveBiomes
         var fx = ((x & Mask) + 0.5f) * InvStride;
         var fy = ((y & Mask) + 0.5f) * InvStride;
         var fz = ((z & Mask) + 0.5f) * InvStride;
-        return Classify(y, surfaceHeight - y, surfaceBiome,
+        var original = Classify(y, surfaceHeight - y, surfaceBiome,
             Blend(EchoDriftNoise, bx, by, bz, fx, fy, fz),
             Blend(DeepDriftNoise, bx, by, bz, fx, fy, fz),
             Blend(SelectorNoise, bx, by, bz, fx, fy, fz));
+        return CaveEchoVolumes.At(x, y, z, surfaceHeight, original);
     }
 
     /// <summary>
@@ -245,9 +247,9 @@ public static class CaveBiomes
         WorldGenerationConfig.CaveDeepTopY + WorldGenerationConfig.CaveDeepDriftBlocks * deepDrift;
 
     /// <summary>The cave echo of a surface biome; plain for a biome without one.</summary>
-    private static CaveBiome EchoOf(Biome surface) => surface switch
+    internal static CaveBiome EchoOf(Biome surface) => surface switch
     {
-        Biome.Frozen => CaveBiome.FrozenEcho,
+        Biome.Frozen or Biome.Taiga => CaveBiome.FrozenEcho,
         Biome.Desert => CaveBiome.DesertEcho,
         _ => CaveBiome.Plain,
     };
@@ -292,15 +294,13 @@ public static class CaveBiomes
     /// The world y band in which <see cref="Fill"/> can find a non-plain cell, and so the band the palette
     /// pass can write, over <paramref name="column"/>, from
     /// <see cref="Classify"/>'s bounds with its clamp: nothing at or below the barrier top; a sub-biome
-    /// at most at the echo band's highest bottom; an echo cell only in a frozen or desert column and at
-    /// least the bare cover under that column's top, so at most the cover under the chunk column's
-    /// tallest top.
+    /// at most at the echo band's highest bottom; expanded echo cells need the bare cover under
+    /// their local column top, so none can reach above the cover under this chunk column's tallest top.
     /// </summary>
     internal static StampBand WriteBand(ColumnData column)
     {
         var max = SubBandTopY;
-        if (AnyEchoColumn(column))
-            max = Math.Max(max, column.MaxHeight - WorldGenerationConfig.CaveEchoCoverBlocks);
+        max = Math.Max(max, column.MaxHeight - WorldGenerationConfig.CaveEchoCoverBlocks);
         return new StampBand(WorldGenerationConfig.BarrierTopY + 1, max);
     }
 
@@ -350,7 +350,6 @@ public static class CaveBiomes
     internal static bool Fill(CaveBiomeMap map, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         if (worldY0 + Chunk.SizeMask <= WorldGenerationConfig.BarrierTopY) return false;
-        if (worldY0 > SubBandTopY && !AnyEchoColumn(column)) return false;
 
         map.Clear();
 
@@ -434,7 +433,7 @@ public static class CaveBiomes
             }
         }
 
-        return map.Present != 1 << (int)CaveBiome.Plain;
+        return CaveEchoVolumes.Expand(map, column, worldX0, worldY0, worldZ0);
     }
 
     /// <summary>
@@ -600,11 +599,5 @@ public static class CaveBiomes
         return slot;
     }
 
-    /// <summary>Whether any column of the chunk column has a surface biome with a cave echo.</summary>
-    private static bool AnyEchoColumn(ColumnData column)
-    {
-        foreach (var biome in column.Biomes)
-            if (biome is Biome.Frozen or Biome.Desert) return true;
-        return false;
-    }
+
 }

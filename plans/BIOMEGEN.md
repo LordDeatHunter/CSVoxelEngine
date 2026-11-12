@@ -642,7 +642,7 @@ Noise seed offsets: ReliefNoise 153, MountainSpineNoise 154, MountainRangeCellWa
   NoiseCaves.ShapeScale 182 (3D, the cave sub-biomes' shape scale, NoiseCaves' ninth channel),
   CaveOres amethyst 183, jade 184, cinnabar 185 (3D, the cave biome exclusive ores; plans/CAVE_BIOMES.md CB-2),
   VulcaniteGenerator.VeinNoise 186 (3D, the vulcanite veins in basalt);
-  the next free noise offset is 187
+  NoiseCaves intermediate pockets 187 (3D, 2 octaves); the next free noise offset is 188
 Hash salts (no noise, SplitMix64.Hash(cell, Seed ^ salt), so a new one re-lays nothing else):
   ruins 0x5E7A-0x5E7D (RuinPlacement, one per kind), waystone satellites 0x5E7E (WaystonePlacement),
   battle towers 0x5E7F (TowerPlacement, cell 1536; plans/BATTLE_TOWER.md BT-2), tower ruin 0x5E80 (TowerRuin, BT-8),
@@ -1229,7 +1229,7 @@ costs of each phase are in `CAVE_BIOMES.md` (Reference); the mobs and chests are
   occluding; ice, sand, gravel and basalt are excluded on purpose.
 * **Shape.** `CaveShape` gives crystal bigger cheese rooms, fungal wider spaghetti tunnels and the
   magma deep both, each boost scaled per region by NoiseCaves' ninth channel (seed offset 182), plus a
-  worm radius factor at the node center. Plain and echo cells carve bit for bit as before.
+  worm radius factor at the node center. Plain and frozen echo use regular carving; DesertEcho uses elongated tunnels and separated large rooms (issue #10).
 * **Ores.** `CaveRichness` shifts the Y-band ores' thresholds per cave biome (negative richer), keeping
   the stamp equal to the point query; `CaveOres` adds amethyst (crystal), jade (fungal) and cinnabar
   (magma deep), seed offsets 183-185, in plain stone of their own biome only.
@@ -1254,3 +1254,13 @@ costs of each phase are in `CAVE_BIOMES.md` (Reference); the mobs and chests are
   show at the edge of edited chunks.
 
 ---------------------------------------------------------------------------------------------------
+
+Issue #10 expands frozen echo materials with bounded 3D ellipsoid sites (`CaveEchoVolumes`, hash salt 0x5E80; no new noise). This deliberately changes newly generated underground material; modified chunk snapshots and the world format are unchanged.
+
+Issue #10 sandstone now shares the frozen 3D echo volumes and seed-aware site cache; no new surface biome, content id, noise or save version.
+
+Issue #10 desert pockets use hash salt 0x5E81; elongated tunnels reuse seeds 111/112 on separate world-aligned sample channels.
+
+Issue #10 sparse cave fluid groups use hash salt 0x5E82 (one or two candidates per 64-cube); offset 94 is retired with the old water patch mask.
+
+PR13 comment345 natural cave lava plans retain hash salt 0x5E83. Bounded floods fill connected depressions in completed terrain at a flat source level, rejecting spills/unknown bounds without constructing support; deeper sites admit larger pools. Desert sites retain salt 0x5E81 with broader size/aspect/depth variation and coherent bounded inward/outward wall detail. These changes intentionally re-lay newly generated cave fluids and desert geometry for existing seeds; modified saved snapshots and save/wire formats are unchanged. See `docs/agents/architecture-and-worldgen.md` and `biomes.md` for planning bounds and geometry rules. No new noise offset is consumed.

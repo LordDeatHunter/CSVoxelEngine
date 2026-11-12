@@ -13,7 +13,7 @@
   "loot": "none",
   "freezesTo": "cobblestone",
   "flow": {
-    "tickDivisor": 2,
+    "tickDivisor": 4,
     "range": 3,
     "infinite": false,
     "hardensTo": "cobblestone",

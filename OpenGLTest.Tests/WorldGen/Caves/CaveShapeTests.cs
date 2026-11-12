@@ -45,15 +45,224 @@ public sealed class CaveShapeTests
     }
 
     [Fact]
+    public void MoreCoverOpensAdditionalRoomsWithoutClosingShallowAir()
+    {
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        ColumnData Column(int height) => new(Enumerable.Repeat(height, Chunk.Size * Chunk.Size).ToArray(),
+            new byte[Chunk.Size * Chunk.Size], new float[Chunk.Size * Chunk.Size], new float[Chunk.Size * Chunk.Size]);
+        var shallowColumn = Column(28);
+        var deepColumn = Column(340);
+        var extra = 0;
+        var shallowAir = 0;
+        var total = 0;
+        for (var cx = -4; cx <= 4; cx++)
+        for (var cz = -4; cz <= 4; cz++)
+        {
+            var shallow = Enumerable.Repeat(stone, Chunk.BlockCount).ToArray();
+            var deep = (ushort[])shallow.Clone();
+            NoiseCaves.Carve(shallow, shallowColumn, cx * Chunk.Size, 0, cz * Chunk.Size);
+            NoiseCaves.Carve(deep, deepColumn, cx * Chunk.Size, 0, cz * Chunk.Size);
+            for (var i = 0; i < shallow.Length; i++)
+            {
+                total++;
+                if (shallow[i] == BlockType.Air)
+                {
+                    shallowAir++;
+                    Assert.Equal(BlockType.Air, deep[i]);
+                }
+                else if (deep[i] == BlockType.Air) extra++;
+            }
+        }
+        Assert.True(shallowAir > 0 && extra > 0);
+        Assert.True(shallowAir + extra < total * 0.7, "deep caves became one continuous open region");
+        Assert.True(NoiseCaves.PocketThreshold(20) > NoiseCaves.PocketThreshold(200));
+    }
+
+    [Fact]
+    public void RegularPassagesProvideStandingAndSidewaysClearance()
+    {
+        var air = 0;
+        var standing = 0;
+        var wide = 0;
+        for (var cx = -4; cx <= 4; cx++)
+        for (var cz = -4; cz <= 4; cz++)
+        {
+            var blocks = Carved(cx, -5, cz, null);
+            for (var x = 1; x < Chunk.Size - 1; x++)
+            for (var y = 1; y < Chunk.Size - 2; y++)
+            for (var z = 1; z < Chunk.Size - 1; z++)
+            {
+                if (blocks[Chunk.Idx(x, y, z)] != BlockType.Air) continue;
+                air++;
+                if (blocks[Chunk.Idx(x, y + 1, z)] != BlockType.Air) continue;
+                standing++;
+                if (blocks[Chunk.Idx(x + 1, y, z)] == BlockType.Air
+                    && blocks[Chunk.Idx(x + 1, y + 1, z)] == BlockType.Air
+                    && blocks[Chunk.Idx(x, y, z + 1)] == BlockType.Air
+                    && blocks[Chunk.Idx(x, y + 1, z + 1)] == BlockType.Air) wide++;
+            }
+        }
+        Assert.True(air > 0);
+        Assert.True(standing > air * 0.65, $"standing clearance {standing}/{air}");
+        Assert.True(wide > air * 0.35, $"turning clearance {wide}/{air}");
+    }
+
+    [Fact]
     public void PlainAndEchoCellsCarveExactlyAsWithoutAMap()
     {
-        foreach (var biome in new[] { CaveBiome.Plain, CaveBiome.FrozenEcho, CaveBiome.DesertEcho })
+        foreach (var biome in new[] { CaveBiome.Plain, CaveBiome.FrozenEcho })
         {
             Assert.False(CaveShape.Shapes(biome));
             var map = MapOf(_ => biome);
             foreach (var (cx, cy, cz) in DeepChunks)
                 Assert.True(Carved(cx, cy, cz, map).AsSpan().SequenceEqual(Carved(cx, cy, cz, null)),
                     $"a {biome} map changed the carve of chunk ({cx}, {cy}, {cz})");
+        }
+    }
+
+    [Fact]
+    public void DesertUsesDistinctCarvingAndLargePocketsKeepSeparatingWalls()
+    {
+        var map = MapOf(_ => CaveBiome.DesertEcho);
+        Assert.Contains(DeepChunks, c => !Carved(c.Cx, c.Cy, c.Cz, map).SequenceEqual(Carved(c.Cx, c.Cy, c.Cz, null)));
+        var open = 0;
+        var closed = 0;
+        for (var x = -192; x < 192; x += 3)
+        for (var y = -192; y < -64; y += 2)
+        for (var z = -192; z < 192; z += 3)
+        {
+            if (DesertCaves.InPocket(x, y, z, 340, 1f)) open++;
+            else closed++;
+            // Pocket boundaries always preserve walls, including at negative world coordinates.
+            Assert.False(DesertCaves.InPocket(x, y, 0, 340, 1f));
+            Assert.False(DesertCaves.InPocket(0, y, z, 340, 1f));
+            Assert.False(DesertCaves.InPocket(x, -128, z, 340, 1f));
+        }
+        Assert.True(open > 0 && closed > open, "desert rooms must be separate pockets in solid rock");
+    }
+
+    [Fact]
+    public void DesertPocketOutlinesAreAsymmetricAndVaryBetweenSites()
+    {
+        var profiles = new HashSet<string>();
+        var irregular = 0;
+        var tested = 0;
+        var cell = WorldGenerationConfig.DesertPocketCellBlocks;
+        for (var cx = -3; cx <= 3; cx++)
+        for (var cz = -3; cz <= 3; cz++)
+        {
+            var open = new HashSet<(int X, int Z)>();
+            var y = -WorldGenerationConfig.DesertPocketCellHeight * 2 + WorldGenerationConfig.DesertPocketCellHeight / 2;
+            for (var x = cx * cell; x < (cx + 1) * cell; x++)
+            for (var z = cz * cell; z < (cz + 1) * cell; z++)
+                if (DesertCaves.InPocket(x, y, z, 340, 1)) open.Add((x, z));
+            if (open.Count == 0) continue;
+            tested++;
+            var minX = open.Min(p => p.X);
+            var maxX = open.Max(p => p.X);
+            var minZ = open.Min(p => p.Z);
+            var maxZ = open.Max(p => p.Z);
+            // An ellipsoid, even with different radii, is symmetric about its bounding box center.
+            var unmatched = open.Count(p => !open.Contains((minX + maxX - p.X, minZ + maxZ - p.Z)));
+            if (unmatched > open.Count / 10) irregular++;
+            var profile = new System.Text.StringBuilder();
+            for (var x = 0; x <= 12; x++)
+            for (var z = 0; z <= 12; z++)
+                profile.Append(open.Contains((minX + x * (maxX - minX) / 12, minZ + z * (maxZ - minZ) / 12)) ? '1' : '0');
+            profiles.Add(profile.ToString());
+
+            // A pocket remains a coherent room rather than a scattering of noise holes.
+            var reached = new HashSet<(int X, int Z)> { open.First() };
+            var pending = new Queue<(int X, int Z)>(reached);
+            while (pending.TryDequeue(out var p))
+            foreach (var q in new[] { (p.X - 1, p.Z), (p.X + 1, p.Z), (p.X, p.Z - 1), (p.X, p.Z + 1) })
+                if (open.Contains(q) && reached.Add(q)) pending.Enqueue(q);
+            Assert.Equal(open.Count, reached.Count);
+        }
+        Assert.True(tested > 0);
+        Assert.True(irregular > tested / 2, "most pocket outlines still have ellipsoid symmetry");
+        Assert.True(profiles.Count > tested / 2, "sites reuse the same normalized outline");
+    }
+
+    [Fact]
+    public void DesertRoomsVaryInScaleAndHaveBothInwardAndOutwardWallDetail()
+    {
+        var areas = new List<int>();
+        var widths = new List<float>();
+        var inward = 0;
+        var outward = 0;
+        var cell = WorldGenerationConfig.DesertPocketCellBlocks;
+        for (var cx = -3; cx <= 3; cx++)
+        for (var cz = -3; cz <= 3; cz++)
+        {
+            var open = new List<(int X, int Z)>();
+            var y = -96;
+            for (var x = cx * cell; x < (cx + 1) * cell; x++)
+            for (var z = cz * cell; z < (cz + 1) * cell; z++)
+            {
+                var detailed = DesertCaves.InPocket(x, y, z, 340, 1);
+                var smooth = DesertCaves.InPocket(x, y, z, 340, 1, detailed: false);
+                if (detailed) open.Add((x, z));
+                if (detailed && !smooth) outward++;
+                if (smooth && !detailed) inward++;
+            }
+            if (open.Count == 0) continue;
+            areas.Add(open.Count);
+            widths.Add((open.Max(p => p.X) - open.Min(p => p.X) + 1f)
+                / (open.Max(p => p.Z) - open.Min(p => p.Z) + 1f));
+        }
+        Assert.True(areas.Max() > areas.Min() * 2, "room scales remain nearly identical");
+        Assert.True(widths.Max() > widths.Min() * 1.5f, "room aspect ratios remain nearly identical");
+        Assert.True(inward > 0 && outward > 0, "wall detail must create alcoves and projecting rock");
+    }
+
+    [Fact]
+    public void DesertPocketOwnershipSurvivesNegativeChunkSeamsQueryOrderAndReseeding()
+    {
+        var positions = (from x in Enumerable.Range(-8, 16)
+                         from z in Enumerable.Range(-8, 16)
+                         select (X: x * Chunk.Size, Y: -128, Z: z * Chunk.Size)).ToArray();
+        bool[] Sample((int X, int Y, int Z) p) =>
+            (from x in Enumerable.Range(0, Chunk.Size)
+             from y in Enumerable.Range(0, Chunk.Size)
+             from z in Enumerable.Range(0, Chunk.Size)
+             select DesertCaves.InPocket(p.X + x, p.Y + y, p.Z + z, 340, 1f)).ToArray();
+        var baseline = positions.Select(Sample).ToArray();
+        Assert.Contains(baseline, cells => cells.Any(open => open));
+        Parallel.For(0, positions.Length, i => Assert.Equal(baseline[i], Sample(positions[i])));
+        foreach (var i in Enumerable.Range(0, positions.Length).Reverse()) Assert.Equal(baseline[i], Sample(positions[i]));
+        try
+        {
+            WorldSeed.Apply(WorldSeed.Default + 7919);
+            Assert.Contains(Enumerable.Range(0, positions.Length), i => !baseline[i].SequenceEqual(Sample(positions[i])));
+        }
+        finally { WorldSeed.Apply(WorldSeed.Default); }
+        foreach (var i in Enumerable.Range(0, positions.Length)) Assert.Equal(baseline[i], Sample(positions[i]));
+
+        // Whole ownership planes, including both sides of zero and negative cells, remain rock.
+        var wall = WorldGenerationConfig.DesertPocketWallBlocks;
+        var cell = WorldGenerationConfig.DesertPocketCellBlocks;
+        for (var boundary = -cell; boundary <= cell; boundary += cell)
+        for (var offset = -wall; offset < wall; offset++)
+        for (var x = -cell; x < cell; x += 3)
+        for (var y = -128; y < -64; y += 3)
+        {
+            Assert.False(DesertCaves.InPocket(boundary + offset, y, x, 340, 1));
+            Assert.False(DesertCaves.InPocket(x, y, boundary + offset, 340, 1));
+        }
+        // Every open pocket cell is actually carved through the bulk path in adjacent chunks.
+        var map = MapOf(_ => CaveBiome.DesertEcho);
+        foreach (var p in positions)
+        {
+            var blocks = Enumerable.Repeat(TerrainGenerator.RockBlock, Chunk.BlockCount).ToArray();
+            var heights = Enumerable.Repeat(p.Y + 340, Chunk.Size * Chunk.Size).ToArray();
+            var column = new ColumnData(heights, new byte[heights.Length], new float[heights.Length], new float[heights.Length]);
+            NoiseCaves.Carve(blocks, column, p.X, p.Y, p.Z, map);
+            for (var x = 0; x < Chunk.Size; x++)
+            for (var y = 0; y < Chunk.Size; y++)
+            for (var z = 0; z < Chunk.Size; z++)
+                if (DesertCaves.InPocket(p.X + x, p.Y + y, p.Z + z, heights[0] - p.Y - y, 1))
+                    Assert.Equal(BlockType.Air, blocks[Chunk.Idx(x, y, z)]);
         }
     }
 
