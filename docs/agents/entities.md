@@ -130,11 +130,11 @@ in `MobPasses.SlimeTransform`, multiplied over the squash spring, the collision 
 over the JSON `hp`; the save and net clamps read it), the contact damage and the loot rolls (the table
 rolled `LootRolls` times). The size is saved (`EntitySaveData.MobData.Size`, absent = 1) and sent (a
 slime entry's `NetEntity.Ammo`). A ring spawn rolls its size (`SlimeSize.Roll`, a pure function of the
-night, an underground flag and one uniform roll): each size past 1 is reached with the large-size
-chance again, which eases from `SlimeLargeChanceDay` to `SlimeLargeChanceNight` with
+night, an underground flag and one uniform roll): size 2 is reached with the large-size
+chance, which eases from `SlimeLargeChanceDay` to `SlimeLargeChanceNight` with
 `DayCycle.NightFactor(World.LightingTime)` — the same sun `FrameLighting.SetLighting` lights the world
 by — and is the night value for ground at least `SlimeUndergroundDepthBlocks` under its column's
-surface (`SlimeSize.IsUnderground`; the surface-only ring never finds such a spot today). A rolled body
+surface (`SlimeSize.IsUnderground`; the surface-only ring never finds such a spot today). Sizes past 2 are reached only in the dark, so by day a ring spawn is size 1 or rarely size 2, and the ring's timer waits `SlimeSpawnIntervalDaySeconds` in full day instead of `SlimeSpawnIntervalSeconds` (eased by the same night factor). A rolled body
 that would overlap a block beside the cleared column steps down a size until it fits. A slime larger
 than the smallest **splits** on the transition, never on being low (`SlimeSize.SplitsOnHit`): a hit that
 takes it from above half its health to at or below half while it survives marks it in

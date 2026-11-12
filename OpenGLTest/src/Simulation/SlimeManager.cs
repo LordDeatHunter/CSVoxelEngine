@@ -288,7 +288,8 @@ public sealed class SlimeManager : IMobPopulation
         if (!_caps.AllowsNaturalSpawn) return;
 
         _spawnTimer += deltaTime * _caps.SpawnHaste;
-        if (_spawnTimer < MobConfig.SlimeSpawnIntervalSeconds) return;
+        var interval = MathUtils.Lerp(MobConfig.SlimeSpawnIntervalDaySeconds, MobConfig.SlimeSpawnIntervalSeconds, night);
+        if (_spawnTimer < interval) return;
         _spawnTimer = 0f;
 
         if (targets.Count == 0) return;

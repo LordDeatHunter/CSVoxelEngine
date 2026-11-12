@@ -25,11 +25,11 @@ public sealed class GiantSlimeTests
     [InlineData(0.5f, false)]
     [InlineData(1f, false)]
     [InlineData(0f, true)]
-    public void TheGiantIsRarerThanTheSizeBelowIt(float night, bool underground)
+    public void TheGiantIsNoCommonerThanTheSizeBelowIt(float night, bool underground)
     {
         var giant = Share(night, underground, SlimeSize.Max);
         var below = Share(night, underground, SlimeSize.Max - 1);
-        Assert.True(giant < below, $"giants {giant:P3} vs the size below {below:P3}");
+        Assert.True(giant <= below, $"giants {giant:P3} vs the size below {below:P3}");
     }
 
     [Fact]

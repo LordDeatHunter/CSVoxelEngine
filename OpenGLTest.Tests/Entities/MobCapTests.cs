@@ -40,7 +40,7 @@ public sealed class MobCapTests
     {
         var drops = new DropManager();
         for (var i = 0; i < intervals && slimes.Slimes.Count == 0; i++)
-            slimes.Update(MobConfig.SlimeSpawnIntervalSeconds + 0.01f, surface, drops, camera);
+            slimes.Update(MobConfig.SlimeSpawnIntervalSeconds + 0.01f, surface, drops, camera, night: 1f);
     }
 
     [Fact]
