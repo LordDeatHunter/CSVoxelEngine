@@ -494,7 +494,11 @@ jump, a sprint auto-step of a whole block inside one state, swimming up and out 
 knockback lift, a fall and standing idle never trip them (`MovementRulesTests` asserts the
 relations against `PlayerPhysics`' own constants, and that a wearer's one air hop is taken and a second rejected, a bunny hop,
 a queued lift and a slime-block bounce are legal; `ServerPlayerJumpTests` that an air hop is never a bellows jump;
-`GameServerTests.AWearersDoubleJumpIsNeverCorrectedButASecondAirHopIs` over loopback). Accepted gaps of the air budget: a
+`GameServerTests.AWearersDoubleJumpIsNeverCorrectedButASecondAirHopIs` over loopback, with immediate and delayed delivery).
+The loopback jump fixture advances the world and server clock once per analytic trajectory sample; extra transport pumps
+use zero elapsed time and assert that the processed state gap equals the sample interval. Advancing the clock again while
+waiting for a reader thread stretches a legal rising path into a hover and makes the test scheduling-dependent.
+Accepted gaps of the air budget: a
 non-wearer may hop once after walking off a ledge (the budget is height-based), a hop within one sample step of the ground counts
 as a landing, an air jump sent before the server applied the equip intent is corrected once, and iceberg mirror lag can still
 mis-judge a rider's bunny hop. A rejection keeps the player where it stood,
