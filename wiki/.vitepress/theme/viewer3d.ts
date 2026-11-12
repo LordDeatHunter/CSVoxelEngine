@@ -142,8 +142,15 @@ export async function createStage(host: HTMLElement, onFrame?: (dt: number) => v
 // ---------------------------------------------------------------- blocks
 /** The block's model as a mesh group in block units (cell centered on the origin), or null without a static model. */
 export async function blockGroup(T: THREE, block: any, base: string, size = 1): Promise<InstanceType<THREE['Group']> | null> {
-  const elements: any[] = block?.model?.elements ?? []
-  if (!elements.length) return null
+  const lowerElements: any[] = block?.model?.elements ?? []
+  if (!lowerElements.length) return null
+  // A block two cells tall stacks its upper half's model one cell (16 model units) above the lower half's
+  const raise = (v: Vec3): Vec3 => [v[0], v[1] + 16, v[2]]
+  const upperElements: any[] = (block?.upperModel?.elements ?? []).map((el: any) => ({
+    ...el, from: raise(el.from), to: raise(el.to),
+    rotation: el.rotation ? { ...el.rotation, origin: raise(el.rotation.origin) } : el.rotation
+  }))
+  const elements = [...lowerElements, ...upperElements]
   const tiles = new Set<string>()
   for (const el of elements) for (const f of Object.values<any>(el.faces)) tiles.add(f.tile)
   const mats = new Map<string, InstanceType<THREE['MeshLambertMaterial']>>()
@@ -176,7 +183,7 @@ export async function blockGroup(T: THREE, block: any, base: string, size = 1): 
     }
   }
   group.scale.setScalar(1 / 16)
-  group.position.set(-size / 2, -size / 2, -size / 2)
+  group.position.set(-size / 2, -(upperElements.length ? 2 : size) / 2, -size / 2)
   return group
 }
 
@@ -191,7 +198,8 @@ export async function buildBlock(host: HTMLElement, block: any, base: string): P
   }
   scene.add(group)
   const h = size / 2
-  stage.frame(new T.Box3(new T.Vector3(-h, -h, -h), new T.Vector3(h, h, h)))
+  const hy = block.upperModel ? 1 : h
+  stage.frame(new T.Box3(new T.Vector3(-h, -hy, -h), new T.Vector3(h, hy, h)))
   const note = block.renderer !== 'model' ? 'Representative shape; the in-game form depends on placement.' : ''
   return { dispose: stage.dispose, note }
 }

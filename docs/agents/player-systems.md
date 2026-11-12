@@ -71,6 +71,7 @@ Singleplayer ticks it in `LocalPlayer.UpdateHealth`, a server in `ServerPlayer.T
 body is not judged); `HealthTests`. Lava also drags movement: `PlayerConfig.LavaSpeedFactor` scales the
 walk and the swim stroke while any part of the body is in it (flight ignores it), so a sprint cannot
 carry through a shallow dip (`LavaMovementTests`).
+**Campfire.** A body whose feet are in a lit campfire (`PlayerBodyProbe.OnLitCampfire`: the lit pile in the cell the feet are in, under its footprint; a pile beside the body or a block below it does not count) catches the `burning` status effect (`PlayerHealth.UpdateCampfire`), with no damage of its own, in singleplayer and on the server (`ServerPlayer.TickStatus`); creative and flight are immune (`CampfireContactTests`).
 
 **Regeneration.** Out of combat the player heals (`PlayerHealth.UpdateRegen`): once
 `PlayerConfig.RegenDelaySeconds` have passed with no damage taken (`TakeDamage` restarts the clock)
@@ -114,8 +115,8 @@ compiled by `ItemLoader.ParseEquip` into a `GearInfo`. `equip.abilities` (`air_j
 `magnet`, `bone_shrapnel`; an unknown name refuses the item) compiles into `GearInfo.Abilities` (`GearAbility` flags), and
 `Equipment.Abilities`/`Has` caches their union with the stats on `Version` (the `no_fall_damage`, `extra_air` and `magnet`
 consumers are under "Armor, modifiers and sets", `bone_shrapnel` under "Bone shrapnel"). Every gear
-sprite is 32x32 committed pixel art (the same width every item sprite is authored at; the large
-swords are the 42x42 exception; several are still placeholders, listed in `USER_TODO.md`): the five-piece silhouette
+sprite is 32x32 committed pixel art (the same width every item sprite is authored at; the iron, tin
+and bronze swords are the 42x42 exception; several are still placeholders, listed in `USER_TODO.md`): the five-piece silhouette
 of each set is drawn once, shaded by a shared bevel and recolored per material, then dressed per material (stitching on
 leather, rivets on metal), and the rings, charms and belt are drawn the same way. **Cloud boots** (`cloud_boots`, feet, from iron boots and cloud shards) carry `air_jump`: one free air jump per airtime
 (`PlayerPhysics`), on a fresh Space press while airborne, never in water or flight nor on the frame a creative double tap toggles
@@ -147,7 +148,7 @@ never puts a row on the hotbar: a pick goes there by a click on a slot, a drag o
 that lifts once the pointer leaves it by `RowDrag.LiftDistance`, then `RowEquip.DropOnHotbar`/`DropOnEquipment`, never a
 toggle; a creative catalog row is granted one first), the right-click or a number key over the row (a plain row or a search hit the player holds); a creative catalog
 grant is picked but stays off the hotbar (`Inventory.Add(..., autoEquip: false)`, on the server's replay too), while a
-world pickup still lands in the first empty slot. `GearTests`, `RowEquipTests`; `visual-examples/gear.json` and `accessories.json` (the double jump
+world pickup still lands in the first empty slot. A hotbar slot drags the same way while the panel is open (`RowDragInput.Press`, the same `RowDrag` with a `FromSlot`): released on another hotbar slot it moves there (`Inventory.MoveSlot`, the `MoveSlot` intent; the slot it replaces keeps its item in the pool), released on the open chest's card it deposits the whole stack or tool (`ChestInput.DepositStack`/`DepositInstance`; a creative player's deposit is refused, as a row click's is), released anywhere else on the [E] panel it empties the slot (the `ClearSlot` intent), and released outside all of them nothing changes. `GearTests`, `RowEquipTests`, `HotbarMoveTests`; `visual-examples/gear.json` and `accessories.json` (the double jump
 and a feather-charm fall; both `VOXEL_TIME=147`).
 **Worn armor (I-3).** A body is drawn wearing its visible armor (`equip.visible`, slots head, chest, legs, feet, gloves) as flat
 tinted shells: `ArmorLook` (GL-free) is the item id per armor slot, `ArmorLook.From(Equipment)` for the local player and

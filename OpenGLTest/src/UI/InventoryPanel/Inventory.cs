@@ -357,6 +357,21 @@ public class Inventory
 
     public void ClearSlot(int hotbarIndex) => _hotbar[Wrap(hotbarIndex)] = HotbarSlot.Empty;
 
+    /// <summary>
+    /// Moves what a hotbar slot shows into another slot and empties the source. The destination's previous contents
+    /// leave the hotbar, but their items stay in their pools. False, changing nothing, when the source shows nothing
+    /// or both are the same slot.
+    /// </summary>
+    public bool MoveSlot(int fromIndex, int toIndex)
+    {
+        var from = Wrap(fromIndex);
+        var to = Wrap(toIndex);
+        if (from == to || _hotbar[from].IsEmpty) return false;
+        _hotbar[to] = _hotbar[from];
+        _hotbar[from] = HotbarSlot.Empty;
+        return true;
+    }
+
     /// <summary>Id shown in a hotbar slot, or 0 when it is empty or its tool is gone.</summary>
     public ushort IdAt(int index)
     {

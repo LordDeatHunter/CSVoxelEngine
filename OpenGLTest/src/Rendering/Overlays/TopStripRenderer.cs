@@ -60,7 +60,7 @@ internal sealed class TopStripRenderer
         var center = _ui.ScreenCenter;
         // Anchored by the spinning cube's largest half-height, so no yaw ever rises above `top`
         var cubeCenter = new Vector2(center.X, top + LookLabelCubeHalfHeight);
-        if (_ui.BlockCubes.Get(label.BlockId) is { } cube)
+        if (_ui.BlockCubes.GetWhole(label.BlockId) is { } cube)
         {
             // The shape is centered on its own origin, so it spins in place; an unknown block is
             // the same mesh with uUseTexture off, a flat dark silhouette. FlipToScreen mirrors

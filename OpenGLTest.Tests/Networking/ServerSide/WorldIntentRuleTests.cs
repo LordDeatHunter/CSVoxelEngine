@@ -253,7 +253,7 @@ public sealed class WorldIntentRuleTests
     {
         var dirt = BlockOf("dirt");
         var required = BreakProgress.RequiredSeconds(Mining.HardnessOf(dirt, 0), Mining.BlockDamage(null),
-            Mining.HitGapSeconds(null));
+            Mining.BlockHitGapSeconds(null));
         Assert.True(required > 0.0, "dirt should take more than one bare-hand hit");
 
         var progress = new BreakProgress();

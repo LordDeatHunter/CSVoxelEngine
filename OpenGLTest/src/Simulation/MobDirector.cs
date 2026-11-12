@@ -528,7 +528,7 @@ internal sealed class MobDirector
     }
 
     /// <summary>Whether the boss <paramref name="entity"/> could be woken at the solid <paramref name="cell"/> now
-    /// (the thumper's rule, the same a client predicts).</summary>
+    /// (the summon item's rule, the same a client predicts).</summary>
     internal bool CanSummonBoss(string entity, Vector3 cell) =>
         _sandworms != null && string.Equals(entity, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase)
         && _sandworms.CanSummonAt(_chunkManager, (int)cell.X, (int)cell.Y, (int)cell.Z);

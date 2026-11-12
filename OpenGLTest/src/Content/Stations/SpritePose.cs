@@ -19,7 +19,7 @@ public static class SpritePose
 {
     /// <summary>Frame width every item sprite is authored at - a spritesheet's frame, not the whole
     /// sheet - and therefore the width <c>ItemMeshCache</c> hands
-    /// <see cref="Primitives.CreateExtrudedSprite"/> for all but the large swords, which are 42x42
+    /// <see cref="Primitives.CreateExtrudedSprite"/> for all but the large swords (iron, tin and bronze), which are 42x42
     /// so their blade fits a frame (a slight overestimate of their resting lift, which is invisible).</summary>
     public const int ItemSpriteFrame = 32;
 

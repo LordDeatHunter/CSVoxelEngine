@@ -4,6 +4,10 @@ Waystones are rune-carved stones, two blocks tall, that let you travel between p
 
 <ShotGallery slugs="waystone_surface" hero />
 
+Both blocks, as they stand (a waystone is two cells tall and breaks as one):
+
+<ModelViewer kind="block" id="waystone_surface" />
+
 ## Finding them
 
 Every waystone stands in a small structure of its own a short walk from a ruin, and only some ruins get one. Each realm has its own layout:

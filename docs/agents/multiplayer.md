@@ -334,7 +334,7 @@ empty. Then, by kind:
   exactly the named cell, loaded and neither air nor fluid. The start records the target, the held
   item (id and tool instance) and the server time in `ServerPlayer.Breaking` (`BreakProgress`); the
   completion breaks only when the held item's hits since then reach the block's hardness the way
-  the client counts them (first hit at the start, then one per `Mining.HitGapSeconds`, each dealing
+  the client counts them (first hit at the start, then one per `Mining.BlockHitGapSeconds`, each dealing
   `Mining.BlockDamage`, summed in float — `BreakProgress.RequiredSeconds`), less
   `NetBreakSlackSeconds` of jitter, never with a tool `Mining.CanMine` refuses, and never after the
   target or the held item changed; a server-creative player breaks at once. The break itself is

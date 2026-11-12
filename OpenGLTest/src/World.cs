@@ -219,6 +219,7 @@ public class World
 
     // The skeletons' ambient rattle; null without audio or on a headless server
     private readonly SkeletonRattle? _skeletonRattle;
+    private readonly CrowCaws? _crowCaws;
 
     /// <summary>The multiplayer client's mirror of its server: cell changes, entities, stations, health, remote players.</summary>
     internal ClientMirror ClientMirror { get; }
@@ -592,7 +593,10 @@ public class World
             Feedback = serverMode ? null : new SpellFeedback(this, _chunkManager, _debris, sfx, clientMode);
             if (Feedback != null) Caster.Feedback = Feedback.OnCast;
             if (sfx != null && !serverMode)
+            {
                 _skeletonRattle = new SkeletonRattle(sfx.Play, Random.Shared);
+                _crowCaws = new CrowCaws(sfx.Play, Random.Shared);
+            }
             Renderer = new WorldRenderer(this, _window, _chunkManager, _lodManager, _dropManager, _tntManager, _falling,
                 _goblins, _campfires, _querns, _kilns, _casting, _toppling, _projectiles, _remotePlayers, _debris,
                 _leaves, _fire, _lavaFire, _torchFire, _bubbles, _sliceTrails, _health, _hotbarName, _hotbarPops);
@@ -655,12 +659,12 @@ public class World
         Director.SpawnEntity(name, feet, size, tier);
 
     /// <summary>Whether the boss <paramref name="entity"/> could be woken at the solid <paramref name="cell"/>
-    /// now: the world is playing and the thumper's rule holds (desert sand, none alive). A client judges the
+    /// now: the world is playing and the summon rule holds (desert sand, none alive). A client judges the
     /// same rule to predict the server's answer.</summary>
     public bool CanSummonBoss(string entity, Vector3 cell) => IsPlaying && Director.CanSummonBoss(entity, cell);
 
     /// <summary>Wakes the boss <paramref name="entity"/> at the solid <paramref name="cell"/> when
-    /// <see cref="CanSummonBoss"/> allows; the thumper's entry point, authoritative worlds only.</summary>
+    /// <see cref="CanSummonBoss"/> allows; the summon item's entry point, authoritative worlds only.</summary>
     public bool TrySummonBoss(string entity, Vector3 cell) => IsPlaying && Director.SummonBoss(entity, cell);
 
     /// <summary>
@@ -889,6 +893,9 @@ public class World
     /// only what the server sends the chest it has open).</summary>
     public ChestManager Chests => _chests;
 
+    /// <summary>The lit campfires, for a body that stands in one (<see cref="PlayerBodyProbe.OnLitCampfire"/>).</summary>
+    public CampfireManager Campfires => _campfires;
+
     /// <summary>The chest panel's UI state: which chest is open and what it shows (see <see cref="ChestView"/>).</summary>
     public ChestView ChestPanel { get; } = new();
 
@@ -1087,6 +1094,7 @@ public class World
         Ambient.UpdateSplashes((float)deltaTime);
         Feedback?.Update((float)deltaTime, _remotePlayers);
         _skeletonRattle?.Tick((float)deltaTime, Skeletons, Camera.Position);
+        _crowCaws?.Tick((float)deltaTime, Wildlife, Camera.Position);
         FrameProfiler.End(ProfileSection.Entities);
 
         _hotbarPops.Update(Inventory, (float)deltaTime);
@@ -1230,6 +1238,7 @@ public class World
         Director.UpdateIcebergs(deltaTime);
         Director.Update(deltaTime);
         _skeletonRattle?.Tick((float)deltaTime, Skeletons, Camera.Position);
+        _crowCaws?.Tick((float)deltaTime, Wildlife, Camera.Position);
 
         // After every mob manager and before the thrown items, so a mob killed or despawned
         // this frame is never hit by a projectile or drawn a healthbar.

@@ -6,6 +6,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Magic;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.Status;
 using VoxelEngine.UI.InventoryPanel;
@@ -358,7 +359,7 @@ public sealed class ServerPlayer : IMobTarget
     /// since the last tick) marks the status dirty too. The cave biome at the eye is read here as well
     /// (<see cref="EyeCaveBiome"/>, kept as it was while dead) and marks the status dirty only when it changes.
     /// </summary>
-    public void TickStatus(float dt, ChunkManager chunks)
+    public void TickStatus(float dt, ChunkManager chunks, CampfireManager? campfires = null)
     {
         if (IsDead)
         {
@@ -377,6 +378,7 @@ public sealed class ServerPlayer : IMobTarget
         var known = PlayerBodyProbe.IsKnown(Position, chunks);
         var inLava = known && PlayerBodyProbe.InLava(Position, chunks);
         Status.UpdateLava(dt, inLava, Creative || Flying);
+        Status.UpdateCampfire(campfires != null && PlayerBodyProbe.OnLitCampfire(Position, campfires), Creative || Flying);
         // Drowning: an unloaded body is not judged, so it never drains (it refills)
         var underWater = known && PlayerBodyProbe.EyeInFluid(Position, chunks, out var eyeInLava) && !eyeInLava;
         Status.UpdateBreath(dt, underWater, Creative || Flying);

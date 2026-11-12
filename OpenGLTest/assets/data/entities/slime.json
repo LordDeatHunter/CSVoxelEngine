@@ -2,5 +2,6 @@
   "name": "Slime",
   "hp": 8,
   "loot": "slime",
+  "blood": { "color": [115, 199, 89], "size": 2.5 },
   "model": "assets/models/entity/slime.bbmodel"
 }

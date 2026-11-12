@@ -76,7 +76,7 @@ public enum ItemUseAction
     RestoreMana,
 
     /// <summary>
-    /// Wakes the boss named by the item's <c>use.entity</c> at the aimed cell (the thumper, <see cref="SummonItem"/>),
+    /// Wakes the boss named by the item's <c>use.entity</c> at the aimed cell (a dragonfly wing, <see cref="SummonItem"/>),
     /// spending one unit. Refused, and not spent, where the boss cannot be summoned (not on desert sand, or one
     /// is already alive).
     /// </summary>

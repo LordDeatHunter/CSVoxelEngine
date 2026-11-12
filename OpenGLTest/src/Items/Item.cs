@@ -97,8 +97,8 @@ public abstract class Item
     /// nothing else. Not a damage number — a hit removes <see cref="BlockDamage"/>.</summary>
     public float ToolPower { get; internal init; } = Mining.DefaultPower;
 
-    /// <summary>Milliseconds between hits while mining; see <see cref="Mining"/>.</summary>
-    public float HitDelayMs { get; internal init; } = Mining.DefaultHitGapMs;
+    /// <summary>Milliseconds between hits the item's tool declares, or null when it declares none; see <see cref="Mining"/>.</summary>
+    public float? HitDelayMs { get; internal init; }
 
     /// <summary>Attack behavior the left-click drives; see <see cref="AttackPattern"/>.</summary>
     public AttackPattern Attack { get; internal init; } = AttackPattern.Punch;
@@ -155,7 +155,7 @@ public abstract class Item
     /// <summary>The tree species an <c>plant_tree</c> use plants (an acorn plants an oak), or null.</summary>
     public string? UseTreeName { get; internal init; }
 
-    /// <summary>The entity a <c>summon</c> use wakes (the thumper wakes the sandworm), or null.</summary>
+    /// <summary>The entity a <c>summon</c> use wakes (a dragonfly wing wakes the sandworm), or null.</summary>
     public string? UseEntityName { get; internal init; }
 
     /// <summary>Cells across the spritesheet texture; 1 for a plain sprite.</summary>

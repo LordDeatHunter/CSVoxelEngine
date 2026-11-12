@@ -230,7 +230,7 @@ internal sealed class PlayerSessions
         var chunks = _state.World.GetChunkManager();
         foreach (var player in _state.PlayerList)
         {
-            player.TickStatus((float)deltaTime, chunks);
+            player.TickStatus((float)deltaTime, chunks, _state.World.Campfires);
             // A death is announced in the chat once, and re-armed by the respawn
             if (player.Status.IsDead && !player.DeathAnnounced)
             {
