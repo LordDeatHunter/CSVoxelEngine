@@ -358,7 +358,7 @@ internal sealed class LocalPlayer
             case "cut": Player.StartSword(SwordSwing.Cut); break;
             case "backcut": Player.StartSword(SwordSwing.BackCut); break;
             case "chop": Player.StartSword(SwordSwing.Chop); break;
-            case "axechop": Player.StartAxeChop(AxeChopSeconds(Mining.HitGapSeconds(ItemRegistry.TryGet(Inventory.SelectedBlockId)))); break;
+            case "axechop": Player.StartAxeChop(AxeChopSeconds(Mining.BlockHitGapSeconds(ItemRegistry.TryGet(Inventory.SelectedBlockId)))); break;
             case "equip": Player.NotifyEquip(); break;
             case "charge": Player.StartThrowCharge(); Player.UpdateThrowCharge(1f); break;
             case "release": Player.ReleaseThrow(1f); break;
@@ -388,10 +388,10 @@ internal sealed class LocalPlayer
         // A slowing status effect lengthens the swing's pace (an axe chop takes longer) but not its
         // weight, which stays the tool's own.
         var held = ItemRegistry.TryGet(Inventory.SelectedBlockId);
-        var toolGap = Mining.HitGapSeconds(held);
-        var gap = Mining.HitGapSeconds(held,
+        var toolGap = Mining.BlockHitGapSeconds(held);
+        var gap = Mining.BlockHitGapSeconds(held,
             (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
-        var weight = MathUtils.InverseLerp(Mining.HitGapSeconds(null), Mining.HitGapSeconds(null) + 0.5f, toolGap);
+        var weight = MathUtils.InverseLerp(Mining.BlockHitGapSeconds(null), Mining.BlockHitGapSeconds(null) + 0.5f, toolGap);
         // An axe chops: one swing paced to its hits (the click loop starts it early, so the blow comes
         // down as the hit lands, and says so with chopStarted)
         if (Mining.IsAxe(held))

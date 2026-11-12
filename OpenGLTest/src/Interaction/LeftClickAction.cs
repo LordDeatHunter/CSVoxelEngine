@@ -119,7 +119,7 @@ internal sealed class LeftClickAction
     private float _breakDamage;
     private float _breakHardness;
     private float _breakPower;
-    private float _breakHitSeconds = Mining.DefaultHitGapMs / 1000f;
+    private float _breakHitSeconds = Mining.DefaultBlockHitGapMs / 1000f;
     private bool _breakAllowed;
     private float _hitTimer;
     // An axe's chop already started ahead of the coming hit, so the blow lands with it
@@ -382,7 +382,7 @@ internal sealed class LeftClickAction
             _breakHardness = Mining.HardnessOf(_breakingBlockId, _breakState);
             _breakAllowed = Mining.CanMine(_breakingBlockId, held);
             _breakPower = Mining.BlockDamage(held);
-            _breakHitSeconds = Mining.HitGapSeconds(held,
+            _breakHitSeconds = Mining.BlockHitGapSeconds(held,
                 (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
             // A natural tree's wood keeps the damage it took (only here: a connected client's server counts
             // its own break from zero, and a placed log never keeps any)
@@ -577,7 +577,7 @@ internal sealed class LeftClickAction
         _breakDamage = 0f;
         _breakHardness = 0f;
         _breakAllowed = false;
-        _breakHitSeconds = Mining.DefaultHitGapMs / 1000f;
+        _breakHitSeconds = Mining.DefaultBlockHitGapMs / 1000f;
         _hitTimer = 0f;
         _popElapsed = BlockPopSeconds;
     }

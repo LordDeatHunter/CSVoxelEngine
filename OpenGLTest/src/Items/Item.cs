@@ -97,8 +97,8 @@ public abstract class Item
     /// nothing else. Not a damage number — a hit removes <see cref="BlockDamage"/>.</summary>
     public float ToolPower { get; internal init; } = Mining.DefaultPower;
 
-    /// <summary>Milliseconds between hits while mining; see <see cref="Mining"/>.</summary>
-    public float HitDelayMs { get; internal init; } = Mining.DefaultHitGapMs;
+    /// <summary>Milliseconds between hits the item's tool declares, or null when it declares none; see <see cref="Mining"/>.</summary>
+    public float? HitDelayMs { get; internal init; }
 
     /// <summary>Attack behavior the left-click drives; see <see cref="AttackPattern"/>.</summary>
     public AttackPattern Attack { get; internal init; } = AttackPattern.Punch;

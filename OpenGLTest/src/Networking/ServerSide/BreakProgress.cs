@@ -31,7 +31,7 @@ public enum BreakVerdict
 /// block only when the hits the held item lands at its pace since then add up to the block's
 /// hardness, exactly as the client counts them:
 /// the first hit lands the moment mining starts and one more every
-/// <see cref="Mining.HitGapSeconds"/>, each removing <see cref="Mining.BlockDamage"/>. A changed
+/// <see cref="Mining.BlockHitGapSeconds"/>, each removing <see cref="Mining.BlockDamage"/>. A changed
 /// target or held item restarts the break, a refused tool never completes it, and a creative
 /// player breaks at once, except an unbreakable block, which nobody breaks. Any verdict ends the
 /// current break. GL-free; main thread only.
@@ -72,7 +72,7 @@ public sealed class BreakProgress
         _allowed = Mining.CanMine(blockId, held);
         _startedAt = now;
         _requiredSeconds = RequiredSeconds(Mining.HardnessOf(blockId, state), Mining.BlockDamage(held),
-            Mining.HitGapSeconds(held, speedFactor));
+            Mining.BlockHitGapSeconds(held, speedFactor));
     }
 
     /// <summary>

@@ -272,7 +272,7 @@ public sealed class ItemDefinition
         /// <summary>Mining tier compared against a block's <c>tools</c> requirement; default 0.5.</summary>
         public float? Power { get; set; }
 
-        /// <summary>Milliseconds between hits while mining; default 600.</summary>
+        /// <summary>Milliseconds between hits; omitted, a punch takes 600 and a block hit 300.</summary>
         public float? HitDelayMs { get; set; }
     }
 

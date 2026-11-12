@@ -56,7 +56,7 @@ public static class ItemTooltip
         // Above Common the kind line names the rarity ("Rare Tool"); gear overwrites it with rarity and slot
         var kind = item.IsTool ? "Tool" : "Item";
         lines.Add(style.HasChrome ? $"{Rarities.Label(rarity)} {kind}" : kind);
-        if (item.IsTool) lines.Add($"Power {item.ToolPower:0.##}   Hit {item.HitDelayMs} ms");
+        if (item.IsTool) lines.Add($"Power {item.ToolPower:0.##}   Hit {Mining.BlockHitGapMs(item)} ms");
         if (item.BlockDamage > Mining.DefaultBlockDamage) lines.Add($"Block damage {item.BlockDamage:0.##}");
         if (item.EntityDamage > Mining.DefaultEntityDamage) lines.Add($"Damage {item.EntityDamage}");
         if (item.MaxDurability > 0)
