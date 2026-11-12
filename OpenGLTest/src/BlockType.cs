@@ -401,6 +401,10 @@ public sealed record BlockType
     /// <see cref="Mining.HardnessOf"/>).</summary>
     public float TipHardness { get; init; } = 0.25f;
 
+    /// <summary><see cref="BlockRenderer.TreeWood"/> only: the highest thickness code that ignores the
+    /// tool gate and mines bare-handed (see <see cref="Mining.Refused"/>); -1 for none.</summary>
+    public int HandMaxThickness { get; init; } = -1;
+
     /// <summary><see cref="BlockRenderer.TreeWood"/> only: the loot each thickness band rolls,
     /// ascending and starting at 0 (see <see cref="WoodLootBand.Select"/>). The default drops
     /// the block itself at every thickness.</summary>

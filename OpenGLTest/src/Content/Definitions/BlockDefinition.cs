@@ -595,6 +595,13 @@ public sealed class BlockDefinition
         public float? TipHardness { get; set; }
 
         /// <summary>
+        /// <c>tree_wood</c> only: the highest thickness code (0..15) at which the block ignores
+        /// <c>requiresTool</c> and <c>tools</c> and can be mined with any item or a bare hand (a
+        /// baby tree, a thin branch). Omitted means every thickness keeps the tool gate.
+        /// </summary>
+        public int? HandMaxThickness { get; set; }
+
+        /// <summary>
         /// <c>tree_wood</c> only: the loot table each thickness band rolls, ascending by
         /// <see cref="LootBandDefinition.MinThickness"/> and starting at 0. Omitted means the
         /// block always drops itself.

@@ -98,7 +98,7 @@ internal static class BlockLoader
         BlockFieldRules.ValidateUnbreakable(definition, renderer, path);
         BlockFieldRules.ValidateCoversSky(definition, renderer, path);
         var onBreak = BlockFieldRules.ParseOnBreak(definition, path);
-        var (tipHardness, woodLootBands) = BlockFieldRules.ParseWood(definition, renderer, path);
+        var (tipHardness, woodLootBands, handMaxThickness) = BlockFieldRules.ParseWood(definition, renderer, path);
 
         var emission = BlockFieldRules.ParseEmission(definition, path);
         var lightColorSlot = ResolveLightColor(definition.Light?.Color, emission, path);
@@ -181,6 +181,7 @@ internal static class BlockLoader
             Chest = BlockSchemaParser.ParseChest(definition.Chest, renderer, path),
             StackMax = (byte)stack.StackMax,
             TipHardness = tipHardness,
+            HandMaxThickness = handMaxThickness,
             WoodLootBands = woodLootBands ?? [new WoodLootBand(0, null, true)],
             HasItem = !fluid && (definition.HasItem ?? true),
             NeedsSupport = support.NeedsSupport,

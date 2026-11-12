@@ -385,9 +385,9 @@ internal static class BlockSchemaParser
     /// <summary>
     /// Validates a <c>tree_wood</c> block: it needs a <c>wood</c> object, cannot be cutout, translucent, a fluid, falling, support-fragile, a stack or
     /// declare a hitbox (its shape comes from the state byte, see <see cref="TreeWoodShape"/>),
-    /// and returns its tip hardness and its ascending thickness loot bands.
+    /// and returns its tip hardness, its ascending thickness loot bands and the highest thickness code a bare hand may mine (-1 for none).
     /// </summary>
-    internal static (float TipHardness, WoodLootBand[] Bands) ParseTreeWood(BlockDefinition definition, string path)
+    internal static (float TipHardness, WoodLootBand[] Bands, int HandMaxThickness) ParseTreeWood(BlockDefinition definition, string path)
     {
         var wood = definition.Wood ?? throw new InvalidOperationException(
             $"Block '{path}' uses renderer \"tree_wood\" without a wood object.");
@@ -406,8 +406,13 @@ internal static class BlockSchemaParser
             throw new InvalidOperationException(
                 $"Block '{path}' has wood.tipHardness {wood.TipHardness}; expected 0..1.");
 
+        var hand = wood.HandMaxThickness ?? -1;
+        if (hand is < -1 or > WoodState.MaxThickness)
+            throw new InvalidOperationException(
+                $"Block '{path}' has wood.handMaxThickness {hand}; expected 0..{WoodState.MaxThickness}.");
+
         if (wood.Loot is not { Length: > 0 } authored)
-            return (tip, [new WoodLootBand(0, null, true)]);
+            return (tip, [new WoodLootBand(0, null, true)], hand);
 
         var bands = new WoodLootBand[authored.Length];
         for (var i = 0; i < authored.Length; i++)
@@ -443,7 +448,7 @@ internal static class BlockSchemaParser
             }
         }
 
-        return (tip, bands);
+        return (tip, bands, hand);
     }
 
     /// <summary>Settles <c>collidesByHitbox</c>: only a solid, non-fluid, non-stack block that declares

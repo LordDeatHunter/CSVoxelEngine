@@ -10,9 +10,11 @@
   "requiresTool": true,
   "tools": { "axe": 1 },
   // Thickness lives in the state byte: a twig keeps tipHardness of the full log's hardness,
-  // and wood under 8 px across yields sticks (the wood table) instead of a log
+  // and wood under 8 px across yields sticks (the wood table) instead of a log; that same thin wood
+  // (thickness code up to handMaxThickness) ignores the axe gate and can be punched bare-handed
   "wood": {
     "tipHardness": 0.25,
+    "handMaxThickness": 4,
     "loot": [ { "minThickness": 0, "loot": "wood" }, { "minThickness": 7, "loot": "self" } ]
   }
 }

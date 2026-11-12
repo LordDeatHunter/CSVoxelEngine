@@ -30,16 +30,20 @@ public static class Mining
     /// against a block's hardness.</summary>
     public const float DefaultBlockDamage = 0.5f;
 
+    /// <summary>State a gate check assumes when the caller has none: a full-cube log, which keeps the
+    /// tool gate (only a thin tree-wood cell is exempt, see <see cref="BlockType.HandMaxThickness"/>).</summary>
+    public const byte FullCubeState = WoodState.FullCube;
+
     /// <summary>Damage per punch a bare hand or an item that declares no <c>entityDamage</c>
     /// deals to an enemy.</summary>
     public const float DefaultEntityDamage = 1f;
 
     /// <summary>Whether the held item may damage this block under its requiresTool gate. Never
     /// for a fluid or an unbreakable block, which nothing mines.</summary>
-    public static bool CanMine(ushort blockId, Item? held)
+    public static bool CanMine(ushort blockId, Item? held, byte state = FullCubeState)
     {
         var block = BlockType.ById[blockId];
-        return block is { Fluid: false, Unbreakable: false } && !Refused(block, held);
+        return block is { Fluid: false, Unbreakable: false } && !Refused(block, held, state);
     }
 
     /// <summary>Whether <paramref name="held"/> is an axe: a member of the <c>axe</c> tag, which swings an
@@ -52,11 +56,11 @@ public static class Mining
 
     /// <summary>Damage one hit deals, or 0 when the block's gate refuses the held item. An
     /// unbreakable block takes no damage from anything.</summary>
-    public static float HitDamage(ushort blockId, Item? held)
+    public static float HitDamage(ushort blockId, Item? held, byte state = FullCubeState)
     {
         var block = BlockType.ById[blockId];
         if (block == null || block.Fluid || block.Unbreakable) return 0f;
-        return Refused(block, held) ? 0f : BlockDamage(held);
+        return Refused(block, held, state) ? 0f : BlockDamage(held);
     }
 
     /// <summary>
@@ -117,9 +121,11 @@ public static class Mining
     /// <c>hitDelayMs</c> uses <see cref="DefaultBlockHitGapMs"/>.</summary>
     public static float BlockHitGapMs(Item? held) => held?.HitDelayMs ?? DefaultBlockHitGapMs;
 
-    private static bool Refused(BlockType block, Item? held)
+    private static bool Refused(BlockType block, Item? held, byte state)
     {
         if (!block.RequiresTool || block.Tools is not { Count: > 0 } tools) return false;
+        // Thin tree wood (a baby tree, a twig) is punchable by hand: its thickness lives in the state byte
+        if (block.Renderer == BlockRenderer.TreeWood && WoodState.Thickness(state) <= block.HandMaxThickness) return false;
         var id = held?.Id ?? BlockType.Air;
         if (id == BlockType.Air) return true;
         foreach (var (tag, required) in tools)

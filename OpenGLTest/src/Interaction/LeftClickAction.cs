@@ -182,7 +182,8 @@ internal sealed class LeftClickAction
             var blockId = Multiblock.TryResolveAnchor(_chunkManager, x, y, z, out var anchorPos, out _, out var anchorType)
                 ? anchorType!.Id
                 : TallBlock.LowerOf(cellId);
-            var state = LookLabel.For(blockId, Camera.IsCreative, Inventory.Knows, HeldItem());
+            var state = LookLabel.For(blockId, Camera.IsCreative, Inventory.Knows, HeldItem(),
+                _chunkManager.GetStateGlobal(x, y, z));
             if (state.Text.Length == 0) return null;
             return new LookLabelState(state.Text, state.Known, state.Mineable, _selectedBlockPosition,
                 blockId, _chunkManager.GetStateGlobal(x, y, z),
@@ -378,7 +379,7 @@ internal sealed class LeftClickAction
             _breakState = _chunkManager.GetStateGlobal(
                 (int)_selectedBlockPosition.X, (int)_selectedBlockPosition.Y, (int)_selectedBlockPosition.Z);
             _breakHardness = Mining.HardnessOf(_breakingBlockId, _breakState);
-            _breakAllowed = Mining.CanMine(_breakingBlockId, held);
+            _breakAllowed = Mining.CanMine(_breakingBlockId, held, _breakState);
             _breakPower = Mining.BlockDamage(held);
             _breakHitSeconds = Mining.BlockHitGapSeconds(held,
                 (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);

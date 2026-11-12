@@ -69,7 +69,7 @@ public sealed class BreakProgress
         _blockId = blockId;
         _heldId = heldId;
         _heldInstance = heldInstance;
-        _allowed = Mining.CanMine(blockId, held);
+        _allowed = Mining.CanMine(blockId, held, state);
         _startedAt = now;
         _requiredSeconds = RequiredSeconds(Mining.HardnessOf(blockId, state), Mining.BlockDamage(held),
             Mining.BlockHitGapSeconds(held, speedFactor));

@@ -1,4 +1,5 @@
 using System.Linq;
+using VoxelEngine.Content.Loot;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 using VoxelEngine.WorldGen.Trees;
@@ -236,6 +237,30 @@ public sealed class MiningTests
         Assert.True(Mining.MeetsRequired(1.5f, 1f));
         Assert.False(Mining.MeetsRequired(0.99f, 1f));
         Assert.True(Mining.MeetsRequired(0f, 0f));
+    }
+
+    [Fact]
+    public void ThinWoodIsPunchableButNeverYieldsALog()
+    {
+        var gated = BlockType.Types.Values.Where(t => BlockType.IsTreeWood(t.Id) && t.RequiresTool).ToList();
+        Assert.NotEmpty(gated);
+        foreach (var wood in gated)
+        {
+            Assert.True(wood.HandMaxThickness >= 0, wood.Name);
+            for (var t = 0; t <= WoodState.MaxThickness; t++)
+            {
+                var state = WoodState.Encode(t, 0, false);
+                var thin = t <= wood.HandMaxThickness;
+                Assert.Equal(thin, Mining.CanMine(wood.Id, null, state));
+                Assert.Equal(thin, Mining.HitDamage(wood.Id, null, state) > 0f);
+                // Whatever a hand may punch must not drop the log itself
+                if (thin) Assert.False(WoodLootBand.Select(wood.WoodLootBands, t).Self, $"{wood.Name} thickness {t}");
+            }
+
+            // Placed (detached) wood is a full cube and keeps the axe gate
+            Assert.False(Mining.CanMine(wood.Id, null, WoodState.Detached));
+            Assert.False(Mining.CanMine(wood.Id, null));
+        }
     }
 
     [Fact]

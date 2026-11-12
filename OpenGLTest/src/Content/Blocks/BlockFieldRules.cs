@@ -182,7 +182,7 @@ internal static class BlockFieldRules
     /// Tree wood carries its thickness and parent direction in the state byte; its wood object
     /// tunes how hardness and loot follow that thickness, so it means nothing on any other renderer.
     /// </summary>
-    internal static (float TipHardness, WoodLootBand[]? LootBands) ParseWood(
+    internal static (float TipHardness, WoodLootBand[]? LootBands, int HandMaxThickness) ParseWood(
         BlockDefinition definition, BlockRenderer renderer, string path)
     {
         var treeWood = renderer == BlockRenderer.TreeWood;
@@ -191,7 +191,7 @@ internal static class BlockFieldRules
                 $"Block '{path}' declares a wood object without renderer \"tree_wood\"; wood.* only tunes tree wood.");
         return treeWood
             ? BlockSchemaParser.ParseTreeWood(definition, path)
-            : (0.25f, (WoodLootBand[]?)null);
+            : (0.25f, (WoodLootBand[]?)null, -1);
     }
 
     /// <summary>The block's <c>light.emission</c>, 0..15.</summary>
