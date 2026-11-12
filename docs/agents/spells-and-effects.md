@@ -81,7 +81,8 @@ and every error names its file. Tests compile in-memory effects through the pure
 | `icon` | none | a `.png` path under `assets/`: the player's HUD icon |
 | `deathMessage` | none | the phrase after the player's name in a death line ("burned to death") |
 
-An effect must do something: damage, a factor below 1 or a block flag. Three ship: `burning` (fire; 6 s,
+An effect must do something: damage, a factor below 1 or a block flag. These ship: `venom` (the spiders' bite and
+the scorpions' sting and spit, see "Spiders"), `slowness` (a spider's web; 3 s, 0.45 speed, no damage, no icon) and `burning` (fire; 6 s,
 5% a second, ignite and thaw, orange, embers), `frostburn` (frost; 8 s, 2% every 2 s, half speed, 0.6
 attack, freeze, pale blue, steam) and `spore` (the sporeling's burst, see "Cave mobs"; 6 s, 3% every 1.5 s, 0.75
 speed, 0.85 attack, fungal green, smoke, no icon), first guesses.

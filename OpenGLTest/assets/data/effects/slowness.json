@@ -1,0 +1,8 @@
+{
+  // A spider's web shot (Spider, CaveMobManager): sticky silk that drags the legs for a moment. No damage of its
+  // own (the web's light sting is the missile's), no HUD icon yet.
+  "name": "Slowness",
+  "durationSeconds": 3,
+  "moveFactor": 0.45,
+  "tint": [220, 220, 230]
+}

@@ -525,12 +525,19 @@ OpenGLTest/
         SandwormChain.cs       # GL-free follow-the-leader chain of segments: fixed link lengths, a bend limit, the taper
         SandwormPose.cs        # GL-free world matrices of the model parts: a segment's, the lower jaw's
       Crawlers/                # the mobs that walk every surface on solved legs (see "Spiders", "Scorpion")
-        CrawlerMob.cs          # abstract crawler (a CaveMob): the crawl toward its target, the ceiling drop, the knock
-                               #   off a wall, the drawn orientation, its part matrices, wire stance and model contract
-        Spider.cs              # the giant spider and the broodmother: the bite's impact event, death on its back
-        Scorpion.cs            # the giant scorpion: sting first, pinch while the sting recovers, which blow landed
+        CrawlerMob.cs          # abstract crawler (a CaveMob): the crawl toward its target, the leap and the path when
+                               #   it stalls, the ceiling drop, the knock off a wall, the ranged shot's aim and release,
+                               #   the drawn orientation, its part matrices, wire stance and model contract
+        CrawlerNavigator.cs    # GL-free: notices a stalled chase, follows a planned path foothold by foothold
+        CrawlerPathfinder.cs   # GL-free A* over block faces: along a face, climb, wrap an edge, let go and fall
+        CrawlerFoothold.cs     # one path step: an air cell and the face held there, its body center, a fall marker
+        Spider.cs              # the giant spider and the broodmother: the bite's impact event, the web shot, death on
+                               #   its back
+        Scorpion.cs            # the giant scorpion: sting first, pinch while the sting recovers, spit out of reach,
+                               #   which blow landed
+        ScorpionStrike.cs      # which of its three attacks a scorpion landed
         SurfaceCrawler.cs      # GL-free body physics on any face of the grid: cling, climb a wall, wrap an edge, fall,
-                               #   float and grab
+                               #   float and grab; a leap's launch velocity
         CrawlFrame.cs          # GL-free: the six faces by wire index, a heading as an angle on a face, the body rotation
         CrawlerRig.cs          # the leg contract read from a model once: hips, segment lengths, resting foot points
         CrawlerLegs.cs         # the eight feet: planted holds probed in the world, alternating steps, the feet's plane

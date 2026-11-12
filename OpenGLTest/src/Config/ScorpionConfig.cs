@@ -1,7 +1,7 @@
 namespace VoxelEngine.Config;
 
 /// <summary>
-/// Tuning for the giant scorpion (<c>Scorpion</c>) of the desert and its caves: its body and two attacks, and
+/// Tuning for the giant scorpion (<c>Scorpion</c>) of the desert and its caves: its body and three attacks, and
 /// where it spawns. How it clings and steps is shared with the other crawlers (<c>CrawlerConfig</c>). Speeds are
 /// blocks per second, lengths blocks.
 /// </summary>
@@ -25,6 +25,21 @@ public static class ScorpionConfig
     public const float StingKnockbackSpeed = 2f;
     public const float StingKnockbackLift = 1f;
     public const float StingVenomScale = 1.4f;
+
+    // Out of AttackReach, holding a surface, with the target's chest SpitMinRange..SpitMaxRange off in a clear line,
+    // it spits venom (first SpitFirstDelaySeconds after it appears, then every SpitCooldownSeconds give or take
+    // SpitCooldownJitter) flying at SpitSpeed: SpitDamage (tier-scaled), a SpitKnockbackSpeed nudge and venom for
+    // SpitVenomScale of the effect's duration.
+    public const float SpitMinRange = 3.5f;
+    public const float SpitMaxRange = 10f;
+    public const float SpitFirstDelaySeconds = 1f;
+    public const float SpitCooldownSeconds = 6f;
+    public const float SpitCooldownJitter = 1.5f;
+    // Its level range v^2/g must clear SpitMaxRange
+    public const float SpitSpeed = 17f;
+    public const int SpitDamage = 2;
+    public const float SpitKnockbackSpeed = 1f;
+    public const float SpitVenomScale = 1f;
 
     // --- Spawning (CaveMobManager) ---
     // Scorpions take CaveSpawnChance of the spawn floors found in the desert's echo caves (the rest are rolled as

@@ -287,4 +287,26 @@ public sealed class SpiderTests
         Assert.True(target.DamageTaken > 0, "the spider never landed its bite");
         Assert.True(target.Effects!.IsActive(venom));
     }
+
+    [Fact]
+    public void AWebShotStingsLightlyAndSlowsATargetOutOfBiteReach()
+    {
+        var chunks = StoneFloor();
+        var slowness = StatusEffectRegistry.Require("slowness");
+        var venom = StatusEffectRegistry.Require("venom");
+        var manager = new CaveMobManager(null, null, null, null, TypeOf(false), TypeOf(true));
+        var drops = new DropManager();
+        var spider = manager.Spawn(Spider.EntityName, OnFloor(1.5f, 8.5f), 0, spawnIn: false) as Spider;
+        Assert.NotNull(spider);
+
+        var target = PlayerOn(13.5f, 8.5f, 1f);
+        for (var i = 0; i < (int)(6f / Dt) && target.DamageTaken == 0; i++)
+            manager.Update(Dt, chunks, drops, [target]);
+
+        Assert.True(target.DamageTaken > 0, "the spider never hit its target");
+        Assert.False(spider.InBiteReach(spider.Position, target.Eye), "the first hit was not from range");
+        Assert.True(target.Effects!.IsActive(slowness), "the web did not slow its target");
+        Assert.False(target.Effects.IsActive(venom), "a web poisoned like a bite");
+        Assert.InRange(target.DamageTaken, SpiderConfig.WebMinDamage, SpiderConfig.WebMaxDamage);
+    }
 }

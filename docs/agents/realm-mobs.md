@@ -230,9 +230,30 @@ MCP plugin (no generator, the skin embedded; `USER_TODO.md`).
   or ceiling when dying. `Mob.Facing` is the heading's angle on the held face (`CrawlFrame`: on a floor the usual yaw).
   In `BiteReach` of the chest (from any side) and off its cooldown it plays `bite`; at the clip's `impact` the manager
   bills every non-immune target still in reach `BiteDamage` (tier-scaled) with a shove and the `venom` status effect
-  (`VenomScale`). A blow knocks it off a wall or ceiling (`Shove` lets go and throws it); on a floor it slides like
+  (`VenomScale`). Out of bite reach, holding a surface, with the chest `WebMinRange`..`WebMaxRange` from `ShotOrigin` in
+  a clear line and off its own cooldown (`WebFirstDelaySeconds` after it appears, then `WebCooldownSeconds` jittered),
+  it shoots a **web** (attack variant 1, replayed on the `bite` clip until it has one of its own): at the `impact` the
+  manager launches a `MobMissiles` missile drawn as `spider_silk` (`CrawlerMob.ReleaseShot`, aimed through an
+  `AimTracker` locked at the clip's start, `WebSpeed`), which stings for `WebMinDamage`..`WebMaxDamage` (a random roll,
+  not tier-scaled) and applies the `slowness` status effect (`WebSlownessScale`). A blow knocks it off a wall or ceiling (`Shove` lets go and throws it); on a floor it slides like
   any walker, and only there does a player walking into it shove it. It never takes fall damage (`SafeFallBlocks`
   infinite).
+- **Getting unstuck** (`CrawlerNavigator`, `CrawlerPathfinder`, both GL-free): the straight crawl hovers level with a
+  target off the face it holds (a crawler on a wall beside a player across the room keeps turning back past the
+  player's height) or presses into a dead end. The navigator watches the chase: no `StallProgressBlocks` closer to the
+  chest in `StallSeconds` is a stall. A stalled crawler first **leaps** (`CrawlerMob.TryLeap`): off
+  `LeapCooldownSeconds`, holding a surface, the target's feet `LeapMinBlocks`..`LeapMaxBlocks` off in a clear line, on
+  the arc `SurfaceCrawler.LeapVelocity` solves (the horizontal distance at `LeapHorizontalSpeed`, in the air long
+  enough to come down onto the spot, `LeapMinSeconds`..`LeapMaxSeconds`), launched away from the held face and no
+  faster than `LeapMaxSpeed`; it then flies as a falling crawler, landing on a floor or grabbing the wall it hits. Else
+  it **plans a path**: A* over `CrawlerFoothold`s (an open cell against one solid neighbor's face; a body wider than a
+  cell also needs the cell in front) whose moves are the crawler's own (along the face, the climb onto a wall in the
+  same cell, the wrap round an edge, and from a wall or a ceiling a fall of up to `PathMaxDropBlocks` onto the floor
+  below), at most `PathMaxNodes` expanded and one plan every `PathRetrySeconds`, ending within the kind's melee reach
+  of the chest or at the foothold nearest it (refused without a block's gain). The navigator hands out the next
+  foothold as the crawl's aim (into the new face for a turn in the same cell; a fall step lets go), skipping ahead to
+  wherever the crawler is found, and gives the path up when it reaches no further foothold for `PathStallSeconds` or
+  the target moves `PathRetargetBlocks` from where it was planned to. Tests: `CrawlerNavigationTests`.
 - **Legs** (`CrawlerRig`, `CrawlerLegs`, `LegIk`, `CrawlerPose`): the model contract is four legs a side, `LegR1..4` on
   +X and `LegL1..4` on -X, each a **top-level** group whose cubes run straight out along X from its origin (the hip),
   with a child `...Lower` whose origin (the knee) sits straight out from the hip (`Spider.ValidateContent` checks it at
@@ -257,11 +278,15 @@ MCP plugin (no generator, the skin embedded; `USER_TODO.md`).
   naturally**: it waits for the spider den (plans/TODO.md `P-60`); the `spawn` op and the item debugger raise it.
 - **Plumbing**: the cave mobs' own (saves by kind name with the tier, the `spawn` op names `spider` and
   `spider_broodmother`, `MobPasses`' rig list), plus `NetEntityKind.Spider` 64 and `SpiderBroodmother` 65 (protocol
-  39): the item field packs the held face above the tier byte (`CrawlerMob.PackStance`, 0 = airborne) and the yaw is
+  39; since protocol 48 the attack count names bite and web shot by its remainder of 2): the item field packs the
+  held face above the tier byte (`CrawlerMob.PackStance`, 0 = airborne) and the yaw is
   the heading's angle on that face, which `ClientMirror` hands to `CrawlerMob.MirrorSurface`. The item debugger's ENTITIES tab
   shows both with the legs walking on the spot (no world: the ground slides back under the body). Tests: `SpiderTests`.
   `visual-examples/spiders.json` (`VOXEL_TIME=147`) films a surface chase, a climb up a pillar and both kinds in a cave.
-- Known gaps: a mirror's falling spider has no heading on the wire beyond its yaw; the healthbar sits above the body
+- Known gaps: the web shot replays the `bite` clip and is drawn as a spider silk sprite (no clip or sprite of its own
+  yet); webs, like every mob missile, are not sent to clients; the pathfinder's room check for the broodmother's
+  1.5-block body is only the cell in front of the face, so she may plan through a gap she cannot pass; a mirror's
+  falling spider has no heading on the wire beyond its yaw; the healthbar sits above the body
   in world up, so under a ceiling it is inside the rock; spiders are not drawn in the water mirror; the legs do not
   avoid each other; silk has no use yet; the numbers are first guesses.
 
@@ -272,11 +297,16 @@ crawler: `Scorpion` (`ScorpionConfig`), a `CrawlerMob` like the spiders, so it c
 they do (see "Spiders"). Its model adds claws (`ArmL/R` > `ClawL/R` > `PincerL/R`) and a tail chain (`Tail1..4` >
 `Stinger`) under `Body` > `Abdomen`, all clip-driven; `Scorpion.ValidateContent` requires `Body`, `ClawL`, `ClawR`,
 `Tail1`, `Stinger`, the leg contract and `pinch` and `sting`, each with `impact`.
-- **Two attacks** over one count (`AttackVariants` 2: pinch even, sting odd, so a mirror replays the right clip): in
+- **Three attacks** over one count (`AttackVariants` 3: pinch, sting and spit by its remainder, the spit on the
+  sting's clip, so a mirror replays the right clip; protocol 48): in
   `AttackReach` of the target's chest it **stings** when the sting is off its `StingCooldownSeconds` (`StingDamage`,
   tier-scaled, and `venom` for `StingVenomScale`), else **pinches** when the pinch is off its own (`PinchDamage` and a
   hard shove, no venom). Each lands at its clip's `impact` (`TryTakeStrike` reports which) on every non-immune target
-  still in reach. A fresh scorpion's first blow is therefore the sting. It dies upright (no roll): the body drops,
+  still in reach. Out of reach, holding a surface, with the chest `SpitMinRange`..`SpitMaxRange` off in a clear line
+  and off its own cooldown (`SpitFirstDelaySeconds`, then `SpitCooldownSeconds` jittered) it **spits** venom: at the
+  `impact` (`TryTakeStrike` reports a `ScorpionStrike`) the manager launches a missile drawn as `scorpion_stinger`
+  (`SpitSpeed`, aimed like the spider's web) carrying `SpitDamage` (tier-scaled) that applies `venom`
+  (`SpitVenomScale`). It gets unstuck like the spiders (see "Spiders"). A fresh scorpion's first blow is therefore the sting. It dies upright (no roll): the body drops,
   the legs curl and the tail falls forward.
 - **Spawning** (`CaveMobManager`, `CaveSpawnRules`): in the desert's echo caves the first `CaveSpawnChance` of the kind
   roll is a scorpion's (`KindFor`; the rest of the roll is judged as in any plain cave, so spiders still turn up), in
@@ -285,5 +315,6 @@ they do (see "Spiders"). Its model adds claws (`ArmL/R` > `ClawL/R` > `PincerL/R
   column (`ScorpionSurfaceBiome`), at tier 0.
 - **Plumbing**: as the spiders', plus `NetEntityKind.Scorpion` 66 (protocol 40) and the `spawn` op name `scorpion`.
   Tests: `ScorpionTests`. `visual-examples/scorpions.json` (`VOXEL_TIME=147`) films one on the deep desert.
-- Known gaps: the tail and claws do not collide (the tail passes through a low ceiling); the stinger has no use yet;
+- Known gaps: the spit replays the `sting` clip and is drawn as a stinger sprite (no venom-glob clip or sprite yet);
+  the tail and claws do not collide (the tail passes through a low ceiling); the stinger has no use yet;
   the numbers are first guesses.

@@ -101,8 +101,9 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   shockwave and ledge caution
     CaveMobs/                  # cave mob contracts, the depth tier and its scaling, the shard band, each attack's event
     Crawlers/                  # the leg contract and solver, climbing a cliff, rounding a ledge, the knock off a wall,
-                               #   footholds, the wire stance, the cave spawn share, the venom bite; the scorpion's
-                               #   sting and pinch and its desert-only spawns
+                               #   footholds, the wire stance, the cave spawn share, the venom bite, the slowing web;
+                               #   the scorpion's sting, pinch, venom spit and desert-only spawns; a stuck crawler's
+                               #   leap and path, every path step a crawler move, the leap's arc (CrawlerNavigationTests)
     TowerMobs/                 # the skeleton's contract, bow band and line of sight, melee, undead, the ambient rattle's timer and range gate; the
                                #   Skeleton King's contract, leash, shockwave and volley fan, its brain's phases and choices
     Sandworms/                 # the sandworm's chain, brain and pose, its melee through the real punch path

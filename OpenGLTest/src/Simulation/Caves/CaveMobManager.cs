@@ -24,7 +24,8 @@ namespace VoxelEngine.Simulation.Caves;
 /// underground outside hell: the floor's cave biome and a roll pick the kind (<see cref="CaveSpawnRules.KindFor"/>),
 /// its depth the tier (<see cref="CaveDifficulty.TierAt"/>), and the pack mates stay on the leader's biome and tier.
 /// At night a spider now and then turns up on the surface too, and scorpions roam the desert's surface (mostly by
-/// night). A scorpion's pinch shoves and its sting poisons. The broodmother is never spawned here: it is the spider
+/// night). A scorpion's pinch shoves and its sting poisons; out of reach a spider shoots webs that slow
+/// (<c>slowness</c>) and a scorpion spits venom, missiles flown like the shards. The broodmother is never spawned here: it is the spider
 /// den's miniboss. Every spawn is judged by the global <see cref="MobCaps"/> it shares with the other mob
 /// kinds. Main thread only.
 /// </summary>
@@ -34,6 +35,7 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
     private const string SporeEffect = "spore";
     private const string BurningEffect = "burning";
     private const string VenomEffect = "venom";
+    private const string SlownessEffect = "slowness";
 
     private readonly EntityType? _shardlingType;
     private readonly EntityType? _sporelingType;
@@ -44,9 +46,14 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
     private float _surfaceTimer;
     private float _desertTimer;
     private int _surfaceCursor;
-    // Each shard carries its shardling's damage, scaled by the shardling's tier
+    // Each missile carries its launcher's damage: a shard its shardling's and a spit its scorpion's, scaled by the
+    // tier, a web a light random sting. A web is drawn as spider silk and a spit as a stinger.
     private readonly MobMissiles _shards = new();
+    private readonly MobMissiles _webs = new();
+    private readonly MobMissiles _spits = new();
     private readonly ushort _shardItemId;
+    private readonly ushort _silkItemId;
+    private readonly ushort _stingerItemId;
 
     // The ring search around a target: dark, unlit cave floors whose cave biome holds a cave mob kind
     private static readonly CaveSpawnSearch RingSearch = new(
@@ -82,10 +89,18 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
         _spiderType = spiderType;
         _broodmotherType = broodmotherType;
         _shardItemId = ContentRegistry.RequireBlock("crystal_block").Id;
+        _silkItemId = ContentRegistry.RequireItem("spider_silk").Id;
+        _stingerItemId = ContentRegistry.RequireItem("scorpion_stinger").Id;
     }
 
-    /// <summary>Crystal shards in flight; drawn and mirrored like the player's own throws.</summary>
+    /// <summary>Crystal shards in flight; drawn like the player's own throws.</summary>
     public IReadOnlyList<ThrownProjectile> Shards => _shards.Flying;
+
+    /// <summary>Spiders' webs in flight; drawn like the player's own throws.</summary>
+    public IReadOnlyList<ThrownProjectile> Webs => _webs.Flying;
+
+    /// <summary>Scorpions' spat venom in flight; drawn like the player's own throws.</summary>
+    public IReadOnlyList<ThrownProjectile> Spits => _spits.Flying;
 
     /// <summary>Test seam: the cave biome of a spawn floor's standing cell; null reads the world's own
     /// (<see cref="MobSpawner.TryFindCaveSpawn"/>'s default).</summary>
@@ -148,7 +163,7 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
         if (chunks == null || targets == null) return;
 
         UpdateMobs(deltaTime, chunks, drops, targets, debris, MobConfig.CaveMobDespawnRadiusBlocks);
-        UpdateShards(deltaTime, chunks, targets);
+        UpdateMissiles(deltaTime, chunks, targets);
         UpdateSpawning(deltaTime, chunks, targets);
         UpdateSurfaceSpawning(deltaTime, chunks, targets, night);
     }
@@ -190,7 +205,14 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
                 return;
 
             case Spider spider:
-                if (!spider.TryTakeBiteImpact()) return;
+                if (!spider.TryTakeImpact(out var web)) return;
+                if (web)
+                {
+                    spider.ReleaseShot(SpiderConfig.WebSpeed, out var webFrom, out var webVelocity);
+                    _webs.Launch(_silkItemId, webFrom, webVelocity, Spider.RollWebDamage());
+                    return;
+                }
+
                 for (var t = 0; t < targets.Count; t++)
                 {
                     var target = targets[t];
@@ -202,12 +224,19 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
                 return;
 
             case Scorpion scorpion:
-                if (!scorpion.TryTakeStrike(out var sting)) return;
+                if (!scorpion.TryTakeStrike(out var strike)) return;
+                if (strike == ScorpionStrike.Spit)
+                {
+                    scorpion.ReleaseShot(ScorpionConfig.SpitSpeed, out var spitFrom, out var spitVelocity);
+                    _spits.Launch(_stingerItemId, spitFrom, spitVelocity, scorpion.SpitDamage);
+                    return;
+                }
+
                 for (var t = 0; t < targets.Count; t++)
                 {
                     var target = targets[t];
                     if (target.IsImmune || !Scorpion.InAttackReach(scorpion.Position, target.Eye)) continue;
-                    if (!sting)
+                    if (strike == ScorpionStrike.Pinch)
                     {
                         Hit(target, scorpion.PinchDamage, scorpion.Position, ScorpionConfig.PinchKnockbackSpeed,
                             ScorpionConfig.PinchKnockbackLift, scorpion.Type.DisplayName);
@@ -231,19 +260,30 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
         _ => MobConfig.CaveShardlingShoveSpeed,
     };
 
-    // A shard flies under gravity; any target it touches stops it, and the first non-immune one takes its damage
-    // and is chilled. A shard that strikes a block or outlives its flight shatters.
-    private void UpdateShards(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
+    // Shards chill, webs slow and spat venom poisons
+    private void UpdateMissiles(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
     {
-        _shards.Update(deltaTime, chunks, targets);
+        UpdateMissiles(_shards, deltaTime, chunks, targets, MobConfig.CaveShardKnockbackSpeed, ChillEffect,
+            MobConfig.CaveShardChillScale, _shardlingType?.DisplayName);
+        UpdateMissiles(_webs, deltaTime, chunks, targets, SpiderConfig.WebKnockbackSpeed, SlownessEffect,
+            SpiderConfig.WebSlownessScale, _spiderType?.DisplayName);
+        UpdateMissiles(_spits, deltaTime, chunks, targets, ScorpionConfig.SpitKnockbackSpeed, VenomEffect,
+            ScorpionConfig.SpitVenomScale, _scorpionType?.DisplayName);
+    }
 
-        var hits = _shards.Hits;
+    // A missile flies under gravity; any target it touches stops it, and the first non-immune one takes its damage
+    // and the kind's effect. A missile that strikes a block or outlives its flight is spent.
+    private void UpdateMissiles(MobMissiles missiles, float deltaTime, ChunkManager chunks,
+        IReadOnlyList<IMobTarget> targets, float knockbackSpeed, string effect, float effectScale, string? source)
+    {
+        missiles.Update(deltaTime, chunks, targets);
+
+        var hits = missiles.Hits;
         for (var i = 0; i < hits.Count; i++)
         {
             var hit = hits[i];
-            Hit(hit.Target, hit.Damage, hit.Position, MobConfig.CaveShardKnockbackSpeed, 0f,
-                _shardlingType?.DisplayName);
-            StatusEffects.Apply(hit.Target, ChillEffect, MobConfig.CaveShardChillScale);
+            Hit(hit.Target, hit.Damage, hit.Position, knockbackSpeed, 0f, source);
+            StatusEffects.Apply(hit.Target, effect, effectScale);
         }
     }
 

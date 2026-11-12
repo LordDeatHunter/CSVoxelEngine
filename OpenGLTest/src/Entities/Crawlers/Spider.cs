@@ -8,7 +8,8 @@ namespace VoxelEngine.Entities.Crawlers;
 /// <summary>
 /// The giant spider, and its oversized broodmother (a miniboss): a <see cref="CrawlerMob"/> of every cave. In
 /// reach and off its cooldown it plays its bite, which lands at the clip's <see cref="ImpactEvent"/>
-/// (<see cref="TryTakeBiteImpact"/>) with venom. It dies on its back. Main thread only.
+/// (<see cref="TryTakeImpact"/>) with venom. Out of reach, with a clear line and off its own cooldown, it shoots a
+/// web that stings lightly and slows. It dies on its back. Main thread only.
 /// </summary>
 public sealed class Spider : CrawlerMob
 {
@@ -21,8 +22,15 @@ public sealed class Spider : CrawlerMob
     /// <summary>Timeline event on the bite clip at which the fangs close.</summary>
     public const string ImpactEvent = "impact";
 
+    // The attacks by variant (RealmMob.StartAttack), which a client's mirror replays by this index. The web shot
+    // rears up on the bite's clip until it has one of its own.
+    private const int BiteAttack = 0;
+    private const int WebAttack = 1;
+
     private readonly Tuning _tuning;
     private float _biteCooldown;
+    private float _webCooldown = SpiderConfig.WebFirstDelaySeconds;
+    private bool _webbing;
 
     private readonly record struct Tuning(float BodySize, float CrawlSpeed, float BiteReach, int BiteDamage,
         float BiteCooldown, float KnockbackSpeed, float KnockbackLift, float VenomScale, float ShoveSpeed);
@@ -59,7 +67,13 @@ public sealed class Spider : CrawlerMob
     public override string AttackClip => BiteClip;
 
     /// <inheritdoc />
+    protected override int AttackVariants => 2;
+
+    /// <inheritdoc />
     public override float ShoveSpeed => _tuning.ShoveSpeed;
+
+    /// <inheritdoc />
+    protected override float MeleeReach => _tuning.BiteReach;
 
     /// <inheritdoc />
     protected override float DeathRollRadians => MathF.PI;
@@ -85,20 +99,44 @@ public sealed class Spider : CrawlerMob
     public static void ValidateContent(EntityType type) =>
         RequireCrawler(type, "Spider", ["Body", "Head", "Abdomen"], [BiteClip], ImpactEvent);
 
+    /// <summary>The damage one web shot carries: a light, random sting (<see cref="SpiderConfig.WebMinDamage"/>..
+    /// <see cref="SpiderConfig.WebMaxDamage"/>), the slow being the point.</summary>
+    public static int RollWebDamage() => Random.Shared.Next(SpiderConfig.WebMinDamage, SpiderConfig.WebMaxDamage + 1);
+
     /// <inheritdoc />
-    protected override void TickCooldowns(float scaledDelta) =>
+    protected override void TickAttackCooldowns(float scaledDelta)
+    {
         _biteCooldown = MathF.Max(0f, _biteCooldown - scaledDelta);
+        _webCooldown = MathF.Max(0f, _webCooldown - scaledDelta);
+    }
 
     /// <inheritdoc />
     protected override Vector3 Decide(float dist, Vector3 toward, ChunkManager chunks, IMobTarget target)
     {
-        if (!InBiteReach(Position, target.Eye)) return Approach(toward, target, _tuning.BiteReach);
+        if (!InBiteReach(Position, target.Eye))
+        {
+            if (_webCooldown > 0f
+                || !TryAimShot(target, chunks, SpiderConfig.WebMinRange, SpiderConfig.WebMaxRange))
+                return Approach(toward, target, _tuning.BiteReach);
+            _webbing = true;
+            StartAttack(WebAttack);
+            _webCooldown = Jittered(SpiderConfig.WebCooldownSeconds, SpiderConfig.WebCooldownJitter);
+            return Vector3.Zero;
+        }
+
         if (_biteCooldown > 0f) return Vector3.Zero;
-        StartAttack();
+        _webbing = false;
+        StartAttack(BiteAttack);
         _biteCooldown = _tuning.BiteCooldown;
         return Vector3.Zero;
     }
 
-    /// <summary>True once per bite, at the bite clip's impact event; the manager decides who is still in reach.</summary>
-    public bool TryTakeBiteImpact() => Animation.ConsumeEvent(ImpactEvent);
+    /// <summary>True once per attack, at its clip's impact event, with whether it was a web shot (then the manager
+    /// launches the web, <see cref="CrawlerMob.ReleaseShot"/>) or a bite (the manager decides who is still in
+    /// reach).</summary>
+    public bool TryTakeImpact(out bool web)
+    {
+        web = _webbing;
+        return Animation.ConsumeEvent(ImpactEvent);
+    }
 }

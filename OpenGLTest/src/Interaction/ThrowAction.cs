@@ -67,43 +67,29 @@ internal sealed class ThrowAction
     internal float ThrowCharge01 => MathUtils.Clamp01(_throwChargeSeconds / PlayerConfig.ThrowChargeSeconds);
 
     /// <summary>Rebuilds the projectile list (<c>_projectiles</c>) from the player's throws, the
-    /// goblins' stones, the hell casters' fire bolts, the shardlings' crystal shards, the skeletons' arrows and the
-    /// Skeleton Kings' bones, with indexed loops so a frame allocates no enumerator.</summary>
+    /// goblins' stones, the hell casters' fire bolts, the shardlings' crystal shards, the spiders' webs, the scorpions'
+    /// spat venom, the skeletons' arrows and the Skeleton Kings' bones, with indexed loops so a frame allocates no
+    /// enumerator.</summary>
     internal void RefreshProjectiles()
     {
         _projectiles.Clear();
-        for (var i = 0; i < _thrown.Count; i++)
-            _projectiles.Add(_thrown[i]);
-        if (_goblins != null)
-        {
-            var stones = _goblins.Stones;
-            for (var i = 0; i < stones.Count; i++)
-                _projectiles.Add(stones[i]);
-        }
-        if (_hellMobs != null)
-        {
-            var bolts = _hellMobs.Bolts;
-            for (var i = 0; i < bolts.Count; i++)
-                _projectiles.Add(bolts[i]);
-        }
+        AddProjectiles(_thrown);
+        if (_goblins != null) AddProjectiles(_goblins.Stones);
+        if (_hellMobs != null) AddProjectiles(_hellMobs.Bolts);
         if (_caveMobs != null)
         {
-            var shards = _caveMobs.Shards;
-            for (var i = 0; i < shards.Count; i++)
-                _projectiles.Add(shards[i]);
+            AddProjectiles(_caveMobs.Shards);
+            AddProjectiles(_caveMobs.Webs);
+            AddProjectiles(_caveMobs.Spits);
         }
-        if (_skeletons != null)
-        {
-            var arrows = _skeletons.Arrows;
-            for (var i = 0; i < arrows.Count; i++)
-                _projectiles.Add(arrows[i]);
-        }
-        if (_kings != null)
-        {
-            var bones = _kings.Bones;
-            for (var i = 0; i < bones.Count; i++)
-                _projectiles.Add(bones[i]);
-        }
+        if (_skeletons != null) AddProjectiles(_skeletons.Arrows);
+        if (_kings != null) AddProjectiles(_kings.Bones);
+    }
+
+    private void AddProjectiles(IReadOnlyList<ThrownProjectile> flying)
+    {
+        for (var i = 0; i < flying.Count; i++)
+            _projectiles.Add(flying[i]);
     }
 
     /// <summary>

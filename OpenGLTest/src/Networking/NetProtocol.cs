@@ -271,8 +271,10 @@ public static class NetFraming
     /// 45: the historical independent bridge integration; not compatible with the lantern layout.
     /// 46: combines the lantern layout (messages 72/73/74) with upstream 43's skeleton role/outfit representation
     /// and upstream 44's world sounds (message 90). All historical layouts are refused by the handshake.
-    /// The separate planned bridge integration reserves 47.</summary>
-    public const int ProtocolVersion = 46;
+    /// The separate planned bridge integration reserves 47.
+    /// 48: a spider's attack count names bite (even) and web shot (odd), and a scorpion's pinch, sting and spit by
+    /// its remainder of 3 (the spit replays the sting's clip); an older peer would replay the wrong clip.</summary>
+    public const int ProtocolVersion = 48;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

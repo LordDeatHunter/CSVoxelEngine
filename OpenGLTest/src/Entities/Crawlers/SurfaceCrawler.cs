@@ -47,6 +47,25 @@ public sealed class SurfaceCrawler
         _wrapGrace = 0f;
     }
 
+    /// <summary>
+    /// The launch velocity of a leap from <paramref name="from"/> that lands a falling body on
+    /// <paramref name="to"/>: the horizontal distance covered at <paramref name="horizontalSpeed"/>, but in the air
+    /// long enough to be past the top of its arc when it gets there (a hop onto a point higher up must not arrive
+    /// still rising and sail on past it), the flight time held to
+    /// <see cref="CrawlerConfig.LeapMinSeconds"/>..<see cref="CrawlerConfig.LeapMaxSeconds"/>; the rise is whatever
+    /// brings it there under <see cref="BodyMotion.Gravity"/> in that time.
+    /// </summary>
+    public static Vector3 LeapVelocity(Vector3 from, Vector3 to, float horizontalSpeed)
+    {
+        var delta = to - from;
+        var flat = MathF.Sqrt(delta.X * delta.X + delta.Z * delta.Z);
+        // Falling on arrival means time^2 > 2 * rise / g; a half again over that comes down onto the point
+        var overTheTop = MathF.Sqrt(3f * MathF.Max(delta.Y, 0f) / BodyMotion.Gravity);
+        var time = Math.Clamp(MathF.Max(flat / horizontalSpeed, overTheTop), CrawlerConfig.LeapMinSeconds,
+            CrawlerConfig.LeapMaxSeconds);
+        return delta / time + Vector3.UnitY * (0.5f * BodyMotion.Gravity * time);
+    }
+
     /// <summary>Takes the surface a server reported (a client's mirror never steps): the face with
     /// <paramref name="normal"/> and <paramref name="heading"/> on it, or nothing for a zero normal.</summary>
     public void Mirror(Vector3 normal, Vector3 heading)

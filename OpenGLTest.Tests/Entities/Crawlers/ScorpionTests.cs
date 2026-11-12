@@ -80,6 +80,25 @@ public sealed class ScorpionTests
     }
 
     [Fact]
+    public void ATargetOutOfReachIsPoisonedBySpatVenom()
+    {
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
+        var venom = StatusEffectRegistry.Require("venom");
+        var manager = new CaveMobManager(null, null, null, null, null, null, ScorpionType);
+        var drops = new DropManager();
+        var scorpion = manager.Spawn(Scorpion.EntityName, OnFloor(1.5f, 8.5f), 0, spawnIn: false);
+        Assert.NotNull(scorpion);
+
+        var target = PlayerOn(11.5f, 8.5f, 1f);
+        for (var i = 0; i < (int)(6f / Dt) && target.DamageTaken == 0; i++)
+            manager.Update(Dt, chunks, drops, [target]);
+
+        Assert.True(target.DamageTaken > 0, "the scorpion never hit its target");
+        Assert.False(Scorpion.InAttackReach(scorpion.Position, target.Eye), "the first hit was not from range");
+        Assert.True(target.Effects!.IsActive(venom), "the spit did not poison its target");
+    }
+
+    [Fact]
     public void ScorpionsKeepToTheDesertAndItsCaves()
     {
         foreach (var biome in Enum.GetValues<CaveBiome>())

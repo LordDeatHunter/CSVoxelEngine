@@ -3,6 +3,7 @@ using System.Numerics;
 using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Entities.CaveMobs;
+using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.Posing;
 using VoxelEngine.Player;
 
@@ -23,8 +24,11 @@ public abstract class CrawlerMob : CaveMob
     private const float DeathShrinkFrom = 0.75f;
 
     private readonly SurfaceCrawler _crawler = new();
+    private readonly CrawlerNavigator _navigator = new();
+    private readonly AimTracker _aim = new();
     private readonly float _bodySize;
     private readonly float _crawlSpeed;
+    private float _leapCooldown;
     private bool _acquired;
     private Quaternion _orientation = Quaternion.Identity;
     private bool _oriented;
@@ -124,6 +128,52 @@ public abstract class CrawlerMob : CaveMob
             EntityContract.RequireEvent(type, kind, EntityContract.RequireClip(type, kind, clip), attackEvent);
     }
 
+    /// <summary>Where a ranged attack leaves the body: a little off the held surface over the body's center.</summary>
+    public Vector3 ShotOrigin => Position + _crawler.Up * (BodyHalfWidth * 0.5f);
+
+    /// <inheritdoc />
+    /// <remarks>Also counts the leap down and keeps a ranged attack's aim on its target through the wind-up.</remarks>
+    protected sealed override void TickCooldowns(float scaledDelta)
+    {
+        _leapCooldown = MathF.Max(0f, _leapCooldown - scaledDelta);
+        _aim.Track(scaledDelta, Animation.IsActionPlaying);
+        TickAttackCooldowns(scaledDelta);
+    }
+
+    /// <summary>Counts the kind's own attack cooldowns down (see <see cref="RealmMob.TickCooldowns"/>).</summary>
+    protected abstract void TickAttackCooldowns(float scaledDelta);
+
+    /// <summary>
+    /// Whether a ranged attack may start at <paramref name="target"/> now: the crawler holds a surface and the
+    /// target's chest is <paramref name="minRange"/>..<paramref name="maxRange"/> from <see cref="ShotOrigin"/> in a
+    /// clear line. When so the aim locks onto the target (the caller starts the clip, and
+    /// <see cref="ReleaseShot"/> launches at its release).
+    /// </summary>
+    protected bool TryAimShot(IMobTarget target, ChunkManager chunks, float minRange, float maxRange)
+    {
+        if (!IsClinging) return false;
+        var range = Vector3.Distance(ShotOrigin, ChestOf(target.Eye));
+        if (range < minRange || range > maxRange || !SeesTarget(ShotOrigin, target, chunks)) return false;
+        _aim.Lock(target, chunks);
+        return true;
+    }
+
+    /// <summary>
+    /// A ranged attack's release: where the shot leaves the body and the velocity of <paramref name="speed"/> that
+    /// meets the target locked by <see cref="TryAimShot"/> where it will be (<see cref="AimTracker"/>; a
+    /// maximum-range toss when out of reach).
+    /// </summary>
+    public void ReleaseShot(float speed, out Vector3 origin, out Vector3 velocity)
+    {
+        origin = ShotOrigin;
+        _aim.Solve(origin, speed, ThrownProjectile.Gravity, out velocity);
+    }
+
+    /// <summary>A cooldown of <paramref name="seconds"/> give or take up to <paramref name="jitter"/>, so a pack's
+    /// shots fall out of step.</summary>
+    protected static float Jittered(float seconds, float jitter) =>
+        seconds + (Random.Shared.NextSingle() - 0.5f) * 2f * jitter;
+
     /// <summary>
     /// What <see cref="RealmMob.Decide"/> answers for a target still out of attack <paramref name="reach"/>: zero
     /// (wait) once inside the standoff share of it, which is where a target behind a thin wall leaves the crawler,
@@ -138,8 +188,9 @@ public abstract class CrawlerMob : CaveMob
 
     /// <summary>
     /// Crawls one frame: toward the chased target's chest or the wander point along whatever surface it holds, or
-    /// holding still for no move. A dying crawler lets go of a wall or a ceiling; one on a ceiling over its target
-    /// lets go to land on it.
+    /// holding still for no move. A chase that stalls is helped along (<see cref="CrawlerNavigator"/>): a leap at
+    /// the target when one is in reach, else a path over the block faces. A dying crawler lets go of a wall or a
+    /// ceiling; one on a ceiling over its target lets go to land on it.
     /// </summary>
     protected override void Locomote(Vector3 move, IMobTarget? target, Vector3? wander, float deltaTime,
         ChunkManager chunks)
@@ -159,14 +210,17 @@ public abstract class CrawlerMob : CaveMob
         }
         else if (move != Vector3.Zero)
         {
-            var to = (target != null ? ChestOf(target.Eye) : wander ?? Position) - Position;
+            var to = (target != null ? Chase(target, deltaTime, chunks) : wander ?? Position) - Position;
             if (to.LengthSquared() > 1e-6f) goal = Vector3.Normalize(to);
             // A stroll hands in a fraction of a unit move
             if (target == null) speed *= MathF.Min(1f, move.Length());
-            if (target != null && _crawler.OnCeiling && to.Y < 0f
-                && to.X * to.X + to.Z * to.Z < CrawlerConfig.CeilingDropRadiusBlocks * CrawlerConfig.CeilingDropRadiusBlocks)
+            var below = target != null ? ChestOf(target.Eye) - Position : Vector3.Zero;
+            if (_crawler.OnCeiling && below.Y < 0f
+                && below.X * below.X + below.Z * below.Z < CrawlerConfig.CeilingDropRadiusBlocks * CrawlerConfig.CeilingDropRadiusBlocks)
                 _crawler.Detach();
         }
+
+        if (target == null || move == Vector3.Zero) _navigator.Reset();
 
         var position = Position;
         var velocity = Velocity;
@@ -178,6 +232,42 @@ public abstract class CrawlerMob : CaveMob
         Facing = CrawlFrame.AngleOf(_crawler.Up, _crawler.Heading);
         Animation.Update(deltaTime, LocomotionSpeed);
     }
+
+    // The point the chase aims at this frame: the target's chest, or the next foothold of a path round what keeps it
+    // from closing in. A stalled chase leaps when it can and plans a path when it cannot.
+    private Vector3 Chase(IMobTarget target, float deltaTime, ChunkManager chunks)
+    {
+        var chest = ChestOf(target.Eye);
+        var aim = _navigator.Aim(Position, BodyHalfWidth, chest, _crawler, deltaTime, out var stalled, out var letGo);
+        if (letGo) _crawler.Detach();
+        if (stalled && !TryLeap(target, chunks)
+            && _navigator.Plan(Position, BodyHalfWidth, chest, MeleeReach, _crawler, chunks))
+            aim = _navigator.Aim(Position, BodyHalfWidth, chest, _crawler, 0f, out _, out _);
+        return aim;
+    }
+
+    // A leap onto the target's feet: off its cooldown, from a held surface and away from it, the feet within leaping
+    // distance in a clear line, on an arc no faster than a leap may launch
+    private bool TryLeap(IMobTarget target, ChunkManager chunks)
+    {
+        if (_leapCooldown > 0f || !_crawler.Attached) return false;
+        var landing = target.Eye - Vector3.UnitY * (Camera.EyeHeight - BodyHalfWidth);
+        var distance = Vector3.Distance(Position, landing);
+        if (distance < CrawlerConfig.LeapMinBlocks || distance > CrawlerConfig.LeapMaxBlocks) return false;
+
+        var velocity = SurfaceCrawler.LeapVelocity(Position, landing, CrawlerConfig.LeapHorizontalSpeed);
+        if (velocity.LengthSquared() > CrawlerConfig.LeapMaxSpeed * CrawlerConfig.LeapMaxSpeed
+            || Vector3.Dot(velocity, _crawler.Normal) <= 0f || !SeesTarget(Position, target, chunks))
+            return false;
+
+        _crawler.Detach();
+        SetVelocity(velocity);
+        _leapCooldown = CrawlerConfig.LeapCooldownSeconds;
+        return true;
+    }
+
+    /// <summary>How far from the target's chest the kind's melee lands, where a path may end.</summary>
+    protected abstract float MeleeReach { get; }
 
     /// <inheritdoc />
     /// <remarks>On a floor it slides like any walker. On a wall or a ceiling the blow knocks it loose: it lets go

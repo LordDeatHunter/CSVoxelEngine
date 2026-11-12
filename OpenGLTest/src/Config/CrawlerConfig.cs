@@ -34,6 +34,30 @@ public static class CrawlerConfig
     // A floating crawler paddles at this share of its crawl speed
     public const float SwimSpeedFactor = 0.5f;
 
+    // --- Getting unstuck (CrawlerNavigator, CrawlerPathfinder, CrawlerMob's leap) ---
+    // A chasing crawler that has not come StallProgressBlocks closer to its target's chest for StallSeconds is stuck:
+    // it hovers level with a target off the face it holds, or presses into a dead end. It then leaps when it can: off
+    // LeapCooldownSeconds, holding a surface, the target's feet LeapMinBlocks..LeapMaxBlocks away in a clear line, on
+    // an arc that covers the horizontal distance at LeapHorizontalSpeed (LeapMinSeconds..LeapMaxSeconds in the air)
+    // and launches no faster than LeapMaxSpeed, away from the face it holds. Else it plans a path over the block
+    // faces (A* over at most PathMaxNodes footholds, falls of at most PathMaxDropBlocks, one plan every
+    // PathRetrySeconds) and follows it, giving it up when it reaches no further foothold for PathStallSeconds or the
+    // target moves PathRetargetBlocks from where it was planned to.
+    public const float StallSeconds = 1f;
+    public const float StallProgressBlocks = 0.5f;
+    public const float LeapCooldownSeconds = 3f;
+    public const float LeapMinBlocks = 2f;
+    public const float LeapMaxBlocks = 7f;
+    public const float LeapHorizontalSpeed = 8f;
+    public const float LeapMinSeconds = 0.35f;
+    public const float LeapMaxSeconds = 0.8f;
+    public const float LeapMaxSpeed = 16f;
+    public const int PathMaxNodes = 1500;
+    public const int PathMaxDropBlocks = 12;
+    public const float PathRetrySeconds = 1f;
+    public const float PathStallSeconds = 1.5f;
+    public const float PathRetargetBlocks = 3f;
+
     // --- Legs (CrawlerLegs, LegIk) ---
     // Each foot rests LegStanceShare of the leg's length out from its hip, the four legs of a side fanned at
     // LegAzimuthDegrees (forward of straight out, front leg first). A planted foot steps once it is LegStepShare

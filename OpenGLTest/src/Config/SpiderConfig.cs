@@ -30,6 +30,23 @@ public static class SpiderConfig
     public const float BroodmotherVenomScale = 1f;
     public const float BroodmotherShoveSpeed = 0.8f;
 
+    // --- The web shot (both kinds) ---
+    // Out of bite reach, holding a surface, with the target's chest WebMinRange..WebMaxRange off in a clear line, a
+    // spider shoots a web (first WebFirstDelaySeconds after it appears, then every WebCooldownSeconds give or take
+    // WebCooldownJitter) flying at WebSpeed; it stings for WebMinDamage..WebMaxDamage with a WebKnockbackSpeed nudge
+    // and slows the target (the slowness effect, WebSlownessScale of its duration).
+    public const float WebMinRange = 3.5f;
+    public const float WebMaxRange = 12f;
+    public const float WebFirstDelaySeconds = 1f;
+    public const float WebCooldownSeconds = 7f;
+    public const float WebCooldownJitter = 1.5f;
+    // Its level range v^2/g must clear WebMaxRange
+    public const float WebSpeed = 19f;
+    public const int WebMinDamage = 1;
+    public const int WebMaxDamage = 3;
+    public const float WebKnockbackSpeed = 0.5f;
+    public const float WebSlownessScale = 1f;
+
     // --- Spawning (CaveMobManager) ---
     // Spiders share the cave mobs' ring search but take any cave biome: a found floor is kept for a spider with
     // CaveSpawnChance in a cave whose biome has no kind of its own and BiomeCaveSpawnChance where one lives. On the
