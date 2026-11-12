@@ -39,25 +39,23 @@ public static class BlockRaycaster
     /// cell by cell and reports the first targetable cell. A fluid is targetable only when
     /// <paramref name="includeFluids"/> is set and the cell is a source, and a cell only counts
     /// when the ray enters one of its <see cref="BlockHitbox"/>es. <paramref name="stopAtRange"/>
-    /// chooses a cell-count cap (<paramref name="cellCap"/>) for capped walks or a traveled
-    /// distance cap for first-person walks; <paramref name="hitT"/> is the distance along the
-    /// ray to the hit.
+    /// chooses a cell-count cap (<paramref name="cellCap"/>) for capped walks or a
+    /// distance-derived cell budget for uncapped walks; every hit is still bounded by
+    /// <paramref name="range"/>. <paramref name="hitT"/> is the distance along the ray to the hit.
     /// </summary>
     public static bool Raycast(Vector3 origin, Vector3 direction, float range, float cellCap, bool stopAtRange,
         ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal, out int hitBoxIndex,
         out float hitT, bool includeFluids, bool sightOnly = false)
     {
-        // A diagonal ray crosses up to 3 cells per block traveled, so a walk counted in
-        // iterations starves rays that travel further (shoulder camera) or aim steeply.
-        // Capped walks therefore count cells generously and stop on traveled distance
-        // instead; the uncapped walk is first person exactly as it always was. tMax holds
-        // the distance to the next cell boundary per axis, so its minimum is where the
-        // current cell ends.
+        // DDA iterations count cell boundaries, not distance traveled. Give distance-bounded
+        // rays enough steps for the worst case of crossing three axes per block, then stop
+        // at the same range boundary used to test each block shape. tMax holds distance to
+        // the next cell boundary per axis.
         var currentPosition = origin.Floor();
         var step = direction.Sign();
         var tDelta = Vector3.Abs(Vector3.One / direction);
         var dist = Vector3.Distance(Vector3.Zero, direction);
-        var stepLimit = stopAtRange ? cellCap : range * dist;
+        var stepLimit = stopAtRange ? cellCap : MathF.Ceiling(range * dist * 3f) + 1f;
         var lastStepNormal = Vector3.Zero;
 
         var tMax = new Vector3(
@@ -86,7 +84,7 @@ public static class BlockRaycaster
                 return true;
             }
 
-            if (stopAtRange && Math.Min(tMax.X, Math.Min(tMax.Y, tMax.Z)) > range)
+            if (Math.Min(tMax.X, Math.Min(tMax.Y, tMax.Z)) > range)
                 break;
 
             if (tMax.X < tMax.Y && tMax.X < tMax.Z)
@@ -135,8 +133,8 @@ public static class BlockRaycaster
             {
                 cellNormal = EntryNormal(lastStepNormal, direction);
                 if (!RayIntersectsBox(origin, direction, cell, cell + Vector3.One,
-                        float.PositiveInfinity, out cellT, out _))
-                    cellT = 0f;
+                        range, out cellT, out _))
+                    return false;
                 return true;
             }
 
