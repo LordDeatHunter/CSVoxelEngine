@@ -14,8 +14,10 @@ namespace VoxelEngine.Interaction;
 public static class SelectionOutlineMesh
 {
     private const int BeamCount = 12;
-    private const int CornersPerBeam = 8;
-    private const int IndicesPerBeam = 36;
+    /// <summary>Corners of one beam.</summary>
+    public const int CornersPerBeam = 8;
+    /// <summary>Indices of one beam: 12 triangles.</summary>
+    public const int IndicesPerBeam = 36;
 
     /// <summary>Vertices written by <see cref="BuildVertices"/>: 12 beams of 8 corners.</summary>
     public const int VertexCount = BeamCount * CornersPerBeam;
@@ -35,14 +37,18 @@ public static class SelectionOutlineMesh
         4, 5, 7, 6  // +Z
     ];
 
-    /// <summary>Writes the <see cref="IndexCount"/> triangle indices; they never change.</summary>
+    /// <summary>
+    /// Writes the triangle indices of as many beams as <paramref name="indices"/> has room for
+    /// (<see cref="IndicesPerBeam"/> each, a whole number of them); they never change, so a draw
+    /// of k beams uses the first k * 36.
+    /// </summary>
     public static void BuildIndices(Span<uint> indices)
     {
-        if (indices.Length < IndexCount)
-            throw new ArgumentException($"need room for {IndexCount} indices", nameof(indices));
+        if (indices.Length % IndicesPerBeam != 0)
+            throw new ArgumentException($"need a multiple of {IndicesPerBeam} indices", nameof(indices));
 
         var n = 0;
-        for (var beam = 0; beam < BeamCount; beam++)
+        for (var beam = 0; beam < indices.Length / IndicesPerBeam; beam++)
         {
             var baseVertex = (uint)(beam * CornersPerBeam);
             for (var f = 0; f < 6; f++)
@@ -69,7 +75,6 @@ public static class SelectionOutlineMesh
         if (vertices.Length < VertexCount)
             throw new ArgumentException($"need room for {VertexCount} vertices", nameof(vertices));
 
-        var half = new Vector3(thickness * 0.5f);
         var n = 0;
         // axis = the direction the edge runs along; (u, v) pick which of the four parallel edges.
         for (var axis = 0; axis < 3; axis++)
@@ -93,15 +98,27 @@ public static class SelectionOutlineMesh
                     break;
             }
 
-            var lo = Vector3.Min(c0, c1) - half;
-            var hi = Vector3.Max(c0, c1) + half;
-            for (var corner = 0; corner < CornersPerBeam; corner++)
-            {
-                vertices[n++] = new Vector3(
-                    (corner & 1) == 0 ? lo.X : hi.X,
-                    (corner & 2) == 0 ? lo.Y : hi.Y,
-                    (corner & 4) == 0 ? lo.Z : hi.Z);
-            }
+            BuildBeam(c0, c1, thickness, vertices.Slice(n, CornersPerBeam));
+            n += CornersPerBeam;
+        }
+    }
+
+    /// <summary>
+    /// Writes the <see cref="CornersPerBeam"/> corners of one beam centered on the axis-aligned
+    /// segment <paramref name="from"/>..<paramref name="to"/>, grown by half of
+    /// <paramref name="thickness"/> on every side (so a beam's end covers its corner).
+    /// </summary>
+    public static void BuildBeam(Vector3 from, Vector3 to, float thickness, Span<Vector3> corners)
+    {
+        var half = new Vector3(thickness * 0.5f);
+        var lo = Vector3.Min(from, to) - half;
+        var hi = Vector3.Max(from, to) + half;
+        for (var corner = 0; corner < CornersPerBeam; corner++)
+        {
+            corners[corner] = new Vector3(
+                (corner & 1) == 0 ? lo.X : hi.X,
+                (corner & 2) == 0 ? lo.Y : hi.Y,
+                (corner & 4) == 0 ? lo.Z : hi.Z);
         }
     }
 }

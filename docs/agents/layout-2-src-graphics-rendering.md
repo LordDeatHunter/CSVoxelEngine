@@ -52,7 +52,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   a staff's cast, the item's use, placement; one overload hands back the outcome)
                                #   and the timed use charge
       RightClickOutcome.cs     # what claimed a right-click: a station, a chest, the spell table, a waystone, a tower altar, the item's use, a placement or a cast
-      SelectionOutlineMesh.cs  # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
+      SelectionOutlineMesh.cs  # GL-free selection outline: thin beams (no glLineWidth), one per segment
+      HitboxUnionEdges.cs      # GL-free: the edge segments of the union of a block's hitboxes (no lines on seams)
       SelectionPulse.cs        # GL-free twin of the outline's breathing opacity (steady while mining)
       SliceCombo.cs            # the blade's two-phase slice combo: press/queue/advance state
       SwordCombo.cs            # the sword's cut / back cut / chop chain: press/queue/advance state and the

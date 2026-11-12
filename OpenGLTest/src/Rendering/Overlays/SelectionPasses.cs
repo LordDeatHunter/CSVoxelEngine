@@ -28,8 +28,11 @@ internal sealed class SelectionPasses : IDisposable
     private uint outlineVao;
     private uint outlineVbo;
     private uint outlineEbo;
-    /// <summary>Reused world-space corners of the outline beams, rebuilt per hitbox.</summary>
-    private readonly Vector3[] _outlineVertices = new Vector3[SelectionOutlineMesh.VertexCount];
+    // Room for this many beams; a block's union outline stays well under it (12 edges per box,
+    // minus every seam), and a longer outline is cut off rather than overrun the buffer.
+    private const int MaxOutlineBeams = 256;
+    private readonly Vector3[] _outlineVertices = new Vector3[MaxOutlineBeams * SelectionOutlineMesh.CornersPerBeam];
+    private readonly List<HitboxUnionEdges.Segment> _outlineSegments = [];
     private uint faceVao;
     private uint faceVbo;
 
@@ -126,8 +129,8 @@ internal sealed class SelectionPasses : IDisposable
     }
 
     /// <summary>
-    /// Draws the targeted block's outline and face highlight. Each of the block's hitboxes gets
-    /// its own outline; the highlight lands on the hit box's face. <paramref name="grow"/> is the
+    /// Draws the targeted block's outline and face highlight. The block's hitboxes outline as one
+    /// merged shape; the highlight lands on the hit box's face. <paramref name="grow"/> is the
     /// block's current pop growth so the highlight tracks it while mining. The outline breathes
     /// (<see cref="SelectionPulse"/>) unless <paramref name="mining"/>, which holds it steady so the
     /// crack overlay stays readable.
@@ -152,7 +155,7 @@ internal sealed class SelectionPasses : IDisposable
         _owner.SelectionShader.SetUniform("uPulseDepth", SelectionPulse.Depth(mining));
         _owner.SelectionShader.SetUniform("uPulsePeriod", HudConfig.SelectionPulsePeriodSeconds);
 
-        // The outline is twelve edge beams (SelectionOutlineMesh) rather than GL lines, since
+        // The outline is a thin beam per union edge (SelectionOutlineMesh) rather than GL lines, since
         // LineWidth is unreliable in a core profile. The vertices are already in world space.
         _gl.BindVertexArray(outlineVao);
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, outlineVbo);
@@ -163,19 +166,25 @@ internal sealed class SelectionPasses : IDisposable
         _gl.Enable(EnableCap.CullFace);
         _gl.CullFace(TriangleFace.Back);
         // The outline inflates a hair past the grown box so it never z-fights the block
-        var outlinePad = new Vector3(0.01f + grow);
-        foreach (var box in boxes)
+        // The boxes outline as one shape: no lines on the seams between overlapping boxes
+        HitboxUnionEdges.Build(boxes, 0.01f + grow, _outlineSegments);
+        var beams = Math.Min(_outlineSegments.Count, MaxOutlineBeams);
+        // Thickness grows with distance so the beams keep roughly the same on-screen width
+        var thickness = MathF.Max(HudConfig.SelectionOutlineMinThickness,
+            HudConfig.SelectionOutlinePixelScale * Vector3.Distance(camera.Position, blockPosition + new Vector3(0.5f)));
+        for (var i = 0; i < beams; i++)
         {
-            var half = (box.Size + outlinePad) * 0.5f;
-            var center = blockPosition + box.Center;
-            // Thickness grows with distance so the beam keeps roughly the same on-screen width
-            var thickness = MathF.Max(HudConfig.SelectionOutlineMinThickness,
-                HudConfig.SelectionOutlinePixelScale * Vector3.Distance(camera.Position, center));
-            SelectionOutlineMesh.BuildVertices(center - half, center + half, thickness, _outlineVertices);
-            _gl.BufferSubData<Vector3>(BufferTargetARB.ArrayBuffer, 0, _outlineVertices);
+            var s = _outlineSegments[i];
+            SelectionOutlineMesh.BuildBeam(blockPosition + s.From, blockPosition + s.To, thickness,
+                _outlineVertices.AsSpan(i * SelectionOutlineMesh.CornersPerBeam, SelectionOutlineMesh.CornersPerBeam));
+        }
+        if (beams > 0)
+        {
+            _gl.BufferSubData<Vector3>(BufferTargetARB.ArrayBuffer, 0,
+                _outlineVertices.AsSpan(0, beams * SelectionOutlineMesh.CornersPerBeam));
             unsafe
             {
-                _gl.DrawElements(PrimitiveType.Triangles, SelectionOutlineMesh.IndexCount,
+                _gl.DrawElements(PrimitiveType.Triangles, (uint)(beams * SelectionOutlineMesh.IndicesPerBeam),
                     DrawElementsType.UnsignedInt, null);
             }
         }
@@ -265,7 +274,7 @@ internal sealed class SelectionPasses : IDisposable
     private void CreateSelectionGeometry()
     {
         // The outline's vertices are rewritten per hitbox each frame; its indices never change.
-        Span<uint> outlineIndices = stackalloc uint[SelectionOutlineMesh.IndexCount];
+        var outlineIndices = new uint[MaxOutlineBeams * SelectionOutlineMesh.IndicesPerBeam];
         SelectionOutlineMesh.BuildIndices(outlineIndices);
 
         outlineVao = _gl.GenVertexArray();
@@ -277,7 +286,7 @@ internal sealed class SelectionPasses : IDisposable
         unsafe
         {
             _gl.BufferData(BufferTargetARB.ArrayBuffer,
-                (nuint)(SelectionOutlineMesh.VertexCount * 3 * sizeof(float)), null, BufferUsageARB.DynamicDraw);
+                (nuint)(_outlineVertices.Length * 3 * sizeof(float)), null, BufferUsageARB.DynamicDraw);
         }
         _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, outlineEbo);
         _gl.BufferData<uint>(BufferTargetARB.ElementArrayBuffer, outlineIndices, BufferUsageARB.StaticDraw);
