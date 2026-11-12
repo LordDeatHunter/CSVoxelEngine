@@ -205,6 +205,7 @@ public sealed class ChestServerTests : IDisposable
         }
         else
             Assert.True(_world.ThrowSelected(false, player.Position, Vector3.UnitY, inventory));
+        var dropped = placed ? null : Assert.Single(_world.Drops);
         inventory.Select(7);
         _inboxes[client].Inventory = null;
         if (placed)
@@ -215,8 +216,14 @@ public sealed class ChestServerTests : IDisposable
             Send(client, NetMessage.WorldIntent, w => WorldIntentCodec.Write(w, 1,
                 WorldIntent.Use(player.Position, aim, target)));
         }
-        TickUntil(() => _inboxes[client].Inventory is { } data && data.Tools?.Any(t => t.Lantern != null) == true,
-            "pickup never sent its authoritative inventory to the client");
+        TickUntil(() =>
+        {
+            // A real throw includes a random pop and a pickup grace period. Follow that instance so this
+            // pickup contract always has an in-range collector, even if the toss lands down a slope.
+            if (dropped != null && _world.Drops.Contains(dropped))
+                player.Position = dropped.Position + Vector3.UnitY * VoxelEngine.Simulation.DropManager.CollectHeightOffset;
+            return _inboxes[client].Inventory is { } data && data.Tools?.Any(t => t.Lantern != null) == true;
+        }, "pickup never sent its authoritative inventory to the client");
         var mirror = Inventory.Empty();
         mirror.Import(_inboxes[client].Inventory!);
         Assert.Equal(7, mirror.SelectedIndex);

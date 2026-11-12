@@ -183,7 +183,10 @@ published layouts too. Historical bridge 45 and the planned bridge integration 4
 Both hellos require an exact version match; none of those versions is admitted. No client-authored inventory/fuel
 is accepted. `ChestServerTests` exercises rejection before join, current-version loopback sessions and hotbar
 move/clear preservation of per-instance fuel alongside positional sound delivery. A remote player snapshot applies
-held id/light and observes its action counter once, so updating its lantern pose never consumes a swing's sound.
+held id/light and observes its action counter once, so updating its lantern pose never consumes a swing's sound. The
+real dropped-lantern loopback case follows the thrown instance within pickup reach during its grace period; its
+random pop and natural terrain cannot determine whether the fixture has a collector in range. It still uses the
+real throw, authoritative pickup/credit and inventory delivery, with the full fuel and equipment assertions.
 
 **Ids cross the wire by name** (`Networking/WireIds.cs`). Every numbered space is handed out in file-name order at
 startup (blocks and items, molten materials, status effects, atlas tiles), so a client whose content differs from the
