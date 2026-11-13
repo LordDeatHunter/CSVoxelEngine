@@ -76,8 +76,6 @@ body wears.
 
 - [ ] **Tin ingot** — `tin_ingot.png`.
 - [ ] **Tin ore (item)** — `tin_ore.png` (the raw ore chunk, not the block tile below).
-- [ ] **Crushed tin** — uses `tin_ore.png` too (`data/items/crushed_tin.json` points at the same
-  sprite), so replacing that one file covers both.
 - [ ] **Tin tool heads** — `tin_axe_head.png`, `tin_pickaxe_head.png`, `tin_sword_head.png`
   (the sword head is 42x42).
 - [ ] **Tin tools** — `tin_axe.png`, `tin_pickaxe.png`, `tin_sword.png`. The sword is 42x42 (the

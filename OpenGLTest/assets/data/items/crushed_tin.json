@@ -1,2 +1,1 @@
-// TODO: placeholder art, reuses the tin chunk sprite.
-{ "name": "Crushed Tin", "texture": "assets/textures/items/tin_ore.png" }
+{ "name": "Crushed Tin", "texture": "assets/textures/items/crushed_tin.png" }

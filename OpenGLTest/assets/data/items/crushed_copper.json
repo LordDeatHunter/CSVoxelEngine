@@ -1,2 +1,1 @@
-// TODO: placeholder art — reuses the malachite chunk sprite until crushed copper gets its own texture.
-{ "name": "Crushed Copper", "texture": "assets/textures/items/malachite_ore.png" }
+{ "name": "Crushed Copper", "texture": "assets/textures/items/crushed_copper.png" }
