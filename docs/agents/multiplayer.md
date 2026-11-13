@@ -77,9 +77,8 @@ describe the live world go through it:
   draws no canopy bumps (its trees are in its blocks) and no gravel caps; an unsupplied column keeps
   every worldgen read verbatim, so a generated region is byte-identical to the build without a
   source;
-- `World.TryGroundHeight` and the spawn settle (`LocalPlayer.EnsureSpawnSettled`, whose water test is now the
-  column's stored `WaterLevel`, the same value `TerrainGenerator.IsWaterColumn` evaluates for a
-  generated column);
+- `World.TryGroundHeight` and the spawn settle (`PlayerArrival.BeginSurface`, which reads the column's
+  heightmap through the world source);
 - `MobSpawner.TryFindSurfaceSpawn` (heights and water from the column; a supplied column's
   mob-biome test, `MobSpawner.SpawnsMobs`, reads its own `Biomes`, a generated one keeps the
   undithered `TerrainGenerator.BiomeAt`);

@@ -353,7 +353,7 @@ internal sealed class WorldPersistence
     /// The player as <see cref="PlayerSaveCodec"/> writes it. While still Loading the saved clock
     /// has not been applied yet, so a flush then keeps the saved one instead of overwriting it
     /// with an unrestored clock. No position is written before the spawn settled: until
-    /// <c>EnsureSpawnSettled</c> has placed the player, <see cref="Camera.Position"/> is the
+    /// <c>UpdateArrival</c> has placed the player, <see cref="Camera.Position"/> is the
     /// pre-settle hold eye, and saving it would make <c>ApplySavedPlayer</c> mark the spawn settled
     /// on the next load and skip the surface search. A close mid-load therefore persists everything
     /// but the pose, and the next load searches again.

@@ -308,6 +308,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       LocalPlayer.cs           # World component: the local player's spawn settle, health, death and respawn,
                                #   body model, hurt and punch feedback, the saved-player apply, its PlayerContext
       ModeToggles.cs           # the creative (C) and double-tap flight toggles and the sprint latch
+      PlayerArrival.cs         # holds the player over a destination still loading (spawn, respawn, /tp, waystone) and
+                               #   lands it by the body's collision rule: the column's top for the spawn, out of any solid
       PlayerBodyProbe.cs       # GL-free body probes over the live chunk map: known (loaded), grounded (a sink
                                #   layer counts), in water, in lava (BurningFluid), the sink layer top, a cushioned
                                #   landing (bounce or softLanding), ground within a reach, a bounce block below; what the

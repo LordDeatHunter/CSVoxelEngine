@@ -72,7 +72,7 @@ internal sealed class WaystoneTravel
         if (!IsArriving) return;
         _held += deltaTime;
         var spot = _landing ?? WaystoneArrival.Find(_cells, _target);
-        var ready = spot.Status != WaystoneArrivalStatus.Unloaded && IsMeshed(spot.Feet);
+        var ready = spot.Status != WaystoneArrivalStatus.Unloaded && PlayerArrival.IsMeshed(_chunks, spot.Feet);
         if (!ready)
         {
             if (_held < StreamingConfig.WaystoneArrivalTimeoutSeconds)
@@ -85,10 +85,6 @@ internal sealed class WaystoneTravel
         Land(spot);
     }
 
-    private bool IsMeshed(Vector3 feet) =>
-        _chunks.ChunkAt(MathUtils.FloorToInt(feet.X), MathUtils.FloorToInt(feet.Y), MathUtils.FloorToInt(feet.Z)) is
-            { IsMeshed: true };
-
     private void Hold(Vector3 feet)
     {
         _camera.TestTeleport(WaystoneArrival.EyeOver(feet), _camera.Yaw, _camera.Pitch);
@@ -100,6 +96,8 @@ internal sealed class WaystoneTravel
         IsArriving = false;
         _landing = null;
         _camera.TestTeleport(WaystoneArrival.EyeOver(spot.Feet), spot.Yaw ?? _camera.Yaw, spot.Yaw.HasValue ? 0f : _camera.Pitch);
-        _player.ResetFall(spot.Feet.Y);
+        // The spot is picked by whole cells; the arrival lifts the body out of anything it still overlaps (a timed-out
+        // landing, a partial block beside it) by the body's own collision rule
+        _player.Arrival.BeginAt(spot.Feet);
     }
 }

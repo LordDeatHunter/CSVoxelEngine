@@ -312,7 +312,18 @@ that is not lost, mana strictly over half unless creative or flying, then `Playe
 frame, like the spawn settle, until the destination is loaded and meshed, then lands it on `WaystoneArrival.Find`'s spot (pure
 over an `IArrivalCells` seam, `ChunkArrivalCells` on the live chunks: the nearest free two-cell standing spot within
 `SearchRadius` columns and `SearchHeight` cells, a level spot beating a climb, facing away; on top of the waystone when nothing is
-free or after `StreamingConfig.WaystoneArrivalTimeoutSeconds`); a landing never bills a fall (`LocalPlayer.ResetFall`).
+free or after `StreamingConfig.WaystoneArrivalTimeoutSeconds`), then hands the spot to `PlayerArrival.BeginAt`, which lifts the
+body out of anything it still overlaps; a landing never bills a fall (`LocalPlayer.ResetFall`).
+
+**Arrival (spawn, respawn, `/tp`, waystone).** Physics reads an unloaded cell as air, so every jump across the world goes
+through `PlayerArrival` (owned by `LocalPlayer.Arrival`, updated once a frame before the camera by `LocalPlayer.UpdateArrival`):
+the camera is held at the destination (velocity zeroed, fall reset) until the cells of the 3x3 columns the body can reach are
+loaded and the chunk under the feet is meshed (the mesh wait gives up after the waystone timeout; an unloaded destination holds
+forever). `BeginSurface` (the first spawn) scans the spawn column down from above the tallest tree to the first height the body
+collides at (`BodyCollision.BodyCollides`, so leaves and a thin snow pile are fallen through, never stood on) or the first water
+surface; `BeginAt` (respawn at the respawn eye, the `/tp` command, a waystone landing) keeps the spot unless the body overlaps a
+solid there, then climbs to the first free height and settles onto the floor. A sideways camera move while held (a scenario
+teleport) cancels it. `PlayerArrivalTests`.
 `WaystoneTeleportTests`, `WaystoneArrivalTests`, `WaystoneRealmsTests`, `WaystoneTravelTests`, `WaystoneViewTests`,
 `WaystoneLayoutTests`; `visual-examples/waystones-ui.json` (`VOXEL_TIME=147`).
 

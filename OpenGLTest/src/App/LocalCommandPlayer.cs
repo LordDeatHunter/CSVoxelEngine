@@ -20,8 +20,8 @@ internal sealed class LocalCommandPlayer(World world, Func<string> name) : IComm
 
     public bool IsFlying => world.Camera.IsFlying;
 
-    public void Teleport(Vector3 feet) =>
-        world.Camera.TestTeleport(feet + new Vector3(0f, Camera.EyeHeight, 0f), world.Camera.Yaw, world.Camera.Pitch);
+    // Held until the cells there are in and lifted out of any solid, so a teleport never buries the player
+    public void Teleport(Vector3 feet) => world.LocalPlayer.Arrival.BeginAt(feet);
 
     public void Give(ushort id, int count) => world.CreditItem(id, count);
 

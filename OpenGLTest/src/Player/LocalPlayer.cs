@@ -15,7 +15,6 @@ using VoxelEngine.Saves;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
-using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.Player;
@@ -52,6 +51,7 @@ internal sealed class LocalPlayer
         _mobs = mobs;
         _serverMode = serverMode;
         _clientMode = clientMode;
+        Arrival = new PlayerArrival(world.Camera, ResetFall);
         // A client's log is the server's mirror and a server's camera is nobody: neither progresses itself
         var authoritative = !serverMode && !clientMode;
         _localContext = new PlayerContext(Inventory) { Camera = Camera, Health = _health, Quests = authoritative ? Quests : null };
@@ -127,14 +127,25 @@ internal sealed class LocalPlayer
     /// </summary>
     internal void RecordSpawn()
     {
-        _spawnX = Camera.Position.X;
-        _spawnZ = Camera.Position.Z;
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VOXEL_SPAWN")))
+        {
             _spawnSettled = true;
+            return;
+        }
+        var guess = Camera.Position;
+        Arrival.BeginSurface(guess.X, guess.Z, guess.Y - Camera.EyeHeight);
     }
 
     /// <summary>Marks the spawn settled (a client starts at its server's spawn).</summary>
-    internal void MarkSpawnSettled() => _spawnSettled = true;
+    internal void MarkSpawnSettled()
+    {
+        _spawnSettled = true;
+        Arrival.Cancel();
+    }
+
+    /// <summary>Holds the player over a destination still streaming in and lands it on real ground: the spawn, a
+    /// respawn, a command teleport, a waystone landing.</summary>
+    internal PlayerArrival Arrival { get; }
 
     /// <summary>Forgets the fall in progress, so a teleport (a waystone arrival) lands as a teleport, never a drop.</summary>
     internal void ResetFall(float feet) => _fall.Reset(feet, grounded: false);
@@ -153,13 +164,10 @@ internal sealed class LocalPlayer
     // Refreshed from the camera by LocalContext() before every use, so it never allocates.
     private readonly PlayerContext _localContext;
 
-    // True once the player rests exactly on real ground at the origin spawn. The camera's
-    // initial position is only a heightmap guess (pre-carve, see SpawnOverrides.SpawnPosition), and
-    // physics starts before the spawn chunks stream in (unloaded cells read as air), so
-    // without this the player falls through and ends up buried once the terrain loads.
+    // True once the player rests on real ground at the spawn. The camera's initial position is only a
+    // heightmap guess (pre-carve, see SpawnOverrides.SpawnPosition), so the spawn is an arrival that
+    // holds the player until the column has loaded (see PlayerArrival).
     private bool _spawnSettled;
-    private float _spawnX;
-    private float _spawnZ;
 
     // The sun's elevation last frame, for the dawn watch behind the day toast
     private float _lastSunElevation;
@@ -197,7 +205,7 @@ internal sealed class LocalPlayer
         {
             Camera.RestoreState(new Vector3(p[0], p[1], p[2]), saved.Yaw ?? Camera.Yaw, saved.Pitch ?? Camera.Pitch,
                 saved.Creative ?? false, saved.Flying ?? false);
-            _spawnSettled = true;
+            MarkSpawnSettled();
         }
         else
         {
@@ -245,84 +253,16 @@ internal sealed class LocalPlayer
         Camera.GearAirJump = Inventory.Equipment.Has(GearAbility.AirJump);
     }
 
-    internal void EnsureSpawnSettled(ChunkManager chunkManager)
+    /// <summary>
+    /// Once a frame before the camera moves: holds the player over a destination still loading, and lands it once
+    /// it is in (<see cref="PlayerArrival"/>). The spawn counts as settled on the frame the spawn's arrival lands.
+    /// </summary>
+    internal void UpdateArrival(ChunkManager chunkManager, double deltaTime)
     {
-        if (_spawnSettled)
-            return;
-
-        var dx = Camera.Position.X - _spawnX;
-        var dz = Camera.Position.Z - _spawnZ;
-        if (dx * dx + dz * dz > 64f)
-        {
+        Arrival.Update(chunkManager, deltaTime);
+        // Landed, or canceled by somebody else's teleport (a scenario), which leaves the spawn where it was put
+        if (!Arrival.IsArriving)
             _spawnSettled = true;
-            return;
-        }
-
-        var sx = MathUtils.FloorToInt(_spawnX);
-        var sz = MathUtils.FloorToInt(_spawnZ);
-        var cx = VoxelCoords.WorldToChunk(sx);
-        var cz = VoxelCoords.WorldToChunk(sz);
-        var lx = VoxelCoords.WorldToLocal(sx);
-        var lz = VoxelCoords.WorldToLocal(sz);
-        // The world source's column (worldgen by default). Its stored water level is exactly what
-        // TerrainGenerator.IsWaterColumn evaluates for a generated column, and an imported one
-        // answers with its own.
-        var column = chunkManager.WorldSource.GetColumn(cx, cz);
-        var columnIndex = VoxelCoords.ColumnIndex(lx, lz);
-        var heightmap = column.Heights[columnIndex];
-        var estimate = Math.Max(heightmap, WorldGenerationConfig.SeaLevel);
-        const float spawnLift = 0.02f;
-        var holdEye = estimate + 1 + Camera.EyeHeight + spawnLift;
-
-        if (heightmap < column.WaterLevel[columnIndex])
-        {
-            if (!chunkManager.TryGetCell(sx, WorldGenerationConfig.SeaLevel, sz, out _, out _))
-            {
-                Camera.TestTeleport(new Vector3(_spawnX, holdEye, _spawnZ), Camera.Yaw, Camera.Pitch);
-                return;
-            }
-
-            Camera.TestTeleport(new Vector3(_spawnX, WorldGenerationConfig.SeaLevel + 1 + Camera.EyeHeight + spawnLift, _spawnZ),
-                Camera.Yaw, Camera.Pitch);
-            _spawnSettled = true;
-            return;
-        }
-
-        var top = estimate + TreeGenerator.ReachUp + 1;
-        if (!chunkManager.TryGetCell(sx, top, sz, out _, out _))
-        {
-            Camera.TestTeleport(new Vector3(_spawnX, holdEye, _spawnZ), Camera.Yaw, Camera.Pitch);
-            return;
-        }
-
-        for (var y = top; y > estimate - 64; y--)
-        {
-            if (!chunkManager.TryGetCell(sx, y, sz, out var id, out _))
-            {
-                Camera.TestTeleport(new Vector3(_spawnX, holdEye, _spawnZ), Camera.Yaw, Camera.Pitch);
-                return;
-            }
-
-            if (!BlockType.IsSolid(id))
-                continue;
-
-            if (!chunkManager.TryGetCell(sx, y + 1, sz, out var above1, out _)
-                || !chunkManager.TryGetCell(sx, y + 2, sz, out var above2, out _))
-            {
-                Camera.TestTeleport(new Vector3(_spawnX, holdEye, _spawnZ), Camera.Yaw, Camera.Pitch);
-                return;
-            }
-
-            if (BlockType.IsSolid(above1) || BlockType.IsSolid(above2))
-                continue;
-
-            Camera.TestTeleport(new Vector3(_spawnX, y + 1 + Camera.EyeHeight + spawnLift, _spawnZ),
-                Camera.Yaw, Camera.Pitch);
-            _spawnSettled = true;
-            return;
-        }
-
-        Camera.TestTeleport(new Vector3(_spawnX, holdEye, _spawnZ), Camera.Yaw, Camera.Pitch);
     }
 
     /// <summary>The local player as a <see cref="PlayerContext"/>, refreshed from the camera.</summary>
@@ -629,8 +569,8 @@ internal sealed class LocalPlayer
         _health.Respawn();
         Camera.IsDead = false;
         var home = _hasRespawnEye ? _respawnEye : Camera.Position;
-        Camera.TestTeleport(home, Camera.Yaw, Camera.Pitch);
-        _fall.Reset(home.Y - Camera.EyeHeight, grounded: false);
+        // Held until the cells there are in, and lifted out of anything built over the spot since
+        Arrival.BeginAt(home - new Vector3(0f, Camera.EyeHeight, 0f));
         Log.WriteLine("Respawned");
     }
 }

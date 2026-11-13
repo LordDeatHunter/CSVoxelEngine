@@ -1186,7 +1186,7 @@ public class World
         }
 
         FrameProfiler.Begin(ProfileSection.Player);
-        LocalPlayer.EnsureSpawnSettled(_chunkManager);
+        LocalPlayer.UpdateArrival(_chunkManager, deltaTime);
         // A waystone traveler stays over its destination until it has loaded
         WaystoneTravel.Update(deltaTime);
         FrameProfiler.End(ProfileSection.Player);
@@ -1378,7 +1378,7 @@ public class World
     private void UpdateLoading(double deltaTime)
     {
         FrameProfiler.Begin(ProfileSection.Player);
-        LocalPlayer.EnsureSpawnSettled(_chunkManager);
+        LocalPlayer.UpdateArrival(_chunkManager, deltaTime);
         FrameProfiler.End(ProfileSection.Player);
 
         // After the spawn settled this frame; the chunk update times itself, as ChunkUnload /
