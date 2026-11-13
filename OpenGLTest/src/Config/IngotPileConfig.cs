@@ -21,8 +21,8 @@ public static class IngotPileConfig
     /// <summary>Width of one ingot, in blocks.</summary>
     public const float IngotWidth = 0.26f;
 
-    /// <summary>Thickness of one ingot, in blocks.</summary>
-    public const float IngotHeight = 0.12f;
+    /// <summary>Thickness of one ingot, in blocks: a third, so a full pile of <see cref="Layers"/> fills the cell.</summary>
+    public const float IngotHeight = 1f / Layers;
 
     /// <summary>Gap between two ingots of one layer, in blocks.</summary>
     public const float Gap = 0.04f;
