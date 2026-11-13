@@ -919,6 +919,9 @@ public class World
     /// <summary>The mold cells, for the look-at label's progress bars.</summary>
     public CastingManager Casting => _casting;
 
+    /// <summary>The querns, for the look-at label's progress bar.</summary>
+    public QuernManager Querns => _querns;
+
     /// <summary>The chest panel's UI state: which chest is open and what it shows (see <see cref="ChestView"/>).</summary>
     public ChestView ChestPanel { get; } = new();
 

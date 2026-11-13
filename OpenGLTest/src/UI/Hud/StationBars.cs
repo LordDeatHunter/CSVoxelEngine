@@ -81,6 +81,12 @@ public static class StationBars
             ? [new StationBar($"Hammered {state.Hits}/{state.Profile.Hits}", state.Hits / (float)Math.Max(1, state.Profile.Hits), StationBarKind.Progress)]
             : null;
 
+    /// <summary>The bar of a quern whose plate is turning: how far through its rotation it is. Null at rest.</summary>
+    public static List<StationBar>? Quern(QuernManager.QuernState? state) =>
+        state is { Spinning: true }
+            ? [new StationBar("Grinding", state.Angle / MathF.Tau, StationBarKind.Progress)]
+            : null;
+
     /// <summary>The bar of a mold cell that holds a pour: filling, then cooling, then done.</summary>
     public static List<StationBar>? Mold(CastingManager.CastState? cast)
     {

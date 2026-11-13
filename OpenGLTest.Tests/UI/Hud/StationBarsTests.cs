@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using VoxelEngine.Simulation;
 using VoxelEngine.UI.Hud;
@@ -32,11 +33,22 @@ public sealed class StationBarsTests
     }
 
     [Fact]
+    public void AQuernShowsItsRotationOnlyWhileTheTopTurns()
+    {
+        var quern = new QuernManager.QuernState();
+        Assert.Null(StationBars.Quern(quern));
+        quern.Spinning = true;
+        quern.Angle = MathF.PI;
+        Assert.Equal(0.5f, Assert.Single(StationBars.Quern(quern)!).Fraction, 3);
+    }
+
+    [Fact]
     public void NothingIsShownForAMissingStation()
     {
         Assert.Null(StationBars.Kiln(null));
         Assert.Null(StationBars.Bloomery(null));
         Assert.Null(StationBars.Anvil(null));
         Assert.Null(StationBars.Mold(null));
+        Assert.Null(StationBars.Quern(null));
     }
 }

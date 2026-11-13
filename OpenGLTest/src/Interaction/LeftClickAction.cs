@@ -201,6 +201,7 @@ internal sealed class LeftClickAction
         var (ax, ay, az) = ((int)anchor.X, (int)anchor.Y, (int)anchor.Z);
         if (type.Renderer == BlockRenderer.BranchPile)
             return StationBars.Campfire(_world.Campfires, x, y, z, _chunkManager.GetStateGlobal(x, y, z), type.StackMax);
+        if (type.Renderer == BlockRenderer.Quern) return StationBars.Quern(_world.Querns.StateAt(x, y, z));
         if (type.Kiln != null) return StationBars.Kiln(_world.Kilns.StateAt(ax, ay, az));
         if (type.Bloomery != null) return StationBars.Bloomery(_world.Smithing.Bloomeries.StateAt(ax, ay, az));
         if (type.Anvil != null) return StationBars.Anvil(_world.Smithing.Anvils.StateAt(x, y, z));
