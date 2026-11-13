@@ -476,6 +476,15 @@ internal sealed class LocalPlayer
     /// <summary>A client takes the eye's cave biome the server's status reports.</summary>
     internal void MirrorCaveBiome(CaveBiome biome) => EyeCaveBiome = biome;
 
+    /// <summary>Kills the player outright (<c>/kill</c>), whatever its mode or armor: the next
+    /// <see cref="UpdateHealth"/> plays the death. False when it is already dead.</summary>
+    internal bool Kill()
+    {
+        if (_health.IsDead) return false;
+        _health.TakeDamage(_health.Health);
+        return true;
+    }
+
     /// <summary>
     /// First-cut survival tick, after <see cref="Camera.Update"/> so grounded state is fresh:
     /// tracks the fall from its highest feet position, burns in lava, decays the damage

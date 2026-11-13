@@ -80,6 +80,10 @@ internal sealed class ClientSession
     /// <summary>The connection, null in singleplayer, on the menu and after a disconnect.</summary>
     internal NetworkClient? Client => netClient;
 
+    /// <summary>Whether the server reports this player may run its operator commands (only what the chat's
+    /// autocomplete and help offer; the server decides every line). False while not connected.</summary>
+    internal bool IsOperator { get; private set; }
+
     /// <summary>The waystone rows, the activation answer and the trip the server is handling for this player (empty
     /// while not connected).</summary>
     internal WaystoneMirror Waystones { get; } = new();
@@ -344,6 +348,7 @@ internal sealed class ClientSession
                 var status = PlayerStatusCodec.Read(reader);
                 w.Camera.SetModes(status.Modes.HasFlag(NetPlayerFlags.Creative),
                     status.Modes.HasFlag(NetPlayerFlags.Flying));
+                IsOperator = status.Operator;
                 var healthBefore = w.Health;
                 w.ClientMirror.ApplyNetworkHealth(status.Health);
                 w.ClientMirror.ApplyNetworkAir(status.Air);
@@ -682,6 +687,7 @@ internal sealed class ClientSession
         netKeepAliveTimer = 0;
         netCorrectionAck = 0;
         netDead = false;
+        IsOperator = false;
         netRespawnTimer = 0f;
         respawnPrompt.Reset();
         prediction = new ClientPrediction();

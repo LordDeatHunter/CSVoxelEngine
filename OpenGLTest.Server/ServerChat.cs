@@ -1,21 +1,20 @@
-using System;
-using VoxelEngine.Content;
-using VoxelEngine.Interaction;
+using VoxelEngine.Commands;
 using VoxelEngine.Networking;
 using VoxelEngine.UI.Hud;
 
 namespace VoxelEngine.Server;
 
-/// <summary>Chat on the server: relays a player's line to everyone, runs a command line for its sender on the shared table (<see cref="ChatCommands"/>) and sends the server's system lines. Main thread only.</summary>
+/// <summary>Chat on the server: relays a player's line to everyone, runs a command line for its sender on the shared command trees (<see cref="GameCommands"/>) and sends the server's system lines. Main thread only.</summary>
 internal sealed class ServerChat
 {
     private readonly ServerState _state;
-    private readonly ServerBroadcasts _broadcasts;
+    private readonly CommandDispatcher _commands = GameCommands.Create();
+    private readonly ServerCommandHost _host;
 
     internal ServerChat(ServerState state, ServerBroadcasts broadcasts)
     {
         _state = state;
-        _broadcasts = broadcasts;
+        _host = new ServerCommandHost(state, broadcasts, BroadcastSystem);
     }
 
     internal void OnChatSend(ClientConnection client, PacketReader reader)
@@ -37,93 +36,22 @@ internal sealed class ServerChat
     }
 
     /// <summary>
-    /// Runs one chat command for the player who sent it, on the same table singleplayer uses
-    /// (<see cref="ChatCommands"/>): <c>/tp</c> and <c>/give</c> need operator rights, and so does
-    /// <c>/time</c>, while <c>/locate</c> and <c>/help</c> need none; the answers are system lines to
-    /// that player (a time change also goes out as a <see cref="NetMessage.TimeSync"/> at once, and
-    /// <c>/locate</c>'s carries a link, searched from that player's eye, since a client holds no seed).
+    /// Runs one command line for the player who sent it, on the same trees singleplayer uses: the player is an
+    /// operator while it may be creative here (<see cref="ServerState.MayBeCreative"/>), its <c>~</c> coordinates
+    /// and <c>/locate</c> search start where it stands (a client holds no seed), and every answer is a system line
+    /// to it, apart from what a command announces to everyone.
     /// </summary>
     private void RunCommand(ClientConnection client, string line)
     {
         if (!_state.Players.TryGetValue(client.Id, out var player)) return;
-        var parsed = ChatCommands.Parse(line);
-        if (ChatCommands.RequiresOperator(parsed.Kind) || parsed.Kind == ChatCommands.CommandKind.Time)
-        {
-            if (!_state.MayBeCreative(player.Name))
-            {
-                SendSystem(client, "That command is for operators only");
-                return;
-            }
-        }
-
-        switch (parsed.Kind)
-        {
-            case ChatCommands.CommandKind.Time:
-                if (parsed.Args.Length == 0 || ChatCommands.TimeSeconds(parsed.Args[0]) is not { } seconds)
-                {
-                    SendSystem(client, "Usage: /time day|night|<seconds>");
-                    return;
-                }
-                _state.World.SetLightingTime(seconds);
-                _broadcasts.BroadcastTime();
-                BroadcastSystem($"Time set to {seconds:0.#} s by {player.Name}");
-                return;
-
-            case ChatCommands.CommandKind.Teleport:
-                if (ChatCommands.TeleportTarget(parsed.Args) is not { } target)
-                {
-                    SendSystem(client, "Usage: /tp x y z");
-                    return;
-                }
-                // A /tp ends a waystone trip still waiting for its destination
-                player.WaystoneTrip = null;
-                player.Teleport(target);
-                PlayerSessions.SendPlayerCorrection(client, player.IssueCorrection(), player.Position);
-                SendSystem(client, $"Teleported to {target.X:0.#} {target.Y:0.#} {target.Z:0.#}");
-                return;
-
-            case ChatCommands.CommandKind.Give:
-                if (ChatCommands.GiveRequest(parsed.Args) is not { } request)
-                {
-                    SendSystem(client, "Usage: /give <item> [count]");
-                    return;
-                }
-                if (!TryResolveContent(request.Item, out var id))
-                {
-                    SendSystem(client, $"Unknown item '{request.Item}'");
-                    return;
-                }
-                player.Inventory.Add(id, request.Count);
-                player.InventoryChanged = true;
-                SendSystem(client, $"Gave {request.Count} x {request.Item}");
-                return;
-
-            case ChatCommands.CommandKind.Locate:
-            {
-                var (text, link) = ChatCommands.Locate(parsed.Args, player.Position, _state.World.Towers);
-                SendSystem(client, text, link);
-                return;
-            }
-
-            default:
-                SendSystem(client, ChatCommands.HelpText);
-                return;
-        }
+        var self = new ServerCommandPlayer(client, player, _state);
+        var permission = _state.MayBeCreative(player.Name) ? CommandPermission.Operator : CommandPermission.Everyone;
+        _commands.Execute(line, new CommandSource(player.Name, permission, self.Feet, self, _host,
+            (text, link) => SendSystem(client, text, link)));
+        Log.WriteLine($"command: <{client.Name}> {line}");
     }
 
-    // An item or block by plain name (blocks first, like a loot entry) or by its block//item/
-    // pinned name
-    private static bool TryResolveContent(string name, out ushort id)
-    {
-        var trimmed = name.Trim();
-        if (trimmed.StartsWith("block/", StringComparison.OrdinalIgnoreCase))
-            return ContentRegistry.TryResolveBlock(trimmed[6..], out id);
-        if (trimmed.StartsWith("item/", StringComparison.OrdinalIgnoreCase))
-            return ContentRegistry.TryResolveItem(trimmed[5..], out id);
-        return ContentRegistry.TryResolveBlock(trimmed, out id) || ContentRegistry.TryResolveItem(trimmed, out id);
-    }
-
-    private static void SendSystem(ClientConnection client, string text, ChatLink? link = null)
+    private static void SendSystem(ClientConnection client, string text, ChatLink? link)
     {
         using var writer = new PacketWriter(NetMessage.ChatMessage);
         ChatMessageCodec.Write(writer, new ChatMessage(ChatKind.System, "", text, link));

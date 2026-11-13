@@ -55,4 +55,11 @@ public interface IScenarioUi
     /// <paramref name="card"/> (0-based) and <c>close</c> closes it.
     /// </summary>
     void Forge(string action, Vector3? cell, int card);
+
+    /// <summary>
+    /// Drives the chat input: <c>type</c> opens the chat if it is closed and types <paramref name="text"/>, <c>tab</c>
+    /// and <c>backtab</c> press Tab and Shift+Tab (the command autocomplete), <c>send</c> presses Enter and
+    /// <c>close</c> closes it.
+    /// </summary>
+    void Chat(string action, string? text);
 }

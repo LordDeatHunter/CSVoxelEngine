@@ -14,15 +14,17 @@ namespace VoxelEngine.Networking;
 /// unless stated), and its mana and the mana max in whole units (<see cref="PlayerMana.NetMana"/>,
 /// <see cref="PlayerMana.Max"/>; a fresh full pool unless stated), and its active status effects as a
 /// bitmask of each effect's <c>StatusEffect.Bit</c> (<see cref="EffectMask"/>; none unless stated), and the cave
-/// biome at its eye (<see cref="CaveBiome"/>, plans/CAVE_BIOMES.md CB-3; plain outside caves and unless stated).
+/// biome at its eye (<see cref="CaveBiome"/>, plans/CAVE_BIOMES.md CB-3; plain outside caves and unless stated), and
+/// whether the player may run operator commands (<see cref="Operator"/>, which only shapes the chat's autocomplete and
+/// help: the server decides every command line).
 /// </summary>
 public readonly record struct PlayerStatusData(NetPlayerFlags Modes, int Health, bool Dead, Vector3 Knockback, float Lift,
     byte Air = Breath.NetSteps, int Mana = ManaConfig.StartMax, int MaxMana = ManaConfig.StartMax, byte EffectMask = 0,
-    CaveBiome CaveBiome = CaveBiome.Plain);
+    CaveBiome CaveBiome = CaveBiome.Plain, bool Operator = false);
 
 /// <summary>
 /// The wire form of a <see cref="PlayerStatusData"/>: <c>(byte flags, int health, bool dead,
-/// Vector3 knockbackImpulse, float lift, byte air, int mana, int maxMana, byte effectMask, byte caveBiome)</c>. The reader is bounds-checked: mode bits other than
+/// Vector3 knockbackImpulse, float lift, byte air, int mana, int maxMana, byte effectMask, byte caveBiome, bool operator)</c>. The reader is bounds-checked: mode bits other than
 /// creative and flight are dropped, the health is clamped to 0..<see cref="PlayerHealth.MaxHealth"/> plus the most gear can add, the air to 0..<see cref="Breath.NetSteps"/>,
 /// the mana max to 1..<see cref="PlayerMana.WireMaxCap"/> and the mana into that max,
 /// the effect mask is taken raw (the client drops the bits no loaded effect owns when it mirrors it),
@@ -45,6 +47,7 @@ public static class PlayerStatusCodec
         writer.Write(status.MaxMana);
         writer.Write(status.EffectMask);
         writer.Write((byte)status.CaveBiome);
+        writer.Write(status.Operator);
     }
 
     /// <summary>Reads one status written by <see cref="Write"/>, starting after the message id.</summary>
@@ -66,6 +69,7 @@ public static class PlayerStatusCodec
         var effectMask = reader.ReadEffectMask();
         var rawCave = (CaveBiome)reader.ReadByte();
         var cave = Enum.IsDefined(rawCave) ? rawCave : CaveBiome.Plain;
-        return new PlayerStatusData(modes, health, dead, knockback, lift, air, mana, maxMana, effectMask, cave);
+        var isOperator = reader.ReadBool();
+        return new PlayerStatusData(modes, health, dead, knockback, lift, air, mana, maxMana, effectMask, cave, isOperator);
     }
 }

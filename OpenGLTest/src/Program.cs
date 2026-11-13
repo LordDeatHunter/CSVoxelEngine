@@ -190,7 +190,7 @@ public static class Program
 
         try
         {
-            visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world!, new ScenarioUi(panelInput, builderInput, waystoneInput, gameplay.Forge));
+            visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world!, new ScenarioUi(panelInput, builderInput, waystoneInput, gameplay.Forge, chatInput));
         }
         catch (Exception e)
         {
@@ -580,7 +580,10 @@ public static class Program
                 showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView, builder: spellBuilderView, waystone: waystoneView, forge: gameplay.Forge.View);
         // The chat log and input draw over the HUD; hidden with the HUD and behind the pause menu.
         if (!hideHud && !pauseMenuView.IsOpen)
+        {
+            chatInput.SyncCompletion();
             renderManager.UiPasses.RenderChat(windowManager.Window, chatView, windowManager.Window.Time);
+        }
         // The Tab player list rides over the HUD while the key is held (a server session only)
         if (!hideHud && !pauseMenuView.IsOpen && gameplay.TabHeld && session.Client != null)
             renderManager.UiPasses.RenderPlayerList(windowManager.Window, chatInput.PlayerListNames());

@@ -73,7 +73,8 @@ public sealed class VisualStep
     /// <summary>What a <c>player</c> step makes the player's model do (<c>hurt</c>, <c>punch</c>,
     /// <c>slice</c>, <c>slicereturn</c> (the buffered return slice), <c>cut</c>, <c>backcut</c>,
     /// <c>chop</c>, <c>equip</c>, <c>charge</c>, <c>release</c>, <c>die</c> or <c>revive</c>), or what a
-    /// <c>waystone</c> step does to the waystone screen (see <see cref="IScenarioUi.Waystone"/>).</summary>
+    /// <c>waystone</c>, <c>forge</c> or <c>chat</c> step does to its screen (see <see cref="IScenarioUi.Waystone"/>,
+    /// <see cref="IScenarioUi.Chat"/>).</summary>
     public string? Action { get; init; }
 
     /// <summary>The hotbar slot a <c>select</c> step picks, 1-based like the number keys.</summary>
@@ -87,7 +88,8 @@ public sealed class VisualStep
     /// <c>crafting</c>).</summary>
     public string? Tab { get; init; }
 
-    /// <summary>The text a <c>search</c> step types into the [E] panel's search field.</summary>
+    /// <summary>The text a <c>search</c> step types into the [E] panel's search field, or a <c>waystone</c> or
+    /// <c>chat</c> step's <c>type</c> types into its field.</summary>
     public string? Text { get; init; }
 
     /// <summary>The listed row a <c>row</c> step picks, 1-based from the top of the list.</summary>
@@ -328,6 +330,7 @@ public sealed class VisualScenario
             },
             "waystone" => ReadWaystone(element, index),
             "forge" => ReadForge(element, index),
+            "chat" => ReadChat(element, index),
             "towerclear" => new VisualStep { Op = "towerclear", Floor = ReadInt(element, "floor") },
             "altar" => new VisualStep { Op = "altar", Pos = ReadPos(element, index, "altar") },
             "towerdefeat" => new VisualStep { Op = "towerdefeat" },
@@ -339,7 +342,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, forge, chest, chestrow, chestwobble, waystone, towerclear, altar, towerdefeat, goblincamp or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, forge, chest, chestrow, chestwobble, waystone, chat, towerclear, altar, towerdefeat, goblincamp or screenshot."),
         };
     }
 
@@ -382,6 +385,22 @@ public sealed class VisualScenario
                     : throw new InvalidOperationException($"Step {index} (waystone teleport) needs 'row', a 1-based row of the list."),
             },
             _ => new VisualStep { Op = "waystone", Action = action },
+        };
+    }
+
+    // chat drives the chat input like a player's keys: "action" type (with "text", opening the chat first if needed),
+    // tab and backtab (Tab and Shift+Tab, the command autocomplete), send (Enter) or close.
+    private static VisualStep ReadChat(JsonElement element, int index)
+    {
+        var action = ReadChoice(element, index, "chat", "action", ["type", "tab", "backtab", "send", "close"]);
+        if (action != "type") return new VisualStep { Op = "chat", Action = action };
+        return new VisualStep
+        {
+            Op = "chat",
+            Action = action,
+            Text = element.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String
+                ? text.GetString()!
+                : throw new InvalidOperationException($"Step {index} (chat type) needs a 'text' string."),
         };
     }
 

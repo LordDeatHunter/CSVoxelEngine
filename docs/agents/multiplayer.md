@@ -726,9 +726,45 @@ underlines link runs in `UiTheme.LinkBlue`, and the click hit-test (`ChatRendere
 the current view), so the two cannot drift. While the chat is open the cursor is free and the look held
 (`GameplayInput.SyncChatCursor`, on the open/close edge; a close recaptures only when no death screen, panel or
 pause menu owns the cursor), a press in the input places its caret (`FieldPointer`) and a click on a link puts
-its command into the input without sending it (`ChatView.Suggest`). `/locate` reads worldgen
-(`ChatCommands.Locate` over `StructureLocator`), so singleplayer answers it locally while a connected client's
-line runs on the server (`ServerChat`), from that player's eye, since a client holds no seed.
+its command into the input without sending it (`ChatView.Suggest`).
+
+**Commands** are trees declared with a builder (`OpenGLTest/src/Commands/`, GL-free, tested): `Cmd.Literal` starts a
+word and `Arg.*` an argument (a word from a list, an int range, a number, `x y z` coordinates with `~` relative to the
+source's feet, an online player by exact name or unique prefix, an entity kind, a block or item with the `block/` and
+`item/` pinned forms, a command name), and at any point of a chain `.Then(...)` names a step that may come next,
+`.Executes(...)` lets a line end there, `.Requires(...)` gates a whole subtree (a child is never looser than its parent)
+and `.Alias(...)` gives a root other names. One definition class per command (`Commands/Definitions/`) registers into
+the one `CommandDispatcher` `GameCommands.Create` builds; a new command is one class and one line there.
+`CommandDispatcher` walks the same trees for everything: `Execute` matches each token against a node's children in
+order (the first that parses wins) and answers every failure as a system line (an unknown command, missing rights, the
+first bad token, or the generated usage when the line stops short, runs on, or begins an argument it is too short
+to finish), and a handler refuses with a `CommandException`; `Suggest` returns the completions for the word at the
+caret (command names first, then whatever the steps reached by the earlier words accept, a multi-token argument
+continuing into its next token), ranked by `SuggestionRanking` (with something typed only the matches, a prefix
+before a match inside, then letter-pair similarity), plus the command's usage; `/help` and every usage line are
+generated from the trees, filtered to what the source may run. The commands: `/help [command]`, `/tp <x y z> |
+<target> [<x y z> | <destination>]` (alias `/teleport`; coordinates are where the feet land), `/give <item> [count
+[target]]`, `/summon <entity> [x y z]`, `/time sunrise|noon|day|sunset|night|midnight | set <s> | add <s>`,
+`/gamemode survival|creative [target]`, `/fly [on|off [target]]`, `/kill [target]` and `/locate tower`, all but `/help`
+and `/locate` operator-only. A command acts through its source's `ICommandHost` and `ICommandPlayer`, so a definition
+never knows its side: singleplayer runs a line on `LocalCommandHost` and is the operator of its own world (creative
+is a keybind there anyway); a server runs a player's line (`ServerChat`) on `ServerCommandHost`, the player an
+operator while `MayBeCreative` holds, a teleport sending its client a correction, a mode change its status (creative
+refused to a player who may not be creative there) and a time change the clock to everyone; a connected client sends
+every `/` line to the server and completes lines on `ClientCommandHost` (the names online), offering only what the
+operator bit in its `PlayerStatus` (`PlayerStatusData.Operator`, protocol 49) allows. `/locate` reads worldgen
+(`LocateCommand.Tower` over `StructureLocator`), so singleplayer answers it locally while a connected client's line
+runs on the server, from where that player stands, since a client holds no seed; its coordinates link a `/tp`
+(`TeleportCommand.LineTo`) onto the tower's landing.
+
+**Autocomplete**: while a command line is typed, `ChatCompletion` (`UI/Hud/ChatCompletion.cs`, GL-free, owned by
+`ChatView`) holds `Suggest`'s answer, resynced once a frame when the text or caret moved (`ChatInput.SyncCompletion`
+before the chat draws, so typing, pastes, clicks and history recall all refresh it). Tab puts the best completion in
+place of the word being completed and each further Tab the next (Shift+Tab back), walking the same list instead of
+completing the completion; any other edit starts the list over. `ChatRenderer` draws the popup above the input, left
+under that word (`ChatLayout.SuggestionRows` rows, the window following the selection; the Tab-selected row gold, the
+best one white before the first Tab), the best completion's untyped rest as dim ghost text after the caret when it
+continues the word, and, with nothing to offer, the command's usage line instead.
 
 **Known gaps** (open): the airtime rise budget is height-based, so a player without the cloud boots may hop once after
 walking off a ledge, a hop within one state step of the ground counts as a landing, a client that double jumps before the

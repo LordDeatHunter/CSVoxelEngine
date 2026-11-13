@@ -14,8 +14,14 @@ namespace VoxelEngine.App;
 /// Built by Program from its own components; main thread only.
 /// </summary>
 internal sealed class ScenarioUi(InventoryPanelInput panelInput, SpellBuilderInput builderInput, WaystoneInput waystoneInput,
-    ForgeInput forgeInput) : IScenarioUi
+    ForgeInput forgeInput, ChatInput chatInput) : IScenarioUi
 {
+    public void Chat(string action, string? text)
+    {
+        RequirePlaying("chat");
+        chatInput.Scripted(action, text);
+    }
+
     public void SetPanelOpen(bool open)
     {
         RequirePlaying("panel");

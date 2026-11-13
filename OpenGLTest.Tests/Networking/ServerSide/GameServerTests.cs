@@ -2,11 +2,13 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Threading;
 using VoxelEngine.Audio;
+using VoxelEngine.Commands;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
@@ -95,6 +97,7 @@ public sealed class GameServerTests : IDisposable
         public readonly List<(int Seq, NetCellChange Cell)> Corrections = [];
         public readonly List<NetCellChange> Broadcast = [];
         public NetPlayerFlags? Status;
+        public bool Operator;
         public int? Health;
         public bool Dead;
         public byte EffectMask;
@@ -147,6 +150,7 @@ public sealed class GameServerTests : IDisposable
                     {
                         var status = PlayerStatusCodec.Read(reader);
                         Status = status.Modes;
+                        Operator = status.Operator;
                         Health = status.Health;
                         Dead = status.Dead;
                         EffectMask = status.EffectMask;
@@ -577,39 +581,100 @@ public sealed class GameServerTests : IDisposable
         Assert.Equal(0, InboxOf(guest).Mirror().CountFor(Stone));
     }
 
-    [Fact]
-    public void ALocateCommandAnswersItsSenderWithATeleportLink()
+    // Sends one chat line from client
+    private static void SendLine(NetworkClient client, string text)
     {
-        // Not an operator: the default server allows creative to nobody, and /locate needs no rights
-        using var client = Connect("Seeker");
-        using (var chat = new PacketWriter(NetMessage.ChatSend))
-        {
-            chat.Write("/locate tower");
-            client.Send(chat.ToArray());
-        }
+        using var chat = new PacketWriter(NetMessage.ChatSend);
+        chat.Write(text);
+        client.Send(chat.ToArray());
+    }
 
+    // Pumps until client holds a system line matching the predicate, and returns the first
+    private ChatMessage AwaitSystemLine(NetworkClient client, Func<ChatMessage, bool> matches)
+    {
         var inbox = InboxOf(client);
         var sw = Stopwatch.StartNew();
-        while (!inbox.Chat.Any(m => m is { Kind: ChatKind.System, Link: not null }) && sw.Elapsed.TotalSeconds < 15)
+        while (!inbox.Chat.Any(m => m.Kind == ChatKind.System && matches(m)) && sw.Elapsed.TotalSeconds < 15)
         {
             _server.Pump(0.01);
             Thread.Sleep(5);
             inbox.Drain(client);
         }
+        var line = inbox.Chat.FirstOrDefault(m => m.Kind == ChatKind.System && matches(m));
+        Assert.True(line.Kind == ChatKind.System && matches(line), "the expected system line never arrived");
+        return line;
+    }
 
-        var answer = inbox.Chat.FirstOrDefault(m => m is { Kind: ChatKind.System, Link: not null });
-        Assert.True(answer.Link.HasValue, "the /locate answer never arrived with a link");
-        var parsed = ChatCommands.Parse(answer.Link!.Value.Command);
-        Assert.Equal(ChatCommands.CommandKind.Teleport, parsed.Kind);
-        var target = ChatCommands.TeleportTarget(parsed.Args);
-        Assert.NotNull(target);
+    [Fact]
+    public void ALocateCommandAnswersItsSenderWithATeleportLink()
+    {
+        // Not an operator: the default server allows creative to nobody, and /locate needs no rights
+        using var client = Connect("Seeker");
+        SendLine(client, "/locate tower");
 
-        // Searched from the sender's own eye, so it lands beside the tower nearest that player
+        var answer = AwaitSystemLine(client, m => m.Link != null);
+        var parts = answer.Link!.Value.Command.Split(' ');
+        Assert.Equal("/tp", parts[0]);
+        var landX = (int)MathF.Floor(float.Parse(parts[1], CultureInfo.InvariantCulture));
+        var landZ = (int)MathF.Floor(float.Parse(parts[3], CultureInfo.InvariantCulture));
+
+        // Searched from where the sender stands, so it lands beside the tower nearest that player
         var eye = PlayerOf(client).Position;
         Assert.True(StructureLocator.TryFindTower((int)MathF.Floor(eye.X), (int)MathF.Floor(eye.Z),
             WorldGenerationConfig.TowerLocateRings, out var location));
-        Assert.Equal((location.LandX, location.LandZ),
-            ((int)MathF.Floor(target!.Value.X), (int)MathF.Floor(target.Value.Z)));
+        Assert.Equal((location.LandX, location.LandZ), (landX, landZ));
+    }
+
+    [Fact]
+    public void AnOperatorCommandIsRefusedToAPlayerWhoIsNoOperator()
+    {
+        using var guest = Connect("Guest");
+        PumpFor(0.1);
+        DrainAll();
+        Assert.False(InboxOf(guest).Operator);
+
+        SendLine(guest, "/give stone 5");
+
+        AwaitSystemLine(guest, m => m.Text == CommandDispatcher.OperatorsOnly);
+        Assert.Equal(0, PlayerOf(guest).Inventory.CountFor(Stone));
+    }
+
+    [Fact]
+    public void AnOperatorTeleportsItselfToAnotherPlayer()
+    {
+        _server.Operators.Add("Op");
+        using var op = Connect("Op");
+        using var other = Connect("Other");
+        PumpFor(0.1);
+        DrainAll();
+        Assert.True(InboxOf(op).Operator);
+        Assert.False(InboxOf(other).Operator);
+        PlayerOf(other).Teleport(PlayerOf(op).Position + new Vector3(40f, 3f, -25f));
+
+        SendLine(op, "/tp Other");
+
+        AwaitSystemLine(op, m => m.Text.StartsWith("Teleported", StringComparison.Ordinal));
+        Assert.True(Vector3.Distance(PlayerOf(op).Position, PlayerOf(other).Position) < 0.01f);
+        // The client is told where it now stands
+        Assert.Contains(InboxOf(op).PlayerCorrections, c => Vector3.Distance(c.Eye, PlayerOf(other).Position) < 0.01f);
+    }
+
+    [Fact]
+    public void GameModeGivesCreativeOnlyToAPlayerWhoMayBeCreative()
+    {
+        _server.Operators.Add("Op");
+        using var op = Connect("Op");
+        using var guest = Connect("Guest");
+
+        SendLine(op, "/gamemode creative Guest");
+        AwaitSystemLine(op, m => m.Text.Contains("may not be creative", StringComparison.Ordinal));
+        Assert.False(PlayerOf(guest).Creative);
+
+        SendLine(op, "/gamemode creative");
+        AwaitSystemLine(op, m => m.Text.Contains("now in creative", StringComparison.Ordinal));
+        Assert.True(PlayerOf(op).Creative);
+        // The client learns its new mode from its status
+        Assert.Equal(NetPlayerFlags.Creative, InboxOf(op).Status);
     }
 
     [Fact]

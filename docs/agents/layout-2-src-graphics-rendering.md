@@ -28,8 +28,6 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       BlockRaycaster.cs        # the DDA block raycast + line-of-sight segment test, split out of Camera.cs
       BlockSupport.cs          # GL-free needsSupport rule: the cell holding a block up (below, or
                                #   behind the front of a support "attached" block)
-      ChatCommands.cs          # the chat command table: /help, /tp, /give, /time, /locate and their rights, the shared
-                               #   /locate reply (its coordinates linked) and the /tp suggestion (TeleportCommand)
       Combat.cs                # GL-free punch rules: the forward cone (3 blocks, 30° half-angle)
                                #   and entity damage, shared by the punch loop and the tests
       DoorState.cs             # GL-free state byte of an openable block: facing in bits 0-1, the
@@ -207,6 +205,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         ClientChunkStreamer.cs # requests streamed chunks/columns and applies them, no worldgen; the
                                #   client's IColumnSource
         ClientLodStreamer.cs   # requests and applies server-built far regions
+        ClientCommandHost.cs   # a connected client's ICommandHost, for completing a command line only (the names online)
         ClientSession.cs       # the client's session: connect, the connecting screen, the network pump and cadences,
                                #   message dispatch, every send, the disconnect
         ClientMirror.cs        # World component, client mode: applies the server's cells, entities, stations,

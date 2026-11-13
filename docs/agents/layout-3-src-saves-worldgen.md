@@ -228,8 +228,9 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       Hud/                     # HUD widgets: chat, clock, compass, crosshair state,
                                #   toasts, hotbar feedback, look label, tooltips, screenshots
         BossBarState.cs        # what one frame's boss bar draws: the boss's name and health share (BossSelection)
-        Chat.cs                # ChatKind/ChatMessage (with its optional ChatLink), ChatView (log/input/history, Suggest) and
-                               #   ChatLayout
+        Chat.cs                # ChatKind/ChatMessage (with its optional ChatLink), ChatView (log/input/history, Suggest, the
+                               #   Completion) and ChatLayout (with the completion popup's geometry)
+        ChatCompletion.cs      # GL-free command autocomplete of the chat input: Sync, Tab cycling (Cycle), the ghost text
         ChatLink.cs            # a clickable span of a chat line and the command a click suggests (FitsIn)
         ChatLogLayout.cs       # GL-free chat log layout shared by the draw and the click hit-test: the shown messages, their
                                #   wrapped lines and where a link lies on every line it spans (LinkAt)
@@ -307,7 +308,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
     VisualTest/                # the VOXEL_SCRIPT scenario runner: parsed scenario, director, scripted keyboard, PNG capture
       ScriptedKeyboard.cs      # an IKeyboard whose pressed keys are set by code instead of the OS
       VisualCapture.cs         # reads the finished frame back from the GPU and writes it as a PNG
-      IScenarioUi.cs           # what a scenario may do to the live UI (panel, tab, search, row, hover, spell builder, waystone, forge)
+      IScenarioUi.cs           # what a scenario may do to the live UI (panel, tab, search, row, hover, spell builder, waystone, forge, chat)
       VisualDirector.cs        # runs a VisualScenario inside the live game
       VisualScenario.cs        # a scripted in-game run:
                                #   teleport/look/wait/walk/mine/place/fly/give/spawn/grow/damage/effect/screenshot

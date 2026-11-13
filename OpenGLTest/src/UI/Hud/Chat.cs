@@ -66,11 +66,15 @@ public sealed class ChatView
 
     public TextFieldState Input { get; } = new(MaxInputLength);
 
+    /// <summary>The autocomplete of a command line being typed into <see cref="Input"/>.</summary>
+    public ChatCompletion Completion { get; } = new();
+
     /// <summary>Opens the input line; a fresh open starts from an empty field.</summary>
     public void Open()
     {
         IsOpen = true;
         Input.Clear();
+        Completion.Reset();
         _historyCursor = _history.Count;
     }
 
@@ -79,6 +83,7 @@ public sealed class ChatView
     {
         IsOpen = false;
         Input.Clear();
+        Completion.Reset();
         _historyCursor = _history.Count;
     }
 
@@ -207,4 +212,21 @@ public static class ChatLayout
     /// <summary>Canvas Y of the top text line for a message drawn <paramref name="fromBottom"/> lines up.</summary>
     public static float LineTop(Vector2 screen, bool inputOpen, int fromBottom) =>
         LogBottom(screen, inputOpen) - (fromBottom + 1) * LineHeight;
+
+    /// <summary>Most completions the popup above the input shows at once; a longer list scrolls with the selection.</summary>
+    public const int SuggestionRows = 8;
+
+    /// <summary>Padding inside the completion popup and the usage hint's box.</summary>
+    public const float SuggestionPad = 6f;
+
+    /// <summary>Canvas Y the bottom of the completion popup (or the usage hint) sits on: just above the input, over
+    /// the log.</summary>
+    public static float SuggestionBottom(Vector2 screen) => InputCenterY(screen) - InputHeight * 0.5f - 4f;
+
+    /// <summary>
+    /// The first of the <see cref="SuggestionRows"/> completions shown out of <paramref name="count"/>: the top of
+    /// the list until the selection passes the window, then the window that ends on it.
+    /// </summary>
+    public static int SuggestionWindowStart(int count, int selected) =>
+        Math.Clamp(selected - SuggestionRows + 1, 0, Math.Max(0, count - SuggestionRows));
 }

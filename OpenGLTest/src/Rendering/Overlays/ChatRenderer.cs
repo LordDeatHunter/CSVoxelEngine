@@ -3,6 +3,8 @@ using System.Numerics;
 using VoxelEngine.Data;
 using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.Menus;
+using VoxelEngine.UI.Widgets;
 using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
@@ -17,6 +19,9 @@ internal sealed class ChatRenderer
     // Where a link's underline sits under the line's top, and how thick it is (canvas units)
     private const float LinkUnderlineDrop = ChatLayout.LineHeight - 4f;
     private const float LinkUnderlineHeight = 2f;
+
+    // The completion popup and the usage hint cover the log lines behind them, so they are near opaque
+    private static readonly Rgba PopupBackground = Rgba.Gray(0.06f, 0.96f);
 
     private readonly UIRenderer _ui;
     private readonly ChatLogLayout _log = new();
@@ -54,9 +59,72 @@ internal sealed class ChatRenderer
                 DrawLine(lines[i], view.Messages[lines[i].Message].Kind);
         }
 
-        if (view.IsOpen)
-            _ui.DrawInputField(ChatLayout.InputCenter(screen), ChatLayout.InputSize, view.Input, true,
-                "Say something...", time);
+        if (!view.IsOpen) return;
+        _ui.DrawInputField(ChatLayout.InputCenter(screen), ChatLayout.InputSize, view.Input, true,
+            "Say something...", time);
+        DrawCompletion(view.Input, view.Completion, screen);
+    }
+
+    /// <summary>
+    /// A command line's autocomplete over the open input: the dimmed ghost of the best completion after the caret,
+    /// and above the input either the completion popup (left-aligned under the word being completed, the
+    /// Tab-selected row in gold and, before the first Tab, the best one in white) or, with nothing to offer, the
+    /// command's usage line.
+    /// </summary>
+    private void DrawCompletion(TextFieldState input, ChatCompletion completion, Vector2 screen)
+    {
+        var scale = _ui.CountScale;
+        var box = new TextBoxLayout(ChatLayout.InputRect(screen));
+        var text = input.Text;
+        // DrawInputField just scrolled the field; text left of ViewStart is off the box
+        var viewStart = Math.Clamp(input.ViewStart, 0, text.Length);
+        var ghost = completion.Ghost(input);
+        if (ghost.Length > 0)
+        {
+            var typedWidth = _ui.TextWidth(text[viewStart..], scale);
+            if (typedWidth + _ui.TextWidth(ghost, scale) <= box.TextBudget)
+                _ui.DrawTextCenteredY(ghost, box.TextLeft + typedWidth, box.CenterY, scale, TextDim.WithAlpha(0.8f));
+        }
+
+        var bottom = ChatLayout.SuggestionBottom(screen);
+        var items = completion.Current.Items;
+        if (items.Count == 0)
+        {
+            if (completion.Current.UsageHint is not { } usage) return;
+            DrawPopupBox(ChatLayout.Left, bottom, _ui.TextWidth(usage, scale), 1, screen);
+            _ui.DrawText(usage, new Vector2(ChatLayout.Left + ChatLayout.SuggestionPad,
+                bottom - ChatLayout.SuggestionPad - ChatLayout.LineHeight), scale, TextDim);
+            return;
+        }
+
+        var rows = Math.Min(items.Count, ChatLayout.SuggestionRows);
+        var first = ChatLayout.SuggestionWindowStart(items.Count, completion.Selected);
+        var width = 0f;
+        for (var i = first; i < first + rows; i++)
+            width = MathF.Max(width, _ui.TextWidth(items[i].Label, scale));
+        var replaceStart = Math.Clamp(completion.Current.ReplaceStart, viewStart, text.Length);
+        var left = box.TextLeft + _ui.TextWidth(text[viewStart..replaceStart], scale) - ChatLayout.SuggestionPad;
+        left = MathF.Max(0f, MathF.Min(left, screen.X - width - ChatLayout.SuggestionPad * 2f));
+        DrawPopupBox(left, bottom, width, rows, screen);
+
+        var top = bottom - ChatLayout.SuggestionPad - rows * ChatLayout.LineHeight;
+        for (var row = 0; row < rows; row++)
+        {
+            var index = first + row;
+            var color = index == completion.Selected ? AccentGold
+                : completion.Selected < 0 && index == 0 ? Rgba.White
+                : TextDim;
+            _ui.DrawText(items[index].Label, new Vector2(left + ChatLayout.SuggestionPad, top + row * ChatLayout.LineHeight),
+                scale, color);
+        }
+    }
+
+    // The backdrop of rows text lines of the given width, its bottom-left corner at (left, bottom)
+    private void DrawPopupBox(float left, float bottom, float textWidth, int rows, Vector2 screen)
+    {
+        var size = new Vector2(textWidth + ChatLayout.SuggestionPad * 2f, rows * ChatLayout.LineHeight + ChatLayout.SuggestionPad * 2f);
+        _ui.DrawRect(new Vector2(MathF.Min(left + size.X * 0.5f, screen.X - size.X * 0.5f), bottom - size.Y * 0.5f), size,
+            PopupBackground);
     }
 
     private void DrawLine(in ChatLogLine line, ChatKind kind)

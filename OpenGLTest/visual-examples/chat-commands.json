@@ -1,0 +1,50 @@
+{
+  // Chat commands and their autocomplete: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/chat-commands.json
+  // Shots land in visual/chat-commands/. Films the command-name popup, an item list narrowed by what is typed with
+  // its ghost text, Tab cycling, the coordinates step's completions, the usage hint where nothing is offered, and
+  // /summon and /help answers in the log.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "wait", "seconds": 10 },
+
+    // The command names, best match first: "/gi" offers give
+    { "op": "chat", "action": "type", "text": "/gi" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "command-names" },
+
+    // An item list narrowed by the typed word, the best one's rest as ghost text after the caret
+    { "op": "chat", "action": "tab" },
+    { "op": "chat", "action": "type", "text": " dia" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "items-ghost" },
+
+    // Tab puts the best one in, a second Tab the next one (gold row)
+    { "op": "chat", "action": "tab" },
+    { "op": "chat", "action": "tab" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "items-tab-cycled" },
+    { "op": "chat", "action": "close" },
+
+    // Coordinates: ~ and the block coordinate of each axis
+    { "op": "chat", "action": "type", "text": "/tp ~ " },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "coordinates" },
+    { "op": "chat", "action": "close" },
+
+    // A step with nothing to pick shows the command's usage instead
+    { "op": "chat", "action": "type", "text": "/time set " },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "usage-hint" },
+    { "op": "chat", "action": "close" },
+
+    // Running lines: a summon a few blocks ahead, then the help list in the log
+    { "op": "chat", "action": "type", "text": "/summon slime ~3 ~ ~" },
+    { "op": "chat", "action": "send" },
+    { "op": "chat", "action": "type", "text": "/help" },
+    { "op": "chat", "action": "send" },
+    { "op": "chat", "action": "type", "text": "/" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "help-and-summon" }
+  ]
+}

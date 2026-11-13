@@ -36,7 +36,11 @@ internal sealed class PlayerSessions
         // The server camera stands at the world spawn and never follows the players, so every
         // joiner starts there, never wherever the players online have wandered.
         var joinSpawn = _state.JoinSpawn ??= _state.World.Camera.Position;
-        var player = new ServerPlayer(client.Id, client.Name, joinSpawn) { LastStateAt = _state.Elapsed };
+        var player = new ServerPlayer(client.Id, client.Name, joinSpawn)
+        {
+            LastStateAt = _state.Elapsed,
+            IsOperator = _state.MayBeCreative(client.Name),
+        };
         // A returning player gets back their inventory and modes, and starts where they left
         var restored = player.Restore(ServerPlayerSaves.Load(_state.World.SaveStore, client.Name), _state.MayBeCreative(client.Name));
         var spawn = restored ? player.Position : joinSpawn;
@@ -144,7 +148,8 @@ internal sealed class PlayerSessions
         using var writer = new PacketWriter(NetMessage.PlayerStatus);
         PlayerStatusCodec.Write(writer,
             new PlayerStatusData(player.GrantedModes, player.Status.Health, player.IsDead, knockback, lift, player.Status.Breath.NetStep,
-                player.Status.Mana.NetMana, player.Status.Mana.Max, player.Status.Effects.Mask, player.EyeCaveBiome));
+                player.Status.Mana.NetMana, player.Status.Mana.Max, player.Status.Effects.Mask, player.EyeCaveBiome,
+                player.IsOperator));
         client.Send(writer.ToArray());
         player.StatusDirty = false;
     }

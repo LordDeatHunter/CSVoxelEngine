@@ -22,7 +22,11 @@ OpenGLTest/
                                #   the mesher and gameplay read (ById, Emission, IsSolid/Occludes/...)
     App/                       # the app's components, built once by Program.OnLoad; they read the live world and screen through Program
       AppScreen.cs             # what the window is showing: Menu / Loading / Playing / Saving
-      ChatInput.cs             # the chat's keys, submitting a line, the local chat commands and the Tab player list's names
+      ChatInput.cs             # the chat's keys, submitting a line (a singleplayer command runs on GameCommands), the command
+                               #   autocomplete (Tab, Shift+Tab, the per-frame SyncCompletion), the scenario chat op and the Tab
+                               #   player list's names
+      LocalCommandHost.cs      # singleplayer's ICommandHost: the local player, the world's clock, mobs and towers, chat announcements
+      LocalCommandPlayer.cs    # singleplayer's ICommandPlayer: the camera, the world's inventory and LocalPlayer.Kill
       DevDiagnostics.cs        # the startup build line, the VOXEL_TIME read, the live debug flag (X, VOXEL_DEBUG) and the X debug line
       ForgeInput.cs            # the anvil's recipe list input (built by GameplayInput): open on a hammer's right-click on a stacked
                                #   anvil, cursor and look capture, card clicks forge, the close rules; connected, predicts and
@@ -39,8 +43,8 @@ OpenGLTest/
       RowDragInput.cs          # dragging a listed [E] row or a hotbar slot onto a hotbar slot, equipment slot, chest or the panel: press, per-frame lift, drop
       MenuInput.cs             # the pause menu's and shared settings page's input, and applying the window-level settings
       ScenarioUi.cs            # the app's IScenarioUi: lets a VOXEL_SCRIPT run open the [E] panel and the spell builder, pick a tab or row,
-                               #   type a search, hold the pointer and drive the waystone screen and the anvil's recipe list through the
-                               #   real input components
+                               #   type a search, hold the pointer and drive the waystone screen, the anvil's recipe list and the chat
+                               #   through the real input components
       SpellBuilderInput.cs     # the spell builder's input: open from the table (or the hold-a-staff toast), close on
                                #   E/Escape or a changed held staff, cursor and look capture, clicks, bind/clear requests
       WaystoneInput.cs         # the waystone screen's input: discover on a right-click, the popup, rename dialog and teleport list,
@@ -136,6 +140,33 @@ OpenGLTest/
         ChunkScanFrontier.cs   # the shared resume point for the chunk-generation workers' closest-first offset scan (PERF_TODO C3)
         StreamingFocus.cs      # the published focus chunks (camera, or every connected player on a server):
                                #   an immutable array swapped only when a focus changes chunk
+    Commands/                  # GL-free chat commands, shared by singleplayer, the server and a client's autocomplete (see "Chat")
+      CommandNode.cs           # one step of a command tree: children tried in order, Handler, Permission (holds for the subtree),
+                               #   Description, Syntax
+      LiteralNode.cs           # a fixed word (a command, a subcommand), case-insensitive, with a root's aliases
+      ArgumentNode.cs          # an argument: its IArgumentType and the name its value is read back by
+      Cmd.cs                   # starts a literal step (Cmd.Literal)
+      Arg.cs                   # starts an argument step: Word, Int, Number, Coordinates, Player, Entity, Item, Command
+      CommandBuilder.cs        # the fluent extensions: Then (a possible next step), Executes, Requires, Describe, Alias
+      CommandDispatcher.cs     # the trees and the one walk over them: Execute (answers unknown, refused, a bad token or the
+                               #   usage), Suggest (the completions for the word at the caret, and the usage), Usage, Visible
+      CommandContext.cs        # a parsed line for a handler: Source, Get<T>, Self, Player (an online player), Reply
+      CommandSource.cs         # who runs a line: name, rights, feet (the base of ~), Self, Host, Reply
+      CommandPermission.cs     # Everyone / Operator
+      CommandException.cs      # a handler's refusal, answered as a system line
+      ICommandHost.cs          # the world a command runs in: players, the clock, SpawnEntity, Towers, Announce
+      ICommandPlayer.cs        # a player a command acts on: Feet, modes, Teleport, Give, TrySetModes, Kill
+      Suggestion.cs            # one completion: what it inserts and what the popup shows
+      CommandSuggestions.cs    # Suggest's answer: ReplaceStart, the ranked completions, the usage hint
+      SuggestionRanking.cs     # filters and orders completions: prefix match, then a match inside, by letter-pair similarity
+      GameCommands.cs          # Create: the dispatcher with every game command registered
+      Arguments/               # IArgumentType (TokenCount, Syntax, TryParse, CouldStart, Suggest) and its kinds: WordArgument,
+                               #   IntArgument, NumberArgument, CoordinatesArgument (x y z with ~), PlayerArgument (exact or
+                               #   unique prefix), EntityArgument (EntityRegistry), ItemArgument (block/ and item/ pinned names,
+                               #   TryResolve; ContentItem), CommandNameArgument (/help's)
+      Definitions/             # one class per command with its Register: HelpCommand, TeleportCommand (LineTo, the /tp a link
+                               #   suggests), GiveCommand, SummonCommand, TimeCommand, GameModeCommand, FlyCommand, KillCommand,
+                               #   LocateCommand (Tower: the linked /locate answer)
     Config/                    # every tuning constant, one static class per domain (all const or static
                                #   readonly, read concurrently by every thread; namespace VoxelEngine.Config)
       AudioConfig.cs           # ambience bed paths, volumes and fades; the sfx volume

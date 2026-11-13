@@ -34,8 +34,12 @@ OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple 
                                       #   names, the player list, leave and the idle sweep
   ServerBroadcasts.cs                 # the cell journal (BlockChanges), entities under stable ids,
                                       #   stations and the day clock
-  ServerChat.cs                       # chat relay and the server's chat commands (over ChatCommands), /locate
-                                      #   answered from the player's eye with its teleport link
+  ServerChat.cs                       # chat relay; a player's command line runs on GameCommands with operator
+                                      #   rights while MayBeCreative, its answers system lines to that player
+  ServerCommandHost.cs                # the server's ICommandHost: the players online, the clock (broadcast),
+                                      #   mobs, towers, announcements broadcast
+  ServerCommandPlayer.cs              # a connected player's ICommandPlayer: a teleport corrects its client, a mode
+                                      #   change sends its status (creative only while MayBeCreative), a grant syncs
   ServerProgram.cs                    # content load, world/port prompts, headless World + tick loop
   ServerState.cs                      # what the components share: world, client and player tables,
                                       #   pending connections, clock, join spawn, creative rights
@@ -65,10 +69,14 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   SyntheticGear (gear items with made-up abilities and modifiers), TowerSiteFixture
                                #   (synthetic tower sites of any radius, floor count and turn), CaveTestWorld
                                #   (a carved, evenly lit cave for the cave spawn searches), StorageCells (cells with
-                               #   N distinct ids and the smallest-storage rule, for the save and net codec tests)
+                               #   N distinct ids and the smallest-storage rule, for the save and net codec tests),
+                               #   RecordingCommandHost and RecordingCommandPlayer (a headless command world)
                                #   and the four [CollectionDefinition]s (ContentRegistrySwapCollection
                                #   runs the tests that swap the registry)
   Audio/                       # the sfx library and the ambience bed
+  Commands/                    # the command trees: branch order, rights over a subtree, the answers, every game
+                               #   command (CommandDispatcherTests), completion (CommandSuggestionTests) and the
+                               #   linked /locate answer (LocateCommandTests)
   Chunks/                      # chunk storage, keys and map, the chunk manager and its mesh scheduling, the
                                #   column cache, fluid surfaces, lava vents, EntityLight; the replay probes
     MeshApplyRecoveryTests.cs  # interrupted applies preserve queued tails and return each owned buffer once
@@ -112,7 +120,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Graphics/                    # shader defines and the chunk-draw shader guard, cutout mips, tile materials
   Interaction/                 # raycast and targeting, mining, combat and the slice combo,
                                #   placement, support, doors and stairs, multiblocks, the selection
-                               #   outline, chat commands and the /locate reply (ChatLocateTests); its own helper
+                               #   outline; its own helper
                                #   SupportTestWorld
   ItemDebugger/                # the OpenGLTest.ItemDebugger project: the timeline, the
                                #   preview states, the display editor and its JSON writer

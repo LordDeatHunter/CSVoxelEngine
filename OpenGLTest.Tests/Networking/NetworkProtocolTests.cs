@@ -228,6 +228,9 @@ public sealed class NetworkProtocolTests
         var dead = new PlayerStatusData(NetPlayerFlags.None, 0, Dead: true, Vector3.Zero, 0f);
         Assert.Equal(dead, RoundTrip(dead));
 
+        var op = new PlayerStatusData(NetPlayerFlags.None, PlayerHealth.MaxHealth, false, Vector3.Zero, 0f, Operator: true);
+        Assert.Equal(op, RoundTrip(op));
+
         // A health past the biggest pool gear can make is clamped into it, and mode bits the protocol does not define
         // are dropped rather than handed to the camera
         var overfull = RoundTrip(new PlayerStatusData((NetPlayerFlags)0xFF, PlayerHealth.MaxHealth + GearConfig.MaxHealthBonusCap + 50, false,

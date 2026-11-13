@@ -273,8 +273,10 @@ public static class NetFraming
     /// and upstream 44's world sounds (message 90). All historical layouts are refused by the handshake.
     /// The separate planned bridge integration reserves 47.
     /// 48: a spider's attack count names bite (even) and web shot (odd), and a scorpion's pinch, sting and spit by
-    /// its remainder of 3 (the spit replays the sting's clip); an older peer would replay the wrong clip.</summary>
-    public const int ProtocolVersion = 48;
+    /// its remainder of 3 (the spit replays the sting's clip); an older peer would replay the wrong clip.
+    /// 49: <see cref="NetMessage.PlayerStatus"/> ends with whether the player may run operator commands
+    /// (<see cref="PlayerStatusData.Operator"/>), for the chat's autocomplete; an older peer would misread the frame.</summary>
+    public const int ProtocolVersion = 49;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

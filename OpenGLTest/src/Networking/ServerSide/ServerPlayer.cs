@@ -160,6 +160,10 @@ public sealed class ServerPlayer : IMobTarget
     /// <summary>Server-owned flight flag; only ever set together with <see cref="Creative"/>.</summary>
     public bool Flying { get; set; }
 
+    /// <summary>Whether the server let this player run operator commands when it joined, as its status reports it
+    /// to the client for the chat's autocomplete; each command line is judged again when it arrives.</summary>
+    public bool IsOperator { get; set; }
+
     /// <summary>The mob-target view of <see cref="Flying"/>: a flying player pushes no iceberg.</summary>
     public bool IsFlying => Flying;
 
