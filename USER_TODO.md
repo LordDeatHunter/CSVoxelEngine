@@ -273,7 +273,7 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   `spawn`, and per-face UVs.
 - [ ] **Crab, Corpse Bloom and Giant Centipede** — `crab.bbmodel` (an orange beach crab about a block across,
   64x32 skin), `corpse_bloom.bbmodel` (a carrion flower: four two-part petals round a spadix, 128x32 skin) and
-  `centipede.bbmodel` (ten dark segments with yellow legs, a red head and tail, 128x64 skin). Built and saved in
+  `centipede.bbmodel` (ten dark segments with yellow legs, a red head and tail, 128x80 skin). Built and saved in
   Blockbench 5 through its MCP plugin (no generator, the skin embedded, flat speckled colors packed face by face):
   edit them in Blockbench. No class reads them yet (`plans/TODO.md` `P-61`..`P-63`), so nothing is checked at
   startup; the group and clip names the wiring will ask for are in `docs/agents/entities.md` "Modeled, not wired".
