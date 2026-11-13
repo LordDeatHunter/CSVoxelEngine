@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.Windowing;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Entities;
@@ -261,8 +262,8 @@ internal sealed class WorldRenderer
             // A just-placed block pops in; skipped while that same cell is the one being mined,
             // whose own out-and-back pop is already playing there
             // (a stacked block, pebbles or a branch pile, is drawn by a procedural emitter the pop cannot
-            // match, so its slab of tiles would flash instead: it just appears)
-            if (placePopGrow > 0f && BlockType.ById[Placer.PlacePopId] is not { StackMax: > 0 }
+            // match, and an ingot pile by an entity pass, so its slab of tiles would flash instead: it just appears)
+            if (placePopGrow > 0f && BlockType.ById[Placer.PlacePopId] is not ({ StackMax: > 0 } or { Renderer: BlockRenderer.IngotPile })
                 && !(LeftClick.IsBreaking && LeftClick.BreakingBlockPosition == Placer.PlacePopPosition))
                 renderManager.Selection.RenderBlockPop(Camera, Placer.PlacePopPosition, Placer.PlacePopId, placePopGrow,
                     HitboxesAt(Placer.PlacePopPosition, Placer.PlacePopId),
