@@ -51,10 +51,18 @@ public sealed class ClientLodStreamer
             var spec = LodRegion.Levels[level];
             var rx = MathUtils.FloorToInt(cameraPos.X / spec.RegionBlocks);
             var rz = MathUtils.FloorToInt(cameraPos.Z / spec.RegionBlocks);
+            var finerCamera = level > 0
+                ? (MathUtils.FloorToInt(cameraPos.X / LodRegion.Levels[level - 1].RegionBlocks),
+                    MathUtils.FloorToInt(cameraPos.Z / LodRegion.Levels[level - 1].RegionBlocks))
+                : default;
             foreach (var (dx, dz) in Offsets[level])
             {
                 var key = (level, rx + dx, rz + dz);
                 if (_lod.Regions.ContainsKey(key))
+                    continue;
+                // The local LodManager drops it again (LodRegion.IsSupersededByFinerRing), so never ask for it
+                if (LodRegion.IsSupersededByFinerRing(level, rx + dx, rz + dz, finerCamera,
+                        StreamingConfig.LodSupersededBuildMarginRegions))
                     continue;
                 if (budget <= 0)
                     return;

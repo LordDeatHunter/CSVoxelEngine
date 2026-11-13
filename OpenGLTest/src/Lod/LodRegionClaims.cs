@@ -164,11 +164,9 @@ internal sealed class LodRegionClaims(LodManager owner)
     /// <summary>
     /// The closest region that is neither loaded nor already claimed; claims it in <c>_queued</c> and
     /// returns it, or null when every level is full. The levels are merged by each region's nearest-point
-    /// distance to the camera in blocks, the finer level first at equal distance: in the steady state
-    /// that is still finest-first (each level's missing regions sit at its own ring's edge), and after a
-    /// long teleport the regions under the camera on every level come first, so a coarse shell left from
-    /// the old ring is buried by its finer children (<see cref="LodCoverPass"/>) within a few builds
-    /// instead of after the whole finest ring.
+    /// distance to the camera in blocks, the finer level first at equal distance. A coarse region its finer
+    /// children cover well inside their ring is skipped (<see cref="LodRegion.IsSupersededByFinerRing"/>), so a
+    /// new world or a long teleport builds the finest level under the camera and never a coarse shell there.
     /// Internal (rather than private) because it is the only path that fills <c>_queued</c>, and
     /// <see cref="MarkEditedColumn"/> refuses to mark a region that is not in it — so a test of the
     /// dirty-set drain can only produce a dirty region by going through this scan first.
@@ -198,7 +196,9 @@ internal sealed class LodRegionClaims(LodManager owner)
             for (var level = 0; level < levels; level++)
             {
                 var offsets = SortedOffsets[level];
-                while (cursors[level] < offsets.Length && IsTaken(KeyAt(level, camRegions[level], offsets[cursors[level]])))
+                while (cursors[level] < offsets.Length
+                       && (IsTaken(KeyAt(level, camRegions[level], offsets[cursors[level]]))
+                           || IsSuperseded(KeyAt(level, camRegions[level], offsets[cursors[level]]), camRegions)))
                     cursors[level]++;
                 if (cursors[level] == offsets.Length) continue;
 
@@ -229,6 +229,11 @@ internal sealed class LodRegionClaims(LodManager owner)
             return key;
         }
     }
+
+    // Covered by its finer children well inside their ring, so never worth building (LodRegion.IsSupersededByFinerRing)
+    private static bool IsSuperseded((int Level, int X, int Z) key, ReadOnlySpan<(int X, int Z)> camRegions) =>
+        key.Level > 0 && LodRegion.IsSupersededByFinerRing(key.Level, key.X, key.Z, camRegions[key.Level - 1],
+            StreamingConfig.LodSupersededBuildMarginRegions);
 
     private static (int Level, int X, int Z) KeyAt(int level, (int X, int Z) camRegion, (int dx, int dz) offset) =>
         (level, camRegion.X + offset.dx, camRegion.Z + offset.dz);

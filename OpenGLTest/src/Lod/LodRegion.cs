@@ -40,6 +40,27 @@ public class LodRegion : IDisposable
         new(CellSize: 8, RegionBlocks: 256, RegionRadius: 8, SampleMargin: 7, HeightBias: 6, ProxyCanopy: true),  // to 2048 blocks
     ];
 
+    /// <summary>
+    /// Whether every finer-level child of the coarse region (<paramref name="level"/>, <paramref name="x"/>,
+    /// <paramref name="z"/>) sits at least <paramref name="margin"/> regions inside the finer level's ring around
+    /// <paramref name="finerCameraRegion"/> (the camera's region on level <c>level - 1</c>). Such a region is buried by
+    /// its children as soon as they load and drawing it before then only shows a coarse shell under the camera, so it
+    /// is neither built nor kept (<see cref="StreamingConfig.LodSupersededBuildMarginRegions"/>). Never true on level 0,
+    /// whose cover is the full-detail chunks.
+    /// </summary>
+    public static bool IsSupersededByFinerRing(int level, int x, int z, (int X, int Z) finerCameraRegion, int margin)
+    {
+        if (level == 0) return false;
+        var finer = Levels[level - 1];
+        var reach = finer.RegionRadius - margin;
+        if (reach < 0) return false;
+        var ratio = Levels[level].RegionBlocks / finer.RegionBlocks;
+        // The farthest child is a corner one: the larger offset on each axis
+        var dx = Math.Max(Math.Abs(x * ratio - finerCameraRegion.X), Math.Abs(x * ratio + ratio - 1 - finerCameraRegion.X));
+        var dz = Math.Max(Math.Abs(z * ratio - finerCameraRegion.Z), Math.Abs(z * ratio + ratio - 1 - finerCameraRegion.Z));
+        return dx * dx + dz * dz <= reach * reach;
+    }
+
     // Rent sizes for a region build's output lists. Every level is 32x32 cells (64/2, 128/4,
     // 256/8) and each cell emits a top quad plus a `top - neighborTop` side skirt per side, so
     // the opaque pair is sized from the measured working set rather than a guess: over each

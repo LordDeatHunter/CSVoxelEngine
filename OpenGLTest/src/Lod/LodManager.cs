@@ -200,7 +200,10 @@ public class LodManager
             var radius = LodRegion.Levels[region.Level].RegionRadius + 1;
             var dx = region.X - camRegions[region.Level].camX;
             var dz = region.Z - camRegions[region.Level].camZ;
-            if (dx * dx + dz * dz <= radius * radius)
+            // Out of its own ring, or deep enough inside the finer one that its children replace it
+            if (dx * dx + dz * dz <= radius * radius
+                && !(region.Level > 0 && LodRegion.IsSupersededByFinerRing(region.Level, region.X, region.Z,
+                    camRegions[region.Level - 1], StreamingConfig.LodSupersededDropMarginRegions)))
                 continue;
 
             var key = (region.Level, region.X, region.Z);

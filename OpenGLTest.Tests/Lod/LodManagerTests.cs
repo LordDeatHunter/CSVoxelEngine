@@ -322,38 +322,54 @@ public sealed class LodManagerTests
         Assert.Null(lods.TakeDirtyRegion());
     }
 
-    /// <summary>After a long teleport only a coarse shell may stand under the camera, and it stays drawn until its
-    /// finer children are loaded: the scan must hand out the regions under the camera on every level first (finest
-    /// first at equal distance), and finish a coarse region's children long before the whole finest ring.</summary>
+    /// <summary>A new world or a long teleport must never show a coarse shell under the camera: the scan starts with the
+    /// finest region the camera stands in and never hands out a coarse region its finer children cover well inside their
+    /// ring, while the coarse regions past that keep the horizon filled.</summary>
     [Fact]
-    public void TheScanReplacesTheCoarseShellUnderTheCameraBeforeFillingTheFinestRing()
+    public void TheScanNeverBuildsACoarseRegionItsFinerRingCovers()
     {
         var lods = new LodManager(null!);
         var cam = new Camera(null, null);
         cam.TestTeleport(new Vector3(1500.5f, 80f, -700.5f), 0f, 0f);
         lods.AttachCamera(cam);
 
-        var (coarseX, coarseZ) = lods.CameraRegion(2);
-        var children = new HashSet<(int Level, int X, int Z)>
+        var (x0, z0) = lods.CameraRegion(0);
+        Assert.Equal((0, x0, z0), lods.FindClosestNeededRegion());
+
+        var coarse = 0;
+        while (lods.FindClosestNeededRegion() is { } key)
         {
-            (1, coarseX * 2, coarseZ * 2), (1, coarseX * 2 + 1, coarseZ * 2),
-            (1, coarseX * 2, coarseZ * 2 + 1), (1, coarseX * 2 + 1, coarseZ * 2 + 1),
-        };
-        var finest = 0;
-        for (var level = 0; level < LodRegion.Levels.Length; level++)
-        {
-            var (x, z) = lods.CameraRegion(level);
-            Assert.Equal((level, x, z), lods.FindClosestNeededRegion());
-            children.Remove((level, x, z));
-        }
-        while (children.Count > 0 && lods.FindClosestNeededRegion() is { } key)
-        {
-            children.Remove(key);
-            if (key.Level == 0) finest++;
+            if (key.Level == 0) continue;
+            coarse++;
+            Assert.False(LodRegion.IsSupersededByFinerRing(key.Level, key.X, key.Z, lods.CameraRegion(key.Level - 1),
+                StreamingConfig.LodSupersededBuildMarginRegions), $"{key} is covered by its finer ring");
+            Assert.NotEqual(lods.CameraRegion(key.Level), (key.X, key.Z));
         }
 
-        Assert.Empty(children);
-        Assert.True(finest < 60, $"{finest} finest regions came before the coarse shell's children");
+        Assert.True(coarse > 0, "no coarse region was built past the finer rings");
+    }
+
+    /// <summary>A coarse shell already loaded (left from the old ring before a teleport) is dropped once the camera
+    /// stands deep inside its finer ring, rather than drawn until children it no longer needs are built.</summary>
+    [Fact]
+    public void ALoadedCoarseShellDeepInsideTheFinerRingIsDropped()
+    {
+        var chunks = new ChunkManager(null!);
+        var lods = new LodManager(null!);
+        var cam = new Camera(null, null);
+        cam.TestTeleport(new Vector3(1500.5f, 80f, -700.5f), 0f, 0f);
+        lods.AttachCamera(cam);
+
+        var (cx, cz) = lods.CameraRegion(2);
+        var under = CoarseHeadlessRegion(2, cx, cz);
+        lods.AddRegion((2, cx, cz), under);
+        var far = CoarseHeadlessRegion(2, cx + 7, cz);
+        lods.AddRegion((2, cx + 7, cz), far);
+
+        lods.Update(chunks);
+
+        Assert.False(lods.Regions.ContainsKey((2, cx, cz)));
+        Assert.True(lods.Regions.ContainsKey((2, cx + 7, cz)));
     }
 
     /// <summary>Covers item C11's common case: the LodGen worker calls TakeDirtyRegion on every

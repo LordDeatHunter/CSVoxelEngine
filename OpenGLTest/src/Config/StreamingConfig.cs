@@ -75,6 +75,16 @@ public static class StreamingConfig
     // --- Far-terrain LOD ---
     // Level definitions (cell sizes, per-level radii) live in LodRegion.Levels.
 
+    // A coarse region whose finer children all sit this many finer regions inside the finer level's
+    // ring is never drawn once they load (LodRegion.IsSupersededByFinerRing), so it is not built: a new
+    // world or a long teleport never shows a coarse shell under the camera for the seconds its
+    // children take. Two finer regions of lead let the camera move that far before the region is
+    // needed again, so it is rebuilt long before its children leave the finer ring.
+    public const int LodSupersededBuildMarginRegions = 2;
+    // A loaded coarse region is dropped once it sits this deep inside the finer ring: one region deeper
+    // than the build margin, so a camera pacing over the line never rebuilds and drops the same region.
+    public const int LodSupersededDropMarginRegions = 3;
+
     // How many completed LOD region meshes to upload to GPU per frame. This is the MAIN
     // THREAD's per-frame GL ceiling (VAO setup, buffer uploads) and C5 does NOT raise it. It is
     // also nowhere near the limiter: C5's capture measured the single builder producing 53-55
