@@ -101,11 +101,16 @@ internal static class SwordMotion
         BladeRoll: 0.8f, BladeCant: 0.12f, BladeYaw: 0.785f,
         DisplayYaw: -55f, DisplayRoll: 25f);
 
+    // The split: the chop's shape, straight overhead and straight down, at the slow pace of a blow meant to
+    // part a log in one go.
+    private static readonly Shape AxeSplit = Chop with { Duration = StumpConfig.SplitSwingSeconds };
+
     private static Shape Of(SwordSwing swing) => swing switch
     {
         SwordSwing.BackCut => BackCut,
         SwordSwing.Chop => Chop,
         SwordSwing.AxeChop => AxeChop,
+        SwordSwing.AxeSplit => AxeSplit,
         _ => Cut,
     };
 

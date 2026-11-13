@@ -622,6 +622,12 @@ public sealed class BlockDefinition
         /// at its root when it is cut above the root. Omitted means this wood leaves no stump (a cactus).
         /// </summary>
         public string? Stump { get; set; }
+
+        /// <summary>
+        /// <c>tree_wood</c> only: the loot table a log of this wood splits into when an axe splits it on a stump (see
+        /// <c>Simulation/Stumps</c>). Omitted means the wood cannot be split.
+        /// </summary>
+        public string? Split { get; set; }
     }
 
     /// <summary>One thickness band of a <c>tree_wood</c> block's loot.</summary>

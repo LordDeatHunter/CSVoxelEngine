@@ -998,8 +998,10 @@ public class World
         Interactions.HammerAnvil(cell, gapSeconds, slackSeconds);
 
     /// <summary>One left-click blow on the tree stump at <paramref name="cell"/> (a <see cref="NetIntentKind.StumpHit"/> intent):
-    /// wobbles the log standing on it. False when the stump holds none.</summary>
-    public bool StumpHitFor(Vector3 cell) => RightClick.Stump.TryHit((int)cell.X, (int)cell.Y, (int)cell.Z);
+    /// splits the log standing on it when <paramref name="split"/> (an axe's blow), wobbles it otherwise. False when the
+    /// stump holds none.</summary>
+    public bool StumpHitFor(Vector3 cell, bool split) =>
+        RightClick.Stump.TryHit((int)cell.X, (int)cell.Y, (int)cell.Z, split);
 
     /// <summary>The battle towers' floor locks (piles and doors); authoritative worlds tick them, a client's are
     /// display-only mirrors.</summary>

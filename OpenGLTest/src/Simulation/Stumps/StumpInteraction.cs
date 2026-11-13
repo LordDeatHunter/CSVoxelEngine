@@ -1,4 +1,8 @@
+using System;
+using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Config;
+using VoxelEngine.Content.Loot;
 using VoxelEngine.Player;
 
 namespace VoxelEngine.Simulation.Stumps;
@@ -54,13 +58,34 @@ internal sealed class StumpInteraction(World world, bool clientMode)
     }
 
     /// <summary>
-    /// A left-click blow on the stump cell: wobbles the log standing on it. Returns whether the stump holds a log, so
-    /// the caller knows the blow was not a mining hit (the stump itself can only be mined bare).
+    /// A left-click blow on the stump cell: an axe's (<paramref name="split"/>) splits the log standing on it into its
+    /// <see cref="BlockType.SplitLoot"/>, thrown out over the stump as drops; anything else wobbles it. Returns whether the
+    /// stump holds a log, so the caller knows the blow was not a mining hit (the stump itself can only be mined bare).
+    /// A log of a wood with no split table only ever wobbles.
     /// </summary>
-    internal bool TryHit(int x, int y, int z)
+    internal bool TryHit(int x, int y, int z, bool split)
     {
-        if (world.Stumps.LogAt(x, y, z) == null) return false;
-        if (!clientMode) world.Stumps.Wobble(x, y, z);
+        if (world.Stumps.LogAt(x, y, z) is not { } log) return false;
+        if (clientMode) return true;
+
+        if (split && BlockType.ById[log.LogId]?.SplitLoot is { } table)
+            Split(x, y, z, log, table);
+        else
+            world.Stumps.Wobble(x, y, z);
         return true;
+    }
+
+    private void Split(int x, int y, int z, StumpLog log, LootTable table)
+    {
+        world.Stumps.TryTake(x, y, z);
+        var rolled = new List<ushort>();
+        table.Roll(new LootContext(x, y, z), rolled);
+
+        var top = new Vector3(x + 0.5f + log.OffsetX, y + StumpConfig.StumpTop + StumpConfig.LogHeight / 2f, z + 0.5f + log.OffsetZ);
+        foreach (var id in rolled)
+        {
+            var scatter = new Vector3(Random.Shared.NextSingle() - 0.5f, 0f, Random.Shared.NextSingle() - 0.5f) * StumpConfig.SplitScatter;
+            world.DropSpawner.SpawnAt(id, top, scatter + new Vector3(0f, StumpConfig.SplitLift, 0f));
+        }
     }
 }

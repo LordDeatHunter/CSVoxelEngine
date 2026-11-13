@@ -282,6 +282,17 @@ internal sealed class LeftClickAction
         _attackWasPressed = isHolding;
         _anvilCooldown = MathF.Max(0f, _anvilCooldown - (float)deltaTime);
         _stumpCooldown = MathF.Max(0f, _stumpCooldown - (float)deltaTime);
+        UpdateSplit((float)deltaTime);
+        // A button still held after a split is spent: it must not go on to mine the stump the log stood on
+        if (_awaitRelease)
+        {
+            if (isHolding)
+            {
+                StopBreaking();
+                return;
+            }
+            _awaitRelease = false;
+        }
 
         var held = HeldItem();
         var player = LocalPlayer.LocalContext();
@@ -523,26 +534,70 @@ internal sealed class LeftClickAction
     }
 
     /// <summary>
-    /// One blow on the log standing on the aimed stump, at <see cref="StumpConfig.HitGapSeconds"/> pace: the swing,
-    /// the knock and chips of the log it hits, then the wobble itself (the server's, through
-    /// <see cref="NetIntentKind.StumpHit"/>, on a connected client).
+    /// A blow on the log standing on the aimed stump. An axe starts the slow overhead split swing (see
+    /// <see cref="UpdateSplit"/>, which lands it); anything else wobbles the log at
+    /// <see cref="StumpConfig.HitGapSeconds"/> pace: the swing, the knock and chips of the log it hits, then the wobble
+    /// itself (the server's, through <see cref="NetIntentKind.StumpHit"/>, on a connected client).
     /// </summary>
     private void UpdateStumpHit()
     {
-        if (_stumpCooldown > 0f) return;
-        _stumpCooldown = StumpConfig.HitGapSeconds;
+        if (_stumpCooldown > 0f || _splitCell != null) return;
 
         var cell = _selectedBlockPosition;
         var (x, y, z) = cell.BlockCell();
         if (_world.Stumps.LogAt(x, y, z) is not { } log) return;
-
         Camera.NotifyPlayerAction();
+
+        if (Mining.IsAxe(HeldItem()) && BlockType.ById[log.LogId]?.SplitLoot != null)
+        {
+            _splitCell = cell;
+            _splitImpactIn = StumpConfig.SplitSwingSeconds * PlayerModel.SwordImpactProgress(SwordSwing.AxeSplit);
+            _stumpCooldown = StumpConfig.SplitSwingSeconds;
+            Player.StartAxeSplit();
+            Camera.PunchFov(-1.2f);
+            return;
+        }
+
+        _stumpCooldown = StumpConfig.HitGapSeconds;
         LocalPlayer.PunchSwing();
         PlayHitSfx(log.LogId, cell);
         _debris.Burst(cell, log.LogId, ParticleConfig.BlockDebrisPerHit, columns: _chunkManager.ColumnSource);
-        _world.StumpHitFor(cell);
+        _world.StumpHitFor(cell, split: false);
         _world.RaiseIntent(WorldIntent.StumpHit(Camera.Position, _selectedAimDirection, cell));
     }
+
+    /// <summary>
+    /// Runs the split swing started by <see cref="UpdateStumpHit"/> to its blow, whether or not the button is still held:
+    /// when the axe comes down the log splits (in singleplayer; a connected client sends the blow as a
+    /// <see cref="NetIntentKind.StumpHit"/> and the server splits it), wood chips burst from the stump, the view kicks, and
+    /// the lumber thrown out is the server's drops. A log already gone by then (lifted off, split by someone else) is just
+    /// a swing at the stump.
+    /// </summary>
+    private void UpdateSplit(float deltaTime)
+    {
+        if (_splitCell is not { } cell) return;
+        _splitImpactIn -= deltaTime;
+        if (_splitImpactIn > 0f) return;
+        _splitCell = null;
+
+        var (x, y, z) = cell.BlockCell();
+        if (_world.Stumps.LogAt(x, y, z) is not { } log) return;
+
+        PlayHitSfx(log.LogId, cell);
+        _debris.Burst(cell, log.LogId, ParticleConfig.StumpSplitDebris, columns: _chunkManager.ColumnSource);
+        Camera.AddHitKick(Vector3.Zero, BreakKick.Strength(SplitKickHardness, false));
+        _world.StumpHitFor(cell, split: true);
+        _awaitRelease = true;
+        _world.RaiseIntent(WorldIntent.StumpHit(Camera.Position, _selectedAimDirection, cell));
+    }
+
+    // The hardness the camera kick of a split is sized as: a heavy blow, like felling a trunk
+    private const float SplitKickHardness = 12f;
+
+    // The stump the split swing in flight is aimed at (null when none) and the seconds until its blow lands
+    private Vector3? _splitCell;
+    private float _splitImpactIn;
+    private bool _awaitRelease;
 
     private float _stumpCooldown;
 

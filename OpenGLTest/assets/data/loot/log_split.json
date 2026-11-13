@@ -1,0 +1,11 @@
+{
+  // What an axe splits a log into on a stump: sixteen lumber (eight of which craft a plank)
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/lumber", "count": 16 }
+      ]
+    }
+  ]
+}

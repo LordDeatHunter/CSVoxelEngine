@@ -30,4 +30,13 @@ public static class StumpConfig
 
     /// <summary>Shortest gap between two wobble-starting blows, in seconds, so a held button wobbles in rhythm.</summary>
     public const float HitGapSeconds = 0.4f;
+
+    /// <summary>Sideways speed (blocks per second, at most half of it each way) the lumber of a split log is thrown out at.</summary>
+    public const float SplitScatter = 3f;
+
+    /// <summary>Upward speed the lumber of a split log is thrown out at.</summary>
+    public const float SplitLift = 2.5f;
+
+    /// <summary>Seconds the axe's overhead swing takes from raised to split (<c>SwordSwing.AxeSplit</c>): a slow blow.</summary>
+    public const float SplitSwingSeconds = 1.25f;
 }

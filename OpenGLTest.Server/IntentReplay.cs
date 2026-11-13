@@ -165,7 +165,8 @@ internal sealed class IntentReplay
             case NetIntentKind.Hammer:
                 return HammerFor(player, intent);
             case NetIntentKind.StumpHit:
-                return AimsAt(player, intent, out _) && _state.World.StumpHitFor(intent.Cell);
+                return AimsAt(player, intent, out _)
+                    && _state.World.StumpHitFor(intent.Cell, split: Mining.IsAxe(player.Inventory.HeldItem));
             case NetIntentKind.Waystone:
                 return _waystones.TripFor(player, intent);
             case NetIntentKind.Forge:

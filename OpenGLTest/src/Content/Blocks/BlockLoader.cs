@@ -182,6 +182,7 @@ internal static class BlockLoader
             SpellBuilder = definition.SpellBuilder ?? false,
             Waystone = definition.Waystone ?? false,
             IsStump = definition.Stump ?? false,
+            SplitLoot = BlockSchemaParser.ParseSplitLoot(definition, path),
             Chest = BlockSchemaParser.ParseChest(definition.Chest, renderer, path),
             Lantern = definition.Lantern,
             StackMax = (byte)stack.StackMax,

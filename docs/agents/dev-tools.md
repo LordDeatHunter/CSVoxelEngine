@@ -93,7 +93,7 @@ Environment variables for scripted captures:
 - `ITEM_DEBUGGER_ANIM=<clip|hurt|hop|spawn|death|...>` picks the entity mode. An unknown mode logs a
   warning listing the valid ones.
 - `ITEM_DEBUGGER_PLAYER_ANIM=<mode>` picks the player animation (`idle`, `walk`, `run`, `sneak`, `jump`,
-  `sprint jump`, `land`, `swim`, `swim idle`, `surface`, `fly`, `punch`, `heavy punch`, `slice`, `slice back`, `cut`, `back cut`, `chop`, `throw`,
+  `sprint jump`, `land`, `swim`, `swim idle`, `surface`, `fly`, `punch`, `heavy punch`, `slice`, `slice back`, `cut`, `back cut`, `chop`, `axe`, `axe split`, `throw`,
   `hurt`, `equip`, `death`, `cast`) and selects the ITEMS tab. An unknown mode logs a warning listing them.
 - `ITEM_DEBUGGER_SPEED=<0..4>` and `ITEM_DEBUGGER_LOOP=<0|1>` set the timeline's speed and loop at startup.
 - `ITEM_DEBUGGER_SHOT=<png path>` saves one screenshot and closes. Without `ITEM_DEBUGGER_SHOT_AT` it

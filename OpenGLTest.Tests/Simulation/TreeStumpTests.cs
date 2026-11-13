@@ -83,6 +83,20 @@ public sealed class TreeStumpTests
     }
 
     [Fact]
+    public void EveryLogAStumpTakesCanBeSplitIntoSomething()
+    {
+        var yielded = new List<ushort>();
+        foreach (var block in BlockType.ById.Where(b => b is { StumpId: not 0 }))
+        {
+            Assert.NotNull(block!.SplitLoot);
+            yielded.Clear();
+            block.SplitLoot!.Roll(new VoxelEngine.Content.Loot.LootContext(0, 0, 0), yielded);
+            Assert.NotEmpty(yielded);
+            Assert.DoesNotContain(block.Id, yielded);
+        }
+    }
+
+    [Fact]
     public void EveryStumpLinkNamesAStumpBlock()
     {
         foreach (var block in BlockType.ById.Where(b => b is { StumpId: not 0 }))

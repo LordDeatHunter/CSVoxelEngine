@@ -23,4 +23,8 @@ public enum SwordSwing : byte
     /// (<see cref="SwordSwings.Next"/> never reaches it). Its length follows the axe's hit pace
     /// (<see cref="Player.PlayerModel.StartAxeChop"/>), so each hit lands as the blade comes down.</summary>
     AxeChop = 3,
+
+    /// <summary>An axe splitting a log stood on a stump: the finisher's slow overhead blow straight down, at the pace of
+    /// <see cref="Config.StumpConfig.SplitSwingSeconds"/>. Not part of the sword's chain either.</summary>
+    AxeSplit = 4,
 }

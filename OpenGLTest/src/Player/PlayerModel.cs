@@ -574,6 +574,9 @@ public class PlayerModel
         _swordSeconds = MathF.Max(seconds, 0.05f);
     }
 
+    /// <summary>Starts the slow overhead blow of an axe splitting a log on a stump (<see cref="SwordSwing.AxeSplit"/>).</summary>
+    public void StartAxeSplit() => StartSword(SwordSwing.AxeSplit);
+
     /// <summary>Starts the staff cast's gesture (<see cref="CastMotion"/>): the staff raised and thrust forward. Cosmetic.</summary>
     public void Cast() => _castT = 0f;
 

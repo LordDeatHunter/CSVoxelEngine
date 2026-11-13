@@ -451,6 +451,16 @@ internal static class BlockSchemaParser
         return (tip, bands, hand);
     }
 
+    /// <summary>The loot table named by a log's <c>wood.split</c>, or null when it names none; a name that is no loot table
+    /// throws naming the file.</summary>
+    internal static LootTable? ParseSplitLoot(BlockDefinition definition, string path)
+    {
+        if (definition.Wood?.Split is not { } name) return null;
+        return ContentRegistry.LootTables.TryGetValue(name, out var table)
+            ? table
+            : throw new InvalidOperationException($"Block '{path}' has wood.split '{name}', which is not an existing loot table.");
+    }
+
     /// <summary>Settles <c>collidesByHitbox</c>: only a solid, non-fluid, non-stack block that declares
     /// a hitbox may collide by shape, because <see cref="Camera"/>'s collision reads exactly those
     /// boxes; anything else throws naming the file.</summary>

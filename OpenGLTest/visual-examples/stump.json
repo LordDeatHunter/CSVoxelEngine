@@ -6,7 +6,9 @@
   // Look for a stump five pixels high with a flared base where the root stood, no log left between
   // it and the ground, and the rest of the tree on the ground. Then an oak log is stood on the stump with a
   // right-click (log_placed), wobbled by a left-click (log_wobble, shot 0.1 s after the blow) and lifted off with a
-  // second right-click (log_taken: the stump bare again).
+  // second right-click (log_taken: the stump bare again). Last the log goes back on and an axe splits it: a slow
+  // overhead swing (axe_swing, 0.5 s in; the swing only advances while a `mine` step holds the click, as the real
+  // game's per-frame input does), then wood chips and sixteen lumber on the ground (split_after).
   "steps": [
     { "op": "fly" },
     { "op": "teleport", "pos": [-82.5, 16.5, -1.5], "yaw": 0, "pitch": 0 },
@@ -34,6 +36,18 @@
     { "op": "wait", "seconds": 1 },
     { "op": "place" },
     { "op": "wait", "seconds": 0.5 },
-    { "op": "screenshot", "name": "log_taken", "hideHud": true }
+    { "op": "screenshot", "name": "log_taken", "hideHud": true },
+
+    { "op": "select", "slot": 1 },
+    { "op": "place" },
+    { "op": "give", "block": "item/primitive_axe", "count": 1 },
+    { "op": "select", "slot": 2 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "mine", "seconds": 0.5 },
+    { "op": "screenshot", "name": "axe_swing", "hideHud": true },
+    { "op": "mine", "seconds": 0.9 },
+    { "op": "screenshot", "name": "split_impact", "hideHud": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "split_after", "hideHud": true }
   ]
 }

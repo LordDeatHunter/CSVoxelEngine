@@ -388,6 +388,10 @@ public sealed record BlockType
     /// (<c>wood.stump</c>), or 0 when it leaves none.</summary>
     public ushort StumpId { get; internal set; }
 
+    /// <summary>For a tree-wood block, what a log of it splits into on a stump (<c>wood.split</c>), or null when it cannot be
+    /// split.</summary>
+    public LootTable? SplitLoot { get; init; }
+
     /// <summary>
     /// The baked model pre-rotated to each of the four horizontal facings, indexed by facing 0..3
     /// (<c>[0]</c> is <see cref="BakedModel"/> itself, the authored north-facing bake), which the

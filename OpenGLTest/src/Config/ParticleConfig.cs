@@ -37,6 +37,9 @@ public static class ParticleConfig
     public const int BlockDebrisMax = 512;
     public const int BlockDebrisPerHit = 4;
     public const int BlockDebrisOnBreak = 20;
+
+    /// <summary>Wood chips thrown off a stump when an axe splits the log standing on it.</summary>
+    public const int StumpSplitDebris = 36;
     public const float BlockDebrisLifetime = 2.0f;
     public const float BlockDebrisSize = 0.12f;
     // Seconds a cube takes to fade out at the end of its life (or after landing)

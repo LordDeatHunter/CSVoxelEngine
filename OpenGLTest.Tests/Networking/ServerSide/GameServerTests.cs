@@ -1144,6 +1144,33 @@ public sealed class GameServerTests : IDisposable
     }
 
     [Fact]
+    public void AnAxeBlowSplitsTheLogOnAStumpIntoLumberAndOtherBlowsOnlyWobbleIt()
+    {
+        using var client = Connect("Woodsman");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var log = ContentRegistry.RequireBlock("oak_log").Id;
+        var lumber = ContentRegistry.RequireItem("lumber").Id;
+        var cell = arena.Front;
+        SetCell(cell, ContentRegistry.RequireBlock("oak_stump").Id);
+        var (x, y, z) = ((int)cell.X, (int)cell.Y, (int)cell.Z);
+        Assert.True(_world.Stumps.TryPlace(_world.GetChunkManager(), x, y, z, log, arena.Eye, Vector3.UnitX));
+        var aim = Vector3.Normalize(cell + new Vector3(0.5f, 0.2f, 0.5f) - arena.Eye);
+
+        // Bare-handed the blow only wobbles: the log stays
+        Assert.True(AwaitResult(client, SendWorld(client, WorldIntent.StumpHit(arena.Eye, aim, cell))));
+        Assert.NotNull(_world.Stumps.LogAt(x, y, z));
+
+        GrantAsSurvival(client, ContentRegistry.RequireItem("primitive_axe").Id, 1);
+        Tick(0.5);
+        Assert.True(AwaitResult(client, SendWorld(client, WorldIntent.StumpHit(arena.Eye, aim, cell))));
+
+        Assert.Null(_world.Stumps.LogAt(x, y, z));
+        // Whatever the table rolls, none of it is the log itself, and lumber is what a split yields
+        Assert.Contains(_world.Drops, d => d.BlockId == lumber);
+        Assert.DoesNotContain(_world.Drops, d => d.BlockId == log);
+    }
+
+    [Fact]
     public void AJumpBesideALitBloomeryWorksItsBellowsForThatPlayer()
     {
         using var client = Connect("Smith");

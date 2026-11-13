@@ -359,6 +359,7 @@ internal sealed class LocalPlayer
             case "cut": Player.StartSword(SwordSwing.Cut); break;
             case "backcut": Player.StartSword(SwordSwing.BackCut); break;
             case "chop": Player.StartSword(SwordSwing.Chop); break;
+            case "axesplit": Player.StartAxeSplit(); break;
             case "axechop": Player.StartAxeChop(AxeChopSeconds(Mining.BlockHitGapSeconds(ItemRegistry.TryGet(Inventory.SelectedBlockId)))); break;
             case "equip": Player.NotifyEquip(); break;
             case "charge": Player.StartThrowCharge(); Player.UpdateThrowCharge(1f); break;
