@@ -253,6 +253,26 @@ internal sealed class BlockInteractions
     /// placement against the structure. Any other click on a bloomery is spent. Returns whether the click belonged
     /// to the bloomery.
     /// </summary>
+    /// <summary>
+    /// A bare-hand right-click on a hand-built cube of a structure's source block presses it into that
+    /// structure, opening toward the player: 2x2x2 mud bricks into a mud brick kiln, 3x3x3 alloy bricks
+    /// into an alloy furnace. Every multiblock anchor is tried in id order with its own source block and
+    /// size, and the first whose volume the aimed cell belongs to is converted. False with anything in hand.
+    /// </summary>
+    internal bool TryConvertMultiblockByHand(float maxDistance, PlayerContext player)
+    {
+        if (player.Inventory.HeldItem != null) return false;
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out var normal)) return false;
+        var cell = new Vector3((int)hit.X, (int)hit.Y, (int)hit.Z);
+        foreach (var type in BlockType.ById)
+        {
+            if (type is not { Renderer: BlockRenderer.Multiblock }) continue;
+            if (Edits.TryConvertMultiblock(cell, normal, type.MultiblockSourceId, type.Id, player.ViewDirection))
+                return true;
+        }
+        return false;
+    }
+
     internal bool TryBloomeryInteract(float maxDistance, PlayerContext player)
     {
         var inventory = player.Inventory;

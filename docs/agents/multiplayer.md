@@ -401,7 +401,7 @@ empty. Then, by kind:
   placed leaf persistent).
 - **Use** — `World.TryUseSelected(InteractionReach, context, out outcome, allowPlace: false)`: the
   right-click chain (campfire, quern, kiln, cast mold, then the held item's `OnUse` — bucket, pile,
-  firestarter on TNT or a kiln, converter) aimed by the player's ray and spending from its
+  firestarter on TNT or a kiln; a bare hand presses a multiblock) aimed by the player's ray and spending from its
   inventory, short of the placement fallback. The item-use tail reads the dispatching player
   (`WorldItemUse._activeContext`), and a chance roll goes through `IItemUseWorld.NextUseRoll`
   (`World.UseRoll`, a test seam).

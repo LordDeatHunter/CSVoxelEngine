@@ -33,7 +33,6 @@ internal static class ItemLoader
                 "place_fluid" => ItemUseAction.PlaceFluid,
                 "place_stack" => ItemUseAction.PlaceStack,
                 "ignite_campfire" => ItemUseAction.IgniteCampfire,
-                "convert_multiblock" => ItemUseAction.ConvertMultiblock,
                 "heal" => ItemUseAction.Heal,
                 "grow_tree" => ItemUseAction.GrowTree,
                 "plant_tree" => ItemUseAction.PlantTree,
@@ -41,7 +40,7 @@ internal static class ItemLoader
                 "restore_mana" => ItemUseAction.RestoreMana,
                 "summon" => ItemUseAction.Summon,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock, heal, grow_tree, plant_tree, learn_parts, restore_mana or summon."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, heal, grow_tree, plant_tree, learn_parts, restore_mana or summon."),
             };
             var teaches = ParseTeaches(definition, action, path);
             var restoresMana = ParseRestoresMana(definition, action, path);
@@ -587,9 +586,6 @@ internal static class ItemLoader
                 case ItemUseAction.PlantTree:
                     ValidatePlantTree(item, path);
                     break;
-                case ItemUseAction.ConvertMultiblock:
-                    ValidateConvertMultiblock(item, path);
-                    break;
                 case ItemUseAction.LearnParts:
                     ValidateLearnParts(item, path);
                     break;
@@ -709,15 +705,6 @@ internal static class ItemLoader
         if (item.UseFluidId != 0 || item.UseBlockId != 0)
             throw new InvalidOperationException(
                 $"Item '{path}' has use.action 'plant_tree' with a use.fluid or use.block: the ground is read from the aimed cell.");
-    }
-
-    // A converter names no structure: it presses whichever multiblock the clicked cube is the
-    // source of (each anchor's own multiblock.source), so it carries none of the use fields
-    private static void ValidateConvertMultiblock(Item item, string path)
-    {
-        if (item.UseBlockId != 0 || item.UseResultId != 0 || item.UseFluidId != 0)
-            throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'convert_multiblock' with a use.block, use.result or use.fluid: a converter presses any multiblock built from the clicked cube, which each anchor's multiblock.source names.");
     }
 
     // The bucket actions: pour or scoop a fluid block, morphing into the use.result item.

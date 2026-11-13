@@ -19,8 +19,6 @@ internal sealed class StubItemUseWorld : IItemUseWorld
     public Vector3 RaycastHit { get; set; }
     public Vector3 RaycastNormal { get; set; }
 
-    public List<(Vector3 Cell, Vector3 Normal, ushort SourceId, ushort AnchorId)> ConvertCalls { get; } = new();
-    public bool ConvertResult { get; set; }
 
     public List<(int, int, int)> IgnitedKilns { get; } = new();
     public bool CanIgniteKilnResult { get; set; }
@@ -111,12 +109,6 @@ internal sealed class StubItemUseWorld : IItemUseWorld
         if (!CanIgniteKilnResult) return false;
         IgnitedKilns.Add((x, y, z));
         return true;
-    }
-
-    public bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, ushort sourceId, ushort anchorId)
-    {
-        ConvertCalls.Add((hitCell, hitNormal, sourceId, anchorId));
-        return ConvertResult;
     }
 
     public bool IsPrimedTntBlock(ushort id) => false;

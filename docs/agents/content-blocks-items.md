@@ -163,12 +163,12 @@ also why a multiblock face may carry no `cullface` and may not cover a whole cel
 per-corner AO path indexes neighbor deltas by `Chunk.CubeFaces` corner order, which rotation
 breaks, so a multiblock shades flat on every facing.
 
-**Conversion** is a right-click with an item whose `use.action` is `convert_multiblock`
-(`ConvertMultiblockItem` -> `BlockEditor.TryConvertMultiblock` -> `MultiblockPlacement.TryFindVolume`).
-The converter names no structure: it tries every multiblock anchor in id order with that anchor's
+**Conversion** is a right-click with a bare hand
+(`BlockInteractions.TryConvertMultiblockByHand` -> `BlockEditor.TryConvertMultiblock` -> `MultiblockPlacement.TryFindVolume`).
+It names no structure: it tries every multiblock anchor in id order with that anchor's
 own source block and size, and the first whose volume the clicked cell belongs to is converted
 (2x2x2 `mud_bricks` into the kiln, 3x3x3 `alloy_bricks` into the alloy furnace), so a new structure
-needs no converter edit, and no two structures may share a source block. The clicked cell lies
+needs no conversion edit, and no two structures may share a source block. The clicked cell lies
 on the volume's front face and the volume always extends **into** the face that was hit, away
 from the player; which of the volumes whose front face holds that cell is taken is decided in
 screen terms, where `right = Cross(screenUp, hitNormal)`: the one reaching farthest right wins,
@@ -482,11 +482,10 @@ right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.Dispatc
 
 | field | meaning |
 |---|---|
-| `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item), `place_fluid` (pour one into the targeted cell), `place_stack` (build a stack block up), `ignite_campfire` (strike a branch pile, or a kiln that has fuel), `convert_multiblock` (turn a volume of the anchor's size into a structure), `heal` (restore health to the user, refused at full health), `grow_tree` (grow the tree the aimed cell belongs to, `AshGrowthPulses` pulses), `restore_mana` (refill the `restoresMana` share of the mana pool, one unit spent, refused at a full pool) `learn_parts` (a teaching scroll: learn the spell parts in `teaches`, spending one; creative spends none, and a scroll that teaches nothing new is refused and kept) or `summon` (wake the boss `use.entity` names at the aimed cell, the dragonfly wing's sandworm; refused, and not spent, off desert sand or with one alive) |
+| `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item), `place_fluid` (pour one into the targeted cell), `place_stack` (build a stack block up), `ignite_campfire` (strike a branch pile, or a kiln that has fuel), `heal` (restore health to the user, refused at full health), `grow_tree` (grow the tree the aimed cell belongs to, `AshGrowthPulses` pulses), `restore_mana` (refill the `restoresMana` share of the mana pool, one unit spent, refused at a full pool) `learn_parts` (a teaching scroll: learn the spell parts in `teaches`, spending one; creative spends none, and a scroll that teaches nothing new is refused and kept) or `summon` (wake the boss `use.entity` names at the aimed cell, the dragonfly wing's sandworm; refused, and not spent, off desert sand or with one alive) |
 | `use.pose` | the pose held while a `use.seconds` charge runs: `raise` (default, the hand presenting the item) or `bow` (`UsePose`, `BowPose`): the item arm out forward, the other arm drawn to the cheek as the charge rises, the shoulders turned side-on, holding at full draw until the button is let go (the use never runs by itself; `RightClickAction.UpdateUseCharge`), then the string arm snaps back and the body settles. Needs `use.seconds`. The `bow` item has no shot yet (`F-4`), and a remote player is not shown drawing one (the draw is not on the wire) |
 | `use.seconds` | seconds holding right-click takes before the use runs: the world charges a use pose (`PlayerModel.StartUseCharge`/`ThrowPose.WithUse`) and only runs the use at completion, so letting go early cancels it and spends nothing (`RightClickAction.TryBeginUseCharge`/`UpdateUseCharge`/`CancelUseCharge`, the twin of `ThrowAction`'s throw charge). 0 (omitted) keeps the old instant use. The firestarter's `useDelay` stays the cooldown after a use |
 | `use.block` | for `place_stack`, the stack block it builds; for `ignite_campfire`, the firepit block |
-| `convert_multiblock` | takes no `use.block`, `use.result` or `use.fluid` (refused naming the file): the converter presses whichever multiblock the clicked cube is the source of (each anchor's `multiblock.source`). It is spent by nothing and never morphs |
 | `use.fluid` | the fluid block the action works on; must be a block with `fluid: true` || `use.result` | the item this one becomes on success; must be an item, and the two normally point at each other |
 | `display` | how the item sits in the right hand: `rotation` as `[pitch, yaw, roll]` degrees (composed yaw, then pitch, then roll), `translation` in blocks of hand space, `scale` as a multiplier; omitted means `{"rotation": [-30, 10, 0]}`, i.e. upright over the hand with a slight sideways cant — the pickaxe yaws to 60 so a tip faces forward, the compass uses rotation `[-60, 0, 0]`, scale `0.67` and a lift to face back up at the holder |
 | `blockDamage` | damage one left-click hit removes from a block's `hardness`; default 0.5 (the bare-hand baseline). Independent of `tool`, which only gates *whether* the block may be mined |

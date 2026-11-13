@@ -36,13 +36,6 @@ public enum ItemUseAction
     IgniteCampfire,
 
     /// <summary>
-    /// Right-clicks a hand-built cube to turn it into the multiblock it is the source of (each
-    /// anchor's <see cref="BlockType.MultiblockSourceId"/>, see <see cref="Multiblock"/>).
-    /// The tool is never consumed and never morphs — the converter is an endless misc item.
-    /// </summary>
-    ConvertMultiblock,
-
-    /// <summary>
     /// Restores health to the player the use runs for (a bandage), spending one unit. Refused
     /// at full health, so the stack is never spent for nothing. On a server the Use intent heals
     /// the sending player's own pool.

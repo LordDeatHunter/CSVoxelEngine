@@ -257,9 +257,6 @@ internal sealed class WorldItemUse : IItemUseWorld
         Interactions.TryTrackKilnAt(x, y, z, out var anchor) && _kilns.Ignite(anchor)
         || Interactions.TryTrackBloomeryAt(x, y, z, out var bloomery) && _world.Smithing.Bloomeries.Ignite(bloomery);
 
-    bool IItemUseWorld.TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, ushort sourceId, ushort anchorId) =>
-        Edits.TryConvertMultiblock(hitCell, hitNormal, sourceId, anchorId, ActiveContext.ViewDirection);
-
     bool IItemUseWorld.IsPrimedTntBlock(ushort id) =>
         BlockType.ById[id]?.OnBreak == BlockBreakAction.PrimeTnt;
 

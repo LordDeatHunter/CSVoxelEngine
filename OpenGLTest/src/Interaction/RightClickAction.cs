@@ -143,6 +143,7 @@ internal sealed class RightClickAction
                                                   || Interactions.TryKilnInteract(maxDistance, player) || Interactions.TryBloomeryInteract(maxDistance, player)
                                                   || Interactions.TryAnvilInteract(maxDistance, player) || Interactions.TryCastInteract(maxDistance, player)
                                                   || Interactions.TryStandCrucible(maxDistance, player)
+                                                  || Interactions.TryConvertMultiblockByHand(maxDistance, player)
                                                   || Interactions.TryToggleOpenable(maxDistance, player))
         {
             LocalPlayer.PunchSwing();

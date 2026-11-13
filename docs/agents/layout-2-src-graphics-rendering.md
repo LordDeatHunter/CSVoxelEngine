@@ -67,7 +67,6 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   drops and recipes resolve both through ItemRegistry
       BucketPickupItem.cs      # scoops a targeted fluid source into the item (empty bucket)
       BucketPlaceItem.cs       # pours a fluid source into the targeted cell (full bucket), becoming the empty item again
-      ConvertMultiblockItem.cs # the converter's right-click: try every multiblock with its own source, convert in place
       CrucibleInventory.cs     # GL-free helper that adds a crucible and hands back its stack
       CrucibleItem.cs          # a vessel whose molten contents ride on its own ItemStack
       FirestarterItem.cs       # the firestarter's own code class: the worked example of a per-item override

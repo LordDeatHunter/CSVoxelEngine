@@ -99,7 +99,6 @@ public static class ItemFactory
             ItemUseAction.PlaceFluid => new BucketPlaceItem(spec),
             ItemUseAction.PlaceStack => new PlaceStackItem(spec),
             ItemUseAction.IgniteCampfire => new IgniteItem(spec),
-            ItemUseAction.ConvertMultiblock => new ConvertMultiblockItem(spec),
             ItemUseAction.Heal => new HealItem(spec),
             ItemUseAction.GrowTree => new GrowTreeItem(spec),
             ItemUseAction.PlantTree => new PlantTreeItem(spec),

@@ -307,12 +307,10 @@ public sealed class ItemDefinition
     public sealed class UseDefinition
     {
         /// <summary><c>pickup_fluid</c>, <c>place_fluid</c>, <c>place_stack</c>,
-        /// <c>ignite_campfire</c> or <c>convert_multiblock</c>.</summary>
+        /// or <c>ignite_campfire</c>.</summary>
         public string? Action { get; set; }
 
-        /// <summary>Item the use swaps this one for, e.g. <c>item/water_bucket</c>. A
-        /// <c>convert_multiblock</c> converter names none: it presses whichever multiblock the
-        /// clicked cube is the source of.</summary>
+        /// <summary>Item the use swaps this one for, e.g. <c>item/water_bucket</c>.</summary>
         public string? Result { get; set; }
 
         /// <summary>Fluid block the action picks up or places, e.g. <c>block/water</c>.</summary>

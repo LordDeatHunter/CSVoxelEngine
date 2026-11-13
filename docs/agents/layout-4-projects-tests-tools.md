@@ -124,7 +124,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   SupportTestWorld
   ItemDebugger/                # the OpenGLTest.ItemDebugger project: the timeline, the
                                #   preview states, the display editor and its JSON writer
-  Items/                       # item uses (acorn, converter, firestarter, heal, grow-tree,
+  Items/                       # item uses (acorn, firestarter, heal, grow-tree,
                                #   timed use), the staff slot binding and the hierarchy; its own helper StubItemUseWorld
   Juice/                       # game-feel rules: blast shake, damage direction and fringe,
                                #   hit-stop, the vignette, pops, FOV and tilt, droplets, tool shatter

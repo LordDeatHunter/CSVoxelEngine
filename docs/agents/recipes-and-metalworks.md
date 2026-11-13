@@ -272,7 +272,7 @@ save and the station broadcast each plumb one object. The flow is crushed iron +
 beside it to keep its bellows going) -> `bloom` -> **anvil** + smithing hammer -> `wrought_iron` + `slag` -> wrought iron
 stacked back on the **anvil** + smithing hammer -> forged parts and armor (**the forge**, below).
 - **The bloomery** (`bloomery` / `bloomery_part`, a 2x2x2 `multiblock` pressed from `bloomery_bricks` by the same
-  converter; it wears the mud brick kiln's model, so its fire burns where `KilnLayout.Kiln` says) is declared by a
+  bare-hand conversion; it wears the mud brick kiln's model, so its fire burns where `KilnLayout.Kiln` says) is declared by a
   `bloomery` object on the anchor block: `{"oreCap", "fuelCap", "ore", "bloom", "slag"}` (`BloomeryProfile`, parsed by
   `BlockSchemaParser.ParseBloomery`, `BlockType.Bloomery`; the three names resolve to ids at load and a missing or unknown
   one throws naming the file, and it is only legal on a multiblock anchor and never with `kiln`). It does **not** reuse
@@ -349,7 +349,7 @@ stacked back on the **anvil** + smithing hammer -> forged parts and armor (**the
 **The alloy furnace** (`alloy_furnace` / `alloy_furnace_part`, `multiblock.size` 3) is the second
 kiln: a 3x3x3 hollow shell of `alloy_bricks` (one mud brick block, a copper and a tin ring each,
 `recipes/alloy_bricks.json`) pressed by the
-same converter, with `{"fuelCap": 8, "meltSpeed": 1.5, "canAlloy": true}`. It is the same
+same bare-hand conversion, with `{"fuelCap": 8, "meltSpeed": 1.5, "canAlloy": true}`. It is the same
 `KilnManager` state, save and wire shape; only its profile and its model differ. Where the render
 pass (`StationPasses.RenderKilns`) draws the crucible, the pending lump and the fuel row, where the
 fire burns (`KilnManager.LitCells`, the flame and point light `AmbientEffects` gathers) and where

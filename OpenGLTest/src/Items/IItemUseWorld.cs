@@ -81,15 +81,6 @@ public interface IItemUseWorld
     /// there is none to light or it is not ready.</summary>
     bool IgniteKiln(int x, int y, int z);
 
-    /// <summary>
-    /// Turns the volume (the anchor's size) of <paramref name="sourceId"/> that the clicked face belongs to
-    /// into the <paramref name="anchorId"/> multiblock, with its opening pointed back at the
-    /// player. The world picks the volume from its own camera (see
-    /// <see cref="MultiblockPlacement.TryFindVolume"/>), so item code passes only the hit.
-    /// False when no candidate volume is whole.
-    /// </summary>
-    bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, ushort sourceId, ushort anchorId);
-
     /// <summary>Whether this block id primes into TNT instead of dropping.</summary>
     bool IsPrimedTntBlock(ushort id);
 

@@ -785,8 +785,6 @@ public class Inventory
             _misc[compass.Id] = _misc.GetValueOrDefault(compass.Id) + 1;
         if (ItemRegistry.FindByName("Obsidian Blade") is { } obsidianBlade)
             _misc[obsidianBlade.Id] = _misc.GetValueOrDefault(obsidianBlade.Id) + 1;
-        if (ItemRegistry.FindByName("Multiblock Converter") is { } converter)
-            _misc[converter.Id] = _misc.GetValueOrDefault(converter.Id) + 1;
         if (ItemRegistry.FindByName("Mud Brick") is { } brick)
             _misc[brick.Id] = _misc.GetValueOrDefault(brick.Id) + 50;
         if (ItemRegistry.FindByName("Coal") is { } coal)

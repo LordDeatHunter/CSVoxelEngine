@@ -17,4 +17,4 @@ title: "Alloy Furnace"
 
 ## How to build
 
-Craft the bricks, stack them into a 3×3×3 cube and right-click a front face with the multiblock converter. The opening ends up facing you.
+Craft the bricks, stack them into a 3×3×3 cube and right-click a front face with a bare hand. The opening ends up facing you.

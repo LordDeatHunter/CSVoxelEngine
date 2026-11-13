@@ -7,7 +7,7 @@
   // z 277..279 (its center a brick, which the conversion hands back). From the eye
   // (157.5, 13.62, 283.5), looking north at the middle of the cube's south face:
   //   cube         the brick cube from the front right
-  //   furnace      the multiblock converter pressed it into an alloy furnace opening south
+  //   furnace      a bare-hand right-click pressed it into an alloy furnace opening south
   //   loaded       eight coal along the back of the hearth, a crucible in front charged with three
   //                copper and one tin ingot (the tin's lump over the rim)
   //   melting      a fire bolt lit it: the flame between the bowl and the fuel, the pool rising
@@ -69,7 +69,6 @@
     { "op": "screenshot", "name": "cube" },
 
     { "op": "teleport", "pos": [157.5, 13.62, 283.5], "yaw": -90, "pitch": -2 },
-    { "op": "give", "block": "multiblock_converter", "count": 1 },
     { "op": "place" },
     { "op": "wait", "seconds": 1 },
     { "op": "teleport", "pos": [160.5, 15.2, 284.5], "yaw": -118, "pitch": -12 },

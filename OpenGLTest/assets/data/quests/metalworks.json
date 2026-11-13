@@ -21,7 +21,7 @@
       "pos": [2, -1],
       "parents": ["mud_bricks"],
       "requirements": [
-        { "type": "craft", "item": "mud_bricks", "count": 4 }
+        { "type": "craft", "item": "mud_bricks", "count": 8 }
       ]
     },
     {
