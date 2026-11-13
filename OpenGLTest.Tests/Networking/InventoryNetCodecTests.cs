@@ -19,7 +19,7 @@ public sealed class InventoryNetCodecTests
     public void AnInventoryRoundTripsThroughTheCodec()
     {
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        var source = new Inventory();
+        var source = TestInventory.Stocked();
         source.Add(stone, 5);
         source.Select(2);
         var data = source.Export();

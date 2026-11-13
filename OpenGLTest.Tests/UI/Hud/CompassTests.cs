@@ -59,7 +59,7 @@ public sealed class CompassTests
 
     [Fact]
     public void CompassShowsOnlyWhileEquippedOnHotbar()
-    {        var inventory = new Inventory();
+    {        var inventory = TestInventory.Stocked();
         var compass = ContentRegistry.RequireItem("compass").Id;
 
         Assert.False(inventory.ContainsInHotbar(compass));

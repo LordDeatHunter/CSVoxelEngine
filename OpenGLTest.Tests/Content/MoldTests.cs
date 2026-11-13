@@ -237,11 +237,11 @@ public sealed class MoldTests
     [Fact]
     public void UncraftThenCraftRoundTripsThroughTheInventory()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var mudball = ContentRegistry.RequireItem("mudball").Id;
         var moldId = ContentRegistry.RequireBlock("mold_pickaxe").Id;
-        Assert.Equal(Inventory.StartingStock, inventory.CountFor(moldId));
-        Assert.Equal(Inventory.StartingStock, inventory.CountFor(ContentRegistry.RequireBlock("mold_axe").Id));
+        Assert.Equal(TestInventory.StartingStock, inventory.CountFor(moldId));
+        Assert.Equal(TestInventory.StartingStock, inventory.CountFor(ContentRegistry.RequireBlock("mold_axe").Id));
 
         var craft = ContentRegistry.RecipeByName("mold_pickaxe")!;
         var uncraft = ContentRegistry.RecipeByName("mudball_from_mold_pickaxe")!;
@@ -256,12 +256,12 @@ public sealed class MoldTests
 
         Assert.True(inventory.TryCraft(uncraft));
         Assert.Equal(3, inventory.CountFor(mudball));
-        Assert.Equal(Inventory.StartingStock - 1, inventory.CountFor(moldId));
+        Assert.Equal(TestInventory.StartingStock - 1, inventory.CountFor(moldId));
         Assert.Contains(craft, inventory.Craftable());
 
         Assert.True(inventory.TryCraft(craft));
         Assert.Equal(0, inventory.CountFor(mudball));
-        Assert.Equal(Inventory.StartingStock, inventory.CountFor(moldId));
+        Assert.Equal(TestInventory.StartingStock, inventory.CountFor(moldId));
     }
 
     [Theory]

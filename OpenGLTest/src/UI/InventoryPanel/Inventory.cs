@@ -40,11 +40,6 @@ public class Inventory
     /// <summary>Gear instances a player carries (see <see cref="GearConfig.GearCapacity"/>); worn pieces count.</summary>
     public const int GearCapacity = GearConfig.GearCapacity;
 
-    /// <summary>Test stock of every placeable block the player spawns with. Every placeable block
-    /// gets this much out of the one shared <see cref="BlockCapacity"/>, so it is kept small
-    /// enough that the whole seed still leaves the pool room to add to as blocks are added.</summary>
-    public const int StartingStock = 20;
-
     private readonly Dictionary<ushort, int> _blocks = new();
     // The ids this player has obtained (the look-at label's "Unknown" rule); filled by Add and
     // saved as names like every other pool
@@ -748,49 +743,13 @@ public class Inventory
 
     private static int Wrap(int index) => ((index % SlotCount) + SlotCount) % SlotCount;
 
-    /// <summary>
-    /// The debug/test inventory: 50 of every placeable block plus the handful of starting tools
-    /// and materials below. A new survival player owns none of it — <see cref="World"/> builds
-    /// an <see cref="Empty"/> pool — so this stock is only what tests and the item debugger open
-    /// with, and the pools it fills are the ones the category-cap tests measure against. It knows no
-    /// spell part.
-    /// </summary>
-    public Inventory() : this(seedTestStock: true)
-    {
-    }
-
     /// <summary>A stockless pool that knows no spell part; a new survival player starts from it plus
     /// the starter kit.</summary>
-    public static Inventory Empty() => new(seedTestStock: false);
+    public static Inventory Empty() => new();
 
-    private Inventory(bool seedTestStock)
+    private Inventory()
     {
         Equipment = new Equipment(this);
-        if (!seedTestStock) return;
-        foreach (var type in BlockType.Types.Values)
-            if (type.HasItem && !type.Fluid)
-                if (type.Lantern) Add(type.Id, 1, autoEquip: false);
-                else _blocks[type.Id] = StartingStock;
-        // One bucket, since water needs one to reach, plus the axe, found by behavior and
-        // display name the way the compass below is.
-        if (ItemRegistry.FindByAction(ItemUseAction.PickupFluid) is { } bucket)
-            _tools.Add(new ItemStack(_nextToolInstance++, bucket));
-        if (ItemRegistry.FindByName("Copper Pickaxe") is { } pickaxe)
-            _tools.Add(new ItemStack(_nextToolInstance++, pickaxe));
-        if (ItemRegistry.FindByName("Copper Axe") is { } axe)
-            _tools.Add(new ItemStack(_nextToolInstance++, axe));
-        // A plain pickup like flint, found by display name. No use action: it only ever
-        // sits on the hotbar for the compass.
-        if (ItemRegistry.FindByName("Compass") is { } compass)
-            _misc[compass.Id] = _misc.GetValueOrDefault(compass.Id) + 1;
-        if (ItemRegistry.FindByName("Obsidian Blade") is { } obsidianBlade)
-            _misc[obsidianBlade.Id] = _misc.GetValueOrDefault(obsidianBlade.Id) + 1;
-        if (ItemRegistry.FindByName("Mud Brick") is { } brick)
-            _misc[brick.Id] = _misc.GetValueOrDefault(brick.Id) + 50;
-        if (ItemRegistry.FindByName("Coal") is { } coal)
-            _misc[coal.Id] = _misc.GetValueOrDefault(coal.Id) + 50;
-        if (ItemRegistry.FindByName("Crushed Copper") is { } crushedCopper)
-            _misc[crushedCopper.Id] = _misc.GetValueOrDefault(crushedCopper.Id) + 50;
     }
 
     /// <summary>One stackable list row: icon, name and the pool count for that id.</summary>

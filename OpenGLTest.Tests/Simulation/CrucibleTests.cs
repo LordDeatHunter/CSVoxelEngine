@@ -107,7 +107,7 @@ public sealed class CrucibleTests
     [Fact]
     public void AddingACrucibleToTheInventoryKeepsEachInstancesContents()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var id = Crucible.Id;
         var ore = MeltOf("malachite_ore");
 
@@ -123,7 +123,7 @@ public sealed class CrucibleTests
             inventory.GetToolStack(second.InstanceId)!.Get<CrucibleComponent>());
 
         // A full tools pool leaves the vessel where it was
-        var full = new Inventory();
+        var full = TestInventory.Stocked();
         var firestarter = ContentRegistry.RequireItem("firestarter").Id;
         while (full.ToolEntries().Count < Inventory.ToolCapacity)
             Assert.True(full.Add(firestarter));

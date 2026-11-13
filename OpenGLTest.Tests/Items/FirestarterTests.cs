@@ -21,7 +21,7 @@ public sealed class FirestarterTests
     public void FirestarterIsAToolSoInstancesNeverStack()
     {
         Assert.Equal(InventoryCategory.Tools, Inventory.CategoryOf(Firestarter));
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         Assert.True(inventory.Add(Firestarter));
         Assert.True(inventory.Add(Firestarter));
         Assert.Equal(2, inventory.ToolEntries().Count(t => t.ItemId == Firestarter));
@@ -30,7 +30,7 @@ public sealed class FirestarterTests
     [Fact]
     public void TenUsesBreakTheFirestarter()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         Assert.True(inventory.Add(Firestarter));
         var instance = Assert.Single(inventory.ToolEntries(), t => t.ItemId == Firestarter).InstanceId;
         for (var i = 0; i < 9; i++)
@@ -44,7 +44,7 @@ public sealed class FirestarterTests
     [Fact]
     public void DurabilityInstancesAreIndependent()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         Assert.True(inventory.Add(Firestarter));
         Assert.True(inventory.Add(Firestarter));
         var tools = inventory.ToolEntries().Where(t => t.ItemId == Firestarter).ToArray();
@@ -57,7 +57,7 @@ public sealed class FirestarterTests
     [Fact]
     public void UseDelayCooldownMarksAndReleases()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         Assert.True(inventory.Add(Firestarter));
         var instance = Assert.Single(inventory.ToolEntries(), t => t.ItemId == Firestarter).InstanceId;
         Assert.True(inventory.ToolReadyAt(instance, 100.0));
@@ -69,7 +69,7 @@ public sealed class FirestarterTests
     [Fact]
     public void BucketsHaveNoDurabilityBar()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var bucket = ContentRegistry.RequireItem("bucket").Id;
         var instance = Assert.Single(inventory.ToolEntries(), t => t.ItemId == bucket).InstanceId;
         Assert.Null(inventory.ToolDurabilityLeft(instance));

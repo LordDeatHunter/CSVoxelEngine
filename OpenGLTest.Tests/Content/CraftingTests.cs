@@ -11,7 +11,7 @@ public sealed class CraftingTests
     [Fact]
     public void TryCraftConsumesIngredientsAndAddsPickaxe()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var baseline = inventory.Craftable();
         var flint = ContentRegistry.RequireItem("flint").Id;
         var branch = ContentRegistry.RequireItem("branch").Id;
@@ -55,7 +55,7 @@ public sealed class CraftingTests
         var recipe = ContentRegistry.RecipeForResult(toolId)!;
         Assert.NotNull(recipe);
 
-        var inventory = new Inventory();
+        var inventory = Inventory.Empty();
         Assert.True(inventory.Add(handle));
         Assert.True(inventory.Add(vine, 2));
         Assert.False(inventory.CanCraft(recipe));
@@ -74,7 +74,7 @@ public sealed class CraftingTests
     [Fact]
     public void LumberCraftsIntoPlanksOnlyWithAFullBundle()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var lumber = ContentRegistry.RequireItem("lumber").Id;
         var planks = ContentRegistry.RequireBlock("oak_planks").Id;
         var recipe = ContentRegistry.RecipeByName("oak_planks_from_lumber")!;
@@ -92,7 +92,7 @@ public sealed class CraftingTests
     [Fact]
     public void TryCraftStillFitsWhenThePoolIsFull()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var flint = ContentRegistry.RequireItem("flint").Id;
         var branch = ContentRegistry.RequireItem("branch").Id;
         var vine = ContentRegistry.RequireItem("vine").Id;
@@ -114,7 +114,7 @@ public sealed class CraftingTests
     [Fact]
     public void TagIngredientPoolsEveryMemberStock()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var cobble = ContentRegistry.RequireBlock("cobblestone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
@@ -128,18 +128,18 @@ public sealed class CraftingTests
 
         // The greedy spend takes stone first: half the stock in crafts drains the stone, and the
         // next one spills over into cobblestone, proving the pool spans both members.
-        for (var i = 0; i < Inventory.StartingStock / 2; i++)
+        for (var i = 0; i < TestInventory.StartingStock / 2; i++)
             Assert.True(inventory.TryCraft(recipe));
         Assert.Equal(0, inventory.CountFor(stone));
-        Assert.Equal(Inventory.StartingStock, inventory.CountFor(cobble));
+        Assert.Equal(TestInventory.StartingStock, inventory.CountFor(cobble));
         Assert.True(inventory.TryCraft(recipe));
-        Assert.Equal(Inventory.StartingStock - 2, inventory.CountFor(cobble));
+        Assert.Equal(TestInventory.StartingStock - 2, inventory.CountFor(cobble));
     }
 
     [Fact]
     public void TryCraftBatchConsumesExplicitMembers()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var flint = ContentRegistry.RequireItem("flint").Id;
         var branch = ContentRegistry.RequireItem("branch").Id;
         var vine = ContentRegistry.RequireItem("vine").Id;
@@ -160,7 +160,7 @@ public sealed class CraftingTests
     [Fact]
     public void BatchCraftRefusesAPickWithoutStock()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var flint = ContentRegistry.RequireItem("flint").Id;
         var branch = ContentRegistry.RequireItem("branch").Id;
         var vine = ContentRegistry.RequireItem("vine").Id;
@@ -180,7 +180,7 @@ public sealed class CraftingTests
     [Fact]
     public void SessionFeedsThenCraftsWithoutTakingUntilCraft()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
         var recipe = new CraftingRecipe("test_feed",
@@ -207,7 +207,7 @@ public sealed class CraftingTests
     [Fact]
     public void SessionBatchScalesNeedsAndResults()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
         var recipe = new CraftingRecipe("test_batch",
@@ -229,7 +229,7 @@ public sealed class CraftingTests
     [Fact]
     public void SessionClearsFedWhenSwitchingRecipes()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
         var first = new CraftingRecipe("test_first",
@@ -245,13 +245,13 @@ public sealed class CraftingTests
         session.Select(second);
         Assert.Equal(0, session.FedAt(0).Count);
         Assert.Equal(1, session.Batch);
-        Assert.Equal(Inventory.StartingStock, inventory.CountFor(stone));
+        Assert.Equal(TestInventory.StartingStock, inventory.CountFor(stone));
     }
 
     [Fact]
     public void SessionFeedsTaggedMembersByChoice()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var cobble = ContentRegistry.RequireBlock("cobblestone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
@@ -268,13 +268,13 @@ public sealed class CraftingTests
         var cobbleBefore = inventory.CountFor(cobble);
         Assert.True(session.Craft(inventory));
         Assert.Equal(cobbleBefore - 1, inventory.CountFor(cobble));
-        Assert.Equal(Inventory.StartingStock, inventory.CountFor(stone));
+        Assert.Equal(TestInventory.StartingStock, inventory.CountFor(stone));
     }
 
     [Fact]
     public void SessionFeedFromInventoryTargetsNeedySlots()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
         var recipe = new CraftingRecipe("test_slots", dirt, 1,

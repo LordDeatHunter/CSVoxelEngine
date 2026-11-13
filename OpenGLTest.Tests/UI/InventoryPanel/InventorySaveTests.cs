@@ -133,7 +133,7 @@ public sealed class InventorySaveTests
     [Fact]
     public void ExportImportRoundTripsEveryPoolToolAndSlot()
     {
-        var a = new Inventory();
+        var a = TestInventory.Stocked();
         a.EquipStackable(0, Stone);
         a.Select(0);
         for (var i = 0; i < 3; i++)
@@ -165,7 +165,7 @@ public sealed class InventorySaveTests
         a.Select(4);
 
         var data = a.Export();
-        var b = new Inventory();
+        var b = TestInventory.Stocked();
         b.Import(data);
 
         foreach (var id in ItemRegistry.ById.Keys)
@@ -192,11 +192,11 @@ public sealed class InventorySaveTests
     [Fact]
     public void ImportReplacesRatherThanMerges()
     {
-        var data = new Inventory().Export();
+        var data = TestInventory.Stocked().Export();
         var omitted = data.Blocks!.First(s => SaveNames.TryResolve(s.Name, out var id) && id == Stone);
         data.Blocks!.Remove(omitted);
 
-        var b = new Inventory();
+        var b = TestInventory.Stocked();
         Assert.True(b.CountFor(Stone) > 0);
         b.Import(data);
 
@@ -225,7 +225,7 @@ public sealed class InventorySaveTests
             ],
         };
 
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         inventory.Import(data);
 
         Assert.Equal(7, inventory.CountFor(Stone));
@@ -248,7 +248,7 @@ public sealed class InventorySaveTests
                 .Select(i => new PlayerSaveData.ToolData { InstanceId = i, Name = toolName })
                 .ToList(),
         };
-        var full = new Inventory();
+        var full = TestInventory.Stocked();
         full.Import(overfull);
         Assert.True(full.UsedOf(InventoryCategory.Blocks) <= Inventory.CapacityOf(InventoryCategory.Blocks));
         Assert.True(full.UsedOf(InventoryCategory.Tools) <= Inventory.ToolCapacity);
@@ -265,7 +265,7 @@ public sealed class InventorySaveTests
             ],
             NextToolInstance = 1,
         };
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         inventory.Import(shared);
         var restored = inventory.ToolEntries().Select(t => t.InstanceId).ToArray();
         Assert.Equal(restored.Distinct().Count(), restored.Length);

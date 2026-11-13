@@ -62,7 +62,7 @@ public sealed class GameplayTests
     [Fact]
     public void InventoryAddAndConsumeRoundtrip()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         inventory.Select(0);
         inventory.EquipStackable(0, stone);
@@ -80,7 +80,7 @@ public sealed class GameplayTests
     [Fact]
     public void InventoryMorphSwapsBucketForWaterBucketInPlace()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var bucket = ContentRegistry.RequireItem("bucket").Id;
         var filled = ContentRegistry.RequireItem("water_bucket").Id;
         var instance = Assert.Single(inventory.ToolEntries(), t => t.ItemId == bucket).InstanceId;
@@ -93,7 +93,7 @@ public sealed class GameplayTests
     [Fact]
     public void InventoryScrollWrapsAround()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         inventory.Select(0);
         inventory.Scroll(1);
         Assert.Equal(Inventory.SlotCount - 1, inventory.SelectedIndex);

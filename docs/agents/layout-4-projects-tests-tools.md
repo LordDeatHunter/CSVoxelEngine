@@ -62,7 +62,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   GlobalUsings.cs                     # VoxelEngine.Core, VoxelEngine.Chunks, VoxelEngine.Content and VoxelEngine.Tests.Support
   Support/                     # cross-area fixtures: TestContent (the headless content load, and
                                #   SwapIn/RestoreReal for the registry-swap tests), SyntheticContentRoot (a
-                               #   temp asset root with N extra stone copies, so ids pass 255),
+                               #   temp asset root with N extra stone copies, so ids pass 255), TestInventory (a pre-stocked Inventory),
                                #   MeshTestWorld, MobTestWorld, FlatWorldSource, StampedTree,
                                #   WideTreeSpecies, TreeWorldgenFixture, IcebergTestWorld (a hand-built sea with a
                                #   pack-ice strip), StubTarget, BoxSolids, SkyZoneFinder (sky zones under the seed),

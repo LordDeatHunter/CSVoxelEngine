@@ -12,7 +12,7 @@ public sealed class PanelTabLabelsTests
     [Fact]
     public void ASurvivalCraftTabCountsTheRecipesItListsAndNamesNoTotal()
     {
-        foreach (var inventory in new[] { Inventory.Empty(), new Inventory() })
+        foreach (var inventory in new[] { Inventory.Empty(), TestInventory.Stocked() })
         {
             var subtitle = PanelTabLabels.Subtitle(inventory, InventoryCategory.Crafting, creative: false);
             Assert.Equal(inventory.ListedRecipes(creative: false).Count.ToString(), subtitle);
@@ -23,7 +23,7 @@ public sealed class PanelTabLabelsTests
     [Fact]
     public void ACreativeCraftTabCountsAgainstEveryRecipe()
     {
-        var subtitle = PanelTabLabels.Subtitle(new Inventory(), InventoryCategory.Crafting, creative: true);
+        var subtitle = PanelTabLabels.Subtitle(TestInventory.Stocked(), InventoryCategory.Crafting, creative: true);
         Assert.EndsWith($"/{ContentRegistry.CraftingRecipes.Count}", subtitle);
     }
 }

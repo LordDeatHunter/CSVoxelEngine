@@ -12,7 +12,7 @@ public sealed class InventoryTests
     [Fact]
     public void BlocksShareOnePoolAcrossIds()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
 
@@ -25,7 +25,7 @@ public sealed class InventoryTests
     [Fact]
     public void PlacingFreesPoolRoomForAnyBlock()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
         inventory.Add(stone, Inventory.BlockCapacity - inventory.UsedOf(InventoryCategory.Blocks));
@@ -43,7 +43,7 @@ public sealed class InventoryTests
     [Fact]
     public void HotbarSlotsSharePoolCounts()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         inventory.EquipStackable(0, stone);
         inventory.EquipStackable(3, stone);
@@ -60,7 +60,7 @@ public sealed class InventoryTests
     [Fact]
     public void EquippingTheShownIdClearsTheSlot()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
 
@@ -77,7 +77,7 @@ public sealed class InventoryTests
     [Fact]
     public void ToolsAreCappedInstancesThatMorphTogether()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var bucket = ContentRegistry.RequireItem("bucket").Id;
         var filled = ContentRegistry.RequireItem("water_bucket").Id;
 
@@ -96,7 +96,7 @@ public sealed class InventoryTests
     [Fact]
     public void DifferentToolInstancesMorphIndependently()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var bucket = ContentRegistry.RequireItem("bucket").Id;
         var filled = ContentRegistry.RequireItem("water_bucket").Id;
         Assert.True(inventory.Add(bucket));
@@ -114,7 +114,7 @@ public sealed class InventoryTests
     [Fact]
     public void RemovingAToolEmptiesItsSlots()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var instance = inventory.ToolEntries()[0].InstanceId;
         inventory.EquipTool(0, instance);
         inventory.EquipTool(3, instance);
@@ -128,7 +128,7 @@ public sealed class InventoryTests
     [Fact]
     public void MiscSharesItsOwnPool()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var flint = ContentRegistry.RequireItem("flint").Id;
         var vine = ContentRegistry.RequireItem("vine").Id;
 
@@ -150,13 +150,13 @@ public sealed class InventoryTests
         Assert.Equal(InventoryCategory.Blocks, Inventory.CategoryOf(log));
         Assert.Equal(InventoryCategory.Tools, Inventory.CategoryOf(bucket));
         Assert.Equal(InventoryCategory.Blocks, Inventory.CategoryOf(stone));
-        Assert.False(new Inventory().CanAccept(water));
+        Assert.False(TestInventory.Stocked().CanAccept(water));
     }
 
     [Fact]
     public void PickBlockSelectsHotbarSlotHoldingTarget()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
         inventory.EquipStackable(0, stone);
@@ -173,7 +173,7 @@ public sealed class InventoryTests
     [Fact]
     public void PickBlockEquipsTargetFromPoolIntoSelectedSlot()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
         inventory.EquipStackable(0, stone);
@@ -201,7 +201,7 @@ public sealed class InventoryTests
     [Fact]
     public void PickBlockDoesNothingWhenTargetInNeitherPoolNorHotbar()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var water = ContentRegistry.RequireBlock("water").Id;
         var stone = ContentRegistry.RequireBlock("stone").Id;
         inventory.EquipStackable(0, stone);
@@ -215,7 +215,7 @@ public sealed class InventoryTests
     [Fact]
     public void PickBlockDoesNothingForAir()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         Assert.False(inventory.PickBlock(0));
         Assert.Equal(0, inventory.SelectedIndex);
     }
@@ -223,7 +223,7 @@ public sealed class InventoryTests
     [Fact]
     public void ThePanelRowsAreSortedByNameThenCount()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var dirt = ContentRegistry.RequireBlock("dirt").Id;
         var flint = ContentRegistry.RequireItem("flint").Id;

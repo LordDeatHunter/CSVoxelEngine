@@ -95,7 +95,7 @@ public sealed class ItemHierarchyTests
     [Fact]
     public void SetItemMorphsInPlaceAndTopsDurabilityUp()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var instance = Assert.Single(inventory.ToolEntries(), t => t.ItemId == ItemId("bucket")).InstanceId;
         var filled = ItemId("water_bucket");
 

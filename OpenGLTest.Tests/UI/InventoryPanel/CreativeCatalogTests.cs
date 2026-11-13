@@ -21,7 +21,7 @@ public sealed class CreativeCatalogTests
             .Select(i => i.Id)
             .ToHashSet();
 
-        var actual = CreativeCatalog.Entries(category, new Inventory())
+        var actual = CreativeCatalog.Entries(category, TestInventory.Stocked())
             .Select(e => e.Id)
             .ToHashSet();
 
@@ -33,7 +33,7 @@ public sealed class CreativeCatalogTests
     {
         var water = ContentRegistry.RequireBlock("water").Id;
 
-        var blocks = CreativeCatalog.Entries(InventoryCategory.Blocks, new Inventory());
+        var blocks = CreativeCatalog.Entries(InventoryCategory.Blocks, TestInventory.Stocked());
 
         Assert.DoesNotContain(blocks, e => e.Id == water);
     }
@@ -41,7 +41,7 @@ public sealed class CreativeCatalogTests
     [Fact]
     public void EntriesAreNameSorted()
     {
-        var entries = CreativeCatalog.Entries(InventoryCategory.Blocks, new Inventory());
+        var entries = CreativeCatalog.Entries(InventoryCategory.Blocks, TestInventory.Stocked());
 
         for (var i = 1; i < entries.Count; i++)
             Assert.True(string.Compare(entries[i - 1].Name, entries[i].Name,
@@ -51,7 +51,7 @@ public sealed class CreativeCatalogTests
     [Fact]
     public void EntriesReportTheOwnedCount()
     {
-        var stock = CreativeCatalog.Entries(InventoryCategory.Blocks, new Inventory());
+        var stock = CreativeCatalog.Entries(InventoryCategory.Blocks, TestInventory.Stocked());
         var empty = CreativeCatalog.Entries(InventoryCategory.Blocks, Inventory.Empty());
         var stone = ContentRegistry.RequireBlock("stone").Id;
 

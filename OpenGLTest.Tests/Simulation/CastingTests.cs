@@ -62,7 +62,7 @@ public sealed class CastingTests
         var recipe = ContentRegistry.CastRecipeFor(moldId, Copper)!;
         Assert.NotNull(recipe);
 
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stack = CrucibleInventory.Add(inventory, Crucible.Id,
             new CrucibleComponent(Copper, moltenMl < 0 ? recipe.AmountMl * 2 : moltenMl, 0));
         Assert.NotNull(stack);
@@ -147,7 +147,7 @@ public sealed class CastingTests
         var recipe = ContentRegistry.CastRecipeFor(basin, glass)!;
         Assert.NotNull(recipe);
 
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var start = recipe.AmountMl * 2;
         var stack = CrucibleInventory.Add(inventory, Crucible.Id, new CrucibleComponent(glass, start, 0))!;
         var chunks = MoldWorld(basin);

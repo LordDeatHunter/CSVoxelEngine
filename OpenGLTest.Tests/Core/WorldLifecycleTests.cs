@@ -292,7 +292,7 @@ public sealed class WorldLifecycleTests : IDisposable
     public void StoreBackedWorldLoadsRestoresThePlayerThenPlays()
     {
         // An exported inventory with one block pool (not the stone thrown below) changed
-        var source = new Inventory();
+        var source = TestInventory.Stocked();
         var exported = source.Export();
         var changed = exported.Blocks!.First(s =>
             SaveNames.TryResolve(s.Name, out var id) && id != TerrainGenerator.RockBlock && s.Count > 1);

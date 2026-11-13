@@ -37,7 +37,7 @@ public sealed class QuernTests
     {
         var recipe = ContentRegistry.RecipeByName("quern");
         Assert.NotNull(recipe);
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var quernBefore = inventory.CountFor(Quern);
         var cobbleBefore = inventory.CountFor(Cobblestone);
         Assert.True(inventory.Add(Cobblestone, 20));

@@ -92,7 +92,7 @@ public sealed class HotbarNameFadeTests
     public void AnInventorySwitchNamesTheNewlySelectedItem()
     {
         TestContent.EnsureLoaded();
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var blocks = BlockType.Types.Values.Where(t => t.HasItem && !t.Fluid).Take(2).ToArray();
         inventory.EquipStackable(0, blocks[0].Id);
         inventory.EquipStackable(1, blocks[1].Id);

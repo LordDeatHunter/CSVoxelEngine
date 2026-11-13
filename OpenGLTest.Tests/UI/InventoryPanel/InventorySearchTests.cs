@@ -13,7 +13,7 @@ public sealed class InventorySearchTests
     [Fact]
     public void EmptyQueryMatchesNothing()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
 
         Assert.Empty(InventorySearch.Search(null, inventory));
         Assert.Empty(InventorySearch.Search("", inventory));
@@ -23,7 +23,7 @@ public sealed class InventorySearchTests
     [Fact]
     public void FindsAnOwnedBlockByItsName()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone");
 
         var hits = InventorySearch.Search(stone.DisplayName, inventory);
@@ -36,7 +36,7 @@ public sealed class InventorySearchTests
     [Fact]
     public void MatchingIsCaseInsensitive()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone");
 
         var hits = InventorySearch.Search(stone.DisplayName.ToUpperInvariant(), inventory);
@@ -47,7 +47,7 @@ public sealed class InventorySearchTests
     [Fact]
     public void FindsARecipeByItsResultName()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var pickaxe = ContentRegistry.RequireItem("primitive_pickaxe");
 
         var hits = InventorySearch.Search(Inventory.DisplayName(pickaxe.Id), inventory, creative: true);
@@ -58,7 +58,7 @@ public sealed class InventorySearchTests
     [Fact]
     public void FindsARecipeByAnIngredientName()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var flint = ContentRegistry.RequireItem("flint");
 
         var hits = InventorySearch.Search(Inventory.DisplayName(flint.Id), inventory, creative: true);
@@ -70,7 +70,7 @@ public sealed class InventorySearchTests
     [Fact]
     public void ASurvivalSearchOnlyFindsTheRecipesTheCraftTabLists()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var listed = inventory.ListedRecipes(creative: false);
 
         foreach (var letter in "aeiou")
@@ -101,7 +101,7 @@ public sealed class InventorySearchTests
     [Fact]
     public void TheScopeKeepsOnlyTheItemsOrOnlyTheRecipes()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var pickaxe = ContentRegistry.RequireItem("primitive_pickaxe");
         var query = Inventory.DisplayName(pickaxe.Id);
 
@@ -141,7 +141,7 @@ public sealed class InventorySearchTests
     [Fact]
     public void FindsAnOwnedToolWithALiveInstance()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var bucket = ContentRegistry.RequireItem("bucket");
 
         var hits = InventorySearch.Search(Inventory.DisplayName(bucket.Id), inventory);
@@ -154,7 +154,7 @@ public sealed class InventorySearchTests
     [Fact]
     public void ListsEveryInstanceOfANonStackableTool()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var bucket = ContentRegistry.RequireItem("bucket");
         inventory.Add(bucket.Id, 2, autoEquip: false);
         var owned = inventory.ToolEntries().Count(t => t.ItemId == bucket.Id);
@@ -170,7 +170,7 @@ public sealed class InventorySearchTests
     [Fact]
     public void PrefixMatchesRankAheadOfSubstrings()
     {
-        var inventory = new Inventory();
+        var inventory = TestInventory.Stocked();
         var stone = ContentRegistry.RequireBlock("stone");
 
         var hits = InventorySearch.Search(stone.DisplayName, inventory);
