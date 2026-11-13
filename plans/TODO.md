@@ -5,7 +5,7 @@
 ## Status
 
 Gameplay and content only: performance is in `PERF.md`, tree residue in `TREES.md`, and
-architecture, content schema and threading rules in `AGENTS.md`. Last updated 2026-11-10.
+architecture, content schema and threading rules in `AGENTS.md`. Last updated 2026-11-13.
 **Current priority:** playable loop first. Finish the Act I survival floor (Milestone 1:
 persistence, furnace, metal tiers, forge, armor), then the first dungeon slice (Milestone 2), then
 one slice per remaining arc to prove the dual identity. No food/hunger system is planned.
@@ -252,6 +252,38 @@ single-arc player.
   `docs/agents/realm-mobs.md` "Spiders"); the den, a use for silk and a unique broodmother drop do not.
   *Hook:* `CaveMobManager` (a den spawner beside the cave ring; `Spider.BroodmotherEntityName` is only raised by the
   `spawn` op today), the structure sites in `docs/agents/layers-and-structures.md`.
+- [ ] **`P-61` · Beach crabs** — P2, M.
+  A neutral beach mob about one block across that turns on whoever hurts it. The entity, model and clips exist and
+  nothing drives them yet (`assets/data/entities/crab.json`, `crab.bbmodel`; contract in
+  `docs/agents/entities.md` "Modeled, not wired"). Still to build: a class (an `Animal` row in `WildlifeSpecies`, the
+  boar's neutral-until-hurt rule, `threaten` on aggro and `pinch` at its `impact`), a beach spawn rule (sand columns
+  beside the sea, day and night), the choice between the forward `walk` and the sideways `scuttle` (which needs the
+  body turned a quarter off its heading, and plays backwards to go left), whether the legs stay clip-driven or are
+  solved by `CrawlerLegs` (they follow its contract), a loot table (crab meat or a claw: items and sprites), the
+  `spawn` op name, saves and a `NetEntityKind`. Later: size variants (the model is the 1-block one), burrowing into
+  sand, a hermit variant.
+  *Hook:* `Entities/Wildlife/` (`WildlifeSpecies`, `WildlifeManager`), `Boar` for the aggro rule.
+- [ ] **`P-62` · Corpse bloom** — P2, M. *(needs the jungle, `BIOMEGEN.md`)*
+  A rooted jungle enemy that never moves: closed until a target comes near (`closed`), it opens (`idle`) and
+  bursts a poison cloud (`spew`, the cloud at `impact`). The entity, model and clips exist and nothing drives them
+  yet (`corpse_bloom.json`, `corpse_bloom.bbmodel`). Still to build: a static mob class (no locomotion, no
+  knockback), the **poison cloud** as a lingering area (a sphere of a few blocks that drifts and thins over some
+  seconds, drawn as particles; anyone inside is given a `poison` status effect each tick, so the area and the
+  particles are one object and a client can mirror it), the `poison` effect file itself (or reuse `venom`), immunity
+  of the bloom to its own cloud, a worldgen or spawn rule on the jungle floor, loot, the `spawn` op, saves and wire.
+  *Hook:* the sporeling's burst (`spore`, `docs/agents/realm-mobs.md`) is the nearest shipped sibling;
+  `StatusEffectRegistry`, the particle systems in `docs/agents/rendering.md`.
+- [ ] **`P-63` · Giant centipede** — P2, L. *(needs the jungle, `BIOMEGEN.md`)*
+  A long jungle hunter of many segments whose legs are solved against the ground. The entity, model and clips exist
+  and nothing drives them yet (`centipede.json`, `centipede.bbmodel`: `Head`, `Segment1..10` each with a leg pair,
+  `Tail`). Still to build: the body as a chain (each segment trails the one ahead along the head's path, like the
+  sandworm's, but on the ground and over steps), per-segment hit testing on one health pool, inverse kinematics for
+  twenty legs (`LegIk.Solve` and the hold probing of `CrawlerLegs`, generalized from four legs a side on one body to
+  one pair per segment, in the segment's space), the metachronal stepping order the `walk` clip shows, a bite at
+  `impact` with venom, whether it climbs like the crawlers, spawn rule, loot, the `spawn` op, saves and wire (a
+  chain needs more than one pose on the wire, see the sandworm). Later: a rearing threat clip, length variants
+  (the segments are identical, so a shorter or longer model is the same rig).
+  *Hook:* `Entities/Crawlers/` (`CrawlerRig`, `CrawlerLegs`, `LegIk`), the sandworm's chain (`plans/SANDWORM.md`).
 - [ ] **`P-56` · Ocean & island content** — P3, M.
   Islands, shipwrecks, reefs, deep-sea POIs; makes the ocean a destination rather than a border.
   Ties `F-19`.

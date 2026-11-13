@@ -3,7 +3,7 @@
 > Every stand-in asset an agent adds goes here: the file, what made it, and what a replacement has
 > to keep. Tick an entry and delete it once the real art is in. If a `tools/` generator wrote the
 > file, remove or repoint that generator in the same change, or a re-run puts the placeholder back.
-> Current list as of 2026-11-09. Sound is not tracked here: features that need it wait in
+> Current list as of 2026-11-13. Sound is not tracked here: features that need it wait in
 > `plans/TODO.md` (`M-26`).
 
 ## Items
@@ -271,6 +271,14 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   `Tail4` > `Stinger`, the claws `ArmL/R` > `ClawL/R` > `PincerL/R` under `Body`, the clips `idle`, `walk`, `pinch` and
   `sting` (each with `impact`), `hurt` (starts and ends at the identity), `death` (must outlast the 0.8 s death) and
   `spawn`, and per-face UVs.
+- [ ] **Crab, Corpse Bloom and Giant Centipede** — `crab.bbmodel` (an orange beach crab about a block across,
+  64x32 skin), `corpse_bloom.bbmodel` (a carrion flower: four two-part petals round a spadix, 128x32 skin) and
+  `centipede.bbmodel` (ten dark segments with yellow legs, a red head and tail, 128x64 skin). Built and saved in
+  Blockbench 5 through its MCP plugin (no generator, the skin embedded, flat speckled colors packed face by face):
+  edit them in Blockbench. No class reads them yet (`plans/TODO.md` `P-61`..`P-63`), so nothing is checked at
+  startup; the group and clip names the wiring will ask for are in `docs/agents/entities.md` "Modeled, not wired".
+  No rest rotations anywhere (the loader has none): the legs, petals, antennae and tail prongs lie flat along an
+  axis and the `idle` clip poses them.
 - [ ] **Boar and Dire Boar** — `boar.bbmodel` (a wild boar, 64x64 skin) and `dire_boar.bbmodel` (the oversized
   miniboss: charcoal hide, scars, bone spikes, red eyes, 128x128 skin). Built and saved in Blockbench 5 through its
   MCP plugin, so there is **no generator and no PNG beside them** (the skin is embedded): edit them in Blockbench.

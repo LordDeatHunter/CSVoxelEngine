@@ -1,0 +1,8 @@
+{
+  "name": "Giant Centipede",
+  // The jungle's many-legged hunter: a chain of segments whose leg pairs are meant to be solved against the ground.
+  // Model and clips only so far; nothing spawns or drives it yet (plans/TODO.md P-63)
+  "blood": { "color": [170, 200, 50] },
+  "hp": 70,
+  "model": "assets/models/entity/centipede.bbmodel"
+}

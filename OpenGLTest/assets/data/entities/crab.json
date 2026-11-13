@@ -1,0 +1,8 @@
+{
+  "name": "Crab",
+  // The beach's scuttler, about a block across: neutral until hurt, then it raises its claws and pinches.
+  // Model and clips only so far; nothing spawns or drives it yet (plans/TODO.md P-61)
+  "blood": { "color": [70, 120, 210] },
+  "hp": 14,
+  "model": "assets/models/entity/crab.bbmodel"
+}

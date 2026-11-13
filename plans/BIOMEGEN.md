@@ -18,7 +18,7 @@ phase E's great-lake river ramps and outflows. Each is documented where it lives
 fold), §6 (each mechanism), §7 (constants), §9 (invariants 11-17), §10 (tests), §11 (limits). Their
 perf numbers are in `PERF.md`, their shots in `visual-examples/terrain-shape.json`. Also done: the
 cave biomes, a 3D cave biome field under the surface biomes (§12; tracked in `CAVE_BIOMES.md`).
-Last updated 2026-11-09.
+Last updated 2026-11-13.
 
 ## In progress
 
@@ -29,6 +29,7 @@ Nothing.
 Phase E polish, none started, in rough priority order. Each keeps the skill's principles and goes
 through plan-and-implement as its own phase; knob names are proposals.
 
+- [ ] **Jungle biome.** A hot, wet biome (the top corner of the temperature and humidity ramps, beyond the forest) with dense tall canopy, undergrowth and its own mobs. It is the home of three things that are modeled and waiting: the corpse bloom (`P-62`), the giant centipede (`P-63`) and a second haunt for the dragonfly, which today keeps to the waterside. Needs the full new-biome checklist of the `biome-worldgen` skill (weights, dither, tint, LOD palette, trees in `TREES.md`) and goes through plan-and-implement as its own phase.
 - [ ] **Desert mesa or butte.** A flat-topped lone peak on the dune profile (clamp the profile at a hashed cap height). The site helper exists, but a peak must not be summed into sand: massifs and lone peaks reject any ocean or desert weight today (§11).
 - [ ] **Plateaus and terraces.** Quantize a low-frequency height term into steps with `smoothstep` risers under a rarity mask, so an area reads as tablelands (badlands in the desert). Lowest priority.
 - [ ] **Scree or gravel band** between the rock line and the snow line on a massif.

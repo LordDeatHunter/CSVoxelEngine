@@ -284,6 +284,29 @@ share every `MobLavaTickSeconds` with the hit flash, a death it causes rolling l
 heightmap) stops a step or a hop that would land more than `MobLedgeMaxDropBlocks` down unless the
 target stands lower (`LedgeCautionTests`).
 
+### Modeled, not wired
+
+Three entities have an entity file, a Blockbench model and clips but **no class, spawn rule, loot or wire kind**: they
+load and show in the item debugger's ENTITIES tab, and nothing in the game raises them. All three were built in
+Blockbench through its MCP plugin (no generator, the skin embedded; `USER_TODO.md`), face -Z, stand on y = 0 and have
+no rest rotations, so parts the clips fold lie flat along an axis.
+- **Crab** (`crab.json`, hp 14; `plans/TODO.md` `P-61`): the beach's neutral mob, about one block across. `Body`
+  holds `EyeL/R` and the claws `ArmL/R` > `ClawL/R` > `PincerL/R` (the pincer is the upper, moving finger). The legs
+  follow the crawlers' contract (see "Spiders" in `realm-mobs.md`): top-level `LegR1..4` (+X) and `LegL1..4` (-X)
+  along X with a `...Lower` child, so they can be clip-driven or solved. Clips: `idle`, `walk` (forward), `scuttle`
+  (sideways toward +X; play it backwards to go the other way), `pinch` with `impact`, `threaten` (a loop: claws up,
+  the body reared), `hurt` and `death`. Only `idle`, `walk`, `scuttle` and `death` key the legs.
+- **Corpse Bloom** (`corpse_bloom.json`, hp 45; `P-62`): the jungle's rooted poison plant. `Base` > `Bulb` >
+  `Spadix` > `SpadixTip`, and under `Bulb` the petals `PetalN/S/E/W`, each with a `...Tip`, lying flat outward.
+  Clips: `idle` (open), `closed` (a loop: the bud shut, the ambush pose), `spew` with `impact` (the petals gulp
+  shut, the bulb swells, the burst is the `impact`), `hurt` and `death`. The bulb's swelling is a scale track.
+- **Giant Centipede** (`centipede.json`, hp 70; `P-63`): `Head` (with `MandibleL/R`, `AntennaL/R` > `...Tip`),
+  `Segment1..10` front to back and `Tail` (with `TailProngL/R`), all top-level, each group's origin on the body's
+  axis at the part's joint or center, 6 units apart, so a chain can place every part by its origin. Each segment
+  owns one leg pair as children, `LegR<n>` and `LegL<n>` with a `...Lower`, shaped like a crawler leg (along X,
+  the knee straight out from the hip) for `LegIk`; a clip-driven centipede plays `walk`, a traveling wave whose
+  pairs step 0.14 of a cycle apart. Clips: `idle`, `walk`, `bite` with `impact`, `hurt` and `death`.
+
 ### Wildlife
 
 The animals of the wild are `Animal`s (`Entities/Wildlife/`): `RealmMob`s that are not hostile by nature, run by one
