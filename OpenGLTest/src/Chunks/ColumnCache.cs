@@ -1,5 +1,6 @@
 using System;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
 using static VoxelEngine.Chunks.Chunk;
 
 namespace VoxelEngine.Chunks;
@@ -142,6 +143,10 @@ public static class ColumnCache
                 topBlock = TerrainGenerator.IsWaterColumn(worldX, worldZ, bed)
                     ? TerrainGenerator.SoilBlock
                     : TerrainGenerator.SurfaceBlock;
+                // The jungle floor is wet mud in noise patches (JungleMud); a ravine-stripped column stays rock
+                if (biome == Biome.Jungle && topBlock == TerrainGenerator.SurfaceBlock
+                    && JungleMud.IsMud(worldX, worldZ))
+                    topBlock = JungleMud.MudBlock;
             }
         }
 

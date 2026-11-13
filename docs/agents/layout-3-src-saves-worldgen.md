@@ -480,7 +480,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         DesertWellGenerator.cs # the desert's ring-and-roof well, dug into sand over sandstone
         FallenLogGenerator.cs  # a rare 3-5 cell hollow log of the biome's tree species lying on the floor
         FlowerGenerator.cs     # meadow flowers on warm, open grass
-        FoliageGenerator.cs    # ground cover: a grass tuft on dry forest grass and a dead shrub on desert sand or tundra permafrost
+        FoliageGenerator.cs    # ground cover: a grass tuft on dry forest and jungle grass and a dead shrub on desert sand or tundra permafrost
+        JungleMud.cs           # the jungle floor's mud: noise patches (seed offset 188) read by the column fill for jungle columns only
         IceSpikeGenerator.cs   # rare single-column ice spikes on the frozen plains
         LilyPadGenerator.cs    # lily pads floating on ponds (PlantClumps)
         MeteorGenerator.cs     # a blast crater with scattered meteor rock

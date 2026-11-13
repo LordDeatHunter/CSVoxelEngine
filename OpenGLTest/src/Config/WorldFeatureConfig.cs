@@ -42,6 +42,9 @@ public static class WorldFeatureConfig
     public const bool FoliageEnabled = true;
     public const float GrassPatchFrequency = 1f / 48f;
     public const float GrassPatchThreshold = 0.05f;
+    // The jungle's mud patches (JungleMud, seed offset 188): wet ground where the noise tops the threshold
+    public const float JungleMudFrequency = 1f / 36f;
+    public const float JungleMudThreshold = 0.2f;
     // The tuft density runs from the dry end to the wet end of the climate's wetness
     public const float GrassDensityDry = 0.15f;
     public const float GrassDensityWet = 0.5f;

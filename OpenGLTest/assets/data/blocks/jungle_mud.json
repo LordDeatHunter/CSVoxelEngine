@@ -1,0 +1,7 @@
+{
+  // The jungle floor's wet mud, laid in noise patches over the rainforest's soil (JungleMud). Placeholder
+  // art: the dirt tile darkened (USER_TODO.md).
+  "name": "Jungle Mud",
+  "model": { "parent": "block/cube_all", "textures": { "all": "jungle_mud" } },
+  "footstepDust": true
+}

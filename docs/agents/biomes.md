@@ -39,6 +39,19 @@ desert/snow separation below is the tighter limit on how strong it may be. The w
 `TemperatureFrequency` lowered to make room for it) re-laid every seed except the origin: existing
 saves regenerate their unmodified chunks under the new climate, so old worlds show seams at the edge
 of their edited chunks.
+**Jungle** (`Biome.Jungle = 7`, a rainforest lowland) is the hot, soaked corner carved out of the warm, wet forest arm, never a new
+grid cell: `Classify` takes `Jungle` where `warm >= 0.5`, the air is wet, and `JungleOf(t, h) = min(HotOf(t), SoakOf(h)) >= 0.5`
+(`TemperatureHotStart/End` 0.30..0.52 above the warm ramp, `HumiditySoakStart/End` 0.10..0.34 above the semi-dry ramp, both
+read through `SampleClimate`). Its only neighbors are forest, savanna and ocean, so the desert/snow separation is untouched, and the
+origin (raw climate exactly 0) stays forest. `BiomeWeights` also returns a smooth `jungleWeight` (`JungleOf` times the land
+share, exactly 0 elsewhere), which `LandHeightCore` multiplies into the hill scale by `JungleHillReduction` for a gently rolling
+lowland (an exact identity where the weight is 0, so no other biome moves). The jungle uses the grass-over-dirt fill and the
+grass-tuft gate; its floor is **mud** (`JungleMud`, seed offset 188, `JungleMudFrequency/Threshold`) in noise patches laid by
+`ColumnCache.GenerateColumn` over jungle columns only (the far LOD draws grass there). Its tree is the `jungle_tree` species (oak growth,
+a tall bare trunk and a broad crown, own `jungle_log`/`jungle_leaves`/`jungle_stump` blocks on placeholder art), and the dragonfly's
+haunt widens to the whole jungle (`WildlifeSpawnRule.AnywhereBiomes`). The grass and foliage tint already read the climate's warm,
+wet corner, so the jungle needed no palette row of its own. Hashed mobs of the jungle (`P-62`, `P-63`) are tracked in `plans/TODO.md`.
+
 Temperature is a **three-band axis**: the cold ramp (`TemperatureColdStart/End`, read by
 `ColdWeight`: snow, ice, and taiga/frozen at `ColdBiomeMinCold`), a temperate band, and the warm
 ramp (`TemperatureWarmStart/End`, read by `WarmWeight`; desert and savanna begin at its midpoint).

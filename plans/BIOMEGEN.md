@@ -29,7 +29,6 @@ Nothing.
 Phase E polish, none started, in rough priority order. Each keeps the skill's principles and goes
 through plan-and-implement as its own phase; knob names are proposals.
 
-- [ ] **Jungle biome.** A hot, wet biome (the top corner of the temperature and humidity ramps, beyond the forest) with dense tall canopy, undergrowth and its own mobs. It is the home of three things that are modeled and waiting: the corpse bloom (`P-62`), the giant centipede (`P-63`) and a second haunt for the dragonfly, which today keeps to the waterside. Needs the full new-biome checklist of the `biome-worldgen` skill (weights, dither, tint, LOD palette, trees in `TREES.md`) and goes through plan-and-implement as its own phase.
 - [ ] **Desert mesa or butte.** A flat-topped lone peak on the dune profile (clamp the profile at a hashed cap height). The site helper exists, but a peak must not be summed into sand: massifs and lone peaks reject any ocean or desert weight today (§11).
 - [ ] **Plateaus and terraces.** Quantize a low-frequency height term into steps with `smoothstep` risers under a rarity mask, so an area reads as tablelands (badlands in the desert). Lowest priority.
 - [ ] **Scree or gravel band** between the rock line and the snow line on a massif.
@@ -643,7 +642,7 @@ Noise seed offsets: ReliefNoise 153, MountainSpineNoise 154, MountainRangeCellWa
   NoiseCaves.ShapeScale 182 (3D, the cave sub-biomes' shape scale, NoiseCaves' ninth channel),
   CaveOres amethyst 183, jade 184, cinnabar 185 (3D, the cave biome exclusive ores; plans/CAVE_BIOMES.md CB-2),
   VulcaniteGenerator.VeinNoise 186 (3D, the vulcanite veins in basalt);
-  NoiseCaves intermediate pockets 187 (3D, 2 octaves); the next free noise offset is 188
+  NoiseCaves intermediate pockets 187 (3D, 2 octaves), JungleMud.PatchNoise 188 (2D, the jungle mud patches); the next free noise offset is 189
 Hash salts (no noise, SplitMix64.Hash(cell, Seed ^ salt), so a new one re-lays nothing else):
   ruins 0x5E7A-0x5E7D (RuinPlacement, one per kind), waystone satellites 0x5E7E (WaystonePlacement),
   battle towers 0x5E7F (TowerPlacement, cell 1536; plans/BATTLE_TOWER.md BT-2), tower ruin 0x5E80 (TowerRuin, BT-8),

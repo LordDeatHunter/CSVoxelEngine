@@ -98,6 +98,7 @@ public static class WorldSeed
         PebbleGenerator.Reseed();
         SnowGenerator.Reseed();
         FoliageGenerator.Reseed();
+        JungleMud.Reseed();
         GravelPocketGenerator.Reseed();
 
         // Every cached value is a function of (key, seed), so all of them are wrong now.
