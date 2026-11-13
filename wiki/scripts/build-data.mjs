@@ -7,6 +7,7 @@ import { resolveModel } from './models.mjs'
 import { buildRecipeIndex, refKey } from './recipes.mjs'
 import { lootRows } from './loot.mjs'
 import { structureFrom } from './structures.mjs'
+import { campfireModel } from './campfire.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const wikiRoot = path.resolve(here, '..')
@@ -62,6 +63,14 @@ for (const { id, file } of listJson(path.join(assets, 'data/blocks'))) {
   }
   const st = structureFrom(id, d)
   if (st) structures[id] = st
+}
+
+// A branch pile is a campfire when it is lit; its baked model is a plain log, so the viewer gets the sticks instead
+const pile = blocks.branch_pile
+if (pile) {
+  const tiles = pile.model?.textures ?? {}
+  pile.model = campfireModel(4, { side: tiles.side ?? 'oak_log_side', end: tiles.end ?? 'oak_log_top' })
+  pile.name = 'Campfire'
 }
 
 // A block two cells tall (a waystone, a door) carries its upper half's model, so a viewer shows the whole block
@@ -242,6 +251,34 @@ for (const b of shownBlocks) {
     `| Property | Value |\n|---|---|\n| Hardness | ${b.hardness} |\n| Needs tool | ${b.requiresTool ? tool ?? 'yes' : 'no'} |\n| Light | ${b.emission || 'none'} |\n` +
     note + blockDrops(b) + recipeSection('block/' + b.id))
 }
+// The campfire has no item (it is built from branches), so it gets its own page beside the block pages
+if (pile) writePage('game/blocks/branch_pile.md', `---
+title: "Campfire"
+---
+
+# Campfire
+
+<ModelViewer kind="block" id="branch_pile" />
+
+Place up to four [branches](/game/items/branch) in one cell to build a campfire: each branch adds a stick to the pile.
+A full pile of four is a firepit that a [firestarter](/game/items/firestarter) can light (each strike has a chance to catch).
+
+## Burning
+
+| Property | Value |
+|---|---|
+| Burn time | 30 s per branch |
+| Light | yes, flickering |
+| Cooking slots | 4 |
+| Ash on burn-out | 4 |
+
+Every 30 seconds the fire burns one branch and leaves ash; it stays lit until the last branch is gone, and you can feed it more branches while one is left. Anything that stands in the flames, you or a mob, catches fire.
+
+## Cooking
+
+Right-click a lit campfire with a raw item to cook it. Up to four items cook at once.
+
+${recipeCards(recipes.filter((r) => r.kind === 'cook'))}`)
 const animatedBlocks = shownBlocks.filter((b) => !b.hasItem).map((b) => `[${esc(b.name)}](/game/blocks/${b.id})`)
 writePage('game/blocks/index.md', '# Blocks\n\n<ItemGrid kind="blocks" />\n' +
   (animatedBlocks.length ? `\nAlso animated, with no item to hold: ${animatedBlocks.join(', ')}.\n` : ''))
@@ -347,7 +384,7 @@ writePage('game/reference/magic.md',
 const byKind = (k) => recipes.filter((r) => r.kind === k)
 const kindText = {
   craft: ['Crafting', 'Shapeless recipes made in the inventory.'],
-  cook: ['Campfire cooking', 'Right-click a lit branch pile with the item.'],
+  cook: ['Campfire cooking', 'Right-click a lit [campfire](/game/blocks/branch_pile) with the item.'],
   crush: ['Quern', 'Crushing in a quern.'],
   melt: ['Melting', 'Put the item in a crucible inside a lit kiln.'],
   cast: ['Casting', 'Pour molten metal from a crucible into a fired mold.'],
