@@ -7,7 +7,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Magic;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.SpellBuilder;
-using static VoxelEngine.Rendering.Overlays.UIRenderer;
+using VoxelEngine.UI.Widgets;
 using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
@@ -71,8 +71,8 @@ internal sealed class SpellBuilderRenderer
 
         var stats = view.StatsFor(staff);
         DrawStats(view, staff, stats, canvas);
-        DrawButton(SpellBuilderLayout.ClearRect(canvas), "CLEAR", component.IsBound(view.Slot), DangerRed);
-        DrawButton(SpellBuilderLayout.BindRect(canvas), "BIND", stats.IsValid, ReadyGreen);
+        _ui.DrawButton(AsRect(SpellBuilderLayout.ClearRect(canvas)), "CLEAR", component.IsBound(view.Slot), DangerRed);
+        _ui.DrawButton(AsRect(SpellBuilderLayout.BindRect(canvas)), "BIND", stats.IsValid, ReadyGreen);
     }
 
     private void DrawSlots(StaffItem staff, in StaffComponent component, SpellBuilderView view, Vector2 canvas)
@@ -140,14 +140,7 @@ internal sealed class SpellBuilderRenderer
         _ui.DrawText(_factorText, origin + new Vector2(0f, LineHeight * 2f), _ui.CountScale, Rgba.White);
     }
 
-    private void DrawButton((Vector2 Center, Vector2 Size) rect, string label, bool enabled, Rgba accent)
-    {
-        _ui.DrawRect(rect.Center, rect.Size,
-            enabled ? _ui.IsHovered(rect.Center, rect.Size) ? ButtonHover : ChipBackground : SlotBackground);
-        _ui.DrawBorder(rect.Center, rect.Size, Border.Standard, enabled ? accent : SlotBorderColor);
-        _ui.DrawTextMiddle(label, rect.Center, _ui.CountScale,
-            enabled ? Rgba.White : TextDim);
-    }
+    private static UiRect AsRect((Vector2 Center, Vector2 Size) rect) => new(rect.Center, rect.Size);
 
     private static string[] BuildSlotLabels(int count)
     {

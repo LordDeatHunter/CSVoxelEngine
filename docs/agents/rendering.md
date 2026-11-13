@@ -413,6 +413,12 @@ since GPU `sin` differs, so `RarityChromeTests` asserts relations (see the shade
 uncraftable recipe) draws it at `DimOpacity`; the row's accent bar stays its status (equipped, ready, a recipe
 hit) on top. `visual-examples/inventory-rarity.json` (`VOXEL_TIME=147`) films every tier.
 
+**Round minimap clip.** `ui-fragment.glsl` drops every fragment outside `uClipCircle` (center x, center y, radius in
+framebuffer pixels, `gl_FragCoord`'s space, y up) when its radius is above 0. `MapRenderer` sets it for the round
+minimap's frame and map (carrying the canvas circle over the way `UiCanvas.ScissorRect` carries a rect, overlay
+offset included) and puts it back to 0 right after, so every other UI draw stays unclipped; the square minimap uses a
+scissor instead. See "Map and minimap" in `player-systems.md`.
+
 **Selection outline pulse.** The targeted block's outline breathes between
 `SelectionPulseMinOpacity` (70 %) and full opacity, one breath every `SelectionPulsePeriodSeconds`:
 `selection-fragment.glsl` scales the outline's `uOpacity` by `1 - uPulseDepth * (0.5 + 0.5 sin)` of

@@ -65,6 +65,7 @@ internal sealed class GameplayInput
         this.diagnostics = diagnostics;
         Forge = new ForgeInput(inputManager, renderManager, session);
         QuestBook = new QuestBookInput(inputManager, renderManager);
+        Map = new MapInput(inputManager, renderManager);
     }
 
     /// <summary>The anvil's recipe list, opened by a hammer's right-click on an anvil holding a metal stack.</summary>
@@ -73,12 +74,15 @@ internal sealed class GameplayInput
     /// <summary>The [P] quest book.</summary>
     internal QuestBookInput QuestBook { get; }
 
+    /// <summary>The [M] map screen.</summary>
+    internal MapInput Map { get; }
+
     private World? ActiveWorld => Program.ActiveWorld;
 
-    /// <summary>A panel owns the mouse: the [E] panel, the spell builder, the waystone screen, the anvil's recipe list
-    /// or the quest book is open.</summary>
+    /// <summary>A panel owns the mouse: the [E] panel, the spell builder, the waystone screen, the anvil's recipe list,
+    /// the quest book or the map screen is open.</summary>
     private bool PanelOpen => inventoryView.IsOpen || builderInput.IsOpen || waystoneInput.IsOpen || Forge.IsOpen
-                              || QuestBook.IsOpen;
+                              || QuestBook.IsOpen || Map.IsOpen;
 
     /// <summary>Whether the HUD draws (F1).</summary>
     internal bool HudVisible => hudVisible;
@@ -96,6 +100,7 @@ internal sealed class GameplayInput
         deathScreenWasUp = chatCursorFree = false;
         placeTimer = MAX_PLACE_TIMER;
         QuestBook.View.ResetForNewWorld();
+        Map.View.ResetForNewWorld();
     }
 
     /// <summary>Whether the death screen is up: the player is down and every game input stands aside for it.</summary>
@@ -119,6 +124,7 @@ internal sealed class GameplayInput
             waystoneInput.Close();
             Forge.Close();
             QuestBook.Close();
+            Map.Close();
             menuInput.SetPauseMenu(PauseMenuPage.Closed);
         }
         w.Camera.SuppressLook = up;
@@ -256,6 +262,8 @@ internal sealed class GameplayInput
                 Forge.Close();
             else if (QuestBook.IsOpen)
                 QuestBook.Close();
+            else if (Map.IsOpen)
+                Map.Close();
             else switch (pauseMenuView.Page)
             {
                 case PauseMenuPage.Closed:
@@ -305,6 +313,8 @@ internal sealed class GameplayInput
                 Forge.Close();
             else if (QuestBook.IsOpen)
                 QuestBook.Close();
+            else if (Map.IsOpen)
+                Map.Close();
             else
                 panelInput.SetInventoryOpen(!inventoryView.IsOpen);
         }
@@ -313,6 +323,8 @@ internal sealed class GameplayInput
         // P toggles the quest book from a clean play state; with the book up, P closes it
         QuestBook.Update(w, !chatView.IsOpen && !pauseMenuView.IsOpen && !deathUp
                             && (QuestBook.IsOpen || !PanelOpen));
+        // M toggles the map screen the same way
+        Map.Update(w, !chatView.IsOpen && !pauseMenuView.IsOpen && !deathUp && (Map.IsOpen || !PanelOpen));
 
         var qPressed = inputManager.Keyboard?.IsKeyPressed(Key.Q) == true;
         // With the panel open, the number keys put the hovered row into that hotbar slot instead

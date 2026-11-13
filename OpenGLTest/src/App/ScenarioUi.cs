@@ -15,8 +15,34 @@ namespace VoxelEngine.App;
 /// Built by Program from its own components; main thread only.
 /// </summary>
 internal sealed class ScenarioUi(InventoryPanelInput panelInput, SpellBuilderInput builderInput, WaystoneInput waystoneInput,
-    ForgeInput forgeInput, ChatInput chatInput, QuestBookInput questBook) : IScenarioUi
+    ForgeInput forgeInput, ChatInput chatInput, QuestBookInput questBook, MapInput map) : IScenarioUi
 {
+    public void Map(string action, float factor, Vector2? point)
+    {
+        var world = RequirePlaying("map");
+        switch (action)
+        {
+            case "open":
+                map.Open(world);
+                break;
+            case "close":
+                map.Close();
+                break;
+            case "zoom":
+                map.ZoomAt(point, factor);
+                break;
+            case "pan":
+                map.PanBy(point ?? Vector2.Zero);
+                break;
+            case "center":
+                map.Recenter();
+                break;
+            case "square" or "round":
+                map.SetMinimapRound(action == "round");
+                break;
+        }
+    }
+
     public void Quests(string action, string? quest, float factor, Vector2? point)
     {
         var world = RequirePlaying("quests");

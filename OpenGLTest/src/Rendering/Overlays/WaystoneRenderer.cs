@@ -71,9 +71,9 @@ internal sealed class WaystoneRenderer
         _ui.DrawTextMiddle(_ui.FittedText(view.Name, _ui.HeadScale, box.Size.X - Margin * 4f),
             WaystoneLayout.PopupNameCenter(canvas), _ui.HeadScale, AccentGold);
         _ui.DrawTextMiddle(WaystoneText.DiscoveredLine, WaystoneLayout.PopupLineCenter(canvas), _ui.CountScale, Rgba.White);
-        DrawButton(WaystoneLayout.ConfirmButton(canvas, view.CanRename), "CONFIRM", true, ReadyGreen);
+        _ui.DrawButton(WaystoneLayout.ConfirmButton(canvas, view.CanRename), "CONFIRM", true, ReadyGreen);
         if (view.CanRename)
-            DrawButton(WaystoneLayout.RenameButton(canvas), "RENAME", true, AccentGold);
+            _ui.DrawButton(WaystoneLayout.RenameButton(canvas), "RENAME", true, AccentGold);
     }
 
     private void DrawRename(WaystoneView view, float time)
@@ -85,8 +85,8 @@ internal sealed class WaystoneRenderer
         var field = WaystoneLayout.RenameField(canvas);
         _ui.DrawInputField(field.Center, field.Size, view.RenameField, focused: true, view.Name, time);
         _ui.DrawTextMiddle(WaystoneText.RenameHint, WaystoneLayout.RenameHintCenter(canvas), _ui.CountScale, TextDim);
-        DrawButton(WaystoneLayout.RenameOk(canvas), "RENAME", view.CanSubmitRename, ReadyGreen);
-        DrawButton(WaystoneLayout.RenameCancel(canvas), "CANCEL", true, SlotBorderColor);
+        _ui.DrawButton(WaystoneLayout.RenameOk(canvas), "RENAME", view.CanSubmitRename, ReadyGreen);
+        _ui.DrawButton(WaystoneLayout.RenameCancel(canvas), "CANCEL", true, SlotBorderColor);
     }
 
     private void DrawList(WaystoneView view, float time)
@@ -166,12 +166,4 @@ internal sealed class WaystoneRenderer
         WaystoneRealm.Sky => SkyColor,
         _ => ReadyGreen,
     };
-
-    private void DrawButton(UiRect rect, string label, bool enabled, Rgba accent)
-    {
-        _ui.DrawRect(rect.Center, rect.Size,
-            enabled ? _ui.IsHovered(rect.Center, rect.Size) ? ButtonHover : ChipBackground : SlotBackground);
-        _ui.DrawBorder(rect.Center, rect.Size, Border.Standard, enabled ? accent : SlotBorderColor);
-        _ui.DrawTextMiddle(label, rect.Center, _ui.CountScale, enabled ? Rgba.White : TextDim);
-    }
 }

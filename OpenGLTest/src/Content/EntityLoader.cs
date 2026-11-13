@@ -45,10 +45,11 @@ internal static class EntityLoader
             var blood = ParseBlood(definition.Blood, path);
             var bloodSize = ParseBloodSize(definition.Blood, path);
             var immune = (definition.Immune ?? []).Select(effect => effect.Trim()).ToHashSet(StringComparer.Ordinal);
+            var attitude = ParseAttitude(definition.Attitude, path);
 
             if (definition.Variants != null)
             {
-                types[name] = LoadVariants(name, path, definition, hp, loot, blood, bloodSize, immune);
+                types[name] = LoadVariants(name, path, definition, hp, loot, blood, bloodSize, immune, attitude);
                 continue;
             }
 
@@ -68,6 +69,7 @@ internal static class EntityLoader
                 DisplayName = definition.Name ?? name,
                 MaxHealth = hp,
                 LootTable = loot,
+                Attitude = attitude,
                 BloodColor = blood,
                 BloodSizeScale = bloodSize,
                 Immune = immune,
@@ -92,6 +94,16 @@ internal static class EntityLoader
                     throw new InvalidOperationException(
                         $"Entity '{type.Name}' is immune to unknown status effect '{effect}'.");
     }
+
+    /// <summary>An entity's <c>attitude</c>: omitted is hostile; anything but <c>"hostile"</c> or <c>"neutral"</c> is
+    /// refused naming the file.</summary>
+    internal static EntityAttitude ParseAttitude(string? attitude, string path) => attitude switch
+    {
+        null or "hostile" => EntityAttitude.Hostile,
+        "neutral" => EntityAttitude.Neutral,
+        _ => throw new InvalidOperationException(
+            $"Entity '{path}' has attitude '{attitude}'; expected \"hostile\" or \"neutral\"."),
+    };
 
     /// <summary>
     /// An entity's <c>blood.size</c>: the multiplier on each droplet's size, 1 when omitted (or when the blood is
@@ -135,7 +147,7 @@ internal static class EntityLoader
     /// and the first one is the kind's <see cref="EntityType.Model"/>.
     /// </summary>
     private static EntityType LoadVariants(string name, string path, EntityDefinition definition, int hp, LootTable? loot,
-        Vector3? blood, float bloodSize, IReadOnlySet<string> immune)
+        Vector3? blood, float bloodSize, IReadOnlySet<string> immune, EntityAttitude attitude)
     {
         var variants = definition.Variants!;
         if (variants.Length == 0)
@@ -160,6 +172,7 @@ internal static class EntityLoader
             DisplayName = definition.Name ?? name,
             MaxHealth = hp,
             LootTable = loot,
+            Attitude = attitude,
             BloodColor = blood,
             BloodSizeScale = bloodSize,
             Immune = immune,

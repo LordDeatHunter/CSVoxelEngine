@@ -307,6 +307,10 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         SpellBuilderText.cs    # the title, the hold-a-staff hint and a phrase per SpellVerdict
         SpellBuilderView.cs    # open flag, transition, chosen slot, the selection (one element/shape/trigger, any
                                #   modifiers), live stats cached per Version; Refresh rebuilds only on a knowledge change
+      Map/                     # the [M] map screen and the minimap's layout, GL-free (MapRenderer draws them, MapInput drives the screen)
+        MapFrame.cs            # what the UI pass draws the maps from in one frame: the tracker, the pins, the focus, the screen
+        MapLayout.cs           # world <-> canvas (north up), the minimap's box and rim clamp, the screen's buttons and lines
+        MapScreenView.cs       # open flag, transition, center and zoom, follow-the-player until panned, the press and drag
       Quests/                  # the [P] quest book, GL-free (QuestBookRenderer draws it, QuestBookInput drives it)
         QuestBookLayout.cs     # grid <-> canvas, zoom about the pointer, pan by a drag, the node hit test, the details panel
         QuestBookView.cs       # open flag, transition, the bound pan/zoom, the selection, the press and drag
@@ -557,6 +561,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
   assets/textures/environment/        # sun, moon and the break-progress frames
   assets/textures/particles/          # particle sprites (bubble)
   assets/textures/ui/                 # HUD icons (hearts); crosshair.png sits in textures/ itself
+  assets/textures/ui/map/             # the map's pin arrow (tinted per kind), waystone and battle tower icons
   assets/fonts/                       # TTF for the UI text
   assets/sfx/                         # mined-block hit groups (<group>.wav / <group>_N.wav, see `sfx`), item pickups and
                                       #   the spell sounds (spell_cast, spell_impact, spell_fizzle; played by code, never a block)

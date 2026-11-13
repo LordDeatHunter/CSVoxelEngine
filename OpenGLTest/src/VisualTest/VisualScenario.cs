@@ -332,6 +332,7 @@ public sealed class VisualScenario
             "forge" => ReadForge(element, index),
             "chat" => ReadChat(element, index),
             "quests" => ReadQuests(element, index),
+            "map" => ReadMap(element, index),
             "towerclear" => new VisualStep { Op = "towerclear", Floor = ReadInt(element, "floor") },
             "altar" => new VisualStep { Op = "altar", Pos = ReadPos(element, index, "altar") },
             "towerdefeat" => new VisualStep { Op = "towerdefeat" },
@@ -343,7 +344,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, forge, chest, chestrow, chestwobble, waystone, chat, quests, towerclear, altar, towerdefeat, goblincamp or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, forge, chest, chestrow, chestwobble, waystone, chat, quests, map, towerclear, altar, towerdefeat, goblincamp or screenshot."),
         };
     }
 
@@ -443,6 +444,33 @@ public sealed class VisualScenario
             default:
                 return new VisualStep { Op = "quests", Action = action };
         }
+    }
+
+    // map drives the [M] map screen: "action" open, close, center, square, round (the minimap's shape), zoom (with
+    // "factor", above 0, and an optional "at" [x, y] canvas point) or pan (with "by" [x, y], a drag's canvas travel)
+    private static VisualStep ReadMap(JsonElement element, int index)
+    {
+        var action = ReadChoice(element, index, "map", "action", ["open", "close", "center", "square", "round", "zoom", "pan"]);
+        return action switch
+        {
+            "zoom" => new VisualStep
+            {
+                Op = "map",
+                Action = action,
+                Scale = element.TryGetProperty("factor", out var factor) && factor.TryGetSingle(out var f) && f > 0f
+                    ? f
+                    : throw new InvalidOperationException($"Step {index} (map zoom) needs a 'factor' above 0."),
+                Point = ReadPoint(element, "at", index),
+            },
+            "pan" => new VisualStep
+            {
+                Op = "map",
+                Action = action,
+                Point = ReadPoint(element, "by", index)
+                        ?? throw new InvalidOperationException($"Step {index} (map pan) needs 'by': [x, y]."),
+            },
+            _ => new VisualStep { Op = "map", Action = action },
+        };
     }
 
     // An optional [x, y] field

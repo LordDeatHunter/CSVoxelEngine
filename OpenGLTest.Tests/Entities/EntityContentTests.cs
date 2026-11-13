@@ -26,6 +26,15 @@ public sealed class EntityContentTests
     }
 
     [Fact]
+    public void AnEntityWithoutAnAttitudeIsHostileAndAnUnknownAttitudeIsRefused()
+    {
+        Assert.Equal(EntityAttitude.Hostile, EntityLoader.ParseAttitude(null, "test.json"));
+        Assert.Equal(EntityAttitude.Neutral, EntityLoader.ParseAttitude("neutral", "test.json"));
+        var error = Assert.Throws<InvalidOperationException>(() => EntityLoader.ParseAttitude("friendly", "test.json"));
+        Assert.Contains("test.json", error.Message);
+    }
+
+    [Fact]
     public void SlimeLootOnlyEverRollsSlimeballs()
     {
         var type = EntityRegistry.Require("slime");

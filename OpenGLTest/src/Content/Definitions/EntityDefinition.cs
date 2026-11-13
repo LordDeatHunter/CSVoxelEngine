@@ -21,6 +21,12 @@ public sealed class EntityDefinition
     public string? Loot { get; set; }
 
     /// <summary>
+    /// How the entity treats a player, which picks its map pin's color: <c>"hostile"</c> (the default when omitted)
+    /// attacks on sight, <c>"neutral"</c> leaves a player alone until provoked (or flees).
+    /// </summary>
+    public string? Attitude { get; set; }
+
+    /// <summary>
     /// What a hit sprays off the entity. Omitted is red blood; <c>"none"</c> sprays nothing (bone, stone);
     /// <c>{"color": [r, g, b]}</c> (sRGB 0..255) sprays that color (a spider's blue ichor).
     /// </summary>

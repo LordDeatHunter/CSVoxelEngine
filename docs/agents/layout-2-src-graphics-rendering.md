@@ -168,6 +168,17 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       SpellProjectile.cs       # GL-free: one bolt in flight (straight, sub-stepped, BoxSweep and first non-air
                                #   cell, mob overlap, spent after its range)
       SpellSparks.cs           # GL-free: the shared spell sparks (the element's color, the trail, the impact, the cast burst)
+    Map/                       # the map's GL-free data (see "Map and minimap"): tiles, layers, the scan, colors, pins
+      ChunkMapCells.cs         # IMapCells over the live chunks (keeps the last chunk looked up within one scan)
+      IMapCells.cs             # what the scanner reads: a chunk's state (unloaded, empty, blocks), a cell, a column's tint fields
+      MapColors.cs             # a block's map color (its top tile's alpha-weighted mean, its tint palette) and kind (clear, solid, fluid)
+      MapColumnScanner.cs      # one chunk column into a MapTile for a layer: the first visible cell, fluid and cave depth, relief
+      MapLayer.cs              # the scan window (surface, sky band, cave slice at the eye) and the rule that picks it
+      MapLayerSelector.cs      # the current layer with the hold on a kind change
+      MapPins.cs               # the frame's pins: the player, other players, mobs by attitude, discovered waystones
+      MapTile.cs               # one chunk column of one layer: 16x16 packed sRGB texels (alpha 0 unexplored) and heights
+      MapTracker.cs            # the tiles of a client world: rescans a column on its chunks' remesh or when it comes in
+                               #   range, nearest first a few a frame; the roof probe
     Networking/                # the GL-free multiplayer protocol and codecs both sides share
                                #   (see "Multiple players and chat"); the client and the server side below
       ChatMessageCodec.cs      # one ChatMessage frame (kind, sender, text, optional link), its one writer and reader;
@@ -528,6 +539,9 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   highlight (RenderBlockSelection) and the crack overlay (RenderBlockBreaking)
         SpellBuilderRenderer.cs # the spell table's builder page: staff slots, the known parts by kind, the live
                                 #   cost/verdict/fizzle/factors, BIND and CLEAR (or the hold-a-staff hint)
+        MapRenderer.cs         # the top-right minimap (square scissored or round via uClipCircle, pins held to the rim) and
+                               #   the [M] map screen (regions, pins, the waystone and pointer readouts, the buttons); owns the pin sprites
+        MapRegionTextures.cs   # one single-slice RGBA8 array texture per 8x8 chunk-column region of the map's layer, patched per rescanned tile
         QuestBookRenderer.cs   # the [P] quest book (grid, edges, node frames and icons, the details panel) and the quest toast card;
                                #   owns the node textures
         WaystoneRenderer.cs    # the waystone screen: the discovery popup, the rename dialog and the teleport list (rows with realm

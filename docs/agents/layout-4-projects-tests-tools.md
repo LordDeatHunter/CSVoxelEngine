@@ -133,6 +133,9 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Magic/                       # the cast rules, pacing and held-staff lookup, the spell effects (bolt flight,
                                #   impact rules, the element impacts on a server world), the sparks, the cast
                                #   feedback and a client's preview bolt; its own helper StaffFixture
+  Map/                         # the map's layer rule and switch hold, the column scan (plants seen through, fluid depth, unexplored,
+                               #   cave rock, relief), the tracker (rescans on a remesh, keeps an explored tile, drops a left cave
+                               #   slice, the roof probe) and the pins (attitude, a mob's heading); FakeMapCells is their world
   Networking/                  # protocol and codecs (the chat line's link: ChatMessageCodecTests), end-to-end chunk and
                                #   imported-world streaming
     Client/                    # client streaming, the mesh gate, predictions and intent flow, the entity
@@ -179,6 +182,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     SpellBuilder/              # the builder's selection rules, live stats and layout hit-tests
     Waystone/                  # the waystone screen's page rules, rows and layout hit-tests
     QuestBookLayoutTests.cs    # the quest book's zoom about the pointer, drag-to-pan and visible-only hit test
+    MapLayoutTests.cs          # the map's world <-> canvas round trip and north-up axes, the minimap's rim clamp (both shapes),
+                               #   the screen's buttons, zoom about the pointer, pan-stops-following and CENTER
   VisualTest/                  # scenario parsing and ops, PNG capture
   WorldGen/                    # terrain, biomes, lakes, ravines, clouds, the generational
                                #   cache, the tree front end and batches, worldgen stats,
@@ -222,6 +227,7 @@ tools/                                # asset generators: models, animation clip
   generate-critter-models.py          # deterministic dragonfly, crow and deer .bbmodels (their own bone sets around the
                                       #   humanoid six, clips) and skins with cutout texels, on the hell script's machinery;
                                       #   models only, no mob class yet; --check
+  generate-map-icons.py               # deterministic placeholder map icons: the pin arrow, the waystone and the battle tower
   generate-quest-node-textures.py     # deterministic placeholder quest book node frames (circle, hex) and the check badge
   generate-forcefield-texture.py      # deterministic placeholder tower_forcefield tile (a faint honeycomb, only the fallback
                                       #   of the world shader's forcefield term), integer geometry; listed in USER_TODO.md; --check

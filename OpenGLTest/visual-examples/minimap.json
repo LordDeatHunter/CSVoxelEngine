@@ -1,0 +1,58 @@
+{
+  // The minimap and the [M] map screen: run with VOXEL_SCRIPT=visual-examples/minimap.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/minimap/. Films the square minimap over goblins.json's forest clearing, the same spot after a
+  // ring of alloy bricks is set down (the edit reaches the map through the remesh), a discovered waystone and a few
+  // mobs (neutral deer and boar, hostile goblins) as pins, the round minimap, the map screen following the player, a
+  // zoomed and panned view, CENTER, and the cave slice down in the stone. Ends on the square shape, the default.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 63.5], "yaw": -90, "pitch": -12 },
+    { "op": "fly" },
+    { "op": "map", "action": "square" },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "surface" },
+
+    { "op": "setblock", "pos": [-48, 10, 56], "block": "alloy_bricks" },
+    { "op": "setblock", "pos": [-47, 10, 56], "block": "alloy_bricks" },
+    { "op": "setblock", "pos": [-46, 10, 56], "block": "alloy_bricks" },
+    { "op": "setblock", "pos": [-45, 10, 56], "block": "alloy_bricks" },
+    { "op": "setblock", "pos": [-44, 10, 56], "block": "alloy_bricks" },
+    { "op": "setblock", "pos": [-48, 10, 57], "block": "alloy_bricks" },
+    { "op": "setblock", "pos": [-48, 10, 58], "block": "alloy_bricks" },
+    { "op": "setblock", "pos": [-48, 10, 59], "block": "alloy_bricks" },
+    { "op": "setblock", "pos": [-48, 10, 60], "block": "alloy_bricks" },
+    { "op": "setblock", "pos": [-38, 10, 59], "block": "waystone_surface" },
+    { "op": "setblock", "pos": [-38, 11, 59], "block": "waystone_surface_upper" },
+    { "op": "waystone", "action": "open", "pos": [-38, 10, 59] },
+    { "op": "waystone", "action": "close" },
+    { "op": "spawn", "entity": "deer", "pos": [-30.5, 53.5] },
+    { "op": "spawn", "entity": "boar", "pos": [-52.5, 70.5] },
+    { "op": "spawn", "entity": "goblin", "pos": [-43.5, 44.5] },
+    { "op": "spawn", "entity": "goblin", "pos": [-40.5, 42.5] },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "edits-and-pins" },
+
+    { "op": "map", "action": "round" },
+    { "op": "look", "yaw": 0, "pitch": -12 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "round" },
+
+    { "op": "map", "action": "open" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "screen" },
+    { "op": "map", "action": "zoom", "factor": 2.5 },
+    { "op": "map", "action": "pan", "by": [200, 120] },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "screen-zoomed" },
+    { "op": "map", "action": "zoom", "factor": 0.15 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "screen-far" },
+    { "op": "map", "action": "center" },
+    { "op": "map", "action": "close" },
+    { "op": "map", "action": "square" },
+
+    { "op": "teleport", "pos": [3.5, -219.38, 3.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "cave" }
+  ]
+}

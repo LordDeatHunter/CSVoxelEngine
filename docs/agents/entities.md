@@ -6,7 +6,10 @@ The mob base, shared mob rules, the slime and the goblin.
 
 Entities (mobs) are data-driven like blocks: `assets/data/entities/<name>.json` gives a display
 `name`, an `hp` pool (optional: an entity with none has no health pool, `EntityType.MaxHealth` 0,
-and the `Mob` constructor refuses it), an optional `loot` table rolled on death, and an optional
+and the `Mob` constructor refuses it), an optional `loot` table rolled on death, an optional `attitude`
+(`"hostile"`, the default, or `"neutral"` for a kind that leaves a player alone until provoked or flees: the deer, boar
+and crab; `EntityType.Attitude`, `EntityLoader.ParseAttitude` refuses anything else; it colors the kind's map pin, see
+"Map and minimap"), and an optional
 `model` Blockbench project (default `assets/models/entity/<name>.bbmodel`), or instead of `model`
 a non-empty `variants` list of projects, one per size class or look (`EntityType.Variants` /
 `VariantPaths`, whose first entry is always `Model`; the icebergs use it), and an optional `held` item every spawn

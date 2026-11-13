@@ -35,7 +35,7 @@ namespace VoxelEngine.Rendering.Overlays;
 /// The pages are the components it builds and exposes as internal properties -
 /// <see cref="HudRenderer"/>, <see cref="TopStripRenderer"/>, <see cref="InventoryPanelRenderer"/>,
 /// <see cref="CraftCardRenderer"/>, <see cref="SpellBuilderRenderer"/>, <see cref="WaystoneRenderer"/>, <see cref="MenuRenderer"/>,
-/// <see cref="LoadingScreenRenderer"/> and <see cref="ChatRenderer"/> - each drawing through these primitives and reading the per-pass
+/// <see cref="LoadingScreenRenderer"/>, <see cref="ChatRenderer"/> and <see cref="MapRenderer"/> - each drawing through these primitives and reading the per-pass
 /// state live. Render thread only.</para>
 /// </summary>
 public class UIRenderer : IDisposable
@@ -154,6 +154,8 @@ public class UIRenderer : IDisposable
     internal QuestBookRenderer Quests { get; }
     internal TopStripRenderer TopStrip { get; }
     internal HudRenderer Hud { get; }
+    /// <summary>The top-right minimap and the [M] map screen.</summary>
+    internal MapRenderer Map { get; }
     /// <summary>The rarity chrome over list rows and the hover tooltip.</summary>
     internal RarityChromeRenderer Chrome { get; }
 
@@ -246,6 +248,7 @@ public class UIRenderer : IDisposable
         Forge = new ForgeRenderer(this);
         Quests = new QuestBookRenderer(gl, this);
         TopStrip = new TopStripRenderer(gl, this);
+        Map = new MapRenderer(gl, this);
     }
 
     /// <summary>Starts a UI pass at scale 1, the canvas being the window itself. Must be paired
@@ -377,6 +380,16 @@ public class UIRenderer : IDisposable
         DrawRect(outer.Center, outer.Size, fill);
         DrawBorder(outer.Center, outer.Size, frame.BorderWidth, SlotBorderColor);
         DrawRect(frame.AccentBar.Center, frame.AccentBar.Size, AccentGold);
+    }
+
+    /// <summary>A labeled button: lit under the pointer, its border in <paramref name="accent"/>; a disabled one is
+    /// flat and dim.</summary>
+    internal void DrawButton(UiRect rect, string label, bool enabled, Rgba accent)
+    {
+        DrawRect(rect.Center, rect.Size,
+            enabled ? IsHovered(rect.Center, rect.Size) ? ButtonHover : ChipBackground : SlotBackground);
+        DrawBorder(rect.Center, rect.Size, Border.Standard, enabled ? accent : SlotBorderColor);
+        DrawTextMiddle(label, rect.Center, _countScale, enabled ? Rgba.White : TextDim);
     }
 
     public void DrawBorder(Vector2 center, Vector2 size, float thickness, Rgba color)
@@ -941,6 +954,7 @@ public class UIRenderer : IDisposable
         _gl.DeleteVertexArray(_textVao);
         Hud.Dispose();
         Quests.Dispose();
+        Map.Dispose();
         foreach (var icon in _itemIcons.Values)
             _gl.DeleteTexture(icon);
         foreach (var frames in _itemFrames.Values)

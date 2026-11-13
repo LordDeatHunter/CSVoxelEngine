@@ -10,6 +10,7 @@ using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Lod;
+using VoxelEngine.Map;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
@@ -19,6 +20,7 @@ using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
 using VoxelEngine.UI.SpellBuilder;
 using VoxelEngine.UI.Forge;
+using VoxelEngine.UI.Map;
 using VoxelEngine.UI.Waystone;
 
 namespace VoxelEngine.Rendering;
@@ -58,6 +60,10 @@ internal sealed class WorldRenderer
     private readonly HotbarNameFade _hotbarName;
     private readonly HotbarPickupPop _hotbarPops;
     private readonly StaffSlotIndicator _staffSlot = new();
+    private readonly MapPins _mapPins = new();
+    // Built on the first HUD frame, so a server's world (which never draws one) scans nothing
+    private MapTracker? _mapTracker;
+    private double _mapTime = double.NaN;
 
     private Camera Camera => _world.Camera;
     private PlayerModel Player => _world.Player;
@@ -356,11 +362,35 @@ internal sealed class WorldRenderer
     internal void RenderUI(RenderManager renderManager, InventoryView view, float time,
         int fps, bool showProfiler, bool showCoordinates = true, PauseMenuView? menu = null,
         SettingsMenuView? settings = null, SpellBuilderView? builder = null, WaystoneView? waystone = null,
-        ForgeView? forge = null)
+        ForgeView? forge = null, MapScreenView? mapScreen = null)
     {
         renderManager.UiPasses.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
             _health.Health, _health.Breath.Fraction, _health.Mana.Fraction, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, LeftClick.Crosshair, LeftClick.LookAt,
-            _staffSlot.Label(Inventory), _health.Effects.Mask, builder, _health.Max, _world.ChestPanel, waystone, BossSelection.Nearest(Mobs, Camera.Position), forge);
+            _staffSlot.Label(Inventory), _health.Effects.Mask, builder, _health.Max, _world.ChestPanel, waystone, BossSelection.Nearest(Mobs, Camera.Position), forge,
+            UpdateMap(mapScreen));
+    }
+
+    /// <summary>
+    /// The frame's map step: builds the tracker on first use (listening to the chunk manager's remeshes), advances
+    /// it to the camera, collects the pins and keeps a following map screen on the player.
+    /// </summary>
+    private MapFrame? UpdateMap(MapScreenView? screen)
+    {
+        if (screen == null) return null;
+        if (_mapTracker == null)
+        {
+            var tracker = new MapTracker(new ChunkMapCells(_chunkManager));
+            _chunkManager.ChunkMeshed += chunk => tracker.MarkColumnDirty((int)chunk.Position.X, (int)chunk.Position.Z);
+            _mapTracker = tracker;
+        }
+        var deltaTime = double.IsNaN(_mapTime) ? 0f : (float)(Now - _mapTime);
+        _mapTime = Now;
+        var eye = Camera.Position;
+        _mapTracker.Update(eye, deltaTime);
+        _mapPins.Collect(_mapTracker.Layer, eye, Camera.Yaw, _remotePlayers, Mobs, Inventory.Waystones);
+        var focus = new Vector2(eye.X, eye.Z);
+        screen.Follow(focus);
+        return new MapFrame(_mapTracker, _mapPins.Pins, focus, screen);
     }
 
     /// <summary>

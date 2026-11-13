@@ -123,6 +123,9 @@ internal sealed class InputEvents
             case MouseButton.Left when gameplay.QuestBook.IsOpen && inputManager.Mouse != null:
                 gameplay.QuestBook.HandleRelease(inputManager.Mouse.Position, ActiveWorld!);
                 break;
+            case MouseButton.Left when gameplay.Map.IsOpen && inputManager.Mouse != null:
+                gameplay.Map.HandleRelease(inputManager.Mouse.Position);
+                break;
             case MouseButton.Left when builderInput.IsOpen && inputManager.Mouse != null:
                 builderInput.HandleClick(inputManager.Mouse.Position);
                 break;
@@ -165,6 +168,10 @@ internal sealed class InputEvents
                                                                   && button == MouseButton.Left && inputManager.Mouse != null:
                 gameplay.QuestBook.HandlePress(inputManager.Mouse.Position);
                 return;
+            case AppScreen.Playing when gameplay.Map.IsOpen && !pauseMenuView.IsOpen
+                                                            && button == MouseButton.Left && inputManager.Mouse != null:
+                gameplay.Map.HandlePress(inputManager.Mouse.Position);
+                return;
         }
 
         if (!menuInput.SettingsPageOpen || button != MouseButton.Left || inputManager.Mouse == null)
@@ -203,6 +210,12 @@ internal sealed class InputEvents
         if (gameplay.QuestBook.IsOpen)
         {
             if (inputManager.Mouse != null) gameplay.QuestBook.HandleScroll(inputManager.Mouse.Position, wheel.Y);
+            return;
+        }
+        // ...and the map screen, where it zooms too
+        if (gameplay.Map.IsOpen)
+        {
+            if (inputManager.Mouse != null) gameplay.Map.HandleScroll(inputManager.Mouse.Position, wheel.Y);
             return;
         }
         switch (inventoryView.IsOpen)

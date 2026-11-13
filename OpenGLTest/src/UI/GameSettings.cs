@@ -49,6 +49,10 @@ public static class GameSettings
     /// <summary>Whether the sprint key toggles instead of being held (see <see cref="SprintToggle"/>).</summary>
     public static bool SprintToggle { get; set; }
 
+    // Map
+    /// <summary>Whether the top-right minimap is round instead of square (the [M] map screen's toggle).</summary>
+    public static bool MinimapRound { get; set; }
+
     /// <summary>Window sizes offered by the resolution option row.</summary>
     public static readonly (int W, int H)[] Resolutions =
         [(1280, 720), (1600, 900), (1920, 1080), (2560, 1440)];
@@ -91,6 +95,7 @@ public static class GameSettings
         MouseSensitivity = 0.2f;
         FieldOfView = 70f;
         SprintToggle = false;
+        MinimapRound = false;
     }
 
     /// <summary>Where the JSON lives (outside the repo, so it never dirties the checkout).</summary>
@@ -136,6 +141,7 @@ public static class GameSettings
         if (dto.MouseSensitivity is { } sensitivity) MouseSensitivity = Math.Clamp(sensitivity, SettingsRows.SensitivityMin, SettingsRows.SensitivityMax);
         if (dto.FieldOfView is { } fov) FieldOfView = Math.Clamp(fov, SettingsRows.FovMin, SettingsRows.FovMax);
         if (dto.SprintToggle is { } sprintToggle) SprintToggle = sprintToggle;
+        if (dto.MinimapRound is { } minimapRound) MinimapRound = minimapRound;
     }
 
     public static void Save(string? path = null)
@@ -164,6 +170,7 @@ public static class GameSettings
             MouseSensitivity = MouseSensitivity,
             FieldOfView = FieldOfView,
             SprintToggle = SprintToggle,
+            MinimapRound = MinimapRound,
         };
         try
         {
@@ -201,5 +208,6 @@ public static class GameSettings
         public float? MouseSensitivity { get; set; }
         public float? FieldOfView { get; set; }
         public bool? SprintToggle { get; set; }
+        public bool? MinimapRound { get; set; }
     }
 }

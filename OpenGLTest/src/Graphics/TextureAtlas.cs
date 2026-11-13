@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using Silk.NET.OpenGL;
 using StbImageSharp;
 using VoxelEngine.Content;
@@ -34,6 +35,10 @@ public static class TextureAtlas
     /// <summary>Tile names in slice order, so a parallel array texture (see
     /// <see cref="BuildMaterial"/>) can be built against the exact same layout.</summary>
     public static IReadOnlyList<string> TileNames { get; private set; } = [];
+
+    /// <summary>Each slice's mean color in linear RGB, weighted by texel alpha (a cutout tile's holes count for
+    /// nothing): what the map paints a block's top face with (<c>MapColors</c>). Black for a fully clear tile.</summary>
+    public static IReadOnlyList<Vector3> TileMeanLinear { get; private set; } = [];
 
     private static readonly Dictionary<string, ushort> Tiles = new();
 
@@ -150,6 +155,7 @@ public static class TextureAtlas
         }
 
         TileNames = names;
+        TileMeanLinear = layers.Select(MeanLinear).ToArray();
         LayerCount = layers.Count;
         TileWidth = tileWidth;
         TileHeight = tileHeight;
@@ -163,6 +169,21 @@ public static class TextureAtlas
             if (TextureSheetRegistry.TryGet(name) == null)
                 return (image.Width, image.Height);
         throw new InvalidOperationException("The block textures are all spritesheets: at least one plain tile sets the atlas tile size.");
+    }
+
+    /// <summary>The alpha-weighted mean of a top-first sRGB RGBA tile, decoded to linear before averaging.</summary>
+    private static Vector3 MeanLinear(byte[] rgba)
+    {
+        var sum = Vector3.Zero;
+        var weight = 0f;
+        for (var i = 0; i + 3 < rgba.Length; i += 4)
+        {
+            var alpha = rgba[i + 3] / 255f;
+            if (alpha <= 0f) continue;
+            sum += ColorSpace.SrgbToLinear(new Vector3(rgba[i], rgba[i + 1], rgba[i + 2]) / 255f) * alpha;
+            weight += alpha;
+        }
+        return weight > 0f ? sum / weight : Vector3.Zero;
     }
 
     private static void AddLayer(string name, byte[] data, List<byte[]> layers, List<string> names)

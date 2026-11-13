@@ -59,8 +59,8 @@ internal sealed class ChestCardRenderer
         var search = ChestCardLayout.SearchBox(screen);
         _ui.DrawInputField(search.Center, search.Size, view.Search.Text, searchFocused, view.LanternInstance != null ? "Search fuel" : "Search the chest", time);
 
-        DrawButton(ChestCardLayout.LootAllButton(screen), view.LanternInstance != null ? "TAKE ALL" : "LOOT ALL", contents is { IsEmpty: false }, ReadyGreen);
-        DrawButton(ChestCardLayout.QuickStackButton(screen), view.LanternInstance != null ? "ADD FUEL" : "QUICK STACK", contents != null, AccentGold);
+        _ui.DrawButton(ChestCardLayout.LootAllButton(screen), view.LanternInstance != null ? "TAKE ALL" : "LOOT ALL", contents is { IsEmpty: false }, ReadyGreen);
+        _ui.DrawButton(ChestCardLayout.QuickStackButton(screen), view.LanternInstance != null ? "ADD FUEL" : "QUICK STACK", contents != null, AccentGold);
 
         var list = ChestCardLayout.List(screen);
         if (contents == null)
@@ -96,14 +96,6 @@ internal sealed class ChestCardRenderer
         {
             _gl.Disable(EnableCap.ScissorTest);
         }
-    }
-
-    private void DrawButton(UiRect rect, string label, bool enabled, Rgba accent)
-    {
-        _ui.DrawRect(rect.Center, rect.Size,
-            enabled ? _ui.IsHovered(rect.Center, rect.Size) ? ButtonHover : ChipBackground : SlotBackground);
-        _ui.DrawBorder(rect.Center, rect.Size, Border.Standard, enabled ? accent : SlotBorderColor);
-        _ui.DrawTextMiddle(label, rect.Center, _ui.CountScale, enabled ? Rgba.White : TextDim);
     }
 
     private void DrawRow(UiRect row, int index, ChestSlot slot, Vector2? hover, UiRect list, float time,

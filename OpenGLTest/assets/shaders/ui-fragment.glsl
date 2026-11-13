@@ -19,6 +19,9 @@ uniform float uAlphaCutoff;
 uniform bool uSrgbTex;
 // Alpha multiplier for the whole draw: a panel's open/close fade (UIRenderer.SetOverlay). 1 otherwise.
 uniform float uFade;
+// The round minimap's clip (MinimapRenderer): (center x, center y, radius) in framebuffer pixels, gl_FragCoord's
+// space; every fragment outside the circle is dropped. A radius of 0 clips nothing, and every other draw leaves it 0.
+uniform vec3 uClipCircle;
 
 // Rarity chrome (RarityChromeRenderer; GL-free twin RarityChrome, the formula not the bits). With uChrome 1 the
 // quad is a list row or the tooltip box: fTexCoord runs 0..1 across it with y down, and the draw's color and
@@ -117,6 +120,9 @@ vec4 RarityChrome(vec2 uv)
 
 void main()
 {
+    if (uClipCircle.z > 0.0 && distance(gl_FragCoord.xy, uClipCircle.xy) > uClipCircle.z)
+        discard;
+
     if (uChrome != 0)
     {
         FragColor = RarityChrome(fTexCoord);

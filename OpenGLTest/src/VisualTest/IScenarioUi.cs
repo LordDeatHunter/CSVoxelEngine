@@ -70,4 +70,12 @@ public interface IScenarioUi
     /// canvas point <paramref name="point"/> (the center when null) and <c>pan</c> drags the book by <paramref name="point"/>.
     /// </summary>
     void Quests(string action, string? quest, float factor, Vector2? point);
+
+    /// <summary>
+    /// Drives the [M] map screen: <c>open</c> and <c>close</c> it, <c>zoom</c> multiplies the zoom by
+    /// <paramref name="factor"/> about canvas point <paramref name="point"/> (the center when null), <c>pan</c> drags the
+    /// map by <paramref name="point"/>, <c>center</c> presses CENTER, and <c>square</c> or <c>round</c> sets the
+    /// minimap's shape (saved with the settings, as the screen's toggle does).
+    /// </summary>
+    void Map(string action, float factor, Vector2? point);
 }

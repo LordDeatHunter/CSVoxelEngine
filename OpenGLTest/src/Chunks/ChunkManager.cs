@@ -150,6 +150,13 @@ public class ChunkManager
     public IColumnSource ColumnSource { get; set; } = WorldgenColumnSource.Instance;
 
     /// <summary>
+    /// Called on the main thread each time a chunk takes a new mesh (its first, or a remesh after any block edit,
+    /// fluid step or streamed change), after the mesh is in place. The map (<c>MapTracker</c>) listens to rescan the
+    /// chunk's column; null when nothing listens (a server).
+    /// </summary>
+    public Action<Chunk>? ChunkMeshed { get; set; }
+
+    /// <summary>
     /// Where this world's terrain comes from: the blocks of every chunk the save store does not
     /// hold (<see cref="CreateChunk"/>) and the <see cref="ColumnData"/> of every chunk column.
     /// Worldgen by default (<see cref="GeneratedWorldSource"/>); a server hosting a custom or

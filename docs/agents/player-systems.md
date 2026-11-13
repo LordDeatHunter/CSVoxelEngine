@@ -31,6 +31,44 @@ with a line whose coordinates are a link (`ChatLink`), whose click puts a `/tp` 
 chat input without sending it (`ChatView.Suggest`; the `/tp` itself still needs rights); the death line is
 `DeathMessages.For` over the blow `PlayerHealth` recorded, drained into the chat (`LocalPlayer.TakeDeathMessage`).
 
+**Map and minimap (U-10).** A minimap sits under the top-right corner whenever the HUD draws (F1 hides it), north-up
+around the player with the player's arrow turning, square or round (`GameSettings.MinimapRound`, saved with the settings,
+toggled on the map screen); M opens the **map screen** over the whole canvas (`App/MapInput`, owned by `GameplayInput`
+like the quest book, from a clean play state; M, E or Escape close it, and the death screen, the pause menu and a world
+switch put it down): a drag pans, the wheel zooms about the pointer (`MapScreenView`, GL-free: it follows the player
+until panned, and CENTER goes back to that at `MapConfig.DefaultZoom`), the MINIMAP button flips the shape, and the
+pointer's block coordinates and the name of a waystone under it show. The data is GL-free in `src/Map/`:
+- **Tiles.** `MapTracker` (one per client world, built by `WorldRenderer` on the first HUD frame, so a server never
+  scans) keeps a `MapTile` (16x16 packed sRGB texels, alpha 0 unexplored, plus each column's height) per (layer, chunk
+  column) and rescans `MapConfig.TilesPerFrame` due ones a frame, nearest first. A column comes due when a chunk in it
+  takes a mesh (`ChunkManager.ChunkMeshed`, raised by `ChunkMeshScheduler.ApplyMesh`): every block edit ends in a
+  remesh, so placing, mining, blasts, fluids and a server's mirrored cells reach the map with no edit-path hook. Entering
+  a new chunk column or switching layers queues every column within `ScanRadiusChunks` that has no tile yet. A scan that
+  found nothing (its chunks unloaded) never replaces a tile, so the surface and sky tiles are the session's explored map
+  (capped at `MaxTiles`, farthest dropped); a cave slice's tiles are dropped on leaving it. Not saved with the world yet.
+- **Layers.** `MapLayer.For`: in hell (at or below `HellTopY`) always a cave slice; up among the sky islands the sky band
+  (`SkyIslandTopY` down to the cloud slab); elsewhere a roof over the head (`MapTracker.IsRoofed`: an occluding block
+  within `RoofProbeCells` above the eye, so leaves and glass never count) means a cave slice and open ground the surface
+  (from under the solid cloud slab, which sits above the relief ceiling). A slice's top is a little above the head,
+  snapped up to `CaveSliceStep`. `MapLayerSelector` holds a kind change for `LayerSwitchSeconds`, so a doorway or cave
+  mouth never flickers. `MapLayerTests`.
+- **Colors.** `MapColumnScanner` walks each column down to the first solid or fluid cell (plants and other clear blocks
+  are seen through; all-air and unloaded chunks are skipped whole), painting `MapColors`: the alpha-weighted mean of the
+  block's top tile (`TextureAtlas.TileMeanLinear`), times the column's biome tint for a tinted top as the mesh does.
+  Fluid darkens with its depth, a cave floor with its depth under the slice top, a slice starting in rock is
+  `RockColor`, and every texel is lit or shaded by its height against its northern neighbor (the relief).
+  `MapColumnScannerTests`, `MapTrackerTests`.
+- **Pins.** `MapPins` collects the local player, every `RemotePlayer`, every live mob (hostile or neutral by its kind's
+  `attitude`, see "Entities" in `entities.md`) and every discovered waystone (`Inventory.Waystones`,
+  rebuilt when its `Version` moves); on a cave slice only the mobs in its height band (`MapPins.ShowsMobAt`). On the
+  minimap a far player or waystone is held to the rim (`MapLayout.ClampToRim`) and a far mob left out. `MapPinsTests`, `MapLayoutTests`.
+The GL side is `MapRenderer` (built by `UIRenderer`, drawn from `UiPasses.RenderUI`: the minimap after the top strip,
+the map screen over the panels and under the pause menu) and its `MapRegionTextures`: one single-slice RGBA8 array
+texture per 8x8 chunk-column region of the current layer, filled from the tracker's tiles on first draw and patched per
+rescanned tile with `TexSubImage3D`; a layer or world change drops them. The round shape clips with the ui shader's
+`uClipCircle`. The icons are `assets/textures/ui/map/` (`pin_arrow.png` tinted per kind, `waystone.png`, and
+`tower.png`, not drawn yet). `visual-examples/minimap.json` (`VOXEL_TIME=147`).
+
 Standing in water switches the player to **swimming** (`Camera.IsInWater`, recomputed every frame by `PlayerPhysics.UpdateWaterState` from the real fluid surface heights under the body): movement is a series of **burst strokes** rather than a steady paddle: a stroke (ready at once on entering the water, then every `SwimStrokeSeconds`) *sets* the horizontal speed to `SwimBurstSpeed` along the WASD direction (0.6x backing up), which then glides off under `SwimGlideDrag` until the next one; Space and Ctrl stroke straight up (`SwimBurstUp`) or down (`SwimBurstDown`), the vertical speed gliding toward the gentle `SinkSpeed` through `MathUtils.Damp`, and no input means no stroke (`Camera.SwimStrokeCount` moves on each, which is how the body starts its stroke animation on the same frame; see "Animation juice"; with the eye under water, not in lava, each one also lets out a burst of `SwimStrokeBubble*` bubbles just in front of the head through `BubbleParticleSystem.TrackSwimStrokes`, run by `AmbientEffects.UpdateBubbles` in singleplayer and on a client, never on a server). Swimming into a bank while holding Space adds `SwimExitBoost` so the player can climb out without a ramp. Flight ignores water entirely, and a player standing on the bottom of a shallow puddle still jumps normally. Flowing water also pushes the player and floating item drops along its flow direction (`ChunkManager.GetFluidFlowGlobal`, Minecraft's `FlowingFluid.getFlow`: a horizontal vector summed from how much lower each neighboring cell's surface sits, zero in a still pool). `Camera.IsEyeInWater` is the separate eye-only test and is the source of truth for the underwater tint.
 
 **Water depth states.** Beside `IsInWater` (which keeps its meaning) the camera reports how deep the

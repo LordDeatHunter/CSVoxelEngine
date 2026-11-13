@@ -15,6 +15,7 @@ using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
 using VoxelEngine.UI.SpellBuilder;
 using VoxelEngine.UI.Forge;
+using VoxelEngine.UI.Map;
 using VoxelEngine.UI.Quests;
 using VoxelEngine.UI.Waystone;
 
@@ -22,8 +23,8 @@ namespace VoxelEngine.Rendering.Overlays;
 
 /// <summary>
 /// The UI hand-off: the HUD pass over the finished frame (the underwater wash, the damage
-/// vignette, the crosshair and look-at label, the compass or clock, the hotbar, hearts and toasts,
-/// the [E] panel, the spell builder, the waystone screen and the pause menu), the chat, tooltip and player-list passes after it, and the
+/// vignette, the crosshair and look-at label, the compass or clock, the minimap, the hotbar, hearts and toasts,
+/// the [E] panel, the spell builder, the waystone screen, the [M] map screen and the pause menu), the chat, tooltip and player-list passes after it, and the
 /// world-less frames: the main menu, the opaque loading screen and the loading fade over the first
 /// playing frames. Every pass draws through the one <see cref="UIRenderer"/> its owner builds,
 /// straight into the default framebuffer in display space. Render thread only.
@@ -53,11 +54,13 @@ internal sealed class UiPasses
         HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null,
         CrosshairState crosshair = default, LookLabelState? lookAt = null, string? staffSlot = null,
         byte effectMask = 0, SpellBuilderView? builder = null, int maxHealth = PlayerHealth.MaxHealth,
-        ChestView? chest = null, WaystoneView? waystone = null, BossBarState? boss = null, ForgeView? forge = null)
+        ChestView? chest = null, WaystoneView? waystone = null, BossBarState? boss = null, ForgeView? forge = null,
+        MapFrame? map = null)
     {
-        // Any panel (the [E] inventory, the spell builder, the waystone screen or the anvil's recipe list) hides the
-        // crosshair and the status row.
-        var panelUp = view.IsOpen || builder?.IsOpen == true || waystone?.IsOpen == true || forge?.IsOpen == true;
+        // Any panel (the [E] inventory, the spell builder, the waystone screen, the anvil's recipe list or the map
+        // screen) hides the crosshair and the status row.
+        var mapUp = map?.Screen.IsOpen == true;
+        var panelUp = view.IsOpen || builder?.IsOpen == true || waystone?.IsOpen == true || forge?.IsOpen == true || mapUp;
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize, UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
 
@@ -105,6 +108,13 @@ internal sealed class UiPasses
             _owner.Ui.TopStrip.DrawCompass(camera!.Yaw, camera.Position, showCoordinates);
         else if (hasClock)
             _owner.Ui.TopStrip.DrawClock(Clock.DayNumber(lightingTime), Clock.Readout(lightingTime));
+        // The minimap stands down while the map screen covers it
+        if (map is { } minimap)
+        {
+            _owner.Ui.Map.Sync(minimap.Tracker);
+            if (!mapUp)
+                _owner.Ui.Map.DrawMinimap(minimap.Tracker, minimap.Pins, minimap.Focus, GameSettings.MinimapRound);
+        }
         _owner.Ui.Hud.BeginBars(time);
         _owner.Ui.Hud.DrawFps(fps);
         if (showProfiler)
@@ -182,6 +192,16 @@ internal sealed class UiPasses
             {
                 _owner.Ui.SetOverlay(new Vector2(0f, forge.Transition.SlideY), forge.Transition.Alpha);
                 _owner.Ui.Forge.Draw(forge, time, camera != null ? Compass.HeadingFromYaw(camera.Yaw) : 0f);
+                _owner.Ui.ClearOverlay();
+            }
+        }
+        if (map is { Screen: var screen } frame)
+        {
+            screen.Transition.Step(screen.IsOpen, time);
+            if (screen.IsOpen || screen.Transition.Visible)
+            {
+                _owner.Ui.SetOverlay(Vector2.Zero, screen.Transition.Alpha);
+                _owner.Ui.Map.DrawScreen(screen, frame.Tracker, frame.Pins);
                 _owner.Ui.ClearOverlay();
             }
         }

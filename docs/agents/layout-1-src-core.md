@@ -44,8 +44,10 @@ OpenGLTest/
       MenuInput.cs             # the pause menu's and shared settings page's input, and applying the window-level settings
       QuestBookInput.cs        # the [P] quest book's input (built by GameplayInput): the toggle, cursor and look capture, the
                                #   press that pans past the drag threshold or selects on release, the wheel zoom
+      MapInput.cs              # the [M] map screen's input (built by GameplayInput): the toggle, cursor and look capture, the
+                               #   press that pans past the drag threshold or presses CENTER / the minimap shape, the wheel zoom
       ScenarioUi.cs            # the app's IScenarioUi: lets a VOXEL_SCRIPT run open the [E] panel and the spell builder, pick a tab or row,
-                               #   type a search, hold the pointer and drive the waystone screen, the anvil's recipe list, the chat and the quest book
+                               #   type a search, hold the pointer and drive the waystone screen, the anvil's recipe list, the chat, the quest book and the map screen
                                #   through the real input components
       SpellBuilderInput.cs     # the spell builder's input: open from the table (or the hold-a-staff toast), close on
                                #   E/Escape or a changed held staff, cursor and look capture, clicks, bind/clear requests
@@ -187,6 +189,9 @@ OpenGLTest/
       LightingConfig.cs        # alpha cutoff, atlas anisotropy, light spread, shadow cascades, point and fire
                                #   lights, fog, tonemap exposure, eye adaptation
       ManaConfig.cs            # the mana pool: start max, growth per known part and its cap, the refill time
+      MapConfig.cs             # the map: the cave slice's roof probe, step and depth, the layer switch hold, the scan radius and
+                               #   budget, the tile cap, the relief and depth shading, the minimap's size and scale, the map
+                               #   screen's zoom range, the pin sizes
       QuestConfig.cs           # the quest toast's timing and size; the quest book's grid step, node size, zoom range, drag threshold
       SpellConfig.cs           # spell recipe rules: when complexity starts to fizzle, the chance per unit and its cap;
                                #   the staff slot cap and the cast cooldown (CastCooldownSeconds)
@@ -466,6 +471,7 @@ OpenGLTest/
       EntityAnimator.cs        # GL-free per-entity animator: idle/walk (or idle/fly) locomotion + one-shot action
                                #   layer, events, parent-chain part matrices, HandAnchor
       EntityModel.cs           # a runtime entity model: the cubes parsed from a Blockbench project
+      EntityAttitude.cs        # Hostile / Neutral: how a kind treats a player (its file's attitude), which colors its map pin
       EntityType.cs            # one entity kind loaded from assets/data/entities/<name>.json: its display name, health pool
       FallingBlock.cs          # a gravity-affected block (sand, gravel) in flight
       FallingBlockLanding.cs   # a falling cube written back as a block: cell, block, fall, submerged (its dust)

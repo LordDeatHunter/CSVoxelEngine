@@ -315,6 +315,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
             if (!poolReturnAttempted) manager.MeshBuffers.Return(meshData);
             throw;
         }
+        manager.ChunkMeshed?.Invoke(chunk);
     }
 
     /// <summary>

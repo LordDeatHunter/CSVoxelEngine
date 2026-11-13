@@ -306,11 +306,16 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
 
 ## UI
 
-Paths are under `OpenGLTest/assets/textures/ui/`. Made by `tools/generate-quest-node-textures.py`: replace the PNGs and
-remove that generator in the same change, or a re-run puts the placeholders back (`--check` compares).
+Paths are under `OpenGLTest/assets/textures/ui/`. The quest book's are made by `tools/generate-quest-node-textures.py` and the
+map's by `tools/generate-map-icons.py`: replace the PNGs and remove that generator in the same change, or a re-run puts the
+placeholders back (`--check` compares).
 
 - [ ] **Quest book nodes** — `quest_node_circle.png` (a non-root quest's frame) and `quest_node_hex.png` (a root's, a
   pointy-top hexagon), 64x64: a dark fill inside a light rim, near gray, since `QuestBookRenderer` tints them by state
   (open, complete, hovered, the gold selection ring). Keep the item icon's room in the middle (about the inner 60%).
+- [ ] **Map icons** — `map/pin_arrow.png` (an arrowhead pointing up: a white fill inside a dark outline, since
+  `MapRenderer` tints the fill per pin kind and turns it to the heading), `map/waystone.png` (an obelisk on a plinth with
+  a rune line, drawn untinted) and `map/tower.png` (a battle tower, not drawn yet), 32x32, made by
+  `tools/generate-map-icons.py`. Keep the arrow pointing straight up and near white, and every icon centered.
 - [ ] **Quest check badge** — `quest_check.png`, 64x64, a green disc with a white check, drawn untinted at the top-right
   of a complete quest's node.

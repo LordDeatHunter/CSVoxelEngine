@@ -29,6 +29,9 @@ public sealed class EntityType
     /// <summary>Table rolled on death; null drops nothing.</summary>
     public LootTable? LootTable { get; init; }
 
+    /// <summary>How this kind treats a player (the entity file's <c>attitude</c>, hostile when omitted).</summary>
+    public EntityAttitude Attitude { get; init; }
+
     /// <summary>The flat sRGB color (0..1) a hit sprays off this kind (the entity file's
     /// <c>blood</c>); null sprays nothing.</summary>
     public Vector3? BloodColor { get; init; } = DefaultBloodColor;
