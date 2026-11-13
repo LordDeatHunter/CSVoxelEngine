@@ -307,6 +307,12 @@ sway blocks of `test-vertex.glsl` and `shadow-vertex.glsl` must stay byte-identi
 `TO_WORLD(p)` macro is what lets them be, and `ChunkDrawShaderTests` guards the sway block and
 its weight decode (both read `vColor.a` at location 1).
 
+**Back faces.** The camera's opaque chunk pass (`TerrainPasses.DrawOpaqueRun`) culls back faces: every chunk quad
+is wound to face out of its block, so from inside the rock a cave wall or the surface's top is not drawn from behind.
+A model element with no thickness (the `cross` plant planes) is baked with its back side as a second quad
+(`ModelBaker.BackSide`), so a plant still shows from both sides. The shadow cascades, the mirror (whose reflection
+flips the winding) and the translucent pass (a water surface seen from below) keep both sides.
+
 **Cave cull.** Every mesh build also records the chunk's face-to-face visibility set (`ChunkVisibility.Compute`, a
 flood fill over its open, non-occluding cells: bit `a * 6 + b` when one open run touches faces a and b; all-air chunks
 see through everything, enclosed ones through nothing), carried by `ChunkMeshData.Visibility` onto `Chunk.Visibility`;

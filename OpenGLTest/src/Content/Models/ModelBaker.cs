@@ -78,7 +78,12 @@ public static class ModelBaker
                     throw new InvalidOperationException(
                         $"Model '{model.Source}' has an unknown face '{name}'; expected north/south/west/east/up/down.");
 
-                quads.Add(BakeFace(model, element, face, faceIndex, from, to, shade));
+                var quad = BakeFace(model, element, face, faceIndex, from, to, shade);
+                quads.Add(quad);
+                // The chunk pass culls back faces, so a flat element (a plant's cross plane) is
+                // given its other side too, or it would vanish from behind
+                if (IsFlatAlong(faceIndex, from, to))
+                    quads.Add(BackSide(quad));
             }
         }
 
@@ -158,6 +163,24 @@ public static class ModelBaker
 
         return new BakedQuad(positions, uvs, normal, dominantFace, cullFace,
             IsFullFace(positions, dominantFace), shade, tile);
+    }
+
+    // Whether the element has no thickness along the axis face faceIndex looks down
+    private static bool IsFlatAlong(int faceIndex, Vector3 from, Vector3 to) => faceIndex switch
+    {
+        0 or 1 => MathF.Abs(to.Z - from.Z) < Epsilon,
+        2 or 3 => MathF.Abs(to.X - from.X) < Epsilon,
+        _ => MathF.Abs(to.Y - from.Y) < Epsilon,
+    };
+
+    // The same quad seen from behind: corners in the opposite winding, the normal flipped, culled against nothing
+    private static BakedQuad BackSide(BakedQuad quad)
+    {
+        var positions = new[] { quad.Positions[0], quad.Positions[3], quad.Positions[2], quad.Positions[1] };
+        var uvs = new[] { quad.Uvs[0], quad.Uvs[3], quad.Uvs[2], quad.Uvs[1] };
+        var normal = -quad.Normal;
+        var face = DominantFace(normal);
+        return new BakedQuad(positions, uvs, normal, face, -1, IsFullFace(positions, face), quad.Shade, quad.Tile);
     }
 
     /// <summary>Minecraft's per-face default uv, derived from the box extents in 0..16.</summary>

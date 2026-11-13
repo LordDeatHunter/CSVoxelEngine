@@ -140,6 +140,11 @@ internal sealed class TerrainPasses
             ? HizOcclusion.SegmentStarts(count, PostProcessConfig.ChunkOcclusionSplits, _segmentStarts)
             : 0;
 
+        // Back faces culled: every chunk face is wound to look out of its block (a flat model plane is
+        // baked with both sides), so from inside the rock a cave wall or the surface's top is never drawn
+        // from behind. The camera pass only: the mirror flips the winding and the shadow depth keeps both.
+        _gl.Enable(EnableCap.CullFace);
+        _gl.CullFace(TriangleFace.Back);
         var start = 0;
         for (var s = 0; s < splits; s++)
         {
@@ -154,6 +159,7 @@ internal sealed class TerrainPasses
         }
 
         draws.DrawRange(vao, _owner.ChunkShader, _owner.LocChunkDrawBase, start, count - start);
+        _gl.Disable(EnableCap.CullFace);
     }
 
     // Reused across frames, like _visibleChunks / _visibleRegions
