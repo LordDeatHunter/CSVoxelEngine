@@ -1,0 +1,15 @@
+{
+  // Connected face highlight: run with VOXEL_TIME=147 and VOXEL_SCRIPT=visual-examples/face-highlight.json from OpenGLTest/.
+  // A mold on the sand patch of ingot-piles.json, looked at from above: the whole rim top lights, not one strip.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [157.5, 32, 283.5], "yaw": -90, "pitch": -39 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "setblock", "pos": [157, 12, 279], "block": "mold_axe" },
+    { "op": "setblock", "pos": [159, 12, 279], "block": "casting_basin" },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "teleport", "pos": [158.7, 13.0, 280.7], "yaw": -135, "pitch": -45 },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "mold", "hideHud": true }
+  ]
+}

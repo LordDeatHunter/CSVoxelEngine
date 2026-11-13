@@ -204,15 +204,10 @@ internal sealed class SelectionPasses : IDisposable
         }
         _gl.Disable(EnableCap.CullFace);
 
-        var hitBox = boxes[Math.Clamp(hitBoxIndex, 0, boxes.Length - 1)];
         var faceIndex = FaceIndexFromNormal(hitNormal);
         if (faceIndex >= 0)
         {
-            var hitCenter = blockPosition + hitBox.Center;
-            var faceModel = Matrix4x4.CreateTranslation(new Vector3(-0.5f))
-                            * Matrix4x4.CreateScale(hitBox.Size + new Vector3(grow))
-                            * Matrix4x4.CreateTranslation(hitCenter + hitNormal * 0.003f);
-            _owner.SelectionShader.SetUniform("uMVP", faceModel * viewProj);
+            var region = HitboxFaceRegion.Connected(boxes, Math.Clamp(hitBoxIndex, 0, boxes.Length - 1), hitNormal);
             // The face highlight mixes in display space (selection-fragment.glsl), so its color
             // stays sRGB and it reads the very target it writes: one quad touches each texel
             // once, which is what glTextureBarrier makes legal. Blending is off for that draw.
@@ -225,7 +220,16 @@ internal sealed class SelectionPasses : IDisposable
             _gl.Disable(EnableCap.Blend);
 
             _gl.BindVertexArray(faceVao);
-            _gl.DrawArrays(GLEnum.TriangleFan, faceIndex * 4, 4);
+            // Every connected face of the surface lights up, not just the hit box's strip of it
+            foreach (var index in region)
+            {
+                var box = boxes[index];
+                var faceModel = Matrix4x4.CreateTranslation(new Vector3(-0.5f))
+                                * Matrix4x4.CreateScale(box.Size + new Vector3(grow))
+                                * Matrix4x4.CreateTranslation(blockPosition + box.Center + hitNormal * 0.003f);
+                _owner.SelectionShader.SetUniform("uMVP", faceModel * viewProj);
+                _gl.DrawArrays(GLEnum.TriangleFan, faceIndex * 4, 4);
+            }
 
             _gl.Enable(EnableCap.Blend);
             // Never leave the render target sitting on a sampler unit
