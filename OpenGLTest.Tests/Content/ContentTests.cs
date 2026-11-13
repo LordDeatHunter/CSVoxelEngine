@@ -205,6 +205,21 @@ public sealed class ContentTests
     }
 
     [Fact]
+    public void AFlatModelPlaneIsBakedWithBothSides()
+    {
+        // The chunk pass culls back faces, so every plane of no thickness (a plant's cross) comes with a twin facing
+        // the other way over the same corners, or the plant would vanish from behind
+        var flower = ContentRegistry.RequireBlock("flower").BakedModel!;
+        foreach (var quad in flower.Quads)
+        {
+            var twin = flower.Quads.Where(q => q != quad && Vector3.Dot(q.Normal, quad.Normal) < -0.99f).ToArray();
+            Assert.Single(twin);
+            Assert.Equal(quad.Positions.ToHashSet(), twin[0].Positions.ToHashSet());
+        }
+        Assert.Equal(0, flower.Quads.Length % 2);
+    }
+
+    [Fact]
     public void GlassIsTranslucentAndSelfCulling()
     {
         var glass = ContentRegistry.RequireBlock("glass");
