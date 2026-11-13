@@ -1,0 +1,15 @@
+{
+  // What a Stone Pine trunk leaves at its root when it is cut above it (wood.stump in stone_pine_log.json)
+  "name": "Stone Pine Stump",
+  "stump": true,
+  "model": {
+    "parent": "block/stump",
+    "textures": { "end": "stone_pine_log_top", "side": "stone_pine_log_side" }
+  },
+  "hardness": 12,
+  "sfx": "hit_wood",
+  "hasItem": false,
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": { "min": [0, 0, 0], "max": [1, 0.3125, 1] }
+}

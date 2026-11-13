@@ -11,6 +11,7 @@
   "tools": { "axe": 1 },
   // Same thickness curve and loot bands as the oak log (see oak_log.json)
   "wood": {
+    "stump": "block/spruce_stump",
     "tipHardness": 0.25,
     "handMaxThickness": 4,
     "loot": [ { "minThickness": 0, "loot": "wood" }, { "minThickness": 7, "loot": "self" } ]

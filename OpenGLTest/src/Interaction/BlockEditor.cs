@@ -319,6 +319,8 @@ internal sealed class BlockEditor
                 lowestY[key] = (int)block.Cell.Y;
         }
 
+        LeaveStump(blockPos, brokenId, brokenState, creative, touchedChunks, lowestY, player, ref min, ref max);
+
         // One box for the whole fell, never one per cell (a 500-cell fell times a reach box
         // would be hundreds of thousands of adds): the leaves left standing beyond the
         // Chebyshev-2 sweep lose their tips
@@ -380,6 +382,40 @@ internal sealed class BlockEditor
         // (RemoveBlock's own pop only looks around the cut cell)
         foreach (var block in collected)
             PopUnsupportedAround(block.Cell, player);
+    }
+
+    /// <summary>
+    /// A trunk cut above its root leaves the root as the wood's stump block (<see cref="TreeStump"/>): the cells between
+    /// the root and the cut go with the fell (each drops its own loot unless <paramref name="creative"/>) and the root cell is
+    /// overwritten in place. Joins the batch <see cref="FellWood"/> is already running: the chunks it touches go into
+    /// <paramref name="touchedChunks"/> to be remeshed, its column into <paramref name="lowestY"/> for the far LOD.
+    /// </summary>
+    private void LeaveStump(Vector3 cut, ushort cutId, byte cutState, bool creative, HashSet<Vector3> touchedChunks,
+        Dictionary<(int X, int Z), int> lowestY, PlayerContext player, ref Vector3 min, ref Vector3 max)
+    {
+        if (!TreeStump.TryFind(_chunkManager, cut, cutId, cutState, out var root, out var stumpId, out var between)) return;
+
+        foreach (var (cell, id, state) in between)
+        {
+            var chunkPos = VoxelCoords.ChunkPosOf(cell);
+            if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var target) || target.ClearBlockAt(cell) == 0) continue;
+            _chunkManager.UnmarkPlayerPlaced((int)cell.X, (int)cell.Y, (int)cell.Z);
+            _chunkManager.ChopDamage.Clear((int)cell.X, (int)cell.Y, (int)cell.Z);
+            touchedChunks.Add(chunkPos);
+            _fluidManager.ScheduleAround(cell);
+            if (!creative) _dropManager.SpawnLoot(id, cell, state: state);
+            PopUnsupportedAround(cell, player);
+        }
+
+        var rootChunk = VoxelCoords.ChunkPosOf(root);
+        if (!_chunkManager.Chunks.TryGetValue(rootChunk, out var holder) || holder.ReplaceBlockAt(root, stumpId) == 0) return;
+        _chunkManager.UnmarkPlayerPlaced((int)root.X, (int)root.Y, (int)root.Z);
+        _chunkManager.ChopDamage.Clear((int)root.X, (int)root.Y, (int)root.Z);
+        touchedChunks.Add(rootChunk);
+        _fluidManager.ScheduleAround(root);
+        min = Vector3.Min(min, root);
+        max = Vector3.Max(max, root);
+        lowestY[((int)root.X, (int)root.Z)] = (int)root.Y;
     }
 
     /// <summary>

@@ -1,0 +1,22 @@
+{
+  // Stump check: cut the oak at (-79, 14, -2) (see trees.json for how it was found; its root and the
+  // three cells over it are a full 16 px log) at its third cell, so the root stays as a stump and the
+  // cell between it and the cut goes with the fell. Run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/stump.json
+  // Look for a stump five pixels high with a flared base where the root stood, no log left between
+  // it and the ground, and the rest of the tree on the ground.
+  "steps": [
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-82.5, 16.5, -1.5], "yaw": 0, "pitch": 0 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "before" },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "teleport", "pos": [-80.6, 16.0, -1.5], "yaw": 0, "pitch": -39 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "stump", "hideHud": true },
+    { "op": "teleport", "pos": [-78.5, 15.6, -4.3], "yaw": 90, "pitch": -25 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "stump_side", "hideHud": true }
+  ]
+}

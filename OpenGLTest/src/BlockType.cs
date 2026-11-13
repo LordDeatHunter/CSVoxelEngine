@@ -380,6 +380,14 @@ public sealed record BlockType
     /// use; the block keeps no state of its own.</summary>
     public bool Waystone { get; init; }
 
+    /// <summary>Whether the block is a tree stump (<c>stump: true</c>): what a felled trunk leaves at its root, which takes a
+    /// log on top.</summary>
+    public bool IsStump { get; init; }
+
+    /// <summary>For a tree-wood block, the stump block its natural trunk leaves at the root when cut above it
+    /// (<c>wood.stump</c>), or 0 when it leaves none.</summary>
+    public ushort StumpId { get; internal set; }
+
     /// <summary>
     /// The baked model pre-rotated to each of the four horizontal facings, indexed by facing 0..3
     /// (<c>[0]</c> is <see cref="BakedModel"/> itself, the authored north-facing bake), which the

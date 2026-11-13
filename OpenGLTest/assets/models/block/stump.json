@@ -1,0 +1,34 @@
+{
+    // What a felled trunk leaves at its root: a flared base two pixels tall under a narrower
+    // body, five pixels high in all (a third of a block). Textures are cropped, not squashed,
+    // like the slab's. A model stays inside its cell, so the flare is the base's full width
+    // against a body a pixel narrower on every side.
+    "textures": {
+        "particle": "#side"
+    },
+    "elements": [
+        {
+            "from": [0, 0, 0],
+            "to": [16, 2, 16],
+            "faces": {
+                "down": { "texture": "#end", "cullface": "down" },
+                "up": { "texture": "#side" },
+                "north": { "texture": "#side" },
+                "south": { "texture": "#side" },
+                "west": { "texture": "#side" },
+                "east": { "texture": "#side" }
+            }
+        },
+        {
+            "from": [1, 2, 1],
+            "to": [15, 5, 15],
+            "faces": {
+                "up": { "texture": "#end" },
+                "north": { "texture": "#side" },
+                "south": { "texture": "#side" },
+                "west": { "texture": "#side" },
+                "east": { "texture": "#side" }
+            }
+        }
+    ]
+}

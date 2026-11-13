@@ -19,6 +19,7 @@ internal sealed class BlockLinkResolver
     private readonly List<(ushort Id, string Wall, string Path)> _wall = [];
     private readonly List<(ushort Id, string Upper, string Path)> _upper = [];
     private readonly List<(ushort Id, string Target, string Path)> _pick = [];
+    private readonly List<(ushort Id, string Stump, string Path)> _stump = [];
 
     /// <summary>Queues the references one block's definition declares (contact hardening, freezesTo / meltsTo, multiblock, wall block, upper half, pickAs).</summary>
     internal void Queue(ushort id, BlockDefinition definition, string path)
@@ -36,6 +37,8 @@ internal sealed class BlockLinkResolver
             _wall.Add((id, definition.WallBlock, path));
         if (definition.UpperHalf != null)
             _upper.Add((id, definition.UpperHalf, path));
+        if (definition.Wood?.Stump != null)
+            _stump.Add((id, definition.Wood.Stump, path));
         if (definition.PickAs != null)
             _pick.Add((id, definition.PickAs, path));
     }
@@ -89,6 +92,10 @@ internal sealed class BlockLinkResolver
             types[upperId].LowerHalfId = pendingId;
             types[upperId].ItemBlockId = pendingId;
         }
+
+        // A log names the stump its trunk leaves; the stump files load after (or before) it
+        foreach (var (pendingId, stump, pendingPath) in _stump)
+            types[pendingId].StumpId = ResolveStump(stump, pendingPath);
 
         // A pickAs target may load after its owner too; run last, so an owner the loops above
         // already made a wall block or an upper half is refused.
@@ -206,6 +213,18 @@ internal sealed class BlockLinkResolver
         if (owner.ItemBlockId != 0)
             throw new InvalidOperationException(
                 $"Block '{path}' sets pickAs but is already picked as another block through a wallBlock or upperHalf.");
+        return id;
+    }
+
+    /// <summary>Resolves a log's <c>wood.stump</c>: it must name a registered block that sets <c>stump: true</c>.</summary>
+    private static ushort ResolveStump(string name, string path)
+    {
+        if (!ContentFiles.TryResolve(name, out var id) || id == BlockType.Air || ItemRegistry.IsItem(id))
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in wood.stump, which is not a registered block.");
+        if (!BlockType.ById[id]!.IsStump)
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in wood.stump, which does not set stump: true.");
         return id;
     }
 

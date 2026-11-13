@@ -519,6 +519,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         TreeSpecies.cs, TreeSpeciesCompiler.cs,
           TreeSpeciesRegistry.cs, TreeWorldgenRules.cs  # compiled species, its validation, the registry, worldgen rules
         TreeSupport.cs, TreeSupportResult.cs  # which wood stands: paths to an anchor (felling, crumbling)
+        TreeStump.cs                          # what a trunk cut above its root leaves: the root cell as the wood's stump (FellWood)
         Features/              # features[]: post-growth stages (roots, buttress) and their registry
           RootsFeature.cs, ButtressFeature.cs  # roots down into carved air; buttress fins
           ITreeFeature.cs, TreeFeatureRegistry.cs,

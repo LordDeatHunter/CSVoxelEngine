@@ -13,6 +13,7 @@
   "requiresTool": true,
   "tools": { "axe": 1 },
   "wood": {
+    "stump": "block/sky_oak_stump",
     "tipHardness": 0.25,
     "handMaxThickness": 4,
     "loot": [ { "minThickness": 0, "loot": "wood" }, { "minThickness": 7, "loot": "self" } ]

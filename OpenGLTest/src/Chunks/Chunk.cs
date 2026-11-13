@@ -510,6 +510,20 @@ public class Chunk : IDisposable
     }
 
     /// <summary>
+    /// Overwrites a breakable block with <paramref name="id"/> (state zero) without remeshing and returns the replaced id
+    /// (0 if the cell was outside this chunk, air or unbreakable, which is left standing). Like
+    /// <see cref="ClearBlockAt"/>, the caller must remesh every touched chunk and run the edit-path hooks. Main thread only.
+    /// </summary>
+    public ushort ReplaceBlockAt(Vector3 worldPos, ushort id)
+    {
+        if (!TryLocal(worldPos, out var x, out var y, out var z)) return 0;
+        var existing = _blocks.Get(Idx(x, y, z));
+        if (existing == 0 || BlockType.IsUnbreakable(existing)) return 0;
+        SetBlockRaw(x, y, z, id, 0);
+        return existing;
+    }
+
+    /// <summary>
     /// The one sanctioned write over an unbreakable block (the battle tower's collapse, BT-8):
     /// writes <paramref name="id"/> and <paramref name="state"/> into the cell whatever holds it
     /// and returns the previous id (0 outside this chunk). Like <see cref="ClearBlockAt"/> it

@@ -181,6 +181,7 @@ internal static class BlockLoader
             Anvil = BlockSchemaParser.ParseAnvil(definition.Anvil, renderer, path),
             SpellBuilder = definition.SpellBuilder ?? false,
             Waystone = definition.Waystone ?? false,
+            IsStump = definition.Stump ?? false,
             Chest = BlockSchemaParser.ParseChest(definition.Chest, renderer, path),
             Lantern = definition.Lantern,
             StackMax = (byte)stack.StackMax,

@@ -189,6 +189,8 @@ chunk drops the cell from the schedule (it freezes, never decays), and a chunk l
 nothing. Tuning: `LeafDecayTickSeconds`, `MaxLeafDecayTicksPerFrame`, `MaxLeafDecayCellsPerFrame`,
 `MaxLeafDecayBacklogCells`.
 
+**Stumps** (`TreeStump.TryFind`, `BlockEditor.LeaveStump`). A natural trunk cut above its root (the cut cell's parent links all point straight down to the root, so a limb never qualifies, and a cut of the root itself fells everything as before) keeps only the root cell, overwritten in place by the block its log names in `wood.stump` (`BlockType.StumpId`, a block with `stump: true`); the trunk cells between the root and the cut go with the fell and drop their own loot. A wood with no `wood.stump` (a cactus) and a wide trunk's shell cut leave no stump. Breaking a stump drops its log (`loot/<species>_stump.json`). The stump model stays inside its cell, so the flare is a 16 px base under a 14 px body, 5 px high in all.
+
 **Felling** (`BlockEditor.FellWood` -> `TopplingTree.Collect`). Mining tree wood fells the cells that
 lose every path to an anchor once the cut cell is gone, through the GL-free bounded search
 `TreeSupport` (`TreeSupportResult` Supported / Unsupported / Unknown): links are parent edges

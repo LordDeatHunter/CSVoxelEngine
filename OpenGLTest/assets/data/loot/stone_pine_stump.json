@@ -1,0 +1,11 @@
+{
+  // Breaking a stump gives the log back
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "block/stone_pine_log", "count": 1 }
+      ]
+    }
+  ]
+}

@@ -192,6 +192,12 @@ public sealed class BlockDefinition
     public OpenDefinition? Open { get; set; }
 
     /// <summary>
+    /// Marks this block as a tree stump: what a felled trunk leaves standing at its root (named by that
+    /// log's <c>wood.stump</c>). Mining it gives its loot like any block; a stump takes a log on top.
+    /// </summary>
+    public bool? Stump { get; set; }
+
+    /// <summary>
     /// Makes this block the lower half of a block two cells tall (a door): the block named here
     /// fills the cell above it. Placement writes both halves with one state byte (and needs both
     /// cells free), breaking either removes the other and drops this block once, and an openable
@@ -610,6 +616,12 @@ public sealed class BlockDefinition
         /// block always drops itself.
         /// </summary>
         public LootBandDefinition[]? Loot { get; set; }
+
+        /// <summary>
+        /// <c>tree_wood</c> only: the stump block (one with <c>stump: true</c>) a natural trunk of this wood leaves
+        /// at its root when it is cut above the root. Omitted means this wood leaves no stump (a cactus).
+        /// </summary>
+        public string? Stump { get; set; }
     }
 
     /// <summary>One thickness band of a <c>tree_wood</c> block's loot.</summary>

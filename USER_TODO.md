@@ -9,6 +9,7 @@
 ## Items
 
 - [ ] **Lumber** — `items/lumber.png` is a generated stack of boards (`tools/generate-lumber-sprite.py`); replace with hand-drawn art and delete the generator.
+- [ ] **Stumps** — `blocks/<species>_stump.json` reuse each log's side and end tiles on `models/block/stump.json`; give them their own cut-wood tile if the ring should differ from a log's end.
 - [ ] **Everfuel** — `items/everfuel.json` currently reuses `coal.png`; replace with a distinct endless-fuel icon.
 
 Paths are under `OpenGLTest/assets/textures/items/`. All sprites are 32x32 RGBA unless noted, with
