@@ -95,7 +95,7 @@ public sealed class SkyRenderer : IDisposable
     /// the view direction alone, so the mirror's dome shows each one where its reflection belongs.
     /// </summary>
     public void Render(Matrix4x4 invViewRotProj, in SkyPalette sky, Vector3 sunDir, Vector3 tint, float tintAmount,
-        in SkyDomeFrame frame)
+        Vector4 waterBelow, in SkyDomeFrame frame)
     {
         _gl.Disable(EnableCap.DepthTest);
         _gl.DepthMask(false);
@@ -110,6 +110,7 @@ public sealed class SkyRenderer : IDisposable
         _shader.SetUniform("uSunDir", sunDir);
         _shader.SetUniform("uSkyTint", tint);
         _shader.SetUniform("uSkyTintAmount", tintAmount);
+        _shader.SetUniform("uSkyWaterBelow", waterBelow);
 
         _shader.SetUniform("uStarVisibility", frame.StarVisibility);
         _shader.SetUniform("uStarTime", frame.StarTime);

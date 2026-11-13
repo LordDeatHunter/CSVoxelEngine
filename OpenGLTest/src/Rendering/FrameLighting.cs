@@ -6,6 +6,7 @@ using VoxelEngine.Effects.Climate;
 using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Effects.Post;
 using VoxelEngine.Effects.Sky;
+using VoxelEngine.Effects.Water;
 using VoxelEngine.Entities;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
@@ -87,9 +88,18 @@ internal sealed class FrameLighting
     private Vector3 _cloudAmbientSrgb = Vector3.One;
     private Vector3 _skyTint;
     private float _skyTintAmount;
+    // The dome below the horizon with the eye in water: the fog color there (rgb) by how far the
+    // eye is under (a); zero dry and in lava (sky-fragment.glsl's uSkyWaterBelow)
+    private Vector4 _skyWaterBelow;
     private float _fogWet;
     private float _fogNear = LightingConfig.FogNearBlocks;
     private float _fogFar = LightingConfig.FogFarBlocks;
+    // The fog range before the water closes it in: what the air above the surface still fogs by
+    // when it is seen from below (uDryFog, and the cloud pass under water)
+    private float _dryFogNear = LightingConfig.FogNearBlocks;
+    private float _dryFogFar = LightingConfig.FogFarBlocks;
+    // The eased open-water weight at the eye (OpenWater, 0 a pond to 1 a sea): picks the ocean fog
+    private float _openWater;
     private Vector3 _cameraPos;
     private float _time;
     // The same lighting clock in double, for the cloud drift: Wind.Offset needs the precision a
@@ -134,6 +144,7 @@ internal sealed class FrameLighting
     // stay for UiPasses.RenderUI's wash rect, which draws after the tonemap onto the gamma
     // framebuffer.
     private static readonly Vector3 UnderwaterFogColorLinear = ColorSpace.SrgbToLinear(UnderwaterFogColor);
+    private static readonly Vector3 OceanFogColorLinear = ColorSpace.SrgbToLinear(WaterRenderConfig.OceanFogColor);
     private static readonly Vector3 UnderwaterAmbientTintLinear = ColorSpace.SrgbToLinear(UnderwaterAmbientTint);
     private static readonly Vector3 LavaFogColorLinear = ColorSpace.SrgbToLinear(LavaFogColor);
     private static readonly Vector3 LavaAmbientTintLinear = ColorSpace.SrgbToLinear(LavaAmbientTint);
@@ -188,9 +199,13 @@ internal sealed class FrameLighting
     internal Vector3 CloudAmbientSrgb => _cloudAmbientSrgb;
     internal Vector3 SkyTint => _skyTint;
     internal float SkyTintAmount => _skyTintAmount;
+    internal Vector4 SkyWaterBelow => _skyWaterBelow;
     internal float FogWet => _fogWet;
     internal float FogNear => _fogNear;
     internal float FogFar => _fogFar;
+    internal float DryFogNear => _dryFogNear;
+    internal float DryFogFar => _dryFogFar;
+    internal float OpenWaterAmount => _eyeInLava ? 0f : _openWater;
     // Settable: the water mirror swaps in its mirrored eye around its own frame uniforms.
     internal Vector3 CameraPos { get => _cameraPos; set => _cameraPos = value; }
     internal float Time => _time;
@@ -398,6 +413,12 @@ internal sealed class FrameLighting
         // below, so only the fog closes in. Lava is an opaque glow, so it still fades both to
         // red (eased through _lavaT) and stays bright at night.
         _eyeInLava = eyeInLava && underwater;
+        // Open water eases while the eye swims from a bay into the sea, but a fresh dive starts at
+        // the body it dove into: the camera's value is stale while the eye is dry
+        var openTarget = camera?.EyeOpenWater ?? 0f;
+        _openWater = _underwaterT <= 0f
+            ? openTarget
+            : MathUtils.Damp(_openWater, openTarget, WaterRenderConfig.OpenWaterEaseRate, dt);
         _underwaterT = MathUtils.Clamp01(
             _underwaterT + (underwater ? dt : -dt) / WaterRenderConfig.UnderwaterFadeSeconds);
         var wet = MathUtils.SmoothStep(_underwaterT);
@@ -471,15 +492,21 @@ internal sealed class FrameLighting
         };
 
         // A cave biome and hell's caverns close the dry fog in; water closes it further
-        _fogNear = MathUtils.Lerp(MathUtils.Lerp(CaveClimate.FogNear(LightingConfig.FogNearBlocks, cave),
-            SkyConfig.HellFogNearBlocks, _hellT), WaterRenderConfig.UnderwaterFogNearBlocks, wet);
-        _fogFar = MathUtils.Lerp(MathUtils.Lerp(CaveClimate.FogFar(LightingConfig.FogFarBlocks, cave),
-            SkyConfig.HellFogFarBlocks, _hellT), WaterRenderConfig.UnderwaterFogFarBlocks, wet);
+        _dryFogNear = MathUtils.Lerp(CaveClimate.FogNear(LightingConfig.FogNearBlocks, cave),
+            SkyConfig.HellFogNearBlocks, _hellT);
+        _dryFogFar = MathUtils.Lerp(CaveClimate.FogFar(LightingConfig.FogFarBlocks, cave),
+            SkyConfig.HellFogFarBlocks, _hellT);
+        // The sea's fog reaches further than a pond's; lava keeps the close one
+        var sea = OpenWaterAmount;
+        _fogNear = MathUtils.Lerp(_dryFogNear, WaterRenderConfig.UnderwaterFogNearBlocks, wet);
+        _fogFar = MathUtils.Lerp(_dryFogFar, MathUtils.Lerp(WaterRenderConfig.UnderwaterFogFarBlocks,
+            WaterRenderConfig.OceanFogFarBlocks, sea), wet);
 
         // Reset before the dry early-out, or a tint would stick after leaving water or lava
         _fogWet = wet;
         _skyTint = Vector3.Zero;
         _skyTintAmount = 0f;
+        _skyWaterBelow = Vector4.Zero;
 
         if (wet <= 0f) return;
 
@@ -487,10 +514,17 @@ internal sealed class FrameLighting
             // The dayness dims were tuned as display-space factors; raised to 1.6 (matched against the
             // old night shots) they dim the linear colors about as much on screen as they used to
             ? LavaFogColorLinear * MathF.Pow(0.6f + 0.4f * dayness, 1.6f)
-            : UnderwaterFogColorLinear * MathF.Pow(0.15f + 0.85f * dayness, 1.6f);
+            : Mix(UnderwaterFogColorLinear, OceanFogColorLinear, sea) * MathF.Pow(0.15f + 0.85f * dayness, 1.6f);
         _skyTint = underwaterColor;
         _skyTintAmount = lavaWet;
         _fogColor = Mix(_fogColor, underwaterColor, wet);
+        if (!_eyeInLava && camera != null)
+        {
+            // What the world fragment fogs a level ray to (WetFogColor): the deep-water dim and the
+            // open-water shade at the horizon
+            var depth = camera.EyeWaterSurfaceY - camera.RenderEye.Y;
+            _skyWaterBelow = new Vector4(_fogColor * DeepWaterFog.Tint(depth) * OpenWater.FogShade(0f, sea), wet);
+        }
         // _fogColor was copied from the dry _skyColor earlier, so this leaves the fog tint alone;
         // afterwards _skyColor only feeds the clear color, which the window shows from below.
         _skyColor = Mix(_skyColor, underwaterColor, lavaWet);
@@ -538,6 +572,7 @@ internal sealed class FrameLighting
         // The eased eye state belongs to the world just released: without this, a quit from
         // underwater would wash the next world's first frames in the fading tint.
         _underwaterT = 0f;
+        _openWater = 0f;
         _lavaT = 0f;
         _eyeInLava = false;
         _hellT = 0f;

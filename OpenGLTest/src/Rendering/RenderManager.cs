@@ -234,6 +234,8 @@ public class RenderManager : IDisposable
     // The eye's depth below its own water surface (Camera.EyeWaterSurfaceY), read in BeginFrame for
     // the deep-water darkness (DeepWaterFog); 0 while the eye is dry or in lava
     private float _eyeWaterDepth;
+    // That surface's world Y (sticky, so the fade out of the water keeps its plane)
+    private float _eyeSurfaceY;
 
     // Hemispheric ambient: the sRGB-authored tint the sky ambient is multiplied by for a face
     // looking straight down (warmer and darker than the sky - light bounced off the ground).
@@ -699,6 +701,11 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterNormalScale", WaterRenderConfig.WaterNormalScale);
         program.SetUniform("uWaterRefractStrength", WaterRenderConfig.WaterRefractStrength);
         program.SetUniform("uWaterWindowRefract", WaterRenderConfig.WaterWindowRefractScale);
+        program.SetUniform("uWaterUnderMirror", WaterRenderConfig.WaterUnderMirror);
+        program.SetUniform("uWaterUnderHaze", new Vector4(WaterRenderConfig.WaterUnderTint, WaterRenderConfig.WaterUnderHaze));
+        program.SetUniform("uWaterUnderGrazeRefract", WaterRenderConfig.WaterUnderGrazeRefract);
+        program.SetUniform("uOceanFogShade", new Vector3(WaterRenderConfig.OceanFogShadeDown,
+            WaterRenderConfig.OceanFogShadeUp, WaterRenderConfig.OceanFogShadeSpan));
         program.SetUniform("uWaterAbsorb", WaterRenderConfig.WaterAbsorb);
         program.SetUniform("uWaterScatter", ColorSpace.SrgbToLinear(WaterRenderConfig.WaterScatter));
         program.SetUniform("uWaterCausticStrength", WaterRenderConfig.WaterCausticStrength);
@@ -858,6 +865,7 @@ public class RenderManager : IDisposable
         _eyeWaterDepth = camera is { IsEyeInWater: true, IsEyeInLava: false }
             ? camera.EyeWaterSurfaceY - camera.RenderEye.Y
             : 0f;
+        _eyeSurfaceY = camera?.EyeWaterSurfaceY ?? 0f;
         ApplyFrameUniforms();
         gl.Enable(EnableCap.Blend);
         // The world passes rely on straight alpha blending for the fluid mesh and the chunk
@@ -1009,6 +1017,11 @@ public class RenderManager : IDisposable
         // underwater tint; nothing in lava, whose fog is its own red glow
         program.SetUniform("uDeepWaterDim",
             Lighting.EyeInLava ? Vector3.Zero : DeepWaterFog.Dim(_eyeWaterDepth) * MathUtils.SmoothStep(Lighting.UnderwaterT));
+        // What the path-aware underwater fog needs (UnderwaterPath): the eye's own water surface, the
+        // fog range of the air above it, and the open-water weight that shades the ocean fog
+        program.SetUniform("uEyeSurfaceY", _eyeSurfaceY);
+        program.SetUniform("uDryFog", new Vector2(Lighting.DryFogNear, Lighting.DryFogFar));
+        program.SetUniform("uOpenWater", Lighting.OpenWaterAmount);
     }
 
     /// <summary>

@@ -15,9 +15,11 @@
 // caustic net on top, projected back up the sun direction to the sea plane.
 // Seen from below (a per-fragment side test against the face normal, not the sea plane, since
 // a pond stands above sea level) the surface is a Snell window: the scene copy is shown through
-// it distorted by the wave normal, the inside fresnel goes to total internal reflection past the
-// critical angle, and that band fades to the underwater fog color instead of sampling the
-// sea-level mirror, which is never valid from that side.
+// it distorted by the wave normal, and the inside fresnel, scaled down by uWaterUnderMirror so
+// the world above stays readable past the critical angle too, mixes in a screen-space mirror of
+// the water body below (the sea-level mirror is never valid from that side). The underwater fog
+// charges only the wet part of a view ray (WetShare), so what stands above the surface is not
+// fogged over its whole distance.
 in vec4 fColor;
 in vec2 fTexCoord;
 flat in uint fLayer;
@@ -129,6 +131,15 @@ uniform float uFogWet;
 // Deep-water darkness (DeepWaterFog): how much the wet fog color is dimmed per channel with the
 // eye's depth below the water surface; 0 (dry, in lava, and the ItemDebugger's default) leaves it.
 uniform vec3 uDeepWaterDim;
+// The path-aware underwater fog (UnderwaterPath is the twin). All inert while uUnderwater is 0
+// (dry, in lava, the ItemDebugger): the world Y of the water surface over the eye, the fog range
+// (near, far) of the air above it, and how much that water is open sea (OpenWater: 0 a pond, 1 a
+// sea), which shades the fog by the view direction with uOceanFogShade (looking down, looking
+// up, the |dir.y| where the shade reaches those ends).
+uniform float uEyeSurfaceY;
+uniform vec2 uDryFog;
+uniform float uOpenWater;
+uniform vec3 uOceanFogShade;
 uniform int uNumPointLights;
 uniform vec3 uPointPos[8];
 uniform vec3 uPointColor[8];
@@ -191,6 +202,15 @@ uniform float uWaterRefractStrength;
 // Multiplies the refraction offset for a face seen from behind: the Snell window squeezes the
 // whole sky into ~97 degrees, so the same wave tilt swings the view through it further.
 uniform float uWaterWindowRefract;
+// How much of the physical inside reflection the underside of the surface keeps: below 1 the
+// world above shows through the whole underside rather than only inside the Snell window.
+uniform float uWaterUnderMirror;
+// What the water does to the world seen up through the surface: rgb multiplies it (the water's
+// blue cast), a mixes that much of the fog color over it (the haze of the water under the surface).
+uniform vec4 uWaterUnderHaze;
+// Past the critical angle the refraction offset from behind shrinks to this share: the far
+// shore sits in a thin band there, and the full window offset tears it into ribbons.
+uniform float uWaterUnderGrazeRefract;
 // Water's index of refraction over air's. The window's critical angle and the total internal
 // reflection past it both follow from it; it is physics, not tuning, hence not a uniform.
 const float WaterEta = 1.333;
@@ -288,6 +308,23 @@ vec3 SkySample(vec3 dir)
 // linearize. A ray that ends behind the scene within the thickness tolerance is a hit; one
 // that ends far behind has passed behind an occluder and misses. The copy holds no water or
 // glass, so SSR never reflects those - acceptable for a fallback.
+// The share of the straight ray from the eye to a point that runs below the water surface
+// (UnderwaterPath.WetShare): all of it at or below the surface, less the higher the point stands.
+float WetShare(float eyeY, float surfaceY, float pointY)
+{
+    if (!(pointY > surfaceY)) return 1.0;
+    return clamp((surfaceY - eyeY) / (pointY - eyeY), 0.0, 1.0);
+}
+
+// The underwater fog color along a view direction: the flat wet color, dimmed by the eye's depth
+// (uDeepWaterDim), and in open water shaded darker toward the deep and brighter toward the lit
+// surface (OpenWater.FogShade). Exactly uFogColor while every underwater term is zero.
+vec3 WetFogColor(vec3 dir)
+{
+    float shade = mix(uOceanFogShade.x, uOceanFogShade.y, smoothstep(-uOceanFogShade.z, uOceanFogShade.z, dir.y));
+    return uFogColor * (1.0 - uDeepWaterDim) * mix(1.0, shade, uOpenWater * uUnderwater);
+}
+
 vec3 WaterSsr(vec3 P, vec3 R, vec3 miss)
 {
     vec3 p = P + R * 0.05;
@@ -1117,12 +1154,14 @@ void main() {
         float F;
         if (fromBehind) {
             // Inside looking out: Snell's window. Past the critical angle (sin > 1/eta, ~48.6
-            // degrees off the normal) nothing gets through and the underside is a mirror of the
-            // water below; inside it, Schlick on the TRANSMITTED angle, which is what a
-            // dense-to-thin interface reflects by. The rise to 1 is steep but continuous, and
-            // the wave normal ripples its edge.
+            // degrees off the normal) the true underside is a full mirror of the water below;
+            // inside it, Schlick on the TRANSMITTED angle, which is what a dense-to-thin
+            // interface reflects by. The rise is steep but continuous, and the wave normal
+            // ripples its edge. Kept only in part (uWaterUnderMirror): a full mirror hides
+            // everything above the water from a swimmer, so past the critical angle the
+            // underside is the world above with the seabed mirrored over it.
             float sinT2 = WaterEta * WaterEta * (1.0 - cosT * cosT);
-            F = sinT2 >= 1.0 ? 1.0 : 0.06 + 0.94 * pow(1.0 - sqrt(1.0 - sinT2), 5.0);
+            F = (sinT2 >= 1.0 ? 1.0 : 0.06 + 0.94 * pow(1.0 - sqrt(1.0 - sinT2), 5.0)) * uWaterUnderMirror;
         } else {
             F = 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
         }
@@ -1131,7 +1170,8 @@ void main() {
         // wave normal. If that spot is in front of the surface (a post, the shore) it is not
         // behind the water, so fall back to the straight-down sample.
         vec2 uv = gl_FragCoord.xy * uInvViewport;
-        float refractStrength = uWaterRefractStrength * (fromBehind ? uWaterWindowRefract : 1.0);
+        float refractStrength = uWaterRefractStrength
+            * (fromBehind ? uWaterWindowRefract * mix(uWaterUnderGrazeRefract, 1.0, smoothstep(0.35, 0.75, cosT)) : 1.0);
         vec2 off = nW.xz * (refractStrength / (1.0 + dist * 0.15));
         vec2 ruv = uv + FadeTapOffset(uv, off);
         // Safety net only: the edge fade above is what keeps the tap off the border texel (and
@@ -1140,6 +1180,9 @@ void main() {
         float refrDepth = texture(uSceneDepth, ruv).r;
         if (refrDepth < gl_FragCoord.z) { ruv = uv; refrDepth = texture(uSceneDepth, uv).r; }
         vec3 behind = texture(uSceneColor, ruv).rgb;
+        // Looking up and out, the world above takes the water's blue cast and a little of its haze
+        if (fromBehind)
+            behind = mix(behind, mix(behind * uWaterUnderHaze.rgb, WetFogColor(-V), uWaterUnderHaze.a), uUnderwater);
 
         // How much water the eye looks through: the distance from this surface point to what the
         // scene copy saw behind it. The reconstruction inverts the exact projection that wrote
@@ -1175,11 +1218,9 @@ void main() {
         vec3 refr = behind * exp(-uWaterAbsorb * thickness)
                   + uWaterScatter * waterLight * (1.0 - exp(-0.1 * thickness));
 
-        // From behind, this fallback IS the look: past the critical angle the underside mirrors
-        // the water body below, and the underwater fog color (already blended to the tint by
-        // SetLighting, dimmed by skylight just below) stands in for that scene. The sea-level
-        // mirror is only valid for a face seen from above, whatever height the eye is at.
-        // (darkened with the eye's depth like the fog it stands in for: the deep-water darkness)
+        // The fallback when there is no mirror: the fog color (dimmed by skylight just below).
+        // The sea-level mirror is only valid for a face seen from above, whatever height the
+        // eye is at; a face seen from behind takes the mirror of the water body further down.
         vec3 refl = uFogColor * (1.0 - uDeepWaterDim);
         if (uReflValid > 0.5 && !fromBehind) {
             vec4 rp = uReflViewProj * vec4(fWorldPos, 1.0);
@@ -1191,6 +1232,16 @@ void main() {
         // No sky to mirror underground: dim the reflection (fallback or stale mirror
         // alike) by the voxel skylight, or sealed caves glow sky-blue in daytime.
         refl *= skyDim;   // the cheap path's clamp(0.12 + 0.88 * fSun) above
+        // From behind the underside mirrors the water body below: a short screen-space march
+        // down the reflected ray finds the seabed and what grows on it in the scene copy (already
+        // lit and fogged, so it stays undimmed), and a miss is the open water, the fog color
+        // that way.
+        if (fromBehind) {
+            vec3 Rd = reflect(-V, nW);
+            Rd.y = min(Rd.y, -0.02);
+            Rd = normalize(Rd);
+            refl = WaterSsr(fWorldPos, Rd, WetFogColor(Rd) * skyDim);
+        }
         // Off the sea plane (a pond above sea level) the planar mirror reflects the wrong
         // height, so a short screen-space march takes over by the surface's plane error.
         // Fluid quads carry flow codes rather than fWaterSurfaceY, so the fragment's own Y is
@@ -1238,20 +1289,37 @@ void main() {
         }
     }
 
-    float f = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
+    // With the eye in water the fog is the water itself, so it charges only the wet part of the
+    // view ray. An opaque fragment above the eye's water surface is seen through the surface,
+    // whose own fragment (drawn over it, at the full distance to the surface) pays for that wet
+    // part; what is left for this fragment is the air beyond, fogged by the dry range toward the
+    // dome. Water fragments always take the full distance: a wave crest stands above the plane.
+    // The hand-over rises over the first block above the surface, so what sits in the waterline
+    // with no water face over it (an ice lid, a bank's lip) still fogs.
+    vec3 fogDir = (fWorldPos - uCameraPos) / max(dist, 1e-4);
+    float wetDist = dist;
+    if (uUnderwater > 0.0 && !isWater && fWorldPos.y > uEyeSurfaceY) {
+        float above = smoothstep(0.25, 1.25, fWorldPos.y - uEyeSurfaceY) * uUnderwater;
+        float dryDist = dist * (1.0 - WetShare(uCameraPos.y, uEyeSurfaceY, fWorldPos.y));
+        wetDist = dist * (1.0 - above);
+        float fd = clamp((dryDist - uDryFog.x) / (uDryFog.y - uDryFog.x), 0.0, 1.0) * above;
+        if (fd > 0.0)
+            col = SrgbToLinear(mix(LinearToSrgb(min(col, vec3(1.0))),
+                                   LinearToSrgb(min(SkySample(fogDir), vec3(1.0))), fd * fd));
+    }
+    float f = clamp((wetDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     // Fog toward the dome's own color in the view direction, so a fully fogged fragment is
     // exactly the sky behind it (seamless LOD edge against the graded sky). The outer branch
     // keeps the cost at zero inside FogNear; underwater (uFogWet ~1) the sample would be
     // thrown away, so it is skipped. In the mirror pass uCameraPos is the mirrored eye.
     if (f > 0.0) {
         // Deep-water darkness: underwater the flat fog color darkens and loses red with the eye's
-        // depth below the surface (uDeepWaterDim, from DeepWaterFog; zero dry and in lava).
-        vec3 wetFogColor = uFogColor * (1.0 - uDeepWaterDim);
+        // depth below the surface (uDeepWaterDim, from DeepWaterFog; zero dry and in lava), and in
+        // open water it is shaded by the view direction (WetFogColor).
+        vec3 wetFogColor = WetFogColor(fogDir);
         vec3 fogCol = wetFogColor;
-        if (uFogWet < 0.999) {
-            vec3 fogDir = (fWorldPos - uCameraPos) / max(dist, 1e-4);
+        if (uFogWet < 0.999)
             fogCol = mix(SkySample(fogDir), wetFogColor, uFogWet);
-        }
         // Squared ramp, mixed in display space in dry air: the same f*f mix done in linear
         // light reads visibly hazier (a half-fogged dark forest lands far brighter once
         // encoded), so the dry mix encodes both ends, mixes, and decodes again - the pre-SH-10

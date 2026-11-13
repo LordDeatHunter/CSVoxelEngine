@@ -1,0 +1,49 @@
+{
+  // The view from under water: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/underwater-view.json
+  // Shots land in visual/underwater-view/. Flight holds every pose (see deep-water.json).
+  // The underside of the surface should show the world above it (sky, clouds, the sun, any
+  // shore) across the whole upper half of the frame, not only inside the Snell window, with the
+  // seabed faintly mirrored over it toward the horizon; the fog charges only the water part of a
+  // view ray (UnderwaterPath), so a far shore above the surface is not fogged out.
+  //   sea_yaw*      the warm sea at x~432, z~0 (open water: the longer, bluer ocean fog, darker
+  //                 looking down and brighter looking up, OpenWater), 2.5 blocks down, level
+  //   sea_up45/80   the same spot looking up through the surface
+  //   sea_down      looking down into the deep
+  //   pond_*        water.json's pond above sea level at (-305, 474): a small body, so it keeps
+  //                 the close plain fog. Under the current worldgen it carries an ice lid, so
+  //                 these show the lid and the banks beyond it rather than a liquid underside
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [432.5, 10.5, 0.5], "yaw": 0, "pitch": -20 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [432.5, -2.5, 0.5], "yaw": 0, "pitch": 12 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "sea_yaw0", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": 12 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "sea_yaw90", "hideHud": true },
+    { "op": "look", "yaw": 180, "pitch": 12 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "sea_yaw180", "hideHud": true },
+    { "op": "look", "yaw": 270, "pitch": 12 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "sea_yaw270", "hideHud": true },
+    { "op": "look", "yaw": 0, "pitch": 45 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "sea_up45", "hideHud": true },
+    { "op": "look", "yaw": 0, "pitch": 80 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "sea_up80", "hideHud": true },
+    { "op": "look", "yaw": 0, "pitch": -40 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "sea_down", "hideHud": true },
+    { "op": "teleport", "pos": [-304.5, 3.2, 474.5], "yaw": -90, "pitch": 70 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "screenshot", "name": "pond_up", "hideHud": true },
+    { "op": "look", "yaw": -90, "pitch": 15 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "pond_graze", "hideHud": true }
+  ]
+}

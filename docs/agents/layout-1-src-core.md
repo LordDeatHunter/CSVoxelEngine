@@ -445,10 +445,12 @@ OpenGLTest/
         LavaPulse.cs           # GL-free twin of the lava glow pulse: the slow noise field and the brightness factor
         LeafBacklight.cs       # GL-free twin of the leaf backlight: lobe around the sun, sun and light-through gates
         OreTwinkle.cs          # GL-free twin of the ore twinkle: per-texel cycle, the flash tent, sun/distance gate
-      Water/                   # deep-water fog, the wet waterline fresnel, sun glitter
+      Water/                   # deep-water and ocean fog, the underwater view ray, the wet waterline fresnel, sun glitter
         DeepWaterFog.cs        # the deep-water darkness curve: per-channel fog dim from the eye's depth, red first
+        OpenWater.cs           # how open the water around a submerged eye is (probe share, weight), the ocean fog shade
         SurfaceFresnel.cs      # GL-free twin of the surface fresnel terms in test-fragment.glsl:
                                #   the shared Schlick helper the ore path reads
+        UnderwaterPath.cs      # the wet share of a submerged eye's view ray: the fog charges only the water part
         WaterGlitter.cs        # GL-free twin of the sun glitter on water: mirror lobe, sparkle life and spot, gate
     Entities/                  # mobs (the Mob base and the shared GL-free mob rules; the goblin, the hell mobs and the slime below), item drops, projectiles,
                                #   primed TNT, falling blocks, damage numbers, the entity animator and clips

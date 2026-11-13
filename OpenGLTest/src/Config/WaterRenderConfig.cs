@@ -172,4 +172,33 @@ public static class WaterRenderConfig
     public const float DeepWaterFogMaxDim = 0.85f;
     public const float DeepWaterFogScaleBlocks = 16f;
     public static readonly Vector3 DeepWaterFogLoss = new(1.6f, 1.0f, 0.8f);
+
+    // Open water (OpenWater): a submerged eye probes 8 directions at each of these radii (blocks)
+    // for water at its own surface level. Up to ShareNear of them wet is a small body (a pond, a
+    // river, a cave pool) and keeps the plain fog above; from ShareFar it is a sea and gets the
+    // ocean fog below. The weight eases at OpenWaterEaseRate per second while swimming between them.
+    public static readonly int[] OpenWaterProbeRadii = [12, 24, 36];
+    public const float OpenWaterShareNear = 0.4f;
+    public const float OpenWaterShareFar = 0.8f;
+    public const float OpenWaterEaseRate = 2f;
+    // The ocean fog: reaches further, is a fuller blue (sRGB, dimmed by dayness like the plain
+    // color) and is shaded by the view direction, darker looking down into the deep and brighter
+    // looking up at the lit surface (OpenWater.FogShade; the span is the |dir.y| where the shade
+    // reaches its end values).
+    public const float OceanFogFarBlocks = 96f;
+    public static readonly Vector3 OceanFogColor = new(0.05f, 0.30f, 0.62f);
+    public const float OceanFogShadeDown = 0.65f;
+    public const float OceanFogShadeUp = 1.5f;
+    public const float OceanFogShadeSpan = 0.6f;
+    // How much of the physical inside reflection the underside of the surface keeps. At 1 it would
+    // be the true Snell window (a mirror of the water below everywhere past the critical angle);
+    // lower lets the world above show through the whole underside, with the seabed mirrored over it.
+    public const float WaterUnderMirror = 0.5f;
+    // What the water does to the world seen up through the surface: a blue cast it is multiplied
+    // by (linear) and the share of the fog color hazed over it.
+    public static readonly Vector3 WaterUnderTint = new(0.55f, 0.8f, 1f);
+    public const float WaterUnderHaze = 0.2f;
+    // The share of the window's refraction offset kept past the critical angle, where the far
+    // shore sits in a thin band that the full offset tears into ribbons.
+    public const float WaterUnderGrazeRefract = 0.3f;
 }

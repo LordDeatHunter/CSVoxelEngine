@@ -273,6 +273,9 @@ internal sealed class WorldRenderer
             FrameProfiler.End(ProfileSection.SelectPass);
         }
 
+        // Seen from under water the clouds lie beyond the surface, so they go first there
+        RenderClouds(renderManager, beforeWater: true);
+
         // Water draws after the world and entities: it blends, so everything it can cover has to be
         // in the depth buffer already
         FrameProfiler.Begin(ProfileSection.WaterPass);
@@ -282,11 +285,7 @@ internal sealed class WorldRenderer
         FrameProfiler.End(ProfileSection.WaterPass);
 
         // Clouds blend too, so they go after water has written its depth
-        FrameProfiler.Begin(ProfileSection.CloudPass);
-        renderManager.GpuTimer.BeginGpuPass(ProfileSection.CloudPass);
-        renderManager.Sky.RenderClouds(Camera, Camera.IsEyeInWater);
-        renderManager.GpuTimer.EndGpuPass(ProfileSection.CloudPass);
-        FrameProfiler.End(ProfileSection.CloudPass);
+        RenderClouds(renderManager, beforeWater: false);
 
         // The depthless blended particles draw last, after the clouds, because none of them writes
         // depth: a cloud painted after them would cover every leaf and ember in front of it, since
@@ -295,7 +294,7 @@ internal sealed class WorldRenderer
         // front of a cloud passes the test and blends over it, one behind it is hidden - while the
         // terrain and water depth already in the buffer still hides particles behind them.
         // Bubbles ride along: they need the water pass' depth (they only exist submerged, where
-        // the clouds are skipped anyway) and used to be the only pass drawn at this point.
+        // the clouds went ahead of the water) and used to be the only pass drawn at this point.
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.EntityPass);
         // Healthbars, damage numbers and notice pips are depthless blended billboards too: drawn
@@ -368,6 +367,16 @@ internal sealed class WorldRenderer
     /// </summary>
     /// <summary>The model a facing block (a hollow log) is drawn with at this cell, turned to its
     /// state's facing, or null for any other block (it pops as its hitboxes).</summary>
+    // The cloud pass, timed; SkyPasses.RenderClouds draws on only one of the frame's two calls
+    private void RenderClouds(RenderManager renderManager, bool beforeWater)
+    {
+        FrameProfiler.Begin(ProfileSection.CloudPass);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.CloudPass);
+        renderManager.Sky.RenderClouds(Camera, beforeWater);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.CloudPass);
+        FrameProfiler.End(ProfileSection.CloudPass);
+    }
+
     private BakedModel? FacingModelAt(Vector3 blockPos, ushort blockId)
     {
         var type = BlockType.ById[blockId];

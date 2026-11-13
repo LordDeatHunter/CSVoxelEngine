@@ -43,7 +43,7 @@ internal sealed class SkyPasses
         if (!Matrix4x4.Invert(viewRotation * projection, out var inv))
             inv = Matrix4x4.Identity;
         // The dome reads the true sun, never the key light: its glow, stars and moon mask follow it
-        _owner.SkyDome?.Render(inv, Lighting.Sky, Lighting.SkySunDir, Lighting.SkyTint, Lighting.SkyTintAmount, frame);
+        _owner.SkyDome?.Render(inv, Lighting.Sky, Lighting.SkySunDir, Lighting.SkyTint, Lighting.SkyTintAmount, Lighting.SkyWaterBelow, frame);
         RenderSun(viewRotation, projection);
         RenderMoon(viewRotation, projection);
     }
@@ -142,13 +142,20 @@ internal sealed class SkyPasses
 
     /// <summary>
     /// Draws the cloud field once, translucent, after every opaque pass and the water pass so the
-    /// terrain and the sea surface both occlude it properly. Skipped with the eye underwater, where
-    /// the water fog already hides the sky. Only the cull state has to be restored afterwards:
-    /// blending is the state the later passes expect anyway.
+    /// terrain and the sea surface both occlude it properly. With the eye in water the order flips
+    /// (<paramref name="beforeWater"/> is the call ahead of the water pass): the clouds lie beyond
+    /// the surface, so they have to be in the scene copy its underside shows, and they fog by the
+    /// dry range, since the water between the eye and the surface is charged by the surface itself.
+    /// Never drawn from inside lava, an opaque glow. Only the cull state has to be restored
+    /// afterwards: blending is the state the later passes expect anyway.
     /// </summary>
-    internal void RenderClouds(Camera? camera, bool eyeInWater)
+    internal void RenderClouds(Camera? camera, bool beforeWater)
     {
-        if (camera == null || eyeInWater || _owner.Clouds == null) return;
+        if (camera == null || _owner.Clouds == null) return;
+        if (camera.IsEyeInLava || beforeWater != camera.IsEyeInWater) return;
+        var wet = beforeWater ? 0f : Lighting.FogWet;
+        var fogNear = beforeWater ? Lighting.DryFogNear : Lighting.FogNear;
+        var fogFar = beforeWater ? Lighting.DryFogFar : Lighting.FogFar;
 
         // Translucent and depth-tested: terrain and water (already drawn) occlude the clouds, and a
         // depth pre-pass inside CloudRenderer picks the nearest surface so overlapping rounded pieces
@@ -163,7 +170,7 @@ internal sealed class SkyPasses
         // (CloudRenderer.Render); never leave it sitting on a sampler unit afterwards.
         Units.BindUnit(RenderManager.SceneReadUnit, TextureTarget.Texture2D, Targets.HdrColorTex);
         _owner.Clouds.Render(camera.GetViewProjection(), Lighting.CameraPos, Lighting.TimeD,
-            Lighting.SunDir, Lighting.SunSrgb, Lighting.CloudSunIntensity, Lighting.CloudAmbientSrgb, Lighting.FogColor, Lighting.FogNear, Lighting.FogFar, Lighting.Sky, Lighting.FogWet, RenderManager.SceneReadUnit);
+            Lighting.SunDir, Lighting.SunSrgb, Lighting.CloudSunIntensity, Lighting.CloudAmbientSrgb, Lighting.FogColor, fogNear, fogFar, Lighting.Sky, wet, RenderManager.SceneReadUnit);
         Units.BindUnit(RenderManager.SceneReadUnit, TextureTarget.Texture2D, 0);
         Units.ActiveUnit(0);
         _gl.Disable(EnableCap.CullFace);

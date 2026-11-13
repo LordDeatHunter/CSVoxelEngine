@@ -7,6 +7,7 @@ using Silk.NET.Windowing;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Data;
+using VoxelEngine.Effects.Water;
 using VoxelEngine.Entities;
 using VoxelEngine.Items;
 using VoxelEngine.Juice;
@@ -182,6 +183,10 @@ public class Camera : IMobTarget
     /// against. Sticky: it keeps its last value after the eye leaves the water, so the rays'
     /// fade-out does not jump to another plane.</summary>
     public float EyeWaterSurfaceY { get; private set; } = WorldGenerationConfig.SeaLevel + FluidState.SourceHeight;
+
+    /// <summary>How much the water the eye is in is open water (<see cref="OpenWater.Amount"/>, 0 a
+    /// pond to 1 a sea), which picks the ocean fog. Sticky like <see cref="EyeWaterSurfaceY"/>.</summary>
+    public float EyeOpenWater { get; private set; }
 
     /// <summary>Whether any cell the body overlaps holds an emissive fluid (lava): the
     /// damage volume for lava burns. Glow tells lava apart from water, exactly like
@@ -471,8 +476,11 @@ public class Camera : IMobTarget
             return;
 
         var surface = chunkManager.GetFluidColumnTopGlobal(eyeX, eyeY, eyeZ);
-        if (float.IsFinite(surface))
-            EyeWaterSurfaceY = surface;
+        if (!float.IsFinite(surface))
+            return;
+
+        EyeWaterSurfaceY = surface;
+        EyeOpenWater = OpenWater.Amount(OpenWater.Share(chunkManager, eyeX, eyeZ, surface));
     }
 
     internal void RefreshEyeWaterState(ChunkManager chunkManager)

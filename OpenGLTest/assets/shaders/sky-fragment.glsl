@@ -18,6 +18,11 @@ uniform vec4 uSkyShape;       // x horizon band, y haze width, z haze strength, 
 uniform vec3 uSunDir;
 uniform vec3 uSkyTint;        // what the dome fades toward in lava
 uniform float uSkyTintAmount;
+// With the eye in water: rgb the underwater fog color at the horizon, a how far the eye is under
+// (0 dry and in lava). The dome stays dry above the horizon, which the surface shows from below,
+// but no ray that points down out of a submerged eye ever reaches the sky, so wherever the dome
+// shows below the horizon (past the edge of the seabed that is drawn) it is open water.
+uniform vec4 uSkyWaterBelow;
 
 // Stars (StarField is the C# twin). Per frame: how visible they are (0 by day) and the cos of
 // the outer and inner radius of the starless disc around the sun. The rest is
@@ -318,5 +323,6 @@ void main()
     }
 
     col = mix(col, uSkyTint, uSkyTintAmount);
+    col = mix(col, uSkyWaterBelow.rgb, uSkyWaterBelow.a * smoothstep(0.02, -0.02, dir.y));
     FragColor = vec4(max(col, 0.0), 1.0);
 }
