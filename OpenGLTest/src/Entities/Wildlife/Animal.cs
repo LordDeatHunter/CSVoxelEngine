@@ -54,6 +54,9 @@ public abstract class Animal : RealmMob
     /// <summary>The damage one landed attack deals.</summary>
     public virtual int StrikeDamage => 0;
 
+    /// <summary>The status effect (by name) a landed attack gives its target, or null for none.</summary>
+    public virtual string? StrikeEffect => null;
+
     /// <summary>The horizontal shove a landed attack gives its target.</summary>
     public virtual float StrikeKnockbackSpeed => 0f;
 

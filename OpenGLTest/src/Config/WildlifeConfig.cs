@@ -186,4 +186,38 @@ public static class WildlifeConfig
     public const float DragonflyBiteCooldownSeconds = 2.6f;
     public const float DragonflyKnockbackSpeed = 6f;
     public const float DragonflyKnockbackLift = 2.5f;
-}
+    // --- Corpse bloom (CorpseBloom) ---
+    // The jungle's rooted ambusher. A player within BloomWakeRangeBlocks opens it; within BloomTriggerRadiusBlocks
+    // with a clear line it spews, off its BloomSpewCooldownSeconds cooldown. The burst reaches BloomBurstRadiusBlocks
+    // horizontally and BloomBurstHeightBlocks vertically for BloomBurstDamage and the poison effect, and leaves a
+    // cloud of the same reach that poisons whoever stands in it every BloomCloudPulseSeconds for BloomCloudSeconds.
+    // It shuts BloomCloseDelaySeconds after the last player left its wake range.
+    public const float BloomSpawnWeight = 3f;
+    public const float BloomHeight = 1.1f;
+    public const float BloomHalfExtent = 0.7f;
+    public const float BloomWakeRangeBlocks = 8f;
+    public const float BloomTriggerRadiusBlocks = 4f;
+    public const float BloomBurstRadiusBlocks = 3.5f;
+    public const float BloomBurstHeightBlocks = 2f;
+    public const int BloomBurstDamage = 3;
+    public const float BloomSpewCooldownSeconds = 6f;
+    public const float BloomCloudSeconds = 5f;
+    public const float BloomCloudPulseSeconds = 1f;
+    public const float BloomCloseDelaySeconds = 4f;
+
+    // --- Giant centipede (Centipede) ---
+    // A long hunter: a player within CentipedeNoticeRangeBlocks is prey, run down at CentipedeWalkSpeed and bitten
+    // within CentipedeBiteReach for CentipedeBiteDamage and venom, every CentipedeBiteCooldownSeconds.
+    public const float CentipedeSpawnWeight = 2.5f;
+    public const float CentipedeHeight = 0.7f;
+    public const float CentipedeHalfExtent = 0.7f;
+    public const float CentipedeShoveSpeed = 2f;
+    public const float CentipedeWalkSpeed = 3.6f;
+    public const float CentipedeJumpSpeed = 7f;
+    public const float CentipedeNoticeRangeBlocks = 14f;
+    public const float CentipedeBiteReach = 2.4f;
+    public const int CentipedeBiteDamage = 9;
+    public const float CentipedeBiteCooldownSeconds = 1.8f;
+    public const float CentipedeKnockbackSpeed = 4f;
+    public const float CentipedeKnockbackLift = 1.5f;
+}

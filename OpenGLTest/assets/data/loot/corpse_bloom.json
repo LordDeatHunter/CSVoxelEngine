@@ -1,0 +1,12 @@
+{
+  // A bone now and then (a placeholder drop until the jungle gets items of its own)
+  "pools": [
+    {
+      "rolls": 1,
+      "chance": 0.4,
+      "entries": [
+        { "item": "item/bone", "weight": 1, "count": 1 }
+      ]
+    }
+  ]
+}

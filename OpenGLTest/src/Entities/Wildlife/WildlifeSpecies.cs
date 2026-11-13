@@ -12,6 +12,8 @@ public enum WildlifeKind : byte
     DireBoar = 2,
     Crow = 3,
     Dragonfly = 4,
+    CorpseBloom = 5,
+    Centipede = 6,
 }
 
 /// <summary>
@@ -23,7 +25,8 @@ public static class WildlifeSpecies
 {
     /// <summary>The entity file names (<c>assets/data/entities/&lt;name&gt;.json</c>), indexed by <see cref="WildlifeKind"/>.</summary>
     public static readonly string[] Names =
-        [Deer.EntityName, Boar.EntityName, Boar.DireEntityName, Crow.EntityName, Dragonfly.EntityName];
+        [Deer.EntityName, Boar.EntityName, Boar.DireEntityName, Crow.EntityName, Dragonfly.EntityName,
+         CorpseBloom.EntityName, Centipede.EntityName];
 
     /// <summary>The species an entity name belongs to, or null for any other entity.</summary>
     public static WildlifeKind? KindOf(string name)
@@ -46,6 +49,8 @@ public static class WildlifeSpecies
         WildlifeKind.DireBoar => new Boar(type, position, dire: true, spawnIn),
         WildlifeKind.Crow => new Crow(type, position, spawnIn),
         WildlifeKind.Dragonfly => new Dragonfly(type, position, spawnIn),
+        WildlifeKind.CorpseBloom => new CorpseBloom(type, position, spawnIn),
+        WildlifeKind.Centipede => new Centipede(type, position, spawnIn),
         _ => null,
     };
 
@@ -59,6 +64,8 @@ public static class WildlifeSpecies
             case WildlifeKind.Boar or WildlifeKind.DireBoar: Boar.ValidateContent(type); break;
             case WildlifeKind.Crow: Crow.ValidateContent(type); break;
             case WildlifeKind.Dragonfly: Dragonfly.ValidateContent(type); break;
+            case WildlifeKind.CorpseBloom: CorpseBloom.ValidateContent(type); break;
+            case WildlifeKind.Centipede: Centipede.ValidateContent(type); break;
         }
     }
 
@@ -71,6 +78,8 @@ public static class WildlifeSpecies
         WildlifeKind.DireBoar => WildlifeConfig.DireBoarHeight,
         WildlifeKind.Crow => WildlifeConfig.CrowHeight,
         WildlifeKind.Dragonfly => WildlifeConfig.DragonflyHeight,
+        WildlifeKind.CorpseBloom => WildlifeConfig.BloomHeight,
+        WildlifeKind.Centipede => WildlifeConfig.CentipedeHeight,
         _ => 0f,
     };
 
@@ -85,6 +94,8 @@ public static class WildlifeSpecies
         WildlifeKind.DireBoar => WildlifeConfig.DireBoarHalfExtent,
         WildlifeKind.Crow => WildlifeConfig.CrowHalfExtent,
         WildlifeKind.Dragonfly => WildlifeConfig.DragonflyHalfExtent,
+        WildlifeKind.CorpseBloom => WildlifeConfig.BloomHalfExtent,
+        WildlifeKind.Centipede => WildlifeConfig.CentipedeHalfExtent,
         _ => 0f,
     };
 }

@@ -276,8 +276,8 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   64x32 skin), `corpse_bloom.bbmodel` (a carrion flower: four two-part petals round a spadix, 128x32 skin) and
   `centipede.bbmodel` (ten dark segments with yellow legs, a red head and tail, 128x80 skin). Built and saved in
   Blockbench 5 through its MCP plugin (no generator, the skin embedded, flat speckled colors packed face by face):
-  edit them in Blockbench. No class reads them yet (`plans/TODO.md` `P-61`..`P-63`), so nothing is checked at
-  startup; the group and clip names the wiring will ask for are in `docs/agents/entities.md` "Modeled, not wired".
+  edit them in Blockbench. The corpse bloom and the centipede are wired (`CorpseBloom`, `Centipede`, checked at startup; the crab is
+  still not, `plans/TODO.md` `P-61`); the group and clip names they ask for are in `docs/agents/entities.md`.
   No rest rotations anywhere (the loader has none): the legs, petals, antennae and tail prongs lie flat along an
   axis and the `idle` clip poses them.
 - [ ] **Boar and Dire Boar** — `boar.bbmodel` (a wild boar, 64x64 skin) and `dire_boar.bbmodel` (the oversized

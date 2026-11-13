@@ -33,6 +33,8 @@ public enum NetEntityKind : byte
     DireBoar = 20,
     Crow = 21,
     Dragonfly = 22,
+    CorpseBloom = 23,
+    Centipede = 24,
 
     // The crawlers sit clear of the animals' run, which grows with every new species
     Spider = 64,

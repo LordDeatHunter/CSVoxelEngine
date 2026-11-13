@@ -296,11 +296,20 @@ no rest rotations, so parts the clips fold lie flat along an axis.
   along X with a `...Lower` child, so they can be clip-driven or solved. Clips: `idle`, `walk` (forward), `scuttle`
   (sideways toward +X; play it backwards to go the other way), `pinch` with `impact`, `threaten` (a loop: claws up,
   the body reared), `hurt` and `death`. Only `idle`, `walk`, `scuttle` and `death` key the legs.
-- **Corpse Bloom** (`corpse_bloom.json`, hp 45; `P-62`): the jungle's rooted poison plant. `Base` > `Bulb` >
+- **Corpse Bloom** (`CorpseBloom`, `corpse_bloom.json`, hp 45): the jungle's rooted poison plant, a wildlife species that never
+  moves. Shut on its `closed` loop until a player is within `BloomWakeRangeBlocks` (it opens to `idle`, and shuts again
+  `BloomCloseDelaySeconds` after the last one left; the open bit rides `Animal.Posture` so a mirror matches); with a clear
+  line within `BloomTriggerRadiusBlocks` and off its cooldown it plays `spew`, and at `impact` a burst hits every target in
+  `BloomBurstRadiusBlocks` for `BloomBurstDamage` and the `poison` effect and leaves a **cloud** (`CloudActive`) that
+  `WildlifeManager` re-poisons every `BloomCloudPulseSeconds` for `BloomCloudSeconds`, server-side only (no cloud particles
+  yet, `P-63`); the immune are never billed and the bloom is never hurt by its own cloud. Model: `Base` > `Bulb` >
   `Spadix` > `SpadixTip`, and under `Bulb` the petals `PetalN/S/E/W`, each with a `...Tip`, lying flat outward.
   Clips: `idle` (open), `closed` (a loop: the bud shut, the ambush pose), `spew` with `impact` (the petals gulp
   shut, the bulb swells, the burst is the `impact`), `hurt` and `death`. The bulb's swelling is a scale track.
-- **Giant Centipede** (`centipede.json`, hp 70; `P-63`): `Head` (with `MandibleL/R`, `AntennaL/R` > `...Tip`),
+- **Giant Centipede** (`Centipede`, `centipede.json`, hp 70): a wildlife species that runs a player within
+  `CentipedeNoticeRangeBlocks` down on `walk` and bites within `CentipedeBiteReach` at the `bite` clip's `impact` for
+  `CentipedeBiteDamage` and `venom`. It is one rigid body playing its authored clips (legs clip-driven, the segments a pose,
+  not a chain: the physical chain and solved legs are `P-63`). Model: `Head` (with `MandibleL/R`, `AntennaL/R` > `...Tip`),
   `Segment1..10` front to back and `Tail` (with `TailProngL/R`), all top-level, each group's origin on the body's
   axis at the part's joint or center, 6 units apart, so a chain can place every part by its origin. Each segment
   owns one leg pair as children, `LegR<n>` and `LegL<n>` with a `...Lower`, shaped like a crawler leg (along X,

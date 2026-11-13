@@ -50,7 +50,8 @@ grass-tuft gate; its floor is **mud** (`JungleMud`, seed offset 188, `JungleMudF
 `ColumnCache.GenerateColumn` over jungle columns only (the far LOD draws grass there). Its tree is the `jungle_tree` species (oak growth,
 a tall bare trunk and a broad crown, own `jungle_log`/`jungle_leaves`/`jungle_stump` blocks on placeholder art), and the dragonfly's
 haunt widens to the whole jungle (`WildlifeSpawnRule.AnywhereBiomes`). The grass and foliage tint already read the climate's warm,
-wet corner, so the jungle needed no palette row of its own. Hashed mobs of the jungle (`P-62`, `P-63`) are tracked in `plans/TODO.md`.
+wet corner, so the jungle needed no palette row of its own. Its animals are the corpse bloom and the giant centipede (jungle-only wildlife species, see "Corpse Bloom" and "Giant
+Centipede" in `entities.md`) beside the dragonfly; the centipede's physical body is `P-63`.
 
 Temperature is a **three-band axis**: the cold ramp (`TemperatureColdStart/End`, read by
 `ColdWeight`: snow, ice, and taiga/frozen at `ColdBiomeMinCold`), a temperate band, and the warm

@@ -263,26 +263,15 @@ single-arc player.
   `spawn` op name, saves and a `NetEntityKind`. Later: size variants (the model is the 1-block one), burrowing into
   sand, a hermit variant.
   *Hook:* `Entities/Wildlife/` (`WildlifeSpecies`, `WildlifeManager`), `Boar` for the aggro rule.
-- [ ] **`P-62` · Corpse bloom** — P2, M. *(needs the jungle, `BIOMEGEN.md`)*
-  A rooted jungle enemy that never moves: closed until a target comes near (`closed`), it opens (`idle`) and
-  bursts a poison cloud (`spew`, the cloud at `impact`). The entity, model and clips exist and nothing drives them
-  yet (`corpse_bloom.json`, `corpse_bloom.bbmodel`). Still to build: a static mob class (no locomotion, no
-  knockback), the **poison cloud** as a lingering area (a sphere of a few blocks that drifts and thins over some
-  seconds, drawn as particles; anyone inside is given a `poison` status effect each tick, so the area and the
-  particles are one object and a client can mirror it), the `poison` effect file itself (or reuse `venom`), immunity
-  of the bloom to its own cloud, a worldgen or spawn rule on the jungle floor, loot, the `spawn` op, saves and wire.
-  *Hook:* the sporeling's burst (`spore`, `docs/agents/realm-mobs.md`) is the nearest shipped sibling;
-  `StatusEffectRegistry`, the particle systems in `docs/agents/rendering.md`.
-- [ ] **`P-63` · Giant centipede** — P2, L. *(needs the jungle, `BIOMEGEN.md`)*
-  A long jungle hunter of many segments whose legs are solved against the ground. The entity, model and clips exist
-  and nothing drives them yet (`centipede.json`, `centipede.bbmodel`: `Head`, `Segment1..10` each with a leg pair,
-  `Tail`). Still to build: the body as a chain (each segment trails the one ahead along the head's path, like the
-  sandworm's, but on the ground and over steps), per-segment hit testing on one health pool, inverse kinematics for
-  twenty legs (`LegIk.Solve` and the hold probing of `CrawlerLegs`, generalized from four legs a side on one body to
-  one pair per segment, in the segment's space), the metachronal stepping order the `walk` clip shows, a bite at
-  `impact` with venom, whether it climbs like the crawlers, spawn rule, loot, the `spawn` op, saves and wire (a
-  chain needs more than one pose on the wire, see the sandworm). Later: a rearing threat clip, length variants
-  (the segments are identical, so a shorter or longer model is the same rig).
+- [ ] **`P-63` · Giant centipede, the physical body** — P3, L.
+  The centipede ships (`Entities/Wildlife/Centipede.cs`) as one rigid body that plays its authored `walk` clip: a jungle
+  hunter that runs a player down and bites with venom, spawned by the jungle's wildlife rule. Still open: the body as a
+  chain (each segment trails the one ahead along the head's path, like the sandworm's, but on the ground and over
+  steps), per-segment hit testing on one health pool, inverse kinematics for twenty legs (`LegIk.Solve` and the hold
+  probing of `CrawlerLegs`, generalized from four legs a side on one body to one pair per segment, in the segment's
+  space), the metachronal stepping order the `walk` clip shows, whether it climbs like the crawlers, and the wire for a
+  chain (more than one pose, see the sandworm). Also open: a lingering-cloud particle for the corpse bloom (its cloud
+  poisons server-side with no particles yet), a rearing threat clip and length variants (the segments are identical).
   *Hook:* `Entities/Crawlers/` (`CrawlerRig`, `CrawlerLegs`, `LegIk`), the sandworm's chain (`plans/SANDWORM.md`).
 - [ ] **`P-56` · Ocean & island content** — P3, M.
   Islands, shipwrecks, reefs, deep-sea POIs; makes the ocean a destination rather than a border.

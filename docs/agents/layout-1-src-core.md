@@ -533,7 +533,8 @@ OpenGLTest/
                                #   hurt, then charges and gores; the dire boar is the same class oversized), FlyingAnimal
                                #   (lands, rests, takes off; posture for mirrors), Crow (flock pest: swoops, pecks, caws),
                                #   CrowCaws (the flock's ambient caw: a randomized timer, played when a crow is in earshot),
-                               #   Dragonfly (waterside hunter: darts and bites)
+                               #   Dragonfly (waterside hunter: darts and bites),
+                               #   CorpseBloom (rooted jungle ambusher: poison burst and a lingering cloud), Centipede (jungle hunter: runs down and bites with venom)
         SkyMob.cs              # abstract sky mob (a RealmMob): the zone tier it spawned in and its tier-scaled pool
         Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event
         Cloudgolem.cs          # the ground bruiser: walk with ledge caution, the slam clip's impact event, the shockwave

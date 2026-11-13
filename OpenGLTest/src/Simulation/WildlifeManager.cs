@@ -6,6 +6,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Interaction;
 using VoxelEngine.Particles;
+using VoxelEngine.Status;
 
 namespace VoxelEngine.Simulation;
 
@@ -142,6 +143,7 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
     /// <inheritdoc />
     protected override void Attack(Animal mob, IReadOnlyList<IMobTarget> targets)
     {
+        if (mob is CorpseBloom bloom) PoisonInCloud(bloom, targets);
         if (!mob.TryTakeStrike()) return;
         for (var t = 0; t < targets.Count; t++)
         {
@@ -149,6 +151,18 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
             if (target.IsImmune || !mob.StrikeReaches(target.Eye)) continue;
             Hit(target, mob.StrikeDamage, mob.Position, mob.StrikeKnockbackSpeed, mob.StrikeKnockbackLift,
                 mob.Type.DisplayName);
+            if (mob.StrikeEffect is { } effect) StatusEffects.Apply(target, effect, 1f);
+        }
+    }
+
+    // A corpse bloom's cloud lingers after its burst: each pulse poisons every target still standing in it
+    private static void PoisonInCloud(CorpseBloom bloom, IReadOnlyList<IMobTarget> targets)
+    {
+        if (!bloom.TakeCloudPulse()) return;
+        for (var t = 0; t < targets.Count; t++)
+        {
+            var target = targets[t];
+            if (!target.IsImmune && bloom.CloudReaches(target.Eye)) StatusEffects.Apply(target, CorpseBloom.PoisonEffect, 1f);
         }
     }
 

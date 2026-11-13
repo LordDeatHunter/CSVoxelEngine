@@ -1,8 +1,9 @@
 {
   "name": "Corpse Bloom",
   // The jungle's rooted ambusher: a carrion flower that never moves and bursts a lingering poison cloud at whoever
-  // comes near. Model and clips only so far; nothing spawns or drives it yet (plans/TODO.md P-62)
+  // comes near (CorpseBloom, WildlifeConfig)
   "blood": { "color": [120, 150, 60] },
   "hp": 45,
+  "loot": "corpse_bloom",
   "model": "assets/models/entity/corpse_bloom.bbmodel"
-}
+}

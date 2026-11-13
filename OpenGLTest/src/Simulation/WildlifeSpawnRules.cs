@@ -40,6 +40,8 @@ public static class WildlifeSpawnRules
         new(WildlifeKind.Dragonfly, WildlifeConfig.DragonflySpawnWeight,
             [Biome.Forest, Biome.Taiga, Biome.Steppe, Biome.Savanna, Biome.Jungle], NearWater: true,
             AnywhereBiomes: [Biome.Jungle]),
+        new(WildlifeKind.CorpseBloom, WildlifeConfig.BloomSpawnWeight, [Biome.Jungle]),
+        new(WildlifeKind.Centipede, WildlifeConfig.CentipedeSpawnWeight, [Biome.Jungle]),
     ];
 
     /// <summary>
