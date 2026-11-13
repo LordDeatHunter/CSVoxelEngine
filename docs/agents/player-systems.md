@@ -45,7 +45,8 @@ pointer's block coordinates and the name of a waystone under it show. The data i
   remesh, so placing, mining, blasts, fluids and a server's mirrored cells reach the map with no edit-path hook. Entering
   a new chunk column or switching layers queues every column within `ScanRadiusChunks` that has no tile yet. A scan that
   found nothing (its chunks unloaded) never replaces a tile, so the surface and sky tiles are the session's explored map
-  (capped at `MaxTiles`, farthest dropped); a cave slice's tiles are dropped on leaving it. Not saved with the world yet.
+  (capped at `MaxTiles`, farthest dropped); a cave slice's tiles are dropped on leaving it. A singleplayer world saves
+  them in `map.bin` (see "The explored map" in `launch-and-saves.md`); a multiplayer client's map lasts the session.
 - **Layers.** `MapLayer.For`: in hell (at or below `HellTopY`) always a cave slice; up among the sky islands the sky band
   (`SkyIslandTopY` down to the cloud slab); elsewhere a roof over the head (`MapTracker.IsRoofed`: an occluding block
   within `RoofProbeCells` above the eye, so leaves and glass never count) means a cave slice and open ground the surface

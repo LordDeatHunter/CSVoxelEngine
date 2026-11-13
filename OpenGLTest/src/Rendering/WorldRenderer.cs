@@ -13,6 +13,7 @@ using VoxelEngine.Lod;
 using VoxelEngine.Map;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Particles;
+using VoxelEngine.Saves;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.UI.Hud;
@@ -63,6 +64,10 @@ internal sealed class WorldRenderer
     private readonly MapPins _mapPins = new();
     // Built on the first HUD frame, so a server's world (which never draws one) scans nothing
     private MapTracker? _mapTracker;
+
+    /// <summary>The world's map, once the first HUD frame built it (<see cref="EnsureMap"/>; never on a server, which
+    /// draws none): what <c>WorldPersistence</c> saves.</summary>
+    internal MapTracker? Map => _mapTracker;
     private double _mapTime = double.NaN;
 
     private Camera Camera => _world.Camera;
@@ -371,26 +376,35 @@ internal sealed class WorldRenderer
     }
 
     /// <summary>
-    /// The frame's map step: builds the tracker on first use (listening to the chunk manager's remeshes), advances
-    /// it to the camera, collects the pins and keeps a following map screen on the player.
+    /// The world's map, built on first use: the saved explored map (<see cref="MapSaveCodec"/>, written by
+    /// <c>WorldPersistence</c>) imported, and the chunk manager's remeshes marking its columns.
+    /// </summary>
+    internal MapTracker EnsureMap()
+    {
+        if (_mapTracker != null) return _mapTracker;
+        var tracker = new MapTracker(new ChunkMapCells(_chunkManager));
+        if (MapSaveCodec.TryParse(_world.SaveStore?.ReadFile(MapSaveCodec.FileName)) is { } saved)
+            tracker.Import(saved);
+        _chunkManager.ChunkMeshed += chunk => tracker.MarkColumnDirty((int)chunk.Position.X, (int)chunk.Position.Z);
+        return _mapTracker = tracker;
+    }
+
+    /// <summary>
+    /// The frame's map step: builds the tracker on first use (<see cref="EnsureMap"/>), advances it to the camera,
+    /// collects the pins and keeps a following map screen on the player.
     /// </summary>
     private MapFrame? UpdateMap(MapScreenView? screen)
     {
         if (screen == null) return null;
-        if (_mapTracker == null)
-        {
-            var tracker = new MapTracker(new ChunkMapCells(_chunkManager));
-            _chunkManager.ChunkMeshed += chunk => tracker.MarkColumnDirty((int)chunk.Position.X, (int)chunk.Position.Z);
-            _mapTracker = tracker;
-        }
+        var tracker = EnsureMap();
         var deltaTime = double.IsNaN(_mapTime) ? 0f : (float)(Now - _mapTime);
         _mapTime = Now;
         var eye = Camera.Position;
-        _mapTracker.Update(eye, deltaTime);
-        _mapPins.Collect(_mapTracker.Layer, eye, Camera.Yaw, _remotePlayers, Mobs, Inventory.Waystones, Inventory.TowerMarks);
+        tracker.Update(eye, deltaTime);
+        _mapPins.Collect(tracker.Layer, eye, Camera.Yaw, _remotePlayers, Mobs, Inventory.Waystones, Inventory.TowerMarks);
         var focus = new Vector2(eye.X, eye.Z);
         screen.Follow(focus);
-        return new MapFrame(_mapTracker, _mapPins.Pins, focus, screen);
+        return new MapFrame(tracker, _mapPins.Pins, focus, screen);
     }
 
     /// <summary>

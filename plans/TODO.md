@@ -354,8 +354,9 @@ single-arc player.
 - [ ] **`U-8` · Key rebinding + controller** — P2, M.
 - [ ] **`U-9` · F3 / debug expansion** — P2, S.
   Biome, light level, chunk coords, facing, targeted block. Coordinates already exist.
-- [ ] **`U-25` · Save the explored map** — P3, M. `MapTracker`'s surface and sky tiles live only for the session; write
-  them beside the world (per player on a server) so the [M] map remembers where the player has been.
+- [ ] **`U-26` · Keep a client's map per server** — P3, S–M. A singleplayer world saves its explored map in `map.bin`
+  (`MapSaveCodec`); a multiplayer client's map lasts only the session. Keep it in a local cache keyed by the server
+  (address, plus something that changes when the server's world is replaced, such as a world id the hello carries).
 - [ ] **`U-11` · Help screen** — P2, S.
   Key list plus a short "how to survive your first night".
 - [ ] **`U-12` · Skill / perk tree UI** — P3, L. For `P-15`/`P-9`.

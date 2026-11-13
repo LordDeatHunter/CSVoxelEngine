@@ -34,4 +34,13 @@ public sealed class MapTile(int chunkX, int chunkZ)
     }
 
     public static int IndexOf(int localX, int localZ) => localZ * Size + localX;
+
+    /// <summary>A copy that later scans never touch (the tracker reuses tile objects), for a save off the main thread.</summary>
+    public MapTile Clone()
+    {
+        var copy = new MapTile(ChunkX, ChunkZ);
+        Texels.CopyTo(copy.Texels, 0);
+        Heights.CopyTo(copy.Heights, 0);
+        return copy;
+    }
 }

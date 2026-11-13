@@ -156,7 +156,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Overlays/                  # healthbars, text batching, the HUD text cache
     ScreenSpace/               # the half-res target
   Saves/                       # codecs and stores of world, chunk, player, entity
-                               #   and server saves, names, seed parsing, world sources
+                               #   and server saves, names, seed parsing, world sources; the explored map's save
+                               #   (MapSaveTests: round trip, damaged file, cave never saved, a world hands it to the next)
   Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
                                #   and felling, saplings, the stations, drops, the mob managers and spawning
     Icebergs/                  # the iceberg manager, its spawner and icebergs in a headless World

@@ -16,8 +16,10 @@ namespace VoxelEngine.Map;
 /// <see cref="MapConfig.ScanRadiusChunks"/> that has no tile for the layer yet.</item>
 /// </list>
 /// Surface and sky tiles stay for the session (the explored map, capped at <see cref="MapConfig.MaxTiles"/>, the
-/// farthest dropped first); a cave slice's tiles are dropped when the map leaves it. A scan that found nothing (none
-/// of the column's chunks loaded) never replaces a tile. GL-free; main thread only.
+/// farthest dropped first) and are what a world saves (<see cref="ExportExplored"/>, <see cref="Import"/>,
+/// <c>MapSaveCodec</c>); a cave slice's tiles are dropped when the map leaves it. A scan that found nothing (none of the
+/// column's chunks loaded) never replaces a tile. The first update rescans every column in range, saved tile or not, so a
+/// map saved before a crash catches up with the chunks. GL-free; main thread only.
 /// </summary>
 public sealed class MapTracker(IMapCells cells)
 {
@@ -42,6 +44,33 @@ public sealed class MapTracker(IMapCells cells)
     /// <summary>How many tiles are kept, over every layer.</summary>
     public int TileCount => _tiles.Count;
 
+    /// <summary>Moves whenever the explored map (the surface and sky tiles) changes, so a save writes it only then.</summary>
+    public int ExploredVersion { get; private set; }
+
+    // Whether a layer's tiles are the explored map, kept for the session and saved; a cave slice's are neither
+    private static bool IsExplored(MapLayer layer) => layer.Kind != MapLayerKind.Cave;
+
+    /// <summary>A copy of every surface and sky tile, for the save (which may encode it off the main thread).</summary>
+    public List<(MapLayerKind Kind, MapTile Tile)> ExportExplored()
+    {
+        var tiles = new List<(MapLayerKind, MapTile)>();
+        foreach (var ((layer, _, _), tile) in _tiles)
+            if (IsExplored(layer)) tiles.Add((layer.Kind, tile.Clone()));
+        return tiles;
+    }
+
+    /// <summary>Adds saved surface and sky tiles (a world opening), over whatever was scanned there; the first update
+    /// still rescans the ones whose chunks are loaded.</summary>
+    public void Import(IEnumerable<(MapLayerKind Kind, MapTile Tile)> tiles)
+    {
+        foreach (var (kind, tile) in tiles)
+        {
+            var layer = kind == MapLayerKind.Sky ? MapLayer.Sky : MapLayer.Surface;
+            _tiles[(layer, tile.ChunkX, tile.ChunkZ)] = tile;
+        }
+        ExploredVersion++;
+    }
+
     /// <summary>The current layer's tile of chunk column (chunkX, chunkZ), when it has been scanned.</summary>
     public bool TryGetTile(int chunkX, int chunkZ, out MapTile tile) =>
         _tiles.TryGetValue((Layer, chunkX, chunkZ), out tile!);
@@ -65,8 +94,9 @@ public sealed class MapTracker(IMapCells cells)
         var focus = ((int)MathF.Floor(eye.X) >> Chunk.SizeShift, (int)MathF.Floor(eye.Z) >> Chunk.SizeShift);
         if (LayerChanged || _focus != focus)
         {
+            // The first update queues every column in range, a saved tile too: its chunks may have changed since
+            QueueAround(focus.Item1, focus.Item2, missingOnly: _focus != null);
             _focus = focus;
-            QueueMissing(focus.Item1, focus.Item2);
         }
         ScanDue(focus.Item1, focus.Item2);
         if (_tiles.Count > MapConfig.MaxTiles)
@@ -97,14 +127,14 @@ public sealed class MapTracker(IMapCells cells)
         return false;
     }
 
-    private void QueueMissing(int focusX, int focusZ)
+    private void QueueAround(int focusX, int focusZ, bool missingOnly)
     {
         const int r = MapConfig.ScanRadiusChunks;
         for (var dx = -r; dx <= r; dx++)
         for (var dz = -r; dz <= r; dz++)
         {
             if (dx * dx + dz * dz > r * r) continue;
-            if (!_tiles.ContainsKey((Layer, focusX + dx, focusZ + dz)))
+            if (!missingOnly || !_tiles.ContainsKey((Layer, focusX + dx, focusZ + dz)))
                 _dirty.Add((focusX + dx, focusZ + dz));
         }
     }
@@ -158,6 +188,7 @@ public sealed class MapTracker(IMapCells cells)
         _tiles.TryGetValue(key, out var replaced);
         _tiles[key] = fresh;
         _changed.Add(fresh);
+        if (IsExplored(layer)) ExploredVersion++;
         if (replaced != null)
         {
             _spare = replaced;
@@ -185,6 +216,7 @@ public sealed class MapTracker(IMapCells cells)
         var excess = _tiles.Count - MapConfig.MaxTiles * 9 / 10;
         for (var i = 0; i < excess; i++)
             _tiles.Remove(_pickKeys[i]);
+        ExploredVersion++;
         return;
 
         int DistanceSq((MapLayer Layer, int X, int Z) key) =>

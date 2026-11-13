@@ -41,7 +41,7 @@ timestamps, format version, and an optional `source` only the dedicated server r
 sources"), `chunks/<cx>_<cy>_<cz>.bin` (one Deflate-compressed,
 block-name-paletted snapshot per **modified** chunk, `ChunkSaveCodec`; an untouched chunk is
 never written and simply regenerates), `lod-edits.bin` (`LodEditState`: column caps,
-felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`WoodDamageCodec`: the permanent chop damage of natural trunk cells, singleplayer only), `player.json` (`PlayerSaveCodec`: position and look,
+felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`WoodDamageCodec`: the permanent chop damage of natural trunk cells, singleplayer only), `map.bin` (`MapSaveCodec`: the explored map's surface and sky tiles, singleplayer only), `player.json` (`PlayerSaveCodec`: position and look,
 creative/flight, health, mana, respawn eye, lighting clock, the full inventory and hotbar (a staff's bound spells by part key), the known spell parts by key, the discovered waystones and the quest progress by quest id with the quest book's pan and zoom; no position
 while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live mobs
 with health, facing, velocity, ammo, a slime's size and a skeleton's tower floor plus still-pending entries, up to
@@ -168,6 +168,15 @@ pure function of the seed: only **deltas** and the seed are written.
   discarded only after `EntityRestoreTimeoutSeconds` of play. A saved iceberg (`Icebergs` in
   `entities.json`) waits until every chunk under its placed bounds is loaded, and a sinking berg
   is not saved.
+- **The explored map** (`map.bin`, `MapSaveCodec`: "CVMP", a version byte, then a Deflate body of the surface and
+  sky `MapTile`s, each its layer kind, chunk column, 256 texels and 256 heights; a cave slice is never kept). Only a
+  world that drew a HUD has a map (`WorldRenderer.EnsureMap`, which imports the file when it builds the tracker), so a
+  server never writes one and a world whose HUD never drew keeps its file untouched. `WorldPersistence.SaveMapIfChanged`
+  writes it when `MapTracker.ExploredVersion` moved: at autosave it copies the tiles on the main thread
+  (`ExportExplored`; the tracker reuses tile objects) and deflates them on a pool thread, one encode at a time, so an
+  autosave never hitches; the closing flush waits for one in flight and encodes inline, so the last write queued is the
+  newest map. The first map update after a load rescans every column in range, so tiles saved before a crash catch up
+  with the chunks. A damaged or foreign file reads as an unexplored map with one warning. `MapSaveTests`.
 - **Stations** (`stations.json`, `StationSaveCodec`/`StationSaveData`): restored into the empty
   managers when the world is built, with no wait for chunks, because every manager already freezes a
   cell in an unloaded chunk and sweeps an entry whose block is gone (dropping what it held) once the

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Threading.Tasks;
 using VoxelEngine.Chunks;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.CaveMobs;
@@ -158,6 +159,11 @@ internal sealed class WorldPersistence
 
     // WoodDamage.Version when wood-damage.bin was last enqueued; 0 is a store nothing ever changed, which writes nothing
     private int _woodDamageVersionSaved;
+
+    // MapTracker.ExploredVersion when map.bin was last snapshotted (0: a map that never changed writes nothing), and the
+    // autosave's encode of it still running off the main thread, if any
+    private int _mapVersionSaved;
+    private Task? _mapSave;
 
     /// <summary>
     /// Spawns every pending saved mob and drop whose chunk is loaded, through the managers' own
@@ -344,6 +350,7 @@ internal sealed class WorldPersistence
         _autosaveTimer = 0;
         SaveLodEditStateIfChanged();
         SaveWoodDamageIfChanged();
+        SaveMapIfChanged(wait: false);
         SavePlayerState();
         SaveEntityState();
         SaveStationState();
@@ -619,6 +626,32 @@ internal sealed class WorldPersistence
     }
 
     /// <summary>
+    /// Enqueues <see cref="MapSaveCodec.FileName"/> when the explored map changed since the last write; does nothing
+    /// without a save store or before the HUD built the map. The tiles are copied here, on the main thread, and encoded
+    /// (a few MB deflated) on a pool thread during play, one encode at a time, so an autosave never hitches;
+    /// <paramref name="wait"/> (the closing flush) first waits for one in flight, then encodes inline, so the last write
+    /// queued is always the newest map.
+    /// </summary>
+    private void SaveMapIfChanged(bool wait)
+    {
+        if (_saveStore is not { } store || _world.Renderer.Map is not { } map)
+            return;
+        if (_mapSave is { IsCompleted: false })
+        {
+            if (!wait) return;
+            _mapSave.Wait();
+        }
+        if (map.ExploredVersion == _mapVersionSaved)
+            return;
+        var tiles = map.ExportExplored();
+        _mapVersionSaved = map.ExploredVersion;
+        if (wait)
+            store.EnqueueFile(MapSaveCodec.FileName, MapSaveCodec.ToBytes(tiles));
+        else
+            _mapSave = Task.Run(() => store.EnqueueFile(MapSaveCodec.FileName, MapSaveCodec.ToBytes(tiles)));
+    }
+
+    /// <summary>
     /// Enqueues <see cref="LodEditState.FileName"/> when the LOD edit state moved since the last
     /// write (<see cref="LodEditState.CombinedVersion"/>), or unconditionally when
     /// <paramref name="force"/> is set. Main thread only: <see cref="LodEditState.Capture"/>
@@ -654,6 +687,7 @@ internal sealed class WorldPersistence
         _chunkManager.FlushModified(int.MaxValue);
         SaveLodEditStateIfChanged(force: true);
         SaveWoodDamageIfChanged();
+        SaveMapIfChanged(wait: true);
         SavePlayerState();
         SaveEntityState();
         SaveStationState();
