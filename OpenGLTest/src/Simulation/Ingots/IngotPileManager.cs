@@ -52,6 +52,20 @@ public sealed class IngotPileManager
         return true;
     }
 
+    /// <summary>
+    /// Takes the ingot laid last off the pile at the cell. Leaves the pile registered with no ingot when it was the
+    /// only one (<see cref="IngotsAt"/> then reports nothing): the caller clears the block, which forgets the cell.
+    /// False for a cell that holds none.
+    /// </summary>
+    public bool TryTakeLast(int x, int y, int z, out ushort itemId)
+    {
+        itemId = 0;
+        if (!_piles.TryGetValue((x, y, z), out var pile) || pile.Count == 0) return false;
+        itemId = pile[^1];
+        pile.RemoveAt(pile.Count - 1);
+        return true;
+    }
+
     /// <summary>Drops every ingot of a broken pile where the block was and forgets the cell. A client passes null drops.</summary>
     public void NotifyBlockRemoved(int x, int y, int z, DropManager? drops)
     {

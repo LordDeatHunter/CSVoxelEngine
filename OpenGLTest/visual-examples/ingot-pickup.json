@@ -1,0 +1,38 @@
+{
+  // Ingot pile pickup: run with VOXEL_TIME=147 (noon) and VOXEL_SCRIPT=visual-examples/ingot-pickup.json from OpenGLTest/.
+  // Shots land in visual/ingot-pickup/. Same sand patch as ingot-piles.json.
+  //   three    a pile of three ingots (no pop-in cube while it is placed)
+  //   two      an empty-handed right-click took one ingot into the selected slot (the hotbar shows it, and a click with it in hand would lay it back)
+  //   gone     a click on each of two other empty slots emptied the pile and cleared the block
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [157.5, 32, 283.5], "yaw": -90, "pitch": -39 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "give", "block": "item/copper_ingot", "count": 5 },
+    { "op": "teleport", "pos": [157.5, 14.5, 279.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "select", "slot": 1 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.05 },
+    { "op": "screenshot", "name": "popping", "hideHud": true },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "teleport", "pos": [157.5, 13.2, 281.2], "yaw": -90, "pitch": -50 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "three", "hideHud": true },
+    { "op": "teleport", "pos": [157.5, 14.5, 279.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "select", "slot": 9 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "two" },
+    { "op": "select", "slot": 8 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "select", "slot": 7 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "gone" }
+  ]
+}

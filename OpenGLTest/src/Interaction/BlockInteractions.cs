@@ -102,6 +102,32 @@ internal sealed class BlockInteractions
     }
 
     /// <summary>
+    /// Right-click on an ingot pile: takes the ingot laid last into the hand (see <see cref="Inventory.AddToHand"/>), one per click, and clears the block
+    /// with the last one. Only with an empty hand (a held ingot adds to the pile instead) unless the player sneaks,
+    /// which takes it whatever is held. A full inventory leaves the pile alone. A client claims the click and leaves
+    /// the take to the server.
+    /// </summary>
+    internal bool TryTakeIngot(float maxDistance, PlayerContext player)
+    {
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var cell = hit.BlockCell();
+        if (!_chunkManager.TryGetCell(cell.X, cell.Y, cell.Z, out var id, out _)
+            || BlockType.ById[id]?.Renderer != BlockRenderer.IngotPile)
+            return false;
+        if (!player.IsSneaking && player.Inventory.HeldItem != null) return false;
+        if (_world.IsClientMode) return true;
+        if (!_world.IngotPiles.TryTakeLast(cell.X, cell.Y, cell.Z, out var ingot)) return true;
+        if (!player.Inventory.AddToHand(ingot))
+        {
+            _world.IngotPiles.TryAdd(_chunkManager, cell.X, cell.Y, cell.Z, ingot);
+            return true;
+        }
+        if (_world.IngotPiles.CountAt(cell.X, cell.Y, cell.Z) == 0)
+            Edits.RemoveBlock(hit, player, pickedUp: true);
+        return true;
+    }
+
+    /// <summary>
     /// Right-click with a crucible in hand on the top of a block: stands it there with its metal. Refused (the click
     /// falls through) against a side or an underside, or where the stand cannot go. A client claims the click and leaves
     /// the placing to the server.

@@ -139,7 +139,7 @@ internal sealed class RightClickAction
         }
 
         if (Interactions.TryCookOrCollect(maxDistance, player) || Interactions.TryQuernInteract(maxDistance, player)
-                                                  || Interactions.TryTakeStandingCrucible(maxDistance, player)
+                                                  || Interactions.TryTakeStandingCrucible(maxDistance, player) || Interactions.TryTakeIngot(maxDistance, player)
                                                   || Interactions.TryKilnInteract(maxDistance, player) || Interactions.TryBloomeryInteract(maxDistance, player)
                                                   || Interactions.TryAnvilInteract(maxDistance, player) || Interactions.TryCastInteract(maxDistance, player)
                                                   || Interactions.TryStandCrucible(maxDistance, player)

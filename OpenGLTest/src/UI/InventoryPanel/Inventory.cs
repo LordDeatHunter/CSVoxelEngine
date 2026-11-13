@@ -211,6 +211,19 @@ public class Inventory
     }
 
     /// <summary>
+    /// <see cref="Add"/> for a unit lifted by a right-click (an ingot off a pile): it lands in the selected hotbar slot
+    /// when that is empty, so it is in the hand at once, otherwise it equips like any pickup. False, changing nothing,
+    /// when its pool is full.
+    /// </summary>
+    public bool AddToHand(ushort id)
+    {
+        if (IdAt(SelectedIndex) != 0) return Add(id);
+        if (!Add(id, autoEquip: false)) return false;
+        EquipStackable(SelectedIndex, id);
+        return true;
+    }
+
+    /// <summary>
     /// Takes in a tool or piece of gear that lives elsewhere (a chest slot) as a new instance of this inventory, keeping
     /// every component it carries. Ground pickups pass autoEquip to equip lanterns into an empty hotbar slot.
     /// False, changing nothing, when its pool is full or it is not an instance item.
