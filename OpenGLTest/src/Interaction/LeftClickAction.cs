@@ -188,8 +188,23 @@ internal sealed class LeftClickAction
             return new LookLabelState(state.Text, state.Known, state.Mineable, _selectedBlockPosition,
                 blockId, _chunkManager.GetStateGlobal(x, y, z),
                 EntityLight.Sample(_chunkManager, _selectedBlockPosition),
-                IronWorksDetail(blockId, anchorPos, x, y, z) ?? _world.Towers.Detail(blockId, x, y, z));
+                IronWorksDetail(blockId, anchorPos, x, y, z) ?? _world.Towers.Detail(blockId, x, y, z),
+                StationBarsAt(blockId, anchorPos, x, y, z));
         }
+    }
+
+    // The progress bars of the station under the crosshair (see StationBars), null for anything else
+    private List<StationBar>? StationBarsAt(ushort blockId, Vector3 anchor, int x, int y, int z)
+    {
+        var type = BlockType.ById[blockId];
+        if (type == null) return null;
+        var (ax, ay, az) = ((int)anchor.X, (int)anchor.Y, (int)anchor.Z);
+        if (type.Renderer == BlockRenderer.BranchPile)
+            return StationBars.Campfire(_world.Campfires, x, y, z, _chunkManager.GetStateGlobal(x, y, z), type.StackMax);
+        if (type.Kiln != null) return StationBars.Kiln(_world.Kilns.StateAt(ax, ay, az));
+        if (type.Bloomery != null) return StationBars.Bloomery(_world.Smithing.Bloomeries.StateAt(ax, ay, az));
+        if (type.Anvil != null) return StationBars.Anvil(_world.Smithing.Anvils.StateAt(x, y, z));
+        return StationBars.Mold(_world.Casting.StateAt(x, y, z));
     }
 
     // The status line of the bloomery or anvil under the crosshair (see SmithingReadout), null for anything else

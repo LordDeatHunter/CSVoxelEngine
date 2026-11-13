@@ -61,6 +61,9 @@ public sealed class CampfireManager
 
     public bool IsLit(int x, int y, int z) => _lit.ContainsKey((x, y, z));
 
+    /// <summary>Seconds left on the branch burning in the pile at a cell, or null when it is not lit.</summary>
+    public float? BurnLeftAt(int x, int y, int z) => _lit.TryGetValue((x, y, z), out var left) ? left : null;
+
     // A resting body's feet can sit a float short of the cell edge they stand on; this much still counts as in the cell
     private const float FeetTolerance = 0.05f;
 

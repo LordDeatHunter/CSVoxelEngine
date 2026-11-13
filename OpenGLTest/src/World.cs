@@ -913,6 +913,12 @@ public class World
     /// <summary>The lit campfires, for a body that stands in one (<see cref="PlayerBodyProbe.OnLitCampfire"/>).</summary>
     public CampfireManager Campfires => _campfires;
 
+    /// <summary>The kilns and alloy furnaces, for the look-at label's progress bars.</summary>
+    public KilnManager Kilns => _kilns;
+
+    /// <summary>The mold cells, for the look-at label's progress bars.</summary>
+    public CastingManager Casting => _casting;
+
     /// <summary>The chest panel's UI state: which chest is open and what it shows (see <see cref="ChestView"/>).</summary>
     public ChestView ChestPanel { get; } = new();
 

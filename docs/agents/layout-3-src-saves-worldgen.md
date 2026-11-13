@@ -250,7 +250,9 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         ItemTooltip.cs         # the hover panel's lines, built from the item's own fields; Hover packs them with the rarity
         HoverTooltip.cs        # the tooltip one frame shows: anchor, lines, line colors and the hovered item's rarity
         LookLabel.cs           # the look-at label's rule: name, "Unknown", the mineable flag
-        LookLabelState.cs      # what one frame's label draws: text, flags, cell, state byte, light
+        LookLabelState.cs      # what one frame's label draws: text, flags, cell, state byte, light, detail line, station bars
+        StationBar.cs          # one progress bar (caption, fraction, fuel/progress/done kind)
+        StationBars.cs         # GL-free builders of the bars: campfire fuel + cook slots, kiln, bloomery, anvil, mold
         ScreenshotPaths.cs     # where F2's capture lands and what it is called
         StaffSlotIndicator.cs  # GL-free, cached label of the held staff's selected spell slot and its parts (or
                                #   empty), drawn by HudRenderer.DrawStaffSlot right of the hotbar

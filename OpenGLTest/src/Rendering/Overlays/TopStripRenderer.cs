@@ -97,6 +97,8 @@ internal sealed class TopStripRenderer
         var detailTop = textTop;
         if (!string.IsNullOrEmpty(label.Detail))
             detailTop = DrawWrappedCentered(label.Detail, center.X, detailTop, TextDim);
+        if (label.Bars != null)
+            detailTop = DrawStationBars(label.Bars, center.X, detailTop);
         if (!debug) return;
 
         var chunkPos = VoxelCoords.ChunkPosOf(label.Cell);
@@ -109,6 +111,28 @@ internal sealed class TopStripRenderer
         var linesTop = detailTop;
         for (var i = 0; i < lines.Length; i++)
             _ui.DrawTextCentered(lines[i], center.X, linesTop + i * (TextSize.Body + 4f), _ui.CountScale, TextDim);
+    }
+
+    // One bar per entry under the label: its caption, then a track filled left to right by its fraction; returns the y below the last
+    private float DrawStationBars(IReadOnlyList<StationBar> bars, float centerX, float top)
+    {
+        foreach (var bar in bars)
+        {
+            _ui.DrawTextCenteredFitted(bar.Label, centerX, top, _ui.CountScale, TextDim, StationBarWidth + 2f * LookLabelSideMargin);
+            top += TextSize.Body + 2f;
+            _ui.DrawRect(new Vector2(centerX, top + StationBarHeight * 0.5f), new Vector2(StationBarWidth, StationBarHeight), StationBarTrack);
+            var fill = MathUtils.Clamp01(bar.Fraction) * StationBarWidth;
+            if (fill > 0.5f)
+                _ui.DrawRect(new Vector2(centerX - StationBarWidth * 0.5f + fill * 0.5f, top + StationBarHeight * 0.5f),
+                    new Vector2(fill, StationBarHeight), bar.Kind switch
+                    {
+                        StationBarKind.Fuel => StationBarFuel,
+                        StationBarKind.Done => StationBarDone,
+                        _ => StationBarProgress,
+                    });
+            top += StationBarHeight + StationBarGap;
+        }
+        return top;
     }
 
     // Draws `text` centered on one line when it fits the label's width cap and otherwise wrapped onto as many lines as it
@@ -156,6 +180,13 @@ internal sealed class TopStripRenderer
     // Wider than any block name, so a long line (a bloomery's heat and ore, a locked gate's hint) wraps rather than being cut
     private const float LookLabelMaxWidth = 460f;
     private const float LookLabelSideMargin = 20f;
+    private const float StationBarWidth = 180f;
+    private const float StationBarHeight = 6f;
+    private const float StationBarGap = 5f;
+    private static readonly Rgba StationBarTrack = Rgba.Gray(0.1f, 0.75f);
+    private static readonly Rgba StationBarFuel = new(255, 160, 60);
+    private static readonly Rgba StationBarProgress = new(110, 200, 255);
+    private static readonly Rgba StationBarDone = new(120, 220, 120);
     private readonly List<string> _wrapScratch = [];
 
     /// <summary>

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
 
@@ -7,7 +8,7 @@ namespace VoxelEngine.UI.Hud;
 /// What the HUD's look-at label draws with this frame, GL-free: the rule's text and flags
 /// (<see cref="LookLabel.State"/>), the targeted cell and its block's state byte, and the voxel
 /// light there (for the debug lines the profiler overlay adds), and an optional status line
-/// (<see cref="Detail"/>, the heat of a bloomery, a hammered piece). Built by the world from the
+/// (<see cref="Detail"/>, the heat of a bloomery, a hammered piece) and the station's progress <see cref="Bars"/>. Built by the world from the
 /// selection raycast; null with no target.
 /// </summary>
 public readonly record struct LookLabelState(
@@ -18,4 +19,5 @@ public readonly record struct LookLabelState(
     ushort BlockId,
     byte BlockState,
     EntityLightSample Light,
-    string? Detail = null);
+    string? Detail = null,
+    IReadOnlyList<StationBar>? Bars = null);
