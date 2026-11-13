@@ -292,6 +292,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
         {
             MeshBeforeApplyForTests?.Invoke(chunk, meshData);
             var wasMeshed = chunk.IsMeshed;
+            var oldVisibility = chunk.Visibility;
             if (manager.Headless)
                 chunk.MarkMeshedHeadless(meshData);
             else
@@ -303,6 +304,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
             // The first mesh makes the chunk count as "drawn" for the LOD cover test even when it is
             // empty (all air, or enclosed) and therefore never enters Renderable
             if (!wasMeshed) renderLists.MeshVersion++;
+            if (chunk.Visibility != oldVisibility) renderLists.VisibilityVersion++;
         }
         catch
         {

@@ -34,6 +34,15 @@ public class ChunkManager
 
     public readonly ChunkMap Chunks = new();
 
+    /// <summary>The cave cull over <see cref="Chunks"/>: which chunks the camera's line of sight can reach.</summary>
+    public ChunkVisibilityGraph CaveCull => _caveCull ??= new ChunkVisibilityGraph(Chunks);
+    private ChunkVisibilityGraph? _caveCull;
+
+    /// <summary>Re-walks the cave cull from <paramref name="eye"/> when the camera's chunk or the meshed chunks
+    /// changed (<see cref="ChunkVisibilityGraph.Update"/>). Main thread only, before the chunk passes.</summary>
+    public void UpdateCaveCull(Vector3 eye) =>
+        CaveCull.Update(eye, _renderLists.MeshVersion, _renderLists.VisibilityVersion);
+
     /// <summary>Builds an empty manager: nothing is loaded until a generation worker or a stream registers chunks.</summary>
     /// <param name="gl">The GL context new chunks are constructed with.</param>
     /// <param name="opaqueGeometry">The shared opaque chunk geometry pool finished meshes upload

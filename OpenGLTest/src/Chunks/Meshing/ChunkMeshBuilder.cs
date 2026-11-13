@@ -45,7 +45,8 @@ internal static class ChunkMeshBuilder
             // The resolve fills only the slots it finds, so a stale neighbor left here would let
             // this thread's next build pass the missing-face-neighbor check
             scratch.ClearNeighbors();
-            return new ChunkMeshData([], [], [], [], false);
+            return new ChunkMeshData([], [], [], [], false)
+                { Visibility = chunk.SolidCount == 0 ? ChunkVisibility.All : 0UL };
         }
 
         // The nine chunk columns' terrain (heights, water levels, corner climate), resolved once
@@ -75,6 +76,7 @@ internal static class ChunkMeshBuilder
             // Read before the neighbors are cleared: a tower brick anywhere in the volume's chunks turns the
             // sky-cover rule on (27 field reads; nothing more for a plain neighborhood)
             var skyCover = AnySkyCover(neighbors);
+            var visibility = ChunkVisibility.Compute(neighborBlocks[13]!);
             scratch.ClearNeighbors();
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
@@ -93,7 +95,7 @@ internal static class ChunkMeshBuilder
                 if (anyTinted) packed[BlockCount + Idx(x, y, z)] = (byte)(b >> 4);
             }
             return GenerateMeshDataFromSnapshot(chunk, padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy, chunkManager.ChopDamage)
-                with { Light = packed };
+                with { Light = packed, Visibility = visibility };
         }
         finally
         {

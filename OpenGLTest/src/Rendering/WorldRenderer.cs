@@ -128,7 +128,9 @@ internal sealed class WorldRenderer
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.Reflection);
         // One frustum pass over the translucent draws feeds both this and the water pass, and
         // tells the reflection whether there is any water on screen to be worth rendering
-        renderManager.Terrain.CullWater(Camera, _chunkManager.TranslucentRenderable, _lodManager.RegionList);
+        _chunkManager.UpdateCaveCull(Camera.RenderEye);
+        renderManager.Terrain.CullWater(Camera, _chunkManager.TranslucentRenderable, _lodManager.RegionList,
+            _chunkManager.CaveCull);
         renderManager.Reflection.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList,
             new ReflectionEntities(_dropManager.Drops, _projectiles, _tntManager.Primed, _falling.Falling, Slimes, Goblins,
                 _toppling, Player, _world.Icebergs));
@@ -143,7 +145,7 @@ internal sealed class WorldRenderer
 
         FrameProfiler.Begin(ProfileSection.WorldPass);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.WorldPass);
-        renderManager.Terrain.RenderWorld(Camera, _chunkManager.Renderable, Now);
+        renderManager.Terrain.RenderWorld(Camera, _chunkManager.Renderable, Now, _chunkManager.CaveCull);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.WorldPass);
         FrameProfiler.End(ProfileSection.WorldPass);
 

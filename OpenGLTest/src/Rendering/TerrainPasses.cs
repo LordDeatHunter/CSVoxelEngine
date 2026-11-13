@@ -56,7 +56,7 @@ internal sealed class TerrainPasses
     /// opaque <see cref="ChunkGeometryPool"/> as a few consecutive <c>glMultiDrawElementsIndirect</c>
     /// ranges with a GPU occlusion cull between them (<see cref="DrawOpaqueRun"/>).
     /// </summary>
-    internal void RenderWorld(Camera camera, IReadOnlyList<Chunk> chunks, double time)
+    internal void RenderWorld(Camera camera, IReadOnlyList<Chunk> chunks, double time, ChunkVisibilityGraph? caves = null)
     {
         if (camera == null) return;
 
@@ -88,6 +88,9 @@ internal sealed class TerrainPasses
                 continue;
 
             if (!frustum.IntersectsAABB(chunk.WorldMin, chunk.WorldMax))
+                continue;
+            // Sealed off from the camera's line of sight (a cave behind the rock): never on screen
+            if (caves != null && !caves.Sees(chunk))
                 continue;
 
             var distSq = Vector3.DistanceSquared(chunk.Position, camChunkPos);
@@ -171,7 +174,8 @@ internal sealed class TerrainPasses
     /// for drawing but never trigger the water-only passes.
     /// Takes the translucent subset (<see cref="ChunkManager.TranslucentRenderable"/>), not all
     /// meshed chunks.</summary>
-    internal void CullWater(Camera camera, IReadOnlyList<Chunk> chunks, IReadOnlyList<LodRegion> regions)
+    internal void CullWater(Camera camera, IReadOnlyList<Chunk> chunks, IReadOnlyList<LodRegion> regions,
+        ChunkVisibilityGraph? caves = null)
     {
         _translucentChunks.Clear();
         _translucentRegions.Clear();
@@ -191,6 +195,8 @@ internal sealed class TerrainPasses
                 continue;
 
             if (!frustum.IntersectsAABB(chunk.WorldMin, chunk.WorldMax))
+                continue;
+            if (caves != null && !caves.Sees(chunk))
                 continue;
 
             _translucentChunks.Add((chunk, Vector3.DistanceSquared(chunk.Position, camChunkPos)));

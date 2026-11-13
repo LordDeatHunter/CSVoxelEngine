@@ -41,4 +41,8 @@ public record ChunkMeshData(List<Vertex> Vertices, List<ushort> Indices,
     /// no quads in the chunk mesh: the chest pass draws it from the shared chest model, so its lid can swing.
     /// </summary>
     public ushort[]? ChestCells { get; init; }
+
+    /// <summary>Which of the chunk's faces see each other through its open cells (<see cref="ChunkVisibility"/>):
+    /// every pair for an all-air chunk, none for a solid one.</summary>
+    public ulong Visibility { get; init; } = ChunkVisibility.All;
 }

@@ -40,6 +40,10 @@ internal sealed class ChunkRenderLists
     /// </summary>
     public int MeshVersion { get; set; }
 
+    /// <summary>Bumped whenever a remesh changes a chunk's <see cref="Chunk.Visibility"/> (a tunnel dug through
+    /// it), so the cave cull (<see cref="ChunkVisibilityGraph"/>) re-walks. Main thread only.</summary>
+    public int VisibilityVersion { get; set; }
+
     /// <summary>
     /// Adds <paramref name="chunk"/> to <see cref="Renderable"/> or drops it, to match whether
     /// it currently has anything to draw — a rebuild can also empty a chunk that had a mesh

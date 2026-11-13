@@ -92,7 +92,8 @@ OpenGLTest/
                                #   (unload only outside every focus's radius), saves of edited chunks, the world cell queries;
                                #   composes ChunkMeshScheduler, ChunkRenderLists and PlayerPlacedIndex and forwards their public members
       ChunkMap.cs              # the loaded-chunk table (ChunkManager.Chunks): a ConcurrentDictionary keyed on a packed ChunkKey long
-      ChunkRenderLists.cs      # Renderable / TranslucentRenderable / ChestChunks swap-remove bookkeeping and MeshVersion (behind ChunkManager's forwarders)
+      ChunkRenderLists.cs      # Renderable / TranslucentRenderable / ChestChunks swap-remove bookkeeping, MeshVersion and VisibilityVersion (behind ChunkManager's forwarders)
+      ChunkVisibilityGraph.cs  # the cave cull: the walk from the camera's chunk over the chunks' visibility sets, stamping the chunks a line of sight reaches
       ChunkRestore.cs          # rebuilds a chunk from a ChunkSnapshot (a save, a world source's map, a streamed chunk):
                                #   shares a Uniform storage, clones a compact one or recompacts an edited one, copies
                                #   state, recounts, surface floor, fluid frontier, publishes (behind Chunk.RestoreFrom)
@@ -113,7 +114,8 @@ OpenGLTest/
                                #   the sky cover rule (no sun under a coversSky block, gated by AnySkyCover; BT-10)
         ChunkMeshBuilder.cs    # the per-chunk mesh build: neighborhood resolve, padded and light snapshots, the light flood
                                #   and the per-voxel emitter loop (behind Chunk.GenerateMeshData)
-        ChunkMeshData.cs       # CPU-side mesh of one chunk (opaque + translucent lists, light snapshot, vents, flame points)
+        ChunkMeshData.cs       # CPU-side mesh of one chunk (opaque + translucent lists, light snapshot, vents, flame points, visibility set)
+        ChunkVisibility.cs     # a chunk's face-to-face visibility set for the cave cull: flood fill over its open cells at mesh time
         ChunkMeshScheduler.cs  # the dirty set, the per-frame dirty scan, the thread-pool mesh runners, the completed queue and budgeted upload,
                                #   the immediate remesh paths (behind ChunkManager.Update, MarkDirty, ImmediateRemesh*)
         ThinWoodBite.cs        # the chop slit of a thin (node-and-tubes) wood cell: the bite box, box subtraction, emission

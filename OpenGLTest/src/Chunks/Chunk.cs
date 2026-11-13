@@ -160,6 +160,13 @@ public class Chunk : IDisposable
     /// </summary>
     public bool IsMeshed { get; private set; }
 
+    /// <summary>Which of this chunk's faces see each other through its open cells, from its last mesh
+    /// (<see cref="ChunkVisibility"/>); every pair before the first. Main thread only.</summary>
+    public ulong Visibility { get; private set; } = ChunkVisibility.All;
+
+    /// <summary>The <see cref="ChunkVisibilityGraph"/> walk that last reached this chunk. Main thread only.</summary>
+    internal int CaveStamp { get; set; }
+
     private long _meshRevision;
 
     /// <summary>Generation advanced by synchronous remesh requests to invalidate older worker output.</summary>
@@ -647,6 +654,7 @@ public class Chunk : IDisposable
         ChunkGeometryPool? translucentPool)
     {
         IsMeshed = true;
+        Visibility = meshData.Visibility;
         PublishLight(meshData.Light);
         ReleaseSlices();
 
@@ -682,6 +690,7 @@ public class Chunk : IDisposable
     public void MarkMeshedHeadless(ChunkMeshData meshData)
     {
         IsMeshed = true;
+        Visibility = meshData.Visibility;
         PublishLight(meshData.Light);
         HasWaterMesh = meshData.HasWater && meshData.TranslucentVertices.Count > 0;
         HotFluidVents = meshData.HotFluidVents;

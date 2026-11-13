@@ -110,6 +110,11 @@ public static class PostProcessConfig
     /// pixel-identical (see <see cref="Rendering.HizOcclusion"/>).</summary>
     public const bool ChunkOcclusionCullEnabled = true;
 
+    /// <summary>Master switch for the cave cull (<see cref="Chunks.ChunkVisibilityGraph"/>): the camera's opaque and
+    /// translucent chunk passes draw only the chunks a line of sight from the camera's chunk can reach through open
+    /// cells, so a sealed cave or the underside of the surface seen from inside the rock is never drawn.</summary>
+    public const bool ChunkCaveCullEnabled = true;
+
     /// <summary>Where the front-to-back opaque run is split, as shares of its chunk count, ascending:
     /// after each split the pyramid is rebuilt from the depth drawn so far and every later chunk is
     /// tested against it (<see cref="Rendering.HizOcclusion.SegmentStarts"/>). Each split costs one

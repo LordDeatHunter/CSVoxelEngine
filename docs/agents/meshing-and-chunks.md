@@ -307,6 +307,20 @@ sway blocks of `test-vertex.glsl` and `shadow-vertex.glsl` must stay byte-identi
 `TO_WORLD(p)` macro is what lets them be, and `ChunkDrawShaderTests` guards the sway block and
 its weight decode (both read `vColor.a` at location 1).
 
+**Cave cull.** Every mesh build also records the chunk's face-to-face visibility set (`ChunkVisibility.Compute`, a
+flood fill over its open, non-occluding cells: bit `a * 6 + b` when one open run touches faces a and b; all-air chunks
+see through everything, enclosed ones through nothing), carried by `ChunkMeshData.Visibility` onto `Chunk.Visibility`;
+a remesh that changes it bumps `ChunkRenderLists.VisibilityVersion`. `WorldRenderer.Render` calls
+`ChunkManager.UpdateCaveCull` before the chunk passes, and `ChunkVisibilityGraph` re-walks (only when the camera's chunk,
+`MeshVersion` or `VisibilityVersion` moved) from the camera's chunk, open on every face, breadth-first over the load
+sphere: a chunk entered through one face is left only through the faces its set joins to it and never back against a
+direction the path already took (Minecraft's advanced cave culling); a position with no loaded, meshed chunk counts as
+open. Reached chunks carry the walk's stamp (`Chunk.CaveStamp`), and `TerrainPasses.RenderWorld` and `CullWater` skip
+the rest (`ChunkVisibilityGraph.Sees`), so a sealed cave, or the underside of the surface seen from inside the rock, is
+never drawn. The shadow cascades and the mirror are not cave-culled (a hidden chunk can still cast onto a visible one),
+and the LOD cover still counts every meshed chunk. `PostProcessConfig.ChunkCaveCullEnabled` switches it off;
+`ChunkVisibilityGraphTests`.
+
 **Opaque occlusion cull (PERF_TODO F9).** The camera's opaque pass (`TerrainPasses.RenderWorld`)
 adds its whole front-to-back run in one `BeginPass` but draws it as consecutive
 `ChunkDrawBatch.DrawRange` segments, split at the shares of the run in
