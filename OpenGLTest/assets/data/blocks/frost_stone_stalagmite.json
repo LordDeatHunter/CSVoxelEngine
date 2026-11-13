@@ -1,0 +1,18 @@
+{
+  // A stone point rising from a cave floor (CaveFormationGenerator), standing on its floor like
+  // any needsSupport block: mine the floor and it pops. Walked through, a thin aim box.
+  "name": "Frost Stone Stalagmite",
+  "model": { "parent": "block/stalagmite", "textures": { "stone": "frost_stone" } },
+  "hardness": 4,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  // Rock, not vegetation: a flow washes an ordinary fragile block away, never this one
+  "flowResistant": true,
+  "blocksSight": false,
+  "loot": "cave_frost_stone",
+  "hitbox": { "min": [0.3, 0, 0.3], "max": [0.7, 1, 0.7] }
+}

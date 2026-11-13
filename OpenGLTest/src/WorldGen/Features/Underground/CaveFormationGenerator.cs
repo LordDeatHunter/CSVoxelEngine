@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 
@@ -10,7 +11,8 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 /// solid rock) takes a stalactite, a floor cell (air over solid rock) a stalagmite, both at least
 /// <see cref="WorldFeatureConfig.CaveFormationMinDepth"/> under the column's height; a
 /// stalactite also drips a stalagmite onto the floor of its own column when that cell is free, so
-/// the two read as a pair. Both blocks carry needsSupport (above and below), so mining the rock
+/// the two read as a pair. Each takes the variant of the rock it hangs from or stands on
+/// (sandstone, frost stone, else stone). Both blocks carry needsSupport (above and below), so mining the rock
 /// they hang from or stand on pops them; the far LOD shows none.
 /// </summary>
 public static class CaveFormationGenerator
@@ -18,15 +20,30 @@ public static class CaveFormationGenerator
     private const ulong StalactiteStream = 0x9E3779B97F4A7C15UL;
     private const ulong StalagmiteStream = unchecked(StalactiteStream * 2);
 
-    /// <summary>Blocks this generator stamps; resolved once in the static constructor.</summary>
+    /// <summary>The plain stone formations, also the fallback over any rock without its own variant.</summary>
     public static readonly ushort StalactiteBlock;
     public static readonly ushort StalagmiteBlock;
+
+    // Host rock id -> its own (stalactite, stalagmite) pair
+    private static readonly Dictionary<ushort, (ushort Stalactite, ushort Stalagmite)> Variants = new();
 
     static CaveFormationGenerator()
     {
         StalactiteBlock = ContentRegistry.RequireBlock("stalactite").Id;
         StalagmiteBlock = ContentRegistry.RequireBlock("stalagmite").Id;
+        foreach (var rock in new[] { "sandstone", "frost_stone" })
+            Variants[ContentRegistry.RequireBlock(rock).Id] = (
+                ContentRegistry.RequireBlock(rock + "_stalactite").Id,
+                ContentRegistry.RequireBlock(rock + "_stalagmite").Id);
     }
+
+    /// <summary>The stalactite that hangs from <paramref name="host"/>: its own variant, else stone's.</summary>
+    public static ushort StalactiteFor(ushort host) =>
+        Variants.TryGetValue(host, out var v) ? v.Stalactite : StalactiteBlock;
+
+    /// <summary>The stalagmite that stands on <paramref name="host"/>: its own variant, else stone's.</summary>
+    public static ushort StalagmiteFor(ushort host) =>
+        Variants.TryGetValue(host, out var v) ? v.Stalagmite : StalagmiteBlock;
 
     /// <summary>Whether a ceiling cell (x, y, z) carries a stalactite, before the terrain checks.</summary>
     public static bool HasStalactite(int x, int y, int z)
@@ -69,12 +86,12 @@ public static class CaveFormationGenerator
                 var floor = BlockType.IsSolid(blocks[i - Chunk.Size]);
                 if (ceiling && HasStalactite(worldX0 + x, y, worldZ0 + z))
                 {
-                    blocks[i] = StalactiteBlock;
+                    blocks[i] = StalactiteFor(blocks[i + Chunk.Size]);
                     StampDrip(blocks, x, y, z, worldY0);
                     continue;
                 }
                 if (floor && HasStalagmite(worldX0 + x, y, worldZ0 + z))
-                    blocks[i] = StalagmiteBlock;
+                    blocks[i] = StalagmiteFor(blocks[i - Chunk.Size]);
             }
         }
     }
@@ -98,7 +115,7 @@ public static class CaveFormationGenerator
             var di = Chunk.Idx(x, dl, z);
             if (blocks[di] != BlockType.Air) break;
             if (blocks[di - Chunk.Size] == BlockType.Air) continue;
-            if (BlockType.IsSolid(blocks[di - Chunk.Size])) blocks[di] = StalagmiteBlock;
+            if (BlockType.IsSolid(blocks[di - Chunk.Size])) blocks[di] = StalagmiteFor(blocks[di - Chunk.Size]);
             break;
         }
     }

@@ -1,0 +1,6 @@
+{
+  // A sandstone cave formation breaks into its own rock
+  "pools": [
+    { "rolls": 1, "entries": [ { "item": "block/sandstone" } ] }
+  ]
+}

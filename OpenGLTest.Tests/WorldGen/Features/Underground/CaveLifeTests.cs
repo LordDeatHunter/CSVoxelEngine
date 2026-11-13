@@ -148,4 +148,18 @@ public sealed class CaveLifeTests
         Assert.False(BlockType.IsReplaceable(stalactite));
         Assert.True(BlockType.IsReplaceable(pebble));
     }
+
+    [Theory]
+    [InlineData("sandstone")]
+    [InlineData("frost_stone")]
+    public void EachRockVariantHasItsOwnFormationAndStoneIsTheFallback(string rock)
+    {
+        var host = ContentRegistry.RequireBlock(rock).Id;
+
+        Assert.Equal(ContentRegistry.RequireBlock(rock + "_stalactite").Id, CaveFormationGenerator.StalactiteFor(host));
+        Assert.Equal(ContentRegistry.RequireBlock(rock + "_stalagmite").Id, CaveFormationGenerator.StalagmiteFor(host));
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        Assert.Equal(CaveFormationGenerator.StalactiteBlock, CaveFormationGenerator.StalactiteFor(stone));
+        Assert.Equal(CaveFormationGenerator.StalagmiteBlock, CaveFormationGenerator.StalagmiteFor(stone));
+    }
 }

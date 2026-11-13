@@ -287,7 +287,7 @@ the gated `StampGround`) is never gated, since its leaves may come from neighbor
   water edge and pads floating on ponds, both over `PlantClumps`.
 - **Glow mushrooms** (`GlowMushroomGenerator`) on dry, dark cave floors, and **cave formations**
   (`CaveFormationGenerator`): stalactites hanging from ceilings and stalagmites standing on floors,
-  both `needsSupport` and `flowResistant` (rock: a flow leaves them standing).
+  both `needsSupport` and `flowResistant` (rock: a flow leaves them standing). Each takes the variant of its host rock (`sandstone_*`, `frost_stone_*`, else the stone pair), with its own texture and loot.
 - **Geodes** (`GeodeGenerator`) and **meteor craters** (`MeteorGenerator`): a hollow, crystal-lined
   sphere deep in solid stone (its `crystal_block` is the one non-ore block on the reflective
   material path), and a blast crater with scattered meteor rock.
