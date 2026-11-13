@@ -86,11 +86,18 @@ public sealed class CraftingSession
     }
 
     /// <summary>
-    /// Feeds one unit of this inventory id into the first slot that still needs it: a slot
+    /// Feeds one unit (the whole stack with <paramref name="wholeStack"/>, as far as the slots need) of this inventory id into the first slot that still needs it: a slot
     /// accepting the id, holding none of another member, and still short of its need. Returns
     /// whether anything was fed.
     /// </summary>
-    public bool FeedFromInventory(ushort id, Inventory inventory)
+    public bool FeedFromInventory(ushort id, Inventory inventory, bool wholeStack = false)
+    {
+        if (!FeedOneFromInventory(id, inventory)) return false;
+        while (wholeStack && FeedOneFromInventory(id, inventory)) { }
+        return true;
+    }
+
+    private bool FeedOneFromInventory(ushort id, Inventory inventory)
     {
         if (Recipe == null || id == 0) return false;
         for (var i = 0; i < Recipe.Ingredients.Length; i++)

@@ -386,7 +386,7 @@ internal sealed class InventoryPanelInput
         // picked from the Blocks tab's search has to land on the Tools tab to be equippable.
         inventoryView.Tab = hit.Category;
         if (hit.ToolInstance == 0 && inventoryView.Craft.Recipe != null)
-            inventoryView.Craft.FeedFromInventory(hit.Id, ActiveWorld.Inventory);
+            inventoryView.Craft.FeedFromInventory(hit.Id, ActiveWorld.Inventory, textKeys.ShiftHeld);
     }
 
     // Opens a recipe on the Craft tab, at the top of its card; the query that found it, if any, is cleared
@@ -550,7 +550,7 @@ internal sealed class InventoryPanelInput
                 inventoryView.SelectedId = picked;
                 inventoryView.SelectedToolInstance = 0;
                 if (inventoryView.Craft.Recipe != null)
-                    inventoryView.Craft.FeedFromInventory(picked, inventory);
+                    inventoryView.Craft.FeedFromInventory(picked, inventory, textKeys.ShiftHeld);
                 break;
             }
         }
