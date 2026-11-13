@@ -10,6 +10,8 @@ using VoxelEngine.Content.Shapes;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Particles;
+using VoxelEngine.WorldGen.Features;
+using VoxelEngine.Chunks;
 using VoxelEngine.UI;
 
 namespace VoxelEngine.Graphics;
@@ -30,6 +32,7 @@ public class BlockCubeCache : IDisposable
     private readonly Dictionary<ushort, Mesh> _tintedMeshes = new();
     private readonly Dictionary<ushort, Mesh> _surfaceMeshes = new();
     private readonly Dictionary<ushort, Mesh> _tallMeshes = new();
+    private readonly Dictionary<(ushort, int), Mesh> _pileMeshes = new();
     private Mesh? _colorChip;
 
     public BlockCubeCache(GL gl) => _gl = gl;
@@ -77,6 +80,58 @@ public class BlockCubeCache : IDisposable
         mesh = Primitives.CreateBlockModel(_gl, quads, 0.5f);
         _tallMeshes[blockId] = mesh;
         return mesh;
+    }
+
+    /// <summary>
+    /// The mesh the look-at label spins for a block in a given state: a branch pile is its
+    /// <see cref="BuildBranchPile"/> sticks (one per state-byte count, so the label shows how many the cell
+    /// holds), anything else is <see cref="GetWhole"/>.
+    /// </summary>
+    public Mesh? GetLookAt(ushort blockId, byte state)
+    {
+        if (BlockType.ById[blockId] is not { Renderer: BlockRenderer.BranchPile } type)
+            return GetWhole(blockId);
+
+        var count = BranchPileGenerator.CountWithState(state, type.StackMax >= 2 ? type.StackMax : 4);
+        var key = (blockId, count);
+        if (_pileMeshes.TryGetValue(key, out var mesh))
+            return mesh;
+
+        var (vertices, indices) = BuildBranchPile(type, count);
+        mesh = new Mesh(_gl, vertices, indices);
+        _pileMeshes[key] = mesh;
+        return mesh;
+    }
+
+    /// <summary>
+    /// The crossed sticks of a <paramref name="count"/>-stick branch pile as a standalone model, laid out
+    /// by <see cref="StackEmitter.BranchStick"/> like the world's and centered on the origin (the pile's
+    /// own height, so it spins in place). Faces are shaded as fully unoccluded. GL-free.
+    /// </summary>
+    public static (Vertex[] Vertices, ushort[] Indices) BuildBranchPile(BlockType type, int count)
+    {
+        var vertices = new List<Vertex>(count * 6 * 4);
+        var indices = new List<ushort>(count * 6 * 6);
+        var center = new Vector3(0.5f, BranchPileGenerator.PileTop(count) * 0.5f, 0.5f);
+        var variant = BranchPileGenerator.VariantAt(0, 0);
+        for (var b = 0; b < count; b++)
+        {
+            StackEmitter.BranchStick(0, 0, variant, b, out var min, out var max, out var cx, out var cz, out var cos, out var sin);
+            for (var face = 0; face < 6; face++)
+            {
+                var tile = face is 2 or 3 ? type.Top : type.Side;
+                ChunkFaceTables.BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
+                var normal = Chunk.CubeFaces[face].normal;
+                var shade = ChunkFaceTables.ShadeLut[(face << 2) | 3];
+                var offset = (ushort)vertices.Count;
+                Span<Vector3> corners = [p0, p1, p2, p3];
+                foreach (var corner in corners)
+                    vertices.Add(new Vertex(StackEmitter.SpinY(corner, cx, cz, cos, sin) - center, shade, shade, shade, 255,
+                        ChunkFaceTables.CropUv(face, corner), tile, 1f, 0f, StackEmitter.SpinY(normal, 0f, 0f, cos, sin)));
+                indices.AddRange([offset, (ushort)(offset + 1), (ushort)(offset + 2), offset, (ushort)(offset + 2), (ushort)(offset + 3)]);
+            }
+        }
+        return (vertices.ToArray(), indices.ToArray());
     }
 
     private static BakedQuad Shifted(BakedQuad quad, float dy) =>
@@ -225,6 +280,9 @@ public class BlockCubeCache : IDisposable
         foreach (var mesh in _tallMeshes.Values)
             mesh.Dispose();
         _tallMeshes.Clear();
+        foreach (var mesh in _pileMeshes.Values)
+            mesh.Dispose();
+        _pileMeshes.Clear();
         foreach (var mesh in _surfaceMeshes.Values)
             mesh.Dispose();
         _surfaceMeshes.Clear();

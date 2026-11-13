@@ -99,15 +99,7 @@ internal static class StackEmitter
 
         for (var b = 0; b < count; b++)
         {
-            BranchPileGenerator.GetCenter(worldX, worldZ, variant, b, out var cx, out var cz);
-            var half = BranchPileGenerator.LengthAt(worldX, worldZ, b) * 0.5f;
-            var halfThick = BranchPileGenerator.Thickness * 0.5f;
-            var yaw = BranchPileGenerator.YawAt(worldX, worldZ, b);
-            var cos = MathF.Cos(yaw);
-            var sin = MathF.Sin(yaw);
-            var y0 = BranchPileGenerator.LayerY(b);
-            var min = new Vector3(cx - half, y0, cz - halfThick);
-            var max = new Vector3(cx + half, y0 + BranchPileGenerator.Thickness, cz + halfThick);
+            BranchStick(worldX, worldZ, variant, b, out var min, out var max, out var cx, out var cz, out var cos, out var sin);
             for (var face = 0; face < 6; face++)
             {
                 if (face == 5) continue;
@@ -122,6 +114,25 @@ internal static class StackEmitter
                     ChunkFaceTables.ShadeLut[(face << 2) | 3], lights[face]);
             }
         }
+    }
+
+    /// <summary>
+    /// The box of stick <paramref name="b"/> of a branch pile at (worldX, worldZ), before its spin: the
+    /// cell-local corners, the spin pivot (cx, cz) and the yaw's cosine and sine. Shared by the chunk
+    /// emitter and the HUD's pile model, so the two draw the same sticks.
+    /// </summary>
+    internal static void BranchStick(int worldX, int worldZ, int variant, int b, out Vector3 min, out Vector3 max,
+        out float cx, out float cz, out float cos, out float sin)
+    {
+        BranchPileGenerator.GetCenter(worldX, worldZ, variant, b, out cx, out cz);
+        var half = BranchPileGenerator.LengthAt(worldX, worldZ, b) * 0.5f;
+        var halfThick = BranchPileGenerator.Thickness * 0.5f;
+        var yaw = BranchPileGenerator.YawAt(worldX, worldZ, b);
+        cos = MathF.Cos(yaw);
+        sin = MathF.Sin(yaw);
+        var y0 = BranchPileGenerator.LayerY(b);
+        min = new Vector3(cx - half, y0, cz - halfThick);
+        max = new Vector3(cx + half, y0 + BranchPileGenerator.Thickness, cz + halfThick);
     }
 
     /// <summary>
