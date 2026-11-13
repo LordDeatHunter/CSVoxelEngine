@@ -576,7 +576,7 @@ internal sealed class WorldPersistence
         var skipped = _campfires.Restore(saved.Campfires) + _querns.Restore(saved.Querns)
             + _kilns.Restore(saved.Kilns) + _casting.Restore(saved.Casts) + _world.Chests.Restore(saved.Chests)
             + _world.Waystones.Restore(saved.Waystones) + _world.Smithing.Restore(saved)
-            + _world.Towers.Restore(saved.Towers) + _world.Stumps.Restore(saved.Stumps)
+            + _world.Towers.Restore(saved.Towers) + _world.Stumps.Restore(saved.Stumps) + _world.IngotPiles.Restore(saved.IngotPiles)
             + _world.StandingCrucibles.Restore(saved.StandingCrucibles);
         if (skipped > 0)
             Log.Warn($"Station save: dropped {skipped} saved station entr{(skipped == 1 ? "y" : "ies")} that no longer resolve");
@@ -597,6 +597,7 @@ internal sealed class WorldPersistence
             Chests = _world.Chests.Capture(),
             Lanterns = _world.Lanterns.Capture(),
             Stumps = _world.Stumps.Capture(),
+            IngotPiles = _world.IngotPiles.Capture(),
             StandingCrucibles = _world.StandingCrucibles.Capture(),
             Waystones = _world.Waystones.Capture(),
             Towers = _world.Towers.Capture(),

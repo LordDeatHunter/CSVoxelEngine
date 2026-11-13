@@ -1,0 +1,33 @@
+{
+  "name": "Ingot Pile",
+  "model": {
+    "parent": "block/cube_all",
+    "textures": {
+      "all": "copper_ingot_block"
+    }
+  },
+  "sfx": "hit_rock",
+  "hardness": 0,
+  "renderer": "ingot_pile",
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "light": {
+    "passes": true
+  },
+  "hasItem": false,
+  "needsSupport": true,
+  "loot": "ingot_pile",
+  "hitbox": {
+    "min": [
+      0,
+      0,
+      0
+    ],
+    "max": [
+      1,
+      0.36,
+      1
+    ]
+  }
+}

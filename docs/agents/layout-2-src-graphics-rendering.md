@@ -85,6 +85,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       ItemUseResult.cs         # outcome of Item.OnUse: did the use take effect, what
                                #   the tool morphs into, and whether the player punches
       PlaceStackItem.cs        # builds up a multi-state block (flint or obsidian on a pebble pile)
+      PlaceIngotItem.cs        # lays an ingot onto an ingot pile or grounds a fresh one (mixed metals)
       PlainItem.cs             # a plain pickup: no right-click behavior (vine, branch, compass)
       PlantTreeItem.cs         # plants a sapling of the item's Item.UseTreeName species
                                #   on the aimed ground (an acorn on dirt or grass)

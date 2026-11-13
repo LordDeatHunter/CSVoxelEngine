@@ -1,0 +1,10 @@
+{
+  "name": "Wrought Iron Ingot Block",
+  "model": {
+    "parent": "block/cube_all",
+    "textures": {
+      "all": "wrought_iron_ingot_block"
+    }
+  },
+  "hasItem": false
+}

@@ -14,6 +14,7 @@ using VoxelEngine.Graphics;
 using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Ingots;
 using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.Simulation.Stumps;
 using VoxelEngine.UI;
@@ -206,6 +207,45 @@ internal sealed class StationPasses : IDisposable
                         * Matrix4x4.CreateTranslation(foot);
             _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(foot + new Vector3(0f, 0.4f, 0f)));
             mesh.Render();
+        }
+    }
+
+    /// <summary>
+    /// Draws every ingot pile: each ingot is its metal's cube squashed to ingot size (see <see cref="IngotPileConfig"/>),
+    /// three side by side with a gap in each layer, every layer turned 90 degrees from the one below. The chunk meshes
+    /// nothing for a pile block. Skips the shadow pass, like the quern tops.
+    /// </summary>
+    internal void RenderIngotPiles(Camera camera, IngotPileManager piles)
+    {
+        if (camera == null || piles == null || !piles.HasAny) return;
+
+        _owner.WorldShader.Use();
+        _owner.BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+        var atlasBound = true;
+
+        foreach (var (cell, ingots) in piles.View())
+        {
+            var center = cell + new Vector3(0.5f, 0f, 0.5f);
+            var light = _owner.LightAt(cell + new Vector3(0.5f, 0.5f, 0.5f));
+            for (var i = 0; i < ingots.Count; i++)
+            {
+                if (ItemRegistry.TryGet(ingots[i]) is not { IngotBlockId: not 0 } item) continue;
+                BindAtlas(ref atlasBound);
+                var mesh = _owner.BlockCubes.Get(item.IngotBlockId);
+                if (mesh == null) continue;
+
+                var layer = i / IngotPileConfig.PerLayer;
+                var slot = i % IngotPileConfig.PerLayer - IngotPileConfig.PerLayer / 2;
+                var model = Matrix4x4.CreateScale(IngotPileConfig.IngotLength, IngotPileConfig.IngotHeight, IngotPileConfig.IngotWidth)
+                            * Matrix4x4.CreateTranslation(0f, IngotPileConfig.IngotHeight * (layer + 0.5f),
+                                slot * (IngotPileConfig.IngotWidth + IngotPileConfig.Gap))
+                            * Matrix4x4.CreateRotationY(layer % 2 * MathF.PI / 2f)
+                            * Matrix4x4.CreateTranslation(center);
+                _owner.SetDrawUniforms(model, model * viewProj, 1f, light);
+                mesh.Render();
+            }
         }
     }
 

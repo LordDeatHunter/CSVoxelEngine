@@ -325,6 +325,12 @@ public sealed class ItemDefinition
         public string? Block { get; set; }
 
         /// <summary>
+        /// For <c>place_ingot</c>: the data block whose textured cube is drawn, squashed to an ingot, for this item in a
+        /// pile, e.g. <c>block/copper_ingot_block</c>.
+        /// </summary>
+        public string? Ingot { get; set; }
+
+        /// <summary>
         /// Per-use success chance 0..1 for <c>ignite_campfire</c>; omitted means always.
         /// </summary>
         public float? Chance { get; set; }

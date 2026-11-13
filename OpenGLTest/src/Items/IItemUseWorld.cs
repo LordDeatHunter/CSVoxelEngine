@@ -58,6 +58,13 @@ public interface IItemUseWorld
     /// <summary>Writes a pile cell's unit count.</summary>
     bool SetPileCount(Vector3 pos, byte count);
 
+    /// <summary>How many ingots rest in the ingot pile at the cell.</summary>
+    int IngotCountAt(int x, int y, int z);
+
+    /// <summary>Lays one ingot item on the ingot pile block at the cell. A client only predicts the block, so it
+    /// reports success without writing: the server's station snapshot brings the contents.</summary>
+    bool AddIngotToPile(Vector3 cell, ushort itemId);
+
     /// <summary>Writes a pebble pile cell's total and obsidian share; other piles ignore the share.</summary>
     bool SetPileComposition(Vector3 pos, ushort blockId, int total, int secondary);
 

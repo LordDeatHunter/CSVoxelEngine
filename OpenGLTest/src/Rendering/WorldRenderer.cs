@@ -171,6 +171,7 @@ internal sealed class WorldRenderer
         renderManager.Stations.RenderCampfireCooking(Camera, _campfires);
         renderManager.Stations.RenderQuerns(Camera, _querns);
         renderManager.Stations.RenderStumpLogs(Camera, _world.Stumps);
+        renderManager.Stations.RenderIngotPiles(Camera, _world.IngotPiles);
         renderManager.Stations.RenderKilns(Camera, _kilns);
         renderManager.Stations.RenderSmithing(Camera, _world.Smithing);
         renderManager.Stations.RenderCastings(Camera, _casting);

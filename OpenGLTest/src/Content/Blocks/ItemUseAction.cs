@@ -29,6 +29,12 @@ public enum ItemUseAction
     PlaceStack,
 
     /// <summary>
+    /// Lays one ingot onto an ingot pile (mixed metals, up to the pile's capacity) or grounds a fresh pile. See
+    /// <see cref="Item.UseBlockId"/> (the pile block) and <see cref="Item.IngotBlockId"/> (the cube drawn for it).
+    /// </summary>
+    PlaceIngot,
+
+    /// <summary>
     /// Strikes a spark at a fully built firepit (a max-count branch pile): a chance per
     /// use to light it, spending durability instead of morphing. See
     /// <see cref="Item.UseBlockId"/> and <see cref="Item.UseChance"/>.

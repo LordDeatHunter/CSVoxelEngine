@@ -1,0 +1,10 @@
+{
+  "name": "Copper Ingot Block",
+  "model": {
+    "parent": "block/cube_all",
+    "textures": {
+      "all": "copper_ingot_block"
+    }
+  },
+  "hasItem": false
+}

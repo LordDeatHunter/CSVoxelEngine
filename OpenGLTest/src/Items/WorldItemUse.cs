@@ -212,6 +212,12 @@ internal sealed class WorldItemUse : IItemUseWorld
         };
     }
 
+    int IItemUseWorld.IngotCountAt(int x, int y, int z) => _world.IngotPiles.CountAt(x, y, z);
+
+    bool IItemUseWorld.AddIngotToPile(Vector3 cell, ushort itemId) =>
+        _clientMode && Simulation.Ingots.IngotPileManager.IsIngot(itemId)
+        || _world.IngotPiles.TryAdd(_chunkManager, (int)cell.X, (int)cell.Y, (int)cell.Z, itemId);
+
     bool IItemUseWorld.SetPileCount(Vector3 pos, byte count)
     {
         var chunk = _chunkManager.ChunkAt((int)pos.X, (int)pos.Y, (int)pos.Z);

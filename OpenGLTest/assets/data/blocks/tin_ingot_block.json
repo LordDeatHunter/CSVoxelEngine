@@ -1,0 +1,10 @@
+{
+  "name": "Tin Ingot Block",
+  "model": {
+    "parent": "block/cube_all",
+    "textures": {
+      "all": "tin_ingot_block"
+    }
+  },
+  "hasItem": false
+}

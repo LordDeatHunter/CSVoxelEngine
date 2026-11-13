@@ -78,6 +78,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   (LanternManager) and versioned persistence (LanternData, LanternCodec)
       Crucibles/               # a crucible standing on the ground: StandingCrucibleManager (the vessel's own stack per cell,
                                #   pick-up, stale sweep, save, snapshot), StandingCrucibleData (its save and wire shape)
+      Ingots/                  # IngotPileManager: the mixed ingots resting in each ingot pile cell (add, spill, stale sweep, save, snapshot)
       Stumps/                  # the log standing on a tree stump: StumpManager (placement, pick-up, wobble, save, snapshot),
                                #   StumpLog (one log's spot, turn and wobble), StumpInteraction (right-click place/lift, left-click blow)
       Chests/                  # chest block entities, namespace VoxelEngine.Simulation.Chests (see "Chests (I-4)")

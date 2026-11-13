@@ -29,6 +29,18 @@ public sealed class StationSaveData
     /// <summary>The logs standing on stumps.</summary>
     public List<StumpData>? Stumps { get; set; }
 
+    /// <summary>The ingot piles, each with its ingots in laying order.</summary>
+    public List<IngotPileData>? IngotPiles { get; set; }
+
+    /// <summary>One ingot pile, keyed by its cell (see <see cref="Simulation.Ingots.IngotPileManager"/>).</summary>
+    public sealed class IngotPileData
+    {
+        public int[]? Cell { get; set; }
+
+        /// <summary>The ingot items' save names, bottom layer first.</summary>
+        public List<string>? Ingots { get; set; }
+    }
+
     /// <summary>One log on a stump, keyed by the stump's cell (see <see cref="Simulation.Stumps.StumpManager"/>).</summary>
     public sealed class StumpData
     {

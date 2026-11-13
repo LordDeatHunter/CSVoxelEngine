@@ -181,6 +181,8 @@ internal sealed class BlockEditor
                     brokenState);
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.BranchPile)
                 _campfires.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, stationDrops);
+            if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.IngotPile)
+                _world.IngotPiles.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, stationDrops);
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.Quern)
                 _querns.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, stationDrops);
             // A broken chest spills what it holds (a ruin chest nobody opened rolls its loot first)

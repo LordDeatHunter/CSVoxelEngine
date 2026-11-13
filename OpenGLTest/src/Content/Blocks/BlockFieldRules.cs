@@ -40,6 +40,7 @@ internal static class BlockFieldRules
             "tree_wood" => BlockRenderer.TreeWood,
             "pebbles" => BlockRenderer.Pebbles,
             "branch_pile" => BlockRenderer.BranchPile,
+            "ingot_pile" => BlockRenderer.IngotPile,
             "snow_layers" => BlockRenderer.SnowLayers,
             "fluid" => BlockRenderer.Fluid,
             "quern" => BlockRenderer.Quern,
@@ -47,7 +48,7 @@ internal static class BlockFieldRules
             "multiblock_part" => BlockRenderer.MultiblockPart,
             "pane" => BlockRenderer.Pane,
             _ => throw new InvalidOperationException(
-                $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tree_wood, pebbles, branch_pile, snow_layers, fluid, quern, multiblock, multiblock_part or pane."),
+                $"Block '{path}' has unknown renderer '{definition.Renderer}'; expected model, tree_wood, pebbles, branch_pile, ingot_pile, snow_layers, fluid, quern, multiblock, multiblock_part or pane."),
         };
 
     /// <summary>The pane profile of a <c>pane</c> block (null for every other renderer), refusing a pane object anywhere else.</summary>

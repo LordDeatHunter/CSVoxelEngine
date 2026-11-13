@@ -66,6 +66,10 @@ body wears.
 - [ ] **Spear** — `spear.png`. `throwAligned`: the sprite's tip must sit on its (1, 1) diagonal
   (up-right), or the thrown copy does not fly point first.
 
+### Ingot piles
+
+- [ ] **Ingot cube tiles** — `blocks/<metal>_ingot_block.png` (copper, tin, bronze, wrought iron, vulcanite) are flat generated 32x32 tiles squashed onto the ingots of a pile; replace with hand-drawn metal faces.
+
 ### Drops
 
 - [ ] **Bone** — `bone.png`. Made by `tools/generate-skeleton-model.py`.

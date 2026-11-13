@@ -905,6 +905,9 @@ public class World
     /// <summary>The logs standing on tree stumps (authoritative on a server and in singleplayer, a mirror on a client).</summary>
     public Simulation.Stumps.StumpManager Stumps { get; } = new();
 
+    /// <summary>The ingots resting in ingot piles (authoritative on a server and in singleplayer, a mirror on a client).</summary>
+    public Simulation.Ingots.IngotPileManager IngotPiles { get; } = new();
+
     /// <summary>The drop manager, for the interactions that hand an item back as a drop when the pool is full.</summary>
     internal DropManager DropSpawner => _dropManager;
 
@@ -1058,11 +1061,11 @@ public class World
     public Vector3 LastAltarCell => RightClick.LastAltarCell;
 
     public bool HasStations => StationNetCodec.AnyWorld(_campfires, _querns, _kilns, _casting,
-        _smithing, _towers, ChestLids, Lanterns, Stumps, StandingCrucibles);
+        _smithing, _towers, ChestLids, Lanterns, Stumps, StandingCrucibles, IngotPiles);
 
     /// <summary>Writes the server-owned stations, including placed lanterns.</summary>
     public void WriteStations(PacketWriter writer) => StationNetCodec.WriteWorld(writer,
-        _campfires, _querns, _kilns, _casting, _smithing, _towers, ChestLids, Lanterns, Stumps, StandingCrucibles);
+        _campfires, _querns, _kilns, _casting, _smithing, _towers, ChestLids, Lanterns, Stumps, StandingCrucibles, IngotPiles);
 
     /// <summary>
     /// One multiplayer-client frame: no local simulation, only the camera (and only once the chunk
@@ -1241,6 +1244,7 @@ public class World
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
         Stumps.Update((float)deltaTime, _chunkManager, _dropManager);
+        IngotPiles.Update(_chunkManager, _dropManager);
         StandingCrucibles.Update(_chunkManager, _dropManager);
         _chests.Update(_chunkManager, _dropManager);
         Lanterns.Update((float)deltaTime, _chunkManager, _dropManager);

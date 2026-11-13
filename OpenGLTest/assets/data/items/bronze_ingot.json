@@ -1,1 +1,3 @@
-{ "name": "Bronze Ingot", "texture": "assets/textures/items/bronze_ingot.png" }
+{ "name": "Bronze Ingot", "texture": "assets/textures/items/bronze_ingot.png",
+  "use": { "action": "place_ingot", "block": "block/ingot_pile", "ingot": "block/bronze_ingot_block" }
+}

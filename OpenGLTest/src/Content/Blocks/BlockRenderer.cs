@@ -31,6 +31,7 @@ public enum BlockRenderer
     TreeWood,
     Pebbles,
     BranchPile,
+    IngotPile,
     Fluid,
     Quern,
     SnowLayers,

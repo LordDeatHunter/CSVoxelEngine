@@ -92,6 +92,20 @@ internal sealed class StubItemUseWorld : IItemUseWorld
 
     public bool SetPileCount(Vector3 pos, byte count) => false;
 
+    /// <summary>The ingots laid on each ingot pile cell, in laying order.</summary>
+    public Dictionary<(int, int, int), List<ushort>> Ingots { get; } = new();
+
+    public int IngotCountAt(int x, int y, int z) => Ingots.TryGetValue((x, y, z), out var pile) ? pile.Count : 0;
+
+    public bool AddIngotToPile(Vector3 cell, ushort itemId)
+    {
+        var key = ((int)cell.X, (int)cell.Y, (int)cell.Z);
+        if (!Ingots.TryGetValue(key, out var pile)) Ingots[key] = pile = [];
+        if (pile.Count >= IngotPileConfig.Capacity) return false;
+        pile.Add(itemId);
+        return true;
+    }
+
     public bool SetPileComposition(Vector3 pos, ushort blockId, int total, int secondary) => false;
 
     public void UnmarkPlayerPlaced(int x, int y, int z) { }

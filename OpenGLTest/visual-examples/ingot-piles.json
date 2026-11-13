@@ -1,0 +1,59 @@
+{
+  // Ingot piles: run with VOXEL_TIME=147 (noon) and VOXEL_SCRIPT=visual-examples/ingot-piles.json from OpenGLTest/.
+  // Shots land in visual/ingot-piles/.
+  //
+  // The flat desert patch of torches.json (sand at y 11). Hovering straight over one column, right-clicks lay
+  // ingots of three metals onto the same pile (the hotbar slot picks the metal): one ingot, a first layer of three,
+  // then a full pile of nine (three layers, each turned 90 degrees). Then the pile is mined to see it spill.
+  //   one      a single copper ingot grounded on the sand
+  //   layer    three ingots side by side with gaps
+  //   full     nine mixed ingots in three layers
+  //   spilled  the pile broken: ingots lying around as drops
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [157.5, 32, 283.5], "yaw": -90, "pitch": -39 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "give", "block": "item/copper_ingot", "count": 5 },
+    { "op": "give", "block": "item/tin_ingot", "count": 2 },
+    { "op": "give", "block": "item/wrought_iron", "count": 2 },
+    { "op": "teleport", "pos": [157.5, 14.5, 279.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "select", "slot": 1 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "teleport", "pos": [157.5, 13.2, 281.2], "yaw": -90, "pitch": -50 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "one", "hideHud": true },
+    { "op": "teleport", "pos": [157.5, 14.5, 279.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "select", "slot": 2 },
+    { "op": "place" },
+    { "op": "select", "slot": 3 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "teleport", "pos": [157.5, 13.2, 281.2], "yaw": -90, "pitch": -50 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "layer", "hideHud": true },
+    { "op": "teleport", "pos": [157.5, 14.5, 279.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "select", "slot": 1 },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "select", "slot": 2 },
+    { "op": "place" },
+    { "op": "select", "slot": 3 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "teleport", "pos": [157.5, 13.2, 281.2], "yaw": -90, "pitch": -50 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "full", "hideHud": true },
+    { "op": "teleport", "pos": [158.7, 13.0, 280.7], "yaw": -135, "pitch": -35 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "full_oblique", "hideHud": true },
+    { "op": "mine", "seconds": 0.3 },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "screenshot", "name": "spilled", "hideHud": true }
+  ]
+}

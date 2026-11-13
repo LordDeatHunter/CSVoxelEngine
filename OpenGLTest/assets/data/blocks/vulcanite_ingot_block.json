@@ -1,0 +1,10 @@
+{
+  "name": "Vulcanite Ingot Block",
+  "model": {
+    "parent": "block/cube_all",
+    "textures": {
+      "all": "vulcanite_ingot_block"
+    }
+  },
+  "hasItem": false
+}

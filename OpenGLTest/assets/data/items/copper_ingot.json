@@ -1,3 +1,4 @@
 {
-  "name": "Copper Ingot", "texture": "assets/textures/items/copper_ingot.png"
+  "name": "Copper Ingot", "texture": "assets/textures/items/copper_ingot.png",
+  "use": { "action": "place_ingot", "block": "block/ingot_pile", "ingot": "block/copper_ingot_block" }
 }

@@ -32,6 +32,7 @@ internal static class ItemLoader
                 "pickup_fluid" => ItemUseAction.PickupFluid,
                 "place_fluid" => ItemUseAction.PlaceFluid,
                 "place_stack" => ItemUseAction.PlaceStack,
+                "place_ingot" => ItemUseAction.PlaceIngot,
                 "ignite_campfire" => ItemUseAction.IgniteCampfire,
                 "heal" => ItemUseAction.Heal,
                 "grow_tree" => ItemUseAction.GrowTree,
@@ -40,7 +41,7 @@ internal static class ItemLoader
                 "restore_mana" => ItemUseAction.RestoreMana,
                 "summon" => ItemUseAction.Summon,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, heal, grow_tree, plant_tree, learn_parts, restore_mana or summon."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, place_ingot, ignite_campfire, heal, grow_tree, plant_tree, learn_parts, restore_mana or summon."),
             };
             var teaches = ParseTeaches(definition, action, path);
             var restoresMana = ParseRestoresMana(definition, action, path);
@@ -178,6 +179,7 @@ internal static class ItemLoader
                 TrailColor: trailColor,
                 ThrowAligned: definition.ThrowAligned,
                 ThrowBlockId: ResolveUseTarget(definition.ThrowBlock, "throwBlock", path),
+                IngotBlockId: ResolveUseTarget(use?.Ingot, "use.ingot", path),
                 UsePose: usePose,
                 StaffSlots: staff?.Slots ?? 0,
                 StaffTier: staff?.Tier ?? 0,
@@ -571,6 +573,9 @@ internal static class ItemLoader
                 case ItemUseAction.PlaceStack:
                     ValidatePlaceStack(item, path);
                     break;
+                case ItemUseAction.PlaceIngot:
+                    ValidatePlaceIngot(item, path);
+                    break;
                 case ItemUseAction.IgniteCampfire:
                     ValidateIgniteCampfire(item, path);
                     break;
@@ -617,6 +622,19 @@ internal static class ItemLoader
         if (item.UseFluidId != 0)
             throw new InvalidOperationException(
                 $"Item '{path}' has use.action 'place_stack' with a use.fluid: that field belongs to the bucket actions.");
+    }
+
+    private static void ValidatePlaceIngot(Item item, string path)
+    {
+        if (BlockType.ById[item.UseBlockId] is not { Renderer: BlockRenderer.IngotPile })
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'place_ingot' but its use.block is not a block with the ingot_pile renderer.");
+        if (BlockType.ById[item.IngotBlockId] == null)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'place_ingot' but its use.ingot is not a block.");
+        if (item.UseResultId != 0 || item.UseFluidId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'place_ingot' with a use.result or use.fluid: placing spends from the stack.");
     }
 
     private static void ValidateIgniteCampfire(Item item, string path)

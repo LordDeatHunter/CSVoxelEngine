@@ -1,1 +1,3 @@
-{ "name": "Tin Ingot", "texture": "assets/textures/items/tin_ingot.png" }
+{ "name": "Tin Ingot", "texture": "assets/textures/items/tin_ingot.png",
+  "use": { "action": "place_ingot", "block": "block/ingot_pile", "ingot": "block/tin_ingot_block" }
+}

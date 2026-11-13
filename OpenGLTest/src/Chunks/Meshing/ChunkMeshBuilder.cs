@@ -403,6 +403,10 @@ internal static class ChunkMeshBuilder
                 continue;
             }
 
+            // An ingot pile meshes nothing: its metals live in IngotPileManager and an entity pass draws them
+            if (type.Renderer == BlockRenderer.IngotPile)
+                continue;
+
             // Branch piles render as 1-4 crossed sticks sharing the cell; see EmitBranchPile
             if (type.Renderer == BlockRenderer.BranchPile)
             {

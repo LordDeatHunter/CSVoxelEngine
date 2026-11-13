@@ -139,6 +139,9 @@ public abstract class Item
     /// <summary>The block whose cube a thrown copy is drawn as instead of this item's sprite, or 0 for the sprite.</summary>
     public ushort ThrowBlockId { get; internal init; }
 
+    /// <summary>The data block whose cube an ingot of this item is drawn as in a pile (<see cref="ItemUseAction.PlaceIngot"/>), or 0.</summary>
+    public ushort IngotBlockId { get; internal init; }
+
     /// <summary>Seconds between uses of this item; 0 means the global click rate applies.</summary>
     public float UseDelaySeconds { get; internal init; }
 
@@ -290,6 +293,7 @@ public abstract class Item
         ThrowDamage = spec.ThrowDamage;
         ThrowAligned = spec.ThrowAligned;
         ThrowBlockId = spec.ThrowBlockId;
+        IngotBlockId = spec.IngotBlockId;
         Rarity = spec.Rarity;
     }
 

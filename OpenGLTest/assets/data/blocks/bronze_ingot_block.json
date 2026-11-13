@@ -1,0 +1,10 @@
+{
+  "name": "Bronze Ingot Block",
+  "model": {
+    "parent": "block/cube_all",
+    "textures": {
+      "all": "bronze_ingot_block"
+    }
+  },
+  "hasItem": false
+}
