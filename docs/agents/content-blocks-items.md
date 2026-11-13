@@ -208,7 +208,7 @@ generic one.
 ### Building blocks
 
 Plain construction pieces built from the schema above. `oak_planks` is the first building wood:
-four from one `oak_log` (`recipes/oak_planks.json`), a plain `cube_all` block with `sfx: hit_wood`
+made from lumber (`recipes/oak_planks_from_lumber.json`), a plain `cube_all` block with `sfx: hit_wood`
 that is mined by hand. Its tile is hand-authored and is what the wooden pieces below crop their faces from.
 `visual-examples/planks.json` (`VOXEL_TIME=147`) builds and shoots them.
 

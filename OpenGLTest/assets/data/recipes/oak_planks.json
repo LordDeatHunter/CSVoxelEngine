@@ -1,7 +1,0 @@
-{
-  "result": "block/oak_planks",
-  "count": 4,
-  "ingredients": [
-    { "item": "block/oak_log", "count": 1 }
-  ]
-}
