@@ -27,12 +27,13 @@
     {
       "id": "mold",
       "title": "Into the Mold",
-      "description": "Shape an ingot mold to pour metal into.",
+      "description": "Shape an ingot mold to pour metal into, then fire it in the kiln.",
       "icon": "mold_ingot",
       "pos": [2, 1],
       "parents": ["mud_bricks"],
       "requirements": [
-        { "type": "craft", "item": "mold_ingot" }
+        { "type": "craft", "item": "mold_ingot" },
+        { "type": "obtain", "item": "fired_mold_ingot" }
       ]
     },
     {
