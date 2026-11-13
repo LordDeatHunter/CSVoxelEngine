@@ -396,6 +396,12 @@ public sealed record BlockType
     /// split.</summary>
     public LootTable? SplitLoot { get; init; }
 
+    /// <summary>Axe blows it takes to split this log on a stump (<c>wood.splitHits</c> / <c>stumpLog.hits</c>).</summary>
+    public int SplitHits { get; init; }
+
+    /// <summary>Whether this block, though not tree wood, stands on a stump like a log (<c>stumpLog</c>: a hollow log).</summary>
+    public bool StandsOnStump { get; init; }
+
     /// <summary>
     /// The baked model pre-rotated to each of the four horizontal facings, indexed by facing 0..3
     /// (<c>[0]</c> is <see cref="BakedModel"/> itself, the authored north-facing bake), which the

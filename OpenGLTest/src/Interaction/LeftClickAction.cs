@@ -600,10 +600,13 @@ internal sealed class LeftClickAction
         if (_world.Stumps.LogAt(x, y, z) is not { } log) return;
 
         PlayHitSfx(log.LogId, cell);
-        _debris.Burst(cell, log.LogId, ParticleConfig.StumpSplitDebris, columns: _chunkManager.ColumnSource);
-        Camera.AddHitKick(Vector3.Zero, BreakKick.Strength(SplitKickHardness, false));
+        // Only the blow that finishes the split bursts the whole log; the ones before it chip it
+        var finishes = log.SplitHits + 1 >= (BlockType.ById[log.LogId]?.SplitHits ?? 1);
+        _debris.Burst(cell, log.LogId, finishes ? ParticleConfig.StumpSplitDebris : ParticleConfig.BlockDebrisPerHit,
+            columns: _chunkManager.ColumnSource);
+        Camera.AddHitKick(Vector3.Zero, BreakKick.Strength(finishes ? SplitKickHardness : SplitKickHardness / 2f, false));
         _world.StumpHitFor(cell, split: true);
-        _awaitRelease = true;
+        _awaitRelease = finishes;
         _world.RaiseIntent(WorldIntent.StumpHit(Camera.Position, _selectedAimDirection, cell));
     }
 

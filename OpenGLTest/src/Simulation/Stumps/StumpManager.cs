@@ -27,8 +27,10 @@ public sealed class StumpManager
     /// <summary>The log on a stump cell, or null when it holds none.</summary>
     public StumpLog? LogAt(int x, int y, int z) => _logs.GetValueOrDefault((x, y, z));
 
-    /// <summary>Whether a block is a log a stump takes: tree wood whose species leaves a stump (a cactus is not a log).</summary>
-    public static bool IsLog(ushort blockId) => blockId != 0 && BlockType.ById[blockId]?.StumpId is not (null or 0);
+    /// <summary>Whether a block is a log a stump takes: tree wood whose species leaves a stump (a cactus is not a log), or a
+    /// block that declares <c>stumpLog</c> (a hollow log).</summary>
+    public static bool IsLog(ushort blockId) =>
+        blockId != 0 && BlockType.ById[blockId] is { } block && (block.StumpId != 0 || block.StandsOnStump);
 
     /// <summary>
     /// Stands <paramref name="logId"/> on the empty stump at the cell, where the ray from <paramref name="eye"/> along
@@ -114,6 +116,10 @@ public sealed class StumpManager
     private static bool IsStumpAt(ChunkManager chunks, int x, int y, int z) =>
         chunks.TryGetCell(x, y, z, out var id, out _) && BlockType.ById[id]?.IsStump == true;
 
+    /// <summary>A stored blow count kept below the log's split, so a bad value can never show a log already split.</summary>
+    private static int ClampHits(ushort logId, int hits) =>
+        Math.Clamp(hits, 0, Math.Max(0, (BlockType.ById[logId]?.SplitHits ?? 1) - 1));
+
     private static float Clamp(float offset) =>
         float.IsFinite(offset) ? Math.Clamp(offset, -StumpConfig.MaxOffset, StumpConfig.MaxOffset) : 0f;
 
@@ -126,6 +132,7 @@ public sealed class StumpManager
             OffsetX = entry.Value.OffsetX,
             OffsetZ = entry.Value.OffsetZ,
             Yaw = entry.Value.Yaw,
+            Hits = entry.Value.SplitHits,
         }).ToList();
 
     /// <summary>Adds the logs saved by <see cref="Capture"/> to an empty registry. An entry with a bad cell, a log that no
@@ -148,6 +155,7 @@ public sealed class StumpManager
                 OffsetX = Clamp(data.OffsetX),
                 OffsetZ = Clamp(data.OffsetZ),
                 Yaw = float.IsFinite(data.Yaw) ? data.Yaw : 0f,
+                SplitHits = ClampHits(logId, data.Hits),
             };
         }
         return skipped;
@@ -168,6 +176,7 @@ public sealed class StumpManager
             writer.Write(log.OffsetZ);
             writer.Write(log.Yaw);
             writer.Write(log.WobbleLeft);
+            writer.Write((byte)log.SplitHits);
         }
     }
 
@@ -189,6 +198,7 @@ public sealed class StumpManager
             var offsetZ = StationNetCodec.ReadFinite(reader);
             var yaw = StationNetCodec.ReadFinite(reader);
             var wobble = Math.Clamp(StationNetCodec.ReadFinite(reader), 0f, StumpConfig.WobbleSeconds);
+            var hits = ClampHits(logId, reader.ReadByte());
             _stale.Remove(key);
             if (!_logs.TryGetValue(key, out var log))
             {
@@ -204,6 +214,7 @@ public sealed class StumpManager
             log.OffsetZ = offsetZ;
             log.Yaw = yaw;
             log.WobbleLeft = wobble;
+            log.SplitHits = hits;
         }
         foreach (var key in _stale)
             _logs.Remove(key);

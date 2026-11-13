@@ -16,6 +16,9 @@ public sealed class StumpLog
     /// <summary>Yaw about the vertical, in radians.</summary>
     public float Yaw;
 
+    /// <summary>Axe blows the log has taken toward its split (0 = whole).</summary>
+    public int SplitHits;
+
     /// <summary>Seconds of wobble left (0 = still).</summary>
     public float WobbleLeft;
 }

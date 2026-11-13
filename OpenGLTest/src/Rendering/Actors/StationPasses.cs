@@ -199,14 +199,35 @@ internal sealed class StationPasses : IDisposable
             var tilt = log.WobbleLeft > 0f
                 ? StumpConfig.WobbleTilt * MathUtils.DampedWobble(progress, StumpConfig.WobbleCycles)
                 : 0f;
-            // The cube is centered on its origin: squash it, lift it onto its foot, tip it about the foot, turn it
-            var model = Matrix4x4.CreateScale(StumpConfig.LogWidth, StumpConfig.LogHeight, StumpConfig.LogWidth)
-                        * Matrix4x4.CreateTranslation(0f, StumpConfig.LogHeight / 2f, 0f)
-                        * Matrix4x4.CreateRotationX(tilt)
-                        * Matrix4x4.CreateRotationY(log.Yaw)
-                        * Matrix4x4.CreateTranslation(foot);
-            _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(foot + new Vector3(0f, 0.4f, 0f)));
-            mesh.Render();
+            // A log being split shows as two halves that open a little more with every blow; a whole one is one piece
+            var block = BlockType.ById[log.LogId];
+            var halves = log.SplitHits > 0 ? 2 : 1;
+            var gap = log.SplitHits * StumpConfig.SplitGapPerHit;
+            var lean = log.SplitHits * StumpConfig.SplitLeanPerHit;
+            // A hollow log's tube runs along the model's Z: turned upright it stands on its end
+            var upright = block is { StandsOnStump: true };
+            var size = upright
+                ? new Vector3(StumpConfig.LogWidth, StumpConfig.LogWidth, StumpConfig.LogHeight)
+                : new Vector3(StumpConfig.LogWidth, StumpConfig.LogHeight, StumpConfig.LogWidth);
+            var stand = upright ? Matrix4x4.CreateRotationX(-MathF.PI / 2f) : Matrix4x4.Identity;
+            var place = Matrix4x4.CreateRotationX(tilt) * Matrix4x4.CreateRotationY(log.Yaw) * Matrix4x4.CreateTranslation(foot);
+            var light = _owner.LightAt(foot + new Vector3(0f, 0.4f, 0f));
+
+            for (var half = 0; half < halves; half++)
+            {
+                // The cube is centered on its origin: squash it (to half its width for a half), lift it onto its foot,
+                // lean it away from the other half, push it aside, tip it about the foot, turn it
+                var side = halves == 1 ? 0f : half == 0 ? -1f : 1f;
+                var model = Matrix4x4.CreateScale(halves == 1 ? 1f : 0.5f, 1f, 1f)
+                            * Matrix4x4.CreateScale(size)
+                            * stand
+                            * Matrix4x4.CreateTranslation(0f, StumpConfig.LogHeight / 2f, 0f)
+                            * Matrix4x4.CreateRotationZ(-side * lean)
+                            * Matrix4x4.CreateTranslation(side * (StumpConfig.LogWidth / 4f + gap / 2f), 0f, 0f)
+                            * place;
+                _owner.SetDrawUniforms(model, model * viewProj, 1f, light);
+                mesh.Render();
+            }
         }
     }
 

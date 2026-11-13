@@ -455,10 +455,22 @@ internal static class BlockSchemaParser
     /// throws naming the file.</summary>
     internal static LootTable? ParseSplitLoot(BlockDefinition definition, string path)
     {
-        if (definition.Wood?.Split is not { } name) return null;
+        if ((definition.Wood?.Split ?? definition.StumpLog?.Split) is not { } name)
+            return definition.StumpLog != null
+                ? throw new InvalidOperationException($"Block '{path}' sets stumpLog without a split loot table.")
+                : null;
         return ContentRegistry.LootTables.TryGetValue(name, out var table)
             ? table
-            : throw new InvalidOperationException($"Block '{path}' has wood.split '{name}', which is not an existing loot table.");
+            : throw new InvalidOperationException($"Block '{path}' splits into '{name}', which is not an existing loot table.");
+    }
+
+    /// <summary>The axe blows a log's split takes (<c>wood.splitHits</c> or <c>stumpLog.hits</c>), at least one.</summary>
+    internal static int ParseSplitHits(BlockDefinition definition, string path)
+    {
+        var hits = definition.Wood?.SplitHits ?? definition.StumpLog?.Hits ?? StumpConfig.DefaultSplitHits;
+        return hits >= 1
+            ? hits
+            : throw new InvalidOperationException($"Block '{path}' has {hits} split hits; a log takes at least one blow.");
     }
 
     /// <summary>Settles <c>collidesByHitbox</c>: only a solid, non-fluid, non-stack block that declares

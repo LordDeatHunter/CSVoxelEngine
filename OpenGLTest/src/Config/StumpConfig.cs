@@ -37,6 +37,15 @@ public static class StumpConfig
     /// <summary>Upward speed the lumber of a split log is thrown out at.</summary>
     public const float SplitLift = 2.5f;
 
+    /// <summary>Axe blows a log takes to split on a stump unless its block says otherwise (a hollow log takes half).</summary>
+    public const int DefaultSplitHits = 4;
+
+    /// <summary>How far each half of a log being split has moved aside, in blocks, per blow taken.</summary>
+    public const float SplitGapPerHit = 0.045f;
+
+    /// <summary>How far each half leans away from the other, in radians, per blow taken.</summary>
+    public const float SplitLeanPerHit = 0.05f;
+
     /// <summary>Seconds the axe's overhead swing takes from raised to split (<c>SwordSwing.AxeSplit</c>): a slow blow.</summary>
     public const float SplitSwingSeconds = 1.25f;
 }

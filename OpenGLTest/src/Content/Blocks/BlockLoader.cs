@@ -186,6 +186,8 @@ internal static class BlockLoader
             Waystone = definition.Waystone ?? false,
             IsStump = definition.Stump ?? false,
             SplitLoot = BlockSchemaParser.ParseSplitLoot(definition, path),
+            SplitHits = BlockSchemaParser.ParseSplitHits(definition, path),
+            StandsOnStump = definition.StumpLog != null,
             Chest = BlockSchemaParser.ParseChest(definition.Chest, renderer, path),
             Lantern = definition.Lantern,
             CrucibleStand = definition.CrucibleStand,

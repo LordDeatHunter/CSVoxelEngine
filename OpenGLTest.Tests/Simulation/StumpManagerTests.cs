@@ -142,6 +142,37 @@ public sealed class StumpManagerTests
     }
 
     [Fact]
+    public void TheBlowsTheLogHasTakenSurviveTheSaveAndTheSnapshotButNeverReachItsSplit()
+    {
+        var chunks = World(OakStump);
+        var stumps = new StumpManager();
+        var (eye, direction) = Aim();
+        stumps.TryPlace(chunks, Cell.X, Cell.Y, Cell.Z, OakLog, eye, direction);
+        var needed = BlockType.ById[OakLog]!.SplitHits;
+        Assert.True(needed > 1);
+        stumps.LogAt(Cell.X, Cell.Y, Cell.Z)!.SplitHits = needed - 1;
+
+        var restored = new StumpManager();
+        restored.Restore(stumps.Capture());
+        Assert.Equal(needed - 1, restored.LogAt(Cell.X, Cell.Y, Cell.Z)!.SplitHits);
+
+        // A saved count at or past the split would show a log already split: it is held short of it
+        var data = stumps.Capture();
+        data[0].Hits = needed + 5;
+        var clamped = new StumpManager();
+        clamped.Restore(data);
+        Assert.Equal(needed - 1, clamped.LogAt(Cell.X, Cell.Y, Cell.Z)!.SplitHits);
+
+        using var writer = new PacketWriter(NetMessage.StationState);
+        stumps.WriteNet(writer);
+        var client = new StumpManager();
+        using var reader = new PacketReader(writer.ToArray());
+        Assert.Equal(NetMessage.StationState, reader.Message);
+        client.ReadNet(reader);
+        Assert.Equal(needed - 1, client.LogAt(Cell.X, Cell.Y, Cell.Z)!.SplitHits);
+    }
+
+    [Fact]
     public void TheSnapshotCarriesTheLogToAMirror()
     {
         var chunks = World(OakStump);

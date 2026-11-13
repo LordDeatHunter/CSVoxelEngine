@@ -52,6 +52,9 @@ public sealed class StationSaveData
         public float OffsetX { get; set; }
         public float OffsetZ { get; set; }
         public float Yaw { get; set; }
+
+        /// <summary>Axe blows the log has taken toward its split.</summary>
+        public int Hits { get; set; }
     }
 
     public List<Simulation.Lanterns.LanternData>? Lanterns { get; set; }

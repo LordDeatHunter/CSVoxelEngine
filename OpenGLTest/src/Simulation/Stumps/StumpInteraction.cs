@@ -58,8 +58,9 @@ internal sealed class StumpInteraction(World world, bool clientMode)
     }
 
     /// <summary>
-    /// A left-click blow on the stump cell: an axe's (<paramref name="split"/>) splits the log standing on it into its
-    /// <see cref="BlockType.SplitLoot"/>, thrown out over the stump as drops; anything else wobbles it. Returns whether the
+    /// A left-click blow on the stump cell: an axe's (<paramref name="split"/>) is one of the <see cref="BlockType.SplitHits"/>
+    /// that split the log standing on it into its <see cref="BlockType.SplitLoot"/>, thrown out over the stump as drops (the
+    /// earlier blows only open it and wobble it); anything else wobbles it. Returns whether the
     /// stump holds a log, so the caller knows the blow was not a mining hit (the stump itself can only be mined bare).
     /// A log of a wood with no split table only ever wobbles.
     /// </summary>
@@ -68,10 +69,20 @@ internal sealed class StumpInteraction(World world, bool clientMode)
         if (world.Stumps.LogAt(x, y, z) is not { } log) return false;
         if (clientMode) return true;
 
-        if (split && BlockType.ById[log.LogId]?.SplitLoot is { } table)
-            Split(x, y, z, log, table);
+        var block = BlockType.ById[log.LogId];
+        if (split && block?.SplitLoot is { } table)
+        {
+            // Each blow opens the log a little more; the last one splits it
+            log.SplitHits++;
+            if (log.SplitHits >= block.SplitHits)
+                Split(x, y, z, log, table);
+            else
+                world.Stumps.Wobble(x, y, z);
+        }
         else
+        {
             world.Stumps.Wobble(x, y, z);
+        }
         return true;
     }
 

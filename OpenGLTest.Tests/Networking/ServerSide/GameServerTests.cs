@@ -1161,6 +1161,16 @@ public sealed class GameServerTests : IDisposable
         Assert.NotNull(_world.Stumps.LogAt(x, y, z));
 
         GrantAsSurvival(client, ContentRegistry.RequireItem("primitive_axe").Id, 1);
+        // Every axe blow before the last only opens the log; the last one splits it
+        var needed = BlockType.ById[log]!.SplitHits;
+        for (var blow = 1; blow < needed; blow++)
+        {
+            Tick(0.5);
+            Assert.True(AwaitResult(client, SendWorld(client, WorldIntent.StumpHit(arena.Eye, aim, cell))));
+            Assert.Equal(blow, _world.Stumps.LogAt(x, y, z)?.SplitHits);
+            Assert.DoesNotContain(_world.Drops, d => d.BlockId == lumber);
+        }
+
         Tick(0.5);
         Assert.True(AwaitResult(client, SendWorld(client, WorldIntent.StumpHit(arena.Eye, aim, cell))));
 

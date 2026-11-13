@@ -198,6 +198,23 @@ public sealed class BlockDefinition
     public bool? Stump { get; set; }
 
     /// <summary>
+    /// Lets a block that is not tree wood (a hollow log) stand on a stump like a log does: <c>split</c> names the loot
+    /// table an axe splits it into and <c>hits</c> how many axe blows that takes. A tree's wood sets the same through
+    /// <c>wood.split</c> and <c>wood.splitHits</c>.
+    /// </summary>
+    public StumpLogDefinition? StumpLog { get; set; }
+
+    /// <summary>What a block that stands on a stump splits into, and in how many blows (see <see cref="StumpLog"/>).</summary>
+    public sealed class StumpLogDefinition
+    {
+        /// <summary>The loot table the log splits into (required).</summary>
+        public string? Split { get; set; }
+
+        /// <summary>Axe blows a split takes; omitted means <c>StumpConfig.DefaultSplitHits</c>.</summary>
+        public int? Hits { get; set; }
+    }
+
+    /// <summary>
     /// Makes this block the lower half of a block two cells tall (a door): the block named here
     /// fills the cell above it. Placement writes both halves with one state byte (and needs both
     /// cells free), breaking either removes the other and drops this block once, and an openable
@@ -632,6 +649,12 @@ public sealed class BlockDefinition
         /// <c>Simulation/Stumps</c>). Omitted means the wood cannot be split.
         /// </summary>
         public string? Split { get; set; }
+
+        /// <summary>
+        /// <c>tree_wood</c> only: axe blows splitting a log of this wood takes; omitted means
+        /// <c>StumpConfig.DefaultSplitHits</c>.
+        /// </summary>
+        public int? SplitHits { get; set; }
     }
 
     /// <summary>One thickness band of a <c>tree_wood</c> block's loot.</summary>
