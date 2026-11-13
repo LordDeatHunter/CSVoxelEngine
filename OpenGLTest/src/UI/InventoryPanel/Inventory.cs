@@ -212,15 +212,22 @@ public class Inventory
 
     /// <summary>
     /// <see cref="Add"/> for a unit lifted by a right-click (an ingot off a pile): it lands in the selected hotbar slot
-    /// when that is empty, so it is in the hand at once, otherwise it equips like any pickup. False, changing nothing,
-    /// when its pool is full.
+    /// when that is empty and no other hotbar slot already shows the id, so it is in the hand at once, otherwise it
+    /// equips like any pickup. False, changing nothing, when its pool is full.
     /// </summary>
     public bool AddToHand(ushort id)
     {
-        if (IdAt(SelectedIndex) != 0) return Add(id);
+        if (IdAt(SelectedIndex) != 0 || ShownInHotbar(id)) return Add(id);
         if (!Add(id, autoEquip: false)) return false;
         EquipStackable(SelectedIndex, id);
         return true;
+    }
+
+    private bool ShownInHotbar(ushort id)
+    {
+        for (var i = 0; i < SlotCount; i++)
+            if (IdAt(i) == id) return true;
+        return false;
     }
 
     /// <summary>
