@@ -155,6 +155,14 @@ public static class MathUtils
         return MathF.Pow(2f, -10f * t) * MathF.Sin((t * 10f - 0.75f) * c4) + 1f;
     }
 
+    /// <summary>A ring-down: <paramref name="cycles"/> sine swings that fade to nothing as <paramref name="t"/> runs 0 to 1
+    /// (0 at both ends, the first swing positive).</summary>
+    public static float DampedWobble(float t, float cycles)
+    {
+        t = Clamp01(t);
+        return MathF.Sin(MathF.Tau * cycles * t) * (1f - t);
+    }
+
     /// <summary>Ball-drop bounces settling at 1; 0 at 0 and exactly 1 at 1.</summary>
     public static float EaseOutBounce(float t)
     {

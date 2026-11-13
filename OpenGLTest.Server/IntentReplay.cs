@@ -125,6 +125,7 @@ internal sealed class IntentReplay
             case NetIntentKind.BreakStart:
             case NetIntentKind.BreakComplete:
             case NetIntentKind.Hammer:
+            case NetIntentKind.StumpHit:
                 player.NoteAction(NetPlayerAction.Punch);
                 break;
             case NetIntentKind.Throw:
@@ -163,6 +164,8 @@ internal sealed class IntentReplay
                 return CastFor(player, intent);
             case NetIntentKind.Hammer:
                 return HammerFor(player, intent);
+            case NetIntentKind.StumpHit:
+                return AimsAt(player, intent, out _) && _state.World.StumpHitFor(intent.Cell);
             case NetIntentKind.Waystone:
                 return _waystones.TripFor(player, intent);
             case NetIntentKind.Forge:

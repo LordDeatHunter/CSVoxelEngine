@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Chunks.Meshing;
+using VoxelEngine.Config;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Entities;
 using VoxelEngine.Items;
@@ -280,6 +281,7 @@ internal sealed class LeftClickAction
         var justPressed = isHolding && !_attackWasPressed;
         _attackWasPressed = isHolding;
         _anvilCooldown = MathF.Max(0f, _anvilCooldown - (float)deltaTime);
+        _stumpCooldown = MathF.Max(0f, _stumpCooldown - (float)deltaTime);
 
         var held = HeldItem();
         var player = LocalPlayer.LocalContext();
@@ -343,6 +345,14 @@ internal sealed class LeftClickAction
         {
             StopBreaking();
             UpdateAnvilHammer(held!, player);
+            return;
+        }
+
+        // A log standing on a stump takes the blow (it wobbles) instead of the stump being mined
+        if (_world.Stumps.LogAt((int)_selectedBlockPosition.X, (int)_selectedBlockPosition.Y, (int)_selectedBlockPosition.Z) != null)
+        {
+            StopBreaking();
+            UpdateStumpHit();
             return;
         }
 
@@ -511,6 +521,30 @@ internal sealed class LeftClickAction
         Camera.AddHitKick(Vector3.Zero, BreakKick.Strength(AnvilKickHardness, false));
         _world.RaiseIntent(WorldIntent.Hammer(Camera.Position, _selectedAimDirection, cell));
     }
+
+    /// <summary>
+    /// One blow on the log standing on the aimed stump, at <see cref="StumpConfig.HitGapSeconds"/> pace: the swing,
+    /// the knock and chips of the log it hits, then the wobble itself (the server's, through
+    /// <see cref="NetIntentKind.StumpHit"/>, on a connected client).
+    /// </summary>
+    private void UpdateStumpHit()
+    {
+        if (_stumpCooldown > 0f) return;
+        _stumpCooldown = StumpConfig.HitGapSeconds;
+
+        var cell = _selectedBlockPosition;
+        var (x, y, z) = cell.BlockCell();
+        if (_world.Stumps.LogAt(x, y, z) is not { } log) return;
+
+        Camera.NotifyPlayerAction();
+        LocalPlayer.PunchSwing();
+        PlayHitSfx(log.LogId, cell);
+        _debris.Burst(cell, log.LogId, ParticleConfig.BlockDebrisPerHit, columns: _chunkManager.ColumnSource);
+        _world.StumpHitFor(cell);
+        _world.RaiseIntent(WorldIntent.StumpHit(Camera.Position, _selectedAimDirection, cell));
+    }
+
+    private float _stumpCooldown;
 
     // The hardness the camera kick of a hammer blow is sized as: a solid knock, like mining stone
     private const float AnvilKickHardness = 5f;

@@ -217,6 +217,7 @@ OpenGLTest/
                                #   the cave biome atmosphere (CaveFog*, CaveAmbient*)
       StreamingConfig.cs       # view radius, per-frame mesh, dirty and scan budgets, thread counts, LOD build and
                                #   upload budgets, loading budgets and gate
+      StumpConfig.cs           # the log standing on a tree stump: size, reach on the stump's top, wobble length, tilt and blow gap
       SurfaceShadingConfig.cs  # per-tile shader terms (ore, snow, leaf backlight, grass shimmer, ice, glass, wet
                                #   albedo, lava), biome tint palette, LOD sky exposure, leaf sway
       WaterRenderConfig.cs     # reflection and its reuse, waves, refraction, absorption, caustics, underwater rays

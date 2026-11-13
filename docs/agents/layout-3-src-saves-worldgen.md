@@ -75,6 +75,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       Lanterns/                # per-instance fuel/storage (LanternState, LanternComponent), target/precedence/access
                                #   (LanternTarget, LanternAccess, LanternInteraction), placed ownership/ticking
                                #   (LanternManager) and versioned persistence (LanternData, LanternCodec)
+      Stumps/                  # the log standing on a tree stump: StumpManager (placement, pick-up, wobble, save, snapshot),
+                               #   StumpLog (one log's spot, turn and wobble), StumpInteraction (right-click place/lift, left-click blow)
       Chests/                  # chest block entities, namespace VoxelEngine.Simulation.Chests (see "Chests (I-4)")
         ChestManager.cs        # the registry by cell: state created on first use (a ruin chest rolls its loot), the
                                #   spill on a break and the stale sweep, the stations.json capture and restore

@@ -26,6 +26,22 @@ public sealed class StationSaveData
     /// <summary>The chests that have been used (a never-opened ruin chest is not here and re-rolls from its seed).</summary>
     public List<ChestData>? Chests { get; set; }
 
+    /// <summary>The logs standing on stumps.</summary>
+    public List<StumpData>? Stumps { get; set; }
+
+    /// <summary>One log on a stump, keyed by the stump's cell (see <see cref="Simulation.Stumps.StumpManager"/>).</summary>
+    public sealed class StumpData
+    {
+        public int[]? Cell { get; set; }
+
+        /// <summary>The log block's content name.</summary>
+        public string? Log { get; set; }
+
+        public float OffsetX { get; set; }
+        public float OffsetZ { get; set; }
+        public float Yaw { get; set; }
+    }
+
     public List<Simulation.Lanterns.LanternData>? Lanterns { get; set; }
 
     /// <summary>The waystone registry's records (a waystone nobody activated has none).</summary>

@@ -48,6 +48,10 @@ public enum NetIntentKind : byte
     /// metal stacked on the anvil cell the intent names. The server judges the hammer in hand, its own ray on the cell
     /// and the stack; the result lands in the inventory. Edits no cell.</summary>
     Forge = 11,
+
+    /// <summary>A left-click blow on the tree stump cell the intent names: the server judges reach and the stump's log and
+    /// wobbles it (an axe in hand splits it). Edits no cell.</summary>
+    StumpHit = 12,
 }
 
 /// <summary>Which left-click attack an <see cref="NetIntentKind.Attack"/> intent carries (see
@@ -124,7 +128,8 @@ public readonly record struct WorldIntent(
     /// spam cap; its gameplay pace is the caster's own <see cref="Magic.CastPacing"/>.</summary>
     public bool IsRateLimited =>
         Kind is NetIntentKind.BreakComplete or NetIntentKind.Place or NetIntentKind.Use or NetIntentKind.Throw
-            or NetIntentKind.Cast or NetIntentKind.Hammer or NetIntentKind.Waystone or NetIntentKind.Forge;
+            or NetIntentKind.Cast or NetIntentKind.Hammer or NetIntentKind.Waystone or NetIntentKind.Forge
+            or NetIntentKind.StumpHit;
 
     public static WorldIntent BreakStart(Vector3 eye, Vector3 direction, Vector3 cell) =>
         new(NetIntentKind.BreakStart, eye, direction, (int)cell.X, (int)cell.Y, (int)cell.Z, HasCell: true);
@@ -152,6 +157,9 @@ public readonly record struct WorldIntent(
 
     public static WorldIntent Cast(Vector3 eye, Vector3 direction, int slot) =>
         new(NetIntentKind.Cast, eye, direction, Slot: slot);
+
+    public static WorldIntent StumpHit(Vector3 eye, Vector3 direction, Vector3 cell) =>
+        new(NetIntentKind.StumpHit, eye, direction, (int)cell.X, (int)cell.Y, (int)cell.Z, HasCell: true);
 
     public static WorldIntent Hammer(Vector3 eye, Vector3 direction, Vector3 cell) =>
         new(NetIntentKind.Hammer, eye, direction, (int)cell.X, (int)cell.Y, (int)cell.Z, HasCell: true);

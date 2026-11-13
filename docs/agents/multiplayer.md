@@ -259,7 +259,7 @@ made from, then that kind's fields (`WorldIntent`): `BreakStart`/`BreakComplete(
 cell), `Cast(slot)` (a held staff's spell slot as one byte; never edits a cell, rate-limited) , `Hammer(cell)` (one hammer hit on an anvil; never edits a cell, rate-limited), `Waystone(cell)` (a trip to the
 discovered waystone at that cell from the one the player last activated; never edits a cell, rate-limited) and
 `Forge(cell, recipe)` (a pick from an anvil's recipe list, the recipe named by its result id byte; never edits a cell,
-rate-limited, answered with the inventory). Its
+rate-limited, answered with the inventory). `StumpHit(cell)` (a left-click blow on a tree stump holding a log: the server judges its own ray and wobbles the log; never edits a cell, rate-limited; the stump logs ride the station snapshot, after the lanterns). Its
 reader refuses an unknown kind or attack, a cast slot at or past `SpellConfig.StaffMaxSlots`, a
 non-finite or far-out eye, an aim that is not close to a unit vector and a normal component
 outside -1..1 as an `InvalidDataException`, renormalizes the aim and clamps the charge. An

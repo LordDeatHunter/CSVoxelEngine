@@ -275,8 +275,10 @@ public static class NetFraming
     /// 48: a spider's attack count names bite (even) and web shot (odd), and a scorpion's pinch, sting and spit by
     /// its remainder of 3 (the spit replays the sting's clip); an older peer would replay the wrong clip.
     /// 49: <see cref="NetMessage.PlayerStatus"/> ends with whether the player may run operator commands
-    /// (<see cref="PlayerStatusData.Operator"/>), for the chat's autocomplete; an older peer would misread the frame.</summary>
-    public const int ProtocolVersion = 49;
+    /// (<see cref="PlayerStatusData.Operator"/>), for the chat's autocomplete; an older peer would misread the frame.
+    /// 50: the station snapshot ends with the logs standing on tree stumps, and <see cref="NetIntentKind.StumpHit"/> is a new
+    /// intent; an older peer would misread the frame.</summary>
+    public const int ProtocolVersion = 50;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

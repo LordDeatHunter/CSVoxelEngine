@@ -899,6 +899,12 @@ public class World
     /// only what the server sends the chest it has open).</summary>
     public ChestManager Chests => _chests;
 
+    /// <summary>The logs standing on tree stumps (authoritative on a server and in singleplayer, a mirror on a client).</summary>
+    public Simulation.Stumps.StumpManager Stumps { get; } = new();
+
+    /// <summary>The drop manager, for the interactions that hand an item back as a drop when the pool is full.</summary>
+    internal DropManager DropSpawner => _dropManager;
+
     public Simulation.Lanterns.LanternManager Lanterns { get; } = new();
 
     /// <summary>The lit campfires, for a body that stands in one (<see cref="PlayerBodyProbe.OnLitCampfire"/>).</summary>
@@ -991,6 +997,10 @@ public class World
     public AnvilHit HammerFor(Vector3 cell, float gapSeconds, float slackSeconds) =>
         Interactions.HammerAnvil(cell, gapSeconds, slackSeconds);
 
+    /// <summary>One left-click blow on the tree stump at <paramref name="cell"/> (a <see cref="NetIntentKind.StumpHit"/> intent):
+    /// wobbles the log standing on it. False when the stump holds none.</summary>
+    public bool StumpHitFor(Vector3 cell) => RightClick.Stump.TryHit((int)cell.X, (int)cell.Y, (int)cell.Z);
+
     /// <summary>The battle towers' floor locks (piles and doors); authoritative worlds tick them, a client's are
     /// display-only mirrors.</summary>
     public TowerManager Towers => _towers;
@@ -1020,11 +1030,11 @@ public class World
     public Vector3 LastAltarCell => RightClick.LastAltarCell;
 
     public bool HasStations => StationNetCodec.AnyWorld(_campfires, _querns, _kilns, _casting,
-        _smithing, _towers, ChestLids, Lanterns);
+        _smithing, _towers, ChestLids, Lanterns, Stumps);
 
     /// <summary>Writes the server-owned stations, including placed lanterns.</summary>
     public void WriteStations(PacketWriter writer) => StationNetCodec.WriteWorld(writer,
-        _campfires, _querns, _kilns, _casting, _smithing, _towers, ChestLids, Lanterns);
+        _campfires, _querns, _kilns, _casting, _smithing, _towers, ChestLids, Lanterns, Stumps);
 
     /// <summary>
     /// One multiplayer-client frame: no local simulation, only the camera (and only once the chunk
@@ -1067,6 +1077,7 @@ public class World
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager, windTime: LightingTime);
         _debris.Update((float)deltaTime, _chunkManager);
         _querns.Animate((float)deltaTime);
+        Stumps.Animate((float)deltaTime);
         ChestLids.Update((float)deltaTime, ChestPanel.OpenCell);
         _slimes?.AnimateMirrors((float)deltaTime, _debris);
         _goblins?.AnimateMirrors((float)deltaTime, _debris, _chunkManager, DayCycle.NightFactor(LightingTime));
@@ -1200,6 +1211,7 @@ public class World
         _debris.Update((float)deltaTime, _chunkManager);
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
+        Stumps.Update((float)deltaTime, _chunkManager, _dropManager);
         _chests.Update(_chunkManager, _dropManager);
         Lanterns.Update((float)deltaTime, _chunkManager, _dropManager);
         Lanterns.UpdateHeld((float)deltaTime, this, _serverMode);

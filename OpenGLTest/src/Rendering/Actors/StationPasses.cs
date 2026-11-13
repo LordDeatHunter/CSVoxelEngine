@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using VoxelEngine.Chunks;
+using VoxelEngine.Config;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;
@@ -14,6 +15,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.Stumps;
 using VoxelEngine.UI;
 
 namespace VoxelEngine.Rendering.Actors;
@@ -166,6 +168,43 @@ internal sealed class StationPasses : IDisposable
             var placed = Matrix4x4.CreateScale(scale)
                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.35f, 0.82f, 0.35f));
             _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
+            mesh.Render();
+        }
+    }
+
+    /// <summary>
+    /// Draws every log standing on a stump: the log block's cube squashed to <see cref="StumpConfig.LogWidth"/> by
+    /// <see cref="StumpConfig.LogHeight"/>, standing where it was put on the stump's top, turned as placed and, while it
+    /// wobbles, tilting about its foot in a ring-down (<see cref="MathUtils.DampedWobble"/>). Skips the shadow pass, like
+    /// the quern tops.
+    /// </summary>
+    internal void RenderStumpLogs(Camera camera, StumpManager stumps)
+    {
+        if (camera == null || stumps == null || !stumps.HasAny) return;
+
+        _owner.WorldShader.Use();
+        _owner.BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+        var atlasBound = true;
+
+        foreach (var (cell, log) in stumps.View())
+        {
+            var mesh = BindStationMesh(log.LogId, ref atlasBound);
+            if (mesh == null) continue;
+
+            var foot = cell + new Vector3(0.5f + log.OffsetX, StumpConfig.StumpTop, 0.5f + log.OffsetZ);
+            var progress = 1f - log.WobbleLeft / StumpConfig.WobbleSeconds;
+            var tilt = log.WobbleLeft > 0f
+                ? StumpConfig.WobbleTilt * MathUtils.DampedWobble(progress, StumpConfig.WobbleCycles)
+                : 0f;
+            // The cube is centered on its origin: squash it, lift it onto its foot, tip it about the foot, turn it
+            var model = Matrix4x4.CreateScale(StumpConfig.LogWidth, StumpConfig.LogHeight, StumpConfig.LogWidth)
+                        * Matrix4x4.CreateTranslation(0f, StumpConfig.LogHeight / 2f, 0f)
+                        * Matrix4x4.CreateRotationX(tilt)
+                        * Matrix4x4.CreateRotationY(log.Yaw)
+                        * Matrix4x4.CreateTranslation(foot);
+            _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(foot + new Vector3(0f, 0.4f, 0f)));
             mesh.Render();
         }
     }

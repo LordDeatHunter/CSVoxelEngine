@@ -38,9 +38,12 @@ internal sealed class RightClickAction
         _world = world;
         _clientMode = clientMode;
         Lantern = new Simulation.Lanterns.LanternInteraction(world, clientMode);
+        Stump = new Simulation.Stumps.StumpInteraction(world, clientMode);
     }
 
     internal Simulation.Lanterns.LanternInteraction Lantern { get; }
+
+    internal Simulation.Stumps.StumpInteraction Stump { get; }
 
     private float _useChargeSeconds;
     private ushort _useItemId;
@@ -126,6 +129,14 @@ internal sealed class RightClickAction
         }
 
         if (Lantern.TryUse(player, maxDistance, out outcome)) return true;
+
+        // A stump takes a held log or gives its log back
+        if (Stump.TryUse(player, maxDistance))
+        {
+            LocalPlayer.PunchSwing();
+            outcome = RightClickOutcome.Station;
+            return true;
+        }
 
         if (Interactions.TryCookOrCollect(maxDistance, player) || Interactions.TryQuernInteract(maxDistance, player)
                                                   || Interactions.TryKilnInteract(maxDistance, player) || Interactions.TryBloomeryInteract(maxDistance, player)

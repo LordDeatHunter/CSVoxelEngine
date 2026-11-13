@@ -1119,6 +1119,31 @@ public sealed class GameServerTests : IDisposable
     }
 
     [Fact]
+    public void ALogIsStoodOnAStumpWobbledAndLiftedOffOnTheServer()
+    {
+        using var client = Connect("Woodsman");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var log = ContentRegistry.RequireBlock("oak_log").Id;
+        var cell = arena.Front;
+        SetCell(cell, ContentRegistry.RequireBlock("oak_stump").Id);
+        GrantAsSurvival(client, log, 1);
+        var (x, y, z) = ((int)cell.X, (int)cell.Y, (int)cell.Z);
+        // The stump is lower than the middle the arena's aim points at, so aim at its low top
+        var aim = Vector3.Normalize(cell + new Vector3(0.5f, 0.2f, 0.5f) - arena.Eye);
+
+        Assert.True(AwaitResult(client, SendWorld(client, WorldIntent.Use(arena.Eye, aim, cell))));
+        Assert.Equal(log, _world.Stumps.LogAt(x, y, z)!.LogId);
+
+        Tick(0.5);
+        Assert.True(AwaitResult(client, SendWorld(client, WorldIntent.StumpHit(arena.Eye, aim, cell))));
+        Assert.True(_world.Stumps.LogAt(x, y, z)!.WobbleLeft > 0f);
+
+        Tick(0.5);
+        Assert.True(AwaitResult(client, SendWorld(client, WorldIntent.Use(arena.Eye, aim, cell))));
+        Assert.Null(_world.Stumps.LogAt(x, y, z));
+    }
+
+    [Fact]
     public void AJumpBesideALitBloomeryWorksItsBellowsForThatPlayer()
     {
         using var client = Connect("Smith");

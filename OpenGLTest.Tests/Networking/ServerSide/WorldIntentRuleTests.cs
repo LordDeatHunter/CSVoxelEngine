@@ -50,6 +50,7 @@ public sealed class WorldIntentRuleTests
             WorldIntent.AttackWith(Eye, direction, NetAttackKind.SliceReturn),
             WorldIntent.AttackWith(Eye, direction, NetAttackKind.SwordChop),
             WorldIntent.Hammer(Eye, direction, cell),
+            WorldIntent.StumpHit(Eye, direction, cell),
             WorldIntent.Waystone(Eye, direction, (-300, -420, 77)),
             WorldIntent.Forge(Eye, direction, cell, 200),
         };
