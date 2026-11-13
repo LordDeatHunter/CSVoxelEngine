@@ -323,7 +323,9 @@ debugger take a new species from it instead of naming it; adding one means a cla
   cannot tell a hovering body from a sitting one, the state rides `Animal.Posture` in the entry's item byte.
 - **Crow** (`Crow`): a thief in flocks. It never attacks until hurt; for `CrowAngerSeconds` after a blow, a player
   within `CrowNoticeRangeBlocks` draws it: it circles overhead and swoops (its `swoop` clip flown at the chest),
-  raking whoever is within `CrowStrikeReach` at the impact; on the ground it pecks an ankle within `CrowPeckReach`.
+  raking whoever is within `CrowStrikeReach` at the impact; a hurt crow also calls its flock
+  (`WildlifeManager.RallyFlocks`): every calm, unprovoked crow within `CrowFlockCallRangeBlocks` gets the same anger
+  (`Crow.JoinFlock`) and so heeds the nearest player like the victim does (crows already angry are left alone); on the ground it pecks an ankle within `CrowPeckReach`.
   Calm, it flies down to the nearest loose item within `CrowThiefRangeBlocks` (`WildlifeManager.SendThieves`) and takes
   it within `CrowThiefReach` (`TakeLoot`), then rests `CrowThiefCooldownSeconds`. Calm in the air (to a wander
   point, a perch or nowhere) it never holds a height: on its `glide` pose it falls under `CrowGlideGravity` until it

@@ -154,6 +154,8 @@ public static class WildlifeConfig
     public const float CrowFlapBoostSpeed = 4f;
     public const float CrowFlapClimbBlocks = 1f;
     public const float CrowAngerSeconds = 20f;
+    /// <summary>How far from a hurt crow its calm flockmates hear it and turn on the attacker too.</summary>
+    public const float CrowFlockCallRangeBlocks = 24f;
     public const float CrowThiefRangeBlocks = 16f;
     public const float CrowThiefReach = 0.9f;
     public const float CrowThiefCooldownSeconds = 15f;

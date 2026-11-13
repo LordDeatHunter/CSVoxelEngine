@@ -70,6 +70,7 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
 
         SendThieves(drops);
         UpdateMobs(deltaTime, chunks, drops, targets, debris, WildlifeConfig.DespawnRadiusBlocks);
+        RallyFlocks();
         TakeLoot(drops);
         UpdateSpawning(deltaTime, chunks, targets);
     }
@@ -105,6 +106,22 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
                 nearest = drop;
             }
             crow.SetPrize(nearest);
+        }
+    }
+
+    // A crow that was hurt calls its flock: every calm crow within earshot turns on the attacker as well
+    private void RallyFlocks()
+    {
+        var rangeSquared = WildlifeConfig.CrowFlockCallRangeBlocks * WildlifeConfig.CrowFlockCallRangeBlocks;
+        foreach (var mob in Mobs)
+        {
+            if (mob is not Crow caller || !caller.ConsumeRallyCall()) continue;
+            foreach (var other in Mobs)
+            {
+                if (other is Crow flockmate && !ReferenceEquals(flockmate, caller) &&
+                    Vector3.DistanceSquared(flockmate.Position, caller.Position) <= rangeSquared)
+                    flockmate.JoinFlock();
+            }
         }
     }
 

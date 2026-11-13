@@ -56,6 +56,7 @@ public sealed class Crow : FlyingAnimal
     private float _thiefCooldown;
     private float _flapIn = Roll(WildlifeConfig.CrowFlapMinSeconds, WildlifeConfig.CrowFlapMaxSeconds);
     private ItemDrop? _prize;
+    private bool _rallyPending;
     private float _habitIn = Roll(WildlifeConfig.CrowHabitMinSeconds, WildlifeConfig.CrowHabitMaxSeconds);
 
     public Crow(EntityType type, Vector3 position, bool spawnIn = true) : base(type, position, Tuning, spawnIn)
@@ -165,6 +166,24 @@ public sealed class Crow : FlyingAnimal
     {
         base.TakeDamage(amount);
         if (amount <= 0) return;
+        _angerLeft = WildlifeConfig.CrowAngerSeconds;
+        _prize = null;
+        _rallyPending = true;
+    }
+
+    /// <summary>Whether it was hurt since the manager last asked, so the flock must be called to arms. Reading it clears it.</summary>
+    public bool ConsumeRallyCall()
+    {
+        var pending = _rallyPending;
+        _rallyPending = false;
+        return pending;
+    }
+
+    /// <summary>Answers a flockmate's distress: a calm crow turns on whoever is near, as if it had been hurt itself.
+    /// A crow already angry (it has its own quarry) is left as it is.</summary>
+    public void JoinFlock()
+    {
+        if (IsProvoked || IsDying) return;
         _angerLeft = WildlifeConfig.CrowAngerSeconds;
         _prize = null;
     }
