@@ -164,7 +164,8 @@ internal sealed class LodRegionClaims(LodManager owner)
     /// <summary>
     /// The closest region that is neither loaded nor already claimed; claims it in <c>_queued</c> and
     /// returns it, or null when every level is full. The levels are merged by each region's nearest-point
-    /// distance to the camera in blocks, the finer level first at equal distance. A coarse region its finer
+    /// distance to the camera in blocks, floored for a coarse level at the finer ring's edge (<see cref="ScanDistanceSq"/>),
+    /// the finer level first at equal distance. A coarse region its finer
     /// children cover well inside their ring is skipped (<see cref="LodRegion.IsSupersededByFinerRing"/>), so a
     /// new world or a long teleport builds the finest level under the camera and never a coarse shell there.
     /// Internal (rather than private) because it is the only path that fills <c>_queued</c>, and
@@ -203,7 +204,7 @@ internal sealed class LodRegionClaims(LodManager owner)
                 if (cursors[level] == offsets.Length) continue;
 
                 // Strictly nearer only, so a tie keeps the finer level (the loop runs finest first)
-                var distSq = NearestDistanceSq(KeyAt(level, camRegions[level], offsets[cursors[level]]), camera);
+                var distSq = ScanDistanceSq(KeyAt(level, camRegions[level], offsets[cursors[level]]), camera);
                 if (distSq >= bestDistSq) continue;
                 best = level;
                 bestDistSq = distSq;
@@ -240,6 +241,20 @@ internal sealed class LodRegionClaims(LodManager owner)
 
     // Loaded, or claimed by a worker that is building it (or holds it waiting for the upload)
     private bool IsTaken((int Level, int X, int Z) key) => _owner.Regions.ContainsKey(key) || _queued.ContainsKey(key);
+
+    /// <summary>
+    /// The scan's order key: <see cref="NearestDistanceSq"/>, but a coarse region never counts as nearer than the edge of
+    /// the finer level's ring. Every finer region is then built before any coarse one, so a coarse region appears only
+    /// once the finer ring it straddles is in and never shows for the moment its finer children take to bury it.
+    /// </summary>
+    internal static float ScanDistanceSq((int Level, int X, int Z) key, Vector2 camera)
+    {
+        var distSq = NearestDistanceSq(key, camera);
+        if (key.Level == 0) return distSq;
+        var finer = LodRegion.Levels[key.Level - 1];
+        float ring = finer.RegionRadius * finer.RegionBlocks;
+        return MathF.Max(distSq, ring * ring);
+    }
 
     /// <summary>The squared distance in blocks from the camera's column to the nearest point of a region's footprint
     /// (0 for the region the camera stands in), so regions of different sizes compare fairly.</summary>

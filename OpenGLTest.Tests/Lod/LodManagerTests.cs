@@ -322,9 +322,10 @@ public sealed class LodManagerTests
         Assert.Null(lods.TakeDirtyRegion());
     }
 
-    /// <summary>A new world or a long teleport must never show a coarse shell under the camera: the scan starts with the
-    /// finest region the camera stands in and never hands out a coarse region its finer children cover well inside their
-    /// ring, while the coarse regions past that keep the horizon filled.</summary>
+    /// <summary>A new world or a long teleport must never show a coarse shell where finer terrain is coming: the scan starts
+    /// with the finest region the camera stands in, finishes each level before the next coarser one, and never hands out
+    /// a coarse region its finer children cover well inside their ring, while the coarse regions past that fill the
+    /// horizon.</summary>
     [Fact]
     public void TheScanNeverBuildsACoarseRegionItsFinerRingCovers()
     {
@@ -337,8 +338,12 @@ public sealed class LodManagerTests
         Assert.Equal((0, x0, z0), lods.FindClosestNeededRegion());
 
         var coarse = 0;
+        var deepest = 0;
         while (lods.FindClosestNeededRegion() is { } key)
         {
+            // Level by level: no coarse region before every finer one
+            Assert.True(key.Level >= deepest, $"{key} came after a coarser region");
+            deepest = key.Level;
             if (key.Level == 0) continue;
             coarse++;
             Assert.False(LodRegion.IsSupersededByFinerRing(key.Level, key.X, key.Z, lods.CameraRegion(key.Level - 1),
