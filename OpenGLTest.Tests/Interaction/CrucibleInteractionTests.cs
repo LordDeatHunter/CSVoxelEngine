@@ -144,4 +144,26 @@ public sealed class CrucibleInteractionTests : IDisposable
         Assert.True(_world.World.Placer.PlaceBlockAtFace(new Vector3(4, _world.Top, 4), Vector3.UnitY,
             ContentRegistry.RequireBlock(StandingCrucibleManager.StandBlock).Id, 0, Vector3.UnitZ, out _));
     }
+
+    [Fact]
+    public void AMoldAtNegativeCoordinatesPoursAndDrainsToo()
+    {
+        var mold = ContentRegistry.RequireBlock("fired_mold_ingot").Id;
+        var y = _world.Top + 1;
+        _world.Load(-5, _world.Top, -5);
+        _world.Set(-5, y, -5, mold);
+        var stack = HoldCrucible(800);
+        var eye = _world.Player.Context.Eye;
+        _world.Player.Context.Eye = new Vector3(-4.5f, eye.Y, -4.5f);
+
+        Assert.True(Click(new Vector3(-4.5f, y + 0.2f, -4.5f), out _));
+        var state = _world.World.Casting.StateAt(-5, y, -5);
+        Assert.NotNull(state);
+
+        var inventory = _world.Player.Inventory;
+        _world.World.Casting.Update(1f, _world.Manager, new DropManager(), inventory, inventory.SelectedToolInstance,
+            _world.Player.Context.Eye, World.InteractionReach);
+        Assert.True(state!.FilledMl > 0);
+        Assert.True(stack.Get<CrucibleComponent>().MoltenMl < 800);
+    }
 }
