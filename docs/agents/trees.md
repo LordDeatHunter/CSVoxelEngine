@@ -206,10 +206,18 @@ real chunk mesher through `CellBatchMesher.Build` (`TopplingTree.BuildMeshData`:
 the felled cells span, so a crown of any size is drawn whole) and drops through
 `TopplingTree.TakeDrops`.
 It falls as a rigid body (`FellBody`, GL-free, fixed 1/120 s substeps): the blocks are point masses with
-the shape's inertia, `BodyMotion.Gravity` pulls, and each block touches the terrain (`isSolid`, the felled
-cells already gone) through its real extremities (`FellContacts`: a thin wood block reaches only half its
-diameter from the cell center, except along its tubes) with impulse contacts (restitution, friction) and a depenetration
-push. A tree standing on its stump (ground under the cut, wood mostly above it) starts pinned to the cut by
+the shape's inertia, `BodyMotion.Gravity` pulls, and each block touches the terrain through its real
+extremities (`FellContacts`: a thin wood block reaches only half its diameter from the cell center, except
+along its tubes) with impulse contacts (restitution, friction) and a depenetration push capped at
+`TreeFellDepenetrateSpeed`, so no contact can fling the tree. The terrain is a `FellTerrain` (`FellTerrain.Of`
+over the chunks, the felled cells already gone; `FellTerrain.Ground` for plain ground in tests): `Stops` is
+what the wood rests on, and standing trees' leaves and thin wood (branches, a thin trunk, never player-placed
+wood) are not in it, so a falling crown crashes through its neighbors' crowns instead of being lifted onto
+them (wedged in that tangle it used to climb out at 0.45 block per substep and launch); `Snags` is that thin
+wood, which snaps off a branch moving through it faster than `TreeFellDetachSpeed`; `HoldsPin` is any
+solid but leaves, so a cut on a thin trunk still tips over the stub below it.
+`ForestFellTests` fells every species among copies of itself and holds that no piece rises and the tree comes down.
+A tree standing on its stump (ground under the cut, wood mostly above it) starts pinned to the cut by
 a ball joint and tips over it from a small kick, so "fall forward" is the physics of a pinned body; the pin
 lets go when it is nearly flat or has been stopped short. A limb or branch set (no ground under the cut or
 wood leaning out) is free from the start, so it drops and tumbles to the ground. The first hard impact is
@@ -218,15 +226,21 @@ been still for `TreeFellRestHoldSeconds` (or `TreeFellSettleCapSeconds` passed s
 later the drops pop out at the blocks' resting cells. Tuning: the `TreeFell*` and `TreeHinge*` constants.
 Wood is heavier toward the root (`TreeFellRootWeightBoost`) so the base outweighs the crown and a canopy
 cannot prop the tree up on its branches. A side branch (`FellBranches`: the wood walked from the cut over
-`TreeSupport.Links`, the main stem going up at each fork) whose block hits the ground faster than
-`TreeFellDetachSpeed` snaps off whole, leaves included, into its own `FellPart` that carries on from the
-parent's pose and speed; the rest is rebuilt and remeshed without it (`TopplingTree.Parts`, one model matrix
+`TreeSupport.Links`, the main stem going up at each fork) whose block hits the ground, runs into a wall or
+snags on a standing tree's branch faster than `TreeFellDetachSpeed` snaps off whole, leaves included, into its
+own `FellPart` that carries on from the parent's pose and speed, free of the pin; the rest is rebuilt and
+remeshed without it, keeping the pin if it still had it (`TopplingTree.Parts`, one model matrix
 and mesh set per part). Only the original part sheds branches. Falling wood hurts: each update `BlockEditor.StrikeWithTree` (singleplayer and server, never a client)
 asks `TopplingTree.TryStrike` per player (`IMobTarget.TakeHit`, skipped when immune or dead) and per mob
 (`MobStrikes.StrikeMob`) whether moving wood overlaps its body box faster than `TreeHitMinSpeed`; damage is
 `TopplingTree.StrikeDamage` (`TreeHitDamagePerSpeed` per block/s, capped at `TreeHitMaxDamage`), the victim
 is shoved along the wood's motion and not hit again for `TreeHitCooldownSeconds`. Leaves and pieces at rest
-hurt nobody. Walls are not collided with, only ground.
+hurt nobody. Walls are not collided with, only ground: a contact point more than a block below the top of
+its solid column (`FellBody.MaxGroundDepth`) is inside a wall, such as a neighboring trunk, and gives no
+contact, so the tree is never lifted up the wall (which used to launch it in a dense forest). Likewise a
+contact point already inside a solid cell in the standing pose (the hillside beside the base, a neighbor's
+branch beside the crown; a block's side-face points sit on the neighboring cell's boundary) is marked
+embedded and touches nothing until it has left the solid; a split-off piece keeps its parent's marks.
 
 **Reactive growth** (`World.TryGrowTree(species, x, yHint, z, steps)`, refused while loading or
 for an unknown species; the `grow` scenario op calls it). `TreeGrowthWriter` (`Simulation/`, GL-free,

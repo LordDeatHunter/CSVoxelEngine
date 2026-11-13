@@ -43,8 +43,12 @@ public static class SimulationConfig
     // Wood is heavier toward the root: a block's mass is 1 + this * (1 - height / tree height), so
     // a trunk base outweighs its crown and a canopy cannot stand the tree back up on its branches
     public const float TreeFellRootWeightBoost = 5f;
-    // A side branch whose block hits the ground faster than this (blocks/s) snaps off the tree
-    public const float TreeFellDetachSpeed = 3.5f;
+    // A side branch whose block hits the ground, or runs into a wall (a neighboring trunk), faster
+    // than this (blocks/s) snaps off the tree
+    public const float TreeFellDetachSpeed = 2.5f;
+    // The fastest (blocks/s) a felled body is eased out of ground it sank into; the contact
+    // impulses stop a landing, so this only mops up the last sink and can never fling the tree
+    public const float TreeFellDepenetrateSpeed = 2f;
     // Leaves weigh this much against a wood block (1)
     public const float TreeFellLeafMass = 0.3f;
     // Contact feel: bounce (below TreeFellBounceSpeed an impact does not bounce), ground friction,

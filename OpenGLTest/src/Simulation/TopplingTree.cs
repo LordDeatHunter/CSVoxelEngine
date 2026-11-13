@@ -44,7 +44,7 @@ public class TopplingTree : IDisposable
     private readonly Vector3[] _centers;
     private readonly Vector3[][] _contacts;
     private readonly float[] _masses;
-    private readonly Func<int, int, int, bool> _isSolid;
+    private readonly FellTerrain _terrain;
     // Seconds every part has been at rest
     private float _restElapsed;
     // Set by the update the swing reaches flat, cleared by TryTakeLanding
@@ -61,11 +61,14 @@ public class TopplingTree : IDisposable
     /// <summary>True once the tree has lain still for <see cref="SimulationConfig.TreeFellRestSeconds"/>.</summary>
     public bool IsDone { get; private set; }
 
-    /// <param name="isSolid">Whether the world cell at (x, y, z) stops a falling tree (the felled
-    /// cells are already gone from it); without it nothing stops the tree.</param>
+    /// <param name="isSolid">Plain ground: whether the world cell at (x, y, z) stops a falling tree
+    /// and holds its pin, with nothing to snag on (see <see cref="FellTerrain.Ground"/>).</param>
+    /// <param name="terrain">The world as the tree feels it (the felled cells are already gone from
+    /// it); wins over <paramref name="isSolid"/>. Without either nothing stops the tree.</param>
     public TopplingTree(List<FellBlock> blocks, Vector3 pivot, Vector3 fallDirection, bool drops = true,
-        Func<int, int, int, bool>? isSolid = null)
+        Func<int, int, int, bool>? isSolid = null, FellTerrain? terrain = null)
     {
+        terrain ??= isSolid != null ? FellTerrain.Ground(isSolid) : null;
         _blocks = blocks;
         _pivot = pivot;
         _drops = drops;
@@ -74,7 +77,7 @@ public class TopplingTree : IDisposable
         // Tipping the +Y axis toward the fall direction rotates around Y x fallDir
         _axis = Vector3.Normalize(Vector3.Cross(Vector3.UnitY, flat));
 
-        _isSolid = isSolid ?? ((_, _, _) => false);
+        _terrain = terrain ?? FellTerrain.Ground((_, _, _) => false);
         _centers = new Vector3[blocks.Count];
         _contacts = FellContacts.Build(blocks);
         // How far a wood block reaches from its center when it hits something; leaves are soft
@@ -96,8 +99,8 @@ public class TopplingTree : IDisposable
         }
         // Still attached when the cut stands on ground and the wood mostly rises above it; a limb
         // or a set of branches has no such base and just falls
-        var pinned = isSolid != null
-                     && isSolid((int)MathF.Floor(pivot.X), (int)MathF.Floor(pivot.Y) - 1, (int)MathF.Floor(pivot.Z))
+        var pinned = terrain != null
+                     && terrain.HoldsPin((int)MathF.Floor(pivot.X), (int)MathF.Floor(pivot.Y) - 1, (int)MathF.Floor(pivot.Z))
                      && StandsAboveCut(blocks, pivot);
 
         var all = new List<int>(blocks.Count);
@@ -136,7 +139,7 @@ public class TopplingTree : IDisposable
             masses[k] = _masses[indices[k]];
             contacts[k] = _contacts[indices[k]];
         }
-        return new FellBody(centers, masses, contacts, _pivot, _axis, hinged, _isSolid, inherit);
+        return new FellBody(centers, masses, contacts, _pivot, _axis, hinged, _terrain.Stops, inherit, _terrain.Snags);
     }
 
     /// <summary>

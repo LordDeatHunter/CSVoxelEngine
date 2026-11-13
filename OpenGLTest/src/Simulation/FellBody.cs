@@ -25,12 +25,22 @@ internal sealed class FellBody
     private const float ContactSkin = 0.02f;
     private const float PenetrationSlop = 0.005f;
     private const int MaxClimbCells = 6;
+    // A point sunk deeper than this below the top of its solid column is inside a wall (a
+    // neighboring trunk, a cliff face), not resting on ground: lifting the whole body out of it
+    // would launch the tree up the wall, so it gives no contact (it can still snap a branch)
+    private const float MaxGroundDepth = 1f;
     private static readonly Vector3 Up = Vector3.UnitY;
-
     private readonly Func<int, int, int, bool> _isSolid;
+    private readonly Func<int, int, int, bool> _snags;
     private readonly Vector3[] _offsets;
     private readonly Vector3[] _contactOffsets;
+    // Each contact point's world position at build time, before any motion
+    private readonly Vector3[] _contactStart;
     private readonly int[] _contactOwner;
+    // A point that was already inside a solid cell when the tree was cut (the hillside beside its
+    // base, a neighbor's branch beside its crown) touches nothing until it has left the solid:
+    // pushing the body out of what it grew into is what launched trees into the air
+    private readonly bool[] _embedded;
     private readonly float _invMass;
     private readonly Matrix4x4 _invInertiaBody;
     private readonly Vector3 _hingeLocal;
@@ -67,7 +77,7 @@ internal sealed class FellBody
     private Vector3 _velocity;
     private Vector3 _angular;
 
-    /// <summary>The blocks (by index) that hit the ground faster than
+    /// <summary>The blocks (by index) that hit the ground, or ran into a wall, faster than
     /// <see cref="SimulationConfig.TreeFellDetachSpeed"/> during the last <see cref="Advance"/>.</summary>
     public IReadOnlyList<int> HardImpacts => _impacts;
 
@@ -79,11 +89,15 @@ internal sealed class FellBody
     /// <param name="hinged">Whether the body starts pinned to the stump at <paramref name="pivot"/>.</param>
     /// <param name="isSolid">Whether a world cell stops the body.</param>
     /// <param name="inherit">A body this one is split from: it carries on from that body's pose and
-    /// motion (and its pin) with only these blocks, so nothing jumps when a piece breaks off.</param>
+    /// motion with only these blocks, so nothing jumps when a piece breaks off. It keeps the pin
+    /// only when <paramref name="hinged"/> and the parent still had it.</param>
+    /// <param name="snags">Cells the body passes through but a block moving fast through them breaks
+    /// off on (a standing tree's branches); none when omitted.</param>
     public FellBody(IReadOnlyList<Vector3> centers, IReadOnlyList<float> masses, IReadOnlyList<Vector3[]> contactPoints, Vector3 pivot, Vector3 tipAxis,
-        bool hinged, Func<int, int, int, bool> isSolid, FellBody? inherit = null)
+        bool hinged, Func<int, int, int, bool> isSolid, FellBody? inherit = null, Func<int, int, int, bool>? snags = null)
     {
         _isSolid = isSolid;
+        _snags = snags ?? ((_, _, _) => false);
         var total = 0f;
         var sum = Vector3.Zero;
         for (var i = 0; i < centers.Count; i++)
@@ -118,16 +132,20 @@ internal sealed class FellBody
         var contactCount = 0;
         foreach (var points in contactPoints) contactCount += points.Length;
         _contactOffsets = new Vector3[contactCount];
+        _contactStart = new Vector3[contactCount];
         _contactOwner = new int[contactCount];
+        _embedded = new bool[contactCount];
         var at = 0;
         for (var i = 0; i < contactPoints.Count; i++)
         {
             foreach (var point in contactPoints[i])
             {
+                _contactStart[at] = point;
                 _contactOffsets[at] = point - Center;
                 _contactOwner[at++] = i;
             }
         }
+        MarkEmbedded(inherit);
 
         _hingeWorld = pivot;
         _hingeLocal = pivot - Center;
@@ -146,8 +164,27 @@ internal sealed class FellBody
         Center = inherit.Center + Vector3.Transform(StartCenter - inherit.StartCenter, inherit.Rotation);
         _angular = inherit._angular;
         _velocity = inherit._velocity + Vector3.Cross(inherit._angular, Center - inherit.Center);
-        Hinged = inherit.Hinged;
+        // A snapped-off branch drops free; the rest of the tree keeps the pin it still had
+        Hinged = hinged && inherit.Hinged;
         Elapsed = inherit.Elapsed;
+    }
+
+    // A new body marks the points sunk into solid in the standing pose; a piece split off a body
+    // keeps its parent's marks, since its points may be legitimately pressed into the ground now
+    private void MarkEmbedded(FellBody? inherit)
+    {
+        if (inherit == null)
+        {
+            for (var i = 0; i < _contactStart.Length; i++)
+                _embedded[i] = DepthIntoGround(_contactStart[i]) > PenetrationSlop;
+            return;
+        }
+
+        var parent = new Dictionary<Vector3, bool>(inherit._contactStart.Length);
+        for (var i = 0; i < inherit._contactStart.Length; i++)
+            parent[inherit._contactStart[i]] = inherit._embedded[i];
+        for (var i = 0; i < _contactStart.Length; i++)
+            _embedded[i] = parent.GetValueOrDefault(_contactStart[i]);
     }
 
     /// <summary>The farthest any block center is from <see cref="Center"/>, plus a block: a sphere
@@ -211,7 +248,7 @@ internal sealed class FellBody
             Center += _hingeWorld - (Center + Vector3.Transform(_hingeLocal, Rotation));
             ReleaseHingeWhenTipped();
         }
-        Depenetrate();
+        Depenetrate(dt);
         SettleWhenStill(dt);
     }
 
@@ -244,17 +281,37 @@ internal sealed class FellBody
         Freeze();
     }
 
-    /// <summary>Every contact point that is in (or within the skin of) a solid cell.</summary>
+    /// <summary>Every contact point that is in (or within the skin of) a solid cell near its top;
+    /// a point deep inside a wall is no contact, but a fast one is a hard impact.</summary>
     private void FindContacts()
     {
         _contacts.Clear();
         for (var i = 0; i < _contactOffsets.Length; i++)
         {
             var lever = Vector3.Transform(_contactOffsets[i], Rotation);
-            var depth = DepthIntoGround(Center + lever);
+            var point = Center + lever;
+            var depth = DepthIntoGround(point);
+            if (depth < 0f && _snags((int)MathF.Floor(point.X), (int)MathF.Floor(point.Y), (int)MathF.Floor(point.Z)))
+                NoteImpact(VelocityAt(point).Length(), _contactOwner[i]);
+            if (_embedded[i])
+            {
+                _embedded[i] = depth > 0f;
+                continue;
+            }
+            if (depth > MaxGroundDepth)
+            {
+                NoteImpact(VelocityAt(Center + lever).Length(), _contactOwner[i]);
+                continue;
+            }
             if (depth > -ContactSkin)
                 _contacts.Add((lever, depth, _contactOwner[i]));
         }
+    }
+
+    private void NoteImpact(float speed, int index)
+    {
+        if (speed >= SimulationConfig.TreeFellDetachSpeed && !_impacts.Contains(index))
+            _impacts.Add(index);
     }
 
     /// <summary>How far above the surface of the solid column holding <paramref name="point"/> the
@@ -294,8 +351,7 @@ internal sealed class FellBody
             if (approach >= 0f) continue;
 
             LastImpactSpeed = MathF.Max(LastImpactSpeed, -approach);
-            if (-approach >= SimulationConfig.TreeFellDetachSpeed && !_impacts.Contains(index))
-                _impacts.Add(index);
+            NoteImpact(-approach, index);
             var bounce = -approach > SimulationConfig.TreeFellBounceSpeed ? SimulationConfig.TreeFellBounce : 0f;
             var normalMass = EffectiveMass(lever, Up);
             var normalImpulse = -(1f + bounce) * approach / normalMass;
@@ -312,15 +368,17 @@ internal sealed class FellBody
         }
     }
 
-    // Pushes the whole body out of the ground by its deepest sunk block
-    private void Depenetrate()
+    // Eases the whole body out of the ground by its deepest sunk block, never faster than
+    // TreeFellDepenetrateSpeed: the contact impulses already stop a real landing, so this only
+    // mops up the last sink, and no contact can teleport the tree upward
+    private void Depenetrate(float dt)
     {
         FindContacts();
         var deepest = 0f;
         foreach (var (_, depth, _) in _contacts)
             deepest = MathF.Max(deepest, depth);
         if (deepest > PenetrationSlop)
-            Center += new Vector3(0f, MathF.Min(deepest - PenetrationSlop, 0.5f) * 0.9f, 0f);
+            Center += new Vector3(0f, MathF.Min((deepest - PenetrationSlop) * 0.9f, SimulationConfig.TreeFellDepenetrateSpeed * dt), 0f);
     }
 
     private float EffectiveMass(Vector3 lever, Vector3 direction) =>

@@ -409,8 +409,8 @@ internal sealed class BlockEditor
             blockPos.Z + 0.5f - feller.Z);
         _toppling.Add(new TopplingTree(collected,
             new Vector3(blockPos.X + 0.5f, blockPos.Y + (leavesStump ? 1 : 0), blockPos.Z + 0.5f), away, drops: !creative,
-            // The felled cells are already gone; an unloaded cell reads as ground so nothing falls into it
-            isSolid: (x, y, z) => !_chunkManager.TryGetCell(x, y, z, out var id, out _) || BlockType.IsSolid(id)));
+            // The felled cells are already gone
+            terrain: FellTerrain.Of(_chunkManager)));
 
         // A torch on the trunk, or a flower on a felled log, loses its support with the wood
         // (RemoveBlock's own pop only looks around the cut cell)

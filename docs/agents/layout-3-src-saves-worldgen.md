@@ -185,6 +185,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       FellBranches.cs          # GL-free: a felled tree's main stem and side branches (which blocks snap off together)
       FellPart.cs              # one rigid piece of a felled tree: its blocks, FellBody and meshes (a branch snaps off into its own)
       FellBody.cs              # GL-free rigid body of a felled tree: point masses, gravity, stump pin, terrain contacts, settle
+      FellTerrain.cs           # the world as a felled tree feels it: what stops it, what snags a branch, what holds the pin
       TreeGrowthResult.cs      # the outcome of one TreeGrowthWriter call: its status,
                                #   the root cell, the added nodes and the written cells
       TreeGrowthStatus.cs      # what one TreeGrowthWriter.Grow call did
