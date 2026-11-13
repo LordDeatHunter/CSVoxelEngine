@@ -85,7 +85,7 @@ internal sealed class BlockInteractions
     }
 
     /// <summary>
-    /// Right-click on a crucible standing on the ground: lifts the vessel, metal and all, into the tools pool whatever
+    /// Right-click on a crucible standing on the ground: lifts the vessel, metal and all, straight into the hand (see <see cref="Inventory.AddLifted"/>) whatever
     /// is in hand (a full pool leaves it standing). A client claims the click and leaves the lift to the server.
     /// </summary>
     internal bool TryTakeStandingCrucible(float maxDistance, PlayerContext player)
@@ -96,7 +96,7 @@ internal sealed class BlockInteractions
             return false;
         if (_world.IsClientMode) return true;
         var vessel = _world.StandingCrucibles.Peek(cell);
-        if (vessel == null || player.Inventory.AddInstance(vessel))
+        if (vessel == null || player.Inventory.AddLifted(vessel))
             Edits.RemoveBlock(hit, player, pickedUp: vessel != null);
         return true;
     }

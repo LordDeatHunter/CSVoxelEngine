@@ -230,6 +230,22 @@ public class Inventory
     }
 
     /// <summary>
+    /// <see cref="AddInstance"/> for a block lifted by a right-click (a lantern, a standing crucible): the instance lands
+    /// straight in the hand, in the selected hotbar slot when that is empty (else the first empty one), without
+    /// switching the selection. False, changing nothing, when its pool is full.
+    /// </summary>
+    public bool AddLifted(ItemStack template)
+    {
+        if (!AddInstance(template)) return false;
+        var lifted = _tools[^1];
+        if (CategoryOf(lifted.DefinitionId) != InventoryCategory.Tools) return true;
+        var slot = IdAt(SelectedIndex) == 0 ? SelectedIndex : FirstEmptySlot();
+        if (slot >= 0)
+            EquipTool(slot, lifted.InstanceId);
+        return true;
+    }
+
+    /// <summary>
     /// Credits one piece of loot gear that rolled <paramref name="rolled"/> (see <see cref="GearRoller"/>): a new
     /// gear instance carrying its rarity and modifiers and the name they earned. False for a non-gear id or a full
     /// gear pool, in which case nothing is added.

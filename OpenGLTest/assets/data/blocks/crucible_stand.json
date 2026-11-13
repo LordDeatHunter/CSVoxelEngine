@@ -10,6 +10,8 @@
   "castsAO": false,
   "hasItem": false,
   "needsSupport": true,
+  // Only on a full block face, like a torch: never on a slab, a stair, a mold or anything whose top is not the top of its cell
+  "supportFullFace": true,
   "loot": "none",
   "crucibleStand": true,
   // The bowl hugs the middle of its cell: an 8x8x8 box (see block/crucible)

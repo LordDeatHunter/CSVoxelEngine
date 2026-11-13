@@ -22,7 +22,7 @@ internal sealed class LanternInteraction(World world, bool clientMode)
             if (clientMode) return true;
             var stack = world.Lanterns.Open(chunks, hit.BlockCell());
             // A full pool claims the click but changes nothing; it must not open the held lantern or place through it.
-            if (stack == null || !player.Inventory.AddInstance(stack, autoEquip: true)) return true;
+            if (stack == null || !player.Inventory.AddLifted(stack)) return true;
             world.Edits.RemoveBlock(hit, player, pickedUp: true);
             return true;
         }
