@@ -1,15 +1,17 @@
-"""Deterministic generator of the map's pin icons (placeholder art, listed in USER_TODO.md).
+"""Deterministic generator of the map's pin icons and the tower map item (placeholder art, listed in USER_TODO.md).
 
 Writes under OpenGLTest/assets/textures/ui/map/:
   pin_arrow.png  a 32x32 arrowhead pointing up (north): a white fill inside a dark outline, so MinimapRenderer's
                  per-kind tint (the player, a hostile, a neutral mob) colors the fill and the outline stays dark
   waystone.png   a 32x32 obelisk on a plinth with a glowing rune line, drawn untinted at a discovered waystone
-  tower.png      a 32x32 battle tower with battlements and a door, for the located towers (not drawn yet)
+  tower.png      a 32x32 battle tower with battlements and a door, the pin of a tower marked with a tower map
+and under OpenGLTest/assets/textures/items/:
+  tower_map.png  a 32x32 parchment with a dotted trail to a red cross beside a small tower (the tower map item)
 
 No randomness and no image library: every texel is 4x4 supersampled from plain polygons, and the PNG writer below
 (stdlib zlib and struct, filter 0, level 9) is the one the other tools/ generators use, so re-running reproduces the
 files byte for byte. Run from the repo root:
-    python -I tools/generate-map-icons.py           (writes the three files)
+    python -I tools/generate-map-icons.py           (writes the four files)
     python -I tools/generate-map-icons.py --check   (exit 1 if a file differs)
 """
 import math
@@ -20,6 +22,7 @@ import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "OpenGLTest", "assets", "textures", "ui", "map")
+ITEM_DIR = os.path.join(ROOT, "OpenGLTest", "assets", "textures", "items")
 SIZE = 32
 SUB = 4
 OUTLINE_WIDTH = 1.6
@@ -31,6 +34,10 @@ STONE_DARK = (104, 108, 116)
 RUNE = (110, 220, 255)
 TOWER = (148, 132, 112)
 TOWER_DARK = (96, 84, 70)
+PARCHMENT = (226, 204, 150)
+PARCHMENT_DARK = (196, 168, 112)
+INK = (92, 64, 40)
+CROSS = (200, 40, 36)
 
 
 def inside(x, y, polygon):
@@ -120,6 +127,34 @@ TOWER_SHAPES = [
 ]
 
 
+PARCHMENT_SHEET = [(4, 6), (27, 4), (28, 26), (5, 28)]
+MAP_TOWER = [(19, 9), (24, 9), (24, 11), (23, 11), (23, 17), (20, 17), (20, 11), (19, 11)]
+
+
+def tower_map_texel(x, y):
+    """A tilted parchment sheet: a darker rim, a dotted ink trail curving to a red cross, a small inked tower."""
+    if not inside(x, y, PARCHMENT_SHEET):
+        return None
+    edge = edge_distance(x, y, PARCHMENT_SHEET)
+    if edge < 1.2:
+        return OUTLINE
+    if edge < 2.6:
+        return PARCHMENT_DARK
+    if inside(x, y, MAP_TOWER):
+        return INK
+    # The cross at the trail's end, beside the tower
+    if min(segment_distance(x, y, (15, 17), (19, 21)), segment_distance(x, y, (19, 17), (15, 21))) < 1.0:
+        return CROSS
+    # The trail: dots along a curve from the sheet's lower left toward the cross
+    for i in range(6):
+        t = i / 6.0
+        px = 8 + t * 6 + math.sin(t * math.pi) * 2
+        py = 25 - t * 6
+        if math.hypot(x - px, y - py) < 0.8:
+            return INK
+    return PARCHMENT
+
+
 def render(texel):
     rows = []
     for py in range(SIZE):
@@ -153,9 +188,10 @@ def png(raw):
 
 
 FILES = {
-    "pin_arrow.png": arrow_texel,
-    "waystone.png": lambda x, y: union_texel(x, y, WAYSTONE),
-    "tower.png": lambda x, y: union_texel(x, y, TOWER_SHAPES),
+    (OUT_DIR, "pin_arrow.png"): arrow_texel,
+    (OUT_DIR, "waystone.png"): lambda x, y: union_texel(x, y, WAYSTONE),
+    (OUT_DIR, "tower.png"): lambda x, y: union_texel(x, y, TOWER_SHAPES),
+    (ITEM_DIR, "tower_map.png"): tower_map_texel,
 }
 
 
@@ -163,8 +199,8 @@ def main():
     check = "--check" in sys.argv[1:]
     differs = False
     os.makedirs(OUT_DIR, exist_ok=True)
-    for name, texel in FILES.items():
-        path = os.path.join(OUT_DIR, name)
+    for (folder, name), texel in FILES.items():
+        path = os.path.join(folder, name)
         data = png(render(texel))
         if check:
             with open(path, "rb") as existing:

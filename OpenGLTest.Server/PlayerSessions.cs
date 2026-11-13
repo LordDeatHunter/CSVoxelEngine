@@ -5,6 +5,7 @@ using VoxelEngine.Networking;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation.Tower;
 
 namespace VoxelEngine.Server;
 
@@ -43,6 +44,8 @@ internal sealed class PlayerSessions
         };
         // A returning player gets back their inventory and modes, and starts where they left
         var restored = player.Restore(ServerPlayerSaves.Load(_state.World.SaveStore, client.Name), _state.MayBeCreative(client.Name));
+        // A tower conquered while this player was away leaves their map
+        TowerMarking.ForgetConquered(player.Inventory.TowerMarks, _state.World.Towers);
         var spawn = restored ? player.Position : joinSpawn;
         // A player with no saved respawn eye comes back where it first stood, like singleplayer's
         // first settled position; the teleport starts its fall tracking there

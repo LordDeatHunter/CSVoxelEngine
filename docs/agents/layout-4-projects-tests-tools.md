@@ -168,7 +168,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   despawn reports; the floor locks (TowerRulesTests, SkeletonPileManagerTests,
                                #   TowerBlockWriterTests, TowerManagerTests, TowerManagerSaveTests: stations.json); the
                                #   altar and the king (TowerAltarTests, TowerAltarWorldTests, SkeletonKingManagerTests);
-                               #   the collapse (TowerCollapseTests) and its cost probe (TowerCollapseCostProbe)
+                               #   the collapse (TowerCollapseTests) and its cost probe (TowerCollapseCostProbe); the tower
+                               #   map's marks (TowerMarkingTests: the next tower out, conquered skipped and forgotten, the save)
     Waystones/                 # waystone names, the registry's discovery, rename, lost and save rules; the teleport rule,
                                #   the arrival search, the realm tag and a trip in a headless world
   Status/                      # the status effect set, the Apply API, the speed factors and the block rule and writer
@@ -227,7 +228,7 @@ tools/                                # asset generators: models, animation clip
   generate-critter-models.py          # deterministic dragonfly, crow and deer .bbmodels (their own bone sets around the
                                       #   humanoid six, clips) and skins with cutout texels, on the hell script's machinery;
                                       #   models only, no mob class yet; --check
-  generate-map-icons.py               # deterministic placeholder map icons: the pin arrow, the waystone and the battle tower
+  generate-map-icons.py               # deterministic placeholder map icons (the pin arrow, the waystone, the battle tower) and the tower map item
   generate-quest-node-textures.py     # deterministic placeholder quest book node frames (circle, hex) and the check badge
   generate-forcefield-texture.py      # deterministic placeholder tower_forcefield tile (a faint honeycomb, only the fallback
                                       #   of the world shader's forcefield term), integer geometry; listed in USER_TODO.md; --check

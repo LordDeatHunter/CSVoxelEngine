@@ -196,5 +196,16 @@ internal sealed class StubItemUseWorld : IItemUseWorld
         return Summonable.Contains(key);
     }
 
+    /// <summary>What <see cref="MarkTower"/> answers, and how many times it was asked.</summary>
+    public bool TowerToMark { get; set; }
+
+    public int MarkTowerCalls { get; private set; }
+
+    public bool MarkTower()
+    {
+        MarkTowerCalls++;
+        return TowerToMark;
+    }
+
     public void ConsumeSelected() => Consumed++;
 }

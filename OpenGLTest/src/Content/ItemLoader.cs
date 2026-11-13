@@ -40,8 +40,9 @@ internal static class ItemLoader
                 "learn_parts" => ItemUseAction.LearnParts,
                 "restore_mana" => ItemUseAction.RestoreMana,
                 "summon" => ItemUseAction.Summon,
+                "mark_tower" => ItemUseAction.MarkTower,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, place_ingot, ignite_campfire, heal, grow_tree, plant_tree, learn_parts, restore_mana or summon."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, place_ingot, ignite_campfire, heal, grow_tree, plant_tree, learn_parts, restore_mana, summon or mark_tower."),
             };
             var teaches = ParseTeaches(definition, action, path);
             var restoresMana = ParseRestoresMana(definition, action, path);
@@ -597,6 +598,9 @@ internal static class ItemLoader
                 case ItemUseAction.Summon:
                     ValidateSummon(item, path);
                     break;
+                case ItemUseAction.MarkTower:
+                    ValidateMarkTower(item, path);
+                    break;
                 default:
                     ValidateFluidAction(item, path);
                     break;
@@ -710,6 +714,16 @@ internal static class ItemLoader
         if (item.UseResultId != 0 || item.UseFluidId != 0 || item.UseBlockId != 0)
             throw new InvalidOperationException(
                 $"Item '{path}' has use.action 'summon' with a use.result, use.fluid or use.block: summoning spends from its stack, it never morphs.");
+    }
+
+    private static void ValidateMarkTower(Item item, string path)
+    {
+        if (item.UseResultId != 0 || item.UseFluidId != 0 || item.UseBlockId != 0 || item.UseEntityName != null)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'mark_tower' with a use.result, use.fluid, use.block or use.entity: a tower map spends from its stack and targets nothing.");
+        if (item is not TowerMapItem)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'mark_tower' but is not built as a tower map (gear or a tool cannot mark towers).");
     }
 
     private static void ValidatePlantTree(Item item, string path)

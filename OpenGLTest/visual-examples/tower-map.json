@@ -1,0 +1,37 @@
+{
+  // Tower maps: run with VOXEL_SCRIPT=visual-examples/tower-map.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/tower-map/. From goblins.json's forest clearing near the origin, one tower map marks the nearest
+  // battle tower (the toast, and its pin held to the minimap's rim, pointing east-north-east), two more mark the next two
+  // out (the zoomed-out map screen shows all three). Then the camera goes to the nearest tower (center (2920, -1411), see
+  // battle-tower.json), towerdefeat fells its king, and the map screen shows the other two marks left.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 63.5], "yaw": -90, "pitch": -12 },
+    { "op": "fly" },
+    { "op": "map", "action": "square" },
+    { "op": "give", "block": "item/tower_map", "count": 3 },
+    { "op": "wait", "seconds": 2 },
+
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "first-mark" },
+
+    { "op": "place" },
+    { "op": "place" },
+    { "op": "map", "action": "open" },
+    { "op": "map", "action": "zoom", "factor": 0.12 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "three-marks" },
+    { "op": "map", "action": "close" },
+
+    { "op": "teleport", "pos": [2920.5, 70.5, -1411.5], "yaw": 0, "pitch": -30 },
+    { "op": "wait", "seconds": 15 },
+    { "op": "towerdefeat" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "map", "action": "open" },
+    { "op": "map", "action": "center" },
+    { "op": "map", "action": "zoom", "factor": 0.12 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "after-conquest" }
+  ]
+}

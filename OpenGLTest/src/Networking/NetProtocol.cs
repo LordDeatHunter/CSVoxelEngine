@@ -287,8 +287,10 @@ public static class NetFraming
     /// 53: the station snapshot ends with the ingot piles; an older peer would misread the frame.
     /// 54: each log standing on a stump carries the axe blows it has taken toward its split; an older peer would misread the frame.
     /// 55: the jungle's animals, <see cref="NetEntityKind.CorpseBloom"/> (its posture byte says whether it is open) and
-    /// <see cref="NetEntityKind.Centipede"/>, in <see cref="NetMessage.EntityList"/>; an older client would not draw them.</summary>
-    public const int ProtocolVersion = 55;
+    /// <see cref="NetEntityKind.Centipede"/>, in <see cref="NetMessage.EntityList"/>; an older client would not draw them.
+    /// 56: the inventory snapshot carries the battle towers the player marked with tower maps (<c>TowerMarks</c>); an older
+    /// client would never show a mark on its map.</summary>
+    public const int ProtocolVersion = 56;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

@@ -354,9 +354,6 @@ single-arc player.
 - [ ] **`U-8` · Key rebinding + controller** — P2, M.
 - [ ] **`U-9` · F3 / debug expansion** — P2, S.
   Biome, light level, chunk coords, facing, targeted block. Coordinates already exist.
-- [ ] **`U-24` · Battle towers on the map** — P3, S. The icon is ready (`assets/textures/ui/map/tower.png`, drawn
-  nowhere yet): add a `MapPinKind` for a tower the player has located (`/locate tower`) or seen, and gray a defeated one
-  (`TowerManager`). See "Map and minimap" in `docs/agents/player-systems.md`.
 - [ ] **`U-25` · Save the explored map** — P3, M. `MapTracker`'s surface and sky tiles live only for the session; write
   them beside the world (per player on a server) so the [M] map remembers where the player has been.
 - [ ] **`U-11` · Help screen** — P2, S.

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
@@ -14,6 +15,7 @@ using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.LeafDecay;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Features;
@@ -77,6 +79,8 @@ internal sealed class WorldItemUse : IItemUseWorld
         _debris = debris;
         _clientMode = clientMode;
         _serverMode = serverMode;
+        // A conquered tower is no longer a tower to find: it leaves the map of everyone who marked it
+        world.Towers.BossDefeated += ForgetConqueredTower;
     }
 
     // Tool instance the item use dispatcher is currently running for (0 for stackable misc
@@ -390,6 +394,45 @@ internal sealed class WorldItemUse : IItemUseWorld
 
     bool IItemUseWorld.SummonBoss(string entity, Vector3 cell) =>
         _clientMode ? _world.CanSummonBoss(entity, cell) : _world.TrySummonBoss(entity, cell);
+
+    bool IItemUseWorld.MarkTower()
+    {
+        // A client holds no seed to search worldgen with: it predicts the use, and the server's inventory snapshot
+        // brings the mark, or puts the map back when the server found no tower
+        if (_clientMode) return true;
+        var context = ActiveContext;
+        var marked = TowerMarking.TryMarkNearest(context.Inventory.TowerMarks, context.Eye.X, context.Eye.Z,
+            _world.Towers, out var found);
+        if (_serverMode)
+        {
+            if (marked) FlagInventoryChanged(context);
+            return marked;
+        }
+        _world.Toast.Show(marked
+            ? string.Create(CultureInfo.InvariantCulture, $"Battle tower marked on your map, {found.Distance:0} blocks away")
+            : NoTowerToMark);
+        return marked;
+    }
+
+    private static readonly string NoTowerToMark = string.Create(CultureInfo.InvariantCulture,
+        $"No unmarked battle tower within {WorldGenerationConfig.TowerLocateRings * WorldGenerationConfig.TowerCellBlocks} blocks");
+
+    // The server resends the inventory of the player a use changed outside its stacks
+    private void FlagInventoryChanged(PlayerContext context)
+    {
+        foreach (var serverPlayer in ServerPlayers)
+            if (ReferenceEquals(serverPlayer.Context, context))
+                serverPlayer.InventoryChanged = true;
+    }
+
+    // Every player who marked the tower whose king just fell forgets it: the local player, and each connected one
+    private void ForgetConqueredTower(TowerRecord record)
+    {
+        LocalPlayer.LocalContext().Inventory.TowerMarks.Remove(record.CenterX, record.CenterZ);
+        foreach (var serverPlayer in ServerPlayers)
+            if (serverPlayer.Inventory.TowerMarks.Remove(record.CenterX, record.CenterZ))
+                serverPlayer.InventoryChanged = true;
+    }
 
     void IItemUseWorld.ConsumeSelected() => ActiveInventory.ConsumeSelected();
     #endregion

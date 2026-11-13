@@ -1,6 +1,10 @@
 using System;
+using System.Numerics;
 using VoxelEngine.Entities;
 using VoxelEngine.Map;
+using VoxelEngine.Networking.Client;
+using VoxelEngine.Simulation.Tower;
+using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.UI.Hud;
 using Xunit;
 
@@ -18,6 +22,31 @@ public sealed class MapPinsTests
     {
         Assert.Equal(MapPinKind.Hostile, MapPins.KindOf(Kind(EntityAttitude.Hostile)));
         Assert.Equal(MapPinKind.Neutral, MapPins.KindOf(Kind(EntityAttitude.Neutral)));
+    }
+
+    [Fact]
+    public void AMarkedTowerIsAPinUntilItsMarkGoes()
+    {
+        var pins = new MapPins();
+        var towers = new TowerMarks();
+        var waystones = new DiscoveredWaystones();
+        void Collect() => pins.Collect(MapLayer.Surface, Vector3.Zero, 0f, Array.Empty<RemotePlayer>(), Array.Empty<Mob>(),
+            waystones, towers);
+
+        Collect();
+        Assert.DoesNotContain(pins.Pins, p => p.Kind == MapPinKind.Tower);
+
+        towers.Add(640, -1280);
+        Collect();
+        var tower = Assert.Single(pins.Pins, p => p.Kind == MapPinKind.Tower);
+        Assert.Equal(new Vector2(640.5f, -1279.5f), tower.Position);
+        Assert.NotNull(tower.Label);
+
+        towers.Remove(640, -1280);
+        Collect();
+        Assert.DoesNotContain(pins.Pins, p => p.Kind == MapPinKind.Tower);
+        // The local player's own arrow is always there, drawn last
+        Assert.Equal(MapPinKind.Self, pins.Pins[^1].Kind);
     }
 
     [Fact]

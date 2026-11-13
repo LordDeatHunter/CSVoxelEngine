@@ -1,4 +1,3 @@
-using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 using VoxelEngine.Simulation;
 
@@ -80,4 +79,11 @@ public enum ItemUseAction
     /// is already alive).
     /// </summary>
     Summon,
+
+    /// <summary>
+    /// Marks the nearest battle tower the player has neither marked nor conquered on their map (a tower map,
+    /// <see cref="TowerMapItem"/>, through <c>TowerMarking.TryMarkNearest</c>), spending one unit. Refused, and not spent,
+    /// when no such tower lies within the locate range.
+    /// </summary>
+    MarkTower,
 }

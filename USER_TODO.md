@@ -11,6 +11,9 @@
 - [ ] **Lumber** — `items/lumber.png` is a generated stack of boards (`tools/generate-lumber-sprite.py`); replace with hand-drawn art and delete the generator.
 - [ ] **Stumps** — `blocks/<species>_stump.json` reuse each log's side and end tiles on `models/block/stump.json`; give them their own cut-wood tile if the ring should differ from a log's end.
 - [ ] **Jungle** — `blocks/jungle_mud.png` is the dirt tile darkened (generated once in PowerShell; no generator to remove), and `jungle_log`, `jungle_leaves` and `jungle_stump` reuse the oak log/leaf tiles; give them their own jungle art (a mossy mud, a darker bark, broad glossy leaves). Keep `jungle_mud.png` 32x32.
+- [ ] **Tower map** — `items/tower_map.png` is a generated parchment with a trail, a red cross and a small tower
+  (`tools/generate-map-icons.py`, which also writes the map's pin icons); replace with hand-drawn art and drop its entry
+  from that generator. Keep it 32x32.
 - [ ] **Everfuel** — `items/everfuel.json` currently reuses `coal.png`; replace with a distinct endless-fuel icon.
 
 Paths are under `OpenGLTest/assets/textures/items/`. All sprites are 32x32 RGBA unless noted, with
@@ -315,7 +318,7 @@ placeholders back (`--check` compares).
   (open, complete, hovered, the gold selection ring). Keep the item icon's room in the middle (about the inner 60%).
 - [ ] **Map icons** — `map/pin_arrow.png` (an arrowhead pointing up: a white fill inside a dark outline, since
   `MapRenderer` tints the fill per pin kind and turns it to the heading), `map/waystone.png` (an obelisk on a plinth with
-  a rune line, drawn untinted) and `map/tower.png` (a battle tower, not drawn yet), 32x32, made by
+  a rune line, drawn untinted) and `map/tower.png` (a battle tower marked with a tower map), 32x32, made by
   `tools/generate-map-icons.py`. Keep the arrow pointing straight up and near white, and every icon centered.
 - [ ] **Quest check badge** — `quest_check.png`, 64x64, a green disc with a white check, drawn untinted at the top-right
   of a complete quest's node.

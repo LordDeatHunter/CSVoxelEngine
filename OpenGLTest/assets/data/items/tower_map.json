@@ -1,0 +1,8 @@
+{
+  // A tower map: right-click to mark the nearest battle tower you have neither marked nor conquered on your map (the
+  // [M] screen and the minimap), spending one map; each use reveals the next tower out. Refused and kept when no such
+  // tower lies within /locate's range. Found in surface ruin chests. Conquering a tower takes its mark off the map.
+  "name": "Tower Map",
+  "texture": "assets/textures/items/tower_map.png",
+  "use": { "action": "mark_tower" }
+}

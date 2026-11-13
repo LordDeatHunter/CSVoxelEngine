@@ -160,6 +160,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   bone shrapnel, the bone volley (both MobMissiles), the summoned minions (capped), the
                                #   empty-server fade, client mirrors
         KingStatus.cs          # None / Alive / Killed (health 0) / Fading (a despawn with health left): what a tower's king is
+        TowerMarks.cs          # the towers one player marked with tower maps (center columns, marking order), saved and synced in the inventory
+        TowerMarking.cs        # the tower map's rules: mark the nearest unmarked, unconquered tower; forget the conquered ones
         TowerAltarState.cs     # Dormant / Ritual / Awake / Defeated: a tower's altar
         AltarVerdict.cs        # Begin / Sealed / Stirring / Awake / Defeated / NoTower: what an altar click comes to
         TowerRecord.cs         # one tower: key, center, radius and a TowerFloorState per floor, the altar state, cell and the

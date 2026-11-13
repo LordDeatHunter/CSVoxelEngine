@@ -3,6 +3,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Entities;
 using VoxelEngine.Networking.Client;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.UI.Hud;
 
@@ -17,6 +18,9 @@ public enum MapPinKind : byte
     Hostile,
     Neutral,
     Waystone,
+
+    /// <summary>A battle tower the player marked with a tower map.</summary>
+    Tower,
 }
 
 /// <summary>One pin: its kind, world XZ, compass heading in degrees (0 north, clockwise; arrows only) and the name a
@@ -25,19 +29,24 @@ public readonly record struct MapPin(MapPinKind Kind, Vector2 Position, float He
 
 /// <summary>
 /// Builds the frame's map pins: the local player, every other player, every live mob (hostile or neutral by its kind's
-/// <see cref="EntityType.Attitude"/>) and every waystone the player has discovered. On a cave slice only the mobs in the
-/// slice's height band show (<see cref="ShowsMobAt"/>), so the surface's animals never crowd a cave. The waystone pins
-/// are rebuilt only when the discovered list's <see cref="DiscoveredWaystones.Version"/> moves. GL-free; main thread
-/// only.
+/// <see cref="EntityType.Attitude"/>), every waystone the player has discovered and every battle tower they marked with
+/// a tower map (<see cref="TowerMarks"/>). On a cave slice only the mobs in the
+/// slice's height band show (<see cref="ShowsMobAt"/>), so the surface's animals never crowd a cave. The waystone and
+/// tower pins are rebuilt only when their list's version moves. GL-free; main thread only.
 /// </summary>
 public sealed class MapPins
 {
     private readonly List<MapPin> _pins = [];
-    private readonly List<MapPin> _waystones = [];
+    private readonly List<MapPin> _places = [];
     private DiscoveredWaystones? _waystoneSource;
     private int _waystoneVersion = -1;
+    private TowerMarks? _towerSource;
+    private int _towerVersion = -1;
 
-    /// <summary>The pins of the last <see cref="Collect"/>: the waystones first, then the mobs, the other players and
+    /// <summary>The name a tower pin shows under the pointer.</summary>
+    public const string TowerLabel = "Battle tower";
+
+    /// <summary>The pins of the last <see cref="Collect"/>: the waystones and towers first, then the mobs, the other players and
     /// the local player last, so the arrows draw over the icons and the player's own over everything.</summary>
     public IReadOnlyList<MapPin> Pins => _pins;
 
@@ -55,11 +64,11 @@ public sealed class MapPins
         layer.Kind != MapLayerKind.Cave || (y >= layer.BottomY && y <= layer.TopY + MapConfig.CaveSliceStep);
 
     public void Collect(MapLayer layer, Vector3 eye, float yaw, IReadOnlyList<RemotePlayer> players,
-        IReadOnlyList<Mob> mobs, DiscoveredWaystones waystones)
+        IReadOnlyList<Mob> mobs, DiscoveredWaystones waystones, TowerMarks towers)
     {
         _pins.Clear();
-        RefreshWaystones(waystones);
-        _pins.AddRange(_waystones);
+        RefreshPlaces(waystones, towers);
+        _pins.AddRange(_places);
         foreach (var mob in mobs)
         {
             if (mob.IsDead || !ShowsMobAt(layer, mob.Position.Y)) continue;
@@ -72,14 +81,20 @@ public sealed class MapPins
         _pins.Add(new MapPin(MapPinKind.Self, new Vector2(eye.X, eye.Z), Compass.HeadingFromYaw(yaw)));
     }
 
-    private void RefreshWaystones(DiscoveredWaystones waystones)
+    // The pins that only move when a list does: the discovered waystones and the marked towers
+    private void RefreshPlaces(DiscoveredWaystones waystones, TowerMarks towers)
     {
-        if (ReferenceEquals(waystones, _waystoneSource) && waystones.Version == _waystoneVersion) return;
+        if (ReferenceEquals(waystones, _waystoneSource) && waystones.Version == _waystoneVersion
+            && ReferenceEquals(towers, _towerSource) && towers.Version == _towerVersion) return;
         _waystoneSource = waystones;
         _waystoneVersion = waystones.Version;
-        _waystones.Clear();
-        // A pin sits on the middle of the stone's cell
-        _waystones.AddRange(waystones.Entries.Select(e =>
+        _towerSource = towers;
+        _towerVersion = towers.Version;
+        _places.Clear();
+        // A pin sits on the middle of the stone's cell, or of the tower's center column
+        _places.AddRange(waystones.Entries.Select(e =>
             new MapPin(MapPinKind.Waystone, new Vector2(e.X + 0.5f, e.Z + 0.5f), 0f, e.Name)));
+        foreach (var (x, z) in towers.Towers)
+            _places.Add(new MapPin(MapPinKind.Tower, new Vector2(x + 0.5f, z + 0.5f), 0f, TowerLabel));
     }
 }

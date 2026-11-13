@@ -1,6 +1,7 @@
 {
   // A broken stone shell on the surface (WorldGen/Structures, the surface ruin): supplies, now and then a piece of
-  // basic gear (common to uncommon) and a rare scroll. Rolled lazily when the chest is first opened or broken.
+  // basic gear (common to uncommon), a rare scroll, and sometimes a tower map pointing at the next battle tower.
+  // Rolled lazily when the chest is first opened or broken.
   "pools": [
     { "rolls": 1, "entries": [ { "table": "ruin_supplies" } ] },
     {
@@ -25,6 +26,7 @@
         { "item": "item/scroll_self" },
         { "item": "item/mana_draught" }
       ]
-    }
+    },
+    { "chance": 0.25, "rolls": 1, "entries": [ { "item": "item/tower_map" } ] }
   ]
 }

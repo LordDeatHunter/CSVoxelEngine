@@ -63,10 +63,10 @@ public static class MapConfig
     public const float DragThreshold = 6f;
 
     // --- Pins ---
-    // Arrow and waystone icon sizes in canvas units, on the minimap and on the map screen
+    // Arrow and place (waystone, tower) icon sizes in canvas units, on the minimap and on the map screen
     public const float PlayerPinSize = 16f;
     public const float MobPinSize = 11f;
-    public const float WaystonePinSize = 16f;
-    // A pointer within this many canvas units of a waystone pin names it on the map screen
-    public const float WaystoneHoverRadius = 12f;
+    public const float PlacePinSize = 16f;
+    // A pointer within this many canvas units of a waystone or tower pin names it on the map screen
+    public const float PlaceHoverRadius = 12f;
 }

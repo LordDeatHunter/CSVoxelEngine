@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Items;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.Simulation.Lanterns;
 using VoxelEngine.UI.Hud;
@@ -62,6 +62,9 @@ public class Inventory
     /// <summary>The waystones this player has discovered; saved in <c>player.json</c> and synced in the inventory
     /// snapshot like the known spell parts.</summary>
     public DiscoveredWaystones Waystones { get; } = new();
+
+    /// <summary>The battle towers this player has marked with a tower map; saved and synced like <see cref="Waystones"/>.</summary>
+    public TowerMarks TowerMarks { get; } = new();
 
     // The same instances, handed to the static helpers that work on this inventory
     // (InventoryCrafting, InventorySaveCodec); state lives only here

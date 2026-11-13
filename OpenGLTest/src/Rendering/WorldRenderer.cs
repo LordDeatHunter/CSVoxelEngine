@@ -387,7 +387,7 @@ internal sealed class WorldRenderer
         _mapTime = Now;
         var eye = Camera.Position;
         _mapTracker.Update(eye, deltaTime);
-        _mapPins.Collect(_mapTracker.Layer, eye, Camera.Yaw, _remotePlayers, Mobs, Inventory.Waystones);
+        _mapPins.Collect(_mapTracker.Layer, eye, Camera.Yaw, _remotePlayers, Mobs, Inventory.Waystones, Inventory.TowerMarks);
         var focus = new Vector2(eye.X, eye.Z);
         screen.Follow(focus);
         return new MapFrame(_mapTracker, _mapPins.Pins, focus, screen);

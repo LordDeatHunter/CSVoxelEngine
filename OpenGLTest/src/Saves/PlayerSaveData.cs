@@ -84,6 +84,10 @@ public sealed class PlayerSaveData
         /// <summary>The waystones this player has discovered, each with the name it had then. Null in an inventory
         /// saved before waystones existed; written as a list, empty or not.</summary>
         public List<DiscoveredWaystoneData>? Waystones { get; set; }
+
+        /// <summary>The battle towers this player has marked with a tower map, as [x, z] center columns, oldest first.
+        /// Null in an inventory saved before tower maps existed.</summary>
+        public List<int[]>? TowerMarks { get; set; }
     }
 
     /// <summary>One discovered waystone: its cell and the name the player knows it by.</summary>

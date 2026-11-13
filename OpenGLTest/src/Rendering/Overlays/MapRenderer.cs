@@ -17,9 +17,10 @@ namespace VoxelEngine.Rendering.Overlays;
 /// <list type="bullet">
 /// <item>the minimap under the top-right corner, north-up around the player, square (scissored) or round (clipped by
 /// the ui shader's <c>uClipCircle</c>), with the pins over it: arrows for players, hostile and neutral mobs, an icon
-/// per discovered waystone, a far player or waystone held to the rim and a far mob left out;</item>
+/// per discovered waystone and per battle tower marked with a tower map, a far player, waystone or tower held to the rim
+/// and a far mob left out;</item>
 /// <item>the [M] map screen over the whole canvas, panned and zoomed by its <see cref="MapScreenView"/>, with the same
-/// pins, the name of the waystone under the pointer, the pointer's block coordinates, the layer it shows and the
+/// pins, the name of the waystone or tower under the pointer, the pointer's block coordinates, the layer it shows and the
 /// CENTER and minimap shape buttons.</item>
 /// </list>
 /// Owns the pin sprites and the region textures. Render thread only.
@@ -39,6 +40,7 @@ internal sealed class MapRenderer : IDisposable
     private readonly UIRenderer _ui;
     private readonly uint _arrowTexture;
     private readonly uint _waystoneTexture;
+    private readonly uint _towerTexture;
     private readonly MapRegionTextures _regions;
     private readonly int _locClipCircle;
     private int _readoutX = int.MinValue, _readoutZ = int.MinValue;
@@ -50,6 +52,7 @@ internal sealed class MapRenderer : IDisposable
         _ui = ui;
         _arrowTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/map/pin_arrow.png");
         _waystoneTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/map/waystone.png");
+        _towerTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/map/tower.png");
         _regions = new MapRegionTextures(gl);
         _locClipCircle = ui.UiShader.GetUniformLocation("uClipCircle");
     }
@@ -88,7 +91,7 @@ internal sealed class MapRenderer : IDisposable
             if (pin.Kind == MapPinKind.Self) continue;
             var at = MapLayout.ToCanvas(pin.Position, focus, MapConfig.MinimapScale, inner.Center);
             var size = SizeOf(pin.Kind);
-            // A far player or waystone stays on the rim, pointing the way; a far mob is no concern
+            // A far player, waystone or tower stays on the rim, pointing the way; a far mob is no concern
             if (MapLayout.ClampToRim(ref at, inner, round, size * 0.5f) && pin.Kind is MapPinKind.Hostile or MapPinKind.Neutral)
                 continue;
             DrawPin(pin, at, size);
@@ -113,14 +116,14 @@ internal sealed class MapRenderer : IDisposable
             var at = MapLayout.ToCanvas(pin.Position, view.Center, view.Zoom, whole.Center);
             if (!whole.Inset(-MapConfig.PlayerPinSize).Contains(at)) continue;
             DrawPin(pin, at, SizeOf(pin.Kind));
-            if (pin.Kind == MapPinKind.Waystone && view.Hover is { } pointer
-                && Vector2.Distance(pointer, at) <= MapConfig.WaystoneHoverRadius)
+            if (pin.Kind is MapPinKind.Waystone or MapPinKind.Tower && view.Hover is { } pointer
+                && Vector2.Distance(pointer, at) <= MapConfig.PlaceHoverRadius)
                 hovered = pin;
         }
-        if (hovered is { Label: { } name } waystone)
+        if (hovered is { Label: { } name } place)
         {
-            var at = MapLayout.ToCanvas(waystone.Position, view.Center, view.Zoom, whole.Center);
-            _ui.DrawTextMiddle(name, at - new Vector2(0f, MapConfig.WaystonePinSize + 4f), _ui.CountScale, AccentGold);
+            var at = MapLayout.ToCanvas(place.Position, view.Center, view.Zoom, whole.Center);
+            _ui.DrawTextMiddle(name, at - new Vector2(0f, SizeOf(place.Kind) + 4f), _ui.CountScale, AccentGold);
         }
 
         var header = MapLayout.Header;
@@ -182,16 +185,16 @@ internal sealed class MapRenderer : IDisposable
     private static float SizeOf(MapPinKind kind) => kind switch
     {
         MapPinKind.Self or MapPinKind.Player => MapConfig.PlayerPinSize,
-        MapPinKind.Waystone => MapConfig.WaystonePinSize,
+        MapPinKind.Waystone or MapPinKind.Tower => MapConfig.PlacePinSize,
         _ => MapConfig.MobPinSize,
     };
 
-    // An arrow turned to its heading and tinted by kind, or the waystone icon upright
+    // An arrow turned to its heading and tinted by kind, or a place's icon upright
     private void DrawPin(MapPin pin, Vector2 at, float size)
     {
-        if (pin.Kind == MapPinKind.Waystone)
+        if (pin.Kind is MapPinKind.Waystone or MapPinKind.Tower)
         {
-            _ui.DrawTexture(at, new Vector2(size), _waystoneTexture);
+            _ui.DrawTexture(at, new Vector2(size), pin.Kind == MapPinKind.Tower ? _towerTexture : _waystoneTexture);
             return;
         }
         var color = pin.Kind switch
@@ -239,6 +242,7 @@ internal sealed class MapRenderer : IDisposable
     {
         _gl.DeleteTexture(_arrowTexture);
         _gl.DeleteTexture(_waystoneTexture);
+        _gl.DeleteTexture(_towerTexture);
         _regions.Dispose();
     }
 }

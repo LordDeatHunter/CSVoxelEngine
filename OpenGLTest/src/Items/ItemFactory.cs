@@ -107,6 +107,7 @@ public static class ItemFactory
             ItemUseAction.LearnParts => new LearnPartsItem(spec),
             ItemUseAction.RestoreMana => new RestoreManaItem(spec),
             ItemUseAction.Summon => new SummonItem(spec),
+            ItemUseAction.MarkTower => new TowerMapItem(spec),
             _ => new PlainItem(spec),
         };
     }

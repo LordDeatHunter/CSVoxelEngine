@@ -59,15 +59,28 @@ pointer's block coordinates and the name of a waystone under it show. The data i
   `RockColor`, and every texel is lit or shaded by its height against its northern neighbor (the relief).
   `MapColumnScannerTests`, `MapTrackerTests`.
 - **Pins.** `MapPins` collects the local player, every `RemotePlayer`, every live mob (hostile or neutral by its kind's
-  `attitude`, see "Entities" in `entities.md`) and every discovered waystone (`Inventory.Waystones`,
-  rebuilt when its `Version` moves); on a cave slice only the mobs in its height band (`MapPins.ShowsMobAt`). On the
-  minimap a far player or waystone is held to the rim (`MapLayout.ClampToRim`) and a far mob left out. `MapPinsTests`, `MapLayoutTests`.
+  `attitude`, see "Entities" in `entities.md`), every discovered waystone (`Inventory.Waystones`) and every battle tower
+  marked with a tower map (`Inventory.TowerMarks`, below), the last two rebuilt only when their list's `Version` moves;
+  on a cave slice only the mobs in its height band (`MapPins.ShowsMobAt`). On the minimap a far player, waystone or
+  tower is held to the rim (`MapLayout.ClampToRim`) and a far mob left out. `MapPinsTests`, `MapLayoutTests`.
+- **Tower maps.** `tower_map` (`use.action: "mark_tower"`, `TowerMapItem`, found in surface ruin chests:
+  `loot/ruin_surface.json`) is used like a scroll: a right-click marks the nearest battle tower the player has neither
+  marked nor conquered (`TowerMarking.TryMarkNearest`, the `/locate tower` search over `StructureLocator.TryFindTower`
+  within `TowerLocateRings`, its skip filter widened to the player's marks), so each map reveals the next tower out,
+  and spends one (creative none); with none left in range it is refused and kept. The marks are the player's
+  `TowerMarks` (tower centers in marking order), saved in `player.json` (`InventoryData.TowerMarks`) and carried in the
+  inventory snapshot (protocol 56). Only a world with the seed searches (`WorldItemUse.MarkTower`): singleplayer toasts
+  the distance or the refusal, a server marks for the sending player and resends its inventory, and a client predicts
+  the use and takes the server's snapshot (no toast there). A tower's fall (`TowerManager.BossDefeated`) takes its mark
+  off every player's map (`WorldItemUse.ForgetConqueredTower`: the local inventory and each connected `ServerPlayer`),
+  and a joining server player drops the marks of towers conquered while away (`TowerMarking.ForgetConquered`).
+  `TowerMarkingTests`, `TowerMapItemTests`; `visual-examples/tower-map.json` (`VOXEL_TIME=147`).
 The GL side is `MapRenderer` (built by `UIRenderer`, drawn from `UiPasses.RenderUI`: the minimap after the top strip,
 the map screen over the panels and under the pause menu) and its `MapRegionTextures`: one single-slice RGBA8 array
 texture per 8x8 chunk-column region of the current layer, filled from the tracker's tiles on first draw and patched per
 rescanned tile with `TexSubImage3D`; a layer or world change drops them. The round shape clips with the ui shader's
 `uClipCircle`. The icons are `assets/textures/ui/map/` (`pin_arrow.png` tinted per kind, `waystone.png`, and
-`tower.png`, not drawn yet). `visual-examples/minimap.json` (`VOXEL_TIME=147`).
+`tower.png`, a marked tower). `visual-examples/minimap.json` (`VOXEL_TIME=147`).
 
 Standing in water switches the player to **swimming** (`Camera.IsInWater`, recomputed every frame by `PlayerPhysics.UpdateWaterState` from the real fluid surface heights under the body): movement is a series of **burst strokes** rather than a steady paddle: a stroke (ready at once on entering the water, then every `SwimStrokeSeconds`) *sets* the horizontal speed to `SwimBurstSpeed` along the WASD direction (0.6x backing up), which then glides off under `SwimGlideDrag` until the next one; Space and Ctrl stroke straight up (`SwimBurstUp`) or down (`SwimBurstDown`), the vertical speed gliding toward the gentle `SinkSpeed` through `MathUtils.Damp`, and no input means no stroke (`Camera.SwimStrokeCount` moves on each, which is how the body starts its stroke animation on the same frame; see "Animation juice"; with the eye under water, not in lava, each one also lets out a burst of `SwimStrokeBubble*` bubbles just in front of the head through `BubbleParticleSystem.TrackSwimStrokes`, run by `AmbientEffects.UpdateBubbles` in singleplayer and on a client, never on a server). Swimming into a bank while holding Space adds `SwimExitBoost` so the player can climb out without a ramp. Flight ignores water entirely, and a player standing on the bottom of a shallow puddle still jumps normally. Flowing water also pushes the player and floating item drops along its flow direction (`ChunkManager.GetFluidFlowGlobal`, Minecraft's `FlowingFluid.getFlow`: a horizontal vector summed from how much lower each neighboring cell's surface sits, zero in a still pool). `Camera.IsEyeInWater` is the separate eye-only test and is the source of truth for the underwater tint.
 

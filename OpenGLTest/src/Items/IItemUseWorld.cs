@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Numerics;
-using VoxelEngine.Interaction;
 
 namespace VoxelEngine.Items;
 
@@ -154,6 +153,14 @@ public interface IItemUseWorld
     /// spent for nothing.
     /// </summary>
     bool SummonBoss(string entity, Vector3 cell);
+
+    /// <summary>
+    /// Marks on the map of the player the use runs for the nearest battle tower they have neither marked nor conquered
+    /// (a tower map). A world holding the seed searches and marks it; a client cannot search, so it predicts success and
+    /// the server's inventory snapshot brings the mark (or the map back). False when there is none, so the map is never
+    /// spent for nothing.
+    /// </summary>
+    bool MarkTower();
 }
 
 /// <summary>Inputs to <see cref="Item.OnUse"/> beyond the world itself: how far the aim reaches

@@ -76,6 +76,7 @@ public static class InventorySaveCodec
             Waystones = inventory.Waystones.Entries
                 .Select(e => new PlayerSaveData.DiscoveredWaystoneData { Cell = [e.X, e.Y, e.Z], Name = e.Name })
                 .ToList(),
+            TowerMarks = inventory.TowerMarks.Towers.Select(t => new[] { t.X, t.Z }).ToList(),
         };
         if (unnamed.Count > 0)
             Log.Warn($"Player save: left out content with no save name: {string.Join(", ", unnamed)}");
@@ -204,6 +205,7 @@ public static class InventorySaveCodec
             }
         inventory.ReplaceKnownParts(knownParts);
         inventory.Waystones.Replace(ImportWaystones(data.Waystones, dropped));
+        inventory.TowerMarks.Replace((data.TowerMarks ?? []).Where(t => t is { Length: 2 }).Select(t => (t[0], t[1])));
 
         ImportStore(data.Blocks, InventoryCategory.Blocks, inventory.Blocks, dropped);
         ImportStore(data.Misc, InventoryCategory.Misc, inventory.Misc, dropped);
