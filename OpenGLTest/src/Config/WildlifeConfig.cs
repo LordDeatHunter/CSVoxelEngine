@@ -105,7 +105,7 @@ public static class WildlifeConfig
     public const float DireBoarShoveSpeed = 0.6f;
     public const float DireBoarNoticeRangeBlocks = 20f;
     public const float DireBoarGoreReach = 2.4f;
-    public const int DireBoarGoreDamage = 24;
+    public const int DireBoarGoreDamage = 48;
     public const float DireBoarKnockbackSpeed = 13f;
     public const float DireBoarKnockbackLift = 6f;
 
