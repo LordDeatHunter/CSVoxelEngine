@@ -222,6 +222,20 @@ internal sealed class InventoryPanelRenderer
         _ui.DrawIdIcon(pointer, RowIcon * 1.4f, id, headingDegrees, timeSeconds);
     }
 
+    /// <summary>The sparkles <see cref="DragTrail"/> leaves behind a dragged row, drawn under the dragged icon.</summary>
+    internal void DrawDragTrail(DragTrail trail)
+    {
+        if (trail.Count == 0) return;
+        _ui.ClearDepthForOverlay();
+        for (var i = 0; i < trail.Count; i++)
+        {
+            var particle = trail.At(i);
+            var left = DragTrail.Remaining(particle);
+            var size = HudConfig.DragTrailSizePixels * (0.4f + 0.6f * left);
+            _ui.DrawSquare(particle.Position, size, new Rgba(255, 236, 160, (byte)(HudConfig.DragTrailAlpha * left)));
+        }
+    }
+
     /// <summary>Panel tab under a window-pixel point, if any.</summary>
     internal InventoryCategory? PanelTabAt(Vector2 point)
     {

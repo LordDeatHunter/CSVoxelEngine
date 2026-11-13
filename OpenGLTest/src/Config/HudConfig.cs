@@ -66,6 +66,17 @@ public static class HudConfig
     public const float PickupFlyArcPixels = 60f;
     public const float PickupFlyEndScale = 0.6f;
 
+    // The sparkle trail behind an item dragged across the [E] panel (DragTrail): particles per canvas pixel the
+    // pointer travels, their lifetime, square size, scatter around the pointer and drift (canvas pixels per second).
+    public const int DragTrailMax = 48;
+    public const float DragTrailSpawnPerPixel = 0.25f;
+    public const float DragTrailLifeSeconds = 0.45f;
+    public const float DragTrailSizePixels = 6f;
+    public const float DragTrailSpreadPixels = 14f;
+    public const float DragTrailDriftPixelsPerSecond = 30f;
+    public const float DragTrailFallPixelsPerSecond = 24f;
+    public const byte DragTrailAlpha = 200;
+
     // The player's active status effects (HudRenderer.DrawEffects): one icon per effect, this many
     // canvas pixels square, in a row beside the hearts with this gap between icons and before them.
     public const float EffectIconSize = 28f;

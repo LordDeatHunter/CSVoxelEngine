@@ -150,7 +150,10 @@ internal sealed class UiPasses
             }
         }
         // A row dragged toward a slot rides the pointer over the panel, the chest card and the hotbar
-        if (view.IsOpen && view.Drag is { Lifted: true } drag && view.HoverCanvas is { } pointer)
+        var liftedPointer = view.IsOpen && view.Drag is { Lifted: true } ? view.HoverCanvas : null;
+        view.Trail.Advance(time, liftedPointer);
+        _owner.Ui.Panel.DrawDragTrail(view.Trail);
+        if (view.Drag is { Lifted: true } drag && liftedPointer is { } pointer)
             _owner.Ui.Panel.DrawDraggedRow(drag.Id, pointer, heading, time);
         if (builder != null)
         {

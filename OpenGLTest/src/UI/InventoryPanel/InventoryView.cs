@@ -104,6 +104,9 @@ public sealed class InventoryView
     /// <summary>A left press on a listed row that may lift into a drag onto a slot; null while none.</summary>
     public RowDrag? Drag { get; set; }
 
+    /// <summary>The sparkles behind a lifted <see cref="Drag"/>; they outlive it by their lifetime.</summary>
+    public DragTrail Trail { get; } = new();
+
     /// <summary>The pointer in canvas units, set once a frame before the panel draws; null when there is none.
     /// Read only for hover looks, never for hit-testing a click.</summary>
     public System.Numerics.Vector2? HoverCanvas { get; set; }

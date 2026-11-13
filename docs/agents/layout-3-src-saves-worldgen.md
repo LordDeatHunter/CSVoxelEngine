@@ -282,6 +282,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   the selected hotbar slot), a drop onto a hotbar or equipment slot, and whether a row is
                                #   on the hotbar or worn; returns the intent that mirrors a change
         RowDrag.cs             # a pressed [E] row or hotbar slot that lifts into a drag once the pointer leaves the press
+        DragTrail.cs           # the sparkle trail behind a lifted drag: spawns along the pointer's path, ages out after the drop
         EquippedMark.cs        # how a listed row shows it is equipped: the hotbar key chip, "worn", the green bar
         StaffComponent.cs      # a staff's bound spells (part keys per slot) and selected slot, immutable
         PanelTransition.cs     # the [E] panel's open/close easing: eased alpha and slide from a self-clocked progress
