@@ -1,0 +1,23 @@
+{
+  // The jungle: run with VOXEL_SCRIPT=visual-examples/jungle.json VOXEL_TIME=147 from OpenGLTest/. Shots land in visual/jungle/.
+  // The first jungle with room around it for the default seed sits near (432, 816): an aerial shot of the canopy and
+  // the forest border, the floor under the trees with mud, then a corpse bloom and a giant centipede spawned ahead.
+  "steps": [
+    { "op": "teleport", "pos": [432.5, 60.5, 700.5], "yaw": 90, "pitch": -30 },
+    { "op": "creative" },
+    { "op": "fly" },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "aerial", "hideHud": true },
+    { "op": "teleport", "pos": [432.5, 30.5, 800.5], "yaw": 90, "pitch": -20 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "canopy", "hideHud": true },
+    { "op": "teleport", "pos": [432.5, 14.5, 816.5], "yaw": 90, "pitch": -8 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "floor", "hideHud": true },
+    { "op": "spawn", "entity": "corpse_bloom", "pos": [437.5, 816.5] },
+    { "op": "spawn", "entity": "centipede", "pos": [441.5, 818.5] },
+    { "op": "look", "yaw": 0, "pitch": -8 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "mobs", "hideHud": true }
+  ]
+}

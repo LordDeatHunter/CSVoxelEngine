@@ -52,6 +52,7 @@ a tall bare trunk and a broad crown, own `jungle_log`/`jungle_leaves`/`jungle_st
 haunt widens to the whole jungle (`WildlifeSpawnRule.AnywhereBiomes`). The grass and foliage tint already read the climate's warm,
 wet corner, so the jungle needed no palette row of its own. Its animals are the corpse bloom and the giant centipede (jungle-only wildlife species, see "Corpse Bloom" and "Giant
 Centipede" in `entities.md`) beside the dragonfly; the centipede's physical body is `P-63`.
+Framed in `visual-examples/jungle.json` (canopy, mud floor, a bloom and a centipede; the first roomy jungle of the default seed is near (432, 816)).
 
 Temperature is a **three-band axis**: the cold ramp (`TemperatureColdStart/End`, read by
 `ColdWeight`: snow, ice, and taiga/frozen at `ColdBiomeMinCold`), a temperate band, and the warm
