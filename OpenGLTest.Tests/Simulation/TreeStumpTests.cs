@@ -9,9 +9,8 @@ using Xunit;
 namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
-/// Rules of what a felled trunk leaves (<see cref="TreeStump.TryFind"/>): a cut above the root
-/// of a wood that names a stump finds the root, with every trunk cell between it and the cut
-/// folded into the fell; the root itself, a limb and a limb leaves nothing.
+/// Rules of what a felled trunk leaves (<see cref="TreeStump.TryFind"/>): breaking the root of a wood that names a stump
+/// leaves it; a cut higher up on the trunk and a limb leave nothing.
 /// Every worldgen species is grown on a flat virtual space and stamped into a headless
 /// <see cref="VoxelEngine.Chunks.ChunkManager"/> like the felling tests.
 /// </summary>
@@ -22,15 +21,25 @@ public sealed class TreeStumpTests
 
     public TreeStumpTests() => TestContent.EnsureLoaded();
 
-    private static bool Find(StampedTree tree, int node, out Vector3 root, out List<(Vector3 Cell, ushort Id, byte State)> between)
+    private static bool Find(StampedTree tree, int node)
     {
         var cell = tree.CellOf(node);
         var (id, state) = tree.Read(((int)cell.X, (int)cell.Y, (int)cell.Z));
-        return TreeStump.TryFind(tree.Chunks, cell, id, state, out root, out _, out between);
+        return TreeStump.TryFind(id, state, out _);
     }
 
     [Fact]
-    public void ACutAboveTheRootLeavesTheRootAndFoldsTheTrunkBetween()
+    public void BreakingTheRootLeavesAStump()
+    {
+        foreach (var species in StampedTree.WorldgenSpecies.Where(s => BlockType.ById[s.WoodId]!.StumpId != 0))
+        {
+            var tree = StampedTree.Stamp(species, Seed, RootX, RootY, RootZ);
+            Assert.True(Find(tree, TreeGraph.Root), species.Name);
+        }
+    }
+
+    [Fact]
+    public void ACutHigherOnTheTrunkLeavesNoStump()
     {
         var checkedAny = false;
         foreach (var species in StampedTree.WorldgenSpecies.Where(s => BlockType.ById[s.WoodId]!.StumpId != 0))
@@ -38,28 +47,14 @@ public sealed class TreeStumpTests
             var tree = StampedTree.Stamp(species, Seed, RootX, RootY, RootZ);
             var trunk = new List<int>();
             TreeRasterizer.TrunkChain(tree.Graph, trunk);
-            if (trunk.Count < 3) continue;
-            checkedAny = true;
-
             for (var i = 1; i < trunk.Count; i++)
             {
-                Assert.True(Find(tree, trunk[i], out var root, out var between), $"{species.Name}: cut at trunk cell {i}");
-                Assert.Equal(tree.CellOf(TreeGraph.Root), root);
-                Assert.Equal(i - 1, between.Count);
+                checkedAny = true;
+                Assert.False(Find(tree, trunk[i]), $"{species.Name}: cut at trunk cell {i}");
             }
         }
 
-        Assert.True(checkedAny, "no stump-leaving species grew a trunk of three cells");
-    }
-
-    [Fact]
-    public void CuttingTheRootLeavesNoStump()
-    {
-        foreach (var species in StampedTree.WorldgenSpecies.Where(s => BlockType.ById[s.WoodId]!.StumpId != 0))
-        {
-            var tree = StampedTree.Stamp(species, Seed, RootX, RootY, RootZ);
-            Assert.False(Find(tree, TreeGraph.Root, out _, out _), species.Name);
-        }
+        Assert.True(checkedAny, "no stump-leaving species grew a trunk");
     }
 
     [Fact]
@@ -72,11 +67,7 @@ public sealed class TreeStumpTests
             var limb = StampedTree.PickLimb(tree.Graph);
             if (limb < 0) continue;
             checkedAny = true;
-
-            var trunk = new List<int>();
-            TreeRasterizer.TrunkChain(tree.Graph, trunk);
-            if (trunk.Contains(limb)) continue;
-            Assert.False(Find(tree, limb, out _, out _), species.Name);
+            Assert.False(Find(tree, limb), species.Name);
         }
 
         Assert.True(checkedAny, "no species grew a limb");

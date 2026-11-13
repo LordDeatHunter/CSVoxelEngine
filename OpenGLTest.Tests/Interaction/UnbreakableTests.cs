@@ -230,7 +230,9 @@ public sealed class UnbreakableTests
 
         Assert.True(world.Break(x, y, z));
 
-        for (var dy = 0; dy <= 3; dy++)
+        // The root stays as the stump, everything it held up falls
+        Assert.True(BlockType.ById[world.IdAt(x, y, z)]!.IsStump);
+        for (var dy = 1; dy <= 3; dy++)
             Assert.Equal(BlockType.Air, world.IdAt(x, y + dy, z));
         Assert.Equal(BlockType.Air, world.IdAt(x + 1, y + 3, z));
         Assert.Equal(Brick, world.IdAt(x + 1, y + 2, z));

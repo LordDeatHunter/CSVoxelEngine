@@ -90,7 +90,8 @@ internal sealed class BlockEditor
             || BlockType.IsUnbreakable(id))
             return false;
         RemoveBlock(cell, player);
-        return _chunkManager.TryGetCell(x, y, z, out var after, out _) && after == 0;
+        // A broken trunk root stays behind as its stump, so the cell need not end as air, only as something else
+        return _chunkManager.TryGetCell(x, y, z, out var after, out _) && after != id;
     }
 
     /// <summary>
@@ -296,6 +297,25 @@ internal sealed class BlockEditor
         }
 
         var collected = TopplingTree.Collect(_chunkManager, blockPos, brokenId, brokenState);
+        var leavesStump = TreeStump.TryFind(brokenId, brokenState, out var stumpId);
+        if (collected.Count < 2 && leavesStump)
+        {
+            // A trunk with nothing above its root: the root itself becomes the stump
+            var lone = new HashSet<Vector3>();
+            var loneLowest = new Dictionary<(int X, int Z), int>();
+            var loneMin = blockPos;
+            var loneMax = blockPos;
+            LeaveStump(blockPos, stumpId, lone, loneLowest, ref loneMin, ref loneMax);
+            foreach (var chunkPos in lone)
+            {
+                if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var touched)) continue;
+                touched.RemeshAfterBatchEdit(_chunkManager);
+                _chunkManager.ImmediateRemesh(chunkPos);
+            }
+            _fluidManager.ScheduleAround(blockPos);
+            _leafDecay.ScheduleAround(blockPos);
+            return;
+        }
         if (collected.Count < 2)
         {
             // Nothing was held up by this block: drop it as-is through the normal
@@ -306,6 +326,9 @@ internal sealed class BlockEditor
             _leafDecay.ScheduleAround(blockPos);
             return;
         }
+
+        // The root stays behind as the stump, so it does not fall with the tree
+        if (leavesStump) collected.RemoveAll(block => block.Cell == blockPos);
 
         var touchedChunks = new HashSet<Vector3>();
         var lowestY = new Dictionary<(int X, int Z), int>();
@@ -330,7 +353,7 @@ internal sealed class BlockEditor
                 lowestY[key] = (int)block.Cell.Y;
         }
 
-        LeaveStump(blockPos, brokenId, brokenState, creative, touchedChunks, lowestY, player, ref min, ref max);
+        if (leavesStump) LeaveStump(blockPos, stumpId, touchedChunks, lowestY, ref min, ref max);
 
         // One box for the whole fell, never one per cell (a 500-cell fell times a reach box
         // would be hundreds of thousands of adds): the leaves left standing beyond the
@@ -385,7 +408,7 @@ internal sealed class BlockEditor
             blockPos.X + 0.5f - feller.X, 0f,
             blockPos.Z + 0.5f - feller.Z);
         _toppling.Add(new TopplingTree(collected,
-            new Vector3(blockPos.X + 0.5f, blockPos.Y, blockPos.Z + 0.5f), away, drops: !creative,
+            new Vector3(blockPos.X + 0.5f, blockPos.Y + (leavesStump ? 1 : 0), blockPos.Z + 0.5f), away, drops: !creative,
             // The felled cells are already gone; an unloaded cell reads as ground so nothing falls into it
             isSolid: (x, y, z) => !_chunkManager.TryGetCell(x, y, z, out var id, out _) || BlockType.IsSolid(id)));
 
@@ -396,28 +419,13 @@ internal sealed class BlockEditor
     }
 
     /// <summary>
-    /// A trunk cut above its root leaves the root as the wood's stump block (<see cref="TreeStump"/>): the cells between
-    /// the root and the cut go with the fell (each drops its own loot unless <paramref name="creative"/>) and the root cell is
-    /// overwritten in place. Joins the batch <see cref="FellWood"/> is already running: the chunks it touches go into
+    /// Breaking a trunk's root leaves the root cell as the wood's stump block (<see cref="TreeStump"/>), overwritten in place.
+    /// Joins the batch <see cref="FellWood"/> is already running: the chunk it touches goes into
     /// <paramref name="touchedChunks"/> to be remeshed, its column into <paramref name="lowestY"/> for the far LOD.
     /// </summary>
-    private void LeaveStump(Vector3 cut, ushort cutId, byte cutState, bool creative, HashSet<Vector3> touchedChunks,
-        Dictionary<(int X, int Z), int> lowestY, PlayerContext player, ref Vector3 min, ref Vector3 max)
+    private void LeaveStump(Vector3 root, ushort stumpId, HashSet<Vector3> touchedChunks,
+        Dictionary<(int X, int Z), int> lowestY, ref Vector3 min, ref Vector3 max)
     {
-        if (!TreeStump.TryFind(_chunkManager, cut, cutId, cutState, out var root, out var stumpId, out var between)) return;
-
-        foreach (var (cell, id, state) in between)
-        {
-            var chunkPos = VoxelCoords.ChunkPosOf(cell);
-            if (!_chunkManager.Chunks.TryGetValue(chunkPos, out var target) || target.ClearBlockAt(cell) == 0) continue;
-            _chunkManager.UnmarkPlayerPlaced((int)cell.X, (int)cell.Y, (int)cell.Z);
-            _chunkManager.ChopDamage.Clear((int)cell.X, (int)cell.Y, (int)cell.Z);
-            touchedChunks.Add(chunkPos);
-            _fluidManager.ScheduleAround(cell);
-            if (!creative) _dropManager.SpawnLoot(id, cell, state: state);
-            PopUnsupportedAround(cell, player);
-        }
-
         var rootChunk = VoxelCoords.ChunkPosOf(root);
         if (!_chunkManager.Chunks.TryGetValue(rootChunk, out var holder) || holder.ReplaceBlockAt(root, stumpId) == 0) return;
         _chunkManager.UnmarkPlayerPlaced((int)root.X, (int)root.Y, (int)root.Z);

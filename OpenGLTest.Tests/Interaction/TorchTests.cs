@@ -344,8 +344,8 @@ public sealed class TorchTests : IDisposable
         Assert.True(_world.Break(x, ground + 2, z));
         Assert.Equal(BlockType.Air, _world.IdAt(x, ground + 3, z));
         Assert.Equal(BlockType.Air, _world.IdAt(x + 1, ground + 3, z));
-        // The root stands as a stump, and its torch with it (the stump is still solid)
-        Assert.True(BlockType.ById[_world.IdAt(x, ground + 1, z)]!.IsStump);
+        // The root stands on as a log, and its torch with it
+        Assert.Equal(log, _world.IdAt(x, ground + 1, z));
         Assert.Equal(wallTorch, _world.IdAt(x + 1, ground + 1, z));
     }
 
