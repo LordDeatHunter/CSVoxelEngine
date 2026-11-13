@@ -422,7 +422,7 @@ internal sealed class HudRenderer : IDisposable
     /// border for a Common item.
     /// </summary>
     internal void DrawTooltip(Vector2 anchor, IReadOnlyList<string> lines, IReadOnlyDictionary<int, Rgba> colors,
-        Rarity rarity, float time, float? fuelFraction = null)
+        Rarity rarity, float time, float? barFraction = null)
     {
         if (_ui.Font == null || lines.Count == 0) return;
 
@@ -440,7 +440,7 @@ internal sealed class HudRenderer : IDisposable
         }
 
         var lineHeight = TextSize.Body + 6f;
-        var layout = TooltipLayout.Compute(wrapped, anchor, _ui.ScreenSize, TooltipMaxTextWidth, TooltipMaxLines, lineHeight, Measure, fuelFraction.HasValue ? lineHeight : 0f);
+        var layout = TooltipLayout.Compute(wrapped, anchor, _ui.ScreenSize, TooltipMaxTextWidth, TooltipMaxLines, lineHeight, Measure, barFraction.HasValue ? lineHeight : 0f);
         _ui.DrawRect(layout.Box.Center, layout.Box.Size, PanelBackground);
         // The chrome's border band stands in for the plain border
         var style = RarityStyle.Of(rarity);
@@ -450,7 +450,7 @@ internal sealed class HudRenderer : IDisposable
             _ui.DrawBorder(layout.Box.Center, layout.Box.Size, Border.Standard, SlotBorderColor);
 
         var pad = UiTheme.Space.Md;
-        if (fuelFraction is { } fuel)
+        if (barFraction is { } fuel)
         {
             var width = layout.Box.Size.X - pad * 2f;
             var y = layout.Box.Bottom - pad - 4f;

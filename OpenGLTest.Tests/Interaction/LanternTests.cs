@@ -158,7 +158,7 @@ public sealed class LanternTests : IDisposable
         {
             view.ShowLantern(default, instance, fuel);
             Assert.Same(fuel, view.LanternFuel);
-            Assert.Equal(VoxelEngine.UI.Hud.ItemTooltip.Hover(Vector2.Zero, Lantern, stack, null).FuelFraction,
+            Assert.Equal(VoxelEngine.UI.Hud.ItemTooltip.Hover(Vector2.Zero, Lantern, stack, null).BarFraction,
                 view.LanternFuel!.Fraction);
         }
         Fuel(stack, Coal, 1);

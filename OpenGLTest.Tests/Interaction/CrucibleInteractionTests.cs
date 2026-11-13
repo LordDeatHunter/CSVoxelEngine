@@ -166,4 +166,15 @@ public sealed class CrucibleInteractionTests : IDisposable
         Assert.True(state!.FilledMl > 0);
         Assert.True(stack.Get<CrucibleComponent>().MoltenMl < 800);
     }
+
+    [Fact]
+    public void ACrucibleTooltipBarShowsHowFullTheVesselIs()
+    {
+        var crucible = ContentRegistry.RequireItem("crucible");
+        var stack = new ItemStack(1, crucible.Id);
+        Assert.Equal(0f, VoxelEngine.UI.Hud.ItemTooltip.Hover(Vector2.Zero, crucible.Id, stack, null).BarFraction);
+
+        stack.Set(new CrucibleComponent(Copper, crucible.CrucibleCapacityMl / 4, 0));
+        Assert.Equal(0.25f, VoxelEngine.UI.Hud.ItemTooltip.Hover(Vector2.Zero, crucible.Id, stack, null).BarFraction!.Value, 2);
+    }
 }

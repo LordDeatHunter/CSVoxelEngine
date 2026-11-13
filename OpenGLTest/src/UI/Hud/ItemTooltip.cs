@@ -30,7 +30,16 @@ public static class ItemTooltip
     /// the rarity (<see cref="Rarities.Of"/>) that dresses the box.</summary>
     public static HoverTooltip Hover(Vector2 anchor, ushort id, ItemStack? stack, Equipment? worn) =>
         new(anchor, Lines(id, stack, worn, out var colors), colors, Rarities.Of(id, stack),
-            LanternState.IsLantern(id) ? LanternState.Of(stack)?.Fraction ?? 0f : null);
+            BarFraction(id, stack));
+
+    // A lantern's fuel left, or how full a crucible is; null for an item with no bar
+    private static float? BarFraction(ushort id, ItemStack? stack)
+    {
+        if (LanternState.IsLantern(id)) return LanternState.Of(stack)?.Fraction ?? 0f;
+        if (ItemRegistry.TryGet(id) is not { CrucibleCapacityMl: > 0 } vessel) return null;
+        var contents = stack?.Get<CrucibleComponent>() ?? default;
+        return MathUtils.Clamp01(contents.TotalMl / (float)vessel.CrucibleCapacityMl);
+    }
 
     /// <summary>
     /// The lines for an id, and the colors of the lines that are not plain: <paramref name="colors"/> maps a line index
