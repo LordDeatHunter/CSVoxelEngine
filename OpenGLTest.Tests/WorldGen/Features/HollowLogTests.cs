@@ -9,6 +9,7 @@ using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Stumps;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Trees;
@@ -19,8 +20,8 @@ namespace VoxelEngine.Tests.WorldGen.Features;
 /// <summary>
 /// The hollow fallen logs as content, checked against the data that names them: every biome whose
 /// tree species declares a fallen log lays a hollow block that mines in half the time of that
-/// species' placed log under the same tool gate, wears its bark outside, drops and is picked as the
-/// plain log, never enters the inventory, and is a shell whose hole runs open along the facing's
+/// species' placed log under the same tool gate, wears its bark outside, drops and is picked as itself,
+/// stands on a stump and splits there in half the blows into half the lumber, and is a shell whose hole runs open along the facing's
 /// axis while its walls hold a body up.
 /// </summary>
 public sealed class HollowLogTests
@@ -120,7 +121,7 @@ public sealed class HollowLogTests
     }
 
     [Fact]
-    public void MiningAHollowLogDropsItsPlainLog()
+    public void MiningAHollowLogDropsTheHollowLog()
     {
         foreach (var (hollow, species) in Pairs())
         {
@@ -128,18 +129,36 @@ public sealed class HollowLogTests
             {
                 var drops = new List<ushort>();
                 DropManager.RollLoot(hollow, new LootContext(0, 0, 0, State: facing), drops);
-                Assert.Equal([species.WoodId], drops);
+                Assert.Equal([hollow], drops);
             }
         }
     }
 
     [Fact]
-    public void AHollowLogIsWorldgenOnlyAndPickedAsItsLog()
+    public void AHollowLogIsAnItemPickedAsItself()
+    {
+        foreach (var (hollow, _) in Pairs())
+        {
+            Assert.True(BlockType.ById[hollow]!.HasItem);
+            Assert.Equal(hollow, BlockType.PickId(hollow));
+        }
+    }
+
+    [Fact]
+    public void AHollowLogStandsOnAStumpAndSplitsInHalfTheBlowsIntoHalfTheLumber()
     {
         foreach (var (hollow, species) in Pairs())
         {
-            Assert.False(BlockType.ById[hollow]!.HasItem);
-            Assert.Equal(species.WoodId, BlockType.PickId(hollow));
+            Assert.True(StumpManager.IsLog(hollow));
+            var hollowType = BlockType.ById[hollow]!;
+            var logType = BlockType.ById[species.WoodId]!;
+            Assert.Equal(logType.SplitHits / 2, hollowType.SplitHits);
+
+            var whole = new List<ushort>();
+            var half = new List<ushort>();
+            logType.SplitLoot!.Roll(new LootContext(0, 0, 0), whole);
+            hollowType.SplitLoot!.Roll(new LootContext(0, 0, 0), half);
+            Assert.Equal(whole.Count / 2, half.Count);
         }
     }
 

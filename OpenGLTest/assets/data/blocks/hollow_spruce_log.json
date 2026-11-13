@@ -15,10 +15,8 @@
   "requiresTool": true,
   "tools": { "axe": 1 },
   "sfx": "hit_wood",
-  // Worldgen only: it drops the plain log (loot/hollow_spruce_log.json)
-  "hasItem": false,
-  // A middle-click picks the plain log
-  "pickAs": "block/spruce_log",
+  // It drops itself, can be stood on a stump like a log and splits there into half the lumber in half the blows
+  "stumpLog": { "split": "hollow_log_split", "hits": 2 },
   // A partial block must not darken the floor around it the way a full cube would
   "castsAO": false,
   "collidesByHitbox": true,

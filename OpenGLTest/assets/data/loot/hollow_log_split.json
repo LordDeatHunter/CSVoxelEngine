@@ -1,0 +1,11 @@
+{
+  // What an axe splits a hollow log into on a stump: half of a whole log's lumber
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/lumber", "count": 8 }
+      ]
+    }
+  ]
+}

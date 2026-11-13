@@ -265,10 +265,10 @@ the gated `StampGround`) is never gated, since its leaves may come from neighbor
   wall `hitbox`es with `collidesByHitbox` leave the hole open to the raycast and the player body
   (only the player: mobs, drops and projectiles see a full cell). Its `hardness` is half the
   species log's full-cube one with the same axe gate, so it mines in half the time; it is
-  worldgen-only (`hasItem: false`), drops the plain log (its own loot table) and is picked as it
-  (`pickAs`). The far LOD draws none. Known gap: snow does not settle on a taiga log, since the log
+  an item of its own that drops itself, and `stumpLog` lets it stand upright on a tree stump and split there in half the
+  blows (2) into half the lumber (`loot/hollow_log_split.json`) of a whole log. The far LOD draws none. Known gap: snow does not settle on a taiga log, since the log
   takes the cell the snow pass would cover. `HollowLogTests` (half hardness and the same gate, the
-  bark outside, the plain-log drop, the pick, the open shell that can be stood on, the stamped
+  bark outside, the self drop, the pick, the stump split at half the blows and lumber, the open shell that can be stood on, the stamped
   facings) and `SceneryTests` (a whole stamped log in every biome that has one, turned along its
   axis); `visual-examples/hollow-logs.json` (`VOXEL_TIME=147`) frames one in each biome.
 - **Boulders** (`BoulderGenerator`): a rare 2-4 cell blob of stone or cobblestone on the forest,
