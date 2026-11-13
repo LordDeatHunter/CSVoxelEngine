@@ -237,7 +237,7 @@ mirrored (`KilnManager.ProfileOf`; never saved or sent, so the state, `stations.
 `StationNetCodec` are shared by every kiln size). Right-clicking it with an item declaring
 `fuel.burnSeconds` stores a unit, up to the profile's `FuelCap` of **one** kind; a firestarter only lights a kiln that has fuel
 (`CanIgnite`), and igniting spends the first unit at once, so four coal burn for four minutes and
-then go out. A crucible (crafted from mud bricks) right-clicked in stands in the hearth, and
+then go out (lumber, 8 of which craft one oak plank via `oak_planks_from_lumber`, burns 15 s a unit). A crucible (crafted from mud bricks) right-clicked in stands in the hearth, and
 anything with a melt recipe right-clicked after that
 charges the vessel with **pending** metal — gated by `KilnManager.CanAccept`, which needs room
 (every metal, molten and pending, counted together) and a metal that may join the vessel

@@ -1,0 +1,7 @@
+{
+  "result": "block/oak_planks",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/lumber", "count": 8 }
+  ]
+}

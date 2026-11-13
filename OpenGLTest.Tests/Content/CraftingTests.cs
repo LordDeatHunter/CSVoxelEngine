@@ -72,6 +72,24 @@ public sealed class CraftingTests
     }
 
     [Fact]
+    public void LumberCraftsIntoPlanksOnlyWithAFullBundle()
+    {
+        var inventory = new Inventory();
+        var lumber = ContentRegistry.RequireItem("lumber").Id;
+        var planks = ContentRegistry.RequireBlock("oak_planks").Id;
+        var recipe = ContentRegistry.RecipeByName("oak_planks_from_lumber")!;
+
+        var before = inventory.CountFor(planks);
+        Assert.True(inventory.Add(lumber, 7));
+        Assert.False(inventory.TryCraft(recipe));
+
+        Assert.True(inventory.Add(lumber));
+        Assert.True(inventory.TryCraft(recipe));
+        Assert.Equal(0, inventory.CountFor(lumber));
+        Assert.Equal(before + recipe.ResultCount, inventory.CountFor(planks));
+    }
+
+    [Fact]
     public void TryCraftStillFitsWhenThePoolIsFull()
     {
         var inventory = new Inventory();

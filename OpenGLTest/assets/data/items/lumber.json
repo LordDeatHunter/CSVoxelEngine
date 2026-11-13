@@ -1,0 +1,6 @@
+{
+  "name": "Lumber",
+  "texture": "assets/textures/items/lumber.png",
+  // Four boards burn as long as one lump of coal (KilnManager and the bloomery burn them one at a time)
+  "fuel": { "burnSeconds": 15 }
+}

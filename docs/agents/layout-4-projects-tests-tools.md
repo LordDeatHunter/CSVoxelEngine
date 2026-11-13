@@ -241,6 +241,7 @@ tools/                                # asset generators: models, animation clip
                                       #   stinger); --check
   generate-wildlife-item-sprites.py   # deterministic placeholder sprites of the wild animals' drops (meats raw and cooked,
                                       #   hide, feather, tusks, dragonfly wing); --check
+  generate-lumber-sprite.py           # deterministic placeholder sprite of the lumber item (a stack of boards); --check
   generate-wiki-shots.mjs             # the wiki's screenshot scenarios (visual-examples/wiki-*.json) and wiki/data/screenshots.json from one spec of poses and captions
   scroll-sprite.py                    # utility: lays one sprite out as a scrolling animation sheet (frames wrapped toward a direction,
                                       #   N px/frame, vertical/horizontal/square), PNG in and out, stdlib only

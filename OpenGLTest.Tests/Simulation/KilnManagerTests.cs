@@ -77,6 +77,18 @@ public sealed class KilnManagerTests
     }
 
     [Fact]
+    public void LumberBurnsAsKilnFuelLikeCoal()
+    {
+        var lumber = ContentRegistry.RequireItem("lumber");
+        Assert.True(lumber.FuelSeconds > 0);
+
+        var anchor = new Vector3(2, 2, 2);
+        var (_, kilns, _) = ConvertedKiln(anchor);
+        Assert.True(kilns.TryAddFuel(anchor, lumber));
+        Assert.Equal(lumber.Id, kilns.StateAt(2, 2, 2)!.FuelItemId);
+    }
+
+    [Fact]
     public void FuelCapsAtTheProfileAndRefusesNonFuel()
     {
         Assert.Equal(60f, Coal.FuelSeconds);
