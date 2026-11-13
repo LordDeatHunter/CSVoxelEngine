@@ -1,0 +1,35 @@
+{
+  // The rainforest giant: the oak's growth with a tall bare trunk and a broad blob crown. Reach
+  // (signalEnergy 18 plus the leaf radius 3) stays under the palm's, so it raises neither
+  // TreeGenerator.ReachChunkRadius nor the proxy canopy reach. Placeholder art (USER_TODO.md).
+  "wood": "block/jungle_log",
+  "leaves": "block/jungle_leaves",
+  "growth": {
+    "logic": "oak",
+    "signalEnergy": 18,
+    "upProbability": 3,
+    "lowestBranchHeight": 9,
+    "maturitySteps": [70, 100]
+  },
+  "thickness": {
+    "tipPx": 1,
+    "pipeExponent": 1.5,
+    "maxPx": 20,
+    "girthProfile": [[0, 2.6], [0.4, 1.6], [1, 1.0]],
+    "trunkShape": "circle",
+    "rim": "block"
+  },
+  "leafCluster": { "shape": "blob", "radius": 3, "hydration": 5, "tipMaxPx": 3, "minRadius": 1, "fullRadiusPx": 16 },
+  "features": [ { "type": "roots", "depth": 4 } ],
+  "lod": { "crownHeight": [16, 20], "crownRadius": 7, "profile": "dome" },
+  "worldgen": {
+    "biomes": ["jungle"],
+    "density": 0.035,
+    "spacing": 3,
+    "maxSlope": 3,
+    "minSoil": 2,
+    "minGround": 1,
+    "maxGround": 90,
+    "openness": 0
+  }
+}

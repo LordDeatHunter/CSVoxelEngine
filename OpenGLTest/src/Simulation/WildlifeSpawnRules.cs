@@ -7,14 +7,17 @@ namespace VoxelEngine.Simulation;
 /// <summary>
 /// Where one species of wild animal lives: the surface biomes it spawns in, how likely it is among the
 /// species sharing a column (a relative weight), and whether it keeps to the
-/// waterside (<see cref="NearWater"/>).
+/// waterside (<see cref="NearWater"/>, except in the <see cref="AnywhereBiomes"/> where its haunt is the whole biome,
+/// such as the jungle's damp air).
 /// </summary>
 public readonly record struct WildlifeSpawnRule(WildlifeKind Kind, float Weight, Biome[] Biomes,
-    bool NearWater = false)
+    bool NearWater = false, Biome[]? AnywhereBiomes = null)
 {
     /// <summary>Whether the species spawns on a column of <paramref name="biome"/> that has surface water
     /// nearby or not (<paramref name="nearWater"/>).</summary>
-    public bool LivesIn(Biome biome, bool nearWater) => (nearWater || !NearWater) && Array.IndexOf(Biomes, biome) >= 0;
+    public bool LivesIn(Biome biome, bool nearWater) =>
+        Array.IndexOf(Biomes, biome) >= 0
+        && (nearWater || !NearWater || (AnywhereBiomes != null && Array.IndexOf(AnywhereBiomes, biome) >= 0));
 }
 
 /// <summary>
@@ -35,7 +38,8 @@ public static class WildlifeSpawnRules
         new(WildlifeKind.Crow, WildlifeConfig.CrowSpawnWeight,
             [Biome.Forest, Biome.Desert, Biome.Taiga, Biome.Frozen, Biome.Steppe, Biome.Savanna]),
         new(WildlifeKind.Dragonfly, WildlifeConfig.DragonflySpawnWeight,
-            [Biome.Forest, Biome.Taiga, Biome.Steppe, Biome.Savanna], NearWater: true),
+            [Biome.Forest, Biome.Taiga, Biome.Steppe, Biome.Savanna, Biome.Jungle], NearWater: true,
+            AnywhereBiomes: [Biome.Jungle]),
     ];
 
     /// <summary>

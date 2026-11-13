@@ -51,7 +51,7 @@ public sealed class BiomeClimateTests
 
                 var biome = TerrainGenerator.BiomeWeights(x, z, out var ocean, out _);
                 Assert.Equal(BiomeClassifier.Classify(ocean, cold, warm,
-                    BiomeClassifier.DryOf(h), BiomeClassifier.SemiDryOf(h)), biome);
+                    BiomeClassifier.DryOf(h), BiomeClassifier.SemiDryOf(h), BiomeClassifier.JungleOf(t, h)), biome);
                 Assert.Equal(biome, TerrainGenerator.BiomeAt(x, z));
 
                 sawCold |= cold > 0f;

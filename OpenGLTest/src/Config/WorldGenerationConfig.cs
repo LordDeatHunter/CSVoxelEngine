@@ -297,6 +297,8 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // BiomeClassifier.BiomeWeights), which flattens steppe, savanna and tundra into plains while the
     // border stays a slope.
     public const float DryHillReduction = 0.6f;
+    // Share of the hills the jungle (scaled by the smooth jungle weight) loses: a rolling lowland.
+    public const float JungleHillReduction = 0.55f;
 
     // One shared domain-warp displacement of the temperature and humidity sample position
     // (TerrainNoise.ClimateWarp, read only by BiomeClassifier.SampleClimate), so biome borders, and

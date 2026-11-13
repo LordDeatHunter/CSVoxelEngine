@@ -261,9 +261,13 @@ public static class TerrainGenerator
         // plains (steppe, savanna, tundra), dunes lift the desert share of the land, then the
         // ocean ramp empties the basins. All are weighted 0..1, so a border lerps between the
         // profiles and comes out as a slope, never a cliff.
-        biome = BiomeClassifier.BiomeWeights(worldX, worldZ, out oceanWeight, out desertWeight, out var aridWeight);
+        biome = BiomeClassifier.BiomeWeights(worldX, worldZ, out oceanWeight, out desertWeight, out var aridWeight,
+            out var jungleWeight);
         var hillScale = 1f - WorldGenerationConfig.OpennessHillReduction * openness;
         hillScale *= 1f - WorldGenerationConfig.DryHillReduction * aridWeight;
+        // The jungle is a gently rolling lowland: its weight is exactly 0 elsewhere, so 1 - 0 is an exact
+        // identity and every other biome keeps its bits
+        hillScale *= 1f - WorldGenerationConfig.JungleHillReduction * jungleWeight;
         // A highland steepens the hills; the arid reduction above still applies, so an arid
         // highland reads as a lifted plateau
         hillScale *= TerrainRelief.HillGain(highland);

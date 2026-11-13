@@ -15,13 +15,18 @@ internal static class TestInventory
 
     private const int MaterialStock = 50;
 
+    /// <summary>Tree wood and leaves are stocked once, not by <see cref="StartingStock"/>: every tree species
+    /// adds two such blocks, and the shared block pool must keep room as the species grow.</summary>
+    private static bool IsTreeMaterial(ushort id) =>
+        BlockType.IsTreeWood(id) || VoxelEngine.WorldGen.TreeGenerator.LeafById[id];
+
     internal static Inventory Stocked()
     {
         var inventory = Inventory.Empty();
         foreach (var type in BlockType.Types.Values)
         {
             if (!type.HasItem || type.Fluid) continue;
-            inventory.Add(type.Id, type.Lantern ? 1 : StartingStock, autoEquip: false);
+            inventory.Add(type.Id, type.Lantern || IsTreeMaterial(type.Id) ? 1 : StartingStock, autoEquip: false);
         }
         if (ItemRegistry.FindByAction(ItemUseAction.PickupFluid) is { } bucket)
             inventory.Add(bucket.Id, autoEquip: false);

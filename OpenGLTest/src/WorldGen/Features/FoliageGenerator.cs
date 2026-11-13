@@ -55,7 +55,7 @@ public static class FoliageGenerator
     {
         // An oasis disc is a dense meadow whatever the patch noise says
         if (OasisGenerator.IsDisc(x, z)) return true;
-        if (TerrainGenerator.BiomeAt(x, z) is not (Biome.Forest or Biome.Steppe or Biome.Savanna)) return false;
+        if (TerrainGenerator.BiomeAt(x, z) is not (Biome.Forest or Biome.Steppe or Biome.Savanna or Biome.Jungle)) return false;
         if (GrassPatchNoise.GetNoise(x, z) <= WorldFeatureConfig.GrassPatchThreshold) return false;
         // Denser where the climate is wetter (Climate's own wetness, the tint's input)
         TerrainGenerator.Climate(x, z, out _, out var wetness);

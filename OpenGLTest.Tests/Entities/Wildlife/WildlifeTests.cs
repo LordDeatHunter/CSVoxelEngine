@@ -387,9 +387,10 @@ public sealed class WildlifeTests
         foreach (var biome in rule.Biomes)
         {
             Assert.True(rule.LivesIn(biome, nearWater: true));
-            Assert.False(rule.LivesIn(biome, nearWater: false));
+            Assert.Equal(rule.AnywhereBiomes?.Contains(biome) == true, rule.LivesIn(biome, nearWater: false));
             for (var i = 0; i < 100; i++)
-                Assert.NotEqual(rule.Kind, WildlifeSpawnRules.Pick(biome, false, i / 100f, _ => true)?.Kind);
+                if (rule.AnywhereBiomes?.Contains(biome) != true)
+                    Assert.NotEqual(rule.Kind, WildlifeSpawnRules.Pick(biome, false, i / 100f, _ => true)?.Kind);
             Assert.Contains(Enumerable.Range(0, 400), i => WildlifeSpawnRules.Pick(biome, true, i / 400f, _ => true)?.Kind == rule.Kind);
         }
 

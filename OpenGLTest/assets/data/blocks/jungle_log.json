@@ -1,0 +1,22 @@
+{
+  // The rainforest tree's trunk: the tree_wood renderer like every log, wearing the oak log art as a
+  // placeholder (USER_TODO.md). Its own block so the leaf-decay and crumble rules resolve the
+  // jungle tree and never an oak.
+  "name": "Jungle Log",
+  "model": {
+    "parent": "block/cube_column",
+    "textures": { "end": "oak_log_top", "side": "oak_log_side" }
+  },
+  "hardness": 24,
+  "renderer": "tree_wood",
+  "sfx": "hit_wood",
+  "requiresTool": true,
+  "tools": { "axe": 1 },
+  "wood": {
+    "stump": "block/jungle_stump",
+    "split": "log_split",
+    "tipHardness": 0.25,
+    "handMaxThickness": 4,
+    "loot": [ { "minThickness": 0, "loot": "wood" }, { "minThickness": 7, "loot": "self" } ]
+  }
+}

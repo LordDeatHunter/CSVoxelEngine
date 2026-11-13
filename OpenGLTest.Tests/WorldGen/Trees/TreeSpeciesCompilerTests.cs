@@ -277,7 +277,7 @@ public sealed class TreeSpeciesCompilerTests
     public void RejectsBadWorldgen()
     {
         Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Biomes = []; });
-        Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Biomes = ["jungle"]; });
+        Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Biomes = ["swamp"]; });
         Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Biomes = ["0"]; });
         Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Biomes = ["forest", "FOREST"]; });
         Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Density = 1.5f; });

@@ -10,10 +10,10 @@ internal static class BiomeTraits
 {
     /// <summary>The snowless grass biomes whose stripped columns (a peak above
     /// <see cref="WorldGenerationConfig.MountainRockHeight"/>, a deep ravine) show bare stone on top.</summary>
-    public static bool ShowsBareRock(Biome biome) => biome is Biome.Forest or Biome.Steppe or Biome.Savanna;
+    public static bool ShowsBareRock(Biome biome) => biome is Biome.Forest or Biome.Steppe or Biome.Savanna or Biome.Jungle;
 
     /// <summary>The grass-fill biomes (the column fill's default branch) whose lake and river rims wear
     /// beach sand.</summary>
     public static bool RimsWaterWithSand(Biome biome) =>
-        biome is Biome.Forest or Biome.Taiga or Biome.Steppe or Biome.Savanna;
+        biome is Biome.Forest or Biome.Taiga or Biome.Steppe or Biome.Savanna or Biome.Jungle;
 }
