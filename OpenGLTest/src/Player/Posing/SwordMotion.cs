@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using VoxelEngine.Interaction;
 
@@ -89,6 +90,10 @@ internal static class SwordMotion
     // turns through the strike and the arm sweeps flat across the front to the left, the elbow
     // straightening into the blow, and it recovers quickly so one swing fits an axe's hit pace. Its
     // length is rescaled to the axe's hit gap at play time, so only the shares matter.
+    // Unlike a sword an axe has one edge, so its blade roll is a half turn past the sword's: the edge leads the sweep
+    // (the sprite's edge is on the item's -X side, which the sword's roll would leave trailing). The half turn
+    // mirrors the display roll's lean with it, so that is the sword's negated: the shaft stays out past the hand
+    // through the strike instead of folding back across the body with the head tucked in.
     private static readonly Shape AxeChop = new(
         Duration: 0.4f, WindupEnd: 0.45f, WindupReach: 0.9f, Impact: 0.58f, StrikeEnd: 0.66f, HoldEnd: 0.72f,
         Dir: 1,
@@ -98,8 +103,8 @@ internal static class SwordMotion
         BodyWindup: 1f, BodyFar: 0.9f, BodyYaw: 0.35f, TorsoYaw: 0.5f, Roll: 0.12f,
         LeanWindup: 0.05f, LeanFar: -0.1f, DipDepth: 0.6f, DipHeld: false,
         PullWindup: new Vector3(0.04f, 0.02f, 0.02f), PullFar: new Vector3(-0.04f, -0.01f, -0.03f),
-        BladeRoll: 0.8f, BladeCant: 0.12f, BladeYaw: 0.785f,
-        DisplayYaw: -55f, DisplayRoll: 25f);
+        BladeRoll: 0.8f + MathF.PI, BladeCant: 0.12f, BladeYaw: 0.785f,
+        DisplayYaw: -55f, DisplayRoll: -25f);
 
     // The split: the chop's shape, straight overhead and straight down, at the slow pace of a blow meant to
     // part a log in one go.
