@@ -41,13 +41,24 @@ public static class PopBoxEmitter
     /// <summary>
     /// Appends a facing block's baked model (already turned to its facing, see
     /// <c>BlockType.RotatedModels</c>) offset by <paramref name="blockPosition"/> and grown about
-    /// the cell center by <paramref name="grow"/>, with the model's own tiles and UVs, so a
+    /// the model's own center by <paramref name="grow"/>, with the model's own tiles and UVs, so a
     /// hollow log pops with the hole and the grain the chunk mesh shows rather than as a plain cube.
     /// </summary>
     public static void EmitModel(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         BakedModel model, float grow, Vector3 blockPosition)
     {
-        var center = new Vector3(0.5f);
+        // Grown about the model's own middle, so a low block (a stump) swells up as well as out instead of its
+        // top sinking under the still-drawn chunk mesh while only its sides pop
+        var min = new Vector3(float.MaxValue);
+        var max = new Vector3(float.MinValue);
+        foreach (var quad in model.Quads)
+            for (var j = 0; j < 4; j++)
+            {
+                min = Vector3.Min(min, quad.Positions[j]);
+                max = Vector3.Max(max, quad.Positions[j]);
+            }
+
+        var center = (min + max) * 0.5f;
         foreach (var quad in model.Quads)
         {
             var shade = ChunkFaceTables.ShadeLut[(quad.Face << 2) | 3];

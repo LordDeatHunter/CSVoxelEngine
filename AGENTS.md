@@ -56,7 +56,7 @@ purpose). When you change code, edit the doc section that owns it (and nothing e
 | HUD, swimming, drowning, lava, regen, mana, status effects (player), gear, chests, waystones | `player-systems.md` | |
 | Water rendering, linear lighting, fog, sky, godrays, AO, per-tile shader terms | `rendering.md` | `shader-sync` |
 | Vertex layout, texture arrays, material atlas, greedy mesher, biome tint, chunk drawing, Hi-Z cull | `meshing-and-chunks.md` | `shader-sync` |
-| Block, item, loot, model schemas, multiblocks, building blocks | `content-blocks-items.md` | `add-content` |
+| Block, item, loot, model schemas, multiblocks, building blocks | `content-blocks-items.md` | `add-content`, `partial-block` |
 | Tree species, growth engine, felling, leaf decay | `trees.md` | |
 | Recipes, kiln, casting, bloomery, anvil, iron, the barrier, hell generation | `recipes-and-metalworks.md` | `add-content` |
 | Spell parts, casts, status effects | `spells-and-effects.md` | `add-content` |

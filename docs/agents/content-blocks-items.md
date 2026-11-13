@@ -122,6 +122,9 @@ Two traps worth repeating: a **model that is not a full cube needs `light.passes
 is its default) or its own cell stays dark and the interior quads render black; and a **cutout
 block must not occlude**, which the registry enforces rather than trusting the file.
 
+A new low, thin or multi-box block (a stump, a slab) has more traps than the schema shows (the mining pop, the
+selection ray, AO): follow the `partial-block` skill.
+
 Partial-block textures are **cropped, never stretched**: the chunk mesher samples `FaceTiles`
 crops (`ChunkFaceTables.TiledUv`/`CropUv`), and the mining pop draws the hitboxes the same way
 (`PopBoxEmitter`), so a new partial block needs no pop work as long as its `FaceTiles` are
