@@ -239,6 +239,30 @@ public sealed class CommandDispatcherTests
     }
 
     [Fact]
+    public void TheNamedTimesKeepTheirOrderThroughTheDay()
+    {
+        double At(string when)
+        {
+            Run($"/time {when}");
+            return _host.LightingTime;
+        }
+
+        // The aliases name the same moment
+        Assert.Equal(At("sunrise"), At("dawn"));
+        Assert.Equal(At("sunset"), At("dusk"));
+        Assert.Equal(At("noon"), At("day"));
+        Assert.Equal(At("midnight"), At("night"));
+
+        // Through one day from sunrise: morning, noon, sunset, then midnight
+        double[] day = [At("dawn"), At("morning"), At("noon"), At("dusk"), At("midnight")];
+        Assert.Equal(day.Order(), day);
+        Assert.True(day[^1] - day[0] < SkyConfig.DayLengthSeconds);
+        // The sun is up between dawn and dusk, down at midnight
+        Assert.True(DayCycle.SunDirection(At("morning")).Y > 0f);
+        Assert.True(DayCycle.SunDirection(At("midnight")).Y < 0f);
+    }
+
+    [Fact]
     public void SummonSpawnsWhereTheSourceStandsOrAtTheCoordinates()
     {
         var entity = VoxelEngine.Entities.EntityRegistry.ByName.Keys.First();
