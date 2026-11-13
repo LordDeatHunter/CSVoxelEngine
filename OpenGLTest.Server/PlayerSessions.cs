@@ -53,6 +53,7 @@ internal sealed class PlayerSessions
         _state.PlayerList.Add(player);
         SendServerHello(client, spawn);
         SendInventory(client, player);
+        SendQuests(client, player);
         // A returning player's health (or death) is mirrored at once
         SendPlayerStatus(client, player);
         BroadcastPlayerList();
@@ -215,6 +216,26 @@ internal sealed class PlayerSessions
         writer.Write(player.LastSeq);
         writer.WriteBytes(InventoryNetCodec.Encode(player.Inventory.Export()));
         client.Send(writer.ToArray());
+    }
+
+    /// <summary>Sends <paramref name="player"/>'s whole quest progress to its own client, and only to it.</summary>
+    private static void SendQuests(ClientConnection client, ServerPlayer player)
+    {
+        player.Quests.Changed = false;
+        using var writer = new PacketWriter(NetMessage.QuestState);
+        writer.WriteBytes(QuestStateCodec.Encode(player.Quests.Export()));
+        client.Send(writer.ToArray());
+    }
+
+    // A gain, craft, break, place or kill moved a player's quests since its last snapshot: send that
+    // player a fresh one (the client toasts what it newly completes)
+    internal void SendChangedQuests()
+    {
+        foreach (var player in _state.PlayerList)
+        {
+            if (player.Quests.Changed && _state.Clients.TryGetValue(player.Id, out var client))
+                SendQuests(client, player);
+        }
     }
 
     // A pickup (or anything else the world credited) changed a player's inventory since its last

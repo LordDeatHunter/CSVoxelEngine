@@ -459,6 +459,9 @@ internal sealed class ClientSession
                     w.Inventory.Import(InventoryNetCodec.Decode(data));
                 break;
             }
+            case NetMessage.QuestState:
+                w.LocalPlayer.ApplyQuestSnapshot(QuestStateCodec.Decode(reader.ReadBytes()));
+                break;
         }
     }
 

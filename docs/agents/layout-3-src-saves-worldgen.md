@@ -19,7 +19,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       LodEditState.cs          # lod-edits.bin: export/import of the LOD caps, surface overrides, canopy markers
       MobSaveCodec.cs          # a live Mob -> its EntitySaveData form (per-kind ammo)
       PlayerSaveCodec.cs       # reads/writes player.json
-      PlayerSaveData.cs        # the player.json shape: pose, modes, health, clock, inventory + hotbar
+      PlayerSaveData.cs        # the player.json shape: pose, modes, health, clock, inventory + hotbar, quests
+      QuestSaveData.cs, QuestViewData.cs  # quest progress by id (completed, counts) and the quest book's pan and zoom
       SaveNames.cs             # block/ and item/ namespaced content names, so saves never store raw ids
       StationSaveCodec.cs      # reads/writes stations.json
       StationSaveData.cs       # the stations.json shape: campfires, querns, kilns, cast molds (content by name), tower locks
@@ -300,6 +301,10 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         SpellBuilderText.cs    # the title, the hold-a-staff hint and a phrase per SpellVerdict
         SpellBuilderView.cs    # open flag, transition, chosen slot, the selection (one element/shape/trigger, any
                                #   modifiers), live stats cached per Version; Refresh rebuilds only on a knowledge change
+      Quests/                  # the [P] quest book, GL-free (QuestBookRenderer draws it, QuestBookInput drives it)
+        QuestBookLayout.cs     # grid <-> canvas, zoom about the pointer, pan by a drag, the node hit test, the details panel
+        QuestBookView.cs       # open flag, transition, the bound pan/zoom, the selection, the press and drag
+        QuestText.cs           # the fixed strings and the requirement lines
       Waystone/                # the waystone screen, GL-free (WaystoneRenderer draws it, WaystoneInput drives it)
         WaystonePage.cs        # Closed / Discovered (the popup) / Rename (the dialog) / List
         WaystoneView.cs        # the page, the waystone, its name and rename right, the rename field, search, scroll, the cached

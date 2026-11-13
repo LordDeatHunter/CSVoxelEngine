@@ -41,6 +41,9 @@ public static class SfxLibrary
     /// <summary>Group played when a battle tower's floor is cleared and its door opens.</summary>
     public const string FloorClearGroup = "floor_clear";
 
+    /// <summary>Group played as a quest-complete toast slides in (one per card).</summary>
+    public const string QuestCompleteGroup = "quest_complete";
+
     /// <summary>Group played when a staff casts a spell (the caster's own cast).</summary>
     public const string SpellCastGroup = "spell_cast";
 

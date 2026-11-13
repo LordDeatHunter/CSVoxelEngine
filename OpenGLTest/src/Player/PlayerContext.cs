@@ -2,6 +2,7 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Interaction;
 using VoxelEngine.Networking.ServerSide;
+using VoxelEngine.Quests;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Player;
@@ -57,6 +58,10 @@ public sealed class PlayerContext(Inventory inventory)
     /// instead of running against an inventory nobody is holding.
     /// </summary>
     public bool Present { get; set; } = true;
+
+    /// <summary>The player's quest log, which a break, a place or a craft for this player advances; null
+    /// where nothing is authoritative (a client's mirror), so a prediction never progresses a quest.</summary>
+    public QuestLog? Quests { get; init; }
 
     /// <summary>The player's health pool, which a landed blow tells the player is in combat; null when the context has none.</summary>
     public PlayerHealth? Health { get; init; }

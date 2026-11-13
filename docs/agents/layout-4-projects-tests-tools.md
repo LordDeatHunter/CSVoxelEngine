@@ -145,6 +145,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Heave/                     # the king's slam heave: only exposed ground in the radius, the ripple, the settle, no write
   Player/                      # camera, physics, water phases and swimming, health and fall tracking,
                                #   the player model, creative, sprint, the saved-player restore
+  Quests/                      # the quest log's unlock, progress, obtain-on-gain and save rules; the toast queue
   Rendering/                   # render-pass gates: GPU timing, reflection reuse, shadow cascades, the texture-unit cache,
                                #   the Hi-Z occlusion twins (HizOcclusionTests)
     Atmosphere/                # cloud copies, cover and shadow
@@ -177,6 +178,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Menus/                     # main and pause menus, the loading screen, text fields
     SpellBuilder/              # the builder's selection rules, live stats and layout hit-tests
     Waystone/                  # the waystone screen's page rules, rows and layout hit-tests
+    QuestBookLayoutTests.cs    # the quest book's zoom about the pointer, drag-to-pan and visible-only hit test
   VisualTest/                  # scenario parsing and ops, PNG capture
   WorldGen/                    # terrain, biomes, lakes, ravines, clouds, the generational
                                #   cache, the tree front end and batches, worldgen stats,
@@ -220,6 +222,7 @@ tools/                                # asset generators: models, animation clip
   generate-critter-models.py          # deterministic dragonfly, crow and deer .bbmodels (their own bone sets around the
                                       #   humanoid six, clips) and skins with cutout texels, on the hell script's machinery;
                                       #   models only, no mob class yet; --check
+  generate-quest-node-textures.py     # deterministic placeholder quest book node frames (circle, hex) and the check badge
   generate-forcefield-texture.py      # deterministic placeholder tower_forcefield tile (a faint honeycomb, only the fallback
                                       #   of the world shader's forcefield term), integer geometry; listed in USER_TODO.md; --check
   generate-cave-ore-textures.py       # deterministic placeholder amethyst_ore, jade_ore and cinnabar_ore tiles: palette swaps

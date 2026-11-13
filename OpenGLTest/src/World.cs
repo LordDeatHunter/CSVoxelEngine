@@ -31,6 +31,7 @@ using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Particles.Collapse;
 using VoxelEngine.Player;
+using VoxelEngine.Quests;
 using VoxelEngine.Rendering;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Saves;
@@ -465,6 +466,7 @@ public class World
             // test worlds, the server camera and clients never do
             if (saveStore != null && !serverMode && !clientMode && StarterKit.NeededBy(savedPlayer))
                 StarterKit.GiveTo(Inventory);
+            LocalPlayer.BindQuests();
             EntitySaveData? savedEntities = null;
             StationSaveData? savedStations = null;
             if (saveStore != null)
@@ -843,6 +845,7 @@ public class World
         var id = Edits.BlockIdAt(cell);
         if (!Edits.BreakBlockFor(player, cell)) return false;
         if (player.Inventory.MarkKnown(id)) FlagInventoryChanged(player);
+        player.Quests?.OnBroke(id);
         return true;
     }
 
@@ -969,6 +972,17 @@ public class World
         if (verdict == WaystoneTeleportVerdict.Teleport)
             WaystoneTravel.Begin(toCell);
         return verdict;
+    }
+
+    /// <summary>The quest log a blow from <paramref name="striker"/> credits: the local player's in singleplayer,
+    /// the connected player's whose pool it is on a server, none on a client (its mobs are mirrors).</summary>
+    internal QuestLog? QuestsOf(PlayerHealth? striker)
+    {
+        if (striker == null || _clientMode) return null;
+        if (!_serverMode) return striker == _health ? LocalPlayer.Quests : null;
+        foreach (var connected in ServerPlayers)
+            if (connected.Status == striker) return connected.Quests;
+        return null;
     }
 
     // A server resends a player's inventory snapshot once its discovered list changed
@@ -1117,6 +1131,7 @@ public class World
         // The pool itself is the server's (ClientMirror.ApplyNetworkHealth mirrors it); only the
         // damage flash fades here
         _health.Update((float)deltaTime);
+        LocalPlayer.UpdateQuestToasts((float)deltaTime);
 
         FrameProfiler.Begin(ProfileSection.Raycast);
         LeftClick.UpdateSelection();
@@ -1326,6 +1341,7 @@ public class World
         _hotbarName.Update(Inventory, (float)deltaTime);
         DamageNumbers.Update((float)deltaTime);
         Toast.Update((float)deltaTime);
+        LocalPlayer.UpdateQuestToasts((float)deltaTime);
         _hitMarker.Update((float)deltaTime);
 
         // Water is aimed through unless the held item is out to scoop it, so a pond never

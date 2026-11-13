@@ -184,8 +184,12 @@ internal sealed class WorldItemUse : IItemUseWorld
     }
 
     bool IItemUseWorld.PlaceBlockAtFace(Vector3 hit, Vector3 normal, ushort blockId, byte state,
-        out Vector3 placedCell) =>
-        Placer.PlaceBlockAtFace(hit, normal, blockId, state, ActiveContext.ViewDirection, out placedCell);
+        out Vector3 placedCell)
+    {
+        if (!Placer.PlaceBlockAtFace(hit, normal, blockId, state, ActiveContext.ViewDirection, out placedCell)) return false;
+        ActiveContext.Quests?.OnPlaced(blockId);
+        return true;
+    }
 
     void IItemUseWorld.AfterPlaced(Vector3 pos)
     {

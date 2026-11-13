@@ -1,6 +1,6 @@
-# Player systems: HUD, water, health, mana, effects, gear, chests, waystones
+# Player systems: HUD, water, health, mana, effects, gear, chests, waystones, quests
 
-HUD and feedback, swimming and water depth states, drowning, lava, regeneration, mana, status effects (player side), gear and armor, bone shrapnel, chests and waystones.
+HUD and feedback, swimming and water depth states, drowning, lava, regeneration, mana, status effects (player side), gear and armor, bone shrapnel, chests, waystones and quests.
 
 **HUD and feedback.** The crosshair is drawn as five pieces cropped out of its 16x16 texture (a
 center dot and four pills): the arms slide outward with the eased `Camera.ThrowCharge` while a throw
@@ -340,3 +340,56 @@ forgotten), a fresh `PlayerCorrection` and the status. The client's `WaystoneMir
 correction that follows its accepted result, holds the camera there (`WaystoneTravel.BeginLanding`, facing away from the
 waystone, ticked in `World.UpdateClient`) until its own streamed chunk there is meshed. `/tp` ends a waiting trip.
 `WaystoneServerTests` (loopback), `WaystoneNetCodecTests`, `WaystoneArrivalHoldTests`.
+
+**Quests (U-15).** Quests are data: `assets/data/quests/<graph>.json`, one file per graph (a cluster of nodes in the
+book; `survival`, `metalworks`, `adventure` ship), loaded last in `ContentRegistry.Load` by `QuestLoader` into
+`QuestRegistry.Book` (a `QuestBook` of compiled `QuestType`s). A graph has an optional `title` and `origin` (`[x, y]` grid
+offset added to every node, so a graph moves as a unit) and its `quests`. A quest has an `id` (unique across every file;
+saves and the wire name a quest by it), `title`, `description`, `icon` (a block or item, `item/`/`block/` prefix allowed),
+`pos` (`[x, y]` grid steps), `parents` (quest ids, any file), `shape` (`hex` or `circle`; default hex for a quest with no
+parents, circle otherwise), `readable` (default true; false hides the requirement list until it is complete) and
+`requirements`, each `{ "type": obtain|craft|break|place|kill, "item"|"block"|"entity": name, "count": n }` (count default
+1). The loader refuses, naming the file, a duplicate or blank id, an unknown or repeated parent, a parent cycle, an unknown
+icon, item, block or entity, a count below 1, a bad shape, type or position, and a quest with no requirements
+(`QuestLoaderTests`, which also proves every shipped quest can unlock).
+
+The rules are `QuestLog`'s (GL-free, one per player; `QuestLogTests`):
+- a quest is **unlocked** once every parent is complete (a root always is); the book shows complete and unlocked quests only,
+  and an edge only between two shown quests;
+- only an unlocked, open quest makes progress; one event never also counts for a quest it just unlocked;
+- `obtain` reads the held count **only when an item is gained**: `Inventory.Gained` (raised by `Add` and `AddInstance`,
+  never by `Import`) feeds `QuestLog.OnGained` once the log is `Bind`-ed; when a quest unlocks, its obtain requirements check
+  what is already held once (this can cascade). Nothing polls the inventory;
+- `craft` counts results through `Inventory.Crafted` (the crafting list's `TryCraft`, and the anvil's forge via
+  `NoteCrafted`); `break` counts the mined cell only (`LeftClickAction.BreakMined`, `World.BreakBlockFor` on a server; never the
+  torches and pebbles it held up); `place` counts the selected block (before a wall mount renames it) in
+  `BlockPlacer.PlaceAgainstFace` and the item-use path (`WorldItemUse`); `kill` credits the striker of the blow that takes a
+  mob from alive to dead (`MobStrikes.StrikeMob`, `World.QuestsOf(PlayerHealth)`);
+- a quest completes when every requirement reached its count, raising `Completed` once.
+
+The break, place and craft hooks read `PlayerContext.Quests`, which is null where nothing is authoritative (a client's mirror,
+the server's own camera), so a prediction never progresses a quest; a client's inventory is never bound. Singleplayer:
+`LocalPlayer.Quests`, bound by `World` after the saved player and any starter kit are in (so the kit completes nothing).
+Server: `ServerPlayer.Quests`, imported and bound in `Restore` (after the kit); a change sets `QuestLog.Changed` and
+`PlayerSessions.SendChangedQuests` sends the player its whole state (`NetMessage.QuestState`, protocol 51, `QuestStateCodec`),
+also on join. The client's `LocalPlayer.ApplyQuestSnapshot` toasts each quest the snapshot newly completes (not on the first
+snapshot after joining) and imports it (`ServerPlayerQuestTests`). Progress persists as `PlayerSaveData.Quests`
+(`QuestSaveData`: completed ids and per-quest counts by id; an unknown id is dropped with a warning).
+
+**The quest book ([P]).** `QuestBookInput` (owned by `GameplayInput`) opens it from a clean play state (no chat, pause menu,
+death screen or other panel); P, E and Escape close it, and it counts as a panel (`PanelOpen`): the cursor is free, the look
+frozen, the hotbar and the world's clicks stand aside. A left press that travels `QuestConfig.DragThreshold` pans, a release
+that never traveled selects the quest under the pointer (or clears the selection on empty space; a click in the details
+panel keeps it), and the wheel zooms about the pointer (`QuestBookLayout.ZoomAbout`, clamped to
+`QuestConfig.MinZoom..MaxZoom`; `QuestBookLayoutTests`). The pan and zoom are the local player's `QuestViewData`, so they are
+where they were on the next open, and singleplayer saves them in `QuestSaveData.View`. `QuestBookRenderer` (in
+`UiPasses.RenderQuests`, after the HUD pass) draws an opaque grid backdrop, the edges (green into a complete quest), the hex or
+circle node frames (tinted by state, a check badge when complete, a gold ring when selected) with the icon inside, the header
+tally, the controls hint and, for the selected quest, the details panel: title, state, wrapped description and one row per
+requirement (`QuestText.Line`, `have/count`, green when met).
+
+**The completion toast.** Each completion queues a card in `LocalPlayer.QuestToasts` (`QuestToastQueue`, one card at a time:
+slide in `ToastSlideInSeconds`, hold `ToastHoldSeconds`, slide out `ToastSlideOutSeconds`; `QuestToastQueueTests`), ticked in
+both `World.Update` and `UpdateClient`; as each card starts, `quest_complete.wav` plays centered
+(`SfxLibrary.QuestCompleteGroup`). The card (accent bar, node frame with the icon, "Quest Complete!", the title) is drawn
+bottom-right by `QuestBookRenderer.DrawToast`, over the world or the book, hidden with the HUD.

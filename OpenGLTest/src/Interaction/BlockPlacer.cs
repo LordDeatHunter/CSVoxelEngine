@@ -188,6 +188,8 @@ internal sealed class BlockPlacer
     {
         if (!PlaceBlockAtFace(hitPos, hitNormal, blockId, state: 0, player.ViewDirection, out var placePos)) return false;
 
+        // The selected block counts, before any wall mount renamed it (a torch, not a wall torch)
+        player.Quests?.OnPlaced(blockId);
         LocalPlayer.PunchSwing();
         PuffPlaced(placePos, hitNormal, blockId);
         // Sand placed into thin air falls at once instead of hovering (stackable piles never

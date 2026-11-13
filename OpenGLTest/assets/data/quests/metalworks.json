@@ -1,0 +1,141 @@
+{
+  // From mud bricks to forged iron: the kiln, casting, bronze, the bloomery and the anvil.
+  "title": "Metalworks",
+  "origin": [-10, 4],
+  "quests": [
+    {
+      "id": "mud_bricks",
+      "title": "Mud and Fire",
+      "description": "Shape and fire mud into bricks: the start of every furnace.",
+      "icon": "item/mud_brick",
+      "pos": [0, 0],
+      "requirements": [
+        { "type": "obtain", "item": "item/mud_brick", "count": 8 }
+      ]
+    },
+    {
+      "id": "brickwork",
+      "title": "Brickwork",
+      "description": "Bind mud bricks into blocks for a kiln.",
+      "icon": "mud_bricks",
+      "pos": [2, -1],
+      "parents": ["mud_bricks"],
+      "requirements": [
+        { "type": "craft", "item": "mud_bricks", "count": 4 }
+      ]
+    },
+    {
+      "id": "mold",
+      "title": "Into the Mold",
+      "description": "Shape an ingot mold to pour metal into.",
+      "icon": "mold_ingot",
+      "pos": [2, 1],
+      "parents": ["mud_bricks"],
+      "requirements": [
+        { "type": "craft", "item": "mold_ingot" }
+      ]
+    },
+    {
+      "id": "crucible",
+      "title": "Hot Pot",
+      "description": "A crucible carries molten metal from the kiln to the mold.",
+      "icon": "item/crucible",
+      "pos": [4, -1],
+      "parents": ["brickwork"],
+      "requirements": [
+        { "type": "craft", "item": "item/crucible" }
+      ]
+    },
+    {
+      "id": "copper",
+      "title": "Copper Age",
+      "description": "Melt copper in the kiln and cast your first ingot.",
+      "icon": "item/copper_ingot",
+      "pos": [6, 0],
+      "parents": ["crucible", "mold"],
+      "requirements": [
+        { "type": "obtain", "item": "item/copper_ingot" }
+      ]
+    },
+    {
+      "id": "copper_tools",
+      "title": "Shiny Tools",
+      "description": "Trade the flint for copper.",
+      "icon": "item/copper_pickaxe",
+      "pos": [8, -1.5],
+      "parents": ["copper"],
+      "requirements": [
+        { "type": "craft", "item": "item/copper_pickaxe" },
+        { "type": "craft", "item": "item/copper_axe" }
+      ]
+    },
+    {
+      "id": "tin",
+      "title": "The Other Half",
+      "description": "Cast a tin ingot.",
+      "icon": "item/tin_ingot",
+      "pos": [8, 1],
+      "parents": ["copper"],
+      "requirements": [
+        { "type": "obtain", "item": "item/tin_ingot" }
+      ]
+    },
+    {
+      "id": "bronze",
+      "title": "Bronze Age",
+      "description": "Alloy copper and tin into bronze.",
+      "icon": "item/bronze_ingot",
+      "pos": [10, 0],
+      "parents": ["copper_tools", "tin"],
+      "requirements": [
+        { "type": "obtain", "item": "item/bronze_ingot", "count": 2 }
+      ]
+    },
+    {
+      "id": "bronze_kit",
+      "title": "Bronze Kit",
+      "description": "A bronze pickaxe and a bronze sword.",
+      "icon": "item/bronze_sword",
+      "pos": [12, -1.5],
+      "parents": ["bronze"],
+      "requirements": [
+        { "type": "craft", "item": "item/bronze_pickaxe" },
+        { "type": "craft", "item": "item/bronze_sword" }
+      ]
+    },
+    {
+      "id": "iron",
+      "title": "Iron Will",
+      "description": "Smelt iron ore in a bloomery and work the bloom into wrought iron.",
+      "icon": "item/wrought_iron",
+      "pos": [12, 1.5],
+      "parents": ["bronze"],
+      "requirements": [
+        { "type": "obtain", "item": "item/wrought_iron" }
+      ]
+    },
+    {
+      "id": "anvil",
+      "title": "Hammer Time",
+      "description": "Build an anvil and a smithing hammer.",
+      "icon": "anvil",
+      "pos": [14, 0],
+      "parents": ["iron"],
+      "requirements": [
+        { "type": "craft", "item": "anvil" },
+        { "type": "craft", "item": "item/smithing_hammer" }
+      ]
+    },
+    {
+      "id": "forged",
+      "title": "Forged in Fire",
+      "description": "Forge an iron sword head on the anvil.",
+      "icon": "item/iron_sword_head",
+      "pos": [16, 1.5],
+      "parents": ["anvil"],
+      "requirements": [
+        { "type": "craft", "item": "item/iron_sword_head" }
+      ]
+    }
+  ]
+}

@@ -7,6 +7,7 @@ using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
+using VoxelEngine.Content.Quests;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Content.Spells;
@@ -144,6 +145,7 @@ public static class ContentRegistry
         EntityLoader.ValidateImmunities();
         GearSetLoader.LoadSets(Path.Combine(assetsRoot, "data", "sets"));
         StructureLoader.LoadStructures(Path.Combine(assetsRoot, "data", "structures"));
+        QuestLoader.LoadQuests(Path.Combine(assetsRoot, "data", "quests"));
     }
 
     /// <summary>
@@ -512,6 +514,7 @@ public static class ContentRegistry
         TreeSpeciesRegistry.Reset();
         SpellPartRegistry.Reset();
         StatusEffectRegistry.Reset();
+        QuestRegistry.Reset();
 
         BlockLightPalette.Reset();
         TileMaterials.Reset();

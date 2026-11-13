@@ -4,7 +4,6 @@ using System.Numerics;
 using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Chunks.Meshing;
-using VoxelEngine.Config;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Entities;
 using VoxelEngine.Items;
@@ -355,7 +354,7 @@ internal sealed class LeftClickAction
         if (Mining.IsHammer(held) && BlockType.ById[Edits.BlockIdAt(_selectedBlockPosition)]?.Anvil != null)
         {
             StopBreaking();
-            UpdateAnvilHammer(held!, player);
+            UpdateAnvilHammer(held!);
             return;
         }
 
@@ -505,7 +504,7 @@ internal sealed class LeftClickAction
     /// (the swing, sound and chips, from the anvil it mirrors) and raises <see cref="NetIntentKind.Hammer"/>; the
     /// server judges the gap itself and its snapshot carries the result.
     /// </summary>
-    private void UpdateAnvilHammer(Item held, PlayerContext player)
+    private void UpdateAnvilHammer(Item held)
     {
         if (_anvilCooldown > 0f) return;
 
@@ -614,7 +613,12 @@ internal sealed class LeftClickAction
         // Mining a block discovers it (the look label's "Unknown"), whether or not its drop is picked up
         var mined = Edits.BlockIdAt(cell);
         Edits.RemoveBlock(cell, player);
-        if (Edits.BlockIdAt(cell) == 0) player.Inventory.MarkKnown(mined);
+        if (Edits.BlockIdAt(cell) == 0)
+        {
+            player.Inventory.MarkKnown(mined);
+            // Only the mined cell counts, never the torches and pebbles it was holding up
+            player.Quests?.OnBroke(mined);
+        }
         _world.RaiseIntent(WorldIntent.BreakComplete(Camera.Position, _selectedAimDirection, cell));
     }
 

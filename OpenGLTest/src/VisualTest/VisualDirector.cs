@@ -342,6 +342,12 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 Advance();
                 break;
 
+            case "quests":
+                RunUi("quests", u => u.Quests(step.Action!, step.Text, step.Scale, step.Point));
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} quests {step.Action} {step.Text}");
+                Advance();
+                break;
+
             case "chat":
                 RunUi("chat", u => u.Chat(step.Action!, step.Text));
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} chat {step.Action} {step.Text}");

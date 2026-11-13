@@ -179,6 +179,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       InventoryIntentCodec.cs  # its bounds-checked wire form
       LanternNetCodec.cs       # held/placed requests and versioned authoritative fuel/storage answers
       InventoryNetCodec.cs     # the server-owned inventory on the wire (the save JSON shape)
+      QuestStateCodec.cs       # a player's quest progress on the wire (NetMessage.QuestState, the save JSON shape)
       LodNetCodec.cs           # a far-LOD region's mesh on the wire
       NetAttacks.cs            # what each NetAttackKind stands for: the attack pattern it needs in hand, the
                                #   sword swing it names, the NetPlayerAction it is rebroadcast as
@@ -355,6 +356,9 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   PlayerPhysics.Update into the view offset and roll the view matrix and its cache key read
       WaterImmersion.cs, WaterPhase.cs  # GL-free water depth states: the submerged share of the body and
                                         #   its phase (Dry / Wade / Float / Swim)
+    Quests/                    # GL-free quest progress (see "Quests (U-15)")
+      QuestLog.cs              # one player's progress: the unlock rule, the event methods, Completed, Export/Import by id
+      QuestToastQueue.cs       # the quest-complete cards, one at a time: slide in, hold, slide out
     Rendering/                 # the GL render passes and their GL-free gates: RenderManager plus its pass components,
                                #   WorldRenderer, GPU timing, the texture-unit cache, shadow cascades, reflection reuse
       ChunkOcclusionCuller.cs  # the opaque pass's Hi-Z occlusion cull: the pyramid texture, the build and cull compute
@@ -522,6 +526,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   highlight (RenderBlockSelection) and the crack overlay (RenderBlockBreaking)
         SpellBuilderRenderer.cs # the spell table's builder page: staff slots, the known parts by kind, the live
                                 #   cost/verdict/fizzle/factors, BIND and CLEAR (or the hold-a-staff hint)
+        QuestBookRenderer.cs   # the [P] quest book (grid, edges, node frames and icons, the details panel) and the quest toast card;
+                               #   owns the node textures
         WaystoneRenderer.cs    # the waystone screen: the discovery popup, the rename dialog and the teleport list (rows with realm
                                #   tag and distance, lost rows dimmed, search field, the mana footer)
         TopStripRenderer.cs    # the top-center HUD strip (compass or clock) and the look-at label below it

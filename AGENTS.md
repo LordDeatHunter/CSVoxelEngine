@@ -53,7 +53,7 @@ purpose). When you change code, edit the doc section that owns it (and nothing e
 |---|---|---|
 | Launch flow, main menu, save folder, persistence rules, autosave, teardown | `launch-and-saves.md` | |
 | `VOXEL_*` env vars, scenario ops, item debugger, `X` profiler overlay | `dev-tools.md` | `visual-verify`, `item-debugger`, `perf-capture` |
-| HUD, swimming, drowning, lava, regen, mana, status effects (player), gear, chests, waystones | `player-systems.md` | |
+| HUD, swimming, drowning, lava, regen, mana, status effects (player), gear, chests, waystones, quests and the quest book | `player-systems.md` | |
 | Water rendering, linear lighting, fog, sky, godrays, AO, per-tile shader terms | `rendering.md` | `shader-sync` |
 | Vertex layout, texture arrays, material atlas, greedy mesher, biome tint, chunk drawing, Hi-Z cull | `meshing-and-chunks.md` | `shader-sync` |
 | Block, item, loot, model schemas, multiblocks, building blocks | `content-blocks-items.md` | `add-content`, `partial-block` |

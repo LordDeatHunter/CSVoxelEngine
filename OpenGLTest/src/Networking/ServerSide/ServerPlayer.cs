@@ -1,10 +1,12 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Quests;
 using VoxelEngine.Entities;
 using VoxelEngine.Items;
 using VoxelEngine.Magic;
 using VoxelEngine.Player;
+using VoxelEngine.Quests;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Waystones;
@@ -45,8 +47,12 @@ public sealed class ServerPlayer : IMobTarget
         Position = position;
         // Cached once, so the per-frame pickup loop never allocates a delegate
         CanAcceptDrop = Inventory.CanAccept;
-        Context = new PlayerContext(Inventory) { Name = name, PlayerId = id, Eye = position, Health = Status };
+        Context = new PlayerContext(Inventory) { Name = name, PlayerId = id, Eye = position, Health = Status, Quests = Quests };
     }
+
+    /// <summary>This player's quest progress, advanced by its own intents and gains; bound to <see cref="Inventory"/>
+    /// in <see cref="Restore"/>, after any starter kit. <see cref="QuestLog.Changed"/> tells the server to send it.</summary>
+    public QuestLog Quests { get; } = new(QuestRegistry.Book);
 
     /// <summary>
     /// The context every world intent of this player runs through: this player's own inventory and
@@ -528,8 +534,11 @@ public sealed class ServerPlayer : IMobTarget
     {
         if (saved != null)
             SavedPlayerPools.Apply(saved, Inventory, Status);
+        if (saved?.Quests != null)
+            Quests.Import(saved.Quests);
         if (StarterKit.NeededBy(saved))
             StarterKit.GiveTo(Inventory);
+        Quests.Bind(Inventory);
         if (saved == null)
             return false;
         if (saved.RespawnEye is { Length: 3 } r)
@@ -556,5 +565,6 @@ public sealed class ServerPlayer : IMobTarget
         Mana = Status.Mana.Current,
         RespawnEye = RespawnEye is { } r ? [r.X, r.Y, r.Z] : null,
         Inventory = Inventory.Export(),
+        Quests = Quests.Export(),
     };
 }

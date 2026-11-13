@@ -190,7 +190,7 @@ public static class Program
 
         try
         {
-            visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world!, new ScenarioUi(panelInput, builderInput, waystoneInput, gameplay.Forge, chatInput));
+            visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world!, new ScenarioUi(panelInput, builderInput, waystoneInput, gameplay.Forge, chatInput, gameplay.QuestBook));
         }
         catch (Exception e)
         {
@@ -578,6 +578,10 @@ public static class Program
             world.Renderer.RenderUI(renderManager, inventoryView,
                 (float)world.LightingTime, shownFps, diagnostics.DebugEnabled,
                 showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView, builder: spellBuilderView, waystone: waystoneView, forge: gameplay.Forge.View);
+        // The quest book covers the world and the HUD; its toast card rides the HUD's corner
+        if (!hideHud)
+            renderManager.UiPasses.RenderQuests(windowManager.Window, gameplay.QuestBook.View, world.LocalPlayer.Quests,
+                world.LocalPlayer.QuestToasts, windowManager.Window.Time);
         // The chat log and input draw over the HUD; hidden with the HUD and behind the pause menu.
         if (!hideHud && !pauseMenuView.IsOpen)
         {

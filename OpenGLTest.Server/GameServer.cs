@@ -194,6 +194,7 @@ public sealed class GameServer : IDisposable
         _broadcasts.DrainCellJournal();
         _broadcasts.BroadcastSounds();
         _sessions.SendChangedInventories();
+        _sessions.SendChangedQuests();
         _chests.Tick();
         _waystones.Tick(deltaTime);
         _sessions.TickPlayers(deltaTime);

@@ -46,6 +46,9 @@ public sealed class PlayerSaveData
 
     public InventoryData? Inventory { get; set; }
 
+    /// <summary>The player's quest progress; null when the save predates quests (nothing done yet).</summary>
+    public QuestSaveData? Quests { get; set; }
+
     /// <summary>Every pool, every tool instance and the hotbar layout.</summary>
     public sealed class InventoryData
     {

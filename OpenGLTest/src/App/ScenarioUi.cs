@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Content.Quests;
 using VoxelEngine.Interaction;
 using VoxelEngine.Magic;
 using VoxelEngine.UI.InventoryPanel;
@@ -8,14 +9,48 @@ using VoxelEngine.VisualTest;
 namespace VoxelEngine.App;
 
 /// <summary>
-/// The app's <see cref="IScenarioUi"/>: a visual scenario drives the [E] panel, the spell builder, the waystone screen and the
-/// anvil's recipe list through
+/// The app's <see cref="IScenarioUi"/>: a visual scenario drives the [E] panel, the spell builder, the waystone screen, the
+/// anvil's recipe list and the quest book through
 /// the same input components a player's keys and clicks reach, so what it films is what the game does.
 /// Built by Program from its own components; main thread only.
 /// </summary>
 internal sealed class ScenarioUi(InventoryPanelInput panelInput, SpellBuilderInput builderInput, WaystoneInput waystoneInput,
-    ForgeInput forgeInput, ChatInput chatInput) : IScenarioUi
+    ForgeInput forgeInput, ChatInput chatInput, QuestBookInput questBook) : IScenarioUi
 {
+    public void Quests(string action, string? quest, float factor, Vector2? point)
+    {
+        var world = RequirePlaying("quests");
+        var log = world.LocalPlayer.Quests;
+        QuestType Named() => quest != null && log.Book.TryGet(quest, out var found)
+            ? found
+            : throw new InvalidOperationException($"no quest named '{quest}'.");
+        switch (action)
+        {
+            case "open":
+                questBook.Open(world);
+                break;
+            case "close":
+                questBook.Close();
+                break;
+            case "select":
+                var selected = Named();
+                if (!log.IsVisible(selected))
+                    throw new InvalidOperationException($"quest '{quest}' is still locked, so the book does not show it.");
+                questBook.View.Selected = selected;
+                break;
+            case "complete":
+                if (!log.ForceComplete(Named()))
+                    throw new InvalidOperationException($"quest '{quest}' is locked or already complete.");
+                break;
+            case "zoom":
+                questBook.ZoomAt(point, factor);
+                break;
+            case "pan":
+                questBook.PanBy(point ?? Vector2.Zero);
+                break;
+        }
+    }
+
     public void Chat(string action, string? text)
     {
         RequirePlaying("chat");

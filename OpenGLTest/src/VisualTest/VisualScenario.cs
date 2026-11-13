@@ -331,6 +331,7 @@ public sealed class VisualScenario
             "waystone" => ReadWaystone(element, index),
             "forge" => ReadForge(element, index),
             "chat" => ReadChat(element, index),
+            "quests" => ReadQuests(element, index),
             "towerclear" => new VisualStep { Op = "towerclear", Floor = ReadInt(element, "floor") },
             "altar" => new VisualStep { Op = "altar", Pos = ReadPos(element, index, "altar") },
             "towerdefeat" => new VisualStep { Op = "towerdefeat" },
@@ -342,7 +343,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, forge, chest, chestrow, chestwobble, waystone, chat, towerclear, altar, towerdefeat, goblincamp or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, forge, chest, chestrow, chestwobble, waystone, chat, quests, towerclear, altar, towerdefeat, goblincamp or screenshot."),
         };
     }
 
@@ -402,6 +403,55 @@ public sealed class VisualScenario
                 ? text.GetString()!
                 : throw new InvalidOperationException($"Step {index} (chat type) needs a 'text' string."),
         };
+    }
+
+    // quests drives the quest book: "action" open, close, select or complete (with "quest", a quest id), zoom (with "factor",
+    // above 0, and an optional "at" [x, y] canvas point) or pan (with "by" [x, y], a drag's canvas travel). The quest id is
+    // checked only when the step runs, so parsing stays content-free.
+    private static VisualStep ReadQuests(JsonElement element, int index)
+    {
+        var action = ReadChoice(element, index, "quests", "action", ["open", "close", "select", "complete", "zoom", "pan"]);
+        switch (action)
+        {
+            case "select" or "complete":
+                return new VisualStep
+                {
+                    Op = "quests",
+                    Action = action,
+                    Text = element.TryGetProperty("quest", out var quest) && quest.ValueKind == JsonValueKind.String
+                        ? quest.GetString()!
+                        : throw new InvalidOperationException($"Step {index} (quests {action}) needs a 'quest' id."),
+                };
+            case "zoom":
+                return new VisualStep
+                {
+                    Op = "quests",
+                    Action = action,
+                    Scale = element.TryGetProperty("factor", out var factor) && factor.TryGetSingle(out var f) && f > 0f
+                        ? f
+                        : throw new InvalidOperationException($"Step {index} (quests zoom) needs a 'factor' above 0."),
+                    Point = ReadPoint(element, "at", index),
+                };
+            case "pan":
+                return new VisualStep
+                {
+                    Op = "quests",
+                    Action = action,
+                    Point = ReadPoint(element, "by", index)
+                            ?? throw new InvalidOperationException($"Step {index} (quests pan) needs 'by': [x, y]."),
+                };
+            default:
+                return new VisualStep { Op = "quests", Action = action };
+        }
+    }
+
+    // An optional [x, y] field
+    private static Vector2? ReadPoint(JsonElement element, string field, int index)
+    {
+        if (!element.TryGetProperty(field, out var value)) return null;
+        if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() != 2)
+            throw new InvalidOperationException($"Step {index} needs '{field}' as [x, y].");
+        return new Vector2((float)value[0].GetDouble(), (float)value[1].GetDouble());
     }
 
     // forge drives the anvil's recipe list like a player's clicks: "action" open (with "pos" [x, y, z], the anvil's cell:

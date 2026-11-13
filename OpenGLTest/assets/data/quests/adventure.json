@@ -1,0 +1,95 @@
+{
+  // Fighting and exploring: the mobs of each realm and the battle tower's king.
+  "title": "Adventure",
+  "origin": [6, -4],
+  "quests": [
+    {
+      "id": "slime",
+      "title": "Sticky Situation",
+      "description": "Defeat a slime.",
+      "icon": "item/slimeball",
+      "pos": [0, 0],
+      "requirements": [
+        { "type": "kill", "entity": "slime" }
+      ]
+    },
+    {
+      "id": "goblins",
+      "title": "Goblin Trouble",
+      "description": "Goblins camp in the woods at night. Drive them off.",
+      "icon": "item/spear",
+      "pos": [2, -1.5],
+      "parents": ["slime"],
+      "requirements": [
+        { "type": "kill", "entity": "goblin", "count": 3 }
+      ]
+    },
+    {
+      "id": "sandworm",
+      "title": "Desert Terror",
+      "description": "Something huge moves under the desert sand.",
+      "icon": "item/sandworm_fang",
+      "pos": [4, -3],
+      "parents": ["goblins"],
+      "requirements": [
+        { "type": "kill", "entity": "sandworm" }
+      ]
+    },
+    {
+      "id": "sky",
+      "title": "Above the Clouds",
+      "description": "Reach the sky islands and bring back a cloud shard.",
+      "icon": "item/cloud_shard",
+      "pos": [4, -1.5],
+      "parents": ["goblins"],
+      "requirements": [
+        { "type": "obtain", "item": "item/cloud_shard" }
+      ]
+    },
+    {
+      "id": "hell",
+      "title": "Down Below",
+      "description": "Get past the barrier and take an ember shard from hell.",
+      "icon": "item/ember_shard",
+      "pos": [6, -1.5],
+      "parents": ["sky"],
+      "requirements": [
+        { "type": "obtain", "item": "item/ember_shard" }
+      ]
+    },
+    {
+      "id": "skeletons",
+      "title": "Bone Collector",
+      "description": "Put two skeletons back to rest.",
+      "icon": "item/bone",
+      "pos": [2, 1.5],
+      "parents": ["slime"],
+      "requirements": [
+        { "type": "kill", "entity": "skeleton", "count": 2 }
+      ]
+    },
+    {
+      "id": "spider",
+      "title": "Arachnophobia",
+      "description": "Kill a giant spider in the caves.",
+      "icon": "item/spider_silk",
+      "pos": [4, 1.5],
+      "parents": ["skeletons"],
+      "requirements": [
+        { "type": "kill", "entity": "spider" }
+      ]
+    },
+    {
+      "id": "skeleton_king",
+      "title": "Regicide",
+      "description": "Something waits at the top of the battle tower.",
+      "icon": "item/bone_charm",
+      "pos": [6, 1.5],
+      "parents": ["spider"],
+      "readable": false,
+      "requirements": [
+        { "type": "kill", "entity": "skeleton_king" }
+      ]
+    }
+  ]
+}

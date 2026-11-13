@@ -1,0 +1,152 @@
+{
+  // The first steps: gather, make primitive tools, then wood and stone.
+  "title": "Survival",
+  "origin": [-10, -4],
+  "quests": [
+    {
+      "id": "sticks_and_stones",
+      "title": "Sticks and Stones",
+      "description": "Every tool starts on the ground. Pick up branches and a piece of flint.",
+      "icon": "item/branch",
+      "pos": [0, 0],
+      "requirements": [
+        { "type": "obtain", "item": "item/branch", "count": 4 },
+        { "type": "obtain", "item": "item/flint" }
+      ]
+    },
+    {
+      "id": "primitive_tools",
+      "title": "Getting a Grip",
+      "description": "Bind flint to a branch with vines: a crude pickaxe and axe.",
+      "icon": "item/primitive_pickaxe",
+      "pos": [2, 0],
+      "parents": ["sticks_and_stones"],
+      "requirements": [
+        { "type": "craft", "item": "item/primitive_pickaxe" },
+        { "type": "craft", "item": "item/primitive_axe" }
+      ]
+    },
+    {
+      "id": "timber",
+      "title": "Timber!",
+      "description": "Chop into an oak.",
+      "icon": "oak_log",
+      "pos": [4, -1.5],
+      "parents": ["primitive_tools"],
+      "requirements": [
+        { "type": "break", "block": "oak_log", "count": 4 }
+      ]
+    },
+    {
+      "id": "planks",
+      "title": "Cut to Size",
+      "description": "Saw logs into planks.",
+      "icon": "oak_planks",
+      "pos": [6, -2.5],
+      "parents": ["timber"],
+      "requirements": [
+        { "type": "craft", "item": "oak_planks", "count": 8 }
+      ]
+    },
+    {
+      "id": "builder",
+      "title": "A Roof Overhead",
+      "description": "Put the planks to use and build something.",
+      "icon": "oak_planks_stairs",
+      "pos": [8, -2.5],
+      "parents": ["planks"],
+      "requirements": [
+        { "type": "place", "block": "oak_planks", "count": 32 }
+      ]
+    },
+    {
+      "id": "storage",
+      "title": "Pack Rat",
+      "description": "Build a chest to keep what your pockets cannot.",
+      "icon": "wooden_chest",
+      "pos": [6, -0.5],
+      "parents": ["timber"],
+      "requirements": [
+        { "type": "craft", "item": "wooden_chest" }
+      ]
+    },
+    {
+      "id": "stone_age",
+      "title": "Stone Age",
+      "description": "Dig into the rock under the soil.",
+      "icon": "stone",
+      "pos": [4, 1.5],
+      "parents": ["primitive_tools"],
+      "requirements": [
+        { "type": "break", "block": "stone", "count": 16 }
+      ]
+    },
+    {
+      "id": "coal",
+      "title": "Black Gold",
+      "description": "Find coal in the stone.",
+      "icon": "item/coal",
+      "pos": [6, 1.5],
+      "parents": ["stone_age"],
+      "requirements": [
+        { "type": "obtain", "item": "item/coal", "count": 4 }
+      ]
+    },
+    {
+      "id": "torches",
+      "title": "Light the Way",
+      "description": "Coal on a branch burns for a long time. Light up the dark.",
+      "icon": "torch",
+      "pos": [8, 1.5],
+      "parents": ["coal"],
+      "requirements": [
+        { "type": "craft", "item": "torch", "count": 8 },
+        { "type": "place", "block": "torch", "count": 4 }
+      ]
+    },
+    {
+      "id": "masonry",
+      "title": "Masonry",
+      "description": "Dress stone into bricks.",
+      "icon": "stone_bricks",
+      "pos": [6, 3],
+      "parents": ["stone_age"],
+      "requirements": [
+        { "type": "craft", "item": "stone_bricks", "count": 8 }
+      ]
+    },
+    {
+      "id": "first_aid",
+      "title": "First Aid",
+      "description": "Make a bandage for the cuts to come.",
+      "icon": "item/bandage",
+      "pos": [-2, -1.5],
+      "parents": ["sticks_and_stones"],
+      "requirements": [
+        { "type": "craft", "item": "item/bandage" }
+      ]
+    },
+    {
+      "id": "hunter",
+      "title": "Hunter",
+      "description": "Bring down a deer.",
+      "icon": "item/raw_venison",
+      "pos": [-2, 1.5],
+      "parents": ["sticks_and_stones"],
+      "requirements": [
+        { "type": "kill", "entity": "deer" }
+      ]
+    },
+    {
+      "id": "cook",
+      "title": "Home Cooking",
+      "description": "Cook the venison over a fire.",
+      "icon": "item/cooked_venison",
+      "pos": [-4, 1.5],
+      "parents": ["hunter"],
+      "requirements": [
+        { "type": "obtain", "item": "item/cooked_venison" }
+      ]
+    }
+  ]
+}

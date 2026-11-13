@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Quests;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 using VoxelEngine.Particles;
+using VoxelEngine.Quests;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
@@ -49,7 +52,58 @@ internal sealed class LocalPlayer
         _mobs = mobs;
         _serverMode = serverMode;
         _clientMode = clientMode;
-        _localContext = new PlayerContext(Inventory) { Camera = Camera, Health = _health };
+        // A client's log is the server's mirror and a server's camera is nobody: neither progresses itself
+        var authoritative = !serverMode && !clientMode;
+        _localContext = new PlayerContext(Inventory) { Camera = Camera, Health = _health, Quests = authoritative ? Quests : null };
+        if (authoritative)
+            Quests.Completed += QuestToasts.Push;
+    }
+
+    /// <summary>The local player's quest progress: advanced in singleplayer, a mirror of the server's on a client.</summary>
+    internal QuestLog Quests { get; } = new(QuestRegistry.Book);
+
+    /// <summary>The quest-complete cards waiting for the HUD (<see cref="UpdateQuestToasts"/>).</summary>
+    internal QuestToastQueue QuestToasts { get; } = new();
+
+    /// <summary>The quest book's pan and zoom; kept while the world is open and saved in singleplayer.</summary>
+    internal QuestViewData QuestView { get; private set; } = new();
+
+    /// <summary>Starts listening to the inventory's gains; the world calls it once the saved player and any
+    /// starter kit are in, so neither completes a quest. Singleplayer only.</summary>
+    internal void BindQuests()
+    {
+        if (!_serverMode && !_clientMode)
+            Quests.Bind(Inventory);
+    }
+
+    /// <summary>Advances the toast card on screen, playing the quest sound as each card slides in.</summary>
+    internal void UpdateQuestToasts(float deltaTime)
+    {
+        if (QuestToasts.Step(deltaTime) != null)
+            _world.Sounds.Play(SfxLibrary.QuestCompleteGroup);
+    }
+
+    /// <summary>
+    /// A client mirrors the server's quest snapshot, toasting each quest it newly completes; the first
+    /// snapshot after joining only restores, so a returning player is not toasted for old quests.
+    /// </summary>
+    internal void ApplyQuestSnapshot(QuestSaveData data)
+    {
+        if (_questsSynced)
+            foreach (var quest in Quests.NewlyCompletedIn(data))
+                QuestToasts.Push(quest);
+        _questsSynced = true;
+        Quests.Import(data);
+    }
+
+    private bool _questsSynced;
+
+    /// <summary>The quest progress and book view as <c>player.json</c> stores them.</summary>
+    internal QuestSaveData CaptureQuests()
+    {
+        var data = Quests.Export();
+        data.View = QuestView;
+        return data;
     }
 
     /// <summary>Whether the player rests on real ground at the spawn (or a saved pose placed it).</summary>
@@ -157,6 +211,10 @@ internal sealed class LocalPlayer
         }
 
         SavedPlayerPools.Apply(saved, Inventory, _health);
+        if (saved.Quests == null) return;
+        Quests.Import(saved.Quests);
+        if (saved.Quests.View is { } view && float.IsFinite(view.PanX) && float.IsFinite(view.PanY) && float.IsFinite(view.Zoom))
+            QuestView = view;
     }
 
     // Standing against a cactus pricks: one tick per ContactDamage.TickSeconds while the body box

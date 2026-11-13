@@ -34,7 +34,8 @@ convention below). Every content error names the file it came from.
 ### Startup order (`RenderManager.LoadResources`)
 
 1. `ContentRegistry.Load("assets")` - parses items, loot tables, blocks and every model they
-   reference, and assigns ids. No GL, no atlas.
+   reference, and assigns ids. No GL, no atlas. The quests load last (`QuestLoader`, see "Quests (U-15)"
+   in `player-systems.md`), once every block, item and entity they name exists.
 2. `TextureAtlas.Build(gl, "assets/textures/blocks")` - loads the tiles into the array texture.
 3. `ContentRegistry.BakeModels()` - bakes each block's model into atlas-ready quads and settles
    the defaults that need to know whether the result is a full cube (`occludes`, `light.passes`).

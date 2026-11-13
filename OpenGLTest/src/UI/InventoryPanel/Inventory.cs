@@ -148,6 +148,20 @@ public class Inventory
     /// </summary>
     public bool Add(ushort id, int amount = 1, bool autoEquip = true)
     {
+        if (!AddToPool(id, amount, autoEquip)) return false;
+        Gained?.Invoke(id);
+        return true;
+    }
+
+    /// <summary>
+    /// Raised with the id after every successful <see cref="Add"/> or <see cref="AddInstance"/> (a pickup, a
+    /// crafted result, a chest or station take, a grant), never by <see cref="Import"/>: the quest log's
+    /// "obtain" check listens here instead of polling the pools.
+    /// </summary>
+    public event Action<ushort>? Gained;
+
+    private bool AddToPool(ushort id, int amount, bool autoEquip)
+    {
         var category = CategoryOf(id);
         if (!category.HasValue || amount <= 0) return false;
         _known.Add(id);
@@ -216,6 +230,7 @@ public class Inventory
         _tools.Add(template.CloneAs(_nextToolInstance++));
         if (autoEquip && LanternState.IsLantern(template.DefinitionId))
             EquipNewTool(_tools[^1].InstanceId);
+        Gained?.Invoke(template.DefinitionId);
         return true;
     }
 
@@ -499,7 +514,23 @@ public class Inventory
     /// the batch is not currently craftable, consuming nothing.
     /// </summary>
     public bool TryCraft(CraftingRecipe recipe, int batch,
-        Func<int, CraftingRecipe.Ingredient, ushort>? pickMember) => InventoryCrafting.TryCraft(this, recipe, batch, pickMember);
+        Func<int, CraftingRecipe.Ingredient, ushort>? pickMember)
+    {
+        if (!InventoryCrafting.TryCraft(this, recipe, batch, pickMember)) return false;
+        NoteCrafted(recipe.ResultId, recipe.ResultCount * batch);
+        return true;
+    }
+
+    /// <summary>
+    /// Raised with the result id and count after every craft this inventory made: the crafting list
+    /// (<see cref="TryCraft(CraftingRecipe, int, Func{int, CraftingRecipe.Ingredient, ushort})"/>) and the
+    /// anvil's forge (<see cref="NoteCrafted"/>). Only an inventory bound to a quest log is heard, so a
+    /// client's predicted craft counts for nothing.
+    /// </summary>
+    public event Action<ushort, int>? Crafted;
+
+    /// <summary>Reports a craft made outside the crafting list (an anvil forge) to <see cref="Crafted"/>.</summary>
+    public void NoteCrafted(ushort resultId, int count) => Crafted?.Invoke(resultId, count);
 
     /// <summary>Display name for a list row or preview heading.</summary>
     public static string DisplayName(ushort id)

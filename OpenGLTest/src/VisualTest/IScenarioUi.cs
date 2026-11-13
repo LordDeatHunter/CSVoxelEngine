@@ -62,4 +62,12 @@ public interface IScenarioUi
     /// <c>close</c> closes it.
     /// </summary>
     void Chat(string action, string? text);
+
+    /// <summary>
+    /// Drives the [P] quest book: <c>open</c> and <c>close</c> it, <c>select</c> shows the details of visible quest
+    /// <paramref name="quest"/>, <c>complete</c> completes unlocked quest <paramref name="quest"/> as if its requirements
+    /// were met (its toast and its children follow), <c>zoom</c> multiplies the zoom by <paramref name="factor"/> about
+    /// canvas point <paramref name="point"/> (the center when null) and <c>pan</c> drags the book by <paramref name="point"/>.
+    /// </summary>
+    void Quests(string action, string? quest, float factor, Vector2? point);
 }

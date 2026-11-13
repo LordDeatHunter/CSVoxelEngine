@@ -305,8 +305,8 @@ single-arc player.
 - [ ] **`F-15` · Factions & reputation** — P3, L.
   Standing with groups that gates quests, prices and safe zones; fed by `F-14`, `F-16`.
 - [ ] **`F-16` · Quests / bounty board** — P2, L.
-  Radiant and hand-authored quests (fetch, hunt, clear a dungeon) as session direction. Needs
-  `U-15`.
+  Radiant quests and a bounty board (fetch, hunt, clear a dungeon) as session direction, on top of the
+  data-driven quest graphs and the [P] quest book (see "Quests (U-15)" in `docs/agents/player-systems.md`).
 - [ ] **`F-17` · Music & instruments** — P3, S–M.
   Playable instruments, biome/day-night music layers, jukebox-style discs.
 - [ ] **`F-18` · Village raids & defense** — P3, L.
@@ -339,7 +339,6 @@ single-arc player.
 - [ ] **`U-12` · Skill / perk tree UI** — P3, L. For `P-15`/`P-9`.
 - [ ] **`U-13` · Spell wheel / magic hotbar** — P3, M. For `P-14`; the selection options live in `MAGIC.md` `MG-15`.
 - [ ] **`U-14` · Tech / research tree UI** — P3, L. For `P-46`, Factorio-style.
-- [ ] **`U-15` · Quest journal** — P3, M. For `F-16`.
 - [ ] **`U-16` · Bestiary / codex** — P3, M. Mobs, blocks, recipes, lore as discoverable entries.
 - [ ] **`U-17` · Waypoints & compass markers** — P3, S–M. Feeds `P-58`, `P-50`.
 - [ ] **`U-18` · Storage / logistics UI** — P3, M. Chests, sorting, filters; for `P-31`.

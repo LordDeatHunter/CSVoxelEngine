@@ -151,6 +151,7 @@ public class UIRenderer : IDisposable
     internal SpellBuilderRenderer SpellBuilder { get; }
     internal WaystoneRenderer Waystone { get; }
     internal ForgeRenderer Forge { get; }
+    internal QuestBookRenderer Quests { get; }
     internal TopStripRenderer TopStrip { get; }
     internal HudRenderer Hud { get; }
     /// <summary>The rarity chrome over list rows and the hover tooltip.</summary>
@@ -243,6 +244,7 @@ public class UIRenderer : IDisposable
         SpellBuilder = new SpellBuilderRenderer(this);
         Waystone = new WaystoneRenderer(gl, this);
         Forge = new ForgeRenderer(this);
+        Quests = new QuestBookRenderer(gl, this);
         TopStrip = new TopStripRenderer(gl, this);
     }
 
@@ -938,6 +940,7 @@ public class UIRenderer : IDisposable
         _gl.DeleteBuffer(_textEbo);
         _gl.DeleteVertexArray(_textVao);
         Hud.Dispose();
+        Quests.Dispose();
         foreach (var icon in _itemIcons.Values)
             _gl.DeleteTexture(icon);
         foreach (var frames in _itemFrames.Values)

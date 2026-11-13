@@ -120,6 +120,9 @@ internal sealed class InputEvents
             case MouseButton.Left when gameplay.Forge.IsOpen && inputManager.Mouse != null:
                 gameplay.Forge.HandleClick(inputManager.Mouse.Position);
                 break;
+            case MouseButton.Left when gameplay.QuestBook.IsOpen && inputManager.Mouse != null:
+                gameplay.QuestBook.HandleRelease(inputManager.Mouse.Position, ActiveWorld!);
+                break;
             case MouseButton.Left when builderInput.IsOpen && inputManager.Mouse != null:
                 builderInput.HandleClick(inputManager.Mouse.Position);
                 break;
@@ -158,6 +161,10 @@ internal sealed class InputEvents
                 panelInput.HandleInventoryScrollbarPress(inputManager.Mouse.Position);
                 panelInput.RowDrag.Press(inputManager.Mouse.Position);
                 return;
+            case AppScreen.Playing when gameplay.QuestBook.IsOpen && !pauseMenuView.IsOpen
+                                                                  && button == MouseButton.Left && inputManager.Mouse != null:
+                gameplay.QuestBook.HandlePress(inputManager.Mouse.Position);
+                return;
         }
 
         if (!menuInput.SettingsPageOpen || button != MouseButton.Left || inputManager.Mouse == null)
@@ -192,6 +199,12 @@ internal sealed class InputEvents
         if (inputManager.Mouse != null && waystoneInput.HandleScroll(inputManager.Mouse.Position, wheel.Y)) return;
         // ...and the anvil's recipe list, so the wheel never steps the hammer out of the hand behind it
         if (gameplay.Forge.IsOpen) return;
+        // ...and the quest book, where it zooms
+        if (gameplay.QuestBook.IsOpen)
+        {
+            if (inputManager.Mouse != null) gameplay.QuestBook.HandleScroll(inputManager.Mouse.Position, wheel.Y);
+            return;
+        }
         switch (inventoryView.IsOpen)
         {
             case false when !pauseMenuView.IsOpen:

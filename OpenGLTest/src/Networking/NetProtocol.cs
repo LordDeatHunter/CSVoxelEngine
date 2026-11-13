@@ -88,6 +88,9 @@ public enum NetMessage : byte
     InventoryRequest = 71,
     /// <summary>Client to server: a <see cref="VoxelEngine.Networking.WorldIntent"/> (break, place, use,
     /// throw, attack, cast, hammer, waystone trip) with its sequence id (<see cref="WorldIntentCodec"/>).</summary>
+    /// <summary>Server to one client: that player's whole quest progress (<see cref="QuestStateCodec"/>), sent on
+    /// join and after every change; the client toasts the quests the snapshot newly completes.</summary>
+    QuestState = 75,
     /// <summary>Client request to open a selected held or aimed placed lantern.</summary>
     LanternOpen = 72,
     /// <summary>Server-owned target, fuel and eight-slot storage.</summary>
@@ -277,8 +280,10 @@ public static class NetFraming
     /// 49: <see cref="NetMessage.PlayerStatus"/> ends with whether the player may run operator commands
     /// (<see cref="PlayerStatusData.Operator"/>), for the chat's autocomplete; an older peer would misread the frame.
     /// 50: the station snapshot ends with the logs standing on tree stumps, and <see cref="NetIntentKind.StumpHit"/> is a new
-    /// intent; an older peer would misread the frame.</summary>
-    public const int ProtocolVersion = 50;
+    /// intent; an older peer would misread the frame.
+    /// 51: <see cref="NetMessage.QuestState"/> sends each player its quest progress; an older client would drop the
+    /// unknown message and never see a quest complete.</summary>
+    public const int ProtocolVersion = 51;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

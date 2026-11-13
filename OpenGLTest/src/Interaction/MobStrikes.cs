@@ -46,11 +46,14 @@ internal sealed class MobStrikes
         float shoveSpeed = MobConfig.SlimePunchShoveSpeed, in ShrapnelProfile shrapnel = default, Item? weapon = null)
     {
         var hits = mob.HitsTaken;
+        var wasAlive = !mob.IsDead;
         damage = Combat.VersusUndead(damage, mob.IsUndead, striker?.Gear?.Stats.UndeadDamage ?? 0f);
         mob.TakeDamage(mob.ScaleDamage(damage, from));
         var landed = mob.HitsTaken != hits;
         if (landed)
         {
+            // The killing blow credits the striker's quests
+            if (wasAlive && mob.IsDead) _world.QuestsOf(striker)?.OnKilled(mob.Type.Name);
             striker?.NoteCombat();
             // Worn gear's on-hit passives (a client never strikes a mob: its mobs are mirrors)
             GearPassives.OnHit(striker, mob, Random.Shared.NextSingle);

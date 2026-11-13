@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
@@ -40,6 +39,7 @@ public sealed class SmithingStations
             return false;
         if (!Anvils.TryForge(cell, resultId, out var recipe) || recipe == null) return false;
         inventory.Add(recipe.ResultId, recipe.ResultCount);
+        inventory.NoteCrafted(recipe.ResultId, recipe.ResultCount);
         return true;
     }
 

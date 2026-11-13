@@ -42,8 +42,10 @@ OpenGLTest/
                                #   creative buttons, hovered row, tooltip
       RowDragInput.cs          # dragging a listed [E] row or a hotbar slot onto a hotbar slot, equipment slot, chest or the panel: press, per-frame lift, drop
       MenuInput.cs             # the pause menu's and shared settings page's input, and applying the window-level settings
+      QuestBookInput.cs        # the [P] quest book's input (built by GameplayInput): the toggle, cursor and look capture, the
+                               #   press that pans past the drag threshold or selects on release, the wheel zoom
       ScenarioUi.cs            # the app's IScenarioUi: lets a VOXEL_SCRIPT run open the [E] panel and the spell builder, pick a tab or row,
-                               #   type a search, hold the pointer and drive the waystone screen, the anvil's recipe list and the chat
+                               #   type a search, hold the pointer and drive the waystone screen, the anvil's recipe list, the chat and the quest book
                                #   through the real input components
       SpellBuilderInput.cs     # the spell builder's input: open from the table (or the hold-a-staff toast), close on
                                #   E/Escape or a changed held staff, cursor and look capture, clicks, bind/clear requests
@@ -183,6 +185,7 @@ OpenGLTest/
       LightingConfig.cs        # alpha cutoff, atlas anisotropy, light spread, shadow cascades, point and fire
                                #   lights, fog, tonemap exposure, eye adaptation
       ManaConfig.cs            # the mana pool: start max, growth per known part and its cap, the refill time
+      QuestConfig.cs           # the quest toast's timing and size; the quest book's grid step, node size, zoom range, drag threshold
       SpellConfig.cs           # spell recipe rules: when complexity starts to fizzle, the chance per unit and its cap;
                                #   the staff slot cap and the cast cooldown (CastCooldownSeconds)
       WildlifeConfig.cs        # the wild animals: their budget and spawn ring, species weights and groups, gaits,
@@ -273,6 +276,7 @@ OpenGLTest/
         RecipeDefinition.cs    # JSON shape of assets/data/recipes/<name>.json
         SpellPartDefinition.cs # JSON shape of assets/data/spell/<kind>/<name>.json
         StatusEffectDefinition.cs # JSON shape of assets/data/effects/<name>.json
+        QuestGraphDefinition.cs # JSON shape of assets/data/quests/<graph>.json (the graph, its quests, their requirements)
         TagDefinition.cs       # JSON shape of assets/data/tags/<name>.json
         TreeSpeciesDefinition.cs # JSON DTO of assets/data/trees/<species>.json
       Loot/                    # compiled loot tables, loot context, wood loot bands
@@ -325,6 +329,13 @@ OpenGLTest/
         SpellPartLoader.cs     # data/spell/<kind>/*.json -> parts; ReadParts and Compile are pure (tests)
         SpellRecipe.cs         # element + shape + modifiers + trigger -> cost, verdict, fizzle, factors
         SpellStats.cs, SpellVerdict.cs  # what a recipe compiles to; the first rule it breaks
+      Quests/                  # quests (see "Quests (U-15)"): the compiled quest book, loader and registry
+        QuestBook.cs           # every compiled quest and the graph titles, by index and id
+        QuestLoader.cs         # data/quests/*.json -> a QuestBook; Compile is pure (tests); refuses cycles and unknown names
+        QuestRegistry.cs       # the published QuestBook, set once by ContentRegistry.Load
+        QuestType.cs           # one compiled quest: id, text, icon, grid position, shape, parents, children, requirements
+        QuestRequirement.cs, QuestRequirementKind.cs  # obtain/craft/break/place/kill with its target and count
+        QuestShape.cs          # Hex / Circle node frame
       StatusEffects/           # status effects (MG-4b): the compiled effect, its block actions, loader and registry
         StatusEffect.cs        # one compiled effect: duration, tick, damage share, factors, block actions, visuals; Bit
         StatusEffectBlockAction.cs # [Flags] Ignite / Freeze / Thaw, what an effect's tick does to the cells around

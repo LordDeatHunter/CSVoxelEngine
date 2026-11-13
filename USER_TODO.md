@@ -292,3 +292,14 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   `tools/generate-cave-mob-models.py`. Keep the humanoid groups (as above), the clip names (`idle`,
   `walk`, `melee`, `hurt`, `death`, `spawn`) and the `impact` event on `melee`, which
   `Magmaborn.ValidateContent` checks at startup, and the `.bbmodel`'s UV layout.
+
+## UI
+
+Paths are under `OpenGLTest/assets/textures/ui/`. Made by `tools/generate-quest-node-textures.py`: replace the PNGs and
+remove that generator in the same change, or a re-run puts the placeholders back (`--check` compares).
+
+- [ ] **Quest book nodes** — `quest_node_circle.png` (a non-root quest's frame) and `quest_node_hex.png` (a root's, a
+  pointy-top hexagon), 64x64: a dark fill inside a light rim, near gray, since `QuestBookRenderer` tints them by state
+  (open, complete, hovered, the gold selection ring). Keep the item icon's room in the middle (about the inner 60%).
+- [ ] **Quest check badge** — `quest_check.png`, 64x64, a green disc with a white check, drawn untinted at the top-right
+  of a complete quest's node.

@@ -375,7 +375,8 @@ internal sealed class WorldPersistence
             Mana = _health.Mana.Current,
             LightingClock = Phase == WorldPhase.Loading ? _savedPlayer?.LightingClock ?? LightingTime : LightingTime,
             RespawnEye = LocalPlayer.HasRespawnEye ? [LocalPlayer.RespawnEye.X, LocalPlayer.RespawnEye.Y, LocalPlayer.RespawnEye.Z] : null,
-            Inventory = Inventory.Export()
+            Inventory = Inventory.Export(),
+            Quests = LocalPlayer.CaptureQuests()
         };
     }
 
@@ -401,7 +402,8 @@ internal sealed class WorldPersistence
             // Like a game world: until the flip has applied the saved clock, keep the saved one
             LightingClock = Phase == WorldPhase.Loading ? _hostedPlayer?.LightingClock ?? LightingTime : LightingTime,
             RespawnEye = _hostedPlayer?.RespawnEye,
-            Inventory = _hostedPlayer?.Inventory
+            Inventory = _hostedPlayer?.Inventory,
+            Quests = _hostedPlayer?.Quests
         };
 
     /// <summary>Enqueues <see cref="PlayerSaveCodec.FileName"/>; does nothing without a save store.</summary>

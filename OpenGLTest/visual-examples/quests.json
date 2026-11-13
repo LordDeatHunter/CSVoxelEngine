@@ -1,0 +1,52 @@
+{
+  // The [P] quest book: run with VOXEL_SCRIPT=visual-examples/quests.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/quests/. Films the book with only the roots showing, a completed root revealing its children
+  // (and the quest-complete toast sliding in), a selected quest's details, a secret quest's hidden requirements, a zoomed
+  // and panned view, the same view after closing and reopening, and the toast over the world with the book closed.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 63.5], "yaw": -90, "pitch": -12 },
+    { "op": "wait", "seconds": 2 },
+
+    { "op": "quests", "action": "open" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "roots" },
+
+    { "op": "quests", "action": "complete", "quest": "sticks_and_stones" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "first-complete" },
+
+    { "op": "quests", "action": "complete", "quest": "primitive_tools" },
+    { "op": "quests", "action": "complete", "quest": "timber" },
+    { "op": "quests", "action": "complete", "quest": "stone_age" },
+    { "op": "quests", "action": "select", "quest": "coal" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "details" },
+
+    { "op": "quests", "action": "complete", "quest": "slime" },
+    { "op": "quests", "action": "complete", "quest": "skeletons" },
+    { "op": "quests", "action": "complete", "quest": "spider" },
+    { "op": "quests", "action": "select", "quest": "skeleton_king" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "secret" },
+
+    { "op": "quests", "action": "zoom", "factor": 1.6, "at": [500, 400] },
+    { "op": "quests", "action": "pan", "by": [180, 120] },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "zoomed" },
+
+    { "op": "quests", "action": "close" },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "quests", "action": "open" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "reopened" },
+
+    { "op": "quests", "action": "close" },
+    { "op": "wait", "seconds": 30 },
+    { "op": "quests", "action": "complete", "quest": "planks" },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "toast-sliding" },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "toast" }
+  ]
+}
