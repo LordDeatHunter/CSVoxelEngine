@@ -73,7 +73,9 @@ public static class InventorySearch
             if (kind != 0) return kind;
             var name = string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
             if (name != 0) return name;
-            return a.Id.CompareTo(b.Id);
+            var id = a.Id.CompareTo(b.Id);
+            if (id != 0) return id;
+            return a.ToolInstance.CompareTo(b.ToolInstance);
         });
         return hits;
     }
@@ -85,12 +87,10 @@ public static class InventorySearch
         AddStacks(query, inventory, InventoryCategory.Misc, hits, owned);
         AddGearHits(query, inventory, hits, owned);
 
-        // One row per tool kind, pointing at its first live instance: tools are instances, but
-        // a search should offer "Bucket", not one row per duplicate.
-        var seen = new HashSet<ushort>();
+        // One row per live instance, like the Tools tab: tools do not stack, so two buckets
+        // are two rows.
         foreach (var tool in inventory.ToolEntries())
         {
-            if (!seen.Add(tool.ItemId)) continue;
             owned.Add(tool.ItemId);
             if (!Matches(tool.Name, query)) continue;
             hits.Add(new SearchHit(SearchHitKind.Inventory, tool.ItemId, tool.Name,
@@ -100,11 +100,9 @@ public static class InventorySearch
 
     private static void AddGearHits(string query, Inventory inventory, List<SearchHit> hits, HashSet<ushort> owned)
     {
-        // Like tools: one row per gear kind, pointing at its first live instance
-        var seen = new HashSet<ushort>();
+        // Like tools: one row per live instance
         foreach (var gear in inventory.GearEntries())
         {
-            if (!seen.Add(gear.ItemId)) continue;
             owned.Add(gear.ItemId);
             if (!Matches(gear.Name, query)) continue;
             hits.Add(new SearchHit(SearchHitKind.Inventory, gear.ItemId, gear.Name,

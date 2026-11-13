@@ -152,6 +152,22 @@ public sealed class InventorySearchTests
     }
 
     [Fact]
+    public void ListsEveryInstanceOfANonStackableTool()
+    {
+        var inventory = new Inventory();
+        var bucket = ContentRegistry.RequireItem("bucket");
+        inventory.Add(bucket.Id, 2, autoEquip: false);
+        var owned = inventory.ToolEntries().Count(t => t.ItemId == bucket.Id);
+
+        var hits = InventorySearch.Search(Inventory.DisplayName(bucket.Id), inventory)
+            .Where(h => h.Kind == SearchHitKind.Inventory && h.Id == bucket.Id).ToList();
+
+        Assert.True(owned > 1);
+        Assert.Equal(owned, hits.Count);
+        Assert.Equal(owned, hits.Select(h => h.ToolInstance).Distinct().Count());
+    }
+
+    [Fact]
     public void PrefixMatchesRankAheadOfSubstrings()
     {
         var inventory = new Inventory();
