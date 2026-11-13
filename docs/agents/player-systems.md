@@ -71,7 +71,7 @@ Singleplayer ticks it in `LocalPlayer.UpdateHealth`, a server in `ServerPlayer.T
 body is not judged); `HealthTests`. Lava also drags movement: `PlayerConfig.LavaSpeedFactor` scales the
 walk and the swim stroke while any part of the body is in it (flight ignores it), so a sprint cannot
 carry through a shallow dip (`LavaMovementTests`).
-**Campfire.** A body whose feet are in a lit campfire (`PlayerBodyProbe.OnLitCampfire`: the lit pile in the cell the feet are in, under its footprint; a pile beside the body or a block below it does not count) catches the `burning` status effect (`PlayerHealth.UpdateCampfire`), with no damage of its own, in singleplayer and on the server (`ServerPlayer.TickStatus`); creative and flight are immune (`CampfireContactTests`).
+**Campfire.** A body whose feet are in a lit campfire (`PlayerBodyProbe.OnLitCampfire`: the lit pile in the cell the feet are in, under its footprint; a pile beside the body or a block below it does not count) catches the `burning` status effect (`PlayerHealth.UpdateCampfire`), with no damage of its own, in singleplayer and on the server (`ServerPlayer.TickStatus`); creative and flight are immune (`CampfireContactTests`). Every living mob catches it the same way by its own footprint (`CampfireManager.IsBodyInLit`, applied by `MobDirector.IgniteMobsInCampfires` in the authoritative world), unless its `immune` list names `burning`.
 
 **Regeneration.** Out of combat the player heals (`PlayerHealth.UpdateRegen`): once
 `PlayerConfig.RegenDelaySeconds` have passed with no damage taken (`TakeDamage` restarts the clock)

@@ -275,7 +275,40 @@ internal sealed class MobDirector
         }
 
         FireWearerPassives((float)deltaTime);
+        IgniteMobsInCampfires();
         ApplyStatusBlockActions();
+    }
+
+    // Every living mob whose feet stand in a lit campfire catches the burning effect, as the player does
+    // (PlayerHealth.UpdateCampfire); a mob immune to burning refuses it in its effect set. Authoritative worlds only.
+    private void IgniteMobsInCampfires()
+    {
+        if (_clientMode || _campfires.LitCount == 0)
+            return;
+        IgniteInCampfires(_slimes?.Slimes);
+        IgniteInCampfires(_goblins?.Goblins);
+        IgniteInCampfires(_hellMobs?.Mobs);
+        IgniteInCampfires(_skyMobs?.Mobs);
+        IgniteInCampfires(_wildlife?.Mobs);
+        IgniteInCampfires(_caveMobs?.Mobs);
+        IgniteInCampfires(_skeletons?.Mobs);
+        IgniteInCampfires(_kings?.Mobs);
+        IgniteInCampfires(_sandworms?.Worms);
+    }
+
+    private void IgniteInCampfires<T>(IReadOnlyList<T>? mobs) where T : Mob
+    {
+        if (mobs == null)
+            return;
+        for (var i = 0; i < mobs.Count; i++)
+        {
+            var mob = mobs[i];
+            if (mob.IsDying || mob.IsDead)
+                continue;
+            var p = mob.Position;
+            if (_campfires.IsBodyInLit(p.X, p.Y - mob.BodyHalfHeight, p.Z, mob.BodyHalfExtent))
+                StatusEffects.Apply(mob, "burning");
+        }
     }
 
     // The on-damaged and low-health passives of every worn set: the local player's in singleplayer, each connected

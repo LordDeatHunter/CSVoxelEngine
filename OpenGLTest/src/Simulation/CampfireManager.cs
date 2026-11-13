@@ -61,6 +61,29 @@ public sealed class CampfireManager
 
     public bool IsLit(int x, int y, int z) => _lit.ContainsKey((x, y, z));
 
+    // A resting body's feet can sit a float short of the cell edge they stand on; this much still counts as in the cell
+    private const float FeetTolerance = 0.05f;
+
+    /// <summary>
+    /// Whether a body with its feet at (<paramref name="x"/>, <paramref name="feetY"/>, <paramref name="z"/>) and
+    /// half-width <paramref name="radius"/> stands in a lit campfire: the pile in the cell its feet are in, under any
+    /// cell of its footprint. A pile is not solid, so a body stands in it rather than on it; a pile beside the body, or
+    /// one a block below its feet, does not count. The one rule for the player and every mob.
+    /// </summary>
+    public bool IsBodyInLit(float x, float feetY, float z, float radius)
+    {
+        if (_lit.Count == 0) return false;
+        var y = (int)MathF.Floor(feetY + FeetTolerance);
+        var minX = (int)MathF.Floor(x - radius);
+        var maxX = (int)MathF.Floor(x + radius);
+        var minZ = (int)MathF.Floor(z - radius);
+        var maxZ = (int)MathF.Floor(z + radius);
+        for (var cx = minX; cx <= maxX; cx++)
+            for (var cz = minZ; cz <= maxZ; cz++)
+                if (IsLit(cx, y, cz)) return true;
+        return false;
+    }
+
     public bool Ignite(int x, int y, int z) => Ignite(x, y, z, BurnSeconds);
 
     /// <summary>Lights the pile with its first branch burning <paramref name="firstBranchSeconds"/> (a goblin camp's

@@ -51,4 +51,15 @@ public sealed class CampfireContactTests
         health.UpdateCampfire(onFire: true, immune: true);
         Assert.False(health.Effects.IsActive(StatusEffectRegistry.Require("burning")));
     }
+
+    [Fact]
+    public void AnyBodyBurnsByItsOwnFootprintNotThePlayers()
+    {
+        var campfires = new CampfireManager();
+        campfires.Ignite(5, 10, 5);
+
+        // A wide body centered a cell away still overlaps the pile with its footprint; a narrow one does not
+        Assert.True(campfires.IsBodyInLit(6.5f, 10f, 5.5f, radius: 0.75f));
+        Assert.False(campfires.IsBodyInLit(6.5f, 10f, 5.5f, radius: 0.2f));
+    }
 }
