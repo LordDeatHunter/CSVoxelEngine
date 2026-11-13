@@ -183,6 +183,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     SpellBuilder/              # the builder's selection rules, live stats and layout hit-tests
     Waystone/                  # the waystone screen's page rules, rows and layout hit-tests
     QuestBookLayoutTests.cs    # the quest book's zoom about the pointer, drag-to-pan and visible-only hit test
+    QuestTrackerTests.cs       # equipping replaces, locked quests refuse, completion unequips
     MapLayoutTests.cs          # the map's world <-> canvas round trip and north-up axes, the minimap's rim clamp (both shapes),
                                #   the screen's buttons, zoom about the pointer, pan-stops-following and CENTER
   VisualTest/                  # scenario parsing and ops, PNG capture

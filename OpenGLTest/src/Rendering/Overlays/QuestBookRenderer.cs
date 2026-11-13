@@ -7,6 +7,7 @@ using VoxelEngine.Data;
 using VoxelEngine.Graphics;
 using VoxelEngine.Quests;
 using VoxelEngine.UI;
+using VoxelEngine.UI.Map;
 using VoxelEngine.UI.Quests;
 using VoxelEngine.UI.Widgets;
 using static VoxelEngine.UI.UiTheme;
@@ -35,6 +36,12 @@ internal sealed class QuestBookRenderer : IDisposable
     private const float PanelPad = 18f;
     private const float RowHeight = 34f;
     private const float RowIcon = 26f;
+    private static readonly Rgba TrackerFill = new(10, 12, 16, 150);
+    private const float TrackerWidth = 240f;
+    private const float TrackerRow = 26f;
+    private const float TrackerIcon = 20f;
+    private const float TrackerPad = 8f;
+    private const float TrackerGap = 8f;
 
     private readonly GL _gl;
     private readonly UIRenderer _ui;
@@ -104,7 +111,7 @@ internal sealed class QuestBookRenderer : IDisposable
         _ui.DrawTextCenteredY(QuestText.Hint, hint.X, hint.Y, _ui.CountScale, TextDim);
 
         if (view.Selected is { } selected)
-            DrawDetails(selected, log, canvas, time);
+            DrawDetails(selected, log, view.Camera, canvas, time);
     }
 
     // A faint grid that pans and zooms with the book; dropped once its lines would crowd together
@@ -148,7 +155,7 @@ internal sealed class QuestBookRenderer : IDisposable
         }
     }
 
-    private void DrawDetails(QuestType quest, QuestLog log, Vector2 canvas, float time)
+    private void DrawDetails(QuestType quest, QuestLog log, VoxelEngine.Saves.QuestViewData camera, Vector2 canvas, float time)
     {
         var panel = QuestBookLayout.Details(canvas);
         // Node icons wrote depth where the panel now covers them; the panel's own icons must draw over
@@ -189,6 +196,48 @@ internal sealed class QuestBookRenderer : IDisposable
                 left + RowIcon + 10f, y, _ui.CountScale, met ? ReadyGreen : Rgba.White);
             _ui.DrawTextCenteredY(progress, panel.Right - PanelPad - progressWidth, y, _ui.CountScale, met ? ReadyGreen : TextDim);
             y += RowHeight;
+        }
+        DrawEquipButton(quest, log, camera, canvas);
+    }
+
+    private void DrawEquipButton(QuestType quest, QuestLog log, VoxelEngine.Saves.QuestViewData camera, Vector2 canvas)
+    {
+        var equipped = QuestTracker.IsEquipped(camera, quest);
+        if (!equipped && !QuestTracker.CanEquip(log, quest)) return;
+        _ui.DrawButton(QuestBookLayout.EquipButton(canvas), equipped ? QuestText.Unequip : QuestText.Equip, true,
+            equipped ? AccentGold : ReadyGreen);
+    }
+
+    /// <summary>
+    /// The equipped quest's requirements under the minimap (icon, line and progress per row, green once met), with
+    /// no title or description. Nothing draws when no quest is equipped; a finished one is unequipped on the way.
+    /// </summary>
+    internal void DrawTracker(QuestLog log, VoxelEngine.Saves.QuestViewData camera, float time)
+    {
+        if (QuestTracker.Current(log, camera) is not { } quest) return;
+        var minimap = MapLayout.Minimap(_ui.ScreenSize);
+        var width = MathF.Max(minimap.Size.X, TrackerWidth);
+        var rows = quest.Requirements.Count;
+        var size = new Vector2(width, rows * TrackerRow + TrackerPad * 2f);
+        var panel = UiRect.FromTopLeft(new Vector2(minimap.Right - width, minimap.Bottom + TrackerGap), size);
+        _ui.DrawRect(panel.Center, panel.Size, TrackerFill);
+        _ui.EnsureDepthCleared();
+        var y = panel.Top + TrackerPad + TrackerRow * 0.5f;
+        for (var r = 0; r < rows; r++, y += TrackerRow)
+        {
+            var requirement = quest.Requirements[r];
+            var have = log.ProgressOf(quest, r);
+            var met = have >= requirement.Count;
+            var left = panel.Left + TrackerPad;
+            if (requirement.Entity == null)
+                _ui.DrawIdIcon(new Vector2(left + TrackerIcon * 0.5f, y), TrackerIcon, requirement.Id, 0f, time);
+            var progress = QuestText.Progress(have, requirement.Count);
+            var progressWidth = _ui.TextWidth(progress, _ui.CountScale);
+            var textLeft = left + TrackerIcon + 8f;
+            _ui.DrawTextCenteredY(
+                _ui.FittedText(QuestText.Line(requirement), _ui.CountScale, panel.Right - TrackerPad - progressWidth - 8f - textLeft),
+                textLeft, y, _ui.CountScale, met ? ReadyGreen : Rgba.White);
+            _ui.DrawTextCenteredY(progress, panel.Right - TrackerPad - progressWidth, y, _ui.CountScale, met ? ReadyGreen : TextDim);
         }
     }
 

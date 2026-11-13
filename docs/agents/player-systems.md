@@ -448,7 +448,12 @@ where they were on the next open, and singleplayer saves them in `QuestSaveData.
 `UiPasses.RenderQuests`, after the HUD pass) draws an opaque grid backdrop, the edges (green into a complete quest), the hex or
 circle node frames (tinted by state, a check badge when complete, a gold ring when selected) with the icon inside, the header
 tally, the controls hint and, for the selected quest, the details panel: title, state, wrapped description and one row per
-requirement (`QuestText.Line`, `have/count`, green when met).
+requirement (`QuestText.Line`, `have/count`, green when met). An open, readable quest shows an EQUIP button at the foot of the
+panel (UNEQUIP when it is the equipped one). **The equipped quest** is `QuestViewData.Equipped` (one id, so one at a time,
+saved with the view in singleplayer, per session on a client; no wire change): `QuestTracker` (GL-free,
+`QuestTrackerTests`) holds the rules, and while playing `QuestBookRenderer.DrawTracker` (in `UiPasses.RenderQuests`, hidden
+with the HUD and under the map screen) lists just its requirements (icon, line, `have/count`) under the minimap, no title or
+description. A quest that completes is unequipped the next frame (`QuestTracker.Current` clears a stale id).
 
 **The completion toast.** Each completion queues a card in `LocalPlayer.QuestToasts` (`QuestToastQueue`, one card at a time:
 slide in `ToastSlideInSeconds`, hold `ToastHoldSeconds`, slide out `ToastSlideOutSeconds`; `QuestToastQueueTests`), ticked in

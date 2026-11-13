@@ -64,6 +64,14 @@ internal static class QuestBookLayout
         return new UiRect(new Vector2(canvas.X - Margin - width * 0.5f, canvas.Y * 0.5f), new Vector2(width, height));
     }
 
+    /// <summary>The EQUIP / UNEQUIP button at the foot of the details panel.</summary>
+    public static UiRect EquipButton(Vector2 canvas)
+    {
+        var panel = Details(canvas);
+        var size = new Vector2(panel.Size.X - 36f, 40f);
+        return new UiRect(new Vector2(panel.Center.X, panel.Bottom - 18f - size.Y * 0.5f), size);
+    }
+
     /// <summary>The title line's left edge and center height, top-left of the canvas.</summary>
     public static Vector2 Header => new(Margin, Margin + 14f);
 

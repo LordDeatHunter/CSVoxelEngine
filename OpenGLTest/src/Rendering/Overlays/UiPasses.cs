@@ -8,6 +8,7 @@ using VoxelEngine.Data;
 using VoxelEngine.Juice;
 using VoxelEngine.Player;
 using VoxelEngine.Quests;
+using VoxelEngine.Saves;
 using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.Chest;
@@ -226,15 +227,17 @@ internal sealed class UiPasses
     /// <summary>
     /// Draws the quest book (see <see cref="QuestBookRenderer"/>) over the world and the HUD while it is open or
     /// fading out, then the quest-complete toast card, in their own UI pass. <paramref name="time"/> is the window
-    /// clock, so the fade runs while paused.
+    /// clock, so the fade runs while paused. <paramref name="showTracker"/> adds the equipped quest's requirements under the minimap.
     /// </summary>
-    internal void RenderQuests(IWindow window, QuestBookView view, QuestLog log, QuestToastQueue toasts, double time)
+    internal void RenderQuests(IWindow window, QuestBookView view, QuestLog log, QuestToastQueue toasts, QuestViewData camera,
+        bool showTracker, double time)
     {
         view.Transition.Step(view.IsOpen, (float)time);
-        if (!view.Transition.Visible && toasts.Current == null) return;
+        if (!view.Transition.Visible && toasts.Current == null && !showTracker) return;
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
+        if (showTracker) _owner.Ui.Quests.DrawTracker(log, camera, (float)time);
         if (view.Transition.Visible)
         {
             _owner.Ui.SetOverlay(Vector2.Zero, view.Transition.Alpha);

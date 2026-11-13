@@ -582,7 +582,7 @@ public static class Program
         // The quest book covers the world and the HUD; its toast card rides the HUD's corner
         if (!hideHud)
             renderManager.UiPasses.RenderQuests(windowManager.Window, gameplay.QuestBook.View, world.LocalPlayer.Quests,
-                world.LocalPlayer.QuestToasts, windowManager.Window.Time);
+                world.LocalPlayer.QuestToasts, world.LocalPlayer.QuestView, !gameplay.Map.View.IsOpen, windowManager.Window.Time);
         // The chat log and input draw over the HUD; hidden with the HUD and behind the pause menu.
         if (!hideHud && !pauseMenuView.IsOpen)
         {

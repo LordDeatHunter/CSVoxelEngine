@@ -14,7 +14,8 @@ namespace VoxelEngine.App;
 /// <item>a left press that travels <see cref="QuestConfig.DragThreshold"/> pans;</item>
 /// <item>a release that never traveled selects the quest under the pointer, or clears the selection on empty
 /// space (a click inside the details panel keeps it);</item>
-/// <item>the wheel zooms about the pointer.</item>
+/// <item>the wheel zooms about the pointer;</item>
+/// <item>the details panel's EQUIP button equips the selected quest (<see cref="QuestTracker"/>).</item>
 /// </list>
 /// P, E and Escape close it. The pan and zoom live in the local player's <see cref="Saves.QuestViewData"/>, so
 /// they are where they were on the next open. Owned by <see cref="GameplayInput"/>; main thread only.
@@ -80,7 +81,12 @@ internal sealed class QuestBookInput
         if (dragged) return;
         var canvas = renderManager.Ui.ScreenSize;
         var point = renderManager.Ui.ToCanvas(windowPoint);
-        if (View.Selected != null && QuestBookLayout.Details(canvas).Contains(point)) return;
+        if (View.Selected is { } selected && QuestBookLayout.Details(canvas).Contains(point))
+        {
+            if (QuestBookLayout.EquipButton(canvas).Contains(point))
+                QuestTracker.Toggle(w.LocalPlayer.Quests, View.Camera, selected);
+            return;
+        }
         View.Selected = QuestBookLayout.NodeAt(w.LocalPlayer.Quests, View.Camera, canvas, point);
     }
 
