@@ -7,10 +7,9 @@ namespace VoxelEngine.Config;
 public static class SkyConfig
 {
     // --- Lighting ---
-// Full day/night cycle length in seconds (sun orbit + sky + light modulation). Matches
-// Minecraft's 20 real minutes for the whole cycle, so the sun crosses the sky at the same
-// 0.3 degrees per second.
-public const float DayLengthSeconds = 1200f;
+// Full day/night cycle length in seconds (sun orbit + sky + light modulation): 40 real
+// minutes, so the sun crosses the sky at 0.15 degrees per second.
+public const float DayLengthSeconds = 2400f;
 
     // --- Sky ---
     // Angular radius of the visible sun disc in degrees. The real sun is 0.27 degrees across

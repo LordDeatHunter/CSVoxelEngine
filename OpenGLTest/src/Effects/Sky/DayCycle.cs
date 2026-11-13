@@ -16,7 +16,7 @@ public static class DayCycle
     public const float StartAngle = 0.8f;
 
     /// <summary>The first lighting time at which the sun stands highest (its orbit angle a quarter
-    /// turn), about 147 s; noon recurs every <see cref="SkyConfig.DayLengthSeconds"/>.</summary>
+    /// turn), about 293 s; noon recurs every <see cref="SkyConfig.DayLengthSeconds"/>.</summary>
     public static double NoonTime => (MathF.PI / 2f - StartAngle) / MathF.Tau * SkyConfig.DayLengthSeconds;
 
     /// <summary>The sun's orbit angle at <paramref name="time"/>, in radians: one turn per
