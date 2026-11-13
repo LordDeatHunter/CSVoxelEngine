@@ -147,7 +147,7 @@ the children and their own split. The player fights back with
 the left-click punch (`LeftClickAction.UpdatePunch` + `Combat`): a mob inside the forward 3-block, 30°-half-angle
 cone with line of sight takes the held item's `entityDamage` and a knockback shove, and while one is in
 the cone mining stands down (attack-first). `Mining.EntityDamage` is the bare-hand baseline (1) an item
-overrides with its `entityDamage` (primitive tools 2, copper tools 5, obsidian blade 6). The obsidian
+overrides with its `entityDamage` (primitive tools 2, copper tools 5, obsidian dagger 6). The obsidian
 blade (`attack: "slice"`) instead swings a two-phase sweep (`LeftClickAction.UpdateSlice` + `SliceCombo`): each
 swing hits the nearest two mobs in a forward hemisphere of the same reach with line of sight, the
 buffered return swing is at half power, and the damage lands at the swing's impact frame rather than on

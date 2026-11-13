@@ -26,7 +26,7 @@ public sealed class ItemDefinition
 
     /// <summary>
     /// Damage one punch deals to an enemy; omitted for the bare-hand baseline (1). A weapon like
-    /// the obsidian blade raises this without needing a <see cref="Tool"/> block.
+    /// the obsidian dagger raises this without needing a <see cref="Tool"/> block.
     /// </summary>
     public float? EntityDamage { get; set; }
 

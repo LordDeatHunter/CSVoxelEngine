@@ -89,7 +89,7 @@ public sealed class CombatTests
     [Fact]
     public void SliceReturnSwingHalvesForwardPowerFlooredAtOne()
     {
-        var blade = ContentRegistry.RequireItem("obsidian_blade");
+        var blade = ContentRegistry.RequireItem("obsidian_dagger");
         var forward = Combat.SliceDamage(blade, returnSwing: false);
         Assert.Equal((int)MathF.Round(forward / 2f, MidpointRounding.AwayFromZero), Combat.SliceDamage(blade, returnSwing: true));
         Assert.True(forward > Combat.SliceDamage(null, returnSwing: false));

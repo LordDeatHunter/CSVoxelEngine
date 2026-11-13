@@ -22,7 +22,7 @@ public sealed class SliceTrailSystemTests
 
     public SliceTrailSystemTests() => TestContent.EnsureLoaded();
 
-    private static Item Blade => ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!;
+    private static Item Blade => ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_dagger").Id)!;
     private static Item Flint => ItemRegistry.TryGet(ContentRegistry.RequireItem("flint").Id)!;
     private static Item Dirt => ItemRegistry.TryGet(ContentRegistry.RequireBlock("dirt").Id)!;
 

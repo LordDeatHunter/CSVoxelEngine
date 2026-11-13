@@ -16,7 +16,7 @@ public sealed class ItemDisplayEditorTests
     private static ItemDisplayEditor EditedBlade()
     {
         var editor = new ItemDisplayEditor();
-        editor.Select(ContentRegistry.RequireItem("obsidian_blade").Id);
+        editor.Select(ContentRegistry.RequireItem("obsidian_dagger").Id);
         // Drag every slider off where it loaded.
         editor.Rotation += new Vector3(10f, -55f, 25f);
         editor.Translation += new Vector3(0.1f, -0.1f, 0.2f);

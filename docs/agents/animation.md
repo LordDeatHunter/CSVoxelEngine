@@ -398,7 +398,7 @@ overshoot or jiggle.
   the shoulder camera's eye counts), aged in `UpdateHeadMotion`, cleared the moment the eye is back
   under, and given a new seed per surfacing; the drop positions, sizes and slides are hashed in the
   shader. `visual-examples/surfacing-droplets.json` films it, `SurfacingDropletsTests` locks it down.
-- **Slice trail** (`Particles/SliceTrail*`): a blade swing (the obsidian blade's slice and its return,
+- **Slice trail** (`Particles/SliceTrail*`): a blade swing (the obsidian dagger's slice and its return,
   the iron sword's cut, back cut and chop) leaves a glowing, curved crescent behind the blade tip that
   fades out within `SliceTrailLifeSeconds`, in first person and in the shoulder view. The tip and an
   inner point are read along the held sprite's (1, 1, 0) diagonal (`SliceTrailTipReach`,

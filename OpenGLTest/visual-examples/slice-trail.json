@@ -1,5 +1,5 @@
 {
-  // The slice trail behind the obsidian blade's slice and return and the iron sword's cut, back cut
+  // The slice trail behind the obsidian dagger's slice and return and the iron sword's cut, back cut
   // and chop, from the shoulder camera and then in first person: run with
   // VOXEL_SCRIPT=visual-examples/slice-trail.json VOXEL_TIME=147 from OpenGLTest/. Shots land in
   // visual/slice-trail/. The player drops (creative, so for free) onto the meadow of the sword
@@ -13,7 +13,7 @@
     { "op": "creative" },
     { "op": "teleport", "pos": [-43.5, 16.5, 60.5], "yaw": 90, "pitch": -10 },
     { "op": "wait", "seconds": 5 },
-    { "op": "give", "block": "item/obsidian_blade", "count": 1 },
+    { "op": "give", "block": "item/obsidian_dagger", "count": 1 },
     { "op": "view", "mode": "shoulder" },
     { "op": "wait", "seconds": 1 },
     { "op": "screenshot", "name": "ready", "hideHud": true },

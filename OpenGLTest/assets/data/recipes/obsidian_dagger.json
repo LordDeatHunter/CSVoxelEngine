@@ -1,5 +1,5 @@
 {
-  "result": "item/obsidian_blade",
+  "result": "item/obsidian_dagger",
   "count": 1,
   "ingredients": [
     { "item": "item/obsidian", "count": 2 },

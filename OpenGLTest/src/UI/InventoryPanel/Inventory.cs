@@ -22,7 +22,7 @@ namespace VoxelEngine.UI.InventoryPanel;
 /// leave a refused drop on the ground (see <see cref="CanAccept"/>). A new survival player
 /// spawns with nothing (<see cref="Empty"/>), and finds what to carry from the world; in
 /// creative mode the panel browses every item and grants it on click. The test/dev constructor
-/// stock (50 of every block plus a bucket, the copper tools, a compass, an obsidian blade, a
+/// stock (50 of every block plus a bucket, the copper tools, a compass, an obsidian dagger, a
 /// multiblock converter and a few station materials) is what tests and the item debugger open
 /// with; a saved inventory replaces whatever the pool held wholesale through <see cref="Import"/>,
 /// and <see cref="Export"/> is its save-side twin.

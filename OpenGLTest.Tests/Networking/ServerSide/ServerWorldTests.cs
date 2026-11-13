@@ -74,7 +74,7 @@ public sealed class ServerWorldTests : IDisposable
     {
         WorldSeed.Apply(WorldSeed.Default);
         _world = new World(null!, null!, null!, null!, null!, null!, null, null, serverMode: true);
-        var blade = ContentRegistry.RequireItem("obsidian_blade").Id;
+        var blade = ContentRegistry.RequireItem("obsidian_dagger").Id;
         _world.Inventory.Add(blade, 1);
         Assert.True(_world.Inventory.PickBlock(blade));
 

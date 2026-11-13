@@ -15,7 +15,7 @@ lighting around it. Full tab, mode and `ITEM_DEBUGGER_*` reference: `docs/agents
 ```
 dotnet build OpenGLTest.ItemDebugger/ItemDebugger.csproj -c Release            # from the repo root, once
 cd OpenGLTest
-ITEM_DEBUGGER_SELECT=obsidian_blade ITEM_DEBUGGER_PLAYER_ANIM=slice \
+ITEM_DEBUGGER_SELECT=obsidian_dagger ITEM_DEBUGGER_PLAYER_ANIM=slice \
 ITEM_DEBUGGER_SHOT_AT=0.28 ITEM_DEBUGGER_ORBIT=160,10 \
 ITEM_DEBUGGER_SHOT=visual/debugger/slice.png \
 dotnet run --project ../OpenGLTest.ItemDebugger -c Release --no-build

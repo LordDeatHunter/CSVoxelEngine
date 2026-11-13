@@ -1,5 +1,5 @@
 {
-  // The obsidian blade's slice from the shoulder camera: run with
+  // The obsidian dagger's slice from the shoulder camera: run with
   // VOXEL_SCRIPT=visual-examples/animations-slice.json VOXEL_TIME=147 from OpenGLTest/.
   // Shots land in visual/animations-slice/. A slice lasts 0.7 s: the wind-up ends at ~0.18 s, the
   // strike is centered on the impact at ~0.26 s and ends at ~0.34 s, the rest is the recovery. Each
@@ -8,7 +8,7 @@
   "steps": [
     { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -5 },
     { "op": "wait", "seconds": 5 },
-    { "op": "give", "block": "item/obsidian_blade", "count": 1 },
+    { "op": "give", "block": "item/obsidian_dagger", "count": 1 },
     { "op": "view", "mode": "shoulder" },
     { "op": "wait", "seconds": 1 },
     { "op": "screenshot", "name": "ready" },

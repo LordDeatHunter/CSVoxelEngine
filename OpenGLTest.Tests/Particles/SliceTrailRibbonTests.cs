@@ -20,7 +20,7 @@ public sealed class SliceTrailRibbonTests
 {
     public SliceTrailRibbonTests() => TestContent.EnsureLoaded();
 
-    private static Item Blade => ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!;
+    private static Item Blade => ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_dagger").Id)!;
 
     // Drives one player model and its trail the way the world does (see SliceTrailTests)
     private sealed class Driver(Item item, double hz)

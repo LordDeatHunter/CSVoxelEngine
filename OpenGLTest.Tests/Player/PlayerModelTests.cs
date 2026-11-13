@@ -416,7 +416,7 @@ public sealed class PlayerModelTests
         TestContent.EnsureLoaded();
         // The blade as drawn: the sprite's tip is its (1, 1, 0) diagonal, taken through the item's display transform
         // (plus what the pose adds to it for the frame) and the hand anchor.
-        var item = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!;
+        var item = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_dagger").Id)!;
 
         foreach (var direction in new[] { 1, -1 })
         {
@@ -503,7 +503,7 @@ public sealed class PlayerModelTests
         // The turn is the difference between the display rotation the blade reads right with mid-cut and its own: so
         // drawing the item with its rotation plus the offset is the same as an item authored at that rotation.
         TestContent.EnsureLoaded();
-        var item = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!;
+        var item = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_dagger").Id)!;
         var tuned = new ItemDisplayEditor();
         tuned.Select(item.Id);
         tuned.Rotation += mid;
@@ -516,7 +516,7 @@ public sealed class PlayerModelTests
     public void TheDrawnBladeLeadsAheadOfTheForearmThroughTheCutAndTheReturnSwingIsItsMirrorImage()
     {
         TestContent.EnsureLoaded();
-        var item = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!;
+        var item = ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_dagger").Id)!;
         var eye = new Vector3(0.5f, 70f, 0.5f);
         var progresses = new[] { 0.3f, 0.35f, 0.4f, 0.45f, 0.48f };
 

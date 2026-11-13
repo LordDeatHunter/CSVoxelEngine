@@ -52,7 +52,7 @@ public sealed class ItemTooltipTests
         Assert.Contains(lines, l => l.StartsWith("Power"));
 
         // A weapon declares damage without being a tool
-        var blade = ContentRegistry.RequireItem("obsidian_blade").Id;
+        var blade = ContentRegistry.RequireItem("obsidian_dagger").Id;
         Assert.Contains(ItemTooltip.Lines(blade, null), l => l.StartsWith("Damage"));
 
         var firestarter = ContentRegistry.RequireItem("firestarter").Id;

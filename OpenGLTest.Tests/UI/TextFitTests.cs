@@ -13,7 +13,7 @@ public sealed class TextFitTests
 
     private static readonly string[] Texts =
     [
-        "Hi", "Obsidian Blade", "A long item name that cannot possibly fit", new string('x', 500),
+        "Hi", "Obsidian Dagger", "A long item name that cannot possibly fit", new string('x', 500),
     ];
 
     private static readonly float[] Widths = [1f, 15f, 60f, 140f, 400f, 6000f];
@@ -56,9 +56,9 @@ public sealed class TextFitTests
     public void TextIsShrunkBeforeItIsCut()
     {
         // 14 characters need 140 at scale 1; 120 is within the 0.7 floor, so nothing is dropped.
-        var fitted = TextFit.SingleLine("Obsidian Blade", 1f, 120f, Mono);
+        var fitted = TextFit.SingleLine("Obsidian Dagger", 1f, 120f, Mono);
         Assert.False(fitted.Truncated);
-        Assert.Equal("Obsidian Blade", fitted.Text);
+        Assert.Equal("Obsidian Dagger", fitted.Text);
         Assert.True(fitted.Scale < 1f);
     }
 

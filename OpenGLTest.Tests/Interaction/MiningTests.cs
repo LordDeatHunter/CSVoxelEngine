@@ -303,14 +303,14 @@ public sealed class MiningTests
 
         var primitive = ItemOf("primitive_pickaxe").EntityDamage;
         var copper = ItemOf("copper_pickaxe").EntityDamage;
-        var blade = ItemOf("obsidian_blade").EntityDamage;
+        var blade = ItemOf("obsidian_dagger").EntityDamage;
         Assert.True(primitive > bareHand);
         Assert.True(copper > primitive);
         Assert.True(blade >= copper);
 
         Assert.Equal((int)primitive, Combat.PunchDamage(ItemOf("primitive_pickaxe")));
         Assert.Equal((int)copper, Combat.PunchDamage(ItemOf("copper_pickaxe")));
-        Assert.Equal((int)blade, Combat.PunchDamage(ItemOf("obsidian_blade")));
+        Assert.Equal((int)blade, Combat.PunchDamage(ItemOf("obsidian_dagger")));
     }
 
     [Fact]

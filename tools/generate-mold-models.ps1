@@ -234,7 +234,7 @@ Copy-IfMissing (Join-Path $itemsDir 'copper_pickaxe.png') (Join-Path $itemsDir '
 Copy-IfMissing (Join-Path $itemsDir 'copper_axe.png')     (Join-Path $itemsDir 'mold_axe.png')
 Copy-IfMissing (Join-Path $itemsDir 'copper_ingot.png')  (Join-Path $itemsDir 'mold_ingot.png')
 Copy-IfMissing (Join-Path $itemsDir 'copper_ring.png')   (Join-Path $itemsDir 'mold_ring.png')
-Copy-IfMissing (Join-Path $itemsDir 'copper_blade.png')  (Join-Path $itemsDir 'mold_dagger.png')
+Copy-IfMissing (Join-Path $itemsDir 'copper_dagger.png')  (Join-Path $itemsDir 'mold_dagger.png')
 
 # model name -> the sprite whose silhouette carves it and the atlas tile it wears. A fired mold is
 # the same geometry as its raw twin in a different tile, so both read the same mask.

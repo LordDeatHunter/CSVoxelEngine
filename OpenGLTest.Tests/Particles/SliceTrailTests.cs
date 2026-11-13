@@ -20,7 +20,7 @@ public sealed class SliceTrailTests
 {
     public SliceTrailTests() => TestContent.EnsureLoaded();
 
-    private static Item Blade => ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_blade").Id)!;
+    private static Item Blade => ItemRegistry.TryGet(ContentRegistry.RequireItem("obsidian_dagger").Id)!;
     private static Item Sword => ItemRegistry.TryGet(ContentRegistry.RequireItem("iron_sword").Id)!;
 
     // Drives one player model and its trail the way the world does: the model updates, then the trail

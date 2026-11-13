@@ -178,7 +178,7 @@ public sealed class PlayerPreviewStateTests
     }
 
     [Theory]
-    [InlineData(PlayerPreviewState.Slice, "obsidian_blade")]
+    [InlineData(PlayerPreviewState.Slice, "obsidian_dagger")]
     [InlineData(PlayerPreviewState.Chop, "iron_sword")]
     public void SeekingRebuildsTheTrailPlayingWouldHave(string mode, string itemName)
     {
@@ -199,7 +199,7 @@ public sealed class PlayerPreviewStateTests
     [Fact]
     public void RestartingClearsTheTrail()
     {
-        var (state, clock) = TrailPreview(PlayerPreviewState.Slice, "obsidian_blade");
+        var (state, clock) = TrailPreview(PlayerPreviewState.Slice, "obsidian_dagger");
         for (var i = 0; i < 20; i++) clock.Update(Dt);
         Assert.True(state.Trail.Count > 0);
 
@@ -215,7 +215,7 @@ public sealed class PlayerPreviewStateTests
     [Fact]
     public void APunchModeLeavesNoTrail()
     {
-        var (state, clock) = TrailPreview(PlayerPreviewState.Punch, "obsidian_blade");
+        var (state, clock) = TrailPreview(PlayerPreviewState.Punch, "obsidian_dagger");
         for (var t = 0f; t < state.Duration; t += Dt)
         {
             clock.Update(Dt);

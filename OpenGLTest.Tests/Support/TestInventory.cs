@@ -25,7 +25,7 @@ internal static class TestInventory
         }
         if (ItemRegistry.FindByAction(ItemUseAction.PickupFluid) is { } bucket)
             inventory.Add(bucket.Id, autoEquip: false);
-        foreach (var name in new[] { "Copper Pickaxe", "Copper Axe", "Compass", "Obsidian Blade" })
+        foreach (var name in new[] { "Copper Pickaxe", "Copper Axe", "Compass", "Obsidian Dagger" })
             if (ItemRegistry.FindByName(name) is { } item)
                 inventory.Add(item.Id, autoEquip: false);
         foreach (var name in new[] { "Mud Brick", "Coal", "Crushed Copper" })
