@@ -230,6 +230,14 @@ covers a whole cell side (`ModelBakeSteps.ValidateFacingBake`); the two `hitbox`
 in third person the predicted facing reads the camera's view while the server reads the aim,
 so a placement near a 45-degree look may be corrected. `StairTests` covers the rules.
 
+A **crucible stand** (`crucibleStand: true`, only `crucible_stand.json`) is a crucible set down on the ground: a supported
+model block with `hasItem` false that holds no item of its own. Right-clicking the top of a block with a crucible in hand
+(`BlockInteractions.TryStandCrucible`) places it through `BlockPlacer.PlaceBlockAtFace` and moves the vessel's `ItemStack`, metal
+and all, into `StandingCrucibleManager` (saved in `stations.json`, mirrored to clients in the station snapshot, protocol 52);
+right-clicking it lifts the vessel back whatever is in hand (`TryTakeStandingCrucible`), breaking it or losing its block drops
+the vessel with its metal, and the look-at label shows its fill and each metal (`StationBars.StandingCrucible`). A client only
+claims the click; the server does the placing and lifting.
+
 The **lantern** (`lantern: true`) is a block item carried as an individual Tools instance. It crafts from
 six copper rings and four glass panes. It hangs under a ceiling (historical state 0) or stands on the floor
 (state bit 0 set); `Placement.TryMount` records the chosen support and every `BlockSupport` pop path honors it.

@@ -282,8 +282,9 @@ public static class NetFraming
     /// 50: the station snapshot ends with the logs standing on tree stumps, and <see cref="NetIntentKind.StumpHit"/> is a new
     /// intent; an older peer would misread the frame.
     /// 51: <see cref="NetMessage.QuestState"/> sends each player its quest progress; an older client would drop the
-    /// unknown message and never see a quest complete.</summary>
-    public const int ProtocolVersion = 51;
+    /// unknown message and never see a quest complete.
+    /// 52: the station snapshot ends with the crucibles standing on the ground; an older peer would misread the frame.</summary>
+    public const int ProtocolVersion = 52;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

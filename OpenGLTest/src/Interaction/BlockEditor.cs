@@ -109,7 +109,7 @@ internal sealed class BlockEditor
     /// hands anything back and nothing fells or topples, since the server runs the real break and
     /// broadcasts what it did.
     /// </summary>
-    internal void RemoveBlock(Vector3 blockPos, PlayerContext player, bool lanternPickup = false)
+    internal void RemoveBlock(Vector3 blockPos, PlayerContext player, bool pickedUp = false)
     {
         var chunkPos = VoxelCoords.ChunkPosOf(blockPos);
 
@@ -159,8 +159,17 @@ internal sealed class BlockEditor
             if (chunk.RemoveBlockAt(blockPos, _chunkManager) && !_clientMode)
             {
                 _world.Lanterns.Take(blockPos.BlockCell());
-                if (!lanternPickup && stack != null)
+                if (!pickedUp && stack != null)
                     _dropManager.SpawnInstance(stack, blockPos + new Vector3(.5f));
+            }
+        }
+        // A standing crucible hands its vessel back with its metal, even in creative (the vessel is not loot)
+        else if (Simulation.Crucibles.StandingCrucibleManager.IsStand(brokenId))
+        {
+            if (chunk.RemoveBlockAt(blockPos, _chunkManager) && !_clientMode)
+            {
+                var vessel = _world.StandingCrucibles.Take(blockPos.BlockCell());
+                if (!pickedUp) _dropManager.SpawnInstance(vessel, blockPos + new Vector3(.5f));
             }
         }
         else if (chunk.RemoveBlockAt(blockPos, _chunkManager))

@@ -355,7 +355,7 @@ internal sealed class ClientMirror
     /// kilns and pours it draws are the server's, which alone runs them.
     /// </summary>
     internal void ApplyNetworkStations(PacketReader reader) => StationNetCodec.ReadWorld(reader,
-        _campfires, _querns, _kilns, _casting, _world.Smithing, _world.Towers, _world.ChestLids, _world.Lanterns, _world.Stumps);
+        _campfires, _querns, _kilns, _casting, _world.Smithing, _world.Towers, _world.ChestLids, _world.Lanterns, _world.Stumps, _world.StandingCrucibles);
 
     /// <summary>
     /// A client mirrors the health the server's <see cref="NetMessage.PlayerStatus"/> reports: the

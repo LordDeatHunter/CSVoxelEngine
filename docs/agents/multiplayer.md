@@ -222,7 +222,7 @@ least one player has open, `ChestLids.WriteNet`, which is what swings a chest's 
 and `SoundEvents` (the world sounds made near a player, `SoundEventCodec`; see "World sounds" below)
 and `InventoryState`/`InventoryRequest` (a player's server-owned inventory, `InventoryNetCodec`,
 and its intents, `InventoryIntentCodec`), `QuestState` (a player's quest progress, `QuestStateCodec`, sent on join and after
-every change; version 51, see "Quests (U-15)"), and the waystone messages `WaystoneRename` (a client's rename request),
+every change; version 51, see "Quests (U-15)"; version 52 ends the station snapshot with the crucibles standing on the ground), and the waystone messages `WaystoneRename` (a client's rename request),
 `WaystoneRows` (a player's registry rows) and `WaystoneOpened` (what a waystone activation came to; `WaystoneNetCodec`,
 see "Waystones on a server"). The intent protocol came with version 3: a client
 never writes a cell (the old raw `BlockEdit` is retired and refused), every intent carries a

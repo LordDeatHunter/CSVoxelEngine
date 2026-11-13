@@ -1,0 +1,17 @@
+{
+  // A crucible set down on the ground. Not an item of its own: a right-click with a crucible in hand on the top of a
+  // block stands it here (StandingCrucibleManager holds the vessel with whatever metal it carries), a right-click on it
+  // picks the vessel back up, and breaking it drops the vessel.
+  "name": "Crucible",
+  "model": "block/crucible",
+  "hardness": 1,
+  "sfx": "hit_stone",
+  "solid": false,
+  "castsAO": false,
+  "hasItem": false,
+  "needsSupport": true,
+  "loot": "none",
+  "crucibleStand": true,
+  // The bowl hugs the middle of its cell: an 8x8x8 box (see block/crucible)
+  "hitbox": { "min": [0.25, 0, 0.25], "max": [0.75, 0.5, 0.75] }
+}

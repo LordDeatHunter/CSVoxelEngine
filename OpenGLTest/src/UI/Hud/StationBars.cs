@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using VoxelEngine.Config;
+using VoxelEngine.Content;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.UI.InventoryPanel;
@@ -72,6 +73,26 @@ public static class StationBars
         };
         if (state.Lit && state.Ore > 0)
             bars.Add(new StationBar("Smelting", state.UnitProgress / BloomeryConfig.SecondsPerOre, StationBarKind.Progress));
+        return bars;
+    }
+
+    /// <summary>The bars of a crucible standing on the ground: how full it is, then one bar per metal (its molten ml, and
+    /// what is still unmelted).</summary>
+    public static List<StationBar>? StandingCrucible(ItemStack? vessel)
+    {
+        if (vessel == null) return null;
+        var capacity = Math.Max(1, vessel.Item.CrucibleCapacityMl);
+        var contents = vessel.Get<CrucibleComponent>();
+        var bars = new List<StationBar>
+        {
+            new(contents.IsEmpty ? "Empty" : $"Holds {contents.TotalMl}/{capacity} ml", contents.TotalMl / (float)capacity, StationBarKind.Done),
+        };
+        foreach (var metal in contents.Metals)
+        {
+            var name = ContentRegistry.MoltenMaterialById(metal.MaterialId)?.DisplayName ?? $"material {metal.MaterialId}";
+            bars.Add(new StationBar(metal.PendingMl > 0 ? $"{name} {metal.MoltenMl} ml + {metal.PendingMl} ml unmelted" : $"{name} {metal.MoltenMl} ml",
+                metal.TotalMl / (float)capacity, StationBarKind.Fuel));
+        }
         return bars;
     }
 

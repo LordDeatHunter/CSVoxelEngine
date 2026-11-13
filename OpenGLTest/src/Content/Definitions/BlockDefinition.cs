@@ -343,6 +343,10 @@ public sealed class BlockDefinition
     /// <summary>Individual fuelled lantern, carried as an instance and lit dynamically.</summary>
     public bool Lantern { get; set; }
 
+    /// <summary>A crucible standing on the ground: the block holds the vessel's own stack in
+    /// <c>StandingCrucibleManager</c>, so it is never an item of its own (needs <c>hasItem</c> false).</summary>
+    public bool CrucibleStand { get; set; }
+
     /// <summary>The <c>chest</c> object.</summary>
     public sealed class ChestDefinition
     {

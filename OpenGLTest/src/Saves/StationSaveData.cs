@@ -44,6 +44,9 @@ public sealed class StationSaveData
 
     public List<Simulation.Lanterns.LanternData>? Lanterns { get; set; }
 
+    /// <summary>The crucibles standing on the ground, with their metal.</summary>
+    public List<Simulation.Crucibles.StandingCrucibleData>? StandingCrucibles { get; set; }
+
     /// <summary>The waystone registry's records (a waystone nobody activated has none).</summary>
     public List<WaystoneData>? Waystones { get; set; }
 

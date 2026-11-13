@@ -910,6 +910,9 @@ public class World
 
     public Simulation.Lanterns.LanternManager Lanterns { get; } = new();
 
+    /// <summary>The crucibles standing on the ground (authoritative on a server and in singleplayer, a mirror on a client).</summary>
+    public Simulation.Crucibles.StandingCrucibleManager StandingCrucibles { get; } = new();
+
     /// <summary>The lit campfires, for a body that stands in one (<see cref="PlayerBodyProbe.OnLitCampfire"/>).</summary>
     public CampfireManager Campfires => _campfires;
 
@@ -1055,11 +1058,11 @@ public class World
     public Vector3 LastAltarCell => RightClick.LastAltarCell;
 
     public bool HasStations => StationNetCodec.AnyWorld(_campfires, _querns, _kilns, _casting,
-        _smithing, _towers, ChestLids, Lanterns, Stumps);
+        _smithing, _towers, ChestLids, Lanterns, Stumps, StandingCrucibles);
 
     /// <summary>Writes the server-owned stations, including placed lanterns.</summary>
     public void WriteStations(PacketWriter writer) => StationNetCodec.WriteWorld(writer,
-        _campfires, _querns, _kilns, _casting, _smithing, _towers, ChestLids, Lanterns, Stumps);
+        _campfires, _querns, _kilns, _casting, _smithing, _towers, ChestLids, Lanterns, Stumps, StandingCrucibles);
 
     /// <summary>
     /// One multiplayer-client frame: no local simulation, only the camera (and only once the chunk
@@ -1238,6 +1241,7 @@ public class World
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
         Stumps.Update((float)deltaTime, _chunkManager, _dropManager);
+        StandingCrucibles.Update(_chunkManager, _dropManager);
         _chests.Update(_chunkManager, _dropManager);
         Lanterns.Update((float)deltaTime, _chunkManager, _dropManager);
         Lanterns.UpdateHeld((float)deltaTime, this, _serverMode);

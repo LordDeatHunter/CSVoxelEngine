@@ -120,6 +120,9 @@ internal static class BlockLoader
             || !supportAbove || horizontalFacing || supportAttached || stack.StackMax > 0 || definition.Unbreakable == true
             || definition.HasItem == false || definition.Chest != null))
             throw new InvalidOperationException($"{path}: lantern requires a collectible supported model with its own state byte");
+        if (definition.CrucibleStand && (renderer != BlockRenderer.Model || fluid || falls || !support.NeedsSupport
+            || definition.HasItem != false))
+            throw new InvalidOperationException($"{path}: crucibleStand requires a supported model block with hasItem false");
         var facingFromLook = BlockSchemaParser.ParseFacingFromLook(definition, horizontalFacing, supportAttached, path);
         var openHitboxes = BlockSchemaParser.ParseOpen(definition, horizontalFacing, path);
         var solid = !fluid && (definition.Solid ?? true);
@@ -185,6 +188,7 @@ internal static class BlockLoader
             SplitLoot = BlockSchemaParser.ParseSplitLoot(definition, path),
             Chest = BlockSchemaParser.ParseChest(definition.Chest, renderer, path),
             Lantern = definition.Lantern,
+            CrucibleStand = definition.CrucibleStand,
             StackMax = (byte)stack.StackMax,
             TipHardness = tipHardness,
             HandMaxThickness = handMaxThickness,

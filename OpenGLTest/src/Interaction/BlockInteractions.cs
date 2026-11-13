@@ -5,6 +5,7 @@ using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Stations;
 using VoxelEngine.Items;
+using VoxelEngine.Simulation.Crucibles;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
@@ -80,6 +81,44 @@ internal sealed class BlockInteractions
             if (!inventory.Add(output))
                 _dropManager.Spawn(output, new Vector3(hx, hy, hz));
         }
+        return true;
+    }
+
+    /// <summary>
+    /// Right-click on a crucible standing on the ground: lifts the vessel, metal and all, into the tools pool whatever
+    /// is in hand (a full pool leaves it standing). A client claims the click and leaves the lift to the server.
+    /// </summary>
+    internal bool TryTakeStandingCrucible(float maxDistance, PlayerContext player)
+    {
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var cell = hit.BlockCell();
+        if (!_chunkManager.TryGetCell(cell.X, cell.Y, cell.Z, out var id, out _) || !StandingCrucibleManager.IsStand(id))
+            return false;
+        if (_world.IsClientMode) return true;
+        var vessel = _world.StandingCrucibles.Peek(cell);
+        if (vessel == null || player.Inventory.AddInstance(vessel))
+            Edits.RemoveBlock(hit, player, pickedUp: vessel != null);
+        return true;
+    }
+
+    /// <summary>
+    /// Right-click with a crucible in hand on the top of a block: stands it there with its metal. Refused (the click
+    /// falls through) against a side or an underside, or where the stand cannot go. A client claims the click and leaves
+    /// the placing to the server.
+    /// </summary>
+    internal bool TryStandCrucible(float maxDistance, PlayerContext player)
+    {
+        var inventory = player.Inventory;
+        if (inventory.HeldItem is not CrucibleItem) return false;
+        var stack = inventory.SelectedToolInstance > 0 ? inventory.GetToolStack(inventory.SelectedToolInstance) : null;
+        if (stack == null || !player.Raycast(maxDistance, _chunkManager, out var hit, out var normal) || normal.Y < 0.5f)
+            return false;
+        if (_world.IsClientMode) return true;
+        if (!_world.Placer.PlaceBlockAtFace(hit, normal, ContentRegistry.RequireBlock(StandingCrucibleManager.StandBlock).Id, 0,
+                player.ViewDirection, out var cell))
+            return false;
+        _world.StandingCrucibles.Place(cell.BlockCell(), stack);
+        inventory.RemoveTool(stack.InstanceId);
         return true;
     }
 
