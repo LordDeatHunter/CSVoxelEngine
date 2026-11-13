@@ -92,6 +92,24 @@ public static class SfxLibrary
     /// <summary>Group played ambiently from time to time by a crow near the camera.</summary>
     public const string CrowCawGroup = "crow_caw";
 
+    /// <summary>Group played when a hit lands on a boar.</summary>
+    public const string BoarHitGroup = "boar_hit";
+
+    /// <summary>Group played when a hit kills a boar.</summary>
+    public const string BoarDeathGroup = "boar_death";
+
+    /// <summary>Group played ambiently from time to time by a boar near the camera.</summary>
+    public const string BoarAmbientGroup = "boar_ambient";
+
+    /// <summary>Group played when a hit lands on a dire boar.</summary>
+    public const string DireBoarHitGroup = "dire_boar_hit";
+
+    /// <summary>Group played when a hit kills a dire boar.</summary>
+    public const string DireBoarDeathGroup = "dire_boar_death";
+
+    /// <summary>Group played ambiently from time to time by a dire boar near the camera.</summary>
+    public const string DireBoarAmbientGroup = "dire_boar_ambient";
+
     /// <summary>Group played when a blade (slice, sword or axe chop) starts a swing: a swoosh.</summary>
     public const string SwooshGroup = "swoosh";
 

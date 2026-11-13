@@ -60,7 +60,7 @@ OpenGLTest/
                                #   asks for or forbids HRTF (SetHrtf, live through alcResetDeviceSOFT) and logs its status
       AudioOutput.cs           # streams a 16-bit PCM IWaveProvider to a head-locked OpenAL source on its own refill thread
       SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups (and names the
-                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle, skeleton_hit, skeleton_death, crow_hit, crow_death, crow_caw, goblin_hit, goblin_death, slime_hit, slime_death, slime_jump, slime_land)
+                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle, skeleton_hit, skeleton_death, crow_hit, crow_death, crow_caw, boar_hit, boar_death, boar_ambient, dire_boar_hit, dire_boar_death, dire_boar_ambient, goblin_hit, goblin_death, slime_hit, slime_death, slime_jump, slime_land)
       AmbientCallTimer.cs      # a randomized repeat timer for ambient calls (skeleton rattle, crow caw); Tick fires once per interval
       SfxManager.cs            # one-shot sound effects: Play mixes a clip centered through one AudioOutput, PlayAt
                                #   plays its mono downmix in 3D (SpatialVoices) against the listener SetListener sets
@@ -538,7 +538,7 @@ OpenGLTest/
                                #   WildlifeSpecies table, Deer (watches, bolts, grazes), Boar (neutral until crowded or
                                #   hurt, then charges and gores; the dire boar is the same class oversized), FlyingAnimal
                                #   (lands, rests, takes off; posture for mirrors), Crow (flock pest: swoops, pecks, caws),
-                               #   CrowCaws (the flock's ambient caw: a randomized timer, played when a crow is in earshot),
+                               #   WildlifeCalls (one species' ambient call on a randomized timer, played when one is in earshot), WildlifeCallSet (the crow's caw and the boar and dire boar grunts),
                                #   Dragonfly (waterside hunter: darts and bites),
                                #   CorpseBloom (rooted jungle ambusher: poison burst and a lingering cloud), Centipede (jungle hunter: runs down and bites with venom)
         SkyMob.cs              # abstract sky mob (a RealmMob): the zone tier it spawned in and its tier-scaled pool

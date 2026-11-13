@@ -221,9 +221,9 @@ public class World
     /// <summary>The cosmetic side of casts (the cast burst and sounds, a client's preview bolts); null on a headless server.</summary>
     internal SpellFeedback? Feedback { get; }
 
-    // The skeletons' ambient rattle and the crows' caws; null on a headless server
+    // The skeletons' ambient rattle and the wildlife's calls (crow, boar, dire boar); null on a headless server
     private readonly SkeletonRattle? _skeletonRattle;
-    private readonly CrowCaws? _crowCaws;
+    private readonly WildlifeCalls[]? _wildlifeCalls;
 
     /// <summary>The multiplayer client's mirror of its server: cell changes, entities, stations, health, remote players.</summary>
     internal ClientMirror ClientMirror { get; }
@@ -603,7 +603,7 @@ public class World
             if (Feedback != null) Caster.Feedback = Feedback.OnCast;
             // The ambient calls are each side's own; a slime's hop is the simulation's, so a client hears the server's
             _skeletonRattle = serverMode ? null : new SkeletonRattle((group, at) => Sounds.PlayAt(group, at), Random.Shared);
-            _crowCaws = serverMode ? null : new CrowCaws((group, at) => Sounds.PlayAt(group, at), Random.Shared);
+            _wildlifeCalls = serverMode ? null : WildlifeCallSet.Build((group, at) => Sounds.PlayAt(group, at), Random.Shared);
             if (_slimes != null && !clientMode) _slimes.PlaySound = (group, at) => Sounds.PlayAt(group, at);
             Renderer = new WorldRenderer(this, _window, _chunkManager, _lodManager, _dropManager, _tntManager, _falling,
                 _goblins, _campfires, _querns, _kilns, _casting, _toppling, _projectiles, _remotePlayers, _debris,
@@ -1137,7 +1137,9 @@ public class World
         Ambient.UpdateSplashes((float)deltaTime);
         Feedback?.Update((float)deltaTime, _remotePlayers);
         _skeletonRattle?.Tick((float)deltaTime, Skeletons, Camera.Position);
-        _crowCaws?.Tick((float)deltaTime, Wildlife, Camera.Position);
+        if (_wildlifeCalls != null)
+            foreach (var calls in _wildlifeCalls)
+                calls.Tick((float)deltaTime, Wildlife, Camera.Position);
         FrameProfiler.End(ProfileSection.Entities);
 
         _hotbarPops.Update(Inventory, (float)deltaTime);
@@ -1287,7 +1289,9 @@ public class World
         Director.UpdateIcebergs(deltaTime);
         Director.Update(deltaTime);
         _skeletonRattle?.Tick((float)deltaTime, Skeletons, Camera.Position);
-        _crowCaws?.Tick((float)deltaTime, Wildlife, Camera.Position);
+        if (_wildlifeCalls != null)
+            foreach (var calls in _wildlifeCalls)
+                calls.Tick((float)deltaTime, Wildlife, Camera.Position);
 
         // After every mob manager and before the thrown items, so a mob killed or despawned
         // this frame is never hit by a projectile or drawn a healthbar.

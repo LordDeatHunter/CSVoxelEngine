@@ -56,4 +56,11 @@ public static class AudioConfig
     // Seconds between ambient caws are drawn uniformly from this range; a flock calls more often than one skeleton rattles
     public const float CrowCawMinSeconds = 6f;
     public const float CrowCawMaxSeconds = 20f;
+
+    // --- Boar grunt ---
+    // A boar or dire boar within this many blocks of the camera can be heard grunting
+    public const float BoarGruntRangeBlocks = 24f;
+    // Seconds between ambient grunts are drawn uniformly from this range; a herd is quieter than a crow flock
+    public const float BoarGruntMinSeconds = 8f;
+    public const float BoarGruntMaxSeconds = 25f;
 }

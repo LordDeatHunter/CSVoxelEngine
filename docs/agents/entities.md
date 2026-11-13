@@ -371,8 +371,8 @@ debugger take a new species from it instead of naming it; adding one means a cla
   than `CrowFlapClimbBlocks` below its aim, never above it. Its rests prefer a tree top
   (`FlyingAnimal.ChoosePerchSpot`: leaf or wood within `FlyerPerchSearchRadiusBlocks`, given up after
   `FlyerPerchSeekSeconds`). It soars on its `glide` clip and pecks the dirt or caws while resting.
-  Its hits and kills play `crow_hit` and `crow_death` clips (`Mob.HitSoundGroup`/`DeathSoundGroup`). Separately, `CrowCaws`
-  (`src/Entities/Wildlife/`, ticked by `World`) plays a random `crow_caw` clip every `CrowCawMinSeconds`..`Max` (`AudioConfig`)
+  Its hits and kills play `crow_hit` and `crow_death` clips (`Mob.HitSoundGroup`/`DeathSoundGroup`). Separately, `WildlifeCalls`
+  (`src/Entities/Wildlife/`, built by `WildlifeCallSet`, ticked by `World`) plays a random `crow_caw` clip every `CrowCawMinSeconds`..`Max` (`AudioConfig`)
   from the nearest live crow within `CrowCawRangeBlocks` of the camera, positionally.
 - **Dragonfly** (`Dragonfly`): the man-sized hunter of the waterside. A player within `DragonflyNoticeRangeBlocks` is
   prey: it holds itself over their head and darts in its `bite` clip, biting whoever is within `DragonflyBiteReach`
@@ -385,6 +385,8 @@ debugger take a new species from it instead of naming it; adding one means a cla
   clip's `impact` whoever is in `InGoreReach` (billed by the manager, never an immune target). Its anger lasts
   `BoarAngerSeconds` past its last sight of the target. The dire boar is the same class oversized and is provoked
   by anyone it notices within `DireBoarNoticeRangeBlocks`.
+  Hits and kills play `boar_hit`/`boar_death` (`dire_boar_*` for the dire one), and `WildlifeCalls` grunts
+  `boar_ambient`/`dire_boar_ambient` every `BoarGruntMinSeconds`..`Max` from the nearest one within `BoarGruntRangeBlocks`.
 - **Drops.** Each species has a loot table of its own name (`WildlifeDropTests`): raw venison and hide from the
   deer; raw boar meat, hide and sometimes a tusk from the boar; a pile of all three plus its trophy `dire_tusk`
   from the dire boar; feathers from the crow; a wing from the dragonfly. The meats cook on a campfire into food

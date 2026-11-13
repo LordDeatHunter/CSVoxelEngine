@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 
 namespace VoxelEngine.Entities.Wildlife;
@@ -59,6 +60,12 @@ public sealed class Boar : Animal
 
     /// <inheritdoc />
     public override WildlifeKind Kind => IsDire ? WildlifeKind.DireBoar : WildlifeKind.Boar;
+
+    /// <inheritdoc />
+    public override string? HitSoundGroup => IsDire ? SfxLibrary.DireBoarHitGroup : SfxLibrary.BoarHitGroup;
+
+    /// <inheritdoc />
+    public override string? DeathSoundGroup => IsDire ? SfxLibrary.DireBoarDeathGroup : SfxLibrary.BoarDeathGroup;
 
     /// <inheritdoc />
     public override float BodyHeight => IsDire ? WildlifeConfig.DireBoarHeight : WildlifeConfig.BoarHeight;
