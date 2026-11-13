@@ -13,7 +13,7 @@ public static class SpiderConfig
     public const float SpiderBodySize = 0.64f;
     public const float SpiderCrawlSpeed = 3.4f;
     public const float SpiderBiteReach = 1.7f;
-    public const int SpiderBiteDamage = 4;
+    public const int SpiderBiteDamage = 12;
     public const float SpiderBiteCooldownSeconds = 1.3f;
     public const float SpiderKnockbackSpeed = 3f;
     public const float SpiderKnockbackLift = 2f;
@@ -23,7 +23,7 @@ public static class SpiderConfig
     public const float BroodmotherBodySize = 1.5f;
     public const float BroodmotherCrawlSpeed = 2.7f;
     public const float BroodmotherBiteReach = 2.9f;
-    public const int BroodmotherBiteDamage = 11;
+    public const int BroodmotherBiteDamage = 33;
     public const float BroodmotherBiteCooldownSeconds = 1.7f;
     public const float BroodmotherKnockbackSpeed = 7f;
     public const float BroodmotherKnockbackLift = 4f;
@@ -42,8 +42,8 @@ public static class SpiderConfig
     public const float WebCooldownJitter = 1.5f;
     // Its level range v^2/g must clear WebMaxRange
     public const float WebSpeed = 19f;
-    public const int WebMinDamage = 1;
-    public const int WebMaxDamage = 3;
+    public const int WebMinDamage = 3;
+    public const int WebMaxDamage = 9;
     public const float WebKnockbackSpeed = 0.5f;
     public const float WebSlownessScale = 1f;
 
