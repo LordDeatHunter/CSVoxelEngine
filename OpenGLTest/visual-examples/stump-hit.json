@@ -1,0 +1,17 @@
+{
+  // The pop of a stump being mined: it must wear the stump's own model (side bark, ring top), not one slab of the
+  // first tile. Run from OpenGLTest/ with VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/stump-hit.json after the
+  // tree of stump.json is cut at its third cell (same coordinates).
+  "steps": [
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-82.5, 16.5, -1.5], "yaw": 0, "pitch": 0 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "teleport", "pos": [-78.5, 15.9, -2.3], "yaw": 90, "pitch": -60 },
+    { "op": "creative", "on": false },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "mine", "seconds": 0.35 },
+    { "op": "screenshot", "name": "pop", "hideHud": true }
+  ]
+}

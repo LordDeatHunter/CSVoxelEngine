@@ -369,6 +369,8 @@ internal sealed class WorldRenderer
     private BakedModel? FacingModelAt(Vector3 blockPos, ushort blockId)
     {
         var type = BlockType.ById[blockId];
+        // A stump's two stacked boxes would pop as one slab wearing its first quad's tile, so it pops as its model too
+        if (type is { IsStump: true, BakedModel: { } stumpModel }) return stumpModel;
         if (type is not { HasHorizontalFacing: true, RotatedModels: { } models }) return null;
         var state = _chunkManager.GetStateGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
         return models[BlockType.ShapeIndex(state, models.Length)];
