@@ -84,11 +84,13 @@ public sealed class MoldTests
         Assert.False(type.CastsAmbientOcclusion);
         Assert.IsType<BlockItem>(ItemRegistry.TryGet(type.Id));
 
-        var box = Assert.Single(type.Hitboxes);
-        Assert.Equal(Vector3.Zero, box.Min);
-        Assert.Equal(1f, box.Max.X, precision: 4);
-        Assert.Equal(1f, box.Max.Z, precision: 4);
-        Assert.InRange(box.Max.Y, 0.001f, 0.999f);
+        // The boxes trace the rim and the pocket: together they span the whole cell footprint, all under a lid.
+        var lid = type.Hitboxes.Max(h => h.Max.Y);
+        Assert.InRange(lid, 0.001f, 0.999f);
+        Assert.Equal(0f, type.Hitboxes.Min(h => h.Min.X), precision: 4);
+        Assert.Equal(1f, type.Hitboxes.Max(h => h.Max.X), precision: 4);
+        Assert.Equal(0f, type.Hitboxes.Min(h => h.Min.Z), precision: 4);
+        Assert.Equal(1f, type.Hitboxes.Max(h => h.Max.Z), precision: 4);
 
         var quads = Quads(name);
         // The whole shape lives inside the cell footprint and under the hitbox lid, so the
@@ -97,10 +99,10 @@ public sealed class MoldTests
         {
             Assert.InRange(p.X, 0f, 1f);
             Assert.InRange(p.Z, 0f, 1f);
-            Assert.InRange(p.Y, 0f, box.Max.Y + 1e-4f);
+            Assert.InRange(p.Y, 0f, lid + 1e-4f);
         }));
         // The generator's $SlabHeight/16 and the block JSON's hitbox height are one number.
-        Assert.Equal(box.Max.Y, quads.SelectMany(q => q.Positions).Max(p => p.Y), precision: 4);
+        Assert.Equal(lid, quads.SelectMany(q => q.Positions).Max(p => p.Y), precision: 4);
         // Per-voxel model emitter: a few dozen quads is the budget. Trade detail away with the
         // script's $RimCells/$AlphaThreshold rather than raising this cap.
         Assert.InRange(quads.Length, 20, 300);
@@ -108,10 +110,28 @@ public sealed class MoldTests
 
     [Theory]
     [MemberData(nameof(AllMolds))]
+    public void MoldHitboxesFollowTheDrawnTop(string name)
+    {
+        var type = ContentRegistry.RequireBlock(name);
+
+        // Every top quad (rim or pocket floor) is covered by a box that reaches exactly its height, so the outline
+        // and the collision hug the pocket instead of lidding it with one rectangle.
+        foreach (var quad in Quads(name).Where(q => q.Face == 4))
+        {
+            var height = quad.Positions[0].Y;
+            var cx = quad.Positions.Average(p => p.X);
+            var cz = quad.Positions.Average(p => p.Z);
+            Assert.Contains(type.Hitboxes, h => MathF.Abs(h.Max.Y - height) < 1e-4f
+                && cx > h.Min.X && cx < h.Max.X && cz > h.Min.Z && cz < h.Max.Z);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(AllMolds))]
     public void MoldTopsHaveARimAndASunkenPocket(string name)
     {
         var type = ContentRegistry.RequireBlock(name);
-        var top = type.Hitboxes[0].Max.Y;
+        var top = type.Hitboxes.Max(h => h.Max.Y);
         var ups = Quads(name).Where(q => q.Face == 4).ToArray();
 
         var levels = ups.Select(q => MathF.Round(q.Positions[0].Y, 4)).Distinct().OrderBy(y => y).ToArray();

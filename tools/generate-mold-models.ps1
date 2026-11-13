@@ -19,7 +19,9 @@
 #     them render; a seam buried between two rim rectangles is omitted altogether.
 #   * No "uv" is written. ModelBaker.DefaultUv crops the tile from the box extents, and the engine
 #     crops partial-block textures rather than stretching them.
-#   * The block JSON's hitbox max Y must equal $SlabHeight/16; MoldTests pins that tie.
+#   * The block JSON's hitbox is generated too: rim boxes top out at $SlabHeight/16, pocket boxes at the floor; MoldTests pins that tie.
+#
+# It also rewrites the `"hitbox"` array of each assets/data/blocks/<model name>.json to the same rectangles.
 #
 # The output is a pure function of the input pixels - no noise, no randomness - so re-running
 # reproduces each model byte for byte.
@@ -31,6 +33,7 @@ $root      = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $blocksDir = Join-Path $root 'OpenGLTest\assets\textures\blocks'
 $itemsDir  = Join-Path $root 'OpenGLTest\assets\textures\items'
 $modelsDir = Join-Path $root 'OpenGLTest\assets\models\block'
+$blockDataDir = Join-Path $root 'OpenGLTest\assets\data\blocks'
 
 # Slab height in model units of 16, i.e. a quarter block. Set to 2 for a 1/32 slab; the hitbox
 # "max" Y in every assets/data/blocks/*mold*.json must then be changed to match ($SlabHeight/16).
@@ -190,6 +193,13 @@ function Format-Element([int[]]$from, [int[]]$to, [string[]]$faces) {
     return ($lines -join "`n")
 }
 
+# One selection box of a rectangle at the given height, in cell-local 0..1 units.
+function Format-Box($rect, [int]$height) {
+    $f = { param($v) ($v / [double]$Grid).ToString('0.####', [System.Globalization.CultureInfo]::InvariantCulture) }
+    $top = ($height / [double]$Grid).ToString('0.####', [System.Globalization.CultureInfo]::InvariantCulture)
+    return "    { ""min"": [$(& $f $rect.X0), 0, $(& $f $rect.Z0)], ""max"": [$(& $f $rect.X1), $top, $(& $f $rect.Z1)] }"
+}
+
 # Builds the whole model text for one mask: rim rectangles at full height carrying the boundary
 # cullfaces and the pocket walls, floor rectangles sunk by $PocketDepth under the pocket.
 function Build-Model($mask, [string]$tile) {
@@ -224,9 +234,15 @@ function Build-Model($mask, [string]$tile) {
         $elements.Add((Format-Element @($rect.X0, 0, $rect.Z0) @($rect.X1, ($SlabHeight - $PocketDepth), $rect.Z1) $faces))
     }
 
+    # The block's selection boxes follow the same decomposition (cell-local 0..1), so the hover outline
+    # and the collision trace the rim and the pocket instead of one rectangle.
+    $boxes = New-Object System.Collections.Generic.List[string]
+    foreach ($rect in @(Merge-Rects $mask $false)) { $boxes.Add((Format-Box $rect $SlabHeight)) }
+    foreach ($rect in @(Merge-Rects $mask $true)) { $boxes.Add((Format-Box $rect ($SlabHeight - $PocketDepth))) }
+
     $text = "{`n  ""textures"": {`n    ""mold"": ""$tile""`n  },`n  ""elements"": [`n" +
             ($elements -join ",`n") + "`n  ]`n}`n"
-    return @{ Text = $text; Elements = $elements.Count; Faces = $faceCount }
+    return @{ Text = $text; Elements = $elements.Count; Faces = $faceCount; Boxes = $boxes.ToArray() }
 }
 
 Copy-IfMissing (Join-Path $blocksDir 'stone.png')         (Join-Path $blocksDir 'fired_mud.png')
@@ -263,5 +279,12 @@ foreach ($entry in $models) {
     $path = Join-Path $modelsDir "$($entry.Model).json"
     [System.IO.File]::WriteAllText($path, $built.Text, $utf8NoBom)
     Write-Output "wrote $path"
+    $blockPath = Join-Path $blockDataDir "$($entry.Model).json"
+    $blockText = [System.IO.File]::ReadAllText($blockPath)
+    $eol = if ($blockText.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $hitbox = '"hitbox": [' + $eol + ($built.Boxes -join (',' + $eol)) + $eol + '  ]'
+    $updated = [regex]::Replace($blockText, '"hitbox":[\s\S]*\}(\s*\}\s*)$', { param($m) $hitbox + $m.Groups[1].Value })
+    if ($updated -eq $blockText -and -not $blockText.Contains($hitbox)) { throw "Could not rewrite the hitbox of $blockPath." }
+    [System.IO.File]::WriteAllText($blockPath, $updated, $utf8NoBom)
     Write-Output "$($entry.Model): elements=$($built.Elements) faces=$($built.Faces)"
 }
