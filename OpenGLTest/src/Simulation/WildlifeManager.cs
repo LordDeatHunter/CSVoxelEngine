@@ -70,7 +70,7 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
 
         SendThieves(drops);
         UpdateMobs(deltaTime, chunks, drops, targets, debris, WildlifeConfig.DespawnRadiusBlocks);
-        RallyFlocks();
+        RallyFlocks(targets);
         TakeLoot(drops);
         UpdateSpawning(deltaTime, chunks, targets);
     }
@@ -109,13 +109,15 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
         }
     }
 
-    // A crow that was hurt calls its flock: every calm crow within earshot turns on the attacker as well
-    private void RallyFlocks()
+    // A crow that was hurt, or is already going after a player, calls its flock: every calm crow within earshot
+    // (one that wandered into range later included) turns on the attacker as well
+    private void RallyFlocks(IReadOnlyList<IMobTarget> targets)
     {
         var rangeSquared = WildlifeConfig.CrowFlockCallRangeBlocks * WildlifeConfig.CrowFlockCallRangeBlocks;
         foreach (var mob in Mobs)
         {
-            if (mob is not Crow caller || !caller.ConsumeRallyCall()) continue;
+            if (mob is not Crow caller) continue;
+            if (!caller.ConsumeRallyCall() && !caller.Heeds(targets)) continue;
             foreach (var other in Mobs)
             {
                 if (other is Crow flockmate && !ReferenceEquals(flockmate, caller) &&
