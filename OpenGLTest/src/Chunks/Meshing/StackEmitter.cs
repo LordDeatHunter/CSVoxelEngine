@@ -140,6 +140,8 @@ internal static class StackEmitter
     /// <see cref="SnowShape"/>): the state byte holds 1..StackMax layers and the box is that
     /// fraction of a block tall, so a full stack is a full cube. The bottom face is skipped unless
     /// the cell below cannot occlude, since a layer normally rests on ground that draws its own top.
+    /// A side is skipped against an opaque cube or a snow cell at least as deep (a drift's inner
+    /// walls), and the top of a full stack under an opaque cube or more snow (<see cref="SnowFaceHidden"/>).
     /// </summary>
     internal static void EmitSnowLayers(int worldX0, int worldY0, int worldZ0, List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         ushort[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
@@ -162,6 +164,16 @@ internal static class StackEmitter
         for (var face = 0; face < 6; face++)
         {
             if (face == 5 && !drawBottom) continue;
+            if (face < 5)
+            {
+                var n = pIdx + ChunkFaceTables.FaceNeighborDelta[face];
+                var normal = CubeFaces[face].normal;
+                var neighborCount = padded[n] == type.Id
+                    ? SnowShape.CountWithState(worldX + (int)normal.X, worldY0 + y + (int)normal.Y, worldZ + (int)normal.Z,
+                        paddedState[n], maxCount)
+                    : 0;
+                if (SnowFaceHidden(face, count, maxCount, BlockType.Occludes(padded[n]), neighborCount)) continue;
+            }
             var tile = face == 4 ? type.Top : face == 5 ? type.Bottom : type.Side;
             ChunkFaceTables.BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
             ChunkMesher.EmitQuad(vertices, indices, ref indexOffset, basePos, p0, p1, p2, p3,
@@ -169,6 +181,19 @@ internal static class StackEmitter
                 ChunkFaceTables.CropUv(face, p0), ChunkFaceTables.CropUv(face, p1), ChunkFaceTables.CropUv(face, p2), ChunkFaceTables.CropUv(face, p3), tile,
                 ChunkFaceTables.ShadeLut[(face << 2) | 3], lights[face]);
         }
+    }
+
+    /// <summary>
+    /// Whether face <paramref name="face"/> (0-3 sides, 4 top) of a snow cell <paramref name="count"/> layers deep is
+    /// covered by its neighbor: an opaque cube covers any face; a snow neighbor <paramref name="neighborCount"/> layers
+    /// deep (0 when it is not snow) covers a side no taller than itself, and covers the top of a full stack, since even
+    /// one layer spans the whole floor of its cell. A top below a full stack is open whatever sits above it.
+    /// </summary>
+    internal static bool SnowFaceHidden(int face, int count, int maxCount, bool neighborOccludes, int neighborCount)
+    {
+        if (face == 4)
+            return count >= maxCount && (neighborOccludes || neighborCount > 0);
+        return neighborOccludes || neighborCount >= count;
     }
 
     /// <summary>Rotates a point about (cx, cz) by a Y spin; normals pass through with cx = cz = 0.</summary>

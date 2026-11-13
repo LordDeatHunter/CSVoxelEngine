@@ -165,7 +165,7 @@ for a thin cell, `TreeWoodEmitter.EmitRimWood`'s stair-stepped `TreeWoodShape.Ri
 pixel-rim trunk shell — pebbles, fluids, any model with cropped or rotated UVs); its full, shaded,
 culled cube faces use the same corner rule, and the procedural emitters (tree wood, pebbles, branch
 piles, snow layers) bilinearly interpolate the smooth corner light
-of the cell face they sample (`FaceLight`, flat where that face's front neighbor occludes).
+of the cell face they sample (`FaceLight`, flat where that face's front neighbor occludes). A snow layer drops a side facing an opaque cube or snow at least as deep, and a full stack's top under an opaque cube or more snow (`StackEmitter.SnowFaceHidden`, `SnowLayerCullingTests`).
 Fluids average each corner over the same own/dx/dz/diagonal cells `CornerHeight` reads, with a
 blocked cell replaced by the brightest open one, an order-independent rule so neighboring fluid
 cells agree at every shared corner. `GenerateMeshData(manager, greedy: false)` is the test seam;
