@@ -129,7 +129,7 @@ public sealed class CastingTests
             });
 
         // Its hitbox reaches the rim top, and a block result stays inside the bowl
-        Assert.Equal(pocket.TopY, ContentRegistry.RequireBlock("casting_basin").Hitboxes![0].Max.Y, precision: 4);
+        Assert.Equal(pocket.TopY, ContentRegistry.RequireBlock("casting_basin").Hitboxes!.Max(h => h.Max.Y), precision: 4);
         Assert.True(pocket.ResultCubeY - pocket.ResultCubeSize / 2f >= pocket.FloorY - 1e-4f);
         Assert.True(pocket.ResultCubeY + pocket.ResultCubeSize / 2f <= pocket.TopY + 1e-4f);
         Assert.True(pocket.ResultCubeSize <= pocket.Width);

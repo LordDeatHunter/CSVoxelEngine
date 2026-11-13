@@ -305,4 +305,21 @@ public sealed class MoldTests
         Assert.Empty(drops.Drops);
         Assert.Null(fires.CookingAt(0, 0, 0));
     }
+
+    [Theory]
+    [InlineData("casting_basin")]
+    [InlineData("casting_basin_raw")]
+    [InlineData("crucible_stand")]
+    public void BowlHitboxesFollowTheDrawnTop(string name)
+    {
+        var type = ContentRegistry.RequireBlock(name);
+        foreach (var quad in Quads(name).Where(q => q.Face == 4))
+        {
+            var height = quad.Positions[0].Y;
+            var cx = quad.Positions.Average(p => p.X);
+            var cz = quad.Positions.Average(p => p.Z);
+            Assert.Contains(type.Hitboxes, h => MathF.Abs(h.Max.Y - height) < 1e-4f
+                && cx > h.Min.X && cx < h.Max.X && cz > h.Min.Z && cz < h.Max.Z);
+        }
+    }
 }
