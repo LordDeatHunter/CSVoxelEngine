@@ -53,13 +53,21 @@ internal static class BiomeClassifier
     /// 0, keep their bits.
     /// </summary>
     public static Biome BiomeWeights(float x, float z, out float oceanWeight, out float desertWeight,
-        out float aridWeight)
+        out float aridWeight) =>
+        BiomeWeights(x, z, out oceanWeight, out desertWeight, out aridWeight, out _);
+
+    /// <summary>
+    /// <see cref="BiomeWeights(float, float, out float, out float, out float)"/> plus the smooth jungle
+    /// weight, <see cref="JungleOf"/> scaled by the land share (exactly 0 outside the hot, soaked corner).
+    /// </summary>
+    public static Biome BiomeWeights(float x, float z, out float oceanWeight, out float desertWeight,
+        out float aridWeight, out float jungleWeight)
     {
         oceanWeight = PreIslandOceanWeight(x, z);
         var island = TerrainIslands.LandWeight(x, z, oceanWeight);
         // No multiply when the island term is 0, so land, the coast band and the spawn keep their bits.
         if (island > 0f) oceanWeight *= 1f - island;
-        return WeightsForOcean(x, z, oceanWeight, out desertWeight, out aridWeight);
+        return WeightsForOcean(x, z, oceanWeight, out desertWeight, out aridWeight, out jungleWeight);
     }
 
     /// <summary>The ocean weight before the island fold: the share of continentalness that falls
@@ -78,7 +86,12 @@ internal static class BiomeClassifier
     /// ocean weight: the climate half of
     /// <see cref="BiomeWeights(float, float, out float, out float, out float)"/>.</summary>
     internal static Biome WeightsForOcean(float x, float z, float oceanWeight, out float desertWeight,
-        out float aridWeight)
+        out float aridWeight) =>
+        WeightsForOcean(x, z, oceanWeight, out desertWeight, out aridWeight, out _);
+
+    /// <summary>The climate half with the jungle weight too.</summary>
+    internal static Biome WeightsForOcean(float x, float z, float oceanWeight, out float desertWeight,
+        out float aridWeight, out float jungleWeight)
     {
         var gate = WorldGenerationConfig.BiomesEnabled ? 1f : 0f;
 
@@ -91,8 +104,10 @@ internal static class BiomeClassifier
         // Min, not a product: the dune blend reaches 0.5 exactly where Classify turns desert.
         desertWeight = MathF.Min(warm, dry) * (1f - oceanWeight) * gate;
         aridWeight = semiDry * (1f - oceanWeight) * gate;
+        var jungle = JungleOf(temperature, humidity);
+        jungleWeight = jungle * (1f - oceanWeight) * gate;
 
-        return gate < 0.5f ? Biome.Forest : Classify(oceanWeight, cold, warm, dry, semiDry);
+        return gate < 0.5f ? Biome.Forest : Classify(oceanWeight, cold, warm, dry, semiDry, jungle);
     }
 
     /// <summary>
@@ -105,12 +120,31 @@ internal static class BiomeClassifier
     /// ramp in this file, and the same line the desert weight, the border dither and the
     /// surface-water fade are keyed to.
     /// </summary>
-    internal static Biome Classify(float oceanWeight, float cold, float warm, float dry, float semiDry) =>
+    internal static Biome Classify(float oceanWeight, float cold, float warm, float dry, float semiDry,
+        float jungle = 0f) =>
         oceanWeight >= WorldGenerationConfig.OceanShoreWeight ? Biome.Ocean
         : cold >= WorldGenerationConfig.ColdBiomeMinCold ? dry >= 0.5f ? Biome.Frozen : Biome.Taiga
-        : warm >= 0.5f ? dry >= 0.5f ? Biome.Desert : semiDry >= 0.5f ? Biome.Savanna : Biome.Forest
+        : warm >= 0.5f ? dry >= 0.5f ? Biome.Desert : semiDry >= 0.5f ? Biome.Savanna
+            : jungle >= 0.5f ? Biome.Jungle : Biome.Forest
         : semiDry >= 0.5f || dry >= 0.5f ? Biome.Steppe
         : Biome.Forest;
+
+    /// <summary>The jungle weight: min(hot, soak), the same min-of-two-ramps shape as the desert weight,
+    /// so it is exactly 0.5 on the jungle line. Scaled by the land share by its callers.</summary>
+    internal static float JungleOf(float temperature, float humidity) =>
+        MathF.Min(HotOf(temperature), SoakOf(humidity));
+
+    /// <summary>The pure hot ramp: 0 at or below <see cref="WorldGenerationConfig.TemperatureHotStart"/>, 1
+    /// at or above <see cref="WorldGenerationConfig.TemperatureHotEnd"/>.</summary>
+    internal static float HotOf(float temperature) =>
+        MathUtils.SmoothStep(WorldGenerationConfig.TemperatureHotStart,
+            WorldGenerationConfig.TemperatureHotEnd, temperature);
+
+    /// <summary>The pure soaked ramp: 0 at or below <see cref="WorldGenerationConfig.HumiditySoakStart"/>, 1
+    /// at or above <see cref="WorldGenerationConfig.HumiditySoakEnd"/>.</summary>
+    internal static float SoakOf(float humidity) =>
+        MathUtils.SmoothStep(WorldGenerationConfig.HumiditySoakStart,
+            WorldGenerationConfig.HumiditySoakEnd, humidity);
 
     /// <summary>The pure dry ramp: 1 at or below <see cref="WorldGenerationConfig.HumidityDryStart"/>,
     /// 0 at or above <see cref="WorldGenerationConfig.HumidityDryEnd"/>.</summary>

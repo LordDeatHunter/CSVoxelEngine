@@ -84,6 +84,43 @@ public sealed class BiomeTests
     }
 
     [Fact]
+    public void JungleExistsNearSpawnButNotAtIt()
+    {
+        var count = 0;
+        var total = 0;
+        const int radius = 96;
+        for (var cx = -radius; cx <= radius; cx += 2)
+        for (var cz = -radius; cz <= radius; cz += 2)
+        {
+            total++;
+            if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) == Biome.Jungle) count++;
+        }
+
+        Assert.True(count > 0, "no jungle within 96 chunks");
+        Assert.True(count < total / 4, $"jungle covers {count} of {total} samples: too common");
+        Assert.NotEqual(Biome.Jungle, TerrainGenerator.BiomeAt(0, 0));
+    }
+
+    [Fact]
+    public void JungleOnlyClassifiesInsideTheWarmWetCorner()
+    {
+        for (var ti = 0; ti <= 400; ti++)
+        for (var hi = 0; hi <= 400; hi++)
+        {
+            var t = -1f + ti * 0.005f;
+            var h = -1f + hi * 0.005f;
+            var warm = BiomeClassifier.WarmOf(t);
+            var dry = BiomeClassifier.DryOf(h);
+            var semiDry = BiomeClassifier.SemiDryOf(h);
+            var jungle = BiomeClassifier.JungleOf(t, h);
+            var biome = BiomeClassifier.Classify(0f, BiomeClassifier.ColdOf(t), warm, dry, semiDry, jungle);
+            if (biome != Biome.Jungle) continue;
+            Assert.True(warm >= 0.5f && semiDry < 0.5f && dry < 0.5f,
+                $"t {t} h {h} is jungle outside the warm, wet corner");
+        }
+    }
+
+    [Fact]
     public void HumidityRampsAreExclusive()
     {
         // The semi-dry ramp lies wholly on the wet side of the dry ramp: wherever any dryness is,

@@ -282,6 +282,17 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // ramp's midpoint sits just below 0 to keep the spawn a forest (BiomeTests.OriginColumnIsForest).
     public const float HumiditySemiDryStart = -0.05f;  // at or below: fully semi-dry
     public const float HumiditySemiDryEnd = 0.03f;     // at or above: wet
+    // The jungle's two ramps, beyond the warm and wet ones: hot = smooth(TemperatureHotStart,
+    // TemperatureHotEnd, temperature) and soak = smooth(HumiditySoakStart, HumiditySoakEnd, humidity).
+    // Jungle is min(hot, soak) >= 0.5 inside the warm, wet forest arm, so it only ever borders forest,
+    // savanna and ocean: the hot ramp starts at or after the warm ramp ends (its midpoint is firmly
+    // warm) and the soak ramp starts at or after the semi-dry ramp ends (firmly wet). The thresholds
+    // are tuned so jungle exists within a few dozen chunks of spawn but never at the origin.
+    public const float TemperatureHotStart = 0.30f;    // at or below: not hot
+    public const float TemperatureHotEnd = 0.52f;      // at or above: fully hot
+    public const float HumiditySoakStart = 0.10f;      // at or below: not soaked
+    public const float HumiditySoakEnd = 0.34f;        // at or above: fully soaked
+
     // Share of the forest-profile hills semi-dry and dry land loses (scaled by the smooth arid weight,
     // BiomeClassifier.BiomeWeights), which flattens steppe, savanna and tundra into plains while the
     // border stays a slope.

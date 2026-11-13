@@ -27,4 +27,9 @@ public enum Biome : byte
     /// <summary>Warm and semi-dry: a dry grassland with scattered trees, between the forest and the
     /// desert on the warm axis.</summary>
     Savanna = 6,
+
+    /// <summary>The hottest, wettest corner of the climate: a lowland rainforest of very tall trees
+    /// and heavy undergrowth over mud and shallow pools. Carved out of the warm, wet forest, so it
+    /// borders forest, savanna and ocean, never desert or snow.</summary>
+    Jungle = 7,
 }
