@@ -23,3 +23,7 @@ https://freesound.org/people/qubodup/sounds/877025/
 https://freesound.org/people/qubodup/sounds/877026/
 https://freesound.org/people/qubodup/sounds/877027/
 https://freesound.org/people/gettinsomegamesounds/sounds/850226/
+
+## Boars
+https://freesound.org/people/TheVeoMammoth11/sounds/492654/
+https://freesound.org/people/TheVeoMammoth11/sounds/492655/
