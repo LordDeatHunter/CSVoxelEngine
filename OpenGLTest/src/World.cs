@@ -575,7 +575,7 @@ public class World
             if (!serverMode)
                 CollapseEffects = new TowerCollapseEffects(Camera, _debris, _chunkManager, _towers);
             if (!serverMode)
-                ConqueredEffects = new FloorConqueredEffects(Camera, _fire, _towers, Sounds);
+                ConqueredEffects = new FloorConqueredEffects(Camera, _towers, Sounds);
             LeftClick = new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, clientMode);
             Placer = new BlockPlacer(this, _chunkManager, _falling, _icebergs, _querns, _fluidManager, _leafDecay,
                 _lodManager, _debris, clientMode, serverMode);
