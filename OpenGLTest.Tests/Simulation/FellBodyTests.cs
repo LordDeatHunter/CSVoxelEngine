@@ -49,17 +49,53 @@ public sealed class FellBodyTests
         }
     }
 
-    // A full-thickness trunk standing on ground (top y = 10) at x = 4, pinned at its cut and kicked toward +X
-    private static FellBody Trunk(Func<int, int, int, bool> isSolid)
+    // A full-thickness trunk standing on ground (top y = 10) at x = 4, pinned at its cut and kicked
+    // toward +X; extra blocks (cell, mass, soft) ride on it, each a whole cell
+    private static FellBody Trunk(Func<int, int, int, bool> isSolid, params (Vector3 Cell, float Mass, bool Soft)[] extra)
     {
         var log = ContentRegistry.RequireBlock("oak_log").Id;
         var blocks = new List<TopplingTree.FellBlock>();
         for (var i = 0; i < 8; i++)
             blocks.Add(new TopplingTree.FellBlock(new Vector3(4, 10 + i, 4), log,
                 WoodState.Encode(15, i == 0 ? WoodState.ParentRoot : 4, false)));
+        var masses = blocks.Select(_ => 1f).ToList();
+        var soft = blocks.Select(_ => false).ToList();
+        foreach (var (cell, mass, isSoft) in extra)
+        {
+            blocks.Add(new TopplingTree.FellBlock(cell, log, WoodState.Encode(15, 4, false)));
+            masses.Add(mass);
+            soft.Add(isSoft);
+        }
         var centers = blocks.Select(b => b.Cell + new Vector3(0.5f)).ToList();
-        return new FellBody(centers, centers.Select(_ => 1f).ToList(), FellContacts.Build(blocks),
-            new Vector3(4.5f, 10f, 4.5f), -Vector3.UnitZ, hinged: true, isSolid: isSolid);
+        return new FellBody(centers, masses, FellContacts.Build(blocks),
+            new Vector3(4.5f, 10f, 4.5f), -Vector3.UnitZ, hinged: true, isSolid: isSolid, soft: soft);
+    }
+
+    // How far toward +X the top of the trunk ends from where it stood
+    private static float TopForwardAtRest(FellBody trunk)
+    {
+        var from = trunk.PointNow(7).X;
+        for (var i = 0; i < 60 * 10 && !trunk.AtRest; i++)
+            trunk.Advance(1f / 60f);
+        return trunk.PointNow(7).X - from;
+    }
+
+    [Fact]
+    public void APinnedTreeWithItsWeightBehindItStillFallsTheWayItWasPushed()
+    {
+        // A heavy arm hangs off the top on the side away from the fall
+        var forward = TopForwardAtRest(Trunk((_, y, _) => y < 10,
+            (new Vector3(3, 17, 4), 8f, false), (new Vector3(2, 17, 4), 8f, false)));
+        Assert.True(forward > 4f, $"the top went {forward} toward the fall");
+    }
+
+    [Fact]
+    public void SoftBlocksOnTheGroundDoNotHoldAPinnedTreeUp()
+    {
+        // A skirt of leaves resting on the ground on the side the tree falls to
+        var forward = TopForwardAtRest(Trunk((_, y, _) => y < 10,
+            (new Vector3(5, 10, 4), 0.3f, true), (new Vector3(6, 10, 4), 0.3f, true)));
+        Assert.True(forward > 4f, $"the top went {forward} toward the fall");
     }
 
     [Theory]

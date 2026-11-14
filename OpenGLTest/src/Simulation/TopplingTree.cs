@@ -45,6 +45,8 @@ public class TopplingTree : IDisposable
     private readonly Vector3[][] _contacts;
     private readonly float[] _masses;
     private readonly FellTerrain _terrain;
+    // How many cells up a block pressed into the ground is looked for a free cell to lie in
+    private const int MaxRestLift = 4;
     // Seconds every part has been at rest
     private float _restElapsed;
     // Set by the update the swing reaches flat, cleared by TryTakeLanding
@@ -62,7 +64,7 @@ public class TopplingTree : IDisposable
     public bool IsDone { get; private set; }
 
     /// <param name="isSolid">Plain ground: whether the world cell at (x, y, z) stops a falling tree
-    /// and holds its pin, with nothing to snag on (see <see cref="FellTerrain.Ground"/>).</param>
+    /// and holds its pin (see <see cref="FellTerrain.Ground"/>).</param>
     /// <param name="terrain">The world as the tree feels it (the felled cells are already gone from
     /// it); wins over <paramref name="isSolid"/>. Without either nothing stops the tree.</param>
     public TopplingTree(List<FellBlock> blocks, Vector3 pivot, Vector3 fallDirection, bool drops = true,
@@ -133,13 +135,15 @@ public class TopplingTree : IDisposable
         var centers = new Vector3[indices.Count];
         var masses = new float[indices.Count];
         var contacts = new Vector3[indices.Count][];
+        var soft = new bool[indices.Count];
         for (var k = 0; k < indices.Count; k++)
         {
+            soft[k] = TreeGenerator.IsLeaf(_blocks[indices[k]].Id);
             centers[k] = _centers[indices[k]];
             masses[k] = _masses[indices[k]];
             contacts[k] = _contacts[indices[k]];
         }
-        return new FellBody(centers, masses, contacts, _pivot, _axis, hinged, _terrain.Stops, inherit, _terrain.Snags);
+        return new FellBody(centers, masses, contacts, _pivot, _axis, hinged, _terrain.Stops, inherit, soft);
     }
 
     /// <summary>
@@ -164,7 +168,7 @@ public class TopplingTree : IDisposable
         var center = sum / count;
         if (center.Y <= 0f) return false;
         var sideways = new Vector3(center.X, 0f, center.Z).Length();
-        return MathF.Atan2(center.Y, sideways) >= SimulationConfig.TreeFlatSnapRadians;
+        return MathF.Atan2(sideways, center.Y) <= SimulationConfig.TreePinMaxLeanRadians;
     }
 
     /// <summary>
@@ -330,10 +334,12 @@ public class TopplingTree : IDisposable
         for (var i = 0; i < count; i++)
         {
             var part = _parts[i];
-            part.Body.Advance(deltaTime);
-            impact |= part.Body.LastImpactSpeed >= SimulationConfig.TreeFellImpactSpeed;
-            if (i == 0)
-                SnapOffBranches(part);
+            var body = part.Body;
+            body.Advance(deltaTime);
+            impact |= body.LastImpactSpeed >= SimulationConfig.TreeFellImpactSpeed;
+            // What holds the pinned tree up snaps off; when none of it can, the stump lets go
+            if (i == 0 && !SnapOffBranches(part) && body.HeldUp)
+                body.Unpin();
         }
         // Whatever still shifts a while after the first hard impact is frozen where it lies
         if (_landed)
@@ -417,10 +423,10 @@ public class TopplingTree : IDisposable
             : Math.Min(SimulationConfig.TreeHitMaxDamage, (int)MathF.Ceiling(speed * SimulationConfig.TreeHitDamagePerSpeed));
 
     // A side branch that struck the ground hard breaks off whole and carries on as its own body
-    // with the speed it had; the rest of the tree is rebuilt without it
-    private void SnapOffBranches(FellPart part)
+    // with the speed it had; the rest of the tree is rebuilt without it. False when nothing broke off
+    private bool SnapOffBranches(FellPart part)
     {
-        if (part.Body.HardImpacts.Count == 0) return;
+        if (part.Body.HardImpacts.Count == 0) return false;
 
         var roots = new List<int>();
         foreach (var local in part.Body.HardImpacts)
@@ -429,7 +435,7 @@ public class TopplingTree : IDisposable
             if (root >= 0 && !roots.Contains(root) && _partOf[root] == part)
                 roots.Add(root);
         }
-        if (roots.Count == 0) return;
+        if (roots.Count == 0) return false;
 
         var parentBody = part.Body;
         var remaining = part.Blocks;
@@ -444,7 +450,7 @@ public class TopplingTree : IDisposable
                 _partOf[i] = null;
             broken.Add(members);
         }
-        if (broken.Count == 0) return;
+        if (broken.Count == 0) return false;
 
         remaining = remaining.FindAll(i => _partOf[i] == part);
         if (remaining.Count == 0)
@@ -452,7 +458,7 @@ public class TopplingTree : IDisposable
             foreach (var members in broken)
                 foreach (var i in members)
                     _partOf[i] = part;
-            return;
+            return false;
         }
 
         foreach (var members in broken)
@@ -463,6 +469,7 @@ public class TopplingTree : IDisposable
                 _partOf[i] = child;
         }
         part.Rebuild(remaining, NewBody(remaining, parentBody.Hinged, parentBody), MeshOf(remaining));
+        return true;
     }
 
     private List<ChunkMeshData> MeshOf(List<int> indices)
@@ -496,8 +503,15 @@ public class TopplingTree : IDisposable
         }
     }
 
-    // The floored cell the part's k-th block has its center in now
-    private static Vector3 RestCell(FellPart part, int k) => part.Body.PointNow(k).Floor();
+    // The floored cell the part's k-th block has its center in now; a block pressed into the
+    // ground (leaves crushed under the trunk) counts as lying on top of it
+    private Vector3 RestCell(FellPart part, int k)
+    {
+        var cell = part.Body.PointNow(k).Floor();
+        for (var lift = 0; lift < MaxRestLift && _terrain.Stops((int)cell.X, (int)cell.Y, (int)cell.Z); lift++)
+            cell.Y++;
+        return cell;
+    }
 
     /// <summary>
     /// Item drops for the landed tree, each at the floored cell its block came to rest in.

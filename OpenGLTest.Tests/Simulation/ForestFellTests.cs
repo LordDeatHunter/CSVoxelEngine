@@ -10,27 +10,31 @@ using Xunit.Abstractions;
 namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
-/// A tree felled at its stump in a dense forest falls down and never up: every worldgen species is
-/// stamped on stone ground with copies of itself crowding it on all sides, its root is cut the way
-/// the game cuts it (the root stays as the stump, the fall is pinned on it, the world is felt through
-/// <see cref="TopplingTree.FallStopper"/>), and no piece of it may rise as it falls.
+/// A tree felled at its stump falls over the way it was pushed, down and never up, alone or in a
+/// dense forest: every worldgen species is stamped on stone ground, by itself or with copies of
+/// itself crowding it on all sides, its root is cut the way the game cuts it (the root stays as the
+/// stump, the fall is pinned on it, the world is felt through <see cref="FellTerrain.Of"/>), no
+/// piece of it may climb as it falls and its stem must end up lying toward the fall.
 /// </summary>
 public sealed class ForestFellTests(ITestOutputHelper output)
 {
     private const int Seed = 4242;
     private const int RootX = 40, RootY = 20, RootZ = 40;
-    // How far a falling piece's center may rise above where it started (a pinned trunk tipping over
-    // its stump lifts its center a hair before it drops)
-    private const float RiseTolerance = 0.3f;
+    // How far a falling piece's center may rise above where it started: a pinned trunk tipping over
+    // its stump lifts its center a hair, and a loose piece may vault a little off the end that lands
+    // first, but nothing climbs a whole block (a launch went up by many)
+    private const float RiseTolerance = 1f;
+    // The top of the stem must travel at least this share of its height toward the fall
+    private const float ForwardShare = 1f / 3f;
 
     private static readonly (int X, int Z)[] Neighbors =
         [(-6, 0), (6, 0), (0, -6), (0, 6), (-5, -5), (5, -5), (-5, 5), (5, 5), (4, 1), (-1, 4)];
 
-    private static (StampedTree Tree, ChunkManager Chunks) Forest(TreeSpecies species)
+    private static (StampedTree Tree, ChunkManager Chunks) Forest(TreeSpecies species, bool crowded)
     {
         var tree = StampedTree.Stamp(species, Seed, RootX, RootY, RootZ);
         var chunks = tree.Chunks;
-        foreach (var (dx, dz) in Neighbors)
+        foreach (var (dx, dz) in crowded ? Neighbors : [])
         {
             // Wood over air or leaves, never over the felled tree's wood; leaves into air only
             foreach (var ((x, y, z), (id, state)) in tree.Wood)
@@ -56,10 +60,11 @@ public sealed class ForestFellTests(ITestOutputHelper output)
 
     /// <summary>Fells the tree at its root toward <paramref name="fall"/> and returns the most any
     /// piece's center rose above where that piece started, how far the tree's blocks ended below
-    /// where they stood on average, and how many pieces the tree ended in.</summary>
-    private static (float Rise, float Drop, int Pieces) Fell(TreeSpecies species, Vector3 fall)
+    /// where they stood on average, and how far the top of the stem (the piece the tree started
+    /// as, less the branches it shed) traveled toward the fall, as a share of its height.</summary>
+    private static (float Rise, float Drop, float Forward) Fell(TreeSpecies species, Vector3 fall, bool crowded)
     {
-        var (tree, chunks) = Forest(species);
+        var (tree, chunks) = Forest(species, crowded);
         var root = tree.CellOf(TreeGraph.Root);
         var (rootId, rootState) = tree.Read(((int)root.X, (int)root.Y, (int)root.Z));
         var collected = TopplingTree.Collect(chunks, root, rootId, rootState);
@@ -73,6 +78,10 @@ public sealed class ForestFellTests(ITestOutputHelper output)
 
         var start = new Dictionary<FellBody, float>();
         var standing = MeanBlockY(toppling);
+        var stem = toppling.Parts[0];
+        var stood = new Dictionary<int, Vector3>();
+        for (var k = 0; k < stem.Blocks.Count; k++)
+            stood[stem.Blocks[k]] = stem.Body.PointNow(k);
         var worst = 0f;
         for (var frame = 0; frame < 60 * 10 && !toppling.IsDone; frame++)
         {
@@ -85,7 +94,12 @@ public sealed class ForestFellTests(ITestOutputHelper output)
             }
         }
 
-        return (worst, standing - MeanBlockY(toppling), toppling.Parts.Count);
+        var top = 0;
+        for (var k = 1; k < stem.Blocks.Count; k++)
+            if (stood[stem.Blocks[k]].Y > stood[stem.Blocks[top]].Y) top = k;
+        var from = stood[stem.Blocks[top]];
+        var forward = Vector3.Dot(stem.Body.PointNow(top) - from, fall) / (from.Y - pivot.Y);
+        return (worst, standing - MeanBlockY(toppling), forward);
     }
 
     private static float MeanBlockY(TopplingTree tree)
@@ -98,20 +112,24 @@ public sealed class ForestFellTests(ITestOutputHelper output)
         return sum / count;
     }
 
-    [Fact]
-    public void ATreeFelledInADenseForestNeverRisesAndComesDown()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AFelledTreeNeverRisesAndComesDownTheWayItWasPushed(bool crowded)
     {
         TestContent.EnsureLoaded();
         var failures = new List<string>();
         foreach (var species in StampedTree.WorldgenSpecies)
         foreach (var fall in new[] { Vector3.UnitX, -Vector3.UnitX, Vector3.UnitZ, -Vector3.UnitZ })
         {
-            var (rise, drop, pieces) = Fell(species, fall);
-            output.WriteLine($"{species.Name} toward {fall}: rose {rise:0.00}, dropped {drop:0.00}, {pieces} pieces");
+            var (rise, drop, forward) = Fell(species, fall, crowded);
+            output.WriteLine($"{species.Name} toward {fall}: rose {rise:0.00}, dropped {drop:0.00}, stem top went {forward:0.00} of its height forward");
             if (rise > RiseTolerance)
                 failures.Add($"{species.Name} toward {fall} rose {rise:0.00}");
             if (drop < 1f)
                 failures.Add($"{species.Name} toward {fall} stayed up (dropped {drop:0.00})");
+            if (forward < ForwardShare)
+                failures.Add($"{species.Name} toward {fall} did not fall forward (stem top went {forward:0.00} of its height)");
         }
 
         Assert.True(failures.Count == 0, string.Join("; ", failures));

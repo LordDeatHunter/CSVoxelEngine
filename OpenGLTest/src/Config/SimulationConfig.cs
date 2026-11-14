@@ -33,10 +33,12 @@ public static class SimulationConfig
     // A felled tree is a rigid body: it rests TreeFellRestSeconds after it stops, then its wood
     // pops out as item drops
     public const float TreeFellRestSeconds = 0.6f;
-    // A tree whose wood centers above the cut within this of straight up is still pinned to the
-    // stump and tips over it; anything leaning further out (a limb, a branch set) just falls
-    public const float TreeFlatSnapRadians = 1.4f;
-    // The pin lets go once the tree has leaned this far from vertical (nearly flat), or sooner when it comes to a stop
+    // A tree whose wood centers above the cut within this of straight up (a leaning palm included)
+    // is still pinned to the stump and tips over it; anything leaning further out (a limb, a
+    // branch set) just falls
+    public const float TreePinMaxLeanRadians = 0.6f;
+    // The pin lets go once the tree has leaned this far from vertical (nearly flat), or sooner when
+    // wood that cannot snap off (its stem on a ledge) holds it up
     public const float TreeHingeReleaseRadians = 1.45f;
     // The shove (rad/s) that starts a tree tipping or a loose limb tumbling
     public const float TreeFellKickRadiansPerSecond = 0.6f;
@@ -46,6 +48,9 @@ public static class SimulationConfig
     // A side branch whose block hits the ground, or runs into a wall (a neighboring trunk), faster
     // than this (blocks/s) snaps off the tree
     public const float TreeFellDetachSpeed = 2.5f;
+    // While a tree is pinned, its wood within this (blocks) of the pin touches nothing: the butt
+    // turns on the pin (a wide trunk's shells included) instead of digging into the ground beside it
+    public const float TreeFellButtRadius = 2f;
     // The fastest (blocks/s) a felled body is eased out of ground it sank into; the contact
     // impulses stop a landing, so this only mops up the last sink and can never fling the tree
     public const float TreeFellDepenetrateSpeed = 2f;

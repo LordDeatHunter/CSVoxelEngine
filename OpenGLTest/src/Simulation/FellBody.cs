@@ -8,10 +8,13 @@ namespace VoxelEngine.Simulation;
 /// <summary>
 /// GL-free rigid body for a felled tree: the tree's blocks are point masses (their centers) held in
 /// one rigid shape that falls under gravity, tumbles, hits the terrain and settles. Optionally it
-/// starts pinned to the stump by a ball joint at the cut (<c>hinged</c>), which is what makes a
-/// standing tree tip over its base like a felled trunk; the pin lets go once the tree has leaned
-/// past <see cref="SimulationConfig.TreeHingeReleaseRadians"/>, and from then on the base kicks free
-/// like a real fall. Without the pin (a limb, a branch set) the body just drops and tumbles. The
+/// starts pinned to the stump by a hinge at the cut (<c>hinged</c>), which is what makes a
+/// standing tree tip over its base like a felled trunk: it turns only around the tip axis, never
+/// slower than the feller's shove unless wood is holding it up (<see cref="HeldUp"/>), and its
+/// soft blocks (leaves) and its butt (what is within
+/// <see cref="SimulationConfig.TreeFellButtRadius"/> of the pin) hold nothing up. The pin lets go
+/// once the tree has leaned past <see cref="SimulationConfig.TreeHingeReleaseRadians"/> or the
+/// owner calls <see cref="Unpin"/>, and from then on the base kicks free like a real fall. Without the pin (a limb, a branch set) the body just drops and tumbles. The
 /// terrain is a solid-cell query; a block collides through the lowest point of its cell, with
 /// impulse contacts (restitution and friction) and a positional correction. Fixed substeps, main
 /// thread, no GL.
@@ -29,18 +32,30 @@ internal sealed class FellBody
     // neighboring trunk, a cliff face), not resting on ground: lifting the whole body out of it
     // would launch the tree up the wall, so it gives no contact (it can still snap a branch)
     private const float MaxGroundDepth = 1f;
+    // A point that was clear of the ground one substep and is deeper than this the next did not
+    // land on it (no fall is that fast): it ran into the side of a wall (a neighboring trunk's top
+    // block), and lifting it onto the wall would carry the tree up
+    private const float SideEntryDepth = 0.3f;
+    // A contact the tip (at 1 rad/s) moves down slower than this is not in its way
+    private const float PropSink = 0.01f;
     private static readonly Vector3 Up = Vector3.UnitY;
     private readonly Func<int, int, int, bool> _isSolid;
-    private readonly Func<int, int, int, bool> _snags;
     private readonly Vector3[] _offsets;
     private readonly Vector3[] _contactOffsets;
     // Each contact point's world position at build time, before any motion
     private readonly Vector3[] _contactStart;
     private readonly int[] _contactOwner;
     // A point that was already inside a solid cell when the tree was cut (the hillside beside its
-    // base, a neighbor's branch beside its crown) touches nothing until it has left the solid:
-    // pushing the body out of what it grew into is what launched trees into the air
+    // base, a neighbor's branch beside its crown), or that ran into the side of one, touches
+    // nothing until it has left the solid: pushing the body out of what it grew into is what
+    // launched trees into the air
     private readonly bool[] _embedded;
+    // Whether each point was in (or within the skin of) solid the last time it was looked at; a
+    // point not looked at yet counts as touching, so its first sight is never a side entry
+    private readonly bool[] _wasTouching;
+    // Per contact point: its block is soft (a leaf) and gives way under a pinned tree
+    private readonly bool[] _soft;
+    private readonly Vector3 _tipAxis;
     private readonly float _invMass;
     private readonly Matrix4x4 _invInertiaBody;
     private readonly Vector3 _hingeLocal;
@@ -78,8 +93,17 @@ internal sealed class FellBody
     private Vector3 _angular;
 
     /// <summary>The blocks (by index) that hit the ground, or ran into a wall, faster than
-    /// <see cref="SimulationConfig.TreeFellDetachSpeed"/> during the last <see cref="Advance"/>.</summary>
+    /// <see cref="SimulationConfig.TreeFellDetachSpeed"/> during the last <see cref="Advance"/>, and
+    /// the blocks that held the pinned tree up at any speed.</summary>
     public IReadOnlyList<int> HardImpacts => _impacts;
+
+    /// <summary>True when, during the last <see cref="Advance"/>, wood on the ground held the pinned
+    /// tree up short of the feller's shove; those blocks are in <see cref="HardImpacts"/>. The owner
+    /// snaps their branches off, or lets go of the stump (<see cref="Unpin"/>) when none can snap.</summary>
+    public bool HeldUp { get; private set; }
+
+    /// <summary>Lets go of the stump: the body carries on free.</summary>
+    public void Unpin() => Hinged = false;
 
     /// <param name="centers">World-space block centers.</param>
     /// <param name="masses">One mass per center (leaves are light).</param>
@@ -91,13 +115,13 @@ internal sealed class FellBody
     /// <param name="inherit">A body this one is split from: it carries on from that body's pose and
     /// motion with only these blocks, so nothing jumps when a piece breaks off. It keeps the pin
     /// only when <paramref name="hinged"/> and the parent still had it.</param>
-    /// <param name="snags">Cells the body passes through but a block moving fast through them breaks
-    /// off on (a standing tree's branches); none when omitted.</param>
+    /// <param name="soft">Per block, whether it is soft (a leaf): while the pin holds it touches
+    /// nothing, so a canopy brushing the ground cannot hold the trunk up. None when omitted.</param>
     public FellBody(IReadOnlyList<Vector3> centers, IReadOnlyList<float> masses, IReadOnlyList<Vector3[]> contactPoints, Vector3 pivot, Vector3 tipAxis,
-        bool hinged, Func<int, int, int, bool> isSolid, FellBody? inherit = null, Func<int, int, int, bool>? snags = null)
+        bool hinged, Func<int, int, int, bool> isSolid, FellBody? inherit = null, IReadOnlyList<bool>? soft = null)
     {
         _isSolid = isSolid;
-        _snags = snags ?? ((_, _, _) => false);
+        _tipAxis = tipAxis;
         var total = 0f;
         var sum = Vector3.Zero;
         for (var i = 0; i < centers.Count; i++)
@@ -135,6 +159,9 @@ internal sealed class FellBody
         _contactStart = new Vector3[contactCount];
         _contactOwner = new int[contactCount];
         _embedded = new bool[contactCount];
+        _wasTouching = new bool[contactCount];
+        Array.Fill(_wasTouching, true);
+        _soft = new bool[contactCount];
         var at = 0;
         for (var i = 0; i < contactPoints.Count; i++)
         {
@@ -142,6 +169,7 @@ internal sealed class FellBody
             {
                 _contactStart[at] = point;
                 _contactOffsets[at] = point - Center;
+                _soft[at] = soft != null && soft[i];
                 _contactOwner[at++] = i;
             }
         }
@@ -215,6 +243,7 @@ internal sealed class FellBody
     public void Advance(float deltaTime)
     {
         LastImpactSpeed = 0f;
+        HeldUp = false;
         _impacts.Clear();
         if (AtRest) return;
 
@@ -237,6 +266,7 @@ internal sealed class FellBody
             if (Hinged) SolveHinge();
             SolveContacts();
         }
+        if (Hinged) DriveTip();
 
         Center += _velocity * dt;
         Rotation = Quaternion.Normalize(Rotation + Quaternion.Multiply(new Quaternion(_angular, 0f) * Rotation, 0.5f * dt));
@@ -252,12 +282,41 @@ internal sealed class FellBody
         SettleWhenStill(dt);
     }
 
-    // The pin holds until the tree is nearly flat, or it has been stopped short (a crown that
-    // reached the ground first): then the stump lets go and the body settles
+    // The pinned tree turns only around the tip axis, toward the fall, and never slower than the
+    // feller's shove: a lopsided crown cannot pull it over sideways or backward. Wood that holds it
+    // up short of that is a hard impact and is reported (HeldUp)
+    private void DriveTip()
+    {
+        var toPin = Vector3.Transform(_hingeLocal, Rotation);
+        var rate = Vector3.Dot(_angular, _tipAxis);
+        if (rate < SimulationConfig.TreeFellKickRadiansPerSecond)
+        {
+            if (NoteProps(toPin)) HeldUp = true;
+            else rate = SimulationConfig.TreeFellKickRadiansPerSecond;
+        }
+
+        _angular = _tipAxis * rate;
+        _velocity = -Vector3.Cross(_angular, toPin);
+    }
+
+    // Marks every block whose contact the tip would press into the ground as a hard impact;
+    // false when nothing is in the way (the base resting on the stump turns in place)
+    private bool NoteProps(Vector3 toPin)
+    {
+        var any = false;
+        foreach (var (lever, _, index) in _contacts)
+        {
+            if (Vector3.Cross(_tipAxis, lever - toPin).Y > -PropSink) continue;
+            any = true;
+            if (!_impacts.Contains(index))
+                _impacts.Add(index);
+        }
+        return any;
+    }
+
+    // The pin holds until the tree is nearly flat: then the stump lets go and the body settles
     private void ReleaseHingeWhenTipped()
     {
-        if (_contacts.Count > 0 && IsStill()) Hinged = false;
-
         var crown = Vector3.Transform(_crownLocal, Rotation);
         var length = crown.Length();
         if (length < 1e-4f) return;
@@ -282,25 +341,40 @@ internal sealed class FellBody
     }
 
     /// <summary>Every contact point that is in (or within the skin of) a solid cell near its top;
-    /// a point deep inside a wall is no contact, but a fast one is a hard impact.</summary>
+    /// a point deep inside a wall is no contact, but a fast one is a hard impact. A soft point of a
+    /// pinned tree is no contact either, nor is its butt (the pin is what holds that), and what
+    /// they sank into stays crushed under them.</summary>
     private void FindContacts()
     {
         _contacts.Clear();
+        var toPin = Vector3.Transform(_hingeLocal, Rotation);
+        var butt = SimulationConfig.TreeFellButtRadius * SimulationConfig.TreeFellButtRadius;
         for (var i = 0; i < _contactOffsets.Length; i++)
         {
             var lever = Vector3.Transform(_contactOffsets[i], Rotation);
             var point = Center + lever;
             var depth = DepthIntoGround(point);
-            if (depth < 0f && _snags((int)MathF.Floor(point.X), (int)MathF.Floor(point.Y), (int)MathF.Floor(point.Z)))
-                NoteImpact(VelocityAt(point).Length(), _contactOwner[i]);
+            var cameFromClear = !_wasTouching[i];
+            _wasTouching[i] = depth > -ContactSkin;
+            if (Hinged && (_soft[i] || (lever - toPin).LengthSquared() < butt))
+            {
+                _embedded[i] = depth > PenetrationSlop;
+                continue;
+            }
             if (_embedded[i])
             {
                 _embedded[i] = depth > 0f;
                 continue;
             }
+            if (cameFromClear && depth > SideEntryDepth)
+            {
+                _embedded[i] = true;
+                NoteImpact(VelocityAt(point).Length(), _contactOwner[i]);
+                continue;
+            }
             if (depth > MaxGroundDepth)
             {
-                NoteImpact(VelocityAt(Center + lever).Length(), _contactOwner[i]);
+                NoteImpact(VelocityAt(point).Length(), _contactOwner[i]);
                 continue;
             }
             if (depth > -ContactSkin)

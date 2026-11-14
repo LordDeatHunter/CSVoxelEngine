@@ -213,21 +213,31 @@ along its tubes) with impulse contacts (restitution, friction) and a depenetrati
 over the chunks, the felled cells already gone; `FellTerrain.Ground` for plain ground in tests): `Stops` is
 what the wood rests on, and standing trees' leaves and thin wood (branches, a thin trunk, never player-placed
 wood) are not in it, so a falling crown crashes through its neighbors' crowns instead of being lifted onto
-them (wedged in that tangle it used to climb out at 0.45 block per substep and launch); `Snags` is that thin
-wood, which snaps off a branch moving through it faster than `TreeFellDetachSpeed`; `HoldsPin` is any
-solid but leaves, so a cut on a thin trunk still tips over the stub below it.
-`ForestFellTests` fells every species among copies of itself and holds that no piece rises and the tree comes down.
-A tree standing on its stump (ground under the cut, wood mostly above it) starts pinned to the cut by
-a ball joint and tips over it from a small kick, so "fall forward" is the physics of a pinned body; the pin
-lets go when it is nearly flat or has been stopped short. A limb or branch set (no ground under the cut or
-wood leaning out) is free from the start, so it drops and tumbles to the ground. The first hard impact is
+them (wedged in that tangle it used to climb out at 0.45 block per substep and launch); `HoldsPin` is any
+solid but leaves, so a cut on a thin trunk still tips over the stub below it. A point that runs into the side of
+a solid column (a neighboring trunk's top block: clear one substep, deeper than a fall can sink the next) is
+not lifted onto it either.
+`ForestFellTests` fells every species alone and among copies of itself and holds that no piece climbs, the tree
+comes down and the top of its stem travels toward the fall.
+A tree standing on its stump (ground under the cut, its wood centered within `TreePinMaxLeanRadians` of straight
+up, so a leaning palm counts) starts pinned to the cut by a hinge and tips over it from a small kick. "Fall
+forward" is a rule of the pinned phase, not luck (`FellBody.DriveTip`): the body turns only around the tip
+axis, and never slower than the kick unless wood on the ground is holding it up, so a lopsided crown cannot
+pull it over sideways or backward. While pinned, leaves touch nothing (a skirt of leaves on the ground used to
+stop a spruce where it stood; what they sink into stays crushed under them, and `RestCell` lifts such a block
+onto the ground for the thud and the drops) and neither does the butt within `TreeFellButtRadius` of the pin.
+Wood that does hold the tip up is reported (`FellBody.HeldUp`, the blocks in `HardImpacts`): `TopplingTree`
+snaps those branches off under the trunk's weight, and when none can snap (the stem on a ledge) it lets go of
+the stump (`Unpin`). Otherwise the pin lets go when the tree is nearly flat (`TreeHingeReleaseRadians`). A limb
+or branch set (no ground under the cut or wood leaning out) is free from the start, so it drops and tumbles to
+the ground. The first hard impact is
 the thud (`TryTakeLanding`, shake, leaf burst, dust at the cells the blocks are in then); once the body has
 been still for `TreeFellRestHoldSeconds` (or `TreeFellSettleCapSeconds` passed since the first hard impact) it freezes, and `TreeFellRestSeconds`
 later the drops pop out at the blocks' resting cells. Tuning: the `TreeFell*` and `TreeHinge*` constants.
 Wood is heavier toward the root (`TreeFellRootWeightBoost`) so the base outweighs the crown and a canopy
 cannot prop the tree up on its branches. A side branch (`FellBranches`: the wood walked from the cut over
-`TreeSupport.Links`, the main stem going up at each fork) whose block hits the ground, runs into a wall or
-snags on a standing tree's branch faster than `TreeFellDetachSpeed` snaps off whole, leaves included, into its
+`TreeSupport.Links`, the main stem going up at each fork) whose block hits the ground or runs into a wall
+faster than `TreeFellDetachSpeed`, or holds the pinned tree up at any speed, snaps off whole, leaves included, into its
 own `FellPart` that carries on from the parent's pose and speed, free of the pin; the rest is rebuilt and
 remeshed without it, keeping the pin if it still had it (`TopplingTree.Parts`, one model matrix
 and mesh set per part). Only the original part sheds branches. Falling wood hurts: each update `BlockEditor.StrikeWithTree` (singleplayer and server, never a client)
