@@ -488,6 +488,39 @@ internal sealed class HudRenderer : IDisposable
     }
 
     /// <summary>
+    /// The pickup feed (<see cref="PickupFeed"/>): one right-aligned row per recent pickup in the
+    /// bottom-right corner, "[icon] Name +gained (total)", the newest at the bottom.
+    /// </summary>
+    internal void DrawPickupFeed(PickupFeed feed, float headingDegrees, float timeSeconds)
+    {
+        if (_ui.Font == null) return;
+        var rowHeight = SlotSize * 0.5f + UiTheme.Space.Md;
+        var iconSize = rowHeight - UiTheme.Space.Sm;
+        var right = _ui.ScreenSize.X - UiTheme.Space.Lg;
+        var bottom = _ui.ScreenSize.Y - UiTheme.Space.Lg;
+        for (var i = 0; i < feed.Count; i++)
+        {
+            var row = feed.At(i);
+            var a = PickupFeed.Alpha(row);
+            if (a <= 0.004f) continue;
+
+            var text = $"{Inventory.DisplayName(row.Id)} +{row.Gained} ({row.Total})";
+            var size = _ui.Font.MeasureSize(text, _ui.CountScale);
+            var width = iconSize + UiTheme.Space.Sm + size.X + UiTheme.Space.Lg * 2f;
+            var center = new Vector2(right - width * 0.5f,
+                bottom - rowHeight * 0.5f - (feed.Count - 1 - i) * (rowHeight + UiTheme.Space.Sm));
+            _ui.TextFade = a;
+            _ui.DrawRect(center, new Vector2(width, rowHeight),
+                new Rgba(PanelBackground.R, PanelBackground.G, PanelBackground.B, (byte)(PanelBackground.A * a)));
+            var left = center.X - width * 0.5f + UiTheme.Space.Lg;
+            _ui.DrawIdIcon(new Vector2(left + iconSize * 0.5f, center.Y), iconSize, row.Id, headingDegrees, timeSeconds);
+            _ui.DrawText(text, new Vector2(left + iconSize + UiTheme.Space.Sm, center.Y - size.Y * 0.5f),
+                _ui.CountScale, Rgba.White);
+            _ui.TextFade = 1f;
+        }
+    }
+
+    /// <summary>
     /// The selected item's name centered over the hearts row (see <see cref="HotbarNameFade"/>),
     /// at <paramref name="alpha"/>, fitted to the hotbar's width. The chat log sits bottom-left,
     /// clear of the centered hotbar, so the two never overlap.

@@ -370,7 +370,7 @@ internal sealed class WorldRenderer
         ForgeView? forge = null, MapScreenView? mapScreen = null)
     {
         renderManager.UiPasses.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
-            _health.Health, _health.Breath.Fraction, _health.Mana.Fraction, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, LeftClick.Crosshair, LeftClick.LookAt,
+            _health.Health, _health.Breath.Fraction, _health.Mana.Fraction, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, _world.PickupFeed, LeftClick.Crosshair, LeftClick.LookAt,
             _staffSlot.Label(Inventory), _health.Effects.Mask, builder, _health.Max, _world.ChestPanel, waystone, BossSelection.Nearest(Mobs, Camera.Position), forge,
             UpdateMap(mapScreen));
     }

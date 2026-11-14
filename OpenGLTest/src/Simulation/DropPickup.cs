@@ -133,7 +133,10 @@ internal sealed class DropPickup
             if (!added) ReturnRefused(i, collected[i], collectedAt[i]);
             pickedUp |= added;
             if (added)
+            {
                 _world.HotbarPops.Flying.Spawn(collected[i], collectedAt[i], FlySlot(collected[i]));
+                _world.PickupFeed.Record(collected[i], 1, Inventory.CountFor(collected[i]));
+            }
             // A first find toasts its name: Add marks the id obtained, so read it before
             if (!known)
                 Toast.Show($"New: {Inventory.DisplayName(collected[i])}");

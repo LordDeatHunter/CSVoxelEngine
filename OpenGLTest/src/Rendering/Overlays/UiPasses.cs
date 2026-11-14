@@ -52,7 +52,7 @@ internal sealed class UiPasses
         int fps, bool showProfiler, Camera? camera = null, bool showCoordinates = true,
         PauseMenuView? menu = null, SettingsMenuView? settings = null,
         int health = PlayerHealth.MaxHealth, float airShare = 1f, float manaShare = 1f, float damageFlash = 0f, HotbarNameFade? hotbarName = null,
-        HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null,
+        HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null, PickupFeed? pickupFeed = null,
         CrosshairState crosshair = default, LookLabelState? lookAt = null, string? staffSlot = null,
         byte effectMask = 0, SpellBuilderView? builder = null, int maxHealth = PlayerHealth.MaxHealth,
         ChestView? chest = null, WaystoneView? waystone = null, BossBarState? boss = null, ForgeView? forge = null,
@@ -128,6 +128,8 @@ internal sealed class UiPasses
         // The day/first-pickup/full-inventory toast rides above the item-name row
         if (toast is { Alpha: > 0f, Text.Length: > 0 })
             _owner.Ui.Hud.DrawToast(toast.Text, toast.Alpha);
+        if (pickupFeed is { Count: > 0 })
+            _owner.Ui.Hud.DrawPickupFeed(pickupFeed, heading, time);
         // The vitals stay up under a panel or the pause menu, so health and mana can be read while one is open
         if (camera?.IsCreative != true)
             _owner.Ui.Hud.DrawHearts(health, maxHealth);

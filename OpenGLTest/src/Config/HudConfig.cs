@@ -81,4 +81,10 @@ public static class HudConfig
     // canvas pixels square, in a row beside the hearts with this gap between icons and before them.
     public const float EffectIconSize = 28f;
     public const float EffectIconGap = 6f;
+
+    // The bottom-right pickup feed (PickupFeed): a row lives this long after its last pickup, fades over
+    // the final stretch, and the feed shows at most this many rows.
+    public const float PickupFeedSeconds = 3f;
+    public const float PickupFeedFadeSeconds = 0.4f;
+    public const int PickupFeedMaxRows = 6;
 }

@@ -254,6 +254,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         HotbarPickupPop.cs     # the bump a hotbar slot gets when its count rises
         PickupFlyIcons.cs      # GL-free ring of collected-drop icons arcing into their hotbar slots
         HudToast.cs            # one hold-then-fade HUD line (the day toast, a first find, packs full)
+        PickupFeed.cs          # bottom-right "+N (total)" rows of recent pickups: same item merges, a row leaves 3 s after its last pickup
         ItemTooltip.cs         # the hover panel's lines, built from the item's own fields; Hover packs them with the rarity
         HoverTooltip.cs        # the tooltip one frame shows: anchor, lines, line colors and the hovered item's rarity
         LookLabel.cs           # the look-at label's rule: name, "Unknown", the mineable flag

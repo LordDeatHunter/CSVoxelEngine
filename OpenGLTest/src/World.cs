@@ -307,6 +307,9 @@ public class World
     /// its alpha is above zero.</summary>
     public HudToast Toast { get; } = new();
 
+    /// <summary>The bottom-right "+N (total)" rows of recent pickups.</summary>
+    public PickupFeed PickupFeed { get; } = new();
+
     // The crosshair's hit marker, shown where the hit-stop is requested
     // (LeftClickAction.UpdatePunch/UpdateSlice)
     private readonly HitMarker _hitMarker = new();
@@ -318,7 +321,9 @@ public class World
     public void CreditItem(ushort id, int count)
     {
         var known = Inventory.Knows(id);
-        if (Inventory.Add(id, count) && !known)
+        if (!Inventory.Add(id, count)) return;
+        PickupFeed.Record(id, count, Inventory.CountFor(id));
+        if (!known)
             Toast.Show($"New: {Inventory.DisplayName(id)}");
     }
 
@@ -1362,6 +1367,7 @@ public class World
         _hotbarName.Update(Inventory, (float)deltaTime);
         DamageNumbers.Update((float)deltaTime);
         Toast.Update((float)deltaTime);
+        PickupFeed.Update((float)deltaTime);
         LocalPlayer.UpdateQuestToasts((float)deltaTime);
         _hitMarker.Update((float)deltaTime);
 
