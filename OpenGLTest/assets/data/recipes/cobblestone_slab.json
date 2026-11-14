@@ -1,7 +1,7 @@
 {
   "result": "block/cobblestone_slab",
-  "count": 6,
+  "count": 2,
   "ingredients": [
-    { "item": "block/cobblestone", "count": 3 }
+    { "item": "block/cobblestone", "count": 1 }
   ]
 }

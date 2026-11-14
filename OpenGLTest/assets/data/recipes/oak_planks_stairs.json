@@ -2,6 +2,6 @@
   "result": "block/oak_planks_stairs",
   "count": 4,
   "ingredients": [
-    { "item": "block/oak_planks", "count": 6 }
+    { "item": "block/oak_planks", "count": 3 }
   ]
 }
