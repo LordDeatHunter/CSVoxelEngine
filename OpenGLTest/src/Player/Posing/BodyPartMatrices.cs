@@ -20,19 +20,21 @@ internal sealed class BodyPartMatrices
         var rig = _model.Rig;
         Vector3 Pivot(string name) => rig.Parts[name].Pivot;
         var feet = eyePos - new Vector3(0f, Camera.EyeHeight, 0f);
+        // A body mod is applied on top of the torso lean: the swim tips the whole body forward about the hips.
+        var mods = _model.Secondary.ComputeMods();
         if (backOffset != 0f)
         {
-            // A forward lean (flight) swings the chest toward the eye; shift the body back by how far the
-            // torso top moves forward, so looking down never lands on the upper torso from behind.
+            // A forward lean (flight torso lean or the swim's body tilt) swings the head toward the eye; shift the
+            // body back by how far the head moves forward, so looking down never lands on the neck from behind.
             var hipY = rig.Parts.TryGetValue("ThighL", out var hipPart) ? hipPart.Pivot.Y : PelvisFallback;
-            backOffset += MathF.Max(0f, MathF.Sin(-pose.TorsoPitch)) * MathF.Max(0f, Camera.EyeHeight - hipY);
+            var forwardLean = MathF.Max(0f, MathF.Sin(-pose.TorsoPitch)) + MathF.Max(0f, MathF.Sin(-mods.SwimPitch));
+            backOffset += forwardLean * MathF.Max(0f, Camera.EyeHeight - hipY);
             var yawBase = yawDeg * MathF.PI / 180f;
             feet -= new Vector3(MathF.Cos(yawBase) * backOffset, 0f, MathF.Sin(yawBase) * backOffset);
         }
         // Model faces -Z at rest; this yaw maps it onto the camera's horizontal facing
         // (at the default -90 it is the identity, verified against Camera.GetForwardVector).
         // A lagging body faces its own yaw and the head makes up the difference.
-        var mods = _model.Secondary.ComputeMods();
         // The blade swing in progress (a slice or a sword swing), or every term zero
         var blade = _model.Blade;
         var bodyYawDeg = _model.DrawnBodyYaw(yawDeg);
