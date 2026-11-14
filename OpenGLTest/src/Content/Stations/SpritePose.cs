@@ -48,4 +48,13 @@ public static class SpritePose
     /// </summary>
     public static Matrix4x4 LyingFaceUp(float yaw) =>
         Matrix4x4.CreateRotationX(-MathF.PI / 2f) * Matrix4x4.CreateRotationY(yaw);
+
+    /// <summary>
+    /// Turns an upright sprite face-down (its front face toward -Y), then yaws it about world Y.
+    /// With <paramref name="yaw"/> = 0 the image bottom points to -Z, so yawing by
+    /// <c>atan2(x, z)</c> of a cell-local offset turns the bottom toward the cell's center
+    /// (campfire food does this).
+    /// </summary>
+    public static Matrix4x4 LyingFaceDown(float yaw) =>
+        Matrix4x4.CreateRotationX(MathF.PI / 2f) * Matrix4x4.CreateRotationY(yaw);
 }

@@ -123,8 +123,10 @@ internal sealed class StationPasses : IDisposable
 
             var scale = ItemDrop.Size * (ItemRegistry.IsItem(itemId) ? 1.5f : 1f);
             var offset = CampfireManager.SlotOffsets[slot % CampfireManager.SlotOffsets.Length];
+            // Food lies face-down on the fire with its bottom toward the fire's center, so each
+            // slot's yaw points from its offset back to the middle of the cell.
             var placed = Matrix4x4.CreateScale(scale)
-                        * Matrix4x4.CreateRotationY(slot * MathF.PI / 2f)
+                        * SpritePose.LyingFaceDown(MathF.Atan2(offset.X, offset.Z))
                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, 0f, 0.5f) + offset);
 
             _owner.SetDrawUniforms(placed, placed * viewProj, 1f, _owner.LightAt(cell + new Vector3(0.5f)));
