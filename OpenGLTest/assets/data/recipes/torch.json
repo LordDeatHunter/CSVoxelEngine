@@ -1,6 +1,6 @@
 {
   "result": "block/torch",
-  "count": 4,
+  "count": 6,
   "ingredients": [
     { "item": "item/branch", "count": 1 },
     { "item": "item/coal", "count": 1 }

@@ -1,0 +1,8 @@
+{
+  "result": "block/torch",
+  "count": 2,
+  "ingredients": [
+    { "item": "item/branch", "count": 1 },
+    { "item": "item/slimeball", "count": 1 }
+  ]
+}

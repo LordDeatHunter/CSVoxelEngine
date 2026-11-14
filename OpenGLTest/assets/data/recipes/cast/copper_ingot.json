@@ -4,7 +4,7 @@
   // result once another molten material exists.
   "mold": "block/fired_mold_ingot",
   "fluid": "copper",
-  "amountMl": 200,
+  "amountMl": 100,
   "coolSeconds": 2,
   "result": "item/copper_ingot",
   "count": 1

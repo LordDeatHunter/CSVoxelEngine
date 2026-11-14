@@ -51,7 +51,7 @@ copper each have an axe, pickaxe and sword (`attack: "sword"`), the tool ladder 
 < bronze.
 
 **Bronze** is the alloy (3 copper + 1 tin by ml, made only in the alloy furnace, see the recipe kind
-below) and the top of that ladder: an ingot, ring, axe, pickaxe and sword heads (each 200 ml, melting back
+below) and the top of that ladder: an ingot (100 ml), ring, axe, pickaxe and sword heads (each 200 ml, melting back
 to `bronze`, cast in the same five molds) and the three tools crafted like the others (head + branch + 2
 vines), in the `axe` and `pickaxe` tags. It has no ore, no blocks and no armor. Its art is recolored from the copper tools; `MiningTests.BronzeOutranksCopperAndMinesWhatCopperMines`
 holds the ladder as relations and `visual-examples/bronze.json` (`VOXEL_TIME=147`) shows the tin,

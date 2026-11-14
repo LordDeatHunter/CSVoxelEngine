@@ -1,6 +1,6 @@
 {
   // Bronze: three parts copper to one of tin, by ml. An alloy kiln turns every full set in a
-  // crucible into the same 800 ml of bronze (four ingots' worth), so nothing is gained or lost;
+  // crucible into the same 800 ml of bronze (eight ingots' worth), so nothing is gained or lost;
   // a plain kiln never mixes metals. The set fits exactly into one crucible.
   "result": "bronze",
   "parts": [

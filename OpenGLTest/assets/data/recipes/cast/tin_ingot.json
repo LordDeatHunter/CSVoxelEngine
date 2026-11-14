@@ -1,7 +1,7 @@
 {
   "mold": "block/fired_mold_ingot",
   "fluid": "tin",
-  "amountMl": 200,
+  "amountMl": 100,
   "coolSeconds": 2,
   "result": "item/tin_ingot",
   "count": 1
