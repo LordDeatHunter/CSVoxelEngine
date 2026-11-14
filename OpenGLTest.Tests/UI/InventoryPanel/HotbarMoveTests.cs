@@ -7,15 +7,15 @@ using Xunit;
 namespace VoxelEngine.Tests.UI.InventoryPanel;
 
 /// <summary>
-/// A hotbar slot dragged onto another moves what it shows there and empties its own slot, the item it replaces stays in
-/// its pool, and a move or clear that would change nothing is refused, on the client and in the server's replay alike.
+/// A hotbar slot dragged onto another moves what it shows there and swaps the destination's contents back into its own
+/// slot, the items stay in their pools, and a move or clear that would change nothing is refused, on the client and in the server's replay alike.
 /// </summary>
 public sealed class HotbarMoveTests
 {
     public HotbarMoveTests() => TestContent.EnsureLoaded();
 
     [Fact]
-    public void AMoveEmptiesTheSourceAndReplacesTheDestinationWithoutLosingItsItem()
+    public void AMoveSwapsTheDestinationsContentsBackIntoTheSource()
     {
         var inventory = Inventory.Empty();
         var stone = ContentRegistry.RequireBlock("stone").Id;
@@ -27,8 +27,21 @@ public sealed class HotbarMoveTests
 
         Assert.True(inventory.MoveSlot(0, 5));
         Assert.Equal(stone, inventory.IdAt(5));
-        Assert.Equal(0, inventory.IdAt(0));
+        Assert.Equal(bucket, inventory.IdAt(0));
         Assert.Single(inventory.ToolEntries());
+    }
+
+    [Fact]
+    public void AMoveOntoAnEmptySlotLeavesTheSourceEmpty()
+    {
+        var inventory = Inventory.Empty();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        Assert.True(inventory.Add(stone, 3, autoEquip: false));
+        inventory.EquipStackable(0, stone);
+
+        Assert.True(inventory.MoveSlot(0, 4));
+        Assert.Equal(stone, inventory.IdAt(4));
+        Assert.Equal(0, inventory.IdAt(0));
     }
 
     [Fact]

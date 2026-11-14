@@ -411,17 +411,16 @@ public class Inventory
     public void ClearSlot(int hotbarIndex) => _hotbar[Wrap(hotbarIndex)] = HotbarSlot.Empty;
 
     /// <summary>
-    /// Moves what a hotbar slot shows into another slot and empties the source. The destination's previous contents
-    /// leave the hotbar, but their items stay in their pools. False, changing nothing, when the source shows nothing
-    /// or both are the same slot.
+    /// Moves what a hotbar slot shows into another slot and swaps it with what that slot held: the destination's
+    /// previous contents go to the source (an empty destination leaves the source empty). Items stay in their pools.
+    /// False, changing nothing, when the source shows nothing or both are the same slot.
     /// </summary>
     public bool MoveSlot(int fromIndex, int toIndex)
     {
         var from = Wrap(fromIndex);
         var to = Wrap(toIndex);
         if (from == to || _hotbar[from].IsEmpty) return false;
-        _hotbar[to] = _hotbar[from];
-        _hotbar[from] = HotbarSlot.Empty;
+        (_hotbar[from], _hotbar[to]) = (_hotbar[to], _hotbar[from]);
         return true;
     }
 
