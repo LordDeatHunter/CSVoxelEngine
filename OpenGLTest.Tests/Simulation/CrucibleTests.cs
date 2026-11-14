@@ -109,7 +109,7 @@ public sealed class CrucibleTests
     {
         var inventory = TestInventory.Stocked();
         var id = Crucible.Id;
-        var ore = MeltOf("malachite_ore");
+        var ore = MeltOf("crushed_copper");
 
         var first = CrucibleInventory.Add(inventory, id, new CrucibleComponent(Copper, ore.AmountMl, ore.AmountMl));
         var second = CrucibleInventory.Add(inventory, id, new CrucibleComponent(Copper, 0, ore.AmountMl));
@@ -140,7 +140,7 @@ public sealed class CrucibleTests
 
         var capacity = Crucible.CrucibleCapacityMl;
         var ingot = MeltOf("copper_ingot");
-        var ore = MeltOf("malachite_ore");
+        var ore = MeltOf("crushed_copper");
         var branch = ContentRegistry.RequireItem("branch").Id;
 
         // No crucible, nothing to charge
@@ -190,7 +190,7 @@ public sealed class CrucibleTests
     {
         var anchor = new Vector3(2, 2, 2);
         var (manager, kilns, drops) = ConvertedKiln(anchor);
-        var ore = MeltOf("malachite_ore");
+        var ore = MeltOf("crushed_copper");
 
         Assert.True(kilns.TryPlaceCrucible(anchor, Crucible.Id, default));
         var state = kilns.StateAt(2, 2, 2)!;
@@ -232,7 +232,7 @@ public sealed class CrucibleTests
         var state = kilns.StateAt(2, 2, 2)!;
         state.Profile = profile;
         Assert.True(kilns.TryPlaceCrucible(anchor, Crucible.Id, default));
-        var ore = MeltOf("malachite_ore");
+        var ore = MeltOf("crushed_copper");
         while (state.Contents.PendingMl < 2 * KilnManager.MeltChunkMl)
             Assert.True(kilns.TryInsertMelt(anchor, ore.InputId));
         Assert.True(kilns.TryAddFuel(anchor, Coal));
@@ -263,7 +263,7 @@ public sealed class CrucibleTests
     {
         var anchor = new Vector3(2, 2, 2);
         var (manager, kilns, drops) = ConvertedKiln(anchor);
-        var ore = MeltOf("malachite_ore");
+        var ore = MeltOf("crushed_copper");
 
         Assert.True(kilns.TryPlaceCrucible(anchor, Crucible.Id, default));
         var state = kilns.StateAt(2, 2, 2)!;
@@ -320,8 +320,8 @@ public sealed class CrucibleTests
     {
         var anchor = new Vector3(2, 2, 2);
         var (_, kilns, _) = ConvertedKiln(anchor);
-        var ore = MeltOf("malachite_ore");
-        var crushed = MeltOf("crushed_copper");
+        var ore = MeltOf("crushed_copper");
+        var crushed = MeltOf("copper_ingot");
 
         Assert.True(kilns.TryPlaceCrucible(anchor, Crucible.Id, default));
         var state = kilns.StateAt(2, 2, 2)!;
@@ -358,7 +358,7 @@ public sealed class CrucibleTests
     {
         var anchor = new Vector3(2, 2, 2);
         var (manager, kilns, drops) = ConvertedKiln(anchor);
-        var ore = MeltOf("malachite_ore");
+        var ore = MeltOf("crushed_copper");
 
         Assert.True(kilns.TryPlaceCrucible(anchor, Crucible.Id, default));
         var state = kilns.StateAt(2, 2, 2)!;
@@ -398,7 +398,7 @@ public sealed class CrucibleTests
     {
         var anchor = new Vector3(2, 2, 2);
         var (_, kilns, drops) = ConvertedKiln(anchor);
-        var ore = MeltOf("malachite_ore");
+        var ore = MeltOf("crushed_copper");
 
         Assert.True(kilns.TryPlaceCrucible(anchor, Crucible.Id,
             new CrucibleComponent(Copper, ore.AmountMl, ore.AmountMl)));

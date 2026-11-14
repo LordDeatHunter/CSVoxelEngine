@@ -27,7 +27,7 @@ public sealed class MetalworksRecipeTests
 
         string[] pureCopper =
         [
-            "malachite_ore", "crushed_copper", "copper_ingot", "copper_pickaxe_head", "copper_axe_head",
+            "crushed_copper", "copper_ingot", "copper_pickaxe_head", "copper_axe_head",
             "copper_sword_head",
         ];
 

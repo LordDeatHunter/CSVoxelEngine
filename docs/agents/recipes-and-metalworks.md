@@ -46,7 +46,7 @@ gloves 4 rings), `bronze_chest` (8 rings and 4 planks), `clock` (4 copper rings 
 
 **Tin** (`tin_ore`, `TinGenerator`) is the second, weaker metal: commoner than malachite, in the
 `TinMinY..TinMaxY` band, mined with any pickaxe; it crushes in the quern into `crushed_tin`, melts as `tin`
-(ingot, axe, pickaxe, sword and ring 200 ml, ore and crushed 100 ml) and casts into the five molds. Tin and
+(ingot and crushed 100 ml, axe, pickaxe, sword and ring 200 ml; the raw ore does not melt, only crushed ore does) and casts into the five molds. Tin and
 copper each have an axe, pickaxe and sword (`attack: "sword"`), the tool ladder runs primitive < tin < copper
 < bronze.
 
@@ -82,7 +82,7 @@ input (`MeltRecipe`, `ContentRegistry.MeltRecipeForInput`). `recipes/cast/<resul
 metalworks recipe proper, `{ "mold", "fluid", "amountMl", "coolSeconds", "result", "count" }`,
 keyed by the **(fired mold block, material)** pair, which must be unique (`CastRecipe`,
 `CastRecipeFor(moldId, materialId)`, and `IsCastMold(id)` for "is this cell a mold at all").
-Every shipped copper form — the malachite chunk, crushed copper, the ingot and both tool heads —
+Every shipped copper form — crushed copper (the raw malachite chunk does not melt), the ingot and both tool heads —
 has a melt recipe, so **a cast melts back into exactly what it took**: `MetalworksRecipeTests`
 asserts that conservation as a relation rather than pinning any ml figure.
 
