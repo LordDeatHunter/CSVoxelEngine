@@ -633,7 +633,8 @@ internal sealed class LeftClickAction
         // Mining a block discovers it (the look label's "Unknown"), whether or not its drop is picked up
         var mined = Edits.BlockIdAt(cell);
         Edits.RemoveBlock(cell, player);
-        if (Edits.BlockIdAt(cell) == 0)
+        // A felled trunk's root stays behind as its stump, so the cell need not end as air, only as something else
+        if (Edits.BlockIdAt(cell) != mined)
         {
             player.Inventory.MarkKnown(mined);
             // Only the mined cell counts, never the torches and pebbles it was holding up
