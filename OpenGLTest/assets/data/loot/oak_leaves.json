@@ -3,8 +3,8 @@
   // and branches like every leaf, and about one time in twenty the acorn inside them. Other
   // species keep assets/data/loot/leaves.json.
   "pools": [
-    { "rolls": 1, "chance": 0.15, "entries": [ { "item": "item/vine" } ] },
-    { "rolls": 1, "chance": 0.15, "entries": [ { "item": "item/branch" } ] },
+    { "rolls": 1, "chance": 0.025, "entries": [ { "item": "item/vine" } ] },
+    { "rolls": 1, "chance": 0.025, "entries": [ { "item": "item/branch" } ] },
     { "rolls": 1, "chance": 0.05, "entries": [ { "item": "item/acorn" } ] }
   ]
 }

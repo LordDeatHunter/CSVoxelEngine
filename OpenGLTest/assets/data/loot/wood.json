@@ -1,7 +1,7 @@
 {
-  // Thin tree wood (the bands below a log in oak_log.json / spruce_log.json): a stick half
-  // the time
+  // Thin tree wood (the bands below a log in oak_log.json / spruce_log.json): a stick about one
+  // time in twelve
   "pools": [
-    { "rolls": 1, "chance": 0.5, "entries": [ { "item": "item/branch" } ] }
+    { "rolls": 1, "chance": 0.083, "entries": [ { "item": "item/branch" } ] }
   ]
 }
