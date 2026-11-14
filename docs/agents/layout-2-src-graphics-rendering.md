@@ -258,7 +258,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       BubbleParticleSystem.cs  # live exhaled bubbles: spawns them at the player's mouth while the eye is submerged
       DebrisLook.cs            # what a BlockDebris chip looks like, i.e. which cached cube BlockCubeCache draws it with
       FireParticle.cs          # one fire particle: an ember, a smoke puff, a steam puff or a floor-conquered pulse mote
-      FloorConqueredEffects.cs # World component: the clear jingle and the rings of motes pulsing out of a conquered battle-tower floor
+      FloorConqueredEffects.cs # World component: the clear jingle and the shockwave shells pulsing out of a conquered battle-tower floor
       FireParticleRenderer.cs  # draws every live FireParticle as a camera-facing billboard
       FireParticleSystem.cs    # live fire particles: embers and smoke rising off every lit cell the caller feeds in
       FootstepDust.cs          # the sprint footstep dust rule, GL-free: when a footfall happens

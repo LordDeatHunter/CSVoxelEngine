@@ -254,19 +254,15 @@ public static class JuiceConfig
     public const float SparkSize = 0.12f;
 
     // --- Conquered battle-tower floor (FloorConqueredEffects): when a floor's last skeleton falls and its door
-    // opens, PulseCount cylinders of glowing motes, one every PulseIntervalSeconds, sweep out from the floor's
-    // axis across its whole height, a layer every MoteLayerSpacing blocks of MotesPerLayer motes flung flat at
-    // MoteSpeed until they reach the wall (the floor's interior radius), while a shockwave rides each shell
-    // and bends the screen (post-fragment.glsl, Shockwave): a lens of half ShockwaveHalfThickness blocks
+    // opens, PulseCount shockwave shells, one every PulseIntervalSeconds, sweep out from the floor's axis across
+    // its whole height at WaveSpeed blocks per second until they reach the wall (the floor's interior radius),
+    // each lens bending the screen (post-fragment.glsl, Shockwave): a lens of half ShockwaveHalfThickness blocks
     // that pushes the picture ShockwavePushBlocks along the way out. The jingle plays when the camera is within
     // SoundRangeBlocks. Cosmetic: singleplayer and a client (from the door bit of the tower snapshot), never a
     // server. ---
     public const int FloorConqueredPulseCount = 3;
     public const float FloorConqueredPulseIntervalSeconds = 0.45f;
-    public const int FloorConqueredMotesPerLayer = 72;
-    public const float FloorConqueredMoteLayerSpacing = 1.5f;
-    public const float FloorConqueredMoteSpeed = 6f;
-    public const float FloorConqueredMoteSize = 0.26f;
+    public const float FloorConqueredWaveSpeed = 6f;
     public const float FloorConqueredShockwaveHalfThickness = 1.4f;
     public const float FloorConqueredShockwavePushBlocks = 1.2f;
     public const float FloorConqueredShockwaveRangeBlocks = 96f;

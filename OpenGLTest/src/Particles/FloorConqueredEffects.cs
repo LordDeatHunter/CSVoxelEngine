@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Audio;
@@ -10,17 +9,14 @@ namespace VoxelEngine.Particles;
 
 /// <summary>
 /// The cosmetic show of a battle tower's floor being conquered (<see cref="TowerManager.FloorConquered"/>): the clear
-/// jingle (when the camera is near) and a few cylinders of glowing motes pulsing outward from the floor's axis across
-/// its whole height until they reach the wall (<see cref="FireParticleSystem.PulseCylinder"/>), each riding a
-/// <see cref="Shockwave"/> the post pass bends the screen with. Never played for the boss: the roof altar's fight has no
-/// floor door. Singleplayer and a client, never a server. Main thread only.
+/// jingle (when the camera is near) and a few shockwave shells pulsing outward from the floor's axis across its whole
+/// height until they reach the wall, each a <see cref="Shockwave"/> the post pass bends the screen with. Never played
+/// for the boss: the roof altar's fight has no floor door. Singleplayer and a client, never a server. Main thread only.
 /// </summary>
 internal sealed class FloorConqueredEffects
 {
     private readonly Camera _camera;
-    private readonly FireParticleSystem _fire;
     private readonly WorldSounds _sounds;
-    private readonly Random _random;
     private readonly List<Show> _shows = [];
     private readonly List<Wave> _waves = [];
     private readonly List<Shockwave> _shockwaves = [];
@@ -46,13 +42,10 @@ internal sealed class FloorConqueredEffects
         public float Age;
     }
 
-    internal FloorConqueredEffects(Camera camera, FireParticleSystem fire, TowerManager towers, WorldSounds sounds,
-        Random? random = null)
+    internal FloorConqueredEffects(Camera camera, TowerManager towers, WorldSounds sounds)
     {
         _camera = camera;
-        _fire = fire;
         _sounds = sounds;
-        _random = random ?? Random.Shared;
         towers.FloorConquered += OnConquered;
     }
 
@@ -99,7 +92,7 @@ internal sealed class FloorConqueredEffects
         {
             var wave = _waves[i];
             wave.Age += deltaTime;
-            var radius = wave.Age * JuiceConfig.FloorConqueredMoteSpeed;
+            var radius = wave.Age * JuiceConfig.FloorConqueredWaveSpeed;
             if (radius >= wave.Radius)
             {
                 _waves.RemoveAt(i);
@@ -115,10 +108,6 @@ internal sealed class FloorConqueredEffects
 
     private void Launch(Show show)
     {
-        var lifetime = show.Radius / JuiceConfig.FloorConqueredMoteSpeed;
-        _fire.PulseCylinder(show.Center, show.BottomY, show.TopY, JuiceConfig.FloorConqueredMotesPerLayer,
-            JuiceConfig.FloorConqueredMoteLayerSpacing, JuiceConfig.FloorConqueredMoteSpeed, lifetime,
-            JuiceConfig.FloorConqueredMoteSize, _random);
         _waves.Add(new Wave { Center = show.Center, BottomY = show.BottomY, TopY = show.TopY, Radius = show.Radius });
     }
 }
