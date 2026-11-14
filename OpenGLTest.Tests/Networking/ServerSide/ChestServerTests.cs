@@ -84,6 +84,7 @@ public sealed class ChestServerTests : IDisposable
                         reader.ReadFloat(); reader.ReadFloat(); reader.ReadByte(); reader.ReadByte(); reader.ReadByte();
                         for (var slot = 0; slot < GearConfig.ArmorSlotCount; slot++) reader.ReadId();
                         Held[name] = (reader.ReadId(), reader.ReadBool());
+                        reader.ReadId(); reader.ReadBool(); // the offhand's item and light
                     }
                 }
                 if (message == NetMessage.SoundEvents)

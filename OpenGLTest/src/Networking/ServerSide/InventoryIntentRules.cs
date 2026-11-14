@@ -83,12 +83,15 @@ public static class InventoryIntentRules
                 return inventory.Equipment.Unequip(intent.Slot);
 
             case NetInventoryAction.MoveSlot:
-                return IsSlot(intent.Slot) && IsSlot(intent.Id) && inventory.MoveSlot(intent.Slot, intent.Id);
+                return IsSlotOrOffhand(intent.Slot) && IsSlotOrOffhand(intent.Id) && inventory.MoveSlot(intent.Slot, intent.Id);
 
             case NetInventoryAction.ClearSlot:
-                if (!IsSlot(intent.Slot)) return false;
+                if (!IsSlotOrOffhand(intent.Slot)) return false;
                 inventory.ClearSlot(intent.Slot);
                 return true;
+
+            case NetInventoryAction.SwapHands:
+                return inventory.SwapHands();
 
             default:
                 return false;
@@ -108,7 +111,7 @@ public static class InventoryIntentRules
 
     private static bool Equip(Inventory inventory, in InventoryIntent intent)
     {
-        if (!IsSlot(intent.Slot)) return false;
+        if (!IsSlotOrOffhand(intent.Slot)) return false;
         var slot = inventory.SlotAt(intent.Slot);
 
         if (intent.IsTool)
@@ -147,6 +150,8 @@ public static class InventoryIntentRules
     }
 
     private static bool IsSlot(int slot) => slot >= 0 && slot < Inventory.SlotCount;
+
+    private static bool IsSlotOrOffhand(int slot) => slot >= 0 && slot <= Inventory.OffhandIndex;
 
     private static bool IsId(int id) => BlockTables.IsAssignedId(id);
 }

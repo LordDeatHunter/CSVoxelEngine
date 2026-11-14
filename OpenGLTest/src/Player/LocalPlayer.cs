@@ -121,6 +121,12 @@ internal sealed class LocalPlayer
     /// <summary>Whether the hand holds anything this frame (a stack or a tool instance).</summary>
     internal bool HasHeld => _hasHeld;
 
+    /// <summary>The item in the left hand this frame, as the body model last read it.</summary>
+    internal ushort OffhandId => _offhandId;
+
+    /// <summary>Whether the left hand holds anything this frame.</summary>
+    internal bool HasOffhand { get; private set; }
+
     /// <summary>
     /// Records the spawn column from the camera's starting position; a <c>VOXEL_SPAWN</c> override
     /// counts as settled at once.
@@ -162,6 +168,7 @@ internal sealed class LocalPlayer
     private Vector3 _prevCamPos;
     private bool _hasPrevCamPos;
     private ushort _heldId;
+    private ushort _offhandId;
     private bool _hasHeld;
 
     // The local player as a PlayerContext: this world's own inventory, aimed by its camera.
@@ -314,6 +321,10 @@ internal sealed class LocalPlayer
         _hasHeld = _heldId != 0 && (Inventory.SelectedCount > 0 || Inventory.SelectedToolInstance > 0);
         Player.HoldingItem = _hasHeld;
         Player.HoldingLantern = _hasHeld && Simulation.Lanterns.LanternState.IsLantern(_heldId);
+        _offhandId = Inventory.OffhandId;
+        HasOffhand = _offhandId != 0 && Inventory.OffhandCount > 0;
+        Player.HoldingOffhand = HasOffhand;
+        Player.HoldingOffhandLantern = HasOffhand && Simulation.Lanterns.LanternState.IsLantern(_offhandId);
         // The shoulder camera shows the body from outside, where it trails the look; first person
         // and orbit (which turns the body itself) keep it on the look.
         Player.BodyYawLags = Camera.IsShoulderSurf && !Camera.IsOrbit;

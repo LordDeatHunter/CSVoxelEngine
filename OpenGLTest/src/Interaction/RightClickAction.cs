@@ -48,6 +48,11 @@ internal sealed class RightClickAction
     private float _useChargeSeconds;
     private ushort _useItemId;
 
+    // The hand a timed use is charging in, so its completion runs on that hand and not on whichever hand the next
+    // click would pick; _forcedHand pins TryUseSelected to one hand for exactly that run
+    private bool _useOffhand;
+    private bool? _forcedHand;
+
     // The slot the last local cast went out on, which a client's Cast intent names
     private int _castSlot;
 
@@ -115,6 +120,26 @@ internal sealed class RightClickAction
     /// </summary>
     internal bool TryUseSelected(float maxDistance, PlayerContext player, out RightClickOutcome outcome,
         bool allowPlace = true, bool beginTimedUse = false)
+    {
+        // The offhand gets the click first; whatever it cannot use falls through to the main hand. Singleplayer, a
+        // client's prediction and the server's replay all run this same chain, so they agree on the hand.
+        if (_forcedHand is { } forced)
+        {
+            using (player.Inventory.UseHand(forced))
+                return TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse);
+        }
+        if (player.Inventory.Offhand.IsEmpty)
+            return TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse);
+        using (player.Inventory.UseHand(offhand: true))
+        {
+            if (TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse))
+                return true;
+        }
+        return TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse);
+    }
+
+    private bool TryUseHand(float maxDistance, PlayerContext player, out RightClickOutcome outcome,
+        bool allowPlace, bool beginTimedUse)
     {
         outcome = RightClickOutcome.None;
         if (!IsPlaying) return false;
@@ -252,6 +277,7 @@ internal sealed class RightClickAction
         IsUseCharging = true;
         _useChargeSeconds = 0f;
         _useItemId = id;
+        _useOffhand = holder.OffhandActive;
         Player.StartUseCharge(item.UsePose);
         return true;
     }
@@ -265,7 +291,10 @@ internal sealed class RightClickAction
         if (!IsPlaying) return;
         if (!IsUseCharging) return;
         var seconds = ItemRegistry.TryGet(_useItemId)?.UseSeconds ?? 0f;
-        if (Inventory.SelectedBlockId != _useItemId || Inventory.SelectedCount <= 0 || seconds <= 0f)
+        bool stillHeld;
+        using (Inventory.UseHand(_useOffhand))
+            stillHeld = Inventory.SelectedBlockId == _useItemId && Inventory.SelectedCount > 0;
+        if (!stillHeld || seconds <= 0f)
         {
             CancelUseCharge();
             return;
@@ -283,7 +312,9 @@ internal sealed class RightClickAction
         // Completed: the use runs now, on the same path a click would have taken
         IsUseCharging = false;
         Player.CancelUseCharge();
-        TryUseSelected(World.InteractionReach);
+        _forcedHand = _useOffhand;
+        try { TryUseSelected(World.InteractionReach); }
+        finally { _forcedHand = null; }
     }
 
     /// <summary>Cancels a held timed use; the item spends nothing.</summary>

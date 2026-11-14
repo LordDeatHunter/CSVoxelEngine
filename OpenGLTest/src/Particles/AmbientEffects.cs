@@ -81,21 +81,29 @@ internal sealed class AmbientEffects
         get
         {
             _lightCells.Clear();
-            if (_world.LocalPlayer.LocalContext().Health?.IsDead != true && Simulation.Lanterns.LanternManager.Emits(_world.Inventory))
-                AddHeldLight(_world.Camera.Position, _world.Camera.PlayerYaw, _world.Camera.Pitch, _world.Player);
+            if (_world.LocalPlayer.LocalContext().Health?.IsDead != true)
+            {
+                if (Simulation.Lanterns.LanternManager.EmitsFrom(_world.Inventory, offhand: false))
+                    AddHeldLight(_world.Camera.Position, _world.Camera.PlayerYaw, _world.Camera.Pitch, _world.Player, offhand: false);
+                if (Simulation.Lanterns.LanternManager.EmitsFrom(_world.Inventory, offhand: true))
+                    AddHeldLight(_world.Camera.Position, _world.Camera.PlayerYaw, _world.Camera.Pitch, _world.Player, offhand: true);
+            }
             foreach (var remote in _world.RemotePlayers)
-                if (remote.HeldLit) AddHeldLight(remote.Eye, remote.Yaw, remote.Pitch, remote.Model);
+            {
+                if (remote.HeldLit) AddHeldLight(remote.Eye, remote.Yaw, remote.Pitch, remote.Model, offhand: false);
+                if (remote.OffhandLit) AddHeldLight(remote.Eye, remote.Yaw, remote.Pitch, remote.Model, offhand: true);
+            }
             _world.Lanterns.AppendLights(_chunkManager, _lightCells);
             _lightCells.AddRange(_fireCells);
             return _lightCells;
         }
     }
 
-    private void AddHeldLight(Vector3 eye, float yaw, float pitch, Player.PlayerModel model)
+    private void AddHeldLight(Vector3 eye, float yaw, float pitch, Player.PlayerModel model, bool offhand)
     {
-        var hand = model.GetHandAnchorMatrix(eye, yaw, 0f, pitch);
+        var hand = offhand ? model.GetOffhandAnchorMatrix(eye, yaw, 0f, pitch) : model.GetHandAnchorMatrix(eye, yaw, 0f, pitch);
         var point = Vector3.Transform(Vector3.Zero, hand);
-        if (model.HoldingLantern) point = Vector3.Transform(Vector3.Zero, Player.HeldItemPose.LanternMatrix(hand, yaw));
+        if (offhand ? model.HoldingOffhandLantern : model.HoldingLantern) point = Vector3.Transform(Vector3.Zero, Player.HeldItemPose.LanternMatrix(hand, yaw, offhand: offhand));
         _lightCells.Add(point - Rendering.FrameLighting.FireLightOffset);
     }
 

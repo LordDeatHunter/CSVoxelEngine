@@ -61,6 +61,7 @@ internal sealed class ThrowAction
     private float _throwChargeSeconds;
     private ushort _throwItemId;
     private float _throwBaseDamage;
+    private bool _throwOffhand;
 
     internal bool IsThrowCharging { get; private set; }
 
@@ -102,6 +103,7 @@ internal sealed class ThrowAction
     {
         if (!IsPlaying) return false;
         var inventory = player.Inventory;
+        using var hand = inventory.UseHand(OffhandThrows(inventory));
         var id = inventory.SelectedBlockId;
         if (id == 0 || inventory.SelectedCount <= 0) return false;
         if (ItemRegistry.TryGet(id) is not { IsThrowable: true } item) return false;
@@ -165,6 +167,8 @@ internal sealed class ThrowAction
     {
         if (!IsPlaying) return false;
         if (IsThrowCharging) return true;
+        _throwOffhand = OffhandThrows(Inventory);
+        using var hand = Inventory.UseHand(_throwOffhand);
         var id = Inventory.SelectedBlockId;
         if (id == 0 || Inventory.SelectedCount <= 0) return false;
         if (ItemRegistry.TryGet(id) is not { IsThrowable: true } item) return false;
@@ -183,7 +187,10 @@ internal sealed class ThrowAction
         if (!IsPlaying) return;
         if (!IsThrowCharging) return;
         _throwChargeSeconds = Math.Min(_throwChargeSeconds + Math.Max(0f, deltaTime), PlayerConfig.ThrowChargeSeconds);
-        if (Inventory.SelectedBlockId != _throwItemId || Inventory.SelectedCount <= 0)
+        bool stillHeld;
+        using (Inventory.UseHand(_throwOffhand))
+            stillHeld = Inventory.SelectedBlockId == _throwItemId && Inventory.SelectedCount > 0;
+        if (!stillHeld)
         {
             IsThrowCharging = false;
             Player.CancelThrowCharge();
@@ -210,8 +217,11 @@ internal sealed class ThrowAction
         if (!IsThrowCharging) return false;
         IsThrowCharging = false;
         var charge01 = MathUtils.Clamp01(_throwChargeSeconds / PlayerConfig.ThrowChargeSeconds);
-        if (!TryLaunchThrow(Inventory, _throwItemId, _throwBaseDamage, charge01, Camera.Position,
-                Camera.ViewDirection, Camera.IsCreative))
+        bool launched;
+        using (Inventory.UseHand(_throwOffhand))
+            launched = TryLaunchThrow(Inventory, _throwItemId, _throwBaseDamage, charge01, Camera.Position,
+                Camera.ViewDirection, Camera.IsCreative);
+        if (!launched)
         {
             Player.CancelThrowCharge();
             return false;
@@ -221,6 +231,11 @@ internal sealed class ThrowAction
         Player.ReleaseThrow(charge01);
         return true;
     }
+
+    /// <summary>Whether a right-click throw leaves the offhand: it does when the offhand holds a throwable, which
+    /// takes the throw before the main hand just as it takes every other right-click.</summary>
+    private static bool OffhandThrows(Inventory inventory) =>
+        inventory.OffhandCount > 0 && inventory.OffhandItem is { IsThrowable: true };
 
     /// <summary>
     /// Launches one <paramref name="id"/> out of <paramref name="inventory"/>'s selected slot from

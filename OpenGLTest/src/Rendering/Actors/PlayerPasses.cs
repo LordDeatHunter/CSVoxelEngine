@@ -124,7 +124,8 @@ internal sealed class PlayerPasses : IDisposable
             _owner.SetDrawUniforms(head, head * viewProj, 1f, light);
             DrawPart("Head", remote.Armor);
 
-            DrawRemoteHeldItem(remote, viewProj, light);
+            DrawRemoteHeldItem(remote, remote.HeldId, offhand: false, viewProj, light);
+            DrawRemoteHeldItem(remote, remote.OffhandId, offhand: true, viewProj, light);
         }
 
         _owner.BindEntityTextures(false);
@@ -134,25 +135,30 @@ internal sealed class PlayerPasses : IDisposable
     /// Draws the authoritative remote held item with the local grip and lantern pose,
     /// then restores the textures used by remote bodies.
     /// </summary>
-    private void DrawRemoteHeldItem(RemotePlayer remote, in Matrix4x4 viewProj, EntityLightSample light)
+    private void DrawRemoteHeldItem(RemotePlayer remote, ushort heldId, bool offhand, in Matrix4x4 viewProj,
+        EntityLightSample light)
     {
-        if (remote.HeldId != 0 && BlockType.ById[remote.HeldId] is { } block)
+        // An empty left hand shows nothing (an empty right hand still shows the assumed blade for the swing pose)
+        if (offhand && heldId == 0) return;
+        if (heldId != 0 && BlockType.ById[heldId] is { } block)
         {
-            var cube = _owner.BlockCubes.Get(remote.HeldId);
+            var cube = _owner.BlockCubes.Get(heldId);
             if (cube == null) return;
             _owner.BindWorldTextures();
-            var hand = remote.Model.GetHandAnchorMatrix(remote.Eye, remote.Yaw, 0f, remote.Pitch);
-            var matrix = block.Lantern ? HeldItemPose.LanternMatrix(hand, remote.Yaw)
+            var hand = offhand
+                ? remote.Model.GetOffhandAnchorMatrix(remote.Eye, remote.Yaw, 0f, remote.Pitch)
+                : remote.Model.GetHandAnchorMatrix(remote.Eye, remote.Yaw, 0f, remote.Pitch);
+            var matrix = block.Lantern ? HeldItemPose.LanternMatrix(hand, remote.Yaw, offhand: offhand)
                 : HeldItemPose.Pose(hand, Matrix4x4.Identity, HeldItemPose.HeldBlockScale, HeldItemPose.HeldBlockGrip);
             _owner.SetDrawUniforms(matrix, matrix * viewProj, 1f, light);
             cube.Render();
             _owner.BindEntityTextures(false);
             return;
         }
-        var item = ItemRegistry.TryGet(remote.HeldId) ?? SliceTrailSystem.AssumedBlade(remote.Model);
+        var item = ItemRegistry.TryGet(heldId) ?? (offhand ? null : SliceTrailSystem.AssumedBlade(remote.Model));
         if (item == null) return;
 
-        var model = HeldItemPose.SpriteMatrix(remote.Model, item, remote.Eye, remote.Yaw, remote.Pitch, 0f);
+        var model = HeldItemPose.SpriteMatrix(remote.Model, item, remote.Eye, remote.Yaw, remote.Pitch, 0f, offhand);
         DrawItemSprite(item, 0, model, viewProj, light);
         _owner.BindEntityTextures(false);
     }
@@ -231,7 +237,7 @@ internal sealed class PlayerPasses : IDisposable
     }
 
     /// <summary>
-    /// Draws the selected hotbar slot in the right hand: a block as its 3D cube, a pure
+    /// Draws the selected hotbar slot in the right hand (the offhand slot in the left when <paramref name="offhand"/>): a block as its 3D cube, a pure
     /// item as its sprite posed by the item's display transform (canted tools by default,
     /// the compass facing back up at the holder). Positioned at the fist through the hand
     /// anchor, so it rides the carrying pose, the walk swing and the punch. The sizing and the
@@ -239,7 +245,7 @@ internal sealed class PlayerPasses : IDisposable
     /// debugger.
     /// </summary>
     internal void RenderHeldItem(Camera camera, PlayerModel player, ushort selectedId, bool hasHeld,
-        float timeSeconds, float headingDegrees)
+        float timeSeconds, float headingDegrees, bool offhand = false)
     {
         if (camera == null || player == null || selectedId == 0 || !hasHeld) return;
 
@@ -256,7 +262,7 @@ internal sealed class PlayerPasses : IDisposable
             var frame = Math.Clamp(type.FrameAt(timeSeconds, headingDegrees), 0,
                 Math.Max(0, type.FrameCount - 1));
             var model = HeldItemPose.SpriteMatrix(player, type, camera.Position, camera.PlayerYaw,
-                camera.Pitch, backOffset);
+                camera.Pitch, backOffset, offhand);
             if (!DrawItemSprite(type, frame, model, viewProj, light)) return;
             _owner.BindWorldTextures();
             return;
@@ -265,10 +271,11 @@ internal sealed class PlayerPasses : IDisposable
         _owner.BindWorldTextures();
         var cube = _owner.BlockCubes.Get(selectedId);
         if (cube == null) return;
-        var hand = player.GetHandAnchorMatrix(camera.Position, camera.PlayerYaw, backOffset,
-            camera.Pitch);
+        var hand = offhand
+            ? player.GetOffhandAnchorMatrix(camera.Position, camera.PlayerYaw, backOffset, camera.Pitch)
+            : player.GetHandAnchorMatrix(camera.Position, camera.PlayerYaw, backOffset, camera.Pitch);
         var blockModel = BlockType.ById[selectedId]?.Lantern == true
-            ? HeldItemPose.LanternMatrix(hand, camera.PlayerYaw)
+            ? HeldItemPose.LanternMatrix(hand, camera.PlayerYaw, offhand: offhand)
             : HeldItemPose.Pose(hand, Matrix4x4.Identity, HeldItemPose.HeldBlockScale, HeldItemPose.HeldBlockGrip);
         _owner.SetDrawUniforms(blockModel, blockModel * viewProj, 1f, light);
         cube.Render();

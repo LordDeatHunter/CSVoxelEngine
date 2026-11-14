@@ -195,7 +195,7 @@ public sealed class InventoryIntentTests
 
         Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.Select(Inventory.SlotCount), creative: false));
         Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.Select(-1), creative: false));
-        Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.EquipStackable(Inventory.SlotCount, stone), creative: false));
+        Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.EquipStackable(Inventory.OffhandIndex + 1, stone), creative: false));
         Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.Craft("no_such_recipe", 1, []), creative: false));
         Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.CreativeGrant(stone, 1), creative: false));
         Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.CreativeGrant(stone, 0), creative: true));

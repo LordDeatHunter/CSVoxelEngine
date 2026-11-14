@@ -35,6 +35,7 @@ public sealed class LanternState
     public static bool Accepts(ushort id) => ContentRegistry.IsInTag("lantern_fuel", id);
     public static LanternState? Of(ItemStack? stack) => stack?.Get<LanternComponent>().State;
     public static LanternState? Held(Inventory inventory) => Of(inventory.GetToolStack(inventory.SelectedToolInstance));
+    public static LanternState? OffhandHeld(Inventory inventory) => Of(inventory.GetToolStack(inventory.OffhandToolInstance));
 
     /// <summary>Uses the existing coal fuel data; slime has one quarter of its duration.</summary>
     public static float Duration(ushort id)

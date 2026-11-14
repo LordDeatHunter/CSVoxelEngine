@@ -66,7 +66,7 @@ public sealed class HotbarMoveTests
         Assert.True(inventory.Add(stone, 3, autoEquip: false));
         inventory.EquipStackable(1, stone);
 
-        Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.MoveSlot(1, Inventory.SlotCount), creative: false));
+        Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.MoveSlot(1, Inventory.OffhandIndex + 1), creative: false));
         Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.ClearSlot(-1), creative: false));
         Assert.Equal(stone, inventory.IdAt(1));
 

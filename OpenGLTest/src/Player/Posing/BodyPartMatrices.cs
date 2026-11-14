@@ -151,6 +151,15 @@ internal sealed class BodyPartMatrices
         };
     }
 
+    /// <summary>The body of <see cref="PlayerModel.GetOffhandAnchorMatrix"/>: the left fist, oriented in body space.</summary>
+    internal Matrix4x4 GetOffhandAnchorMatrix(Vector3 eyePos, float yawDeg, float backOffset = 0f, float pitchDeg = 0f)
+    {
+        var forearm = GetPartMatrix("ForearmL", eyePos, yawDeg, pitchDeg, backOffset);
+        var fist = Vector3.Transform(new Vector3(0f, _model.HandDepth(), 0f), forearm);
+        var yawRad = -(_model.DrawnBodyYaw(yawDeg) + 90f) * MathF.PI / 180f;
+        return Matrix4x4.CreateRotationY(yawRad + _model.SwayYaw) * Matrix4x4.CreateTranslation(fist);
+    }
+
     /// <summary>The body of <see cref="PlayerModel.GetHandAnchorMatrix"/>.</summary>
     internal Matrix4x4 GetHandAnchorMatrix(Vector3 eyePos, float yawDeg, float backOffset = 0f, float pitchDeg = 0f)
     {

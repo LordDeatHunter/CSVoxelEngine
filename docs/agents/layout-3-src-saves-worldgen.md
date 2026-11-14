@@ -268,6 +268,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         CreativeCatalog.cs     # GL-free browsable catalog of every item, grouped by pool and name-sorted
         HotbarLayout.cs        # hotbar strip geometry shared by the draw, its hit-test and the panel
         HotbarSlot.cs          # one hotbar slot: a stackable id or a tool instance (the default is empty)
+        HandScope.cs           # using-scope that points Inventory's Selected* readers at the offhand while a use runs
         Inventory.cs, ItemStack.cs  # the three pools, the hotbar, stacks and their components
         InventoryCategory.cs   # which storage pool an id belongs to (Blocks, Tools, Misc, Crafting)
         InventoryCrafting.cs   # GL-free crafting rules behind Inventory's Craftable/CanCraftBatch/TryCraft forwarders

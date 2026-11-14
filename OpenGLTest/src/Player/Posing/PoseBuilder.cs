@@ -68,10 +68,12 @@ internal sealed class PoseBuilder
         // stay slightly bent at rest and flex forward as the arm swings.
         var leftKnee = -(Math.Max(0f, MathF.Sin(_model.WalkPhase - 0.7f)) * kneeAmp * _model.MoveBlend + 0.03f);
         var rightKnee = -(Math.Max(0f, MathF.Sin(_model.WalkPhase + MathF.PI - 0.7f)) * kneeAmp * _model.MoveBlend + 0.03f);
-        var leftShoulder = PlayerModel.RestShoulderForward - swing + MathF.Sin(_model.PoseTime * 1.7f) * 0.02f;
+        var leftShoulder = PlayerModel.RestShoulderForward - swing + MathF.Sin(_model.PoseTime * 1.7f) * 0.02f
+            + _model.OffhandBlend * _model.OffhandCarryShoulder;
         var rightShoulder = PlayerModel.RestShoulderForward + swing - MathF.Sin(_model.PoseTime * 1.7f) * 0.02f
             + _model.HoldBlend * _model.CarryShoulder;
-        var leftElbow = (Math.Max(0f, MathF.Sin(_model.WalkPhase)) * elbowAmp * _model.MoveBlend) + PlayerModel.RestElbow;
+        var leftElbow = (Math.Max(0f, MathF.Sin(_model.WalkPhase)) * elbowAmp * _model.MoveBlend) + PlayerModel.RestElbow
+            + _model.OffhandBlend * _model.OffhandCarryElbow;
         var rightElbow = (Math.Max(0f, -MathF.Sin(_model.WalkPhase)) * elbowAmp * _model.MoveBlend) + PlayerModel.RestElbow
             + _model.HoldBlend * _model.CarryElbow;
 
@@ -97,10 +99,11 @@ internal sealed class PoseBuilder
             MathUtils.Lerp(JumpKneeFront, SprintJumpKneeFront, _model.AirRun) - rise * 0.25f + fall * 0.7f);
         var airRightKnee = Math.Min(MinKneeBend,
             MathUtils.Lerp(JumpKneeBack, SprintJumpKneeBack, _model.AirRun) - rise * 0.2f + fall * 0.9f);
-        var airLeftShoulder = MathUtils.Lerp(JumpShoulder, SprintJumpShoulderFront, _model.AirRun);
+        var airLeftShoulder = MathUtils.Lerp(JumpShoulder, SprintJumpShoulderFront, _model.AirRun)
+            + _model.OffhandBlend * _model.OffhandCarryShoulder;
         var airRightShoulder = MathUtils.Lerp(JumpShoulder, SprintJumpShoulderBack, _model.AirRun)
             + _model.HoldBlend * _model.CarryShoulder;
-        var airLeftElbow = JumpElbow;
+        var airLeftElbow = JumpElbow + _model.OffhandBlend * _model.OffhandCarryElbow;
         var airRightElbow = JumpElbow + _model.HoldBlend * _model.CarryElbow;
         var airTorso = -MathUtils.Lerp(JumpTorso, SprintJumpTorso, _model.AirRun);
         var air = new Pose(airLeftHip, airRightHip, airLeftKnee, airRightKnee,

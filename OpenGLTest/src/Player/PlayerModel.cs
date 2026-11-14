@@ -111,6 +111,7 @@ public class PlayerModel
     private float _throwReleaseCharge;
     private float _time;
     private float _holdBlend;
+    private float _offhandBlend;
 
     // Secondary motion. Springs carry their own velocity so a landing, a hit or an item swap rings
     // out instead of easing: the landing dip (positive = body lowered), the hit flinch (positive =
@@ -225,9 +226,20 @@ public class PlayerModel
 
     /// <summary>Raises the carrying arm for a hanging lantern.</summary>
     public bool HoldingLantern { get; set; }
-    internal float FirstPersonBack => HoldingLantern ? 0f : FirstPersonBodyBack;
+    internal float FirstPersonBack => HoldingLantern || HoldingOffhandLantern ? 0f : FirstPersonBodyBack;
     internal float CarryShoulder => HoldingLantern ? LanternConfig.CarryShoulder : HoldShoulder;
     internal float CarryElbow => HoldingLantern ? LanternConfig.CarryElbow : HoldElbow;
+
+    /// <summary>Whether the left hand currently holds something; eases the left arm's carrying pose in and out.</summary>
+    public bool HoldingOffhand { get; set; }
+
+    /// <summary>Raises the left carrying arm for a hanging lantern.</summary>
+    public bool HoldingOffhandLantern { get; set; }
+    internal float OffhandCarryShoulder => HoldingOffhandLantern ? LanternConfig.CarryShoulder : HoldShoulder;
+    internal float OffhandCarryElbow => HoldingOffhandLantern ? LanternConfig.CarryElbow : HoldElbow;
+
+    /// <summary>Smoothed 0..1 amount the left arm carries its item.</summary>
+    public float OffhandBlend => _offhandBlend;
 
     /// <summary>Smoothed 0..1 carrying amount.</summary>
     public float HoldBlend => _holdBlend;
@@ -499,6 +511,7 @@ public class PlayerModel
             PoseBuilder.RunBlendRate, deltaTime);
         _airVelocity = verticalVelocity;
         _holdBlend = MathUtils.Damp(_holdBlend, HoldingItem ? 1f : 0f, PoseBuilder.MoveBlendRate, deltaTime);
+        _offhandBlend = MathUtils.Damp(_offhandBlend, HoldingOffhand ? 1f : 0f, PoseBuilder.MoveBlendRate, deltaTime);
 
         // Stride rate grows with speed so feet roughly keep up with the ground, plus an
         // extra kick while running so the cadence lifts beyond a sped-up walk.
@@ -717,6 +730,12 @@ public class PlayerModel
     public Matrix4x4 GetHandAnchorMatrix(Vector3 eyePos, float yawDeg, float backOffset = 0f,
         float pitchDeg = 0f)
         => Matrices.GetHandAnchorMatrix(eyePos, yawDeg, backOffset, pitchDeg);
+
+    /// <summary>The left fist's anchor for the offhand item: positioned at the left fist, oriented in body space like
+    /// <see cref="GetHandAnchorMatrix"/>, without the jab and blade terms (the offhand never attacks).</summary>
+    public Matrix4x4 GetOffhandAnchorMatrix(Vector3 eyePos, float yawDeg, float backOffset = 0f,
+        float pitchDeg = 0f)
+        => Matrices.GetOffhandAnchorMatrix(eyePos, yawDeg, backOffset, pitchDeg);
 
     /// <summary>Mesh name per draw; arms/legs draw one mesh twice (left + right matrices).</summary>
     public static readonly string[] BodyParts =

@@ -320,7 +320,9 @@ internal sealed class PlayerSessions
             VoxelEngine.Player.ArmorLook.From(player.Inventory.Equipment).CopyTo(worn);
             foreach (var piece in worn) writer.WriteId(piece);
             writer.WriteId(player.Inventory.HeldItem?.Id ?? 0);
-            writer.Write(!player.IsDead && VoxelEngine.Simulation.Lanterns.LanternManager.Emits(player.Inventory));
+            writer.Write(!player.IsDead && VoxelEngine.Simulation.Lanterns.LanternManager.EmitsFrom(player.Inventory, offhand: false));
+            writer.WriteId(player.Inventory.OffhandItem?.Id ?? 0);
+            writer.Write(!player.IsDead && VoxelEngine.Simulation.Lanterns.LanternManager.EmitsFrom(player.Inventory, offhand: true));
         }
         _state.Broadcast(writer.ToArray());
     }

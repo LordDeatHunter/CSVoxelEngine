@@ -31,7 +31,10 @@ public sealed class LanternManager
     {
         if (!player.Present || player.Health?.IsDead == true) return null;
         if (instance > 0)
-            return player.Inventory.SelectedToolInstance == instance ? LanternState.Held(player.Inventory) : null;
+        {
+            if (player.Inventory.SelectedToolInstance == instance) return LanternState.Held(player.Inventory);
+            return player.Inventory.OffhandToolInstance == instance ? LanternState.OffhandHeld(player.Inventory) : null;
+        }
         return ChestAccess.InReach(player.Eye, cell.X, cell.Y, cell.Z, World.InteractionReach)
             ? LanternState.Of(Open(chunks, cell)) : null;
     }
@@ -49,13 +52,20 @@ public sealed class LanternManager
 
     internal void UpdateHeld(float seconds, World world, bool serverMode)
     {
-        if (!serverMode && !world.LocalPlayer.LocalContext().Health!.IsDead) LanternState.Held(world.Inventory)?.Advance(seconds);
+        if (!serverMode && !world.LocalPlayer.LocalContext().Health!.IsDead) AdvanceHeld(world.Inventory, seconds);
         foreach (var holder in world.ServerPlayers)
-            if (!holder.IsDead && LanternState.Held(holder.Inventory) is { } lantern)
-            {
-                lantern.Advance(seconds);
+            if (!holder.IsDead && AdvanceHeld(holder.Inventory, seconds))
                 holder.InventoryChanged = true;
-            }
+    }
+
+    // Burns the fuel of the lantern in each hand; one lantern shown in both hands burns once
+    private static bool AdvanceHeld(Inventory inventory, float seconds)
+    {
+        var main = LanternState.Held(inventory);
+        var off = LanternState.OffhandHeld(inventory);
+        main?.Advance(seconds);
+        if (off != null && off != main) off.Advance(seconds);
+        return main != null || off != null;
     }
 
     /// <summary>Claims a broken lantern's one complete drop so a later stale sweep cannot duplicate it.</summary>
@@ -87,10 +97,17 @@ public sealed class LanternManager
                 fireCells.Add(new Vector3(cell.X, cell.Y - .5f, cell.Z));
     }
 
-    /// <summary>Whether the selected item emits, derived solely from owned state.</summary>
-    public static bool Emits(Inventory inventory) => inventory.SelectedCount > 0
-        && (LanternState.Held(inventory) is { } lantern ? lantern.HasFuel
-            : BlockType.ById[inventory.SelectedBlockId]?.LightEmission > 0);
+    /// <summary>Whether the item in either hand emits, derived solely from owned state.</summary>
+    public static bool Emits(Inventory inventory) => EmitsFrom(inventory, offhand: false) || EmitsFrom(inventory, offhand: true);
+
+    /// <summary>Whether the item in one hand emits (see <see cref="Emits"/>).</summary>
+    public static bool EmitsFrom(Inventory inventory, bool offhand)
+    {
+        using var hand = inventory.UseHand(offhand);
+        return inventory.SelectedCount > 0
+            && (LanternState.Held(inventory) is { } lantern ? lantern.HasFuel
+                : BlockType.ById[inventory.SelectedBlockId]?.LightEmission > 0);
+    }
 
     public List<LanternData> Capture()
     {

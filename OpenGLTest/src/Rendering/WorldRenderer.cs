@@ -232,6 +232,8 @@ internal sealed class WorldRenderer
         renderManager.Players.RenderPlayer(Camera, Player);
         renderManager.Players.RenderHeldItem(Camera, Player, LocalPlayer.HeldId, LocalPlayer.HasHeld,
             (float)Now, Compass.HeadingFromYaw(Camera.Yaw));
+        renderManager.Players.RenderHeldItem(Camera, Player, LocalPlayer.OffhandId, LocalPlayer.HasOffhand,
+            (float)Now, Compass.HeadingFromYaw(Camera.Yaw), offhand: true);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 

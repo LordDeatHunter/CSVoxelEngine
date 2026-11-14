@@ -135,6 +135,9 @@ public enum NetInventoryAction : byte
     MoveSlot = 13,
     /// <summary>Empties a hotbar slot: <c>Slot</c>. The item stays in its pool.</summary>
     ClearSlot = 14,
+    /// <summary>Swaps the selected hotbar slot with the offhand. The offhand is named by slot index
+    /// <c>Inventory.OffhandIndex</c> in <c>Equip</c>, <c>MoveSlot</c> and <c>ClearSlot</c>.</summary>
+    SwapHands = 15,
 }
 
 /// <summary>
@@ -289,8 +292,11 @@ public static class NetFraming
     /// 56: the inventory snapshot carries the battle towers the player marked with tower maps (<c>TowerMarks</c>); an older
     /// client would never show a mark on its map.
     /// 57: <see cref="NetEntityKind"/> 6 is retired; an older client would still expect that entry kind in
-    /// <see cref="NetMessage.EntityList"/>.</summary>
-    public const int ProtocolVersion = 57;
+    /// <see cref="NetMessage.EntityList"/>.
+    /// 58: the offhand slot: the inventory snapshot carries it, <see cref="NetInventoryAction.SwapHands"/> is new, the
+    /// equip, move and clear intents may name it, and each <see cref="NetMessage.PlayerList"/> entry ends with the offhand's
+    /// held item and lit flag; an older peer would misread the frame.</summary>
+    public const int ProtocolVersion = 58;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

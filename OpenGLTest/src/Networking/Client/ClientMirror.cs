@@ -516,7 +516,7 @@ internal sealed class ClientMirror
                 remote.Name = entry.Name;
             }
             var started = remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq,
-                entry.Armor, entry.HeldId, entry.HeldLit);
+                entry.Armor, entry.HeldId, entry.HeldLit, entry.OffhandId, entry.OffhandLit);
             if (RemotePlayer.SoundOf(started) is { } sound)
                 _world.Sounds.PlayAt(sound, entry.Eye);
         }

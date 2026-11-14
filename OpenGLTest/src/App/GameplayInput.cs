@@ -35,6 +35,7 @@ internal sealed class GameplayInput
     private bool tabHeld;
     private bool xWasPressed;
     private bool qWasPressed;
+    private bool fWasPressed;
     private bool rightWasDown;
     private bool middleWasPressed;
     private bool eWasPressed;
@@ -96,7 +97,7 @@ internal sealed class GameplayInput
     /// <summary>Drops the input edges and the repeat timer a world switch must not carry over (<see cref="Program"/>'s ResetWorldViews).</summary>
     internal void ResetEdges()
     {
-        escWasPressed = eWasPressed = qWasPressed = rightWasDown = middleWasPressed = false;
+        escWasPressed = eWasPressed = qWasPressed = fWasPressed = rightWasDown = middleWasPressed = false;
         deathScreenWasUp = chatCursorFree = false;
         placeTimer = MAX_PLACE_TIMER;
         QuestBook.View.ResetForNewWorld();
@@ -173,6 +174,14 @@ internal sealed class GameplayInput
     {
         if (ActiveWorld is not { } w || !HeldStaff.TryCycle(w.Inventory, step, out var selected)) return;
         session.SendInventoryIntent(InventoryIntent.SelectStaffSlot(selected));
+    }
+
+    /// <summary>Swaps the selected hotbar slot with the offhand: applied here at once and, while connected, sent as the
+    /// intent the server replays against its own copy.</summary>
+    private void RequestSwapHands()
+    {
+        if (!ActiveWorld!.Inventory.SwapHands()) return;
+        session.SendInventoryIntent(InventoryIntent.SwapHands());
     }
 
     /// <summary>Throws the held item: a server intent while connected, a local throw otherwise.</summary>
@@ -327,6 +336,7 @@ internal sealed class GameplayInput
         Map.Update(w, !chatView.IsOpen && !pauseMenuView.IsOpen && !deathUp && (Map.IsOpen || !PanelOpen));
 
         var qPressed = inputManager.Keyboard?.IsKeyPressed(Key.Q) == true;
+        var fPressed = inputManager.Keyboard?.IsKeyPressed(Key.F) == true;
         // With the panel open, the number keys put the hovered row into that hotbar slot instead
         // (the equip a click on the slot performs with the row selected)
         panelInput.AssignHoveredRowToHotbar(
@@ -346,10 +356,14 @@ internal sealed class GameplayInput
                     || inputManager.Keyboard?.IsKeyPressed(Key.ControlRight) == true;
                 RequestThrowSelected(wholeStack);
             }
+
+            // F swaps the selected slot with the offhand, once per press
+            if (fPressed && !fWasPressed) RequestSwapHands();
         }
         // The latch tracks the key every frame, gated or not: a Q typed into the chat or the search
         // field must not read as a fresh press the moment the field lets the keyboard go.
         qWasPressed = qPressed;
+        fWasPressed = fPressed;
         FrameProfiler.End(ProfileSection.ProgramUpdate);
 
         // Right-click use/place does real work (raycast plus a synchronous remesh on bucket

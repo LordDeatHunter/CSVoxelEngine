@@ -57,9 +57,7 @@ public static class InventorySaveCodec
 
         var hotbar = new List<PlayerSaveData.HotbarSlotData>(Inventory.SlotCount);
         foreach (var slot in inventory.Hotbar)
-            hotbar.Add(slot.IsTool
-                ? new PlayerSaveData.HotbarSlotData { IsTool = true, ToolInstance = slot.ToolInstance }
-                : new PlayerSaveData.HotbarSlotData { IsTool = false, Name = SaveNames.NameOf(slot.Id), ToolInstance = 0 });
+            hotbar.Add(ExportSlot(slot));
 
         var data = new PlayerSaveData.InventoryData
         {
@@ -67,6 +65,7 @@ public static class InventorySaveCodec
             Misc = ExportStore(inventory.Misc),
             Tools = tools,
             Hotbar = hotbar,
+            Offhand = ExportSlot(inventory.Offhand),
             SelectedIndex = inventory.SelectedIndex,
             NextToolInstance = inventory.NextToolInstance,
             Known = ExportKnown(inventory),
@@ -187,6 +186,7 @@ public static class InventorySaveCodec
         inventory.Tools.Clear();
         inventory.Known.Clear();
         Array.Fill(inventory.Hotbar, HotbarSlot.Empty);
+        inventory.Offhand = HotbarSlot.Empty;
         var dropped = new List<string>();
 
         // The obtained set: the saved names that still exist this run
@@ -364,25 +364,33 @@ public static class InventorySaveCodec
         if (spells != default) stack.Set(spells);
     }
 
+    private static PlayerSaveData.HotbarSlotData ExportSlot(HotbarSlot slot) => slot.IsTool
+        ? new PlayerSaveData.HotbarSlotData { IsTool = true, ToolInstance = slot.ToolInstance }
+        : new PlayerSaveData.HotbarSlotData { IsTool = false, Name = SaveNames.NameOf(slot.Id), ToolInstance = 0 };
+
     private static void ImportHotbar(Inventory inventory, PlayerSaveData.InventoryData data)
     {
+        inventory.Offhand = ImportSlot(inventory, data.Offhand);
         if (data.Hotbar == null) return;
         for (var i = 0; i < Math.Min(Inventory.SlotCount, data.Hotbar.Count); i++)
-        {
-            var slot = data.Hotbar[i];
-            if (slot == null) continue;
-            if (slot.IsTool == true)
-            {
-                if (slot.ToolInstance is { } instance
-                    && inventory.Tools.Any(t => t.InstanceId == instance && t.Item is not GearItem))
-                    inventory.Hotbar[i] = new HotbarSlot(true, 0, instance);
-            }
-            else if (SaveNames.TryResolve(slot.Name, out var lanternId) && LanternState.IsLantern(lanternId)
-                     && inventory.Tools.FirstOrDefault(t => t.DefinitionId == lanternId) is { } lantern)
-                inventory.Hotbar[i] = new HotbarSlot(true, 0, lantern.InstanceId);
-            else if (SaveNames.TryResolve(slot.Name, out var id) && inventory.StoreOf(id) != null
-                     && inventory.CountFor(id) > 0)
-                inventory.Hotbar[i] = new HotbarSlot(false, id, 0);
-        }
+            inventory.Hotbar[i] = ImportSlot(inventory, data.Hotbar[i]);
+    }
+
+    // The slot a saved reference restores to, or empty when what it named is gone
+    private static HotbarSlot ImportSlot(Inventory inventory, PlayerSaveData.HotbarSlotData? slot)
+    {
+        if (slot == null) return HotbarSlot.Empty;
+        if (slot.IsTool == true)
+            return slot.ToolInstance is { } instance
+                   && inventory.Tools.Any(t => t.InstanceId == instance && t.Item is not GearItem)
+                ? new HotbarSlot(true, 0, instance)
+                : HotbarSlot.Empty;
+        if (SaveNames.TryResolve(slot.Name, out var lanternId) && LanternState.IsLantern(lanternId)
+            && inventory.Tools.FirstOrDefault(t => t.DefinitionId == lanternId) is { } lantern)
+            return new HotbarSlot(true, 0, lantern.InstanceId);
+        if (SaveNames.TryResolve(slot.Name, out var id) && inventory.StoreOf(id) != null
+            && inventory.CountFor(id) > 0)
+            return new HotbarSlot(false, id, 0);
+        return HotbarSlot.Empty;
     }
 }

@@ -62,6 +62,7 @@ public static class InventoryIntentCodec
             }
             case NetInventoryAction.DropSelected:
             case NetInventoryAction.DropAllSelected:
+            case NetInventoryAction.SwapHands:
                 break;
             case NetInventoryAction.Equip:
                 writer.Write(intent.Slot);
@@ -105,6 +106,7 @@ public static class InventoryIntentCodec
                 return InventoryIntent.Select(reader.ReadInt());
             case NetInventoryAction.DropSelected:
             case NetInventoryAction.DropAllSelected:
+            case NetInventoryAction.SwapHands:
                 return new InventoryIntent(action);
             case NetInventoryAction.Equip:
             {

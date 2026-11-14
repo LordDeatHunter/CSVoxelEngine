@@ -599,14 +599,14 @@ internal sealed class HudRenderer : IDisposable
     /// <param name="pops">Per-slot pickup pops scaling each icon and its count; null draws every slot at rest.</param>
     internal void DrawHotbar(Inventory inventory, float headingDegrees, float timeSeconds, HotbarPickupPop? pops = null)
     {
-        var stride = SlotSize + SlotGap;
-        var firstCenterX = HotbarLayout.FirstCenterX(_ui.ScreenSize);
-        var centerY = HotbarLayout.CenterY(_ui.ScreenSize);
+        var screen = _ui.ScreenSize;
         var slotSize = new Vector2(SlotSize);
 
-        for (var i = 0; i < Inventory.SlotCount; i++)
+        // The hotbar's slots, then the offhand slot to their left (Inventory.OffhandIndex); the pickup pops only
+        // exist for the hotbar slots
+        for (var i = 0; i <= Inventory.OffhandIndex; i++)
         {
-            var center = new Vector2(firstCenterX + i * stride, centerY);
+            var center = HotbarLayout.SlotCenter(i, screen);
             var selected = i == inventory.SelectedIndex;
 
             _ui.DrawRect(center, slotSize, selected ? SelectedBackground : SlotBackground);
@@ -614,33 +614,34 @@ internal sealed class HudRenderer : IDisposable
                 selected ? Border.Selected : Border.Standard,
                 selected ? SelectedBorderColor : SlotBorderColor);
             // A broken tool's slot flashes: a bright panel fading out (HotbarPickupPop.FlashAt)
-            var flash = pops?.FlashAt(i) ?? 0f;
+            var flash = i < Inventory.SlotCount ? pops?.FlashAt(i) ?? 0f : 0f;
             if (flash > 0f)
                 _ui.DrawRect(center, slotSize, new Rgba(255, 255, 255,
                     (byte)Math.Clamp(flash * HudConfig.HotbarFlashAlpha * 255f, 0f, 255f)));
         }
 
         // Icons come after every background so the depth clear can't erase a later slot's panel
-        for (var i = 0; i < Inventory.SlotCount; i++)
+        for (var i = 0; i <= Inventory.OffhandIndex; i++)
         {
             var id = inventory.IdAt(i);
             if (id == 0) continue;
-            var center = new Vector2(firstCenterX + i * stride, centerY);
+            var center = HotbarLayout.SlotCenter(i, screen);
             // The pop marks a pickup; IconFill leaves enough margin for it to stay in the slot
-            var iconSize = SlotSize * IconFill * (pops?.ScaleAt(i) ?? 1f);
+            var iconSize = SlotSize * IconFill * PopScale(pops, i);
             // Items show their flat sprites here like the list rows; blocks keep 3D cubes
             _ui.DrawIdIcon(center, iconSize, id, headingDegrees, timeSeconds);
         }
 
         // Durability bars sit along the slot bottom, under the icons so they stay visible.
-        for (var i = 0; i < Inventory.SlotCount; i++)
+        for (var i = 0; i <= Inventory.OffhandIndex; i++)
         {
             var slot = inventory.SlotAt(i);
             if (!slot.IsTool) continue;
             var fraction = inventory.ToolDurabilityFraction(slot.ToolInstance);
             if (fraction == null) continue;
-            var center = new Vector2(firstCenterX + i * stride,
-                centerY + SlotSize * 0.5f - DurabilityPadBottom - DurabilityHeight * 0.5f);
+            var slotCenter = HotbarLayout.SlotCenter(i, screen);
+            var center = new Vector2(slotCenter.X,
+                slotCenter.Y + SlotSize * 0.5f - DurabilityPadBottom - DurabilityHeight * 0.5f);
             _ui.DrawDurabilityBar(center, SlotSize * DurabilityFill, fraction.Value);
         }
 
@@ -648,21 +649,26 @@ internal sealed class HudRenderer : IDisposable
         // Slots share pool totals, so two slots showing one block show the same number.
         if (_ui.Font != null)
         {
-            for (var i = 0; i < Inventory.SlotCount; i++)
+            for (var i = 0; i <= Inventory.OffhandIndex; i++)
             {
                 if (inventory.IdAt(i) == 0) continue;
                 var text = _ui.TextCache.SlotCount(i, inventory.CountAt(i));
                 // The count pops with its icon, growing out of the slot's corner
-                var countScale = _ui.CountScale * (pops?.ScaleAt(i) ?? 1f);
+                var countScale = _ui.CountScale * PopScale(pops, i);
                 var size = _ui.Font.MeasureSize(text.AsSpan(), countScale);
-                var slotRight = firstCenterX + i * stride + SlotSize * 0.5f;
-                var slotBottom = centerY + SlotSize * 0.5f;
+                var slotCenter = HotbarLayout.SlotCenter(i, screen);
+                var slotRight = slotCenter.X + SlotSize * 0.5f;
+                var slotBottom = slotCenter.Y + SlotSize * 0.5f;
                 _ui.DrawText(text,
                     new Vector2(slotRight - CountPadRight - size.X, slotBottom - CountPadBottom - size.Y),
                     countScale, Rgba.White);
             }
         }
     }
+
+    // The pickup pop scale of a hotbar slot; the offhand slot never pops
+    private static float PopScale(HotbarPickupPop? pops, int slot) =>
+        slot < Inventory.SlotCount ? pops?.ScaleAt(slot) ?? 1f : 1f;
 
     /// <summary>
     /// Draws every collected drop's icon in flight: from where the drop was (its world position
