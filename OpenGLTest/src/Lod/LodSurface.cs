@@ -126,6 +126,17 @@ public static class LodSurface
     /// </summary>
     internal static bool IsSurfaceSolid(ushort id) => BlockType.IsSolid(id) && BlockType.Occludes(id);
 
+    /// <summary>
+    /// Whether a packed override still belongs to the shell: one at sky-island height never does.
+    /// Builds apply it as they read, so a save made before the edit hooks learned this rule
+    /// (<see cref="RecordEdit"/>) never draws its pillar.
+    /// </summary>
+    internal static bool IsShellOverride(long packed)
+    {
+        Unpack(packed, out var top, out _);
+        return top < WorldGenerationConfig.SkyIslandBottomY;
+    }
+
     /// <summary>Forgets every override, which belongs to the previous world; only <see cref="WorldSeed.Apply"/> calls it.</summary>
     internal static void Reset() => Overrides.Clear();
 
@@ -224,6 +235,11 @@ public static class LodSurface
         if (y <= WorldGenerationConfig.BarrierTopY)
             return false;
 
+        // Sky islands float above the far LOD's reach: the shell has no island under them, so an
+        // edit up there would raise the column's surface and draw a pillar from the ground to it.
+        if (y >= WorldGenerationConfig.SkyIslandBottomY)
+            return false;
+
         if (!chunks.TryGetCell(x, y, z, out var id, out _))
             return false;
 
@@ -256,6 +272,16 @@ public static class LodSurface
             return Set(x, z, y - depth - 1, BlockType.Air);
         }
 
-        return !IsSurfaceSolid(id) && LodColumnCaps.LowerColumnBelow(chunks.WorldSource, x, y, z);
+        if (IsSurfaceSolid(id))
+            return false;
+
+        // A dig far under the surface (a mine shaft, a cave deep in the stone) is out of the
+        // shell's sight: capping the column there would draw a pit from the surface down to it,
+        // and every further dig nearby would deepen it. Only digs within the rescan depth of the
+        // top can open a hole the shell must follow.
+        if (y < top - StreamingConfig.LodSurfaceRescanDepth)
+            return false;
+
+        return LodColumnCaps.LowerColumnBelow(chunks.WorldSource, x, y, z);
     }
 }

@@ -428,7 +428,10 @@ public sealed class TreeGrowthWriter
         foreach (var (x, z) in log.Columns)
         {
             TreeGenerator.PoisonCanopy(x, z, 0);
-            if (TryFindCrownTop(chunks, x, z, scanTop, (int)log.Min.Y, out var crownTop, out var crownLeaf))
+            // A crown on a sky island is above the far LOD's reach: recording it would draw a
+            // leaf pillar from the ground up to it
+            if (TryFindCrownTop(chunks, x, z, scanTop, (int)log.Min.Y, out var crownTop, out var crownLeaf)
+                && crownTop < WorldGenerationConfig.SkyIslandBottomY)
                 TreeGenerator.SetCanopyAdded(x, z, crownTop, crownLeaf);
             lod?.MarkEditedColumn(x, z);
         }

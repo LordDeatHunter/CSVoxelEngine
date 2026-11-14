@@ -95,6 +95,15 @@ public static class LodColumnCaps
         return true;
     }
 
+    /// <summary>
+    /// Whether a column's <paramref name="cap"/> lowers its <paramref name="height"/>: below it, but
+    /// within <see cref="StreamingConfig.LodSurfaceRescanDepth"/> (a deeper dig is out of the shell's
+    /// sight, see <see cref="LodSurface.RecordEdit"/>). Builds read caps through this, so an older
+    /// save's deep cap draws no shaft.
+    /// </summary>
+    internal static bool Applies(int cap, int height) =>
+        cap < height && cap >= height - StreamingConfig.LodSurfaceRescanDepth - 1;
+
     private static int _capEditVersion;
 
     /// <summary>Bumped by every cap <see cref="LowerColumnBelow(int, int, int)"/> writes, so a save can tell whether anything changed.</summary>

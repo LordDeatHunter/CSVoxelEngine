@@ -98,6 +98,9 @@ internal static class TreeCanopy
         if (value == LodSurface.None)
             return false;
         LodSurface.Unpack(value, out top, out leaf);
+        // A crown at sky-island height is above the far LOD's reach (an older save may hold one)
+        if (top >= WorldGenerationConfig.SkyIslandBottomY)
+            return false;
         // A leaf block this run no longer knows (a save read it back as air) is no crown at all
         return leaf != BlockType.Air;
     }

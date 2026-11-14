@@ -231,10 +231,10 @@ internal sealed class LodMeshBuilder
 
         var overrides = _overrideMaps?[cx * _chunkSpan + cz];
         var packed = overrides != null ? overrides[local] : LodSurface.None;
-        if (packed != LodSurface.None) LodSurface.Unpack(packed, out height, out block);
+        if (packed != LodSurface.None && LodSurface.IsShellOverride(packed)) LodSurface.Unpack(packed, out height, out block);
 
         var caps = _capmaps?[cx * _chunkSpan + cz];
-        if (caps != null && caps[local] < height)
+        if (caps != null && LodColumnCaps.Applies(caps[local], height))
         {
             height = caps[local];
             block = BlockType.Air;
@@ -300,9 +300,9 @@ internal sealed class LodMeshBuilder
                     _fineGen[dst + lz] = h;
                     var b = BlockType.Air;
                     var o = overrides != null ? overrides[src + lz] : LodSurface.None;
-                    if (o != LodSurface.None) LodSurface.Unpack(o, out h, out b);
+                    if (o != LodSurface.None && LodSurface.IsShellOverride(o)) LodSurface.Unpack(o, out h, out b);
                     var c = caps != null ? caps[src + lz] : LodColumnCaps.NoCap;
-                    if (c < h)
+                    if (LodColumnCaps.Applies(c, h))
                     {
                         h = c;
                         b = BlockType.Air;   // a cap below the override: the override is not what shows
