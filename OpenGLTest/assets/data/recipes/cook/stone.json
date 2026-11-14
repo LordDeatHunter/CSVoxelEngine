@@ -1,0 +1,7 @@
+{
+  // Cobblestone baked on a lit campfire smooths back into plain stone.
+  "input": "block/cobblestone",
+  "result": "block/stone",
+  "count": 1,
+  "cookSeconds": 10
+}
