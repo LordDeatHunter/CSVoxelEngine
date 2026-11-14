@@ -127,6 +127,10 @@ internal sealed class LocalPlayer
     /// </summary>
     internal void RecordSpawn()
     {
+        // A restored pose already settled the spawn: holding it over a surface search would freeze a player saved
+        // in a cave, in hell or over a void, where no surface is ever found
+        if (_spawnSettled)
+            return;
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("VOXEL_SPAWN")))
         {
             _spawnSettled = true;
