@@ -27,6 +27,6 @@
         { "item": "item/mana_draught" }
       ]
     },
-    { "chance": 0.25, "rolls": 1, "entries": [ { "item": "item/tower_map" } ] }
+    { "chance": 0.6, "rolls": 1, "entries": [ { "item": "item/tower_map" } ] }
   ]
 }
