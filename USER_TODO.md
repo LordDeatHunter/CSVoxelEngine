@@ -3,7 +3,7 @@
 > Every stand-in asset an agent adds goes here: the file, what made it, and what a replacement has
 > to keep. Tick an entry and delete it once the real art is in. If a `tools/` generator wrote the
 > file, remove or repoint that generator in the same change, or a re-run puts the placeholder back.
-> Current list as of 2026-11-13. Sound is not tracked here: features that need it wait in
+> Current list as of 2026-11-14. Sound is not tracked here: features that need it wait in
 > `plans/TODO.md` (`M-26`).
 
 ## Items
@@ -11,9 +11,6 @@
 - [ ] **Lumber** — `items/lumber.png` is a generated stack of boards (`tools/generate-lumber-sprite.py`); replace with hand-drawn art and delete the generator.
 - [ ] **Stumps** — `blocks/<species>_stump.json` reuse each log's side and end tiles on `models/block/stump.json`; give them their own cut-wood tile if the ring should differ from a log's end.
 - [ ] **Jungle** — `blocks/jungle_mud.png` is the dirt tile darkened (generated once in PowerShell; no generator to remove), and `jungle_log`, `jungle_leaves` and `jungle_stump` reuse the oak log/leaf tiles; give them their own jungle art (a mossy mud, a darker bark, broad glossy leaves). Keep `jungle_mud.png` 32x32.
-- [ ] **Tower map** — `items/tower_map.png` is a generated parchment with a trail, a red cross and a small tower
-  (`tools/generate-map-icons.py`, which also writes the map's pin icons); replace with hand-drawn art and drop its entry
-  from that generator. Keep it 32x32.
 - [ ] **Everfuel** — `items/everfuel.json` currently reuses `coal.png`; replace with a distinct endless-fuel icon.
 
 Paths are under `OpenGLTest/assets/textures/items/`. All sprites are 32x32 RGBA unless noted, with
@@ -42,7 +39,6 @@ body wears.
 
 ### Staffs
 
-- [ ] **Wooden staff** — `wooden_staff.png`.
 - [ ] **Crystal staff** — `crystal_staff.png`. Keep it visually above the wooden staff (the
   `advanced` tier).
 
@@ -66,9 +62,6 @@ body wears.
 
 - [ ] **Bow** — `bow.png`. No shot yet; the two-handed draw pose (`UsePose.Bow`) already uses the
   held sprite.
-- [ ] **Smithing hammer** — `smithing_hammer.png`.
-- [ ] **Spear** — `spear.png`. `throwAligned`: the sprite's tip must sit on its (1, 1) diagonal
-  (up-right), or the thrown copy does not fly point first.
 
 ### Ingot piles
 
