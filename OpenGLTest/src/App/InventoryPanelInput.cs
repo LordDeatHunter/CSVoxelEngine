@@ -618,6 +618,14 @@ internal sealed class InventoryPanelInput
             UnbindHotbarSlot(inventory, hotbar);
             return;
         }
+        if (inventoryView.Tab == InventoryCategory.Crafting && !Chest.IsOpen
+            && renderManager.Ui.CraftCard.CraftHitAt(position, inventoryView) is
+                { Kind: CraftHitKind.IngPlus or CraftHitKind.IngMinus or CraftHitKind.MemberChip } fedHit)
+        {
+            if (textKeys.ShiftHeld) inventoryView.Craft.FeedNone(fedHit.IngredientIndex);
+            else inventoryView.Craft.FeedLess(fedHit.IngredientIndex);
+            return;
+        }
         if (EntryAt(position, inventory, BrowseCreative) is not { } entry) return;
         if (entry.Recipe is { } recipe)
         {
@@ -715,11 +723,13 @@ internal sealed class InventoryPanelInput
                     craft.FeedLess(hit.IngredientIndex);
                     return;
                 case CraftHitKind.IngPlus:
-                    craft.FeedMore(hit.IngredientIndex, inventory);
+                    if (textKeys.ShiftHeld) craft.FeedAll(hit.IngredientIndex, inventory);
+                    else craft.FeedMore(hit.IngredientIndex, inventory);
                     return;
                 case CraftHitKind.MemberChip:
                     craft.SetMember(hit.IngredientIndex, hit.MemberId, inventory);
-                    craft.FeedMore(hit.IngredientIndex, inventory);
+                    if (textKeys.ShiftHeld) craft.FeedAll(hit.IngredientIndex, inventory);
+                    else craft.FeedMore(hit.IngredientIndex, inventory);
                     return;
                 case CraftHitKind.CraftButton:
                 {

@@ -77,6 +77,21 @@ public sealed class CraftingSession
         _fed[index] = new FedEntry(member, fed.Count + 1);
     }
 
+    /// <summary>Reserves units into a slot until it meets its need or the stock runs out.</summary>
+    public void FeedAll(int index, Inventory inventory)
+    {
+        if (Recipe == null || (uint)index >= (uint)Recipe.Ingredients.Length) return;
+        while (true)
+        {
+            var before = FedAt(index).Count;
+            FeedMore(index, inventory);
+            if (FedAt(index).Count == before) return;
+        }
+    }
+
+    /// <summary>Releases every reserved unit from a slot.</summary>
+    public void FeedNone(int index) => _fed.Remove(index);
+
     /// <summary>Releases one reserved unit from a slot.</summary>
     public void FeedLess(int index)
     {
