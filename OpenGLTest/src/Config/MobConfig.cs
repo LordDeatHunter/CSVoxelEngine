@@ -75,7 +75,7 @@ public static class MobConfig
     // A mob only chases a target within this horizontal distance, scaled by MobSneakNoticeFactor
     // while the target sneaks, so a crouching player can creep past. Inside the spawn ring's outer
     // edge on purpose: a mob spawned at the far edge waits until the player comes closer.
-    public const float MobNoticeRadiusBlocks = 32f;
+    public const float MobNoticeRadiusBlocks = 24f;
     public const float MobSneakNoticeFactor = 0.5f;
 
     // --- Mob interest (MobInterest, Mob.PickTarget / WanderGoal) ---
@@ -145,10 +145,10 @@ public static class MobConfig
     public const float SlimeSpawnIntervalSeconds = 8f;
     // The ring's timer waits this long in full day instead (eased by the night factor), so
     // slimes are a bit rarer on the surface by day.
-    public const float SlimeSpawnIntervalDaySeconds = 14f;
-    public const float SlimeSpawnMinRadiusBlocks = 40f;
-    public const float SlimeSpawnMaxRadiusBlocks = 64f;
-    public const float SlimeDespawnRadiusBlocks = 100f;
+    public const float SlimeSpawnIntervalDaySeconds = 24f;
+    public const float SlimeSpawnMinRadiusBlocks = 48f;
+    public const float SlimeSpawnMaxRadiusBlocks = 72f;
+    public const float SlimeDespawnRadiusBlocks = 110f;
     public const int SlimeSpawnTries = 8;
     public const int SlimeContactDamage = 12;
     public const float SlimeShoveSpeed = 3.5f;
