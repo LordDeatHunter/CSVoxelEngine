@@ -379,7 +379,7 @@ rather than being forgotten.
 
 The right-click chain in `RightClickAction.TryUseSelected` runs `TryCookOrCollect` -> `TryQuernInteract` ->
 `TryKilnInteract` -> `TryCastInteract` -> `TryToggleOpenable` -> `TryOpenChest` -> `TryOpenSpellTable` -> `TryOpenWaystone` -> `TryUseAltar` (all on `BlockInteractions`) -> a held spell staff's cast (which never places) -> the item's own `use` action or block placement, and the
-first one that claims the click wins (`TryUseSelected(maxDistance, out RightClickOutcome)` hands back which). On a kiln: an empty hand lifts the crucible out (and puts it
+first one that claims the click wins (`TryUseSelected(maxDistance, out RightClickOutcome)` hands back which). On a kiln: an empty hand lifts the crucible out into the hand, equipped exactly as a crucible lifted off the ground (and puts it
 straight back when the tools pool is full), a crucible stands one in, a melt input charges it, fuel
 goes into the hearth, a **firestarter falls through** to its own `Item.OnUse` so it can strike and
 spend durability, and a **block in hand falls through** to placement against the structure — any

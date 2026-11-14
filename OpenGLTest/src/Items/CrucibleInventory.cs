@@ -9,10 +9,15 @@ namespace VoxelEngine.Items;
 /// hands out fresh empty tool instances.
 ///
 /// <para>
+/// The vessel is equipped exactly as a crucible lifted off the ground (see
+/// <see cref="Inventory.AddLifted"/>): into the hand, in the selected slot when that is empty.
+/// </para>
+///
+/// <para>
 /// This lives outside <see cref="Inventory"/> deliberately: the inventory knows nothing about
 /// molten metal, and a crucible is the only item so far whose pickup carries state. It leans on
 /// the one documented guarantee the tool pool gives — instance ids are handed out increasing and
-/// never reused — to find the instance <see cref="Inventory.Add"/> just created.
+/// never reused — to find the instance <see cref="Inventory.AddLifted"/> just created.
 /// </para>
 /// </summary>
 public static class CrucibleInventory
@@ -24,7 +29,9 @@ public static class CrucibleInventory
     /// </summary>
     public static ItemStack? Add(Inventory inventory, ushort crucibleId, CrucibleComponent contents)
     {
-        if (!inventory.Add(crucibleId)) return null;
+        var template = new ItemStack(0, crucibleId);
+        template.Set(contents);
+        if (!inventory.AddLifted(template)) return null;
 
         // Increasing, never-reused instance ids: the highest of this item id is the one just made
         var rows = inventory.ToolEntries().Where(r => r.ItemId == crucibleId).ToArray();
