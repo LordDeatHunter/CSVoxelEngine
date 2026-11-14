@@ -37,6 +37,17 @@
       ]
     },
     {
+      "id": "quern",
+      "title": "Grind Stone",
+      "description": "Build a quern to crush ore before it goes in the kiln.",
+      "icon": "quern",
+      "pos": [4, 1],
+      "parents": ["mold"],
+      "requirements": [
+        { "type": "craft", "item": "quern" }
+      ]
+    },
+    {
       "id": "crucible",
       "title": "Hot Pot",
       "description": "A crucible carries molten metal from the kiln to the mold.",
@@ -53,7 +64,7 @@
       "description": "Melt copper in the kiln and cast your first ingot.",
       "icon": "item/copper_ingot",
       "pos": [6, 0],
-      "parents": ["crucible", "mold"],
+      "parents": ["crucible", "quern"],
       "requirements": [
         { "type": "obtain", "item": "item/copper_ingot" }
       ]
@@ -75,8 +86,8 @@
       "title": "The Other Half",
       "description": "Cast a tin ingot.",
       "icon": "item/tin_ingot",
-      "pos": [8, 1],
-      "parents": ["copper"],
+      "pos": [6, 2],
+      "parents": ["crucible", "quern"],
       "requirements": [
         { "type": "obtain", "item": "item/tin_ingot" }
       ]
