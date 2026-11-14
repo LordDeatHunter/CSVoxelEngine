@@ -89,7 +89,7 @@ public static class StationBars
         };
         foreach (var metal in contents.Metals)
         {
-            var name = ContentRegistry.MoltenMaterialById(metal.MaterialId)?.DisplayName ?? $"material {metal.MaterialId}";
+            var name = MetalName(metal.MaterialId);
             bars.Add(new StationBar(metal.PendingMl > 0 ? $"{name} {metal.MoltenMl} ml + {metal.PendingMl} ml unmelted" : $"{name} {metal.MoltenMl} ml",
                 metal.TotalMl / (float)capacity, StationBarKind.Fuel));
         }
@@ -108,14 +108,32 @@ public static class StationBars
             ? [new StationBar("Grinding", state.Angle / MathF.Tau, StationBarKind.Progress)]
             : null;
 
-    /// <summary>The bar of a mold cell that holds a pour: filling, then cooling, then done.</summary>
-    public static List<StationBar>? Mold(CastingManager.CastState? cast)
+    /// <summary>The bars of a cast mold: its pour, its cooling or its finished cast, each labeled with the metal and the
+    /// milliliters it holds of the milliliters it needs. An empty mold shows every metal it casts at zero, one bar per
+    /// recipe. Null for anything that is not a mold.</summary>
+    public static List<StationBar>? Mold(ushort moldId, CastingManager.CastState? cast)
     {
-        if (cast == null) return null;
-        if (cast.Done) return [new StationBar("Cast ready", 1f, StationBarKind.Done)];
-        if (cast.Cooling) return [new StationBar("Cooling", cast.Cool01, StationBarKind.Progress)];
-        return [new StationBar("Pouring", cast.Fill01, StationBarKind.Progress)];
+        if (cast != null) return [MoldBar(cast)];
+        if (!ContentRegistry.IsCastMold(moldId)) return null;
+        var bars = new List<StationBar>();
+        foreach (var recipe in ContentRegistry.CastRecipesList)
+            if (recipe.MoldId == moldId)
+                bars.Add(new StationBar($"{MetalName(recipe.MaterialId)} 0/{recipe.AmountMl}ml", 0f, StationBarKind.Progress));
+        return bars;
     }
+
+    // One cast cell's bar: filling, then cooling, then done
+    private static StationBar MoldBar(CastingManager.CastState cast)
+    {
+        var label = $"{MetalName(cast.Recipe.MaterialId)} {cast.FilledMl}/{cast.Recipe.AmountMl}ml";
+        if (cast.Done) return new StationBar($"{label}, ready", 1f, StationBarKind.Done);
+        if (cast.Cooling) return new StationBar($"{label}, cooling", cast.Cool01, StationBarKind.Progress);
+        return new StationBar(label, cast.Fill01, StationBarKind.Progress);
+    }
+
+    // A molten material's display name, for a bar's caption
+    private static string MetalName(byte materialId) =>
+        ContentRegistry.MoltenMaterialById(materialId)?.DisplayName ?? $"material {materialId}";
 
     // Seconds as m:ss
     private static string Clock(float seconds)

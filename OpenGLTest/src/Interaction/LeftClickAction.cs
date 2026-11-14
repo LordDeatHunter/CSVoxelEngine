@@ -206,7 +206,7 @@ internal sealed class LeftClickAction
         if (type.Kiln != null) return StationBars.Kiln(_world.Kilns.StateAt(ax, ay, az));
         if (type.Bloomery != null) return StationBars.Bloomery(_world.Smithing.Bloomeries.StateAt(ax, ay, az));
         if (type.Anvil != null) return StationBars.Anvil(_world.Smithing.Anvils.StateAt(x, y, z));
-        return StationBars.Mold(_world.Casting.StateAt(x, y, z));
+        return StationBars.Mold(blockId, _world.Casting.StateAt(x, y, z));
     }
 
     // The status line of the bloomery or anvil under the crosshair (see SmithingReadout), null for anything else

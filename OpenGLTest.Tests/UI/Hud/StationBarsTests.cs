@@ -48,7 +48,33 @@ public sealed class StationBarsTests
         Assert.Null(StationBars.Kiln(null));
         Assert.Null(StationBars.Bloomery(null));
         Assert.Null(StationBars.Anvil(null));
-        Assert.Null(StationBars.Mold(null));
+        Assert.Null(StationBars.Mold(BlockType.Air, null));
         Assert.Null(StationBars.Quern(null));
+    }
+
+    [Fact]
+    public void AnEmptyMoldShowsEachMetalItCastsAtZeroOfWhatItNeeds()
+    {
+        var moldId = ContentRegistry.RequireBlock("fired_mold_pickaxe").Id;
+        var recipes = ContentRegistry.CastRecipesList.Where(recipe => recipe.MoldId == moldId).ToList();
+        var bars = StationBars.Mold(moldId, null)!;
+
+        Assert.Equal(recipes.Count, bars.Count);
+        foreach (var recipe in recipes)
+            Assert.Contains(bars, bar => bar.Label.EndsWith($"0/{recipe.AmountMl}ml", StringComparison.Ordinal));
+        Assert.All(bars, bar => Assert.Equal(0f, bar.Fraction));
+    }
+
+    [Fact]
+    public void APartlyPouredMoldShowsWhatIsContainedOfWhatItNeeds()
+    {
+        var moldId = ContentRegistry.RequireBlock("fired_mold_pickaxe").Id;
+        var recipe = ContentRegistry.CastRecipesList.First(recipe => recipe.MoldId == moldId);
+        var contained = recipe.AmountMl / 2;
+        var cast = new CastingManager.CastState(recipe) { FilledMl = contained };
+
+        var bar = Assert.Single(StationBars.Mold(moldId, cast)!);
+        Assert.EndsWith($"{contained}/{recipe.AmountMl}ml", bar.Label, StringComparison.Ordinal);
+        Assert.Equal(contained / (float)recipe.AmountMl, bar.Fraction, 3);
     }
 }

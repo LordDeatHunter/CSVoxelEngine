@@ -375,7 +375,7 @@ pair that always sums to 1 (no hard cut at the end of the pour). A finished cast
 another right-click, and breaking the mold — **creative included** — drops a finished cast and only
 a finished cast; metal still cooling is lost. Like the campfire, quern and kiln registries, cast
 progress is saved with the world (`stations.json`, see "Saves"; a pour comes back paused and a right-click resumes it), and an unloaded mold cell freezes
-rather than being forgotten.
+rather than being forgotten. Hovering a mold shows its progress as a bar per cell (`StationBars.Mold`): a pour reads `Copper 23/100ml`, a cooling one `..., cooling` and a finished one `..., ready`, and an empty mold reads `0/<ml>ml` for each metal it casts (one bar per cast recipe, so the ring shows all three).
 
 The right-click chain in `RightClickAction.TryUseSelected` runs `TryCookOrCollect` -> `TryQuernInteract` ->
 `TryKilnInteract` -> `TryCastInteract` -> `TryToggleOpenable` -> `TryOpenChest` -> `TryOpenSpellTable` -> `TryOpenWaystone` -> `TryUseAltar` (all on `BlockInteractions`) -> a held spell staff's cast (which never places) -> the item's own `use` action or block placement, and the
