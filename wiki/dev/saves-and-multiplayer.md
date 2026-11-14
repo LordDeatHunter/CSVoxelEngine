@@ -11,7 +11,7 @@ A world lives in `%APPDATA%/CSVoxelEngine/saves/<slug>/`:
 | `lod-edits.bin` | Far-LOD column caps, canopy markers and surface overrides |
 | `wood-damage.bin` | Permanent chop damage of natural trunk cells |
 | `player.json` | Pose, modes, health, mana, inventory, known spell parts |
-| `entities.json` | Live mobs, item drops and icebergs |
+| `entities.json` | Live mobs and item drops |
 | `stations.json` | Campfires, querns, kilns and cast molds |
 
 An untouched chunk is never written and simply regenerates. Writes are asynchronous: the main thread copies arrays, and one background thread builds the palette, compresses and writes a temp file that is then moved into place. A pending map guarantees a lookup always finds a chunk either in memory or on disk. A file that cannot be read is moved to `.bad` instead of being overwritten. A world folder is held by `session.lock`, so a second session cannot open it.

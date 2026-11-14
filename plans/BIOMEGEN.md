@@ -12,7 +12,7 @@ Paths are relative to the repo root; code is under `OpenGLTest/src/`. Read `AGEN
 seed-offset and tuning traps before any change here.
 
 Done: the semi-dry ramp, Steppe and Savanna; a domain-warped climate sample; a permafrost tundra with
-dead shrubs; a ragged pack-ice edge; drifting icebergs (§11); the terrain-shape phases A to D
+dead shrubs; a ragged pack-ice edge; the terrain-shape phases A to D
 (relief highlands and ranges, massifs and lone peaks, islands and archipelagos, great lakes) and
 phase E's great-lake river ramps and outflows. Each is documented where it lives: §4 (the island
 fold), §6 (each mechanism), §7 (constants), §9 (invariants 11-17), §10 (tests), §11 (limits). Their
@@ -1014,8 +1014,8 @@ Grep `Biome\.` to confirm; at time of writing:
   and great-lake vantages and the audit of the other scenarios (every teleport outside
   terrain-shape.json lies at least 4118 blocks outside a great-lake footprint, ramps included) are in
   its header:
-  `icebergs.json` and `biomes.json`'s `pack_ice`/`pack_ice_low` now have an island near (-1100, -2510)
-  in or beside the frame; both were re-run, still read, and carry a header note.
+  `biomes.json`'s `pack_ice`/`pack_ice_low` now have an island near (-1100, -2510)
+  in or beside the frame; it was re-run, still reads, and carries a header note.
 * Run: `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release` (needs .NET 10 SDK; on a
   runtime-only-10 box prefix `DOTNET_ROLL_FORWARD=LatestMajor`). Follow the repo test policy: assert
   rules/relations, never constants or content literals.
@@ -1174,18 +1174,6 @@ Grep `Biome\.` to confirm; at time of writing:
   chunks. The near stamp reads `ColdWeightAt` at the column's bed height and the far LOD at the
   cell's highest ground, so a lake above `MountainRockHeight` (where altitude raises the cold) can
   disagree between near and far by a cell.
-* **Drifting icebergs** (entities, never blocks; `AGENTS.md` "Icebergs"). They spawn on open sea at the
-  pack-ice edge: the stored column is `Biome.Ocean` at `SeaLevel` (no river or lake), the cold weight
-  (`SnowGenerator.ColdWeightAt`) lies from `IcebergConfig.SpawnColdMin`, a little below
-  `PackIceColdStart`, up to `FreezeColdThreshold` where the sheet closes, and the top water is not
-  frozen by `SnowGenerator.IsFrozenWater` (`IcebergSpawnRule.InBand`), so they appear in the open
-  leads of the pack-ice band and a fringe of open sea just warmer than it. They drift along the wind,
-  stop at the pack ice, shallows and each other, can be pushed (a big berg barely) and stood on.
-  Limits: a column a world source supplies has no worldgen climate, so an imported sea grows no
-  natural bergs; the spawn reads the same `ColdWeightAt` as the near ice stamp, so a berg never
-  spawns inside the sheet but may drift into the band's floes only until it touches one. Tests:
-  `IcebergSpawnRuleTests`, `IcebergSpawnerTests`, `IcebergManagerTests`; visual check
-  `visual-examples/icebergs.json` (`VOXEL_TIME=147`), at the band near (-1045, -2470).
 * Existing saves regenerate unmodified chunks under the new rules, so seams appear beside edited areas.
 * Tree biome lists are lowercase enum names; an unknown name fails at content load.
 * **The shrub-over-snow exception.** Every surface stamp writes into air only, except one: a tundra

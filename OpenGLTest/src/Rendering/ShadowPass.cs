@@ -5,7 +5,6 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Data;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
-using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Lod;
@@ -68,7 +67,7 @@ internal sealed class ShadowPass
     /// <summary>
     /// Depth-only passes that fill both shadow cascades. The near pass renders every caster
     /// inside the near light box: opaque chunk meshes, primed TNT, falling blocks, slimes,
-    /// goblins (<paramref name="goblins"/>), icebergs (<paramref name="icebergs"/>, each on its own skin), the chests (<paramref name="chestChunks"/>, posed by <paramref name="chestLids"/>), toppling trees and the player. The far pass then renders only the opaque chunk casters
+    /// goblins (<paramref name="goblins"/>), the chests (<paramref name="chestChunks"/>, posed by <paramref name="chestLids"/>), toppling trees and the player. The far pass then renders only the opaque chunk casters
     /// inside the far box - entities are sub-texel at that range - plus every non-buried LOD
     /// region (<paramref name="lodRegions"/>) it holds, drawn with opaque foliage so the LOD
     /// ring is shadowed by its own hills and canopy out to the far box. Both run first each frame,
@@ -96,7 +95,7 @@ internal sealed class ShadowPass
         IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees,
         PlayerModel? player = null, IReadOnlyList<Slime>? slimes = null,
         IReadOnlyList<LodRegion>? lodRegions = null, IReadOnlyList<Goblin>? goblins = null,
-        IReadOnlyList<Iceberg>? icebergs = null, IReadOnlyList<RiggedMob>? hellMobs = null,
+        IReadOnlyList<RiggedMob>? hellMobs = null,
         IReadOnlyList<RiggedMob>? skyMobs = null, IReadOnlyList<Sandworm>? sandworms = null,
         IReadOnlyList<RiggedMob>? skeletons = null, IReadOnlyList<RiggedMob>? skeletonKings = null,
         IReadOnlyList<RiggedMob>? caveMobs = null, IReadOnlyList<RiggedMob>? wildlife = null,
@@ -211,9 +210,6 @@ internal sealed class ShadowPass
         DrawRealmCasters(caveMobs);
         DrawRealmCasters(wildlife);
         DrawSandwormCasters(sandworms);
-
-        if (icebergs != null)
-            DrawIcebergCasters(icebergs, frustum);
 
         // The chests are no part of the chunk casters above: they are drawn from the chest model, lids as they stand
         if (chestChunks != null && chestLids != null && chestChunks.Count > 0)
@@ -369,26 +365,6 @@ internal sealed class ShadowPass
         _owner.ShadowShader.SetUniform("uLightMVP", heldModel * _owner.NearShadow.ViewProj);
         held.Render();
         Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
-    }
-
-    // The bergs inside the near light box, each on its own skin like the goblin casters (its texels
-    // would otherwise be alpha-tested against the atlas)
-    private void DrawIcebergCasters(IReadOnlyList<Iceberg> icebergs, Frustum frustum)
-    {
-        var drew = false;
-        foreach (var berg in icebergs)
-        {
-            var mesh = _owner.IcebergPasses.MeshOf(berg.Variant);
-            if (mesh == null || !frustum.IntersectsAABB(berg.Bounds.Min, berg.Bounds.Max)) continue;
-            Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.IcebergPasses.TextureOf(berg.Variant));
-            var model = IcebergPasses.ModelMatrix(berg, _owner.IcebergPasses.Time);
-            _owner.ShadowShader.SetUniform("uModel", model);
-            _owner.ShadowShader.SetUniform("uLightMVP", model * _owner.NearShadow.ViewProj);
-            mesh.Render();
-            drew = true;
-        }
-        if (drew)
-            Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
     }
 
     /// <summary>

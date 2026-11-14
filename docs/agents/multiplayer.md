@@ -245,13 +245,7 @@ mob fields only: a flyer's whole position and velocity ride the entry and its fl
 mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
 them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
 mob fields only: a mirror's layer, and so its pool, follows from where it is first seen); an older client would not
-draw them. Version 16 makes a crucible carry one entry per metal (the alloy kiln): a `StationState` kiln entry writes a metal count (at most `CrucibleComponent.MaxMetals`; `StationNetCodec.ReadCrucible` refuses more, a material 0, a repeat or a negative amount) and each metal's id, molten and pending ml, and the `InventoryState` crucible a `Metals` list; an older peer would misread the station frames. Version 13 ends every `EntityList` entry, of every kind, with a status-effect byte mask (`NetEntity.Effects`: a mob's `StatusEffect.Bit`s, 0 for a drop, primed TNT, falling block or iceberg) and ends `PlayerStatus` with the player's own effect mask (`PlayerStatusData.EffectMask`); both codecs carry the mask raw and the client drops unknown bits when it mirrors them, and an older peer would misread every frame after the first entry. Version 8 added
-`NetEntityKind.Iceberg` (6): `Position` the waterline center, `Yaw` the quarter turns times pi/2
-(`NetEntity.YawFromTurns` / `TurnsFromYaw`), `Health` the seed, `Ammo` the scale in thousandths and
-the sinking in its next byte (`NetEntity.PackIcebergAmmo` / `UnpackIcebergAmmo`), `ItemId` the
-variant and `Velocity` the drift the client dead-reckons along; an older client is refused, since
-it would neither draw nor collide with bergs while the server judges a rider's hover against
-them. A
+draw them. Version 16 makes a crucible carry one entry per metal (the alloy kiln): a `StationState` kiln entry writes a metal count (at most `CrucibleComponent.MaxMetals`; `StationNetCodec.ReadCrucible` refuses more, a material 0, a repeat or a negative amount) and each metal's id, molten and pending ml, and the `InventoryState` crucible a `Metals` list; an older peer would misread the station frames. Version 13 ends every `EntityList` entry, of every kind, with a status-effect byte mask (`NetEntity.Effects`: a mob's `StatusEffect.Bit`s, 0 for a drop, primed TNT, or falling block) and ends `PlayerStatus` with the player's own effect mask (`PlayerStatusData.EffectMask`); both codecs carry the mask raw and the client drops unknown bits when it mirrors them, and an older peer would misread every frame after the first entry. Version 8 is reserved (an entity kind since removed). Version 57 retires `NetEntityKind` 6. A
 `WorldIntent` is the sequence id, a `NetIntentKind` byte, the eye and the unit aim the action was
 made from, then that kind's fields (`WorldIntent`): `BreakStart`/`BreakComplete(cell)`,
 `Place(hit cell, face normal)`, `Use(cell under the crosshair, optional)`, `Throw(charge 0..1)`,
@@ -547,17 +541,12 @@ use zero elapsed time and assert that the processed state gap equals the sample 
 waiting for a reader thread stretches a legal rising path into a hover and makes the test scheduling-dependent.
 Accepted gaps of the air budget: a
 non-wearer may hop once after walking off a ledge (the budget is height-based), a hop within one sample step of the ground counts
-as a landing, an air jump sent before the server applied the equip intent is corrected once, and iceberg mirror lag can still
-mis-judge a rider's bunny hop. A rejection keeps the player where it stood,
+as a landing, an air jump sent before the server applied the equip intent is corrected once. A rejection keeps the player where it stood,
 resets its fall tracking and sends a numbered `PlayerCorrection(seq, eye)`
 (`ServerPlayer.IssueCorrection`); the client snaps there (`Camera.TestTeleport`, motion reset),
 echoes the number in every following `PlayerState`, and the server ignores state positions until
 one acks the newest correction (`AcceptsStatePosition`), so the states the client sent before it
-snapped can never trip a second correction. A respawn uses the same correction. The hover rule
-(and the fall tracker's grounded probe) also counts the server's iceberg boxes as ground
-(`World.BodySolids`, an `IBodySolids` passed to `MovementRules.Judge` and
-`ServerPlayer.ObserveAcceptedState`), so a rider is never a hoverer; the endpoint-collision rule
-stays block-only, since a client stands on a mirror up to a snapshot behind the server's berg.
+snapped can never trip a second correction. A respawn uses the same correction.
 
 **Creative permission** is per player: a client's creative bit is only a request, granted (with
 flight only alongside it, and flight is noclip to the movement rules) while
@@ -769,7 +758,7 @@ continues the word, and, with nothing to offer, the command's usage line instead
 
 **Known gaps** (open): the airtime rise budget is height-based, so a player without the cloud boots may hop once after
 walking off a ledge, a hop within one state step of the ground counts as a landing, a client that double jumps before the
-server applied its equip intent is corrected once, and iceberg mirror lag can still mis-judge a rider's bunny hop; players are
+server applied its equip intent is corrected once; players are
 keyed by name with no authentication, so whoever joins first
 under a name gets that name's inventory, status and operator rights (`ops.json` is read once at
 start, and there is no in-game op command); a slice's return-swing flag and a throw's charge are

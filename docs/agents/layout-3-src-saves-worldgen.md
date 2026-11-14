@@ -93,11 +93,6 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   close, the locked wobble), the viewed cells on the wire (the end of StationState)
       HellMobManager.cs        # the hell mobs: AI tick, the brute's blow at its impact, the casters' fire bolts
                                #   (MobMissiles; damage + burning), loot, despawn, the hell-only ring spawn (packs by layer)
-      Icebergs/                # the iceberg simulation, namespace VoxelEngine.Simulation.Icebergs
-        IcebergManager.cs      # the live bergs: forced and ring spawns, drift and push, the terrain/berg/body
-                               #   collision, the life cycle, IBodySolids, the rider carry and push-out, client mirrors
-        IcebergSpawner.cs      # where a berg may spawn: ocean at sea level, the band (injectable IcebergClimate),
-                               #   the footprint clear and loaded, no target near
       KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible
                                #   slot and its melt loop, plus the multiblock integrity sweep
       Smithing/                # the iron works, namespace VoxelEngine.Simulation.Smithing (see "The bloomery and the anvil")

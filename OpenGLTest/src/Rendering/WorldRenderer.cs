@@ -128,9 +128,8 @@ internal sealed class WorldRenderer
     {
         // Depth-only sun pass first: every world draw below samples the shadow map it fills. It
         // times itself as the shadowNear and shadowFar rows.
-        renderManager.IcebergPasses.Time = _world.LightingTime;
         renderManager.Shadows.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes,
-            _lodManager.RegionList, goblins: Goblins, icebergs: _world.Icebergs, hellMobs: _world.HellMobs,
+            _lodManager.RegionList, goblins: Goblins, hellMobs: _world.HellMobs,
             skyMobs: _world.SkyMobs, sandworms: _world.Sandworms, skeletons: _world.Skeletons,
             skeletonKings: _world.SkeletonKings, caveMobs: _world.CaveMobs, wildlife: _world.Wildlife,
             chestChunks: _chunkManager.ChestChunks, chestLids: _world.ChestLids);
@@ -144,7 +143,7 @@ internal sealed class WorldRenderer
             _chunkManager.CaveCull);
         renderManager.Reflection.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList,
             new ReflectionEntities(_dropManager.Drops, _projectiles, _tntManager.Primed, _falling.Falling, Slimes, Goblins,
-                _toppling, Player, _world.Icebergs));
+                _toppling, Player));
         renderManager.GpuTimer.EndGpuPass(ProfileSection.Reflection);
         FrameProfiler.End(ProfileSection.Reflection);
 
@@ -201,7 +200,6 @@ internal sealed class WorldRenderer
         renderManager.Mobs.RenderRealmMobs(Camera, _world.SkeletonKings);
         renderManager.Mobs.RenderRealmMobs(Camera, _world.CaveMobs);
         renderManager.Mobs.RenderSandworms(Camera, _world.Sandworms);
-        renderManager.IcebergPasses.RenderIcebergs(Camera.GetViewProjection(), _world.Icebergs);
         renderManager.Players.RenderRemotePlayers(Camera, _remotePlayers);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);

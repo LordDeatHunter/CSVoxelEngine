@@ -28,8 +28,7 @@ public interface IMobTarget
     /// cosmetic flag, which is untrusted but can only ever help the one who claims it.</summary>
     bool IsSneaking => false;
 
-    /// <summary>Whether the player flies (noclip): a flying body neither pushes nor is blocked by
-    /// an iceberg. The camera's own flight flag, or a connected player's server-owned one.</summary>
+    /// <summary>Whether the player flies (noclip): a flying body is noclip. The camera's own flight flag, or a connected player's server-owned one.</summary>
     bool IsFlying => false;
 
     /// <summary>Whether the player is dead: a dead body pushes nothing. A connected player

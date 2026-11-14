@@ -15,7 +15,6 @@ using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
-using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Wildlife;
@@ -39,7 +38,6 @@ using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Caves;
 using VoxelEngine.Simulation.Chests;
 using VoxelEngine.Simulation.Fluids;
-using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.Simulation.Tower;
@@ -81,7 +79,6 @@ public class World
     private readonly TntManager _tntManager = new();
     private readonly FallingBlockManager _falling = new();
     private readonly SlimeManager? _slimes;
-    private readonly IcebergManager? _icebergs;
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
@@ -385,15 +382,6 @@ public class World
     /// <summary>The live sandworm boss, if any (plus one playing its death), feeding the entity and shadow passes.</summary>
     public IReadOnlyList<Sandworm> Sandworms => _sandworms?.Worms ?? [];
 
-    /// <summary>Live icebergs (a client's mirrors of the server's); public for the server's broadcast.</summary>
-    public IReadOnlyList<Iceberg> Icebergs => _icebergs?.Icebergs ?? [];
-
-    /// <summary>The iceberg simulation, when the iceberg entity exists.</summary>
-    internal IcebergManager? IcebergManager => _icebergs;
-
-    /// <summary>The non-block solids a player body collides with (the icebergs), for the server's judging.</summary>
-    public IBodySolids? BodySolids => _icebergs;
-
     // Every live mob of every kind, rebuilt once a frame after the mob managers ran
     // (MobDirector.RefreshMobs), so punch, slice, thrown items and healthbars target them all.
     private readonly List<Mob> _mobs = [];
@@ -549,9 +537,6 @@ public class World
                 _kings = new SkeletonKingManager(kingType, _mobCaps);
             if (EntityRegistry.TryGet(Sandworm.EntityName) is { } wormType)
                 _sandworms = new SandwormManager(wormType, _mobCaps);
-            if (EntityRegistry.TryGet("iceberg") is { } icebergType)
-                _icebergs = new IcebergManager(icebergType);
-            Camera.BodySolids = _icebergs;
             // The per-job components: each only stores its references here and reads this world lazily
             Strikes = new MobStrikes(this, _debris, Sounds, serverMode);
             // Each side sounds the lids it sees swing (they follow the viewers everywhere), so a server never sends them
@@ -577,7 +562,7 @@ public class World
             if (!serverMode)
                 ConqueredEffects = new FloorConqueredEffects(Camera, _towers, Sounds);
             LeftClick = new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, clientMode);
-            Placer = new BlockPlacer(this, _chunkManager, _falling, _icebergs, _querns, _fluidManager, _leafDecay,
+            Placer = new BlockPlacer(this, _chunkManager, _falling, _querns, _fluidManager, _leafDecay,
                 _lodManager, _debris, clientMode, serverMode);
             Throws = new ThrowAction(this, _chunkManager, _dropManager, _goblins, _hellMobs, _caveMobs, _skeletons, _kings, _mobs,
                 _projectiles, clientMode);
@@ -588,9 +573,9 @@ public class World
             RightClick = new RightClickAction(this, clientMode);
             Caster = new SpellCaster(this, clientMode);
             ClientMirror = new ClientMirror(this, _chunkManager, _dropManager, _tntManager, _falling, _slimes, _goblins, _hellMobs,
-                _skyMobs, _wildlife, _caveMobs, _skeletons, _kings, _sandworms, _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
+                _skyMobs, _wildlife, _caveMobs, _skeletons, _kings, _sandworms, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
             Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _wildlife, _caveMobs, _skeletons,
-                _kings, _sandworms, _icebergs, _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
+                _kings, _sandworms, _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
             Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, serverMode, clientMode);
             WaystoneTravel = new WaystoneTravel(Camera, LocalPlayer, _chunkManager);
             // Status effects convert cells only where the world is authoritative: a client's effects
@@ -600,7 +585,7 @@ public class World
                 : new StatusEffectBlockWriter(_chunkManager, _fluidManager, _leafDecay, _falling, _lodManager,
                     Edits.NotifyLodEdit);
             Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _caveMobs, _skeletons, _kings, _sandworms,
-                _icebergs, _debris, serverMode ? null : _fire, _health, _mobs, serverMode, clientMode, statusBlocks, _campfires,
+                _debris, serverMode ? null : _fire, _health, _mobs, serverMode, clientMode, statusBlocks, _campfires,
                 _mobCaps, _wildlife);
             Spells = statusBlocks == null
                 ? null
@@ -1127,7 +1112,6 @@ public class World
         _kings?.AnimateMirrors((float)deltaTime, _debris);
         _sandworms?.AnimateMirrors((float)deltaTime, _chunkManager);
         _tntManager.AnimateMirrors((float)deltaTime);
-        Director.AnimateIcebergMirrors(deltaTime);
         Ambient.UpdateStatusParticles((float)deltaTime);
         Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
         Ambient.UpdateKingEffects((float)deltaTime);
@@ -1291,9 +1275,7 @@ public class World
         foreach (var block in _falling.Falling)
             Camera.PushOutOf(block.Position, FallingBlock.HalfExtent, _chunkManager);
 
-        // The icebergs drift and carry their rider, then the mobs: their targets, the slime and goblin
-        // updates and the damage they deal (MobDirector)
-        Director.UpdateIcebergs(deltaTime);
+        // The mobs: their targets, the slime and goblin updates and the damage they deal (MobDirector)
         Director.Update(deltaTime);
         _skeletonRattle?.Tick((float)deltaTime, Skeletons, Camera.Position);
         if (_wildlifeCalls != null)

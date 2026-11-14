@@ -26,7 +26,7 @@ namespace VoxelEngine.ItemDebugger;
 /// clip is a one-shot that replays after <see cref="RestBetweenPlays"/>, and the preview consumes the
 /// events it fires so none pile up) and <see cref="HurtMode"/> when it authored no <c>hurt</c> clip of
 /// its own. A clip-less model (the slime) offers the life-cycle modes <see cref="SlimeModes"/>. An entity
-/// with several model variants (the iceberg's size classes) offers one static mode per variant instead,
+/// with several model variants offers one static mode per variant instead,
 /// named by its file (<see cref="SelectedVariant"/>), and an entity with no health pool is never offered
 /// <see cref="HurtMode"/>. The shared chest model (<see cref="ChestModel"/>) is listed after the entities as
 /// "Chest": no entity, but a Blockbench model with clips, each shown exactly as the game's lids show it (one

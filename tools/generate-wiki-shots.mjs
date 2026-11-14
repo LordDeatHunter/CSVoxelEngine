@@ -36,7 +36,7 @@ const SCENARIOS = [
     ['savanna', 'Savanna', 'Dry grassland with umbrella-crowned stone pines and wild cotton.', 'biome', [1392.5, 50.5, -1264.5], 90, -16, 30],
     ['savanna_ground', 'Savanna, ground level', 'Cotton clumps and stone pines on the warm, dry plain.', 'biome', [1392.5, 28.5, -1236.5], 90, -6, 6],
     ['pack_ice', 'Pack ice', 'In cold seas the water freezes into a walkable sheet, broken into floes.', 'biome', [-951.5, 120.5, -2535.5], 144, -35, 30],
-    ['pack_ice_low', 'Pack ice, ground level', 'Icebergs drift where the sea is just cold enough.', 'biome', [-1055.5, 3.5, -2455.5], 144, -6, 10]
+    ['pack_ice_low', 'Pack ice, ground level', 'Open leads and floes where the sea is just cold enough.', 'biome', [-1055.5, 3.5, -2455.5], 144, -6, 10]
   ]),
   day('highlands', 30, 'Highland terrain and mountains.', [
     ['origin_valley', 'The spawn valley', 'Near the spawn the land is kept calm: gentle hills and a wide valley.', 'terrain', [0.5, 45.5, 60.5], -90, -14, 12],

@@ -45,7 +45,7 @@ felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`Woo
 creative/flight, health, mana, respawn eye, lighting clock, the full inventory and hotbar (a staff's bound spells by part key), the known spell parts by key, the discovered waystones and the quest progress by quest id with the quest book's pan and zoom; no position
 while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live mobs
 with health, facing, velocity, ammo, a slime's size and a skeleton's tower floor plus still-pending entries, up to
-`MaxSavedDrops` item drops, nearest first, and the drifting icebergs) and `stations.json` (`StationSaveCodec`:
+`MaxSavedDrops` item drops, nearest first) and `stations.json` (`StationSaveCodec`:
 the campfires, querns, kilns and cast molds with their fuel, fire, crucible, cooking and cast progress, the used chests,
 the waystone registry and the battle towers' floor locks). See "Saves" below for the rules.
 
@@ -165,9 +165,7 @@ pure function of the seed: only **deltas** and the seed are written.
   once loading finishes, each only when its chunk is loaded; a restore is a forced spawn, so it
   may pass the natural mob cap but a mob waits while the hard cap (`MobHardCap`, which sizes the
   healthbar buffers) is full; an entry that waits stays pending and is saved again, and is
-  discarded only after `EntityRestoreTimeoutSeconds` of play. A saved iceberg (`Icebergs` in
-  `entities.json`) waits until every chunk under its placed bounds is loaded, and a sinking berg
-  is not saved.
+  discarded only after `EntityRestoreTimeoutSeconds` of play.
 - **The explored map** (`map.bin`, `MapSaveCodec`: "CVMP", a version byte, then a Deflate body of the surface and
   sky `MapTile`s, each its layer kind, chunk column, 256 texels and 256 heights; a cave slice is never kept). Only a
   world that drew a HUD has a map (`WorldRenderer.EnsureMap`, which imports the file when it builds the tracker), so a

@@ -125,5 +125,4 @@ campfire `FireParticleSystem.Puff` (`AmbientEffects.UpdateStatusParticles`, near
 Known gaps: effects are not saved (`player.json`, `entities.json`); other players' effects are not shown
 (the `PlayerList` carries none); the player's slowdown is client-trusted (the server rubberband only
 caps speed from above); sword and slice swing durations are not scaled by the attack factor; a blast
-does not consult effects; a slime's split children do not inherit its effects; and icebergs are not
-consulted, so a frostburned rider may freeze water inside a berg's submerged boxes.
+does not consult effects; a slime's split children do not inherit its effects.

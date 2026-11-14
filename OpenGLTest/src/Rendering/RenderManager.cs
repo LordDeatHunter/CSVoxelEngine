@@ -328,9 +328,6 @@ public class RenderManager : IDisposable
     /// goblin rig, its part meshes and its skin.</summary>
     internal MobPasses Mobs { get; private set; }
 
-    /// <summary>The iceberg draws: one mesh and skin per iceberg variant.</summary>
-    internal IcebergPasses IcebergPasses { get; private set; }
-
     /// <summary>The chest draws: the shared chest model's base and lid for every chest cell, each on its
     /// block's skin.</summary>
     internal ChestPasses Chests { get; private set; }
@@ -585,7 +582,6 @@ public class RenderManager : IDisposable
         Stations = new StationPasses(gl, this);
         Players = new PlayerPasses(gl, this);
         Mobs = new MobPasses(gl, this);
-        IcebergPasses = new IcebergPasses(gl, this);
         Chests = new ChestPasses(gl, this);
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes, atlasIsSrgb: true);
         // The damage numbers are laid out from the HUD's font; without one there is nothing to draw
@@ -1057,7 +1053,6 @@ public class RenderManager : IDisposable
         itemMeshes.Dispose();
         Stations.Dispose();
         Players.Dispose();
-        IcebergPasses.Dispose();
         Chests.Dispose();
         Mobs.Dispose();
         worldShader.Dispose();

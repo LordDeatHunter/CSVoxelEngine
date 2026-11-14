@@ -12,7 +12,7 @@ and crab; `EntityType.Attitude`, `EntityLoader.ParseAttitude` refuses anything e
 "Map and minimap"), and an optional
 `model` Blockbench project (default `assets/models/entity/<name>.bbmodel`), or instead of `model`
 a non-empty `variants` list of projects, one per size class or look (`EntityType.Variants` /
-`VariantPaths`, whose first entry is always `Model`; the icebergs use it), and an optional `held` item every spawn
+`VariantPaths`, whose first entry is always `Model`), and an optional `held` item every spawn
 holds: `{ "item", "part", "display" }`, a pure item drawn from its own extruded sprite at the hand of that group
 (`EntityAnimator.HandAnchor`, the bottom of its lowest cube, so it swings with the limb), posed by the item file's
 `display` shape and parser (`ItemLoader.ParseDisplay`, `Item.ComposeDisplay`). The loader checks the item and that every

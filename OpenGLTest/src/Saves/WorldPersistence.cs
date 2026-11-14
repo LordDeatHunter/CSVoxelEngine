@@ -16,7 +16,6 @@ using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Caves;
-using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Structures;
@@ -43,7 +42,6 @@ internal sealed class WorldPersistence
     private readonly SkeletonManager? _skeletons;
     private readonly SkeletonKingManager? _kings;
     private readonly SandwormManager? _sandworms;
-    private readonly IcebergManager? _icebergs;
     private readonly PlayerHealth _health;
     private readonly bool _serverMode;
     private readonly CampfireManager _campfires;
@@ -67,7 +65,7 @@ internal sealed class WorldPersistence
 
     internal WorldPersistence(World world, ChunkSaveStore? saveStore, ChunkManager chunkManager,
         DropManager dropManager, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        SkyMobManager? skyMobs, WildlifeManager? wildlife, CaveMobManager? caveMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms, IcebergManager? icebergs,
+        SkyMobManager? skyMobs, WildlifeManager? wildlife, CaveMobManager? caveMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms,
         PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         StationSaveData? savedStations)
@@ -90,7 +88,6 @@ internal sealed class WorldPersistence
         _skeletons = skeletons;
         _kings = kings;
         _sandworms = sandworms;
-        _icebergs = icebergs;
         _health = health;
         _serverMode = serverMode;
         _savedPlayer = savedPlayer;
@@ -105,8 +102,6 @@ internal sealed class WorldPersistence
             _pendingMobs.AddRange(savedEntities.Mobs);
         if (savedEntities?.Drops != null)
             _pendingDrops.AddRange(savedEntities.Drops);
-        if (savedEntities?.Icebergs != null)
-            _pendingIcebergs.AddRange(savedEntities.Icebergs);
     }
 
     /// <summary>The player.json this world was opened with, until the Loading -> Playing flip forgets it.</summary>
@@ -140,7 +135,6 @@ internal sealed class WorldPersistence
     // and ordinary entries expire after EntityRestoreTimeoutSeconds; owned instance drops keep waiting
     private readonly List<EntitySaveData.MobData> _pendingMobs = [];
     private readonly List<EntitySaveData.DropData> _pendingDrops = [];
-    private readonly List<EntitySaveData.IcebergData> _pendingIcebergs = [];
     private double _entityRestoreTimer;
 
     // The tower floors of saved skeletons a restore timeout discarded, owed back to their floors
@@ -180,7 +174,7 @@ internal sealed class WorldPersistence
     /// </summary>
     internal void RestorePendingEntities(double deltaTime)
     {
-        if (_pendingMobs.Count == 0 && _pendingDrops.Count == 0 && _pendingIcebergs.Count == 0)
+        if (_pendingMobs.Count == 0 && _pendingDrops.Count == 0)
             return;
         _entityRestoreTimer += deltaTime;
         List<string>? dropped = null;
@@ -235,22 +229,19 @@ internal sealed class WorldPersistence
             _pendingDrops.RemoveAt(i);
         }
 
-        RestorePendingIcebergs(ref dropped);
-
         if (dropped != null)
             Log.Warn($"Entity save: dropped {dropped.Count} unrestorable entr{(dropped.Count == 1 ? "y" : "ies")}: {string.Join(", ", dropped)}");
 
         if (!(_entityRestoreTimer >= SaveConfig.EntityRestoreTimeoutSeconds)
-            || (_pendingMobs.Count <= 0 && _pendingDrops.Count <= 0 && _pendingIcebergs.Count <= 0)) return;
+            || (_pendingMobs.Count <= 0 && _pendingDrops.Count <= 0)) return;
 
         var discardedDrops = _pendingDrops.RemoveAll(drop => drop.Instance == null);
-        if (_pendingMobs.Count == 0 && discardedDrops == 0 && _pendingIcebergs.Count == 0) return;
-        Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s), {discardedDrops} drop(s) and {_pendingIcebergs.Count} iceberg(s) whose chunks never loaded or that a full cap kept out");
+        if (_pendingMobs.Count == 0 && discardedDrops == 0) return;
+        Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s), {discardedDrops} drop(s) whose chunks never loaded or that a full cap kept out");
         foreach (var mob in _pendingMobs)
             if (TowerFloorOf(mob) is { } floor)
                 _discardedTowerSkeletons.Add(floor);
         _pendingMobs.Clear();
-        _pendingIcebergs.Clear();
     }
 
     /// <summary>How many saved skeletons bound to <paramref name="floor"/> still wait for a restore; they count
@@ -289,38 +280,6 @@ internal sealed class WorldPersistence
         && mob.Type != null && SkeletonManager.HeightOf(mob.Type) > 0f
             ? new TowerFloorRef(cell[0], cell[1], floor)
             : null;
-
-    // Spawns every pending saved iceberg once every chunk under its placed bounds is loaded (a berg
-    // collides with its whole footprint, so a part over an unloaded chunk would refuse it). A spawn
-    // the cap or a blocked footprint refuses stays pending.
-    private void RestorePendingIcebergs(ref List<string>? dropped)
-    {
-        for (var i = _pendingIcebergs.Count - 1; i >= 0; i--)
-        {
-            var saved = _pendingIcebergs[i];
-            if (_icebergs == null || saved.Position is not { Length: 3 } p)
-            {
-                (dropped ??= []).Add("iceberg");
-                _pendingIcebergs.RemoveAt(i);
-                continue;
-            }
-
-            var variant = Math.Clamp(saved.Variant ?? 0, 0, _icebergs.VariantCount - 1);
-            var scale = Math.Clamp(saved.Scale ?? 1f, IcebergConfig.ScaleMin, IcebergConfig.ScaleMax);
-            var turns = (saved.Turns ?? 0) & 3;
-            var center = new Vector3(p[0], p[1], p[2]);
-            var (min, max) = _icebergs.ShapeOf(variant).PlacedBounds(turns, scale, center);
-            if (!IcebergManager.ChunksLoaded(_chunkManager, min, max))
-                continue;
-
-            var berg = _icebergs.Spawn(_chunkManager, variant, scale, turns, saved.Seed ?? 0, center,
-                saved.Life ?? IcebergConfig.LifeMaxSeconds);
-            if (berg == null)
-                continue;
-            berg.Velocity = ToVector(saved.Velocity);
-            _pendingIcebergs.RemoveAt(i);
-        }
-    }
 
     // Whether the chunk owning the cell under a world position is loaded
     private bool IsCellLoaded(Vector3 position) =>
@@ -537,30 +496,7 @@ internal sealed class WorldPersistence
 
         if (unnamed > 0)
             Log.Warn($"Entity save: skipped {unnamed} drop(s) of an item with no save name");
-        return new EntitySaveData { Mobs = mobs, Drops = drops, Icebergs = CaptureIcebergs() };
-    }
-
-    // Every live iceberg that is not sinking away, plus the saved ones still pending a restore
-    private List<EntitySaveData.IcebergData> CaptureIcebergs()
-    {
-        var icebergs = new List<EntitySaveData.IcebergData>();
-        foreach (var berg in _world.Icebergs)
-        {
-            if (berg.IsSinking)
-                continue;
-            icebergs.Add(new EntitySaveData.IcebergData
-            {
-                Variant = berg.Variant,
-                Scale = berg.Scale,
-                Turns = berg.Turns,
-                Seed = berg.Seed,
-                Position = [berg.Center.X, berg.Center.Y, berg.Center.Z],
-                Velocity = [berg.Velocity.X, berg.Velocity.Y, berg.Velocity.Z],
-                Life = berg.LifeLeft,
-            });
-        }
-        icebergs.AddRange(_pendingIcebergs);
-        return icebergs;
+        return new EntitySaveData { Mobs = mobs, Drops = drops };
     }
 
     /// <summary>Enqueues <see cref="EntitySaveCodec.FileName"/>; does nothing without a save store.</summary>

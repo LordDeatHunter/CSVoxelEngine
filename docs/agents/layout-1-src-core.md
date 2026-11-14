@@ -178,8 +178,6 @@ OpenGLTest/
       AudioConfig.cs           # ambience bed paths, volumes and fades; the sfx volume
       BloomeryConfig.cs        # iron smelting: the bloomery's heat band, bellows pump, smelt and burn times, the anvil's slack
       HudConfig.cs             # selection outline and pulse, hotbar name fade, pop and flash, the loading screen
-      IcebergConfig.cs         # icebergs: caps and the spawn ring, the spawn band, size and mass, drift and push,
-                               #   wobble, life cycle, the client mirror's lead
       RarityStyleConfig.cs     # the rarity chrome's per-rarity layer strengths (opacity, wash, glow, sheen, sparkle,
                                #   pulse depth) and its shape and motion knobs; Common all zero
       JuiceConfig.cs           # landing and footstep dust, slime splat, hit sparks, death poof, blast shake and
@@ -523,16 +521,6 @@ OpenGLTest/
         IBonePose.cs           # a pose of a Blockbench rig: each bone's animated local transform
         RigPose.cs             # GL-free: composes a pose down the rig's parent chain into a part's world matrix
         ClipPose.cs            # one clip sampled at one time as a pose, no layers (a chest's lid); default = rest
-      Icebergs/                # drifting icebergs (not mobs): the berg and its GL-free rules, see "Icebergs"
-        Iceberg.cs             # one berg: variant, horizontal scale, quarter turns, seed, waterline center,
-                               #   velocity, cached world boxes, emerge/sink, the client mirror's dead reckoning
-        IcebergContact.cs      # GL-free box rules: overlap, riding, side contact and its push direction; the one
-                               #   player body box (BodyMin/BodyMax) BodyCollision builds from
-        IcebergMotion.cs       # GL-free drift along the wind, the push over the mass, the speed cap
-        IcebergShape.cs        # a variant's collision boxes from its model cubes; the one turn rule (RotateQuarter),
-                               #   ModelMatrix, Place, mass
-        IcebergSpawnRule.cs    # GL-free spawn band: open water from SpawnColdMin to the freeze threshold
-        IcebergWobble.cs       # GL-free render-only bob, pitch and roll of (seed, lighting clock)
       SkyMobs/                 # the sky islands' mobs (see "Sky mobs"): the shared base, the two kinds, the zone difficulty
       Wildlife/                # the animals of the wild (see "Wildlife"): Animal (heeding, idle habits, gaits), the
                                #   WildlifeSpecies table, Deer (watches, bolts, grazes), Boar (neutral until crowded or

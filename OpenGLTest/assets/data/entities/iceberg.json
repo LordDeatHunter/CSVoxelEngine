@@ -1,8 +1,0 @@
-{
-  "name": "Iceberg",
-  "variants": [
-    "assets/models/entity/iceberg_small.bbmodel",
-    "assets/models/entity/iceberg_medium.bbmodel",
-    "assets/models/entity/iceberg_large.bbmodel"
-  ]
-}

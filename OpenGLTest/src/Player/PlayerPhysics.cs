@@ -391,8 +391,8 @@ internal sealed class PlayerPhysics
         }
 
         var horizontalStart = camera.Position;
-        var afterX = BodyCollision.MoveOnAxis(camera.Position, frameMovement.X, 0, chunkManager, out var collidedX, camera.BodySolids);
-        var afterZ = BodyCollision.MoveOnAxis(afterX, frameMovement.Z, 2, chunkManager, out var collidedZ, camera.BodySolids);
+        var afterX = BodyCollision.MoveOnAxis(camera.Position, frameMovement.X, 0, chunkManager, out var collidedX);
+        var afterZ = BodyCollision.MoveOnAxis(afterX, frameMovement.Z, 2, chunkManager, out var collidedZ);
         camera.SetPosition(afterZ);
 
         // Auto-step: on foot and grounded, a low ledge is climbed instead of stopping the
@@ -401,7 +401,7 @@ internal sealed class PlayerPhysics
         var steppedThisFrame = false;
         if (!swimming && camera.IsGrounded && (collidedX || collidedZ)
             && BodyCollision.TryStepUp(horizontalStart, frameMovement,
-                camera.IsSprinting ? SprintStepHeight : WalkStepHeight, chunkManager, camera.BodySolids) is { } stepped)
+                camera.IsSprinting ? SprintStepHeight : WalkStepHeight, chunkManager) is { } stepped)
         {
             camera.SetPosition(stepped);
             steppedThisFrame = true;
@@ -421,7 +421,7 @@ internal sealed class PlayerPhysics
         }
 
         var feetBefore = camera.Position.Y - EyeHeight;
-        var afterY = BodyCollision.MoveOnAxis(camera.Position, frameMovement.Y, 1, chunkManager, out var collidedY, camera.BodySolids);
+        var afterY = BodyCollision.MoveOnAxis(camera.Position, frameMovement.Y, 1, chunkManager, out var collidedY);
         camera.SetPosition(afterY);
 
         if (collidedY)
