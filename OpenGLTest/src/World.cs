@@ -565,6 +565,8 @@ public class World
             _dropManager.InstanceLoot = (id, cell) => Lanterns.DropRemoved(id, cell, _dropManager);
             Edits = new BlockEditor(this, _chunkManager, _debris, _dropManager, _campfires, _querns, _kilns, _casting,
                 _fluidManager, _leafDecay, _lodManager, _leaves, _falling, _toppling, clientMode, serverMode);
+            if (!clientMode)
+                _falling.PopUnsupported = Edits.PopUnsupportedAt;
             // Built before the persistence, whose constructor restores the stations (towers included)
             _towers = new TowerManager(clientMode ? null : new TowerBlockWriter(_chunkManager, _fluidManager, _leafDecay,
                 _falling, _lodManager, Edits.NotifyLodEdit, Edits.PopUnsupportedAt,

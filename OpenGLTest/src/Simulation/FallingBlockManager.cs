@@ -21,6 +21,12 @@ public class FallingBlockManager
     public IReadOnlyList<FallingBlock> Falling => _falling;
 
     /// <summary>
+    /// Pops the support-fragile blocks an emptied cell (x, y, z) was holding up; the world wires it to
+    /// <c>BlockEditor.PopUnsupportedAt</c>. Null in the headless tests, which pop nothing.
+    /// </summary>
+    internal System.Action<int, int, int>? PopUnsupported { get; set; }
+
+    /// <summary>
     /// Every cube the last <see cref="Update"/> wrote back as a block, with how far it fell and whether
     /// it settled under water; valid until the next one. The world raises the settling dust from it
     /// (<see cref="GroundDust.LandBlock"/>), except on a headless server.
@@ -142,6 +148,12 @@ public class FallingBlockManager
         }
 
         if (batch == null) return false;
+
+        // What the toppled cells held up (a torch on top, a wall torch on a side) would float
+        // where the cube used to be: pop it like a mined holder
+        if (PopUnsupported != null)
+            for (var py = y; py < cy; py++)
+                PopUnsupported(x, py, z);
 
         // The removals change the far LOD like any mined block, recorded once the whole run is
         // clear: the highest cell first, which rescans down through the emptied run when it was
