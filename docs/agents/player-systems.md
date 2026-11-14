@@ -269,7 +269,7 @@ broken or out of reach. Right-clicking a chest is a `RightClickOutcome.Container
 `ChestInput` (owned by `InventoryPanelInput`) opens the `ChestView` card (`UI/Chest/`, `ChestCardRenderer`) beside the [E] list,
 whose rows then deposit (one unit, all with shift) while the card's rows withdraw, and whose LOOT ALL and QUICK STACK buttons (`ChestMoveKind.LootAll`/`QuickStack`, `ChestTransfer.LootAll`/`QuickStack`: take everything that fits, or deposit every stackable whose id the chest already holds) sit under the search field; the card's rows wear the same
 `RarityStyle` chrome, accent bar and name color as the [E] rows (see "Rarity chrome"). The chest card takes the right side
-of the panel, so the preview, equipment and crafting cards are neither drawn nor clicked while it is up. `ChestTests`, `TowerChestTests`, `ChestServerTests`;
+of the panel, so the preview, equipment and crafting cards are neither drawn nor clicked while it is up. Drag and drop (`RowDragInput`, the same `RowDrag` as the [E] list): a press on a chest row lifts it (`RowDrag.FromChestSlot`), and released on the inventory panel or the hotbar it withdraws the whole slot (`ChestInput.Withdraw(.., all: true)`); a listed row released on the chest card deposits what it names (its whole stack, or the tool or gear instance; refused in creative). A chest row released on the chest card itself, or outside the panel, changes nothing. `ChestTests`, `TowerChestTests`, `ChestServerTests`;
 `visual-examples/chests.json` (`VOXEL_TIME=147`, with the `setblock`, `chest`, `chestrow` and `chestwobble` ops).
 
 **Lantern fuel.** `Simulation/Lanterns/` owns the individual `LanternComponent`, eight-slot list storage and

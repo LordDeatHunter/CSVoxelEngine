@@ -3,13 +3,14 @@ using System.Numerics;
 namespace VoxelEngine.UI.InventoryPanel;
 
 /// <summary>
-/// A left press on a listed row of the [E] panel, or on a hotbar slot showing something, which lifts into a drag once the
-/// pointer leaves the press by <see cref="LiftDistance"/>: the item then follows the pointer. A listed row goes into the
-/// hotbar or equipment slot it is released over (<see cref="RowEquip.DropOnHotbar"/>,
-/// <see cref="RowEquip.DropOnEquipment"/>); a hotbar slot's drop is judged by the panel's drag input. Until it lifts, the
+/// A left press on a listed row of the [E] panel, on a hotbar slot showing something, or on a row of the open chest's
+/// card, which lifts into a drag once the pointer leaves the press by <see cref="LiftDistance"/>: the item then follows
+/// the pointer. A listed row goes into the hotbar or equipment slot it is released over (<see cref="RowEquip.DropOnHotbar"/>,
+/// <see cref="RowEquip.DropOnEquipment"/>) or into the open chest; a hotbar slot's drop is judged by the panel's drag
+/// input, and a chest row's drop out of the chest card takes the whole slot into the inventory. Until it lifts, the
 /// release is an ordinary click. GL-free.
 /// </summary>
-public sealed class RowDrag(ushort id, int toolInstance, Vector2 pressCanvas, int fromSlot = -1)
+public sealed class RowDrag(ushort id, int toolInstance, Vector2 pressCanvas, int fromSlot = -1, int fromChestSlot = -1)
 {
     /// <summary>Canvas units the pointer must travel from the press before the row lifts.</summary>
     public const float LiftDistance = 6f;
@@ -22,6 +23,9 @@ public sealed class RowDrag(ushort id, int toolInstance, Vector2 pressCanvas, in
 
     /// <summary>The hotbar slot the drag began on, or -1 for a listed row.</summary>
     public int FromSlot { get; } = fromSlot;
+
+    /// <summary>The open chest's slot the drag began on, or -1 when it began elsewhere.</summary>
+    public int FromChestSlot { get; } = fromChestSlot;
 
     /// <summary>Whether the pointer has left the press: the release is a drop, not a click.</summary>
     public bool Lifted { get; private set; }
