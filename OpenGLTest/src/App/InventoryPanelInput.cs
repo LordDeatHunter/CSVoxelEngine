@@ -714,10 +714,13 @@ internal sealed class InventoryPanelInput
             switch (hit.Kind)
             {
                 case CraftHitKind.BatchMinus:
-                    craft.SetBatch(craft.Batch - 1);
+                    if (craft.CanDecreaseBatch) craft.SetBatch(craft.Batch - 1);
                     return;
                 case CraftHitKind.BatchPlus:
-                    craft.SetBatch(craft.Batch + 1);
+                    if (craft.CanIncreaseBatch(inventory)) craft.SetBatch(craft.Batch + 1);
+                    return;
+                case CraftHitKind.BatchMax:
+                    if (craft.CanSetBatchToMax(inventory)) craft.SetBatch(craft.MaxBatchAffordable(inventory));
                     return;
                 case CraftHitKind.IngMinus:
                     craft.FeedLess(hit.IngredientIndex);

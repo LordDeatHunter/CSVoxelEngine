@@ -205,6 +205,28 @@ public sealed class CraftingTests
     }
 
     [Fact]
+    public void BatchButtonsStopAtTheAffordableMaximum()
+    {
+        var inventory = TestInventory.Stocked();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var dirt = ContentRegistry.RequireBlock("dirt").Id;
+        var recipe = new CraftingRecipe("test_batch_max",
+            dirt, 1, [new CraftingRecipe.Ingredient(stone, 2)]);
+        var session = new CraftingSession();
+        session.Select(recipe);
+        var max = session.MaxBatchAffordable(inventory);
+
+        Assert.False(session.CanDecreaseBatch);
+        Assert.Equal(max > 1, session.CanIncreaseBatch(inventory));
+        Assert.Equal(max != 1, session.CanSetBatchToMax(inventory));
+
+        session.SetBatch(max);
+        Assert.False(session.CanIncreaseBatch(inventory));
+        Assert.False(session.CanSetBatchToMax(inventory));
+        Assert.Equal(max > 1, session.CanDecreaseBatch);
+    }
+
+    [Fact]
     public void SessionBatchScalesNeedsAndResults()
     {
         var inventory = TestInventory.Stocked();

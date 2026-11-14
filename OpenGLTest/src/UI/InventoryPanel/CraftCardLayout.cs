@@ -11,6 +11,7 @@ public enum CraftHitKind
     None,
     BatchMinus,
     BatchPlus,
+    BatchMax,
     CraftButton,
     IngMinus,
     IngPlus,
@@ -45,6 +46,8 @@ public sealed class CraftCardLayout
     public const float StepBox = 24f;
     public const float BatchCountW = 34f;
     public const float BatchGap = 8f;
+    /// <summary>Width of the [max] box; narrow enough that the batch row still fits the minimum card width.</summary>
+    public const float MaxButtonW = 36f;
     public const float IngPad = 10f;
     public const float IngTitleLineH = 20f;
     public const float IngBarH = 6f;
@@ -246,8 +249,11 @@ public sealed class CraftCardLayout
         return new Vector2(count.X + BatchCountW * 0.5f + BatchGap + StepBox * 0.5f, count.Y);
     }
 
-    /// <summary>Left edge of the "max N" label, right of the batch + box.</summary>
-    public float BatchMaxX(float scroll) => BatchPlusCenter(scroll).X + StepBox * 0.5f + BatchGap;
+    public Vector2 BatchMaxCenter(float scroll)
+    {
+        var plus = BatchPlusCenter(scroll);
+        return new Vector2(plus.X + StepBox * 0.5f + BatchGap + MaxButtonW * 0.5f, plus.Y);
+    }
 
     public Vector2 IngPlusCenter(int i, float scroll) =>
         new(Left + Width - Pad - IngPad - IngStepBox * 0.5f, ContentY(Ingredients[i].FedY, scroll) + IngFedH * 0.5f);
@@ -303,6 +309,8 @@ public sealed class CraftCardLayout
             return new CraftHit(CraftHitKind.BatchMinus);
         if (InBox(point, BatchPlusCenter(scroll), new Vector2(StepBox)))
             return new CraftHit(CraftHitKind.BatchPlus);
+        if (InBox(point, BatchMaxCenter(scroll), new Vector2(MaxButtonW, StepBox)))
+            return new CraftHit(CraftHitKind.BatchMax);
 
         for (var i = 0; i < Ingredients.Length; i++)
         {

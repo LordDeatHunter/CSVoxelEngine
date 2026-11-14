@@ -51,6 +51,18 @@ public sealed class CraftingSession
     /// <summary>Desired copies, clamped to 1..99. Affordability is what gates the button, not this.</summary>
     public void SetBatch(int batch) => Batch = Math.Clamp(batch, 1, MaxBatch);
 
+    /// <summary>The batch the [max] button sets: what the player can afford, never below 1.</summary>
+    public int MaxBatchAffordable(Inventory inventory) => Math.Clamp(MaxAffordable(inventory), 1, MaxBatch);
+
+    /// <summary>[+] stops at the affordable maximum.</summary>
+    public bool CanIncreaseBatch(Inventory inventory) => Batch < MaxBatchAffordable(inventory);
+
+    /// <summary>[-] stops at 1.</summary>
+    public bool CanDecreaseBatch => Batch > 1;
+
+    /// <summary>[max] does nothing when the batch already sits at the affordable maximum.</summary>
+    public bool CanSetBatchToMax(Inventory inventory) => Batch != MaxBatchAffordable(inventory);
+
     /// <summary>
     /// Picks which member a slot takes. Keeps the fed count, clamped to what is on hand.
     /// Ignored for unknown slots or ids the ingredient does not accept.

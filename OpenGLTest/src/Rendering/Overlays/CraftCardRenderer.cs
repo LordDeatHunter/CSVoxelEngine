@@ -93,10 +93,19 @@ internal sealed class CraftCardRenderer
     /// <summary>Clamps a crafting card scroll offset against the last drawn layout (0 without one).</summary>
     internal float ClampCraftScroll(float offset) => _craftLayouts.Current?.ClampScroll(offset) ?? 0f;
 
-    private void DrawBoxButton(Vector2 center, float size, string label, Rgba bg, Rgba border, Rgba text)
+    /// <summary>A square stepper or max box; a disabled one draws dimmed and never highlights.</summary>
+    private void DrawBoxButton(Vector2 center, Vector2 size, string label, Rgba bg, Rgba border, Rgba text,
+        bool enabled = true)
     {
-        _ui.DrawRect(center, new Vector2(size), _ui.IsHovered(center, new Vector2(size)) ? ButtonHover : bg);
-        _ui.DrawBorder(center, new Vector2(size), Border.Thin, border);
+        if (!enabled)
+        {
+            _ui.DrawRect(center, size, ButtonDisabled);
+            _ui.DrawBorder(center, size, Border.Thin, border);
+            _ui.DrawTextMiddle(label, center, _ui.CountScale, ButtonTextDisabled);
+            return;
+        }
+        _ui.DrawRect(center, size, _ui.IsHovered(center, size) ? ButtonHover : bg);
+        _ui.DrawBorder(center, size, Border.Thin, border);
         _ui.DrawTextMiddle(label, center, _ui.CountScale, text);
     }
 
@@ -189,16 +198,16 @@ internal sealed class CraftCardRenderer
         _ui.DrawText("Batch", new Vector2(textX, batchTextY), _ui.CountScale, TextDim);
         var batchMinus = layout.BatchMinusCenter(scroll);
         var batchPlus = layout.BatchPlusCenter(scroll);
-        DrawBoxButton(batchMinus, CraftCardLayout.StepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
+        var batchMax = layout.BatchMaxCenter(scroll);
+        var stepSize = new Vector2(CraftCardLayout.StepBox);
+        DrawBoxButton(batchMinus, stepSize, "-", ChipBackground, SlotBorderColor, Rgba.White,
+            session.CanDecreaseBatch);
         _ui.DrawTextMiddle(session.Batch.ToString(), layout.BatchCountCenter(scroll) with { Y = batchMinus.Y },
             _ui.CountScale, Rgba.White);
-        DrawBoxButton(batchPlus, CraftCardLayout.StepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
-        var maxBatch = session.MaxAffordable(inventory);
-        var maxX = layout.BatchMaxX(scroll);
-        var maxRight = layout.Left + layout.Width - pad;
-        _ui.DrawText(_ui.FitText($"max {maxBatch}", _ui.CountScale, Math.Max(20f, maxRight - maxX)),
-            new Vector2(maxX, batchTextY),
-            _ui.CountScale, maxBatch >= session.Batch ? ReadyGreen : DangerRed);
+        DrawBoxButton(batchPlus, stepSize, "+", ChipBackground, SlotBorderColor, Rgba.White,
+            session.CanIncreaseBatch(inventory));
+        DrawBoxButton(batchMax, new Vector2(CraftCardLayout.MaxButtonW, CraftCardLayout.StepBox), "max",
+            ChipBackground, SlotBorderColor, Rgba.White, session.CanSetBatchToMax(inventory));
 
         var separatorY = layout.ContentY(pad + layout.HeaderHeight + CraftCardLayout.HeaderGap - 5f, scroll);
         _ui.DrawRect(new Vector2(cardCenterX, separatorY), new Vector2(innerWidth, Border.Thin), SlotBorderColor);
@@ -243,8 +252,9 @@ internal sealed class CraftCardRenderer
             _ui.DrawTextCenteredY(_ui.FitText(fedText, _ui.CountScale, Math.Max(20f, fedAvail)),
                 fedCx + 24f, fedCy, _ui.CountScale,
                 fed.Count >= need ? ReadyGreen : Rgba.White);
-            DrawBoxButton(minus, CraftCardLayout.IngStepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
-            DrawBoxButton(plus, CraftCardLayout.IngStepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
+            var ingStep = new Vector2(CraftCardLayout.IngStepBox);
+            DrawBoxButton(minus, ingStep, "-", ChipBackground, SlotBorderColor, Rgba.White);
+            DrawBoxButton(plus, ingStep, "+", ChipBackground, SlotBorderColor, Rgba.White);
 
             var members = recipe.Ingredients[i].AcceptedIds;
             var picked = fed.MemberId;

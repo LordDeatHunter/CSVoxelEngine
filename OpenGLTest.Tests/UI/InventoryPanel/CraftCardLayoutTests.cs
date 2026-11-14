@@ -204,6 +204,7 @@ public sealed class CraftCardLayoutTests
         Expect(layout.ButtonCenter(scroll), new CraftHit(CraftHitKind.CraftButton));
         Expect(layout.BatchMinusCenter(scroll), new CraftHit(CraftHitKind.BatchMinus));
         Expect(layout.BatchPlusCenter(scroll), new CraftHit(CraftHitKind.BatchPlus));
+        Expect(layout.BatchMaxCenter(scroll), new CraftHit(CraftHitKind.BatchMax));
         for (var i = 0; i < layout.Ingredients.Length; i++)
         {
             Expect(layout.IngMinusCenter(i, scroll), new CraftHit(CraftHitKind.IngMinus, i));
