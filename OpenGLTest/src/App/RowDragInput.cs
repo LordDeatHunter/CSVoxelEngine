@@ -124,7 +124,7 @@ internal sealed class RowDragInput(
         var screen = renderManager.Ui.ScreenSize;
         if (panel.Chest.IsOpen && ChestCardLayout.Contains(canvas, screen))
         {
-            if (world.Camera.IsCreative) return;
+            if (DepositRefused(world)) return;
             var instance = inventory.ToolInstanceAt(from);
             if (instance != 0) panel.Chest.DepositInstance(instance);
             else panel.Chest.DepositStack(inventory.IdAt(from), wholeStack: true);
@@ -158,11 +158,14 @@ internal sealed class RowDragInput(
             panel.Chest.Withdraw(world, slot, all: true);
     }
 
+    // A creative player's chest deposit is refused (it owns everything); a lantern still takes the fuel it is given
+    private bool DepositRefused(World world) => world.Camera.IsCreative && world.ChestPanel.LanternInstance == null;
+
     // A listed row dropped on the open chest's card deposits what it names, as a click with shift would; a creative
     // player's deposit is refused, as a row click's is, and a stackable the player does not hold moves nothing
     private void DepositListedRow(World world, RowDrag drag)
     {
-        if (world.Camera.IsCreative) return;
+        if (DepositRefused(world)) return;
         if (drag.ToolInstance != 0) panel.Chest.DepositInstance(drag.ToolInstance);
         else if (world.Inventory.CountFor(drag.Id) > 0 && !ChestTransfer.IsInstance(drag.Id))
             panel.Chest.DepositStack(drag.Id, wholeStack: true);
