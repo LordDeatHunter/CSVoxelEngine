@@ -440,14 +440,14 @@ GL-free twin `SkyAmbient` (`SkyAmbientTests`: the composed color at `fSun` 0 is 
 day palette, and no shader keeps the old floor).
 Verified in-game with `visual-examples/sealed-room.json` (a 9x6x9 `tower_bricks` shell, `coversSky`: by `ChunkLighting`'s seeding rule sun is seeded at every
 air cell at or above the terrain height unless a `coversSky` block covers it, so an ordinary roof does not
-seal a room above the heightmap; the scenario writes with `setblock`, the player placement path was not traced or run): the interior's sampled skylight is 0 and the
-unlit room reads mean RGB (0.35, 0.35, 0.37) at `VOXEL_TIME` 147 and 700 alike (before the fix a constant
-(4.9, 6.3, 10.6) glow); a torch lights it, and the outdoor control still follows the clock. In the tunnel of
-`sealed-ambient.json` the remaining noon/night difference is consistent with the block-light flicker (`FlickAt`/`BlockFlicker`,
-scaling `torch` on every fragment with block light, driven by `uTime` = the lighting clock including
-`VOXEL_TIME`): 147 and 1347 (the same sun) differ about as much as 147 and 700. That does not rule out other
-time-driven local terms (e.g. point-light flicker). Whole-frame means of the room shots include the
-selection highlight, so interior ROI numbers are in the evidence bundle instead.
+seal a room above the heightmap; the scenario writes with `setblock`, the player placement path was not traced or run),
+at `VOXEL_TIME` 255 (lighting time ~310, sun elevation 0.94) and 1454 (~1507, -0.94), `DayLengthSeconds` 2400. Interior skylight
+sampled 0 at both times. Unlit interior ROI means before the fix: about (4.4, 5.7, 9.6) by day and (0.26, 0.37, 1.0) at night
+(the ambient followed the clock); after: exactly 0 at both. A torch lights the room at both times and the open-air control
+still follows the clock. In the tunnel of `sealed-ambient.json` the noon/night mean red differs (2.85 vs 3.24), but so does the same sun
+2400 s later (255 vs 2655: 2.85 vs 3.31), consistent with the block-light flicker (`FlickAt`/`BlockFlicker`, scaling `torch`
+where there is block light, driven by `uTime`, the lighting clock including `VOXEL_TIME`); other time-driven local terms were not
+ruled out. Whole-frame means of the room shots include the selection highlight, so the interior ROI numbers are in the evidence bundle.
 
 **Leaf backlight.** A leaf-sway face (bit 5: canopy leaves and rooted plants; `test-vertex.glsl`
 hands the fragment the flag as the flat `fSwayFlag`, outside the guarded sway block) standing

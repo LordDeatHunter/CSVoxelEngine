@@ -1,5 +1,6 @@
 // Sealed plain tower_bricks room (coversSky, so the heightmap-seeded sun cannot reach the interior) (9x6x9 shell at x 0..8, y 100..105, z 0..8, no emissive blocks), eye inside facing -Z.
-// Shots: room_unlit, room_torch (one torch on the floor), outside (open-sky control). Run twice, VOXEL_TIME=147 and 700.
+// Shots: room_unlit, room_torch (one torch on the floor), outside (open-sky control). Run twice from OpenGLTest/ (SkyConfig.DayLengthSeconds is 2400; noon is lighting time ~294, midnight ~1494; the shots land ~40-60 s after the offset):
+// VOXEL_TIME=255 (day) and VOXEL_TIME=1454 (night). Fixed: the unlit interior is black at both times; the outside shot follows the clock.
 {
 "steps": [
 {
