@@ -14,10 +14,10 @@ public sealed class CreativeCatalogTests
     [InlineData(InventoryCategory.Blocks)]
     [InlineData(InventoryCategory.Tools)]
     [InlineData(InventoryCategory.Misc)]
-    public void EntriesHoldExactlyEveryItemInTheirPool(InventoryCategory category)
+    public void EntriesHoldExactlyEveryItemListedInTheirTab(InventoryCategory category)
     {
         var expected = ItemRegistry.All
-            .Where(i => Inventory.CategoryOf(i.Id) == category)
+            .Where(i => InventoryTabs.TabOf(i.Id) == category)
             .Select(i => i.Id)
             .ToHashSet();
 

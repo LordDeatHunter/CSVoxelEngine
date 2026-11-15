@@ -146,13 +146,8 @@ internal sealed class InventoryPanelInput
             var entries = CreativeCatalog.Entries(inventoryView.Tab, inventory);
             return row < entries.Count ? new RowEntry(entries[row].Id, 0, null) : null;
         }
-        if (inventoryView.Tab is InventoryCategory.Tools or InventoryCategory.Gear)
-        {
-            var tools = inventoryView.Tab == InventoryCategory.Gear ? inventory.GearEntries() : inventory.ToolEntries();
-            return row < tools.Count ? new RowEntry(tools[row].ItemId, tools[row].InstanceId, null) : null;
-        }
-        var stacks = inventory.StackEntries(inventoryView.Tab);
-        return row < stacks.Count ? new RowEntry(stacks[row].Id, 0, null) : null;
+        var rows = InventoryTabs.Entries(inventory, inventoryView.Tab);
+        return row < rows.Count ? new RowEntry(rows[row].Id, rows[row].InstanceId, null) : null;
     }
 
     /// <summary>
@@ -232,12 +227,7 @@ internal sealed class InventoryPanelInput
             return ActiveWorld!.Inventory.ListedRecipes(BrowseCreative).Count;
         if (BrowseCreative)
             return CreativeCatalog.Entries(tab, ActiveWorld!.Inventory).Count;
-        return tab switch
-        {
-            InventoryCategory.Tools => ActiveWorld!.Inventory.ToolEntries().Count,
-            InventoryCategory.Gear => ActiveWorld!.Inventory.GearEntries().Count,
-            _ => ActiveWorld!.Inventory.StackEntries(tab).Count,
-        };
+        return InventoryTabs.Entries(ActiveWorld!.Inventory, tab).Count;
     }
 
     /// <summary>
@@ -531,22 +521,21 @@ internal sealed class InventoryPanelInput
         }
         else switch (inventoryView.Tab)
         {
-            case InventoryCategory.Tools:
-                inventoryView.SelectedToolInstance = inventory.ToolEntries()[row].InstanceId;
-                inventoryView.SelectedId = 0;
-                break;
-            case InventoryCategory.Gear:
-                // A click picks the piece (its fitting slots light up), however often; a click on a lit slot or a
-                // right-click on the row wears it
-                inventoryView.SelectedToolInstance = inventory.GearEntries()[row].InstanceId;
-                inventoryView.SelectedId = 0;
-                break;
             case InventoryCategory.Crafting:
                 OpenRecipe(inventory.ListedRecipes(creative)[row]);
                 break;
             default:
             {
-                var picked = inventory.StackEntries(inventoryView.Tab)[row].Id;
+                var listed = InventoryTabs.Entries(inventory, inventoryView.Tab)[row];
+                if (listed.InstanceId != 0)
+                {
+                    // A click picks the instance (a piece of gear's fitting slots light up), however often; a click on
+                    // a lit slot or a right-click on the row wears it
+                    inventoryView.SelectedToolInstance = listed.InstanceId;
+                    inventoryView.SelectedId = 0;
+                    break;
+                }
+                var picked = listed.Id;
                 inventoryView.SelectedId = picked;
                 inventoryView.SelectedToolInstance = 0;
                 if (inventoryView.Craft.Recipe != null)
@@ -574,16 +563,12 @@ internal sealed class InventoryPanelInput
         {
             case InventoryCategory.Crafting:
                 return false;
-            case InventoryCategory.Tools:
-                if (row < inventory.ToolEntries().Count) Chest.DepositInstance(inventory.ToolEntries()[row].InstanceId);
-                return true;
-            case InventoryCategory.Gear:
-                if (row < inventory.GearEntries().Count) Chest.DepositInstance(inventory.GearEntries()[row].InstanceId);
-                return true;
             default:
             {
-                var stacks = inventory.StackEntries(inventoryView.Tab);
-                if (row < stacks.Count) Chest.DepositStack(stacks[row].Id);
+                var listed = InventoryTabs.Entries(inventory, inventoryView.Tab);
+                if (row >= listed.Count) return true;
+                if (listed[row].InstanceId != 0) Chest.DepositInstance(listed[row].InstanceId);
+                else Chest.DepositStack(listed[row].Id);
                 return true;
             }
         }

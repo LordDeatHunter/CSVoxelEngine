@@ -26,7 +26,7 @@ public static class CreativeCatalog
         var entries = new List<CatalogEntry>();
         foreach (var item in ItemRegistry.All)
         {
-            if (Inventory.CategoryOf(item.Id) != category) continue;
+            if (InventoryTabs.TabOf(item.Id) != category) continue;
             entries.Add(new CatalogEntry(item.Id, item.Name, inventory.CountFor(item.Id)));
         }
         entries.Sort((a, b) =>

@@ -245,7 +245,9 @@ claims the click; the server does the placing and lifting.
 The **lantern** (`lantern: true`) is a block item carried as an individual Tools instance. It crafts from
 six copper rings and four glass panes. It hangs under a ceiling (historical state 0) or stands on the floor
 (state bit 0 set); `Placement.TryMount` records the chosen support and every `BlockSupport` pop path honors it.
-It is non-solid and has no unconditional block emission: only a fuelled held or loaded placed lantern contributes
+It is stored as an instance in the Tools pool (it carries its own fuel) but listed in the panel's Blocks tab: a tab is
+`Item.TabCategory` read through `InventoryTabs`, separate from the pool, so moving an item between tabs changes that one
+property and no storage, save or wire code. It is non-solid and has no unconditional block emission: only a fuelled held or loaded placed lantern contributes
 to the existing warm dynamic point lights. The model crops a cage, lid and chain from one opaque tile; its held
 transform keeps it upright below the raised hand. `HangingBlockTests`, `LanternTests` and
 `visual-examples/held-lanterns.json` cover support, progression and visuals (`VOXEL_TIME=700`).

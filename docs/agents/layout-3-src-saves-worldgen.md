@@ -265,7 +265,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   immutable, sorted, empty metals dropped; the last charged input
         CrucibleMetal.cs       # one metal in a crucible: material id, molten ml, pending ml
         CraftingSession.cs     # the crafting tab's open recipe, copies and fed reservations
-        CreativeCatalog.cs     # GL-free browsable catalog of every item, grouped by pool and name-sorted
+        CreativeCatalog.cs     # GL-free browsable catalog of every item, grouped by tab and name-sorted
+        InventoryTabs.cs       # GL-free: which panel tab lists an id (TabOf) and what a tab lists (Entries: stacks and instances together), apart from the storage pool
         HotbarLayout.cs        # hotbar strip geometry shared by the draw, its hit-test and the panel
         HotbarSlot.cs          # one hotbar slot: a stackable id or a tool instance (the default is empty)
         HandScope.cs           # using-scope that points Inventory's Selected* readers at the offhand while a use runs

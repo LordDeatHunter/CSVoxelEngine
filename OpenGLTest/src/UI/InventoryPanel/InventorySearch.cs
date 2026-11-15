@@ -16,7 +16,7 @@ public enum SearchHitKind
 }
 
 /// <summary>
-/// One row the inventory's search field offers. Inventory hits carry the id's pool category,
+/// One row the inventory's search field offers. Inventory hits carry the id's tab (<see cref="InventoryTabs.TabOf"/>),
 /// its stock count and, for a tool, the instance to equip; recipe hits carry the recipe the
 /// Craft tab should open. <see cref="Id"/> is the item/block id either way.
 /// </summary>
@@ -94,7 +94,7 @@ public static class InventorySearch
             owned.Add(tool.ItemId);
             if (!Matches(tool.Name, query)) continue;
             hits.Add(new SearchHit(SearchHitKind.Inventory, tool.ItemId, tool.Name,
-                InventoryCategory.Tools, tool.InstanceId, inventory.CountFor(tool.ItemId), null));
+                InventoryTabs.TabOf(tool.ItemId) ?? InventoryCategory.Tools, tool.InstanceId, inventory.CountFor(tool.ItemId), null));
         }
     }
 
@@ -126,7 +126,7 @@ public static class InventorySearch
     {
         foreach (var item in ItemRegistry.All)
         {
-            if (Inventory.CategoryOf(item.Id) is not { } category) continue;
+            if (InventoryTabs.TabOf(item.Id) is not { } category) continue;
             if (!owned.Add(item.Id)) continue;
             if (!Matches(item.Name, query)) continue;
             hits.Add(new SearchHit(SearchHitKind.Inventory, item.Id, item.Name, category, 0,
