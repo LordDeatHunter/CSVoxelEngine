@@ -742,6 +742,10 @@ float WaterGlitterAt(vec2 xz, vec3 nW, vec3 H, float t) {
 // Schlick fresnel with the water/wet-surface F0 of 0.06, shared by the ore path and the wet
 // sheen. GL-free twin: SurfaceFresnel.Schlick. The water surface keeps its own inline copies,
 // which carry the inside-view total-internal-reflection variants.
+// Ambient and sky-mirror share of a fragment: skylight itself, so a sealed room (fSun 0) gets no
+// daylight bounce and is lit by torch, point and emissive light alone (twin: SkyAmbient.Gate).
+float SkyGate(float sun) { return clamp(sun, 0.0, 1.0); }
+
 float Schlick(float cosT) {
     return 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
 }
@@ -828,7 +832,7 @@ void main() {
     // Hemispheric ambient: floors face the sky, while ceilings and overhangs see the warm,
     // darker bounce off the ground; side faces get the average of the two.
     vec3 hemi = mix(uGroundAmbient, uAmbient, 0.5 + 0.5 * N.y);
-    vec3 light = hemi * (0.12 + 0.88 * fSun) + max(sun, torch + pl);
+    vec3 light = hemi * SkyGate(fSun) + max(sun, torch + pl);
     // The reflective tiles (the ores) carry their own sheen, so the wet and rim terms skip them
     // rather than stacking a second fresnel on top. fLayer is flat: this resolves per quad.
     bool oreTile = !isWater && uMaterialCount > 0 && int(fLayer) < uMaterialCount
@@ -890,7 +894,7 @@ void main() {
             // flatten obsidian into a pale slab with no material left in it. Dimmed by skylight
             // so there is no sky to reflect underground.
             float F = Schlick(max(dot(Vm, Nm), 0.0));
-            vec3 skyColor = uFogColor * clamp(0.12 + 0.88 * fSun, 0.0, 1.0);
+            vec3 skyColor = uFogColor * SkyGate(fSun);
 
             // Metal is a dark body with a bright specular: the body pays for the highlight, so
             // the diffuse darkens by the same 0.6 it did before linear lighting. Easing that off
@@ -1025,7 +1029,7 @@ void main() {
         vec3 Vf = normalize(uCameraPos - fWorldPos);
         vec2 face = vec2(dot(fWorldPos, fTangent), dot(fWorldPos, fBitangent));
         fieldAlpha = ForcefieldAlpha(face, fWorldPos, dot(Vf, N), uTime, dist);
-        vec3 fieldLight = 0.5 * (uAmbient + uGroundAmbient) * (0.12 + 0.88 * fSun)
+        vec3 fieldLight = 0.5 * (uAmbient + uGroundAmbient) * SkyGate(fSun)
                         + max(uSunColor * (fSun * uSunIntensity * 0.5 * shadow), torch + pl);
         col = uForcefieldColor * fieldLight;
     }
@@ -1100,9 +1104,9 @@ void main() {
         // Near->Far band blends the two so the switch never pops; lava keeps its glow path
         // above regardless of distance.
         float fancy = 1.0 - smoothstep(uWaterFancyNear, uWaterFancyFar, dist);
-        vec3 waterLightCheap = uAmbient * (0.12 + 0.88 * fSun) + uSunColor * (uSunIntensity * fSun * shadow * 0.6)
+        vec3 waterLightCheap = uAmbient * SkyGate(fSun) + uSunColor * (uSunIntensity * fSun * shadow * 0.6)
                      + (torch + pl) * 0.6;
-        float skyDim = clamp(0.12 + 0.88 * fSun, 0.0, 1.0);
+        float skyDim = SkyGate(fSun);
         vec3 vCheap = normalize(uCameraPos - fWorldPos);
         float cosTcheap = max(dot(vCheap, N), 0.0);
         float fCheap = 0.06 + 0.94 * pow(1.0 - cosTcheap, 5.0);
@@ -1213,7 +1217,7 @@ void main() {
             }
         }
 
-        vec3 waterLight = uAmbient * (0.12 + 0.88 * fSun) + uSunColor * (uSunIntensity * fSun * shadow * 0.6)
+        vec3 waterLight = uAmbient * SkyGate(fSun) + uSunColor * (uSunIntensity * fSun * shadow * 0.6)
                           + (torch + pl) * 0.6;
         vec3 refr = behind * exp(-uWaterAbsorb * thickness)
                   + uWaterScatter * waterLight * (1.0 - exp(-0.1 * thickness));
@@ -1231,7 +1235,7 @@ void main() {
         }
         // No sky to mirror underground: dim the reflection (fallback or stale mirror
         // alike) by the voxel skylight, or sealed caves glow sky-blue in daytime.
-        refl *= skyDim;   // the cheap path's clamp(0.12 + 0.88 * fSun) above
+        refl *= skyDim;   // the cheap path's clampSkyGate(fSun) above
         // From behind the underside mirrors the water body below: a short screen-space march
         // down the reflected ray finds the seabed and what grows on it in the scene copy (already
         // lit and fogged, so it stays undimmed), and a miss is the open water, the fog color

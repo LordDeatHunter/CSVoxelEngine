@@ -430,6 +430,15 @@ outline holds steady at full and the crack overlay stays readable; the face high
 face of a beam: with both faces blended an alpha `a` read as `1-(1-a)^2` and the breath all but
 vanished. `SelectionPulseTests`, `visual-examples/selection-pulse.json` (`VOXEL_TIME=147`).
 
+**Sealed-room ambient.** Ambient is skylight bounce and nothing else: the world fragment scales the
+hemispheric ambient, the ore and water sky mirrors, the forcefield film and the falling-leaf light by
+`SkyGate(fSun)` (`fSun` itself, clamped), with no floor, so a fragment the sky does not reach (a sealed
+tower or cave, `fSun` 0) is lit by torch, point and emissive light alone and never changes with the
+clock. Before, a 12 % floor multiplied the day-varying `uAmbient`, so sealed rooms brightened by day.
+Outdoors and under real openings the gate is the baked skylight gradient, which still follows the clock.
+GL-free twin `SkyAmbient` (`SkyAmbientTests`: the composed color at `fSun` 0 is the local light for every
+day palette, and no shader keeps the old floor).
+
 **Leaf backlight.** A leaf-sway face (bit 5: canopy leaves and rooted plants; `test-vertex.glsl`
 hands the fragment the flag as the flat `fSwayFlag`, outside the guarded sway block) standing
 between the eye and the sun glows warm, as if lit through: the world fragment adds
