@@ -5,7 +5,7 @@ hinged lid and a latch) and differs only in its skin. For each variant this writ
   OpenGLTest/assets/textures/chests/chest_<variant>.png              the 128 x 128 skin the model's face UVs address
                                                                      (64 x 64 UV units, two texels per model pixel,
                                                                      the density of a block tile)
-  OpenGLTest/assets/textures/blocks/chest_<variant>_{front,side,top}.png   the 32 x 32 tiles of the static twin,
+  OpenGLTest/assets/textures/blocks/chest_<variant>_{front,back,left,right,top,bottom}.png   the 32 x 32 tiles of the static twin,
                                                                      models/block/chest.json (the inventory icon,
                                                                      the held block, drops and break particles),
                                                                      cut from the very faces the skin is built of
@@ -253,8 +253,8 @@ def skin(pal):
 
 
 def tiles(pal):
-    """The static twin's three tiles. models/block/chest.json crops each face out of its tile by the face's place
-    in the cell, so the lid lands on tile rows 2..6 and the base on rows 6..16 (in model pixels), one pixel in from
+    """The static twin's six tiles. models/block/chest.json crops each face out of its tile by the face's place
+    in the cell (the top and the bottom their 14 x 14 face, one pixel in), so the lid lands on tile rows 2..6 and the base on rows 6..16 (in model pixels), one pixel in from
     each side; the rest of a tile is trim, opaque so the tile never reads as a cutout."""
     painted = faces(pal)
     t = TEXELS
@@ -267,12 +267,22 @@ def tiles(pal):
     blit(front, painted["lid_front"], 1 * t, 2 * t)
     blit(front, painted["base_front"], 1 * t, 6 * t)
     blit(front, painted["latch_front"], 7 * t, 4 * t)
-    side = blank()
-    blit(side, painted["lid_left"], 1 * t, 2 * t)
-    blit(side, painted["base_left"], 1 * t, 6 * t)
+    out = {"front": front}
+    # Each side wears its own skin face (the back and the two walls are painted apart), so the static twin
+    # matches the world chest from every angle; "left" and "right" are the model's west and east walls.
+    for part, lid, base in (("back", "lid_back", "base_back"), ("left", "lid_left", "base_left"),
+                            ("right", "lid_right", "base_right")):
+        tile = blank()
+        blit(tile, painted[lid], 1 * t, 2 * t)
+        blit(tile, painted[base], 1 * t, 6 * t)
+        out[part] = tile
     top = blank()
     blit(top, painted["lid_top"], 1 * t, 1 * t)
-    return {"front": front, "side": side, "top": top}
+    out["top"] = top
+    bottom = blank()
+    blit(bottom, painted["base_bottom"], 1 * t, 1 * t)
+    out["bottom"] = bottom
+    return out
 
 
 # ---- PNG -----------------------------------------------------------------------------------------

@@ -3,7 +3,7 @@
   // Worldgen-only: it holds nothing until first opened or broken, then rolls the "ruin_surface" loot table from the hash of its cell
   // and the world seed. It is picked as a wooden chest and drops nothing but its contents.
   "name": "Weathered Chest",
-  "model": { "parent": "block/chest", "textures": { "front": "chest_ruin_surface_front", "side": "chest_ruin_surface_side", "top": "chest_ruin_surface_top" } },
+  "model": { "parent": "block/chest", "textures": { "front": "chest_ruin_surface_front", "back": "chest_ruin_surface_back", "left": "chest_ruin_surface_left", "right": "chest_ruin_surface_right", "bottom": "chest_ruin_surface_bottom", "top": "chest_ruin_surface_top" } },
   "facing": "horizontal",
   "facingFromLook": true,
   "hardness": 4,

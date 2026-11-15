@@ -1,7 +1,7 @@
 {
   // Iron Chest: a crafted 36-slot chest. Iron cannot be smelted yet, so it is plated with crushed iron (recipes/iron_chest.json). A chest block entity (ChestManager): right-click opens it, breaking it spills what it holds.
   "name": "Iron Chest",
-  "model": { "parent": "block/chest", "textures": { "front": "chest_iron_front", "side": "chest_iron_side", "top": "chest_iron_top" } },
+  "model": { "parent": "block/chest", "textures": { "front": "chest_iron_front", "back": "chest_iron_back", "left": "chest_iron_left", "right": "chest_iron_right", "bottom": "chest_iron_bottom", "top": "chest_iron_top" } },
   "facing": "horizontal",
   "facingFromLook": true,
   "hardness": 8,

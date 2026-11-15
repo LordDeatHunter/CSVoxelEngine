@@ -107,6 +107,21 @@ public sealed class ChestLidTests
     }
 
     [Fact]
+    public void EveryFaceOfAChestsStaticModelWearsItsOwnTile()
+    {
+        // The skin paints the back, both walls and the underside apart from the front and the lid, so the popped block
+        // (which draws the static model) only matches the chest at rest when each face has a tile of its own: one
+        // shared side tile made three faces show other planks, and the underside a frame it never had
+        foreach (var type in BlockType.ById.Where(t => t?.Chest != null))
+        {
+            var tiles = type!.BakedModel!.Quads.Select(q => q.Face).Distinct().ToArray();
+            Assert.Equal(6, tiles.Length);
+            var perFace = type.BakedModel.Quads.GroupBy(q => q.Face).Select(g => g.First().Tile).ToArray();
+            Assert.Equal(6, perFace.Distinct().Count());
+        }
+    }
+
+    [Fact]
     public void TheCloseClipStartsWhereTheOpenClipEnds()
     {
         // Or the lid would jump the moment the last viewer leaves

@@ -6,7 +6,7 @@
   // and the world seed. It is picked as a wooden chest and drops nothing but its contents. Placeholder art: the
   // underground ruin chest's skin and tiles.
   "name": "Tower Chest",
-  "model": { "parent": "block/chest", "textures": { "front": "chest_ruin_underground_front", "side": "chest_ruin_underground_side", "top": "chest_ruin_underground_top" } },
+  "model": { "parent": "block/chest", "textures": { "front": "chest_ruin_underground_front", "back": "chest_ruin_underground_back", "left": "chest_ruin_underground_left", "right": "chest_ruin_underground_right", "bottom": "chest_ruin_underground_bottom", "top": "chest_ruin_underground_top" } },
   "facing": "horizontal",
   "facingFromLook": true,
   "hardness": 4,
