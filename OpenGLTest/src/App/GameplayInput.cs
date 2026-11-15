@@ -87,11 +87,17 @@ internal sealed class GameplayInput
                               || QuestBook.IsOpen || Map.IsOpen;
 
     /// <summary>Whether the world holds still this frame: the pause menu is up, or (singleplayer only, a server keeps
-    /// ticking, and with <see cref="GameSettings.PauseInPanels"/> on) the [E] panel, quest book or map is open.</summary>
+    /// ticking, and with <see cref="GameSettings.PauseInPanels"/> on) the [E] panel, quest book or map is open. An open
+    /// chest panel only freezes the world once the lid has finished swinging open, so the lid animation and its sound
+    /// still play out.</summary>
     private bool SimulationFrozen(World w) =>
         pauseMenuView.IsOpen
         || (GameSettings.PauseInPanels && !w.IsClientMode
-            && (inventoryView.IsOpen || QuestBook.IsOpen || Map.IsOpen));
+            && (QuestBook.IsOpen || Map.IsOpen || (inventoryView.IsOpen && ChestSettled(w))));
+
+    // True unless the panel is a chest whose lid is still opening (a lantern panel has no lid)
+    private static bool ChestSettled(World w) =>
+        w.ChestPanel.OpenCell is not { } c || w.ChestLids.IsFullyOpen(c.X, c.Y, c.Z);
 
     /// <summary>Whether the HUD draws (F1).</summary>
     internal bool HudVisible => hudVisible;

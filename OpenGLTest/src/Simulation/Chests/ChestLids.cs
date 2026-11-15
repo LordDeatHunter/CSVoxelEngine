@@ -50,6 +50,15 @@ public sealed class ChestLids(AnimationClip open, AnimationClip close, Animation
     /// <summary>Whether the chest at the cell is open (has a viewer) as of the last <see cref="Update"/>.</summary>
     public bool IsOpen(int x, int y, int z) => _open.Contains((x, y, z));
 
+    /// <summary>Whether the chest at the cell is open and its open clip has played out (the lid rests wide open). False
+    /// while the lid is still swinging, or for a chest that is closed or closing.</summary>
+    public bool IsFullyOpen(int x, int y, int z)
+    {
+        var cell = (x, y, z);
+        return _open.Contains(cell)
+            && _motions.TryGetValue(cell, out var m) && m.Kind == Motion.Opening && m.Time >= open.Length;
+    }
+
     /// <summary>
     /// Rattles the chest at the cell, the way a locked chest answers a hand: the wobble clip, once. Ignored (false)
     /// while the chest is open or its lid is still moving, so it never cuts an open or a close short.
