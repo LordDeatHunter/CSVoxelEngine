@@ -113,6 +113,18 @@ public static class Mining
     public static float HitGapSeconds(Item? held, float attackFactor) =>
         HitGapSeconds(held) / MathF.Max(attackFactor, 0.05f);
 
+    /// <summary>Whether <paramref name="held"/> is a weapon: an item with its own attack pattern (sword, slice).
+    /// Only a weapon's punch pace is its own and scaled by the attack-speed stat; a tool or bare hand punches
+    /// at <see cref="DefaultHitGapMs"/>, however fast it mines.</summary>
+    public static bool IsWeapon(Item? held) => held != null && held.Attack != AttackPattern.Punch;
+
+    /// <summary>Seconds between punches: a weapon's own pace divided by <paramref name="attackFactor"/> (status
+    /// effects and the attack-speed stat), anything else the default pace divided by <paramref name="effectFactor"/>
+    /// alone.</summary>
+    public static float PunchGapSeconds(Item? held, float effectFactor, float attackSpeedFactor = 1f) =>
+        (IsWeapon(held) ? HitGapMs(held) : DefaultHitGapMs) / 1000f
+        / MathF.Max(effectFactor * (IsWeapon(held) ? attackSpeedFactor : 1f), 0.05f);
+
     /// <summary>Milliseconds between punches for the held item; a bare hand or an item with no declared
     /// <c>hitDelayMs</c> uses <see cref="DefaultHitGapMs"/>.</summary>
     public static float HitGapMs(Item? held) => held?.HitDelayMs ?? DefaultHitGapMs;
