@@ -265,12 +265,18 @@ internal sealed class PlayerPhysics
             accelRate = SwimGlideDrag;
             wish = Vector2.Zero;
             _swimStrokeTimer += deltaTime;
-            // In shallow water Space swims straight up at once, no stroke to wait for
+            // In shallow water Space swims straight up at once, no stroke to wait for, and the WASD
+            // direction paddles steadily too, so a ledge ahead is pushed against and climbed out at once
             shallowRise = !_diving && keyboard.IsKeyPressed(Key.Space)
                           && PlayerBodyProbe.GroundedWithin(camera.Position, PlayerConfig.ShallowSwimDepth, chunkManager);
+            if (shallowRise)
+            {
+                accelRate = AirAccelRate;
+                wish = new Vector2(moveInput.X * moveSpeed, moveInput.Z * moveSpeed);
+            }
             var strokeUp = keyboard.IsKeyPressed(Key.Space) && !shallowRise;
             var strokeDown = keyboard.IsKeyPressed(Key.ControlLeft);
-            if (_swimStrokeTimer >= SwimStrokeSeconds && (moving || strokeUp || strokeDown))
+            if (!shallowRise && _swimStrokeTimer >= SwimStrokeSeconds && (moving || strokeUp || strokeDown))
             {
                 _swimStrokeTimer = 0f;
                 SwimStrokeCount++;

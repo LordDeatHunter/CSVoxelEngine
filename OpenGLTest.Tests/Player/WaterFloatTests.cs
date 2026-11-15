@@ -196,4 +196,22 @@ public sealed class WaterFloatTests
             $"hopped up to feet {top}");
         Assert.Equal(0, camera.SwimStrokeCount);
     }
+
+    [Fact]
+    public void HoldingSpaceAndForwardClimbsOntoAOneDeepLedgeFromTwoDeepWaterAtOnce()
+    {
+        // Two-deep water for x < 10, then a ledge one block higher with one-deep water on it
+        var world = MobTestWorld.Pool(2);
+        var ledge = ContentRegistry.RequireBlock("stone").Id;
+        for (var x = 10; x < Chunk.Size; x++)
+            for (var z = 0; z < Chunk.Size; z++)
+                world.Chunks[Vector3.Zero].SetBlockRaw(x, 1, z, ledge, 0);
+        var camera = BodyAt(1f, x: 7.5f);
+        var keys = new ScriptedKeyboard();
+        keys.Press([Key.W, Key.Space]);
+        Run(camera, world, keys, 2.5f);
+
+        Assert.Equal(0, camera.SwimStrokeCount);
+        Assert.True(camera.Position.X > 10.2f, $"still at x {camera.Position.X}");
+    }
 }
