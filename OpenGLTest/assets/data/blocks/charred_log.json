@@ -8,6 +8,8 @@
   },
   "hardness": 12,
   "renderer": "tree_wood",
+  // Placed lying along the look, or upright when looking steeply up or down
+  "axisFromLook": true,
   "sfx": "hit_wood",
   "requiresTool": true,
   "tools": { "axe": 1 },

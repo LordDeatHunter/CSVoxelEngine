@@ -10,6 +10,8 @@
     "textures": { "side": "spruce_log_side", "inner": "hollow_spruce_log_inner", "end": "hollow_spruce_log_end" }
   },
   "facing": "horizontal",
+  // Placed lying along the look, or upright when looking steeply up or down
+  "axisFromLook": true,
   // Half of spruce_log's full-cube 24, so it mines in half the time
   "hardness": 12,
   "requiresTool": true,

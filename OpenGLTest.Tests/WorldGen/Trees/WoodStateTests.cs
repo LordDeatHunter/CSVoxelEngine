@@ -18,7 +18,10 @@ public sealed class WoodStateTests
             Assert.Equal(parent, WoodState.Parent(s));
             Assert.Equal(shell, WoodState.IsShell(s));
             Assert.Equal(thickness + 1, WoodState.DiameterPx(s));
-            Assert.Equal(thickness == WoodState.MaxThickness, WoodState.IsFullCube(s));
+            // A detached cell may be a log lying on its side, whose axis rides in the thickness code but is still a whole cube
+            var lying = parent == WoodState.ParentDetached
+                && thickness is WoodState.LyingXThickness or WoodState.LyingZThickness;
+            Assert.Equal(thickness == WoodState.MaxThickness || lying, WoodState.IsFullCube(s));
             Assert.Equal(parent == WoodState.ParentRoot, WoodState.IsRoot(s));
             Assert.Equal(parent == WoodState.ParentDetached, WoodState.IsDetached(s));
             Assert.Equal(!WoodState.IsRoot(s) && !WoodState.IsDetached(s), WoodState.HasParentCell(s));

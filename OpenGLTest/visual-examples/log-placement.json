@@ -1,0 +1,34 @@
+{
+  // A placed log takes its axis from the look: level looks lay it along the look (north/south along Z, east/west along
+  // X), a steep look up or down stands it upright; a hollow log does the same. Run from OpenGLTest/ with VOXEL_TIME=147
+  // VOXEL_SCRIPT=visual-examples/log-placement.json. The desert patch of alloy-furnace.json (sand at y 11): solid
+  // logs placed looking north, east and straight down in the near row, hollow ones in the far row.
+  "steps": [
+    {"op": "fly", "on": true},
+    {"op": "teleport", "pos": [157.5, 32, 283.5], "yaw": -90, "pitch": -39},
+    {"op": "wait", "seconds": 14},
+    {"op": "give", "block": "oak_log", "count": 3},
+    {"op": "teleport", "pos": [150.5, 13.5, 281.5], "yaw": -90, "pitch": -30},
+    {"op": "wait", "seconds": 0.4},
+    {"op": "place"},
+    {"op": "teleport", "pos": [154.5, 13.5, 281.5], "yaw": 0, "pitch": -30},
+    {"op": "wait", "seconds": 0.4},
+    {"op": "place"},
+    {"op": "teleport", "pos": [158.5, 13.5, 277.5], "yaw": -90, "pitch": -89},
+    {"op": "wait", "seconds": 0.4},
+    {"op": "place"},
+    {"op": "give", "block": "hollow_oak_log", "count": 3},
+    {"op": "teleport", "pos": [150.5, 13.5, 276.5], "yaw": -90, "pitch": -30},
+    {"op": "wait", "seconds": 0.4},
+    {"op": "place"},
+    {"op": "teleport", "pos": [154.5, 13.5, 276.5], "yaw": 0, "pitch": -30},
+    {"op": "wait", "seconds": 0.4},
+    {"op": "place"},
+    {"op": "teleport", "pos": [162.5, 13.5, 277.5], "yaw": -90, "pitch": -89},
+    {"op": "wait", "seconds": 0.4},
+    {"op": "place"},
+    {"op": "teleport", "pos": [157.5, 20, 288], "yaw": -90, "pitch": -35},
+    {"op": "wait", "seconds": 1.5},
+    {"op": "screenshot", "name": "logs", "hideHud": true}
+  ]
+}
