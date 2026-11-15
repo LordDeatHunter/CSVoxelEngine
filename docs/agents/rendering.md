@@ -433,17 +433,21 @@ vanished. `SelectionPulseTests`, `visual-examples/selection-pulse.json` (`VOXEL_
 **Sealed-room ambient.** Ambient is skylight bounce and nothing else: the world fragment scales the
 hemispheric ambient, the ore and water sky mirrors, the forcefield film and the falling-leaf light by
 `SkyGate(fSun)` (`fSun` itself, clamped), with no floor, so a fragment the sky does not reach (a sealed
-tower or cave, `fSun` 0) is lit by torch, point and emissive light alone and never changes with the
-clock. Before, a 12 % floor multiplied the day-varying `uAmbient`, so sealed rooms brightened by day.
+tower or cave, `fSun` 0) is lit by torch, point and emissive light alone: no sky or ambient term follows the solar
+clock (local lights keep their own variation, e.g. the block-light flicker). Before, a 12 % floor multiplied the day-varying `uAmbient`, so sealed rooms brightened by day.
 Outdoors and under real openings the gate is the baked skylight gradient, which still follows the clock.
 GL-free twin `SkyAmbient` (`SkyAmbientTests`: the composed color at `fSun` 0 is the local light for every
 day palette, and no shader keeps the old floor).
-Verified in-game with `visual-examples/sealed-room.json` (a 9x6x9 `tower_bricks` shell, `coversSky`, since a
-heightmap-seeded sun is not blocked by an ordinary placed roof): the interior's sampled skylight is 0 and the
+Verified in-game with `visual-examples/sealed-room.json` (a 9x6x9 `tower_bricks` shell, `coversSky`: by `ChunkLighting`'s seeding rule sun is seeded at every
+air cell at or above the terrain height unless a `coversSky` block covers it, so an ordinary roof does not
+seal a room above the heightmap; the scenario writes with `setblock`, the player placement path was not traced or run): the interior's sampled skylight is 0 and the
 unlit room reads mean RGB (0.35, 0.35, 0.37) at `VOXEL_TIME` 147 and 700 alike (before the fix a constant
 (4.9, 6.3, 10.6) glow); a torch lights it, and the outdoor control still follows the clock. In the tunnel of
-`sealed-ambient.json` the remaining noon/night difference is block-light flicker, which runs on the same
-clock as `VOXEL_TIME` (147 and 1347, the same sun, differ as much as 147 and 700), not a sky term.
+`sealed-ambient.json` the remaining noon/night difference is consistent with the block-light flicker (`FlickAt`/`BlockFlicker`,
+scaling `torch` on every fragment with block light, driven by `uTime` = the lighting clock including
+`VOXEL_TIME`): 147 and 1347 (the same sun) differ about as much as 147 and 700. That does not rule out other
+time-driven local terms (e.g. point-light flicker). Whole-frame means of the room shots include the
+selection highlight, so interior ROI numbers are in the evidence bundle instead.
 
 **Leaf backlight.** A leaf-sway face (bit 5: canopy leaves and rooted plants; `test-vertex.glsl`
 hands the fragment the flag as the flat `fSwayFlag`, outside the guarded sway block) standing

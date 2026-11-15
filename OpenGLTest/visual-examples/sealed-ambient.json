@@ -1,6 +1,7 @@
 // Sealed-room ambient check (SkyAmbient): the unlit cave tunnel of eye-adaptation.json, filmed once the eye has
 // adapted, plus an open-sky control. Run twice from OpenGLTest/, VOXEL_TIME=147 (noon) and VOXEL_TIME=700 (night),
-// baseline and fixed build: the cave shots must match between the two times once fixed, the outdoor ones must differ.
+// baseline and fixed build: the outdoor shots must differ. The cave shots carry glow mushrooms, whose block-light flicker follows the lighting clock,
+// so they need not match; sealed-room.json is the clean zero-skylight check.
 {
   "steps": [
     { "op": "wait", "seconds": 5 },

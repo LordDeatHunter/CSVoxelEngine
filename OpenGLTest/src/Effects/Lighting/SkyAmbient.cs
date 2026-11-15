@@ -7,7 +7,8 @@ namespace VoxelEngine.Effects.Lighting;
 /// GL-free twin of the shader's <c>SkyGate</c> and the hemispheric ambient term of
 /// <c>test-fragment.glsl</c>: ambient is skylight bounce, so it reaches a fragment exactly as far as
 /// the sky does (<c>fSun</c>). With no skylight there is no ambient at all — a sealed room is lit by
-/// torch, point and emissive light only, and never changes with the time of day.
+/// torch, point and emissive light only: the sky contributes nothing there, so no ambient term follows the solar
+/// clock. Local lights keep their own time variation (the block-light flicker runs on the lighting clock).
 /// </summary>
 public static class SkyAmbient
 {
