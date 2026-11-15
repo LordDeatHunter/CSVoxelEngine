@@ -128,6 +128,8 @@ public sealed class RemotePlayer
             case NetPlayerAction.SwordBackCut: Model.StartSword(SwordSwing.BackCut); break;
             case NetPlayerAction.SwordChop: Model.StartSword(SwordSwing.Chop); break;
             case NetPlayerAction.Throw: Model.ReleaseThrow(1f); break;
+            case NetPlayerAction.ThrowOffhand: Model.ReleaseThrow(1f, offhand: true); break;
+            case NetPlayerAction.PunchOffhand: Model.Punch(0f, offhand: true); break;
             case NetPlayerAction.Cast:
                 Model.Cast();
                 _castPending = true;

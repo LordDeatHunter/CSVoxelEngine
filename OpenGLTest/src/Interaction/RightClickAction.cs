@@ -125,15 +125,22 @@ internal sealed class RightClickAction
         // client's prediction and the server's replay all run this same chain, so they agree on the hand.
         if (_forcedHand is { } forced)
         {
+            LastUseOffhand = forced;
             using (player.Inventory.UseHand(forced))
                 return TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse);
         }
+        LastUseOffhand = false;
         if (TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse))
             return true;
         if (player.Inventory.Offhand.IsEmpty) return false;
+        LastUseOffhand = true;
         using (player.Inventory.UseHand(offhand: true))
             return TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse);
     }
+
+    /// <summary>Whether the newest <see cref="TryUseSelected(float, PlayerContext, out RightClickOutcome, bool, bool)"/>
+    /// ran in the offhand (it claimed the click, or no hand did and the offhand was the last tried).</summary>
+    internal bool LastUseOffhand { get; private set; }
 
     private bool TryUseHand(float maxDistance, PlayerContext player, out RightClickOutcome outcome,
         bool allowPlace, bool beginTimedUse)

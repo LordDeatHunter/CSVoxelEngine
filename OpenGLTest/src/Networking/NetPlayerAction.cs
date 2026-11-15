@@ -17,4 +17,9 @@ public enum NetPlayerAction : byte
     SwordChop = 7,
     /// <summary>A staff cast's gesture: the staff raised and thrust forward (PlayerModel.Cast).</summary>
     Cast = 8,
+    /// <summary>A throw released from the left hand: the same swing on the other arm (added without a bump, like
+    /// <see cref="Cast"/>: an older client plays nothing for an action it does not know).</summary>
+    ThrowOffhand = 9,
+    /// <summary>A right-click placement or use the left hand took: the jab on the other arm.</summary>
+    PunchOffhand = 10,
 }

@@ -844,7 +844,29 @@ public class World
     /// <summary>Places <paramref name="player"/>'s selected block against a face it can see (see
     /// <see cref="BlockPlacer.TryPlaceSelectedBlockAt"/>); public for the dedicated server.</summary>
     public bool TryPlaceSelectedBlockAt(PlayerContext player, Vector3 hitCell, Vector3 hitNormal) =>
-        Placer.TryPlaceSelectedBlockAt(player, hitCell, hitNormal);
+        TryPlaceSelectedBlockAt(player, hitCell, hitNormal, out _);
+
+    /// <summary>
+    /// <see cref="TryPlaceSelectedBlockAt(PlayerContext, Vector3, Vector3)"/> with the right-click's hand order: the main
+    /// hand's block, else the offhand's, the one a client's own click placed with.
+    /// <paramref name="offhand"/> says which hand placed.
+    /// </summary>
+    public bool TryPlaceSelectedBlockAt(PlayerContext player, Vector3 hitCell, Vector3 hitNormal, out bool offhand)
+    {
+        offhand = false;
+        if (Placer.TryPlaceSelectedBlockAt(player, hitCell, hitNormal)) return true;
+        if (player.Inventory.Offhand.IsEmpty) return false;
+        offhand = true;
+        using (player.Inventory.UseHand(offhand: true))
+            return Placer.TryPlaceSelectedBlockAt(player, hitCell, hitNormal);
+    }
+
+    /// <summary>Whether the last <see cref="TryUseSelected"/> ran in the offhand; public for the dedicated server.</summary>
+    public bool LastUseOffhand => RightClick.LastUseOffhand;
+
+    /// <summary>Whether a right-click throw of <paramref name="player"/>'s leaves the offhand (see
+    /// <see cref="ThrowAction.OffhandThrows"/>); public for the dedicated server.</summary>
+    public static bool ThrowIsOffhand(PlayerContext player) => ThrowAction.OffhandThrows(player.Inventory);
 
     /// <summary>Lands <paramref name="player"/>'s punch (see <see cref="LeftClickAction.PunchFor"/>); public
     /// for the dedicated server.</summary>

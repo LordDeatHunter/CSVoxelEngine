@@ -228,14 +228,15 @@ internal sealed class ThrowAction
         }
         _world.RaiseIntent(WorldIntent.Throw(Camera.Position, Camera.ViewDirection, charge01));
         Camera.NotifyPlayerAction();
-        Player.ReleaseThrow(charge01);
+        Player.ReleaseThrow(charge01, _throwOffhand);
         return true;
     }
 
-    /// <summary>Whether a right-click throw leaves the offhand: it does when the offhand holds a throwable, which
-    /// takes the throw before the main hand just as it takes every other right-click.</summary>
-    private static bool OffhandThrows(Inventory inventory) =>
-        inventory.OffhandCount > 0 && inventory.OffhandItem is { IsThrowable: true };
+    /// <summary>Whether a right-click throw leaves the offhand: it does when the offhand holds a throwable and the main
+    /// hand holds none, since the main hand takes every right-click it can use first.</summary>
+    internal static bool OffhandThrows(Inventory inventory) =>
+        inventory.OffhandCount > 0 && inventory.OffhandItem is { IsThrowable: true }
+        && !(inventory.SelectedCount > 0 && inventory.HeldItem is { IsThrowable: true });
 
     /// <summary>
     /// Launches one <paramref name="id"/> out of <paramref name="inventory"/>'s selected slot from

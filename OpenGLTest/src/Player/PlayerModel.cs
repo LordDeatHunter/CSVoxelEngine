@@ -666,8 +666,9 @@ public class PlayerModel
 
     public void CancelThrowCharge() => _throwCharge01 = null;
 
-    public void ReleaseThrow(float charge01)
+    public void ReleaseThrow(float charge01, bool offhand = false)
     {
+        _actionOffhand = offhand;
         _throwReleaseCharge = MathUtils.Clamp01(charge01);
         _throwCharge01 = null;
         _throwT = 0f;
