@@ -98,6 +98,7 @@ public sealed class LootTable
         PebbleFlintCount,
         PebbleObsidianCount,
         PileCount,
+        SnowLayers,
     }
 
     internal sealed class Entry
@@ -143,6 +144,10 @@ public sealed class LootTable
                 : PebbleGenerator.ObsidianCountWithState(context.X, context.Z, 0, 3),
             // Player-only piles never read the world: a bare block is one unit.
             RollProvider.PileCount => context.Count > 0 ? context.Count : 1,
+            // A natural snow cell drops its drawn depth, so mining a drift matches a player stack.
+            RollProvider.SnowLayers => context.Count > 0
+                ? context.Count
+                : Math.Max(1, SnowGenerator.DepthAt(context.X, context.Z, context.Y)),
             _ => RollRange.Sample(random),
         };
 

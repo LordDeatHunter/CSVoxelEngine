@@ -149,6 +149,7 @@ internal static class LootTableCompiler
                 "pebble_flint_count" => LootTable.RollProvider.PebbleFlintCount,
                 "pebble_obsidian_count" => LootTable.RollProvider.PebbleObsidianCount,
                 "pile_count" => LootTable.RollProvider.PileCount,
+                "snow_layers" => LootTable.RollProvider.SnowLayers,
                 _ => throw new InvalidOperationException(
                     $"Loot table '{path}' uses unknown roll provider '{providerName}'."),
             };
