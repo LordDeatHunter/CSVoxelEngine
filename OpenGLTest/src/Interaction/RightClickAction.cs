@@ -275,7 +275,7 @@ internal sealed class RightClickAction
         _useChargeSeconds = 0f;
         _useItemId = id;
         _useOffhand = holder.OffhandActive;
-        Player.StartUseCharge(item.UsePose);
+        Player.StartUseCharge(item.UsePose, holder.OffhandActive);
         return true;
     }
 

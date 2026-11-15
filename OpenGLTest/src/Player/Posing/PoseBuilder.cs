@@ -87,7 +87,7 @@ internal sealed class PoseBuilder
         // after the two are blended so a swing still plays while running or falling. The swim
         // stroke and the body mods (landing, crouch, flinch, sway) sit between the two.
         if (_model.AirBlend <= 0.001f)
-            return Finish(ground, pitchDeg);
+            return Finish(SwapArms(ground), pitchDeg);
 
         var rise = MathUtils.Clamp01(_model.AirVelocity / 11f);
         var fall = MathUtils.Clamp01(-_model.AirVelocity / 12f);
@@ -121,8 +121,14 @@ internal sealed class PoseBuilder
             MathUtils.Lerp(ground.RightElbow, air.RightElbow, t),
             MathUtils.Lerp(ground.TorsoPitch, air.TorsoPitch, t),
             MathUtils.Lerp(ground.Bob, 0f, t));
-        return Finish(blended, pitchDeg);
+        return Finish(SwapArms(blended), pitchDeg);
     }
+
+    // While the left arm acts, the acting arm is built in the right slot (every action is authored for it), so the
+    // two arms' idle joints trade places; BodyPartMatrices mirrors each slot back onto its own side.
+    private Pose SwapArms(in Pose pose) => !_model.ArmsSwapped ? pose
+        : new Pose(pose.LeftHip, pose.RightHip, pose.LeftKnee, pose.RightKnee, pose.RightShoulder, pose.LeftShoulder,
+            pose.RightElbow, pose.LeftElbow, pose.TorsoPitch, pose.Bob);
 
     // Flight, then swim, then the body mods, the jab, the throw, the cast and the use over the base pose
     private Pose Finish(in Pose basePose, float pitchDeg) =>

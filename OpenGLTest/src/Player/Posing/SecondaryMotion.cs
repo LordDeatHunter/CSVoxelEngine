@@ -44,6 +44,8 @@ internal sealed class SecondaryMotion
             throwTwist = MathUtils.Lerp(-ThrowWindTwist * cocked, ThrowFollowTwist, strike) * settle;
         }
 
+        // The arm-driven twist and roll turn the other way while the left arm acts
+        var armSide = _model.ArmsSwapped ? -1f : 1f;
         var fall = _model.DeathFall;
         return new PoseMods
         {
@@ -55,11 +57,12 @@ internal sealed class SecondaryMotion
             TorsoPitch = -dip * 0.2f - crouch * 0.25f + _model.Flinch * 0.3f + throwLean - blade.Dip * 0.22f + blade.Lean
                          + _model.Bow.TorsoLean() + CastMotion.Lean(_model.CastProgress),
             Drop = dip * 0.12f + crouch * 0.17f + blade.Dip * 0.06f,
-            TorsoYaw = MathF.Sin(_model.WalkPhase) * 0.1f * move + blade.TorsoTwist + throwTwist + _model.Bow.TorsoTwist()
-                       - PunchPose.PunchTwist * PunchPose.PunchWeights(_model.MineT).Extend,
+            TorsoYaw = MathF.Sin(_model.WalkPhase) * 0.1f * move + blade.TorsoTwist
+                       + armSide * (throwTwist + _model.Bow.TorsoTwist()
+                                    - PunchPose.PunchTwist * PunchPose.PunchWeights(_model.MineT).Extend),
             // The body also leans a little toward whichever side its shoulders are being pulled out to.
             TorsoRoll = MathF.Cos(_model.WalkPhase) * 0.035f * move + blade.TorsoRoll + _model.Flinch * 0.08f
-                        - (_model.RightPullX + _model.LeftPullX) * 0.8f,
+                        - armSide * (_model.RightPullX + _model.LeftPullX) * 0.8f,
             HeadPitch = _model.Flinch * 0.45f - crouch * 0.1f,
             HeadYaw = _model.BodyYawLags && _model.LookKnown ? -MathUtils.ToRadians(PlayerModel.WrapDegrees(_model.LookYaw - _model.TrailingBodyYaw)) : 0f,
             // The whole body (legs included) tips toward the heading: forward when swimming ahead, back

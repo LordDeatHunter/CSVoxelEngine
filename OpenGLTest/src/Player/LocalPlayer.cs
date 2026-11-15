@@ -415,7 +415,7 @@ internal sealed class LocalPlayer
         }
         else
         {
-            Player.Punch(weight);
+            Player.Punch(weight, Inventory.OffhandActive);
         }
         Camera.PunchFov(-0.8f - 0.8f * weight);
         return weight;
@@ -424,7 +424,7 @@ internal sealed class LocalPlayer
     /// <summary>The staff cast's gesture: the staff raised and thrust forward, with a light view pinch.</summary>
     internal void CastSwing()
     {
-        Player.Cast();
+        Player.Cast(Inventory.OffhandActive);
         Camera.PunchFov(SpellConfig.CastFovKickDegrees);
     }
 

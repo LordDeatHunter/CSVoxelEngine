@@ -176,7 +176,7 @@ internal sealed class ThrowAction
         _throwChargeSeconds = 0f;
         _throwItemId = id;
         _throwBaseDamage = item.ThrowDamage ?? 0f;
-        Player.StartThrowCharge();
+        Player.StartThrowCharge(_throwOffhand);
         return true;
     }
 

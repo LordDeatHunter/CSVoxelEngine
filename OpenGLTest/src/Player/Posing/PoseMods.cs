@@ -17,4 +17,9 @@ internal readonly struct PoseMods
     public float RootYaw { get; init; }
     public float SwimRoll { get; init; }
     public float DeathPitch { get; init; }
+
+    /// <summary>These mods as the acting arm's slot sees them while the arms are swapped (see
+    /// <see cref="PlayerModel.ArmsSwapped"/>): the slot's poses are built for the right arm, and the left arm shows
+    /// them mirrored across the torso, so the torso's twist and roll read the other way round.</summary>
+    internal PoseMods Mirrored() => this with { TorsoYaw = -TorsoYaw, TorsoRoll = -TorsoRoll };
 }

@@ -162,6 +162,43 @@ public sealed class PlayerModelTests
     }
 
     [Fact]
+    public void AnOffhandActionAnimatesTheLeftArmAsTheMirrorOfTheMainHandOne()
+    {
+        PlayerModel Ready()
+        {
+            var model = new PlayerModel { HoldingItem = true, HoldingOffhand = true };
+            for (var i = 0; i < 120; i++)
+                model.Update(1f / 60f, 0f);
+            return model;
+        }
+
+        var main = Ready();
+        var off = Ready();
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        var back = PlayerModel.FirstPersonBodyBack;
+        Vector3 Fist(Matrix4x4 anchor) => Vector3.Transform(Vector3.Zero, anchor) - eye;
+
+        main.Punch();
+        off.Punch(offhand: true);
+        main.Update(PlayerModel.MineDuration * 0.4f, 0f);
+        off.Update(PlayerModel.MineDuration * 0.4f, 0f);
+
+        var acting = Fist(main.GetHandAnchorMatrix(eye, -90f, back));
+        var mirrored = Fist(off.GetOffhandAnchorMatrix(eye, -90f, back));
+        Assert.True(Vector3.Distance(new Vector3(-acting.X, acting.Y, acting.Z), mirrored) < 0.03f);
+
+        // The other arm does what the left arm does in a main-hand punch (its counter-swing), mirrored
+        var counter = Fist(main.GetOffhandAnchorMatrix(eye, -90f, back));
+        var other = Fist(off.GetHandAnchorMatrix(eye, -90f, back));
+        Assert.True(Vector3.Distance(new Vector3(-counter.X, counter.Y, counter.Z), other) < 0.03f);
+
+        // The swap ends with the action: the arms are back on their own sides
+        for (var i = 0; i < 90; i++)
+            off.Update(1f / 60f, 0f);
+        Assert.False(off.ArmsSwapped);
+    }
+
+    [Fact]
     public void PunchSwingsTheRightArmWhileAirborne()
     {
         var player = new PlayerModel();

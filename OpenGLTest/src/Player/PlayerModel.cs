@@ -112,6 +112,8 @@ public class PlayerModel
     private float _time;
     private float _holdBlend;
     private float _offhandBlend;
+    // Whether the swing, cast, throw or use that started last is the left hand's (a right-click the offhand took)
+    private bool _actionOffhand;
 
     // Secondary motion. Springs carry their own velocity so a landing, a hit or an item swap rings
     // out instead of easing: the landing dip (positive = body lowered), the hit flinch (positive =
@@ -220,6 +222,16 @@ public class PlayerModel
         Poses = new PoseBuilder(this);
         Matrices = new BodyPartMatrices(this);
     }
+
+    /// <summary>
+    /// Whether the left arm is the one animating: an action the offhand took (its right-click placement, use, cast,
+    /// throw or draw) is playing. The pose and the arm matrices are then built for the swapped arms (the acting arm in
+    /// the right slot with the offhand's carry, the other in the left) and the arm matrices mirrored back onto their
+    /// own sides, so every action animates the arm holding the item without a left-handed copy of any of them.
+    /// A blade swing is always the main hand's, so it ends the swap.
+    /// </summary>
+    internal bool ArmsSwapped => _actionOffhand && !IsSlicing && !IsSwordSwinging
+        && (_mineT < 1f || _castT < 1f || _throwT < 1f || _bowReleaseT < 1f || _useCharge01.HasValue || _throwCharge01.HasValue);
 
     /// <summary>Whether the right hand currently holds something; eases the carrying pose in and out.</summary>
     public bool HoldingItem { get; set; }
@@ -542,8 +554,9 @@ public class PlayerModel
     /// swing (bare hand, a quick tool) up to 1 for a heavy one (a slow tool): a heavy swing takes
     /// longer and leans the body harder into the blow.
     /// </summary>
-    public void Punch(float weight = 0f)
+    public void Punch(float weight = 0f, bool offhand = false)
     {
+        _actionOffhand = offhand;
         _mineWeight = MathUtils.Clamp01(weight);
         _mineSpeed = MathUtils.Lerp(1f, 0.7f, _mineWeight);
         _mineT = 0f;
@@ -557,6 +570,7 @@ public class PlayerModel
     /// </summary>
     public void StartSlice(int direction)
     {
+        _actionOffhand = false;
         _sliceDir = direction;
         _sliceT = 0f;
         _sliceStop.Reset();
@@ -570,6 +584,7 @@ public class PlayerModel
     /// </summary>
     public void StartSword(SwordSwing swing)
     {
+        _actionOffhand = false;
         _swordSwing = swing;
         _swordSeconds = SwordDuration(swing);
         _swordT = 0f;
@@ -591,13 +606,22 @@ public class PlayerModel
     public void StartAxeSplit() => StartSword(SwordSwing.AxeSplit);
 
     /// <summary>Starts the staff cast's gesture (<see cref="CastMotion"/>): the staff raised and thrust forward. Cosmetic.</summary>
-    public void Cast() => _castT = 0f;
+    public void Cast(bool offhand = false)
+    {
+        _actionOffhand = offhand;
+        _castT = 0f;
+    }
 
-    public void StartThrowCharge() => _throwCharge01 = 0f;
+    public void StartThrowCharge(bool offhand = false)
+    {
+        _actionOffhand = offhand;
+        _throwCharge01 = 0f;
+    }
 
     /// <summary>Starts the timed-use pose (see <see cref="VoxelEngine.Interaction.RightClickAction.TryBeginUseCharge()"/>).</summary>
-    public void StartUseCharge(UsePose pose = UsePose.Raise)
+    public void StartUseCharge(UsePose pose = UsePose.Raise, bool offhand = false)
     {
+        _actionOffhand = offhand;
         _usePose = pose;
         _useCharge01 = 0f;
         _bowReleaseT = 1f;
