@@ -7,7 +7,8 @@
 // then convert with `npm run shots` in wiki/.
 //
 // The lighting clock follows the wall clock, so each scenario is short enough (see the printed
-// budgets) to stay in daylight from its start time. Poses come from the existing scenarios
+// budgets) to stay within its intended lighting window; the night scenario starts in full night.
+// Poses come from the existing scenarios
 // (biomes.json, cold.json, terrain-shape.json, hell.json, barrier.json, sky-*.json, aurora.json, moon.json).
 import fs from 'node:fs'
 import path from 'node:path'
@@ -79,7 +80,7 @@ const SCENARIOS = [
     ['waystone_sky', 'A sky waystone', 'A frost-stone plaza under a crystal-keyed arch, on the island of a sky ruin.', 'waystone', [-145.1, 386.0, -50.1], 45, -12, 20],
     ['waystone_hell', 'A hell waystone', 'A basalt ring crowned with ember crystal, in the same hell layer as its ruin.', 'waystone', [-2601.5, -339.5, -422.5], 112, -23, 20]
   ]),
-  day('night', 700, 'The night sky.', [
+  day('night', 1494, 'The night sky.', [
     ['aurora', 'The aurora', 'Slow green and violet curtains in the night sky of cold lands.', 'night', [-1112.5, 40.5, 584.5], 270, 14, 24],
     ['aurora_up', 'The aurora overhead', 'Looking up into the curtains.', 'night', [-1112.5, 40.5, 584.5], 270, 40, 4],
     ['night_sky', 'Stars', 'The star field turns once a day; there is no aurora over the temperate lands.', 'night', [0.5, 140.5, 0.5], 270, 14, 20],

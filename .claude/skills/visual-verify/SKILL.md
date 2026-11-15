@@ -36,7 +36,7 @@ Start-Process OpenGLTest/bin/Release/net9.0/VoxelEngine.exe -WorkingDirectory Op
 | 147 | noon (default for most scenarios) |
 | 360 | water.json |
 | 440 | dusk |
-| 700 | night |
+| 1494 | night |
 
 ## Scenario ops
 `teleport`, `look`, `wait`, `walk`, `mine`, `place`, `fly`, `creative`, `give`, `spawn`, `grow`, `screenshot` (`hideHud` optional). Parsing is covered by `VisualScenarioTests`. Existing scenarios live in `OpenGLTest/visual-examples/` (basic, water, flow-water, ponds, lava, trees, goblins, grass-tint, ores, sky, clouds, cloud-shadows, linear-lighting, colored-lights, night-lights, lod-horizon, cold, biomes, particles, ...). **Extend or copy a matching one before writing a new one.**
