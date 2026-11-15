@@ -1,0 +1,15 @@
+// Sealed-room ambient check (SkyAmbient): the unlit cave tunnel of eye-adaptation.json, filmed once the eye has
+// adapted, plus an open-sky control. Run twice from OpenGLTest/, VOXEL_TIME=147 (noon) and VOXEL_TIME=700 (night),
+// baseline and fixed build: the cave shots must match between the two times once fixed, the outdoor ones must differ.
+{
+  "steps": [
+    { "op": "wait", "seconds": 5 },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [55.5, -11.5, -73.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "screenshot", "name": "cave_adapted", "hideHud": true },
+    { "op": "teleport", "pos": [0.5, 90.5, 0.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "outside", "hideHud": true }
+  ]
+}

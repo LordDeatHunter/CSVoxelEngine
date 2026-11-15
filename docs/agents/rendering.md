@@ -438,6 +438,11 @@ clock. Before, a 12 % floor multiplied the day-varying `uAmbient`, so sealed roo
 Outdoors and under real openings the gate is the baked skylight gradient, which still follows the clock.
 GL-free twin `SkyAmbient` (`SkyAmbientTests`: the composed color at `fSun` 0 is the local light for every
 day palette, and no shader keeps the old floor).
+Measured effect is small: in the unlit tunnel of `visual-examples/sealed-ambient.json` (`VOXEL_TIME` 147 and
+700) the fix lowers the noon mean red channel from 2.73 to 2.71 (night 3.31 to 3.23), matching a torch-only
+shading experiment (2.77). A night-over-noon difference of about 0.5 remains even with ambient and sun removed
+entirely, and exposure and eye skylight are identical at both times, so it comes from outside the diffuse
+term (distant fog or the post pass; not isolated).
 
 **Leaf backlight.** A leaf-sway face (bit 5: canopy leaves and rooted plants; `test-vertex.glsl`
 hands the fragment the flag as the flat `fSwayFlag`, outside the guarded sway block) standing

@@ -742,13 +742,13 @@ float WaterGlitterAt(vec2 xz, vec3 nW, vec3 H, float t) {
 // Schlick fresnel with the water/wet-surface F0 of 0.06, shared by the ore path and the wet
 // sheen. GL-free twin: SurfaceFresnel.Schlick. The water surface keeps its own inline copies,
 // which carry the inside-view total-internal-reflection variants.
-// Ambient and sky-mirror share of a fragment: skylight itself, so a sealed room (fSun 0) gets no
-// daylight bounce and is lit by torch, point and emissive light alone (twin: SkyAmbient.Gate).
-float SkyGate(float sun) { return clamp(sun, 0.0, 1.0); }
-
 float Schlick(float cosT) {
     return 0.06 + 0.94 * pow(1.0 - cosT, 5.0);
 }
+
+// Ambient and sky-mirror share of a fragment: skylight itself, so a sealed room (fSun 0) gets no
+// daylight bounce and is lit by torch, point and emissive light alone (twin: SkyAmbient.Gate).
+float SkyGate(float sun) { return clamp(sun, 0.0, 1.0); }
 
 void main() {
     // The reflection pass clips everything below the sea surface out of the mirror.
@@ -1235,7 +1235,7 @@ void main() {
         }
         // No sky to mirror underground: dim the reflection (fallback or stale mirror
         // alike) by the voxel skylight, or sealed caves glow sky-blue in daytime.
-        refl *= skyDim;   // the cheap path's clampSkyGate(fSun) above
+        refl *= skyDim;   // the cheap path's SkyGate(fSun) above
         // From behind the underside mirrors the water body below: a short screen-space march
         // down the reflected ray finds the seabed and what grows on it in the scene copy (already
         // lit and fogged, so it stays undimmed), and a miss is the open water, the fog color
