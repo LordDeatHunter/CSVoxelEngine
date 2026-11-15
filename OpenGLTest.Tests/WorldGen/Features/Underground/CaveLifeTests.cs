@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features.Underground;
 using Xunit;
@@ -131,6 +133,31 @@ public sealed class CaveLifeTests
 
         Assert.True(stalactites > 0, "no stalactite in the cave room");
         Assert.True(stalagmites > 0, "no stalagmite in the cave room");
+    }
+
+    [Theory]
+    [InlineData("stalagmite")]
+    [InlineData("stalactite")]
+    [InlineData("sandstone_stalagmite")]
+    [InlineData("sandstone_stalactite")]
+    [InlineData("frost_stone_stalagmite")]
+    [InlineData("frost_stone_stalactite")]
+    public void AFormationsHitboxesAreItsModelSegments(string name)
+    {
+        // The outline, the break overlay and the mining pop all draw the hitboxes, so a tapering point with one
+        // full-height slab for a hitbox pops as a column wearing the whole tile: every drawn vertex must sit
+        // inside a box, and no box may reach past the model.
+        var type = ContentRegistry.RequireBlock(name);
+        var quads = type.BakedModel!.Quads;
+        const float eps = 1e-4f;
+
+        Assert.True(type.Hitboxes.Length > 1, "a tapering formation needs a box per segment");
+        Assert.All(quads, quad => Assert.All(quad.Positions, p => Assert.Contains(type.Hitboxes, box =>
+            p.X >= box.Min.X - eps && p.X <= box.Max.X + eps
+            && p.Y >= box.Min.Y - eps && p.Y <= box.Max.Y + eps
+            && p.Z >= box.Min.Z - eps && p.Z <= box.Max.Z + eps)));
+        Assert.All(type.Hitboxes, box => Assert.Contains(quads.SelectMany(q => q.Positions), p =>
+            MathF.Abs(p.Y - box.Max.Y) < eps || MathF.Abs(p.Y - box.Min.Y) < eps));
     }
 
     [Fact]
