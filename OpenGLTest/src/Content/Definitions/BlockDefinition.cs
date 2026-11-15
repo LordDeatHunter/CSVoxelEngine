@@ -191,6 +191,14 @@ public sealed class BlockDefinition
     public bool? FacesViewer { get; set; }
 
     /// <summary>
+    /// A log's placement picks its axis from the player's look: looking steeply up or down stands it upright, a
+    /// shallower look lays it along the look's horizontal axis (<c>Placement.TryMount</c>). Only legal on tree wood
+    /// (a placed log's state byte holds the axis, <c>WoodState.LyingX</c>) and on a <c>facing: "horizontal"</c> block
+    /// authored along Z (a hollow log, which also bakes an upright shape). Omitted means false.
+    /// </summary>
+    public bool? AxisFromLook { get; set; }
+
+    /// <summary>
     /// Makes the block openable (a trapdoor, a door half): right-click flips the open bit in its
     /// state byte (<see cref="DoorState"/>) and the block is then drawn and hit with this object's
     /// <c>model</c> and <c>hitbox</c>, authored facing north like the closed ones. Only legal with

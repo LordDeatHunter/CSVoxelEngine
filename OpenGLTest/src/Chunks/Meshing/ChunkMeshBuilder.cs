@@ -477,9 +477,13 @@ internal static class ChunkMeshBuilder
             // byte's low two bits carry (see MultiblockShape), as does a facing block such as a
             // wall torch, turned about its own cell (see HorizontalFacing); an openable block also
             // reads its open bit (DoorState), picking one of its eight models.
-            var model = type.RotatedModels != null
-                ? type.RotatedModels[BlockType.ShapeIndex(paddedState[pIdx], type.RotatedModels.Length)]
-                : type.BakedModel;
+            // A placed log lying on its side draws its lying shape instead of the upright cube
+            var lyingAxis = type.LyingModels != null ? WoodState.LyingAxis(paddedState[pIdx]) : -1;
+            var model = lyingAxis >= 0
+                ? type.LyingModels![lyingAxis]
+                : type.RotatedModels != null
+                    ? type.RotatedModels[BlockType.ShapeIndex(paddedState[pIdx], type.RotatedModels.Length)]
+                    : type.BakedModel;
             if (model == null) continue;
 
             // A block with a flame (a torch) records the flame's exact chunk-local point, turned with

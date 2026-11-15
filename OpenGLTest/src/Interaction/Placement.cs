@@ -1,5 +1,8 @@
+using System;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Shapes;
+using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine.Interaction;
 
@@ -67,6 +70,12 @@ public static class Placement
         out ushort placedId, out byte placedState)
     {
         if (!TryMount(blockId, state, normal, fillsHitCell, out placedId, out placedState)) return false;
+        if (BlockType.ById[placedId] is { AxisFromLook: true } log)
+        {
+            placedState = LogState(log, viewDirection);
+            return true;
+        }
+
         if (BlockType.ById[placedId] is { FacingFromLook: true } type)
         {
             var facing = LookFacing(viewDirection);
@@ -75,6 +84,26 @@ public static class Placement
         }
         return true;
     }
+
+    /// <summary>
+    /// The state a log placed looking along <paramref name="viewDirection"/> starts with: upright when the look is steeper
+    /// than <see cref="PlayerConfig.UprightPlaceLookY"/> (a placed trunk's detached state, or bit 2 of a hollow log's
+    /// facing), otherwise lying along the look's horizontal axis (a trunk's <see cref="WoodState.LyingX"/> or
+    /// <see cref="WoodState.LyingZ"/>, a hollow log's facing, whose north and south run along Z).
+    /// </summary>
+    public static byte LogState(BlockType log, Vector3 viewDirection)
+    {
+        var direction = viewDirection.LengthSquared() > 0f ? Vector3.Normalize(viewDirection) : Vector3.UnitY;
+        var upright = MathF.Abs(direction.Y) > PlayerConfig.UprightPlaceLookY;
+        var facing = LookFacing(viewDirection);
+        if (log.Renderer == BlockRenderer.TreeWood)
+            return upright ? WoodState.Detached : facing < 2 ? WoodState.LyingZ : WoodState.LyingX;
+
+        return (byte)(upright ? UprightHollow : facing);
+    }
+
+    /// <summary>The state of a hollow log standing upright: bit 2 over a facing, picking one of its four upright shapes.</summary>
+    public const byte UprightHollow = 4;
 
     /// <summary>
     /// The horizontal facing a look along <paramref name="viewDirection"/> points at: the dominant

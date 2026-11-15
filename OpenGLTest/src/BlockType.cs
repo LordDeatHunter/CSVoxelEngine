@@ -480,6 +480,15 @@ public sealed record BlockType
     /// <summary>With <see cref="FacingFromLook"/>, the front faces the placing player rather than along the look (a chest).</summary>
     public bool FacesViewer { get; init; }
 
+    /// <summary>Whether a placement picks this log's axis from the placing player's look (<c>axisFromLook</c>): upright when
+    /// looking steeply up or down, otherwise lying along the look. See <see cref="Placement.TryMount(ushort, byte, System.Numerics.Vector3, bool, System.Numerics.Vector3, out ushort, out byte)"/>.</summary>
+    public bool AxisFromLook { get; init; }
+
+    /// <summary>For tree wood with <see cref="AxisFromLook"/>, the full-cube model of a placed log lying along X (index 0)
+    /// and along Z (index 1): the bark tile on the four sides with its grain along the axis, the end tile on the two
+    /// ends. Null otherwise. See <see cref="WoodState.LyingAxis"/>.</summary>
+    public BakedModel[]? LyingModels { get; internal set; }
+
     /// <summary>The <see cref="Hitboxes"/> turned to each horizontal facing, indexed like
     /// <see cref="RotatedModels"/>; null unless <see cref="HasHorizontalFacing"/>.</summary>
     public BlockHitbox[][]? RotatedHitboxes { get; internal set; }

@@ -175,6 +175,20 @@ internal static class BlockSchemaParser
     }
 
     /// <summary>
+    /// Reads a block's <c>axisFromLook</c>: it picks a log's axis, so it needs tree wood or a horizontal facing to
+    /// carry one.
+    /// </summary>
+    internal static bool ParseAxisFromLook(BlockDefinition definition, BlockRenderer renderer, bool horizontalFacing,
+        string path)
+    {
+        if (!(definition.AxisFromLook ?? false)) return false;
+        if (renderer != BlockRenderer.TreeWood && !horizontalFacing)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets axisFromLook without renderer \"tree_wood\" or facing: \"horizontal\"; it has no axis to turn.");
+        return true;
+    }
+
+    /// <summary>
     /// Reads a block's <c>open</c> object: its open boxes, or null for a block that does not open.
     /// The open bit shares the state byte with the facing, so an openable block needs one, and
     /// both the open model and the open boxes must be written.

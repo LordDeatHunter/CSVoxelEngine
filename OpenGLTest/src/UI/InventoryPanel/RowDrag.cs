@@ -10,7 +10,7 @@ namespace VoxelEngine.UI.InventoryPanel;
 /// input, and a chest row's drop out of the chest card takes the whole slot into the inventory. Until it lifts, the
 /// release is an ordinary click. GL-free.
 /// </summary>
-public sealed class RowDrag(ushort id, int toolInstance, Vector2 pressCanvas, int fromSlot = -1, int fromChestSlot = -1)
+public sealed class RowDrag(ushort id, int toolInstance, Vector2 pressCanvas, int fromSlot = -1, int fromChestSlot = -1, int fromEquipSlot = -1)
 {
     /// <summary>Canvas units the pointer must travel from the press before the row lifts.</summary>
     public const float LiftDistance = 6f;
@@ -26,6 +26,9 @@ public sealed class RowDrag(ushort id, int toolInstance, Vector2 pressCanvas, in
 
     /// <summary>The open chest's slot the drag began on, or -1 when it began elsewhere.</summary>
     public int FromChestSlot { get; } = fromChestSlot;
+
+    /// <summary>The equipment slot of the worn piece the drag began on, or -1 when it began elsewhere.</summary>
+    public int FromEquipSlot { get; } = fromEquipSlot;
 
     /// <summary>Whether the pointer has left the press: the release is a drop, not a click.</summary>
     public bool Lifted { get; private set; }

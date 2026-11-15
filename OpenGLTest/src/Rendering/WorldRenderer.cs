@@ -3,6 +3,7 @@ using System.Numerics;
 using Silk.NET.Windowing;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Entities;
@@ -428,6 +429,13 @@ internal sealed class WorldRenderer
         var type = BlockType.ById[blockId];
         // A stump's two stacked boxes would pop as one slab wearing its first quad's tile, so it pops as its model too
         if (type is { IsStump: true, BakedModel: { } stumpModel }) return stumpModel;
+        // A log lying on its side pops with its grain along the axis, not as an upright cube
+        if (type is { LyingModels: { } lying })
+        {
+            var logState = _chunkManager.GetStateGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
+            return WoodState.LyingAxis(logState) is var axis and >= 0 ? lying[axis] : null;
+        }
+
         if (type is not { HasHorizontalFacing: true, RotatedModels: { } models }) return null;
         var state = _chunkManager.GetStateGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
         return models[BlockType.ShapeIndex(state, models.Length)];

@@ -49,6 +49,31 @@ public static class WoodState
     /// <summary>State of player-placed wood: a full cube with no tree behind it.</summary>
     public static readonly byte Detached = Encode(FullCube, ParentDetached, false);
 
+    /// <summary>Thickness code a detached log lying along X carries (see <see cref="LyingAxis"/>).</summary>
+    public const int LyingXThickness = 14;
+
+    /// <summary>Thickness code a detached log lying along Z carries.</summary>
+    public const int LyingZThickness = 13;
+
+    /// <summary>State of a player-placed log lying along X: still a detached full cube, its axis in the thickness code
+    /// (a detached cell never reads its thickness as a girth).</summary>
+    public static readonly byte LyingX = Encode(LyingXThickness, ParentDetached, false);
+
+    /// <summary>State of a player-placed log lying along Z.</summary>
+    public static readonly byte LyingZ = Encode(LyingZThickness, ParentDetached, false);
+
+    /// <summary>The axis a detached log lies along: 0 for X, 1 for Z, -1 for upright (and for every tree cell).</summary>
+    public static int LyingAxis(byte state)
+    {
+        if (!IsDetached(state)) return -1;
+        return Thickness(state) switch
+        {
+            LyingXThickness => 0,
+            LyingZThickness => 1,
+            _ => -1,
+        };
+    }
+
     /// <summary>Packs the three fields; throws when a field is out of its range.</summary>
     public static byte Encode(int thickness, int parent, bool shell)
     {
@@ -78,8 +103,8 @@ public static class WoodState
     /// <summary>Whether the shell flag is set.</summary>
     public static bool IsShell(byte state) => (state & ShellBit) != 0;
 
-    /// <summary>Whether the cell is a whole 16 px cube.</summary>
-    public static bool IsFullCube(byte state) => Thickness(state) == FullCube;
+    /// <summary>Whether the cell is a whole 16 px cube (an upright full trunk, or a placed log lying on its side).</summary>
+    public static bool IsFullCube(byte state) => Thickness(state) == FullCube || LyingAxis(state) >= 0;
 
     /// <summary>Replaces the thickness code, leaving the other fields untouched.</summary>
     public static byte WithThickness(byte state, int thickness)

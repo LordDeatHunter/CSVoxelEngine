@@ -125,6 +125,7 @@ internal static class BlockLoader
             throw new InvalidOperationException($"{path}: crucibleStand requires a supported model block with hasItem false");
         var facingFromLook = BlockSchemaParser.ParseFacingFromLook(definition, horizontalFacing, supportAttached, path);
         var facesViewer = BlockSchemaParser.ParseFacesViewer(definition, facingFromLook, path);
+        var axisFromLook = BlockSchemaParser.ParseAxisFromLook(definition, renderer, horizontalFacing, path);
         var openHitboxes = BlockSchemaParser.ParseOpen(definition, horizontalFacing, path);
         var solid = !fluid && (definition.Solid ?? true);
         BlockFieldRules.ValidateStackSolidity(stack.StackSolidAt, solid, path);
@@ -205,6 +206,7 @@ internal static class BlockLoader
             HasHorizontalFacing = horizontalFacing,
             FacingFromLook = facingFromLook,
             FacesViewer = facesViewer,
+            AxisFromLook = axisFromLook,
             Openable = openHitboxes != null,
             ReplaceableByPlacement = replaceableByPlacement,
             Falls = falls,
@@ -224,7 +226,9 @@ internal static class BlockLoader
         };
         // A facing block's selection boxes turn with it, exactly like its model will in BakeModels
         if (horizontalFacing)
-            type.RotatedHitboxes = HorizontalFacing.RotateBoxes(type.Hitboxes);
+            type.RotatedHitboxes = axisFromLook
+                ? HorizontalFacing.WithUpright(HorizontalFacing.RotateBoxes(type.Hitboxes))
+                : HorizontalFacing.RotateBoxes(type.Hitboxes);
         // ...and an openable block's open boxes follow the closed ones (DoorState.ShapeIndex)
         if (openHitboxes != null)
         {

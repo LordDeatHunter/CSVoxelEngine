@@ -75,7 +75,7 @@ public static class Mining
         if (type == null) return 0f;
         if (type.Renderer != BlockRenderer.TreeWood) return type.Hardness;
 
-        var share = WoodState.Thickness(state) / (float)WoodState.FullCube;
+        var share = WoodState.IsFullCube(state) ? 1f : WoodState.Thickness(state) / (float)WoodState.FullCube;
         return type.Hardness * (type.TipHardness + (1f - type.TipHardness) * share);
     }
 
