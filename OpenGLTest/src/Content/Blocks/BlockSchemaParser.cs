@@ -175,16 +175,16 @@ internal static class BlockSchemaParser
     }
 
     /// <summary>
-    /// Reads a block's <c>axisFromLook</c>: it picks a log's axis, so it needs tree wood or a horizontal facing to
+    /// Reads a block's <c>axisFromFace</c>: it picks a log's axis, so it needs tree wood or a horizontal facing to
     /// carry one.
     /// </summary>
-    internal static bool ParseAxisFromLook(BlockDefinition definition, BlockRenderer renderer, bool horizontalFacing,
+    internal static bool ParseAxisFromFace(BlockDefinition definition, BlockRenderer renderer, bool horizontalFacing,
         string path)
     {
-        if (!(definition.AxisFromLook ?? false)) return false;
+        if (!(definition.AxisFromFace ?? false)) return false;
         if (renderer != BlockRenderer.TreeWood && !horizontalFacing)
             throw new InvalidOperationException(
-                $"Block '{path}' sets axisFromLook without renderer \"tree_wood\" or facing: \"horizontal\"; it has no axis to turn.");
+                $"Block '{path}' sets axisFromFace without renderer \"tree_wood\" or facing: \"horizontal\"; it has no axis to turn.");
         return true;
     }
 

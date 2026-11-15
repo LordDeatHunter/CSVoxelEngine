@@ -6,11 +6,6 @@ namespace VoxelEngine.Config;
 /// </summary>
 public static class PlayerConfig
 {
-    // --- Placement ---
-    // A log (or hollow log) placed looking steeper than this stands upright; shallower, it lies along the look.
-    // The vertical component of the unit view direction, sin 50 degrees.
-    public const float UprightPlaceLookY = 0.766f;
-
     // --- Mining ---
     // The block-breaking crack sprite (assets/textures/environment/break_progress.png) is a
     // vertical strip of this many square frames, top frame first and blank (0 % damage). The

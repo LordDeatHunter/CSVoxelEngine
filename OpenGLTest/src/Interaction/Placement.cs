@@ -70,9 +70,9 @@ public static class Placement
         out ushort placedId, out byte placedState)
     {
         if (!TryMount(blockId, state, normal, fillsHitCell, out placedId, out placedState)) return false;
-        if (BlockType.ById[placedId] is { AxisFromLook: true } log)
+        if (BlockType.ById[placedId] is { AxisFromFace: true } log)
         {
-            placedState = LogState(log, viewDirection);
+            placedState = LogState(log, normal);
             return true;
         }
 
@@ -86,16 +86,15 @@ public static class Placement
     }
 
     /// <summary>
-    /// The state a log placed looking along <paramref name="viewDirection"/> starts with: upright when the look is steeper
-    /// than <see cref="PlayerConfig.UprightPlaceLookY"/> (a placed trunk's detached state, or bit 2 of a hollow log's
-    /// facing), otherwise lying along the look's horizontal axis (a trunk's <see cref="WoodState.LyingX"/> or
-    /// <see cref="WoodState.LyingZ"/>, a hollow log's facing, whose north and south run along Z).
+    /// The state a log placed against a face with outward normal <paramref name="normal"/> starts with: a floor or ceiling
+    /// stands it upright (a trunk's detached state, or bit 2 of a hollow log's facing); a wall lays it along that wall's
+    /// normal, pointing out of the wall (a trunk's <see cref="WoodState.LyingX"/> or <see cref="WoodState.LyingZ"/>, a
+    /// hollow log's facing, whose north and south run along Z). The player's own facing never matters.
     /// </summary>
-    public static byte LogState(BlockType log, Vector3 viewDirection)
+    public static byte LogState(BlockType log, Vector3 normal)
     {
-        var direction = viewDirection.LengthSquared() > 0f ? Vector3.Normalize(viewDirection) : Vector3.UnitY;
-        var upright = MathF.Abs(direction.Y) > PlayerConfig.UprightPlaceLookY;
-        var facing = LookFacing(viewDirection);
+        var facing = HorizontalFacing.FacingOf(normal);
+        var upright = facing < 0;
         if (log.Renderer == BlockRenderer.TreeWood)
             return upright ? WoodState.Detached : facing < 2 ? WoodState.LyingZ : WoodState.LyingX;
 
