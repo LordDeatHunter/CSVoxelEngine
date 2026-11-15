@@ -92,6 +92,9 @@ public static class PlayerConfig
     // by the swim sink and rise speeds; the pair is near critically damped, so it settles without
     // bobbing through the surface.
     public const float WaterFloatRestShare = 0.7f;
+    // Ground within this many blocks under the feet makes the water shallow: Space then swims
+    // straight up at once instead of waiting for a stroke.
+    public const float ShallowSwimDepth = 2f;
     public const float FloatBuoyancy = 2.5f;
     public const float FloatSettleRate = 6.4f;
 

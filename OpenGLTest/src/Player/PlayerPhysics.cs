@@ -256,6 +256,7 @@ internal sealed class PlayerPhysics
         if (camera.IsInLava && !camera.IsFlying) moveSpeed *= PlayerConfig.LavaSpeedFactor;
         var wish = new Vector2(moveInput.X * moveSpeed, moveInput.Z * moveSpeed);
         float accelRate;
+        var shallowRise = false;
         if (camera.IsFlying)
             accelRate = FlyAccelRate;
         else if (swimming)
@@ -264,7 +265,10 @@ internal sealed class PlayerPhysics
             accelRate = SwimGlideDrag;
             wish = Vector2.Zero;
             _swimStrokeTimer += deltaTime;
-            var strokeUp = keyboard.IsKeyPressed(Key.Space);
+            // In shallow water Space swims straight up at once, no stroke to wait for
+            shallowRise = !_diving && keyboard.IsKeyPressed(Key.Space)
+                          && PlayerBodyProbe.GroundedWithin(camera.Position, PlayerConfig.ShallowSwimDepth, chunkManager);
+            var strokeUp = keyboard.IsKeyPressed(Key.Space) && !shallowRise;
             var strokeDown = keyboard.IsKeyPressed(Key.ControlLeft);
             if (_swimStrokeTimer >= SwimStrokeSeconds && (moving || strokeUp || strokeDown))
             {
@@ -349,6 +353,8 @@ internal sealed class PlayerPhysics
                         : MathF.Min(_verticalVelocity, _pendingSwimVertical);
                     _pendingSwimVertical = 0f;
                 }
+                if (shallowRise)
+                    _verticalVelocity = MathF.Max(_verticalVelocity, SwimUpSpeed);
                 _verticalVelocity = _diving
                     ? MathUtils.Damp(_verticalVelocity, SinkSpeed, SwimGlideDrag, deltaTime)
                     : MathUtils.Damp(_verticalVelocity, WaterImmersion.BuoyancySpeed(camera.ImmersionShare),

@@ -151,4 +151,31 @@ public sealed class WaterFloatTests
         Assert.True(peak - 1f > 0.9f * landJump, $"the wading jump rose {peak - 1f}, the land jump {landJump}");
         Assert.True(wader.IsGrounded);
     }
+
+    [Fact]
+    public void SpaceSwimsStraightUpInShallowWaterWithoutWaitingForAStroke()
+    {
+        var shallow = MobTestWorld.Pool(3);
+        var camera = BodyAt(1.5f);
+        var keys = new ScriptedKeyboard();
+        keys.Press([Key.Space]);
+        var start = Feet(camera);
+        Run(camera, shallow, keys, 0.4f, c => Assert.True(c.VerticalVelocity > 0f));
+
+        Assert.Equal(0, camera.SwimStrokeCount);
+        Assert.True(Feet(camera) > start + 0.5f, $"rose only {Feet(camera) - start}");
+    }
+
+    [Fact]
+    public void SpaceStillWaitsForTheStrokeTimerInDeepWater()
+    {
+        var deep = MobTestWorld.Pool(12);
+        var camera = BodyAt(6f);
+        var keys = new ScriptedKeyboard();
+        keys.Press([Key.Space]);
+        Run(camera, deep, keys, 0.5f);
+        Assert.Equal(1, camera.SwimStrokeCount);
+        Run(camera, deep, keys, 0.4f);
+        Assert.Equal(1, camera.SwimStrokeCount);
+    }
 }
