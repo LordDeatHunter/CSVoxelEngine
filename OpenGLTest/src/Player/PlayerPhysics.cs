@@ -353,7 +353,9 @@ internal sealed class PlayerPhysics
                         : MathF.Min(_verticalVelocity, _pendingSwimVertical);
                     _pendingSwimVertical = 0f;
                 }
-                if (shallowRise)
+                // Only while the body is still well under: at the surface the rise would lift it out and
+                // hop it along the top, so there Space does nothing (a bank is left through SwimExitBoost)
+                if (shallowRise && camera.ImmersionShare > PlayerConfig.WaterFloatRestShare + 0.05f)
                     _verticalVelocity = MathF.Max(_verticalVelocity, SwimUpSpeed);
                 _verticalVelocity = _diving
                     ? MathUtils.Damp(_verticalVelocity, SinkSpeed, SwimGlideDrag, deltaTime)

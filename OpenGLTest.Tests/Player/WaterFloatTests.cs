@@ -178,4 +178,22 @@ public sealed class WaterFloatTests
         Run(camera, deep, keys, 0.4f);
         Assert.Equal(1, camera.SwimStrokeCount);
     }
+
+    [Fact]
+    public void HoldingSpaceInShallowWaterNeverHopsAlongTheSurface()
+    {
+        var shallow = MobTestWorld.Pool(3);
+        var surface = 3f + FluidState.SourceHeight;
+        var camera = BodyAt(1.5f);
+        var keys = new ScriptedKeyboard();
+        keys.Press([Key.Space]);
+        Run(camera, shallow, keys, 1.5f);
+
+        // Settled at the float: no rise above it, and no strokes, however long Space is held
+        var top = Feet(camera);
+        Run(camera, shallow, keys, 3f, c => top = MathF.Max(top, Feet(c)));
+        Assert.True(top < surface - PlayerConfig.WaterFloatRestShare * PlayerPhysics.PlayerHeight + 0.15f,
+            $"hopped up to feet {top}");
+        Assert.Equal(0, camera.SwimStrokeCount);
+    }
 }
