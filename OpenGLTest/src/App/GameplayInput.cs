@@ -7,6 +7,7 @@ using VoxelEngine.Networking.Client;
 using VoxelEngine.Platform;
 using VoxelEngine.Rendering;
 using VoxelEngine.Simulation.Tower;
+using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
@@ -84,6 +85,13 @@ internal sealed class GameplayInput
     /// the quest book or the map screen is open.</summary>
     private bool PanelOpen => inventoryView.IsOpen || builderInput.IsOpen || waystoneInput.IsOpen || Forge.IsOpen
                               || QuestBook.IsOpen || Map.IsOpen;
+
+    /// <summary>Whether the world holds still this frame: the pause menu is up, or (singleplayer only, a server keeps
+    /// ticking, and with <see cref="GameSettings.PauseInPanels"/> on) the [E] panel, quest book or map is open.</summary>
+    private bool SimulationFrozen(World w) =>
+        pauseMenuView.IsOpen
+        || (GameSettings.PauseInPanels && !w.IsClientMode
+            && (inventoryView.IsOpen || QuestBook.IsOpen || Map.IsOpen));
 
     /// <summary>Whether the HUD draws (F1).</summary>
     internal bool HudVisible => hudVisible;
@@ -443,7 +451,7 @@ internal sealed class GameplayInput
         // The menu freezes the simulation: the world keeps rendering behind the overlay
         // but physics, chunks, fluids and mining all hold still until resume.
         // The update below times itself; the shell spans above and below stay outside it.
-        if (!pauseMenuView.IsOpen)
+        if (!SimulationFrozen(w))
         {
             // A focused text field owns the keyboard: pass no board so the camera cannot act on
             // the very keys being typed (E, C, Space, WASD) while the panel or chat is up.

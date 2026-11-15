@@ -48,7 +48,7 @@ public static class SettingsRows
     public const float FovMin = 60f;
     public const float FovMax = 100f;
 
-    public static readonly string[] Tabs = ["Display", "Graphics", "Water", "Audio", "Controls"];
+    public static readonly string[] Tabs = ["Display", "Graphics", "Water", "Audio", "Controls", "Gameplay"];
 
     /// <summary>The GUI Scale row's labels: Auto, then every <see cref="GameSettings.GuiScales"/> entry
     /// through <see cref="UiCanvas.FormatScale"/>, so the length is always 1 + GuiScales.Length.</summary>
@@ -109,6 +109,9 @@ public static class SettingsRows
             () => GameSettings.SprintToggle, v => GameSettings.SprintToggle = v),
         new SliderRow("Controls", "Field of View", FovMin, FovMax, 0, "deg",
             () => GameSettings.FieldOfView, v => GameSettings.FieldOfView = v),
+
+        new ToggleRow("Gameplay", "Pause in Inventory, Quests, Map",
+            () => GameSettings.PauseInPanels, v => GameSettings.PauseInPanels = v),
     ];
 
     /// <summary>Indexes into <see cref="All"/> of the rows on one tab, in draw order.</summary>
