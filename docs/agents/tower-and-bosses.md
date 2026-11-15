@@ -97,7 +97,7 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
 (the cave biome byte, CB-3) and 29 (the cave mobs, CB-4) came after it.
 - **Dark interiors (BT-10)**: the floors get no sun. The three palette bricks carry `coversSky`, so a mesh build over a
   tower chunk starts every sun seed above the slab over it ("Sky cover (BT-10)" under "Chunk meshing"); a floor is lit only
-  by its template lanterns and the torches a player brings, identically in singleplayer, on a server and on a client. The
+  by its template eternal lanterns (`eternal_lantern`: the lantern's model with a plain block emission, no fuel, no item, `unbreakable`, so only the collapse clears it, and `TowerRuin` turns it to air rather than rubble) and the torches a player brings, identically in singleplayer, on a server and on a client. The
   ruin's rubble does not cover, so the collapse's remesh lets the sun back in.
 - **The sealed roof**: the parapet stands `TowerParapetHeight` (4) over the roof slab, solid but for its merlon layer, and
   a forcefield dome closes it: `TowerDome` (GL-free, pure) is half a spheroid standing on that merlon layer, as wide as the

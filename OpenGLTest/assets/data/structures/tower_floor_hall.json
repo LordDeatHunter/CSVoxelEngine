@@ -12,7 +12,7 @@
     "P": "tower_bricks",
     "c": "cobblestone",
     "h": "cobblestone_slab",
-    "L": "lantern",
+    "L": "eternal_lantern",
     "S": "skeleton_pile",
     "C": { "block": "tower_chest", "facing": "south" },
     "D": { "block": "tower_chest", "facing": "north" }

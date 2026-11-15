@@ -73,7 +73,8 @@ public static class TowerRuin
         var top = StumpTop(s, ring, x, z);
         if (y > top) return AboveStump(s, ring, block, x, y, z);
         if (!BlockType.IsUnbreakable(block)) return StructureCell.None;
-        if (block == TowerPalette.DoorBlock || block == TowerPalette.PileBlock || block == TowerPalette.AltarBlock)
+        if (block == TowerPalette.DoorBlock || block == TowerPalette.PileBlock || block == TowerPalette.AltarBlock
+            || block == TowerPalette.EternalLanternBlock)
             return BlockType.Air;
         return Rubble(x, y, z);
     }

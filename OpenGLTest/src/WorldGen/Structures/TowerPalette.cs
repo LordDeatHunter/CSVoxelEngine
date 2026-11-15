@@ -24,7 +24,7 @@ public sealed record TowerPalette(ushort Brick, ushort Step)
         DoorBlock = ContentRegistry.RequireBlock("tower_door").Id;
         PileBlock = ContentRegistry.RequireBlock("skeleton_pile").Id;
         ChestBlock = ContentRegistry.RequireBlock("tower_chest").Id;
-        LanternBlock = ContentRegistry.RequireBlock("lantern").Id;
+        EternalLanternBlock = ContentRegistry.RequireBlock("eternal_lantern").Id;
         AltarBlock = ContentRegistry.RequireBlock("tower_altar").Id;
         ForcefieldBlock = ContentRegistry.RequireBlock("tower_forcefield").Id;
         Plain = new TowerPalette(DefaultBrick, step);
@@ -70,8 +70,11 @@ public sealed record TowerPalette(ushort Brick, ushort Step)
     /// </summary>
     internal static ushort ForcefieldBlock { get; }
 
-    /// <summary>The lantern hung in each floor's stairwell doorway, the same in every palette.</summary>
-    internal static ushort LanternBlock { get; }
+    /// <summary>
+    /// The fuel-free, unbreakable lantern hung in each floor's stairwell doorway and placed by the floor templates, the same
+    /// in every palette; the tower's collapse removes it with the rest.
+    /// </summary>
+    internal static ushort EternalLanternBlock { get; }
 
     /// <summary>Every palette, once each.</summary>
     internal static IReadOnlyList<TowerPalette> All { get; }
