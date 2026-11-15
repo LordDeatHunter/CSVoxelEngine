@@ -183,21 +183,14 @@ the entity pass draws it from the shared chest model with its lid as it stands (
 `ChunkRenderLists.ChestChunks` (`ChunkManager.ChestChunks`) lists the chunks with one, apart from `Renderable`, because a
 chunk holding nothing but a chest has no mesh at all.
 
-**Sky cover (BT-10).** The sun seeds of a light volume normally start at the column's terrain height, which a battle
-tower stands above (its heightmap must not be raised: the far LOD, water and spawns read it). A block flagged
-`coversSky` (the three tower bricks) closes that gap. `Chunk.MayHaveSkyCover` is a sticky flag that a chunk may hold
-one: the worldgen fill's `Finish` sets it for every generated chunk from the palette (`BlockType.ContainsSkyCover`
-over `ChunkBlocks.IdSpan`, a few ids instead of 4096 cells; a stale entry could only raise it), `ChunkRestore` sets it
-the same way on every restore (a save, an imported map, a client's streamed chunk) and `Chunk.SetBlockRaw` raises it when it writes a
-covering id; an edit never clears it. `ChunkMeshBuilder` passes `ChunkLighting.AnySkyCover` (any of the 27 resolved
-neighbors flagged) to `ComputeLight`, and only then does `RaiseSeedsUnderSkyCover` scan each volume column top-down and
-start its seeds one above the highest covering cell at or above the heightmap start. Every seed still enters at 15, so
-the pruned-seed flood stays exact, and the rule reads only the volume's blocks: singleplayer, a headless server and a
-client compute byte-identical light with no wire change. The tower's slabs are 7 apart and the light border 15, so every
-floor cell sees its slab inside its own volume. The collapse's light-radius remesh relights the ruin, whose rubble does
-not cover. A chunk with no flagged neighbor pays 27 field reads. Known gap: a room cell in the volume above a chunk
-whose slab lies past the volume's top still seeds sun, which can reach the chunk only down the helical stair, more than
-10 cells away. `TowerInteriorLightTests`, `LightFloodTests`, `ChunkSkyCoverTests`.
+**Sky cover.** Sun seeds start at each column's terrain height, which stays unchanged because far LOD, water and
+spawns read it. `ChunkLighting.RaiseSeedsUnderSkyCover` also scans each light-volume column from the top and moves its
+first seed above the highest block that does not pass light. Ordinary opaque roofs and generated overhangs therefore
+shade the cells below, including battle-tower interiors; glass, leaves, fluids and partial blocks still pass sky light.
+The scan uses the blocks already in the mesh snapshot, with no saved light or wire change. Placement and removal use
+the existing 15-block dirty radius to relight loaded chunks. The light volume extends only 15 cells beyond a chunk,
+so a roof above that ceiling can leave a tall room's lower chunk sunlit. An all-air chunk publishes no light snapshot,
+and missing corner neighbors temporarily read as air. `LightFloodTests`, `TowerInteriorLightTests`.
 
 **Biome-tinted grass and leaves.** Grass and every species' leaves (`oak_leaves`, `spruce_leaves`,
 `baobab_leaves`, `stone_pine_leaves`, all on the `foliage` palette) take their color from the

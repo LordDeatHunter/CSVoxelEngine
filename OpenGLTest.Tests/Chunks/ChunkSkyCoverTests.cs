@@ -6,7 +6,7 @@ using Xunit;
 namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
-/// The sticky per-chunk <see cref="Chunk.MayHaveSkyCover"/> flag the light flood's sky-cover rule is gated on: a raw
+/// The legacy sticky tower-brick marker, no longer a gate for the opaque-cover light rule: a raw
 /// write of a covering block raises it and no edit lowers it, a restore derives it from the snapshot's blocks alone (so a
 /// client's streamed copy agrees with the server), and worldgen raises it in a tower chunk but never in a plain one.
 /// </summary>

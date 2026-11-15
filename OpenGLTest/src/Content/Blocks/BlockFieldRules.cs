@@ -149,9 +149,8 @@ internal static class BlockFieldRules
     }
 
     /// <summary>
-    /// The <c>coversSky</c> flag. A covering block stops the sun seeds of every cell under it in a
-    /// light volume, so it must be an opaque, plain full cell: anything that passes light or is
-    /// drawn see-through would leave the cells under it visibly lit by the sky it claims to hide.
+    /// The legacy <c>coversSky</c> marker remains legal only on an opaque, plain full cell.
+    /// Actual sky cover follows the block's light-passing property for every block.
     /// </summary>
     internal static void ValidateCoversSky(BlockDefinition definition, BlockRenderer renderer, string path)
     {
