@@ -449,6 +449,15 @@ still follows the clock. In the tunnel of `sealed-ambient.json` the noon/night m
 where there is block light, driven by `uTime`, the lighting clock including `VOXEL_TIME`); other time-driven local terms were not
 ruled out. Whole-frame means of the room shots include the selection highlight, so the interior ROI numbers are in the evidence bundle.
 
+Limits of the sealed-room rule: it follows the baked skylight, so it only darkens what the light flood leaves at
+sky 0. A roof of ordinary blocks over open terrain keeps its sun seeds (only `coversSky` blocks cover them; `setblock` and
+`BlockPlacer` share `PlaceBlockAt`, so this is not a scenario artifact), and widening sky coverage was not part of this change. A
+fragment with partial skylight is now slightly darker than before, since the floor is gone. The sea-level planar mirror reads
+the sky, so a sealed fragment loses that local reflection, while local water and SSR still work. Distant fog and the local
+flicker can still follow the clock. `SkyAmbientTests` is arithmetic on the C# twin plus a literal source guard (brittle by design);
+the in-game evidence is a manual GPU A/B (`sealed-room.json`), not an automated GPU regression, and the twin is kept in step with
+the shader by hand.
+
 **Leaf backlight.** A leaf-sway face (bit 5: canopy leaves and rooted plants; `test-vertex.glsl`
 hands the fragment the flag as the flat `fSwayFlag`, outside the guarded sway block) standing
 between the eye and the sun glows warm, as if lit through: the world fragment adds
