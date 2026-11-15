@@ -14,8 +14,6 @@
   "castsAO": false,
   "collidesByHitbox": true,
   "hitbox": { "min": [0.0625, 0, 0.0625], "max": [0.9375, 0.875, 0.9375] },
-  "hasItem": false,
-  "pickAs": "wooden_chest",
   "loot": "none",
   "chest": {
     "slots": 18,
