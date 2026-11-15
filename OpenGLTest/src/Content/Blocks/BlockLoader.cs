@@ -124,6 +124,7 @@ internal static class BlockLoader
             || definition.HasItem != false))
             throw new InvalidOperationException($"{path}: crucibleStand requires a supported model block with hasItem false");
         var facingFromLook = BlockSchemaParser.ParseFacingFromLook(definition, horizontalFacing, supportAttached, path);
+        var facesViewer = BlockSchemaParser.ParseFacesViewer(definition, facingFromLook, path);
         var openHitboxes = BlockSchemaParser.ParseOpen(definition, horizontalFacing, path);
         var solid = !fluid && (definition.Solid ?? true);
         BlockFieldRules.ValidateStackSolidity(stack.StackSolidAt, solid, path);
@@ -203,6 +204,7 @@ internal static class BlockLoader
             SupportAbove = supportAbove,
             HasHorizontalFacing = horizontalFacing,
             FacingFromLook = facingFromLook,
+            FacesViewer = facesViewer,
             Openable = openHitboxes != null,
             ReplaceableByPlacement = replaceableByPlacement,
             Falls = falls,

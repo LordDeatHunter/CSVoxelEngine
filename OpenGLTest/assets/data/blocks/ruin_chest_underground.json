@@ -9,6 +9,7 @@
   "model": { "parent": "block/chest", "textures": { "front": "chest_ruin_underground_front", "back": "chest_ruin_underground_back", "left": "chest_ruin_underground_left", "right": "chest_ruin_underground_right", "bottom": "chest_ruin_underground_bottom", "top": "chest_ruin_underground_top" } },
   "facing": "horizontal",
   "facingFromLook": true,
+  "facesViewer": true,
   "hardness": 4,
   "sfx": "hit_wood",
   "castsAO": false,

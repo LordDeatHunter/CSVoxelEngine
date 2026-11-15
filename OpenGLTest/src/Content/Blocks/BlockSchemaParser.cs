@@ -163,6 +163,18 @@ internal static class BlockSchemaParser
     }
 
     /// <summary>
+    /// Reads a block's <c>facesViewer</c>: it turns the look-derived facing a half turn, so it needs
+    /// <c>facingFromLook</c> to have a look facing to turn.
+    /// </summary>
+    internal static bool ParseFacesViewer(BlockDefinition definition, bool facingFromLook, string path)
+    {
+        if (!(definition.FacesViewer ?? false)) return false;
+        if (!facingFromLook)
+            throw new InvalidOperationException($"Block '{path}' sets facesViewer without facingFromLook.");
+        return true;
+    }
+
+    /// <summary>
     /// Reads a block's <c>open</c> object: its open boxes, or null for a block that does not open.
     /// The open bit shares the state byte with the facing, so an openable block needs one, and
     /// both the open model and the open boxes must be written.

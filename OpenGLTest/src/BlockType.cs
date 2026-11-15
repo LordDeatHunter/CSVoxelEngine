@@ -477,6 +477,9 @@ public sealed record BlockType
     /// placing player's horizontal look (stairs); see <see cref="Placement.LookFacing"/>.</summary>
     public bool FacingFromLook { get; init; }
 
+    /// <summary>With <see cref="FacingFromLook"/>, the front faces the placing player rather than along the look (a chest).</summary>
+    public bool FacesViewer { get; init; }
+
     /// <summary>The <see cref="Hitboxes"/> turned to each horizontal facing, indexed like
     /// <see cref="RotatedModels"/>; null unless <see cref="HasHorizontalFacing"/>.</summary>
     public BlockHitbox[][]? RotatedHitboxes { get; internal set; }

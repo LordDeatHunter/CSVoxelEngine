@@ -37,7 +37,7 @@ public sealed class StairTests : IDisposable
     }
 
     private static BlockType[] LookFaced() =>
-        BlockType.Types.Values.Where(t => t.FacingFromLook).ToArray();
+        BlockType.Types.Values.Where(t => t.FacingFromLook && !t.FacesViewer).ToArray();
 
     private static readonly Vector3[] HitNormals =
         [Vector3.UnitY, -Vector3.UnitZ, Vector3.UnitZ, -Vector3.UnitX, Vector3.UnitX];
@@ -92,6 +92,28 @@ public sealed class StairTests : IDisposable
             var top = stair.RotatedModels![state & 3].Quads.Where(q => q.Face == 4 && q.Positions.All(p => p.Y > 1f - 1e-4f));
             Assert.All(top, q => Assert.True(Vector3.Dot(q.Positions.Aggregate(Vector3.Add) / 4f - new Vector3(0.5f), look) > 0f));
         }
+    }
+
+    [Fact]
+    public void AViewerFacingBlockFacesBackAtItsPlacer()
+    {
+        var chests = BlockType.Types.Values.Where(t => t.FacesViewer).ToArray();
+        Assert.NotEmpty(chests);
+        for (var facing = 0; facing < 4; facing++)
+        {
+            // The player looks along the facing's axis, so the block's front points back along the opposite one
+            var look = Chunk.CubeFaces[facing].normal;
+            foreach (var chest in chests)
+            foreach (var normal in HitNormals)
+            {
+                Assert.True(Placement.TryMount(chest.Id, 0, normal, fillsHitCell: false, look, out _, out var state));
+                Assert.Equal(-look, Chunk.CubeFaces[state & 3].normal);
+            }
+        }
+
+        const string path = "data/blocks/x.json";
+        Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
+            BlockSchemaParser.ParseFacesViewer(new BlockDefinition { FacesViewer = true }, facingFromLook: false, path)).Message);
     }
 
     [Fact]

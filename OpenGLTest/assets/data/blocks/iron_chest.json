@@ -4,6 +4,7 @@
   "model": { "parent": "block/chest", "textures": { "front": "chest_iron_front", "back": "chest_iron_back", "left": "chest_iron_left", "right": "chest_iron_right", "bottom": "chest_iron_bottom", "top": "chest_iron_top" } },
   "facing": "horizontal",
   "facingFromLook": true,
+  "facesViewer": true,
   "hardness": 8,
   "sfx": "hit_rock",
   "castsAO": false,

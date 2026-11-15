@@ -6,6 +6,7 @@
   "model": { "parent": "block/chest", "textures": { "front": "chest_ruin_sky_front", "back": "chest_ruin_sky_back", "left": "chest_ruin_sky_left", "right": "chest_ruin_sky_right", "bottom": "chest_ruin_sky_bottom", "top": "chest_ruin_sky_top" } },
   "facing": "horizontal",
   "facingFromLook": true,
+  "facesViewer": true,
   "hardness": 6,
   "sfx": "hit_rock",
   "castsAO": false,

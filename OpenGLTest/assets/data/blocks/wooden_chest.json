@@ -4,6 +4,7 @@
   "model": { "parent": "block/chest", "textures": { "front": "chest_wooden_front", "back": "chest_wooden_back", "left": "chest_wooden_left", "right": "chest_wooden_right", "bottom": "chest_wooden_bottom", "top": "chest_wooden_top" } },
   "facing": "horizontal",
   "facingFromLook": true,
+  "facesViewer": true,
   "hardness": 4,
   "sfx": "hit_wood",
   "castsAO": false,

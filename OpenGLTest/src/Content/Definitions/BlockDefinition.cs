@@ -184,6 +184,13 @@ public sealed class BlockDefinition
     public bool? FacingFromLook { get; set; }
 
     /// <summary>
+    /// With <c>facingFromLook</c>, the block's front turns toward the placing player (a chest: its latch faces the
+    /// one who placed it) instead of along the look, a half turn from it. Only legal with <c>facingFromLook</c>.
+    /// Omitted means false.
+    /// </summary>
+    public bool? FacesViewer { get; set; }
+
+    /// <summary>
     /// Makes the block openable (a trapdoor, a door half): right-click flips the open bit in its
     /// state byte (<see cref="DoorState"/>) and the block is then drawn and hit with this object's
     /// <c>model</c> and <c>hitbox</c>, authored facing north like the closed ones. Only legal with

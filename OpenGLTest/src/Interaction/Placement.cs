@@ -59,15 +59,20 @@ public static class Placement
     /// <summary>
     /// <see cref="TryMount(ushort, byte, Vector3, bool, out ushort, out byte)"/> for a placement made
     /// looking along <paramref name="viewDirection"/>: a placed block that takes its facing from the
-    /// look (<see cref="BlockType.FacingFromLook"/>, stairs) faces <see cref="LookFacing"/> of it,
+    /// look (<see cref="BlockType.FacingFromLook"/>, stairs) faces <see cref="LookFacing"/> of it (or back at the player
+    /// with <see cref="BlockType.FacesViewer"/>, a chest),
     /// whatever face was hit. Everything else mounts exactly as the overload without a look.
     /// </summary>
     public static bool TryMount(ushort blockId, byte state, Vector3 normal, bool fillsHitCell, Vector3 viewDirection,
         out ushort placedId, out byte placedState)
     {
         if (!TryMount(blockId, state, normal, fillsHitCell, out placedId, out placedState)) return false;
-        if (BlockType.ById[placedId] is { FacingFromLook: true })
-            placedState = (byte)LookFacing(viewDirection);
+        if (BlockType.ById[placedId] is { FacingFromLook: true } type)
+        {
+            var facing = LookFacing(viewDirection);
+            // Facings pair up north/south and west/east, so the half turn toward the player flips the low bit
+            placedState = (byte)(type.FacesViewer ? facing ^ 1 : facing);
+        }
         return true;
     }
 
