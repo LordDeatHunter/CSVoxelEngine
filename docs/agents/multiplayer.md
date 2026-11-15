@@ -739,7 +739,7 @@ and sunset, morning sits halfway between sunrise and noon),
 and `/locate` operator-only. A command acts through its source's `ICommandHost` and `ICommandPlayer`, so a definition
 never knows its side: singleplayer runs a line on `LocalCommandHost` and is the operator of its own world (creative
 is a keybind there anyway); a server runs a player's line (`ServerChat`) on `ServerCommandHost`, the player an
-operator while `MayBeCreative` holds, a teleport sending its client a correction, a mode change its status (creative
+operator when it is in the operator list (creative or not), a teleport sending its client a correction, a mode change its status (creative
 refused to a player who may not be creative there) and a time change the clock to everyone; a connected client sends
 every `/` line to the server and completes lines on `ClientCommandHost` (the names online), offering only what the
 operator bit in its `PlayerStatus` (`PlayerStatusData.Operator`, protocol 49) allows. `/locate` reads worldgen

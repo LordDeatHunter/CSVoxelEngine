@@ -40,7 +40,7 @@ internal sealed class PlayerSessions
         var player = new ServerPlayer(client.Id, client.Name, joinSpawn)
         {
             LastStateAt = _state.Elapsed,
-            IsOperator = _state.MayBeCreative(client.Name),
+            IsOperator = _state.IsOperator(client.Name),
         };
         // A returning player gets back their inventory and modes, and starts where they left
         var restored = player.Restore(ServerPlayerSaves.Load(_state.World.SaveStore, client.Name), _state.MayBeCreative(client.Name));

@@ -35,7 +35,7 @@ OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple 
   ServerBroadcasts.cs                 # the cell journal (BlockChanges), entities under stable ids,
                                       #   stations and the day clock
   ServerChat.cs                       # chat relay; a player's command line runs on GameCommands with operator
-                                      #   rights while MayBeCreative, its answers system lines to that player
+                                      #   rights when listed as an operator, its answers system lines to that player
   ServerCommandHost.cs                # the server's ICommandHost: the players online, the clock (broadcast),
                                       #   mobs, towers, announcements broadcast
   ServerCommandPlayer.cs              # a connected player's ICommandPlayer: a teleport corrects its client, a mode

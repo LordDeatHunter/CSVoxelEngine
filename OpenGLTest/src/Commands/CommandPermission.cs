@@ -3,7 +3,7 @@ namespace VoxelEngine.Commands;
 /// <summary>
 /// The rights a command node needs, ordered: a source may use a node whose permission is at most its own
 /// (<see cref="CommandSource.Allows"/>). Singleplayer is the operator of its own world; on a server a player is an
-/// operator while it may be creative there (<c>ServerState.MayBeCreative</c>).
+/// operator when it is in the server's operator list (<c>ServerState.IsOperator</c>), in any game mode.
 /// </summary>
 public enum CommandPermission : byte
 {

@@ -37,7 +37,7 @@ internal sealed class ServerChat
 
     /// <summary>
     /// Runs one command line for the player who sent it, on the same trees singleplayer uses: the player is an
-    /// operator while it may be creative here (<see cref="ServerState.MayBeCreative"/>), its <c>~</c> coordinates
+    /// operator when it is in the operator list (<see cref="ServerState.IsOperator"/>), its <c>~</c> coordinates
     /// and <c>/locate</c> search start where it stands (a client holds no seed), and every answer is a system line
     /// to it, apart from what a command announces to everyone.
     /// </summary>
@@ -45,7 +45,7 @@ internal sealed class ServerChat
     {
         if (!_state.Players.TryGetValue(client.Id, out var player)) return;
         var self = new ServerCommandPlayer(client, player, _state);
-        var permission = _state.MayBeCreative(player.Name) ? CommandPermission.Operator : CommandPermission.Everyone;
+        var permission = _state.IsOperator(player.Name) ? CommandPermission.Operator : CommandPermission.Everyone;
         _commands.Execute(line, new CommandSource(player.Name, permission, self.Feet, self, _host,
             (text, link) => SendSystem(client, text, link)));
         Log.WriteLine($"command: <{client.Name}> {line}");
