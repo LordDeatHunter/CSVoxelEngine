@@ -276,7 +276,7 @@ spawns, never past the hard cap), each carrying a torch, lit at night, and wande
 its wander goals are picked round the fire instead of where it stands) until one notices a player and the pack joins in.
 The anchor is not saved and the camp keeps no record: after a reload, or once the goblins despawn, the fire is just a
 campfire. The `goblincamp` scenario op pitches one at once (`MobDirector.PitchGoblinCamp`); `GoblinCampTests`;
-`visual-examples/goblin-camp.json` (`VOXEL_TIME=700`).
+`visual-examples/goblin-camp.json` (`VOXEL_TIME=1494`).
 
 Every mob shares three more hazards. **Fall damage**: `Mob.NoteLanding` bills `MobFallDamage.Damage`
 over the drop its impact speed implies — free up to `Mob.SafeFallBlocks` (plus a slime's own hop

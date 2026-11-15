@@ -1,5 +1,5 @@
 {
-  // Entity world-light check (SH-2): run with VOXEL_TIME=700 (night) and
+  // Entity world-light check (SH-2): run with VOXEL_TIME=1494 (night) and
   // VOXEL_SCRIPT=visual-examples/entity-light.json. Shots land in visual/entity-light/.
   //
   // Entity draws take the sun/block light of the cell they stand in (EntityLight.Sample through

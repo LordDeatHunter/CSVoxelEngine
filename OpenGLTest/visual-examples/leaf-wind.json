@@ -1,7 +1,7 @@
 {
   // Falling leaves carried by the wind (LeafParticle / LeafParticleSystem over Wind.cs): run twice
-  // from OpenGLTest/, with VOXEL_TIME=147 and VOXEL_TIME=1347. Shots land in visual/leaf-wind/.
-  // 1200 s apart the sun stands the same (one day cycle), while the wind, turning 0.15 degrees a
+  // from OpenGLTest/, with VOXEL_TIME=147 and VOXEL_TIME=2547. Shots land in visual/leaf-wind/.
+  // 2400 s apart (one day, SkyConfig.DayLengthSeconds) the sun stands the same (one day cycle), while the wind, turning 0.15 degrees a
   // second, has swung right round (180 degrees), so the two runs must show the leaf cloud streaming
   // off to opposite sides.
   // An oak is grown on an open grass patch at the desert's edge (ground top y 10 at x 154, z 136;

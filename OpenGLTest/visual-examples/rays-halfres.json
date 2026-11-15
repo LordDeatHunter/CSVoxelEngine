@@ -7,6 +7,9 @@
 //
 // Run from OpenGLTest/: VOXEL_TIME=360 VOXEL_SCRIPT=visual-examples/rays-halfres.json
 // Add VOXEL_DEBUG=1 for the profiler lines the closing hold exists to produce.
+// NOTE: the day is now SkyConfig.DayLengthSeconds = 2400 s (noon ~294, sunset ~894, midnight ~1494).
+// The times and sun arithmetic in this header were measured on the former 1200 s day and are kept as
+// the historical record; re-derive them (or use 1494 for night) before relying on them.
 // VOXEL_TIME=360 is not a free choice: the pass is gated off entirely when
 // wet * shadowStrength * dayness * WaterSunShafts <= 0.0005 (RenderManager.RenderUnderwaterRays),
 // and the sun angle is wall-clock driven (angle = (Window.Time + VOXEL_TIME)/1200*tau + 0.8,

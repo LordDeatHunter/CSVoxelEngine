@@ -1,5 +1,5 @@
 {
-  // Torch check: run with VOXEL_TIME=700 (night) and VOXEL_SCRIPT=visual-examples/torches.json.
+  // Torch check: run with VOXEL_TIME=1494 (night) and VOXEL_SCRIPT=visual-examples/torches.json.
   // Shots land in visual/torches/.
   //
   // Stands on a flat, bare patch of desert at (157, 283) (sand at y 11, so the feet are at 12; the

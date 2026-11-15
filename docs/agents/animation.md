@@ -359,7 +359,7 @@ overshoot or jiggle.
   `TorchFlameJitter` and the particle scale `TorchFlameScale`, both constructor parameters, the scale
   shrinking a `FireParticle`'s size, life, speed and sway), drawn after the lava batch. No point lights:
   the torch's own block light lights it (`TorchFlameTests`; `visual-examples/torches.json` at
-  `VOXEL_TIME=700` ends on close shots of a floor and a wall torch).
+  `VOXEL_TIME=1494` ends on close shots of a floor and a wall torch).
   `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
   these effects; its blasts use the scenario op `prime` (`{ "op": "prime", "pos": [x, y, z] }`,
   `WorldItemUse.PrimeTnt`), a firestarter strike on the TNT block in that cell that never misses, since

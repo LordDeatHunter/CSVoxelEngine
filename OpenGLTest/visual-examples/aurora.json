@@ -1,9 +1,9 @@
 // Aurora check (Aurora, AuroraCurtains in sky-fragment.glsl): slow green and violet curtains in the
 // night dome, seen only from cold lands. Run from OpenGLTest/ at night, copying visual/aurora/ aside
 // between runs:
-//   $env:VOXEL_SCRIPT='visual-examples/aurora.json'; $env:VOXEL_TIME='700'
+//   $env:VOXEL_SCRIPT='visual-examples/aurora.json'; $env:VOXEL_TIME='1494'
 //   bin/Release/net9.0/VoxelEngine.exe
-// Times: 700 night (the curtains), 147 noon (none, whatever the climate).
+// Times: 1494 night (the curtains), 147 high morning sun (none, whatever the climate).
 // The cold spot is snow-sparkle.json's barren frozen plain (-1112, 584), ground 18 (WorldSeed.Default).
 // The coldness at the eye is eased, so each arrival waits for it to settle; the last shot flies back
 // to the temperate origin, where the curtains have faded out.

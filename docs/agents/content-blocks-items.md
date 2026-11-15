@@ -246,7 +246,7 @@ six copper rings and four glass panes. It hangs under a ceiling (historical stat
 It is non-solid and has no unconditional block emission: only a fuelled held or loaded placed lantern contributes
 to the existing warm dynamic point lights. The model crops a cage, lid and chain from one opaque tile; its held
 transform keeps it upright below the raised hand. `HangingBlockTests`, `LanternTests` and
-`visual-examples/held-lanterns.json` cover support, progression and visuals (`VOXEL_TIME=700`).
+`visual-examples/held-lanterns.json` cover support, progression and visuals (`VOXEL_TIME=1494`).
 
 The **fence** (`oak_fence`, three from four planks and two sticks) is the `pane` renderer with
 its dimensions as block data: the `pane` object (schema table) becomes the block's `PaneProfile`

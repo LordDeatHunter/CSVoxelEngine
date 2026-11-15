@@ -31,12 +31,17 @@ Start-Process OpenGLTest/bin/Release/net9.0/VoxelEngine.exe -WorkingDirectory Op
 ## Env vars
 `VOXEL_SCRIPT` (scenario), `VOXEL_SPAWN=x,y,z`, `VOXEL_LOOK=yaw,pitch` (yaw 0 = +X, default -90 = -Z), `VOXEL_TIME=<s>` (added to the lighting clock), `VOXEL_DEBUG=1` (FPS + profiler lines in the log). SCRIPT/SPAWN/LOOK skip the menu and play a storeless world; TIME alone still boots to the menu.
 
+The day is `SkyConfig.DayLengthSeconds` = 2400 s and the sun's angle is `t / 2400 * tau + 0.8` (`DayCycle`), so on the lighting clock noon is ~294, sunset ~894, midnight ~1494 and sunrise ~2094. The lighting clock is the window time **plus** `VOXEL_TIME`, so a shot taken 50 s into a scenario is lit at `VOXEL_TIME + 50`; for short captures pick a time well inside the phase you want.
+
 | VOXEL_TIME | look |
 |---|---|
-| 147 | noon (default for most scenarios) |
-| 360 | water.json |
-| 440 | dusk |
-| 700 | night |
+| 147 | high morning sun, day (default for most scenarios; noon itself is ~294) |
+| 294 | noon |
+| 360 | afternoon, still high (water.json) |
+| 894 | sunset (the glow, dusk fog) |
+| 1494 | night (midnight; stars, moonlight) |
+
+Older scenario headers and docs quote times for the former 1200 s day (700 "night", 440 "dusk"): at 2400 s those are afternoon and early afternoon, so a night or dusk run needs 1494 or ~894 instead.
 
 ## Scenario ops
 `teleport`, `look`, `wait`, `walk`, `mine`, `place`, `fly`, `creative`, `give`, `spawn`, `grow`, `screenshot` (`hideHud` optional). Parsing is covered by `VisualScenarioTests`. Existing scenarios live in `OpenGLTest/visual-examples/` (basic, water, flow-water, ponds, lava, trees, goblins, grass-tint, ores, sky, clouds, cloud-shadows, linear-lighting, colored-lights, night-lights, lod-horizon, cold, biomes, particles, ...). **Extend or copy a matching one before writing a new one.**
