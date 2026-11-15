@@ -293,7 +293,8 @@ the instance even in creative, so it never duplicates its contents.
 The tooltip and the held/placed storage card above Search fuel read the same current burn fraction (empty at zero,
 full with Everfuel); stored reserves remain in the list. `lantern-followup.json` covers these card states and ground pickup.
 Held emissive blocks such as torches and active lanterns use `AmbientEffects.LightCells`, separate from flame
-particle emitters. Remote held id and light status come from the server's own inventory.
+particle emitters. Each is a `FireLight`: a held block takes its own `light.color` and `light.emission` (relative to a
+torch's 14), lanterns and fires the warm default. Remote held id and light status come from the server's own inventory.
 
 **Chest model and lid.** In the world a chest is no part of its chunk's mesh: the mesher records each chest cell
 (`ChunkMeshData.ChestCells` -> `Chunk.ChestCells`, the chunks holding one in `ChunkManager.ChestChunks`) and `ChestPasses`

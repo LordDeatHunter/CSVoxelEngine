@@ -89,12 +89,12 @@ public sealed class LanternManager
             if (Take(cell) is { } stack) drops.SpawnInstance(stack, new Vector3(cell.X + .5f, cell.Y + .5f, cell.Z + .5f));
     }
 
-    public void AppendLights(ChunkManager chunks, List<Vector3> fireCells)
+    public void AppendLights(ChunkManager chunks, List<Effects.Lighting.FireLight> lights)
     {
         foreach (var (cell, stack) in _placed)
             if (LanternState.Of(stack)!.HasFuel && chunks.TryGetCell(cell.X, cell.Y, cell.Z, out var id, out _)
                 && LanternState.IsLantern(id))
-                fireCells.Add(new Vector3(cell.X, cell.Y - .5f, cell.Z));
+                lights.Add(Effects.Lighting.FireLight.Warm(new Vector3(cell.X, cell.Y - .5f, cell.Z)));
     }
 
     /// <summary>Whether the item in either hand emits, derived solely from owned state.</summary>

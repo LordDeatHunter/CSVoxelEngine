@@ -152,7 +152,7 @@ internal sealed class FrameLighting
     // Point-light hues (sRGB-authored, decoded once); SetLighting scales them as linear intensities
     private static readonly Vector3 TntLightColor = ColorSpace.SrgbToLinear(new Vector3(1f, 0.45f, 0.15f));
     private static readonly Vector3 TntFlashColor = ColorSpace.SrgbToLinear(new Vector3(1f, 0.9f, 0.8f));
-    private static readonly Vector3 CampfireLightColor = ColorSpace.SrgbToLinear(new Vector3(1f, 0.5f, 0.15f));
+    internal static readonly Vector3 CampfireLightColor = ColorSpace.SrgbToLinear(new Vector3(1f, 0.5f, 0.15f));
     private double _prevTime;
     private float _underwaterT;
     private bool _eyeInLava;
@@ -244,7 +244,7 @@ internal sealed class FrameLighting
     /// toward (<see cref="CaveClimate"/>); plain, the default, leaves them as they were.
     /// </summary>
     internal void SetLighting(double time, Camera? camera, IReadOnlyList<PrimedTnt>? primed, bool underwater, bool eyeInLava,
-        IReadOnlyList<Vector3>? campfires = null, CaveBiome eyeCaveBiome = CaveBiome.Plain)
+        IReadOnlyList<FireLight>? campfires = null, CaveBiome eyeCaveBiome = CaveBiome.Plain)
     {
         // The window clock is the only time source this pass has; clamp the step so a hitch
         // (or the very first frame) cannot jump the fade
@@ -391,12 +391,12 @@ internal sealed class FrameLighting
         _fireLightStart = _pointCount;
         if (campfires != null)
         {
-            foreach (var cell in campfires)
+            foreach (var light in campfires)
             {
                 if (_pointCount >= LightingConfig.MaxPointLights) break;
-                var flicker = LightFlicker.Campfire(_time, LightFlicker.CellPhase(cell));
-                _pointPos[_pointCount] = cell + FireLightOffset;
-                _pointColors[_pointCount] = CampfireLightColor * (2.0f * flicker);
+                var flicker = LightFlicker.Campfire(_time, LightFlicker.CellPhase(light.Cell));
+                _pointPos[_pointCount] = light.Cell + FireLightOffset;
+                _pointColors[_pointCount] = light.Color * (2.0f * light.Strength * flicker);
                 _pointCount++;
             }
         }

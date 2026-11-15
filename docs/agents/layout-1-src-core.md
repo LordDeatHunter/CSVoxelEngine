@@ -409,6 +409,7 @@ OpenGLTest/
       Lighting/                # the block-light palette, its two-slot tint code and the campfire flicker
         BlockLightPalette.cs   # GL-free 8-slot block-light color palette (slot 0 = the default warm torch color)
         LightFlicker.cs        # GL-free per-cell flicker phase + curve for the campfire point lights
+        FireLight.cs           # one dynamic point light: cell, linear color, strength (a held block uses its own light.color and emission)
         LightTint.cs           # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
       Post/                    # the post pass and screen-space effects: tonemap, eye
                                #   adaptation, biome grade, contact AO, godrays, sun dazzle, lens flare, underwater wobble

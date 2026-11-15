@@ -390,7 +390,7 @@ public class World
     public IReadOnlyList<Mob> Mobs => _mobs;
 
     /// <summary>Warm dynamic lights, including active held items and placed lanterns.</summary>
-    public IReadOnlyList<Vector3> FireCells => Ambient.LightCells;
+    public IReadOnlyList<VoxelEngine.Effects.Lighting.FireLight> FireCells => Ambient.LightCells;
 
     /// <summary>
     /// Builds the world and starts its chunk-generation and LOD workers. With a
