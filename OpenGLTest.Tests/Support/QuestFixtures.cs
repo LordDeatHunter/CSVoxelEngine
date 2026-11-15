@@ -13,8 +13,19 @@ internal static class QuestFixtures
         params QuestGraphDefinition.RequirementDefinition[] requirements) =>
         new() { Id = id, Icon = "stone", Pos = [0, 0], Parents = parents, Requirements = [.. requirements] };
 
+    internal static QuestGraphDefinition.QuestDefinition AnyOfQuest(string id, string[]? parents,
+        params QuestGraphDefinition.RequirementDefinition[] requirements)
+    {
+        var quest = Quest(id, parents, requirements);
+        quest.AnyOf = true;
+        return quest;
+    }
+
     internal static QuestGraphDefinition.RequirementDefinition Obtain(string item, int count = 1) =>
         new() { Type = "obtain", Item = item, Count = count };
+
+    internal static QuestGraphDefinition.RequirementDefinition ObtainTag(string tag, int count = 1) =>
+        new() { Type = "obtain", Tag = tag, Count = count };
 
     internal static QuestGraphDefinition.RequirementDefinition Break(string block, int count = 1) =>
         new() { Type = "break", Block = block, Count = count };

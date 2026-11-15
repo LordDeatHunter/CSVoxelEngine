@@ -410,9 +410,11 @@ book; `survival`, `metalworks`, `adventure` ship), loaded last in `ContentRegist
 offset added to every node, so a graph moves as a unit) and its `quests`. A quest has an `id` (unique across every file;
 saves and the wire name a quest by it), `title`, `description`, `icon` (a block or item, `item/`/`block/` prefix allowed),
 `pos` (`[x, y]` grid steps), `parents` (quest ids, any file), `shape` (`hex` or `circle`; default hex for a quest with no
-parents, circle otherwise), `readable` (default true; false hides the requirement list until it is complete) and
-`requirements`, each `{ "type": obtain|craft|break|place|kill, "item"|"block"|"entity": name, "count": n }` (count default
-1). The loader refuses, naming the file, a duplicate or blank id, an unknown or repeated parent, a parent cycle, an unknown
+parents, circle otherwise), `readable` (default true; false hides the requirement list until it is complete), `anyOf` (default false; true completes the
+quest once any one requirement is met instead of all) and `requirements`, each `{ "type": obtain|craft|break|place|kill,
+"item"|"block"|"entity": name, "count": n }` (count default 1). An obtain or craft requirement may name a `tag` (a
+`data/tags` file, optional `label` for its display name) instead of an `item`: any member counts and an obtain sums the held
+counts across them (`copper_tin_casts` for the first-pour quest). The loader refuses, naming the file, a duplicate or blank id, an unknown or repeated parent, a parent cycle, an unknown
 icon, item, block or entity, a count below 1, a bad shape, type or position, and a quest with no requirements
 (`QuestLoaderTests`, which also proves every shipped quest can unlock).
 

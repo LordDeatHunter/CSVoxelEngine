@@ -11,6 +11,7 @@ internal static class QuestText
     public const string Complete = "Complete";
     public const string InProgress = "In progress";
     public const string Requirements = "Requirements";
+    public const string RequirementsAnyOf = "Requirements (any one)";
     public const string Equip = "EQUIP";
     public const string Unequip = "UNEQUIP";
     public const string Hidden = "The requirements are a secret until you complete it.";

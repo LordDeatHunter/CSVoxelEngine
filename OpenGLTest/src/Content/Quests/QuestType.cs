@@ -6,7 +6,7 @@ namespace VoxelEngine.Content.Quests;
 /// <summary>
 /// One compiled quest: its index in <see cref="QuestBook.Quests"/>, its id, text and icon, its absolute
 /// grid position in the quest book (the graph's origin already added), the indices of its parents (all
-/// of which must be complete before it unlocks) and children, and its requirements (all of which complete it).
+/// of which must be complete before it unlocks) and children, and its requirements (all of which complete it, or any one of them when <see cref="AnyOf"/>).
 /// </summary>
 public sealed class QuestType
 {
@@ -39,4 +39,7 @@ public sealed class QuestType
     public required IReadOnlyList<int> Children { get; init; }
 
     public required IReadOnlyList<QuestRequirement> Requirements { get; init; }
+
+    /// <summary>Whether meeting any one requirement completes the quest, instead of all of them.</summary>
+    public required bool AnyOf { get; init; }
 }
