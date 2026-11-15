@@ -121,21 +121,18 @@ internal sealed class RightClickAction
     internal bool TryUseSelected(float maxDistance, PlayerContext player, out RightClickOutcome outcome,
         bool allowPlace = true, bool beginTimedUse = false)
     {
-        // The offhand gets the click first; whatever it cannot use falls through to the main hand. Singleplayer, a
+        // The main hand gets the click first; whatever it cannot use falls through to the offhand. Singleplayer, a
         // client's prediction and the server's replay all run this same chain, so they agree on the hand.
         if (_forcedHand is { } forced)
         {
             using (player.Inventory.UseHand(forced))
                 return TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse);
         }
-        if (player.Inventory.Offhand.IsEmpty)
-            return TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse);
+        if (TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse))
+            return true;
+        if (player.Inventory.Offhand.IsEmpty) return false;
         using (player.Inventory.UseHand(offhand: true))
-        {
-            if (TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse))
-                return true;
-        }
-        return TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse);
+            return TryUseHand(maxDistance, player, out outcome, allowPlace, beginTimedUse);
     }
 
     private bool TryUseHand(float maxDistance, PlayerContext player, out RightClickOutcome outcome,
