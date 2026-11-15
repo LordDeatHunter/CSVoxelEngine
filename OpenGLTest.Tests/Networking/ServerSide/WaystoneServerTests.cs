@@ -290,6 +290,10 @@ public sealed class WaystoneServerTests : IDisposable
         var inbox = _inboxes[alice];
         BuildBeside(alice, Far);
         Assert.True(Activate(alice, Far));
+        Assert.True(Loaded(Far));
+        // Far is live, so no generation for its chunk can already be in flight. Arm before moving away; after the
+        // unload removes its queued key, every re-generation route must cross this source Fill gate.
+        _source.Arm();
         BuildBeside(alice, Home);
         Assert.True(Activate(alice, Home));
         TickUntil(() => !Loaded(Far), "the far waystone's chunk never unloaded");
@@ -299,7 +303,6 @@ public sealed class WaystoneServerTests : IDisposable
         // A zero-delta pump still streams asynchronously. Hold the exact destination chunk at the existing source seam
         // so the accepted result and mana packet are observed while arrival cells are provably still unloaded.
         Assert.Null(_world.SaveStore);
-        _source.Arm();
         try
         {
             Assert.True(Trip(alice, Far, dt: 0));
@@ -320,6 +323,8 @@ public sealed class WaystoneServerTests : IDisposable
             {
                 SendState(alice, EyeBeside(Home), ack: 0);
                 Tick(0);
+                Assert.Equal(WaystoneArrivalStatus.Unloaded,
+                    WaystoneArrival.Find(new ChunkArrivalCells(_world.GetChunkManager()), Far).Status);
             }
             Assert.Equal(correctionsBefore, inbox.Corrections.Count);
             Assert.Equal(trip.HoldEye, player.Position);
