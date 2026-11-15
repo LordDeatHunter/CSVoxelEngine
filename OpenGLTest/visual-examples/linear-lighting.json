@@ -2,7 +2,7 @@
 // visual/linear-lighting/ aside between runs since each run overwrites it:
 //   $env:DOTNET_ROLL_FORWARD='LatestMajor'; $env:VOXEL_SCRIPT='visual-examples/linear-lighting.json';
 //   $env:VOXEL_TIME='<t>'; ~/.dotnet/dotnet.exe run --project VoxelEngine.csproj -c Release
-// Times: 147 noon, 440 dusk, 700 night. Compare each shot against the same shot captured
+// Times: 147 high morning sun, 894 dusk, 1494 night (the 2400 s day; the original 440/700 were for the former 1200 s day). Compare each shot against the same shot captured
 // before the linear pipeline landed: overall brightness and hue should stay close, with AO
 // and shadowed faces reading somewhat lighter.
 // Camera.IsEyeInWater and the physics only update during wait/walk/mine (never on a

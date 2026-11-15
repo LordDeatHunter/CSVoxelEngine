@@ -102,7 +102,7 @@ after it, straight into the gamma default framebuffer, so text and icons stay cr
 colors stay display-space; the two textures it shares with the world (the atlas and the item
 meshes) are re-encoded in `ui-fragment.glsl` behind `uSrgbTex` (`UIRenderer`'s `atlasIsSrgb`
 constructor flag, `ItemMeshCache.IsSrgb`), so icons write the same bytes as before.
-`visual-examples/linear-lighting.json` (run at `VOXEL_TIME` 147, 440 and 700) frames the surface,
+`visual-examples/linear-lighting.json` (run at `VOXEL_TIME` 147 day, 894 sunset and 1494 night) frames the surface,
 the Snell window, the lava cave with and without the HUD and a high LOD/fog vista for comparing a
 lighting change against earlier shots.
 
@@ -363,7 +363,7 @@ same anywhere in the world — keep the two sway blocks byte-identical), fire sm
 along it (`FireParticle.Update`'s `wind`), falling leaves (ambient and burst) ease their sideways
 motion into it, pushed by the canopy's own gusts (`LeafParticleSystem.Update`'s `windTime`,
 `Wind.Gust`, the C# twin of the sway's `0.6 + 0.4 sin(phase)`; a landed leaf stays put;
-`visual-examples/leaf-wind.json` at `VOXEL_TIME` 147 and 2547), and the cloud layer and its shadows are carried by it
+`visual-examples/leaf-wind.json` at `VOXEL_TIME` 147 and 1347, 1200 s apart so the wind has turned 180 degrees; 1347 is night under the 2400 s day), and the cloud layer and its shadows are carried by it
 (`CloudCopies.Drift`, wrapped modulo the field on both axes; `uCloudDrift` is a `vec2`). `World`
 gets the same lighting clock through `World.TimeOffset`, which `Program` sets from `VOXEL_TIME`, so
 leaves, smoke and clouds agree; `FrameLighting.WindDirection` exposes the unit direction for future
