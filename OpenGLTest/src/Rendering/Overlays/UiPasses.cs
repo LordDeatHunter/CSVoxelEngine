@@ -204,7 +204,8 @@ internal sealed class UiPasses
             if (screen.IsOpen || screen.Transition.Visible)
             {
                 _owner.Ui.SetOverlay(Vector2.Zero, screen.Transition.Alpha);
-                _owner.Ui.Map.DrawScreen(screen, frame.Tracker, frame.Pins);
+                _owner.Ui.Map.DrawScreen(screen, frame.Tracker, frame.Pins,
+                    camera?.IsCreative == true || (camera != null && HasCompassEquipped(inventory)));
                 _owner.Ui.ClearOverlay();
             }
         }

@@ -20,7 +20,7 @@ namespace VoxelEngine.Rendering.Overlays;
 /// per discovered waystone and per battle tower marked with a tower map, a far player, waystone or tower held to the rim
 /// and a far mob left out;</item>
 /// <item>the [M] map screen over the whole canvas, panned and zoomed by its <see cref="MapScreenView"/>, with the same
-/// pins, the name of the waystone or tower under the pointer, the pointer's block coordinates, the layer it shows and the
+/// pins, the name of the waystone or tower under the pointer, the pointer's block coordinates (only in creative or with a compass on the hotbar), the layer it shows and the
 /// CENTER and minimap shape buttons.</item>
 /// </list>
 /// Owns the pin sprites and the region textures. Render thread only.
@@ -103,7 +103,7 @@ internal sealed class MapRenderer : IDisposable
     }
 
     /// <summary>The [M] map screen over the whole canvas.</summary>
-    internal void DrawScreen(MapScreenView view, MapTracker tracker, IReadOnlyList<MapPin> pins)
+    internal void DrawScreen(MapScreenView view, MapTracker tracker, IReadOnlyList<MapPin> pins, bool showCoordinates)
     {
         var canvas = _ui.ScreenSize;
         var whole = new UiRect(canvas * 0.5f, canvas);
@@ -132,7 +132,7 @@ internal sealed class MapRenderer : IDisposable
             _ui.CountScale, TextDim);
         var hint = MapLayout.Hint(canvas);
         _ui.DrawTextCenteredY("Drag to pan   Wheel to zoom   M or Esc to close", hint.X, hint.Y, _ui.CountScale, TextDim);
-        if (view.Hover is { } point)
+        if (showCoordinates && view.Hover is { } point)
         {
             var world = MapLayout.ToWorld(point, view.Center, view.Zoom, canvas);
             var readout = Readout((int)MathF.Floor(world.X), (int)MathF.Floor(world.Y));

@@ -37,7 +37,7 @@ toggled on the map screen); M opens the **map screen** over the whole canvas (`A
 like the quest book, from a clean play state; M, E or Escape close it, and the death screen, the pause menu and a world
 switch put it down): a drag pans, the wheel zooms about the pointer (`MapScreenView`, GL-free: it follows the player
 until panned, and CENTER goes back to that at `MapConfig.DefaultZoom`), the MINIMAP button flips the shape, and the
-pointer's block coordinates and the name of a waystone under it show. The data is GL-free in `src/Map/`:
+name of a waystone under the pointer shows, and so do the pointer's block coordinates, but only in creative or with a compass on the hotbar. The data is GL-free in `src/Map/`:
 - **Tiles.** `MapTracker` (one per client world, built by `WorldRenderer` on the first HUD frame, so a server never
   scans) keeps a `MapTile` (16x16 packed sRGB texels, alpha 0 unexplored, plus each column's height) per (layer, chunk
   column) and rescans `MapConfig.TilesPerFrame` due ones a frame, nearest first. A column comes due when a chunk in it
