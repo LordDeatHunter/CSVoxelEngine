@@ -324,25 +324,31 @@ public sealed class WorldSourceTests : IDisposable
             var sx = (int)MathF.Floor(world.Camera.Position.X);
             var sz = (int)MathF.Floor(world.Camera.Position.Z);
 
-            // Pumped until the spawn column is loaded from the plateau top up past the reach the
-            // settle scans from, and then until the eye has stopped moving for a while
-            bool ScanLoaded() =>
-                manager.TryGetCell(sx, source.Top, sz, out _, out _)
-                && manager.TryGetCell(sx, source.Top + TreeGenerator.ReachUp + 3, sz, out _, out _);
-
+            // The spawn is an arrival: the player is held at the heightmap's guess, which sits far below the import's
+            // plateau, until the column has loaded and the chunk under it is meshed, and only then put down on the
+            // surface. A held eye does not move, so a still eye proves nothing; pump until the arrival has landed,
+            // then until the body has come to rest on what it landed on
             var sw = Stopwatch.StartNew();
+            while (world.LocalPlayer.Arrival.IsArriving && sw.Elapsed.TotalSeconds < 30)
+            {
+                world.Update(0.05, null);
+                Thread.Sleep(1);
+            }
+
+            Assert.False(world.LocalPlayer.Arrival.IsArriving, "the spawn arrival never landed over the import");
+
             var previousY = float.NaN;
             var stableFrames = 0;
             while (stableFrames < 10 && sw.Elapsed.TotalSeconds < 30)
             {
                 world.Update(0.05, null);
                 var y = world.Camera.Position.Y;
-                stableFrames = ScanLoaded() && y == previousY ? stableFrames + 1 : 0;
+                stableFrames = y == previousY ? stableFrames + 1 : 0;
                 previousY = y;
                 Thread.Sleep(1);
             }
 
-            Assert.True(stableFrames >= 10, "the spawn never settled over the import");
+            Assert.True(stableFrames >= 10, "the spawn never came to rest over the import");
 
             Assert.True(world.TryGroundHeight(0, 0, out var ground));
             Assert.Equal(source.Top, ground);
