@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
-using VoxelEngine.Networking.ServerSide;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>
 /// What the server's components share: the world, the connected clients and players, the

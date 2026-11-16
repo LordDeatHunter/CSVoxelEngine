@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Player;
-using VoxelEngine.Server;
+using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.WorldGen.Caves;
 using Xunit;

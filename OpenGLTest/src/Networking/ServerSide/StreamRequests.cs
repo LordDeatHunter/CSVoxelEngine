@@ -3,7 +3,7 @@ using VoxelEngine.Lod;
 using VoxelEngine.Networking;
 using VoxelEngine.Saves;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>Answers a client's streaming requests from the loaded world: chunks, column terrain and far-LOD regions, the regions queued and built a bounded number per Pump. Main thread only.</summary>
 internal sealed class StreamRequests

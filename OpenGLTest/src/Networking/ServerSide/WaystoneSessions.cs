@@ -1,9 +1,8 @@
 using System.Collections.Generic;
 using VoxelEngine.Networking;
-using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Simulation.Waystones;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>
 /// The server's side of waystones. The registry and every rule are the world's (<see cref="World.Waystones"/>,

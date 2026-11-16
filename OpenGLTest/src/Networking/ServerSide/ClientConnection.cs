@@ -5,7 +5,7 @@ using System.Net.Sockets;
 using System.Threading;
 using VoxelEngine.Networking;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>
 /// One connected socket: its id and name, a lock-guarded framed send, the last time a frame

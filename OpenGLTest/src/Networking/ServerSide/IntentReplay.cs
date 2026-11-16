@@ -5,10 +5,9 @@ using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
 using VoxelEngine.Magic;
 using VoxelEngine.Networking;
-using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Simulation.Smithing;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>Replays a player's intents (breaks, placements, uses, throws, attacks, casts, hammer hits, anvil forges, waystone trips, respawns and inventory actions) through the singleplayer rules and answers each one in order: the authoritative cells around a world intent's target, the inventory when it could change or was refused, then the result. Also refuses the retired raw block edit. Main thread only.</summary>
 internal sealed class IntentReplay

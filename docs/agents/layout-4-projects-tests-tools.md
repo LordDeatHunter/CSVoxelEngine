@@ -19,34 +19,11 @@ OpenGLTest.ItemDebugger/              # the item/entity/tree preview tool (ITEMS
   SliceTrailSampler.cs                # the delegate that poses the previewed blade for PlayerPreviewState's slice trail
   TreePreviewState.cs                 # GL-free state of the TREES tab: species, seed, step, per-step
                                       #   snapshots, ground plane and framing bounds
-OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple players and chat")
+OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple players and chat"); the server
+                                      #   core it runs is in the game's Networking/ServerSide/
   VoxelEngine.Server.csproj           # the project file (references the game project)
   GlobalUsings.cs                     # VoxelEngine.Core and VoxelEngine.Config
-  ClientConnection.cs                 # one connected socket: id, name, lock-guarded framed send, idle
-                                      #   clock (LastInboundAt), the far-LOD regions queued for it
-  GameServer.cs                       # the composition root: builds the components below, owns the
-                                      #   public surface, Start/Stop and the main-thread Pump, and
-                                      #   dispatches each inbound message (Handle)
-  Inbound.cs                          # one frame a reader thread queued (a null payload: remove it)
-  IntentReplay.cs                     # world and inventory intents replayed for their player and
-                                      #   answered (BlockCorrection, InventoryState, IntentResult)
-  PlayerSessions.cs                   # join (hello), PlayerState judging, status ticks, saves, unique
-                                      #   names, the player list, leave and the idle sweep
-  ServerBroadcasts.cs                 # the cell journal (BlockChanges), entities under stable ids,
-                                      #   stations and the day clock
-  ServerChat.cs                       # chat relay; a player's command line runs on GameCommands with operator
-                                      #   rights when listed as an operator, its answers system lines to that player
-  ServerCommandHost.cs                # the server's ICommandHost: the players online, the clock (broadcast),
-                                      #   mobs, towers, announcements broadcast
-  ServerCommandPlayer.cs              # a connected player's ICommandPlayer: a teleport corrects its client, a mode
-                                      #   change sends its status (creative only while MayBeCreative), a grant syncs
   ServerProgram.cs                    # content load, world/port prompts, headless World + tick loop
-  ServerState.cs                      # what the components share: world, client and player tables,
-                                      #   pending connections, clock, join spawn, creative rights
-  ServerTransport.cs                  # TCP listener, accept thread, per-connection reader threads
-  StreamRequests.cs                   # chunk, column and far-LOD region requests and the LOD queue
-  WaystoneSessions.cs                 # waystones for each player: discovery on a replayed Use (WaystoneOpened),
-                                      #   the rows kept current, the rename, the trip judged, held and landed
 OpenGLTest.WikiExport/                # headless exporter for the wiki (wiki/): grows every tree species step by step
                                       #   over flat ground (the item debugger's TREES setup) and writes per-step cell
                                       #   diffs; CI runs it before the wiki build (`dotnet run --project
@@ -254,5 +231,5 @@ tools/                                # asset generators: models, animation clip
                                       #   N px/frame, vertical/horizontal/square), PNG in and out, stdlib only
 ```
 
-Lantern sessions live in `OpenGLTest.Server/LanternSessions.cs`; lantern interaction rules are covered by
+Lantern sessions live in `OpenGLTest/src/Networking/ServerSide/LanternSessions.cs`; lantern interaction rules are covered by
 `OpenGLTest.Tests/Interaction/LanternTests.cs` and the TCP tests in `ChestServerTests`.

@@ -271,7 +271,7 @@ bounds-checked: an unknown action, an overlong recipe name, more than
 longer than `MaxPartKeyLength` is an `InvalidDataException` (the sender is
 dropped like any malformed frame), while merely out-of-range values parse and are refused.
 
-**The server** (`OpenGLTest.Server/GameServer.cs`, the composition root over `ServerTransport`, `PlayerSessions`, `IntentReplay`, `StreamRequests`, `ServerBroadcasts` and `ServerChat`, which share a `ServerState`) is a dual-mode `TcpListener.Create(port)`
+**The server** (`OpenGLTest/src/Networking/ServerSide/GameServer.cs`, the composition root over `ServerTransport`, `PlayerSessions`, `IntentReplay`, `StreamRequests`, `ServerBroadcasts` and `ServerChat`, which share a `ServerState`) is a dual-mode `TcpListener.Create(port)`
 (IPv6 any with IPv4 mapped, so `[::1]:port` works like `127.0.0.1:port`) with one reader thread per
 connection that only frames inbound bytes onto a `ConcurrentQueue`; `Pump` (main thread) drains it
 and owns every piece of `World` state, so the simulation stays single-threaded exactly like the

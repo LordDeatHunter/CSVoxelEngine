@@ -1,9 +1,8 @@
 using System.Collections.Generic;
 using VoxelEngine.Networking;
-using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Simulation.Chests;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>
 /// The server's side of chests: which chest each player has open, and the three requests that work it. A chest is

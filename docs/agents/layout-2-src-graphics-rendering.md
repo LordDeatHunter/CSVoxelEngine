@@ -228,23 +228,48 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         RemotePlayer.cs        # another player as the client sees them: pose smoothing + a PlayerModel
         WaystoneMirror.cs      # GL-free: the waystone rows the server sent, its activation answer and the trip awaiting
                                #   its landing correction
-      ServerSide/              # the server's side of a session: the connected player and the rules its intents and
-                               #   moves are judged by (the dedicated server itself is OpenGLTest.Server, VoxelEngine.Server)
+      ServerSide/              # the server's side of a session: GameServer and its components, the connected player
+                               #   and the rules its intents and moves are judged by (the dedicated CLI is OpenGLTest.Server)
         AttackPacing.cs        # GL-free: the shortest gap from one attack to the next (a punch's pace, a
                                #   slice's swing, the sword swing before the one asked for)
         BreakProgress.cs       # GL-free: a player's mining on the server, judged against the held item's hits
+        ChestSessions.cs       # the chest each player has open: open, take/put intents, the contents kept current
+        ClientConnection.cs    # one connected socket: id, name, lock-guarded framed send, idle
+                               #   clock (LastInboundAt), the far-LOD regions queued for it
+        GameServer.cs          # the composition root: builds the components, owns the public surface,
+                               #   Start/Stop and the Pump (one thread), and dispatches each inbound message (Handle)
+        Inbound.cs             # one frame a reader thread queued (a null payload: remove it)
         InventoryIntentRules.cs # GL-free: what the server accepts of an intent, against that player's inventory
+        IntentReplay.cs        # world and inventory intents replayed for their player and
+                               #   answered (BlockCorrection, InventoryState, IntentResult)
+        LanternSessions.cs     # lantern open/close intents for each player's own lantern
         MovementRules.cs       # GL-free movement rubberband: speed clamp, then collision, rise and hover checks
         MovementState.cs       # a player's per-connection movement memory (airborne-still time, the airtime rise budget's
                                #   climb, takeoff and bounce, the lift credit)
         MoveVerdict.cs         # Accepted / Clamped / Rejected
         NetValidation.cs       # server movement, edit-reach, intent-eye and visible-face sanity rules
         OperatorList.cs        # who may be creative: ops.json in the world folder plus --op, matched by save slug
+        PlayerSessions.cs      # join (hello), PlayerState judging, status ticks, saves, unique
+                               #   names, the player list, leave and the idle sweep
         RateLimiter.cs         # GL-free token bucket (a player's edit rate)
         ServerPlayer.cs        # a connected player on the server: own Inventory, creative/flight flags, pose,
                                #   its PlayerContext, newest sequence id, mining progress, edit rate, attack pace,
                                #   cast pacing (Casting), its PlayerHealth/fall tracking/respawn eye, mob-hit sink,
                                #   correction numbers, its open chest, the waystone it stands at, a waiting trip
+        ServerBroadcasts.cs    # the cell journal (BlockChanges), entities under stable ids,
+                               #   stations and the day clock
+        ServerChat.cs          # chat relay; a player's command line runs on GameCommands with operator
+                               #   rights when listed as an operator, its answers system lines to that player
+        ServerCommandHost.cs   # the server's ICommandHost: the players online, the clock (broadcast),
+                               #   mobs, towers, announcements broadcast
+        ServerCommandPlayer.cs # a connected player's ICommandPlayer: a teleport corrects its client, a mode
+                               #   change sends its status (creative only while MayBeCreative), a grant syncs
+        ServerState.cs         # what the components share: world, client and player tables,
+                               #   pending connections, clock, join spawn, creative rights
+        ServerTransport.cs     # TCP listener, accept thread, per-connection reader threads
+        StreamRequests.cs      # chunk, column and far-LOD region requests and the LOD queue
+        WaystoneSessions.cs    # waystones for each player: discovery on a replayed Use (WaystoneOpened),
+                               #   the rows kept current, the rename, the trip judged, held and landed
     Particles/                 # every particle system (debris, bubbles, fire, leaves,
                                #   splashes, dust) and its renderer; the ParticleRing buffer
       AmbientEffects.cs        # World component: the fire cells (campfires, lit kilns, goblin torches), cosmetic

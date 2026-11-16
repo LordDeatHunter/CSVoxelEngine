@@ -2,12 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Networking;
-using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation.Tower;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>The connected players' sessions: the join (hello), each PlayerState judged by the movement rules, the status ticks, the saves, unique names, the player list, leaving and the idle sweep, and the per-client status, correction and inventory senders the other components share. Main thread only.</summary>
 internal sealed class PlayerSessions

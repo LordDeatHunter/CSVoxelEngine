@@ -4,7 +4,7 @@ using System.Net.Sockets;
 using System.Threading;
 using VoxelEngine.Networking;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>The server's sockets: the dual-mode TCP listener, the accept thread and one reader thread per connection. The threads only accept and frame inbound bytes onto <see cref="InboundQueue"/>; GameServer.Pump drains it on the main thread.</summary>
 internal sealed class ServerTransport

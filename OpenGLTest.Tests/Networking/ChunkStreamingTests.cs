@@ -7,7 +7,7 @@ using VoxelEngine.Lod;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Saves;
-using VoxelEngine.Server;
+using VoxelEngine.Networking.ServerSide;
 using Xunit;
 
 namespace VoxelEngine.Tests.Networking;

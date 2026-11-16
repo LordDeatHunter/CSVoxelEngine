@@ -4,7 +4,7 @@ using System.Numerics;
 using VoxelEngine.Commands;
 using VoxelEngine.Simulation.Tower;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>The server's world as commands see it: the connected players, the world's clock (a change goes out to
 /// every client at once), mobs and towers, and announcements broadcast as system lines. Main thread only.</summary>

@@ -8,7 +8,6 @@ using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
-using VoxelEngine.Server;
 using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.WorldGen;
 using Xunit;

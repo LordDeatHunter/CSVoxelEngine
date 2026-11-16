@@ -7,7 +7,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Player;
-using VoxelEngine.Server;
+using VoxelEngine.Networking.ServerSide;
 using Xunit;
 
 namespace VoxelEngine.Tests.Networking.Client;

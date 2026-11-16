@@ -1,8 +1,7 @@
 using VoxelEngine.Networking;
-using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Simulation.Lanterns;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>Server-owned lantern sessions: validate selection/reach on every move; snapshots are answers only.</summary>
 internal sealed class LanternSessions(ServerState state)

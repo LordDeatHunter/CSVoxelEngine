@@ -15,7 +15,7 @@ using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Networking;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>The world state the server broadcasts to every client: the journaled cell writes (BlockChanges), the live entities under stable ids, the station block entities, the day clock and the world sounds (to the players near each). Main thread only, except <see cref="OnCellWritten"/>, which only enqueues.</summary>
 internal sealed class ServerBroadcasts

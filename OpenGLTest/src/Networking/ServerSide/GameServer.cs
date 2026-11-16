@@ -4,10 +4,9 @@ using System.Net;
 using System.Net.Sockets;
 using VoxelEngine.Chunks;
 using VoxelEngine.Networking;
-using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Saves;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>
 /// The multiplayer server: a TCP listener, one reader thread per connection, and a main-thread

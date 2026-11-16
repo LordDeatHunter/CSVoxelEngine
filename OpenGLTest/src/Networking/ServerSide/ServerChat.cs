@@ -2,7 +2,7 @@ using VoxelEngine.Commands;
 using VoxelEngine.Networking;
 using VoxelEngine.UI.Hud;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>Chat on the server: relays a player's line to everyone, runs a command line for its sender on the shared command trees (<see cref="GameCommands"/>) and sends the server's system lines. Main thread only.</summary>
 internal sealed class ServerChat

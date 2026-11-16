@@ -1,9 +1,8 @@
 using System.Numerics;
 using VoxelEngine.Commands;
-using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
 
-namespace VoxelEngine.Server;
+namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>A connected player as commands see it: each effect lands on the server's <see cref="ServerPlayer"/> and is
 /// sent to its client (a teleport as a correction, a mode change as a status, a grant through the inventory sync).

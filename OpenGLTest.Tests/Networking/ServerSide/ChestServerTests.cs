@@ -10,7 +10,6 @@ using VoxelEngine.Content.Blocks;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
-using VoxelEngine.Server;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation.Chests;
 using VoxelEngine.Simulation.Lanterns;

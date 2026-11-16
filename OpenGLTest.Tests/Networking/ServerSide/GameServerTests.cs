@@ -27,7 +27,6 @@ using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
-using VoxelEngine.Server;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Status;

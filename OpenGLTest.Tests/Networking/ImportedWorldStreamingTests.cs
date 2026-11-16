@@ -11,7 +11,7 @@ using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
-using VoxelEngine.Server;
+using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen;
 using Xunit;
