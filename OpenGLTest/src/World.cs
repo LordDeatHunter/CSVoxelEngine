@@ -320,16 +320,20 @@ public class World
     private readonly HitMarker _hitMarker = new();
 
     /// <summary>
-    /// Credits <paramref name="count"/> of an item to this world's inventory (the creative grants
-    /// and the /give command), toasting a first find like a pickup does.
+    /// Credits up to <paramref name="count"/> of an item to this world's inventory (the creative grants
+    /// and the /give command), toasting a first find like a pickup does, and returns the amount accepted.
     /// </summary>
-    public void CreditItem(ushort id, int count)
+    public int CreditItem(ushort id, int count)
     {
         var known = Inventory.Knows(id);
-        if (!Inventory.Add(id, count)) return;
-        PickupFeed.Record(id, count, Inventory.CountFor(id));
+        var before = Inventory.CountFor(id);
+        if (!Inventory.Add(id, count)) return 0;
+        var total = Inventory.CountFor(id);
+        var credited = total - before;
+        PickupFeed.Record(id, credited, total);
         if (!known)
             Toast.Show($"New: {Inventory.DisplayName(id)}");
+        return credited;
     }
 
     /// <summary>Where the world is in its lifecycle (see <see cref="WorldPhase"/>).</summary>

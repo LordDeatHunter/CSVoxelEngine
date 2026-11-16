@@ -25,10 +25,12 @@ internal sealed class ServerCommandPlayer(ClientConnection client, ServerPlayer 
         PlayerSessions.SendPlayerCorrection(client, player.IssueCorrection(), player.Position);
     }
 
-    public void Give(ushort id, int count)
+    public int Give(ushort id, int count)
     {
+        var before = player.Inventory.CountFor(id);
         player.Inventory.Add(id, count);
         player.InventoryChanged = true;
+        return player.Inventory.CountFor(id) - before;
     }
 
     public bool TrySetModes(bool creative, bool flying, out string refusal)

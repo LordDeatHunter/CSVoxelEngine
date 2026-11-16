@@ -23,7 +23,7 @@ internal sealed class LocalCommandPlayer(World world, Func<string> name) : IComm
     // Held until the cells there are in and lifted out of any solid, so a teleport never buries the player
     public void Teleport(Vector3 feet) => world.LocalPlayer.Arrival.BeginAt(feet);
 
-    public void Give(ushort id, int count) => world.CreditItem(id, count);
+    public int Give(ushort id, int count) => world.CreditItem(id, count);
 
     // Singleplayer's modes are the player's own to switch (a keybind does it too)
     public bool TrySetModes(bool creative, bool flying, out string refusal)
