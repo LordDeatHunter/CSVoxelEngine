@@ -112,6 +112,39 @@ public class ChunkSaveCodecTests
     }
 
     [Fact]
+    public void MalformedUtf8PaletteNameIsRejected()
+    {
+        var malformed = ForgeOneNameChunk([0xFF]);
+
+        Assert.Throws<InvalidDataException>(() => Decode(malformed, static _ => null));
+    }
+
+    [Fact]
+    public void IncompleteUtf8SequenceAtTheEndOfALongPaletteNameIsRejected()
+    {
+        var name = new byte[2048];
+        Array.Fill(name, (byte)'a', 0, name.Length - 2);
+        name[^2] = 0xE2;
+        name[^1] = 0x82;
+
+        Assert.Throws<InvalidDataException>(() => Decode(ForgeOneNameChunk(name), static _ => null));
+    }
+
+    [Fact]
+    public void WellFormedReplacementCharacterAndLongSplitMultibytePaletteNameAreAccepted()
+    {
+        var replacementName = System.Text.Encoding.UTF8.GetBytes("\uFFFD");
+        var replacement = Decode(ForgeOneNameChunk(replacementName), static _ => null);
+        Assert.Equal(0, replacement.Storage.Get(1));
+
+        var longUnicodeName = new string('x', 300) + "\u03BB";
+        var unicodeName = System.Text.Encoding.UTF8.GetBytes(longUnicodeName);
+        using var fragmented = new FragmentedReadStream(ForgeOneNameChunk(unicodeName), maxRead: 5);
+        var decoded = ChunkSaveCodec.Read(fragmented, name => name == longUnicodeName ? (ushort)7 : null);
+        Assert.Equal((ushort)7, decoded.Storage.Get(1));
+    }
+
+    [Fact]
     public void BadMagicOrTruncatedBodyThrowsInvalidData()
     {
         var garbage = new byte[64];
@@ -152,6 +185,11 @@ public class ChunkSaveCodecTests
     // cells, then a byte-index body that is air except for one cell naming palette entry index
     private static byte[] ForgeOneNameChunk(int cell, byte index)
     {
+        return ForgeOneNameChunk(System.Text.Encoding.UTF8.GetBytes(NameOf(1)!), cell, index);
+    }
+
+    private static byte[] ForgeOneNameChunk(byte[] nameBytes, int cell = 1, byte index = 1)
+    {
         var indices = new byte[Chunk.BlockCount];
         indices[cell] = index;
         using var forged = new MemoryStream();
@@ -161,11 +199,57 @@ public class ChunkSaveCodecTests
             header.Write(ChunkSaveCodec.Version);
             header.Write((byte)0);
             header.Write((ushort)1);
-            header.Write(NameOf(1)!);
+            Write7BitLength(header, nameBytes.Length);
+            header.Write(nameBytes);
         }
         using (var deflate = new DeflateStream(forged, CompressionLevel.Fastest, leaveOpen: true))
             deflate.Write(indices);
         return forged.ToArray();
+    }
+
+    private static void Write7BitLength(BinaryWriter writer, int length)
+    {
+        var value = (uint)length;
+        while (value >= 0x80)
+        {
+            writer.Write((byte)(value | 0x80));
+            value >>= 7;
+        }
+        writer.Write((byte)value);
+    }
+
+    private sealed class FragmentedReadStream(byte[] bytes, int maxRead) : Stream
+    {
+        private readonly MemoryStream _inner = new(bytes);
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush() { }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            _inner.Read(buffer, offset, Math.Min(count, maxRead));
+
+        public override int Read(Span<byte> buffer) => _inner.Read(buffer[..Math.Min(buffer.Length, maxRead)]);
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
     }
 
     /// <summary>

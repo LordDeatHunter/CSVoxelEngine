@@ -102,8 +102,11 @@ pure function of the seed: only **deltas** and the seed are written.
   the snapshot's storage into a dense array and re-derives the name palette in first-seen cell
   order, so stale in-memory entries never reach the file and the bytes depend only on the cells;
   `ReadCore` decodes into `ChunkBlocks.DenseScratch` and compacts it with `FromDense`, so a loaded
-  chunk holds the smallest storage for its ids. A file of any other version (a v2 file from a build whose ids were bytes)
-  is refused as `InvalidDataException`, never misread: `ChunkSaveStore` warns once, regenerates
+  chunk holds the smallest storage for its ids. Palette names must be well-formed UTF-8; malformed
+  name bytes refuse the file and use the normal regenerate-and-archive path, while valid names the
+  current content registry does not know still load as air. A file of any other version (a v2 file
+  from a build whose ids were bytes) is refused as `InvalidDataException`, never misread:
+  `ChunkSaveStore` warns once, regenerates
   the chunk and sets the old file aside as `.bad` before the first write over it. An imported
   map's chunk files share the format, so a map written by an older build loads as air
   (`ImportedMapSource` warns per chunk) and must be re-imported.

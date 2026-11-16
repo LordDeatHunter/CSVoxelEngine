@@ -37,6 +37,9 @@ namespace VoxelEngine.Saves;
 public static class ChunkSaveCodec
 {
     private static readonly byte[] Magic = "CVXC"u8.ToArray();
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+
+    private const int PaletteReadBufferSize = 1024;
 
     /// <summary>The format version this build writes and the only one it reads.</summary>
     public const byte Version = 3;
@@ -130,9 +133,9 @@ public static class ChunkSaveCodec
     /// Decodes a chunk written by <see cref="Write"/>. Each palette name goes through
     /// <paramref name="idOf"/>; a name it does not know (or the "" of an unknown block) decodes
     /// to air, and the set of such names is reported once per call with <see cref="Log.Warn"/>.
-    /// Bad magic, an unknown version, a truncated file or an out-of-range index all surface as
-    /// one exception type, <see cref="InvalidDataException"/>, so callers catch that (plus
-    /// <see cref="IOException"/> for the disk itself).
+    /// Bad magic, an unknown version, malformed UTF-8 palette names, a truncated file or an
+    /// out-of-range index all surface as one exception type, <see cref="InvalidDataException"/>, so
+    /// callers catch that (plus <see cref="IOException"/> for the disk itself).
     /// </summary>
     public static ChunkSnapshot Read(Stream input, Func<string, ushort?> idOf)
     {
@@ -150,6 +153,10 @@ public static class ChunkSaveCodec
         catch (FormatException e)
         {
             throw new InvalidDataException("The chunk save's palette is malformed.", e);
+        }
+        catch (DecoderFallbackException e)
+        {
+            throw new InvalidDataException("The chunk save's palette contains malformed UTF-8.", e);
         }
     }
 
@@ -171,10 +178,13 @@ public static class ChunkSaveCodec
 
         // Palette index -> this run's id; index 0 is air
         var idOfIndex = new ushort[paletteCount + 1];
+        var paletteBytes = new byte[PaletteReadBufferSize];
+        var paletteChars = new char[PaletteReadBufferSize];
+        var paletteDecoder = StrictUtf8.GetDecoder();
         HashSet<string>? unknown = null;
         for (var k = 1; k <= paletteCount; k++)
         {
-            var name = header.ReadString();
+            var name = ReadPaletteName(header, paletteDecoder, paletteBytes, paletteChars);
             var id = name.Length == 0 ? null : idOf(name);
             if (id is { } resolved)
             {
@@ -233,6 +243,42 @@ public static class ChunkSaveCodec
 
         // The storage, state and placed arrays are this call's own, so the snapshot takes them over
         return new ChunkSnapshot(storage, state, placed is { Length: > 0 } ? placed : null);
+    }
+
+    // BinaryReader.ReadString does not flush its buffered decoder at every string boundary. Decode
+    // exactly the declared bytes ourselves and flush the decoder at this name's end, without
+    // allocating an array from an untrusted length before those bytes have actually arrived.
+    private static string ReadPaletteName(BinaryReader header, Decoder decoder, byte[] bytes, char[] chars)
+    {
+        var byteCount = header.Read7BitEncodedInt();
+        if (byteCount < 0) throw new FormatException("The palette name has a negative byte length.");
+        if (byteCount == 0) return string.Empty;
+
+        decoder.Reset();
+        var name = new StringBuilder();
+        var remaining = byteCount;
+
+        while (remaining > 0)
+        {
+            var readCount = Math.Min(remaining, bytes.Length);
+            header.BaseStream.ReadExactly(bytes.AsSpan(0, readCount));
+            remaining -= readCount;
+
+            var offset = 0;
+            var flush = remaining == 0;
+            while (true)
+            {
+                decoder.Convert(bytes, offset, readCount - offset, chars, 0, chars.Length, flush,
+                    out var bytesUsed, out var charsUsed, out var completed);
+                name.Append(chars, 0, charsUsed);
+                offset += bytesUsed;
+                if (completed) break;
+                if (bytesUsed == 0 && charsUsed == 0)
+                    throw new InvalidDataException("The chunk palette decoder made no progress.");
+            }
+        }
+
+        return name.ToString();
     }
 
     // The cell indices at the width WriteBody chose for this palette, widened to ushort
