@@ -6,15 +6,15 @@ using VoxelEngine.Saves;
 namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>
-/// The players a dedicated server lets be creative even while it does not allow creative for
-/// everyone (<c>GameServer.MayBeCreative</c>). GL-free and content-free.
+/// The players a server lets be creative and run operator commands (<c>GameServer.IsOperator</c>).
+/// GL-free and content-free.
 /// <para>
 /// Names are matched by their save slug (<see cref="WorldNames.Slug"/>), the same normalization
 /// that keys a player's save file, so "Alice", "alice" and "ALICE!" are one operator, exactly as
 /// they are one save. The list comes from two places, merged with <see cref="AddAll"/>: every
 /// <c>--op &lt;name&gt;</c> on the server's command line (<see cref="FromArgs"/>) and a JSON array of
-/// names in the hosted world's folder (<see cref="FileName"/>, <see cref="Parse"/>). With neither,
-/// nobody is an operator. Players are known only by the name they join with, so the list grants
+/// names in the hosted world's folder (<see cref="FileName"/>, <see cref="Parse"/>), which <c>/op</c> and
+/// <c>/deop</c> rewrite (<see cref="ToJson"/>). With neither, nobody is an operator. Players are known only by the name they join with, so the list grants
 /// creative to whoever joins under a listed name first.
 /// </para>
 /// </summary>
@@ -35,14 +35,28 @@ public sealed class OperatorList
     /// <summary>The operators' names as first given, one per slug, in the order they were added.</summary>
     public IReadOnlyList<string> Names => _names;
 
-    /// <summary>Adds <paramref name="name"/>; a blank name, or one whose slug is already listed, adds nothing.</summary>
-    public void Add(string? name)
+    /// <summary>Adds <paramref name="name"/>; a blank name, or one whose slug is already listed, adds nothing
+    /// and returns false.</summary>
+    public bool Add(string? name)
+    {
+        var trimmed = name?.Trim();
+        if (string.IsNullOrEmpty(trimmed) || !_slugs.Add(WorldNames.Slug(trimmed)))
+            return false;
+        _names.Add(trimmed);
+        return true;
+    }
+
+    /// <summary>Removes the operator whose slug matches <paramref name="name"/>; false when none is listed.</summary>
+    public bool Remove(string? name)
     {
         var trimmed = name?.Trim();
         if (string.IsNullOrEmpty(trimmed))
-            return;
-        if (_slugs.Add(WorldNames.Slug(trimmed)))
-            _names.Add(trimmed);
+            return false;
+        var slug = WorldNames.Slug(trimmed);
+        if (!_slugs.Remove(slug))
+            return false;
+        _names.RemoveAll(n => WorldNames.Slug(n) == slug);
+        return true;
     }
 
     /// <summary>Whether a player joining as <paramref name="name"/> is an operator (slug match).</summary>
@@ -102,6 +116,10 @@ public sealed class OperatorList
         }
         return list;
     }
+
+    /// <summary>The list as an <see cref="FileName"/> file: an indented JSON array of the names as first given,
+    /// which <see cref="Parse"/> reads back.</summary>
+    public byte[] ToJson() => JsonSerializer.SerializeToUtf8Bytes(_names, new JsonSerializerOptions { WriteIndented = true });
 
     /// <summary>
     /// The operators named on a command line: the argument after every <c>--op</c> (the flag

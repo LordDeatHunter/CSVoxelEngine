@@ -37,6 +37,13 @@ public static class CommandBuilder
         return node;
     }
 
+    /// <summary>Makes a root command exist only in multiplayer (<see cref="CommandNode.MultiplayerOnly"/>).</summary>
+    public static LiteralNode MultiplayerOnly(this LiteralNode node)
+    {
+        node.MultiplayerOnly = true;
+        return node;
+    }
+
     /// <summary>The line <c>/help</c> shows for a command.</summary>
     public static T Describe<T>(this T node, string description) where T : CommandNode
     {

@@ -10,7 +10,7 @@ public sealed class CommandNameArgument(CommandDispatcher dispatcher) : IArgumen
     public bool TryParse(ReadOnlySpan<string> tokens, CommandSource source, out object value, out string error)
     {
         var name = tokens[0].TrimStart('/');
-        if (dispatcher.FindRoot(name) is { } root && source.Allows(root.Permission))
+        if (dispatcher.FindRoot(name) is { } root && source.MayRun(root))
         {
             value = root;
             error = "";

@@ -32,4 +32,8 @@ public interface ICommandHost
 
     /// <summary>A system line every player sees.</summary>
     void Announce(string text);
+
+    /// <summary>The server's operator list for <c>/op</c> and <c>/deop</c>; null in singleplayer, which has none (so
+    /// those commands do not exist there).</summary>
+    IOperatorAdmin? Operators { get; }
 }

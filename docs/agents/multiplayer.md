@@ -10,9 +10,8 @@ program sets its own current directory to the assets parent so `FileUtils`' rela
 paths resolve). It is a **CLI**: it loads content headlessly (`ContentRegistry.Load` +
 `TextureAtlas.RegisterTilesWithoutUpload` + `ContentRegistry.BakeModels`, the `TestContent`
 recipe), lists `WorldStore.List()` and asks for a world number or `N` for a new one (name and
-optional seed), asks for a port (default `ServerAddress.DefaultPort`, 25566; `--allow-creative` on
-the command line sets `GameServer.AllowCreative`, default `NetworkConfig.ServerAllowCreative`,
-off, and every repeatable `--op <name>` joins `GameServer.Operators` with the names in the world
+optional seed), asks for a port (default `ServerAddress.DefaultPort`, 25566; every repeatable
+`--op <name>` on the command line joins `GameServer.Operators` with the names in the world
 folder's `ops.json` — see the creative permission below — and the server prints one line saying
 who may be creative), resolves the world source (`--source <name>`, else `world.json`'s
 `source`; see "World sources" below), then builds a
@@ -549,9 +548,8 @@ one acks the newest correction (`AcceptsStatePosition`), so the states the clien
 snapped can never trip a second correction. A respawn uses the same correction.
 
 **Creative permission** is per player: a client's creative bit is only a request, granted (with
-flight only alongside it, and flight is noclip to the movement rules) while
-`GameServer.MayBeCreative(name)` holds — everyone when `AllowCreative` (`--allow-creative`) is on,
-otherwise only an operator. `OperatorList` (`Networking/ServerSide/OperatorList.cs`, GL-free) holds the
+flight only alongside it, and flight is noclip to the movement rules) only to an operator
+(`GameServer.IsOperator(name)`; there is no allow-everyone switch). `OperatorList` (`Networking/ServerSide/OperatorList.cs`, GL-free) holds the
 operators by save slug (`WorldNames.Slug`, the same normalization that names a player's file, so
 a name matches exactly when it would load the same save file — case and punctuation fold away —
 and a duplicate joiner's "Name 2" is not an operator); `ServerProgram` builds it from every repeatable `--op <name>` plus
@@ -559,7 +557,13 @@ and a duplicate joiner's "Name 2" is not an operator); `ServerProgram` builds it
 `ChunkSaveStore.ReadFile`; no file means nobody, a broken one warns and means nobody), and nobody
 is an operator by default. Both enforcement points use it — the restored modes at hello and every
 `PlayerState` — creative grants and clears follow `ServerPlayer.Creative`, and a refused request
-is answered once with a `PlayerStatus` carrying the modes the player really has.
+is answered once with a `PlayerStatus` carrying the modes the player really has. `/op <name>` and
+`/deop <name>` (operator-only, multiplayer-only) change the list at run time through `ServerOperators`:
+the list is saved as `ops.json` (`OperatorList.ToJson`, through `ChunkSaveStore.EnqueueFile`, so it holds
+the `--op` names too from then on), and every online player under that name has its `ServerPlayer.IsOperator`
+updated and its status resent at once, a deop also ending its creative and flight. A world hosted from the
+game has a hosting player (`GameServer.HostPlayer`, matched by slug like the list): always an operator, never
+written to `ops.json`, and refused by `/deop`.
 
 **Mobs follow real players.** A mob chases and hurts an `IMobTarget` (`IMobTarget.cs`: `Eye`,
 `IsImmune`, `TakeHit(damage, away, speed, lift)`), never the camera directly. `MobDirector.Update`
@@ -735,8 +739,12 @@ generated from the trees, filtered to what the source may run. The commands: `/h
 <target> [<x y z> | <destination>]` (alias `/teleport`; coordinates are where the feet land), `/give <item> [count
 [target]]`, `/summon <entity> [x y z]`, `/time dawn|sunrise|morning|noon|day|dusk|sunset|night|midnight | set <s> | add <s>` (dawn and dusk name sunrise
 and sunset, morning sits halfway between sunrise and noon),
-`/gamemode survival|creative [target]`, `/fly [on|off [target]]`, `/kill [target]` and `/locate tower`, all but `/help`
-and `/locate` operator-only. A command acts through its source's `ICommandHost` and `ICommandPlayer`, so a definition
+`/gamemode survival|creative [target]`, `/fly [on|off [target]]`, `/kill [target]`, `/locate tower` and `/op <name>`
+/ `/deop <name>` (any name, online or not, `Arg.PlayerName`), all but `/help` and `/locate` operator-only. A root marked
+`.MultiplayerOnly()` (`/op`, `/deop`) exists only where the host has an operator list (`ICommandHost.Operators`,
+null on `LocalCommandHost`): singleplayer answers it with `CommandDispatcher.MultiplayerOnlyReply` and never offers or
+helps it (`CommandSource.Has`/`MayRun`), while `ServerCommandHost` runs it on `ServerOperators` and
+`ClientCommandHost` completes it. A command acts through its source's `ICommandHost` and `ICommandPlayer`, so a definition
 never knows its side: singleplayer runs a line on `LocalCommandHost` and is the operator of its own world (creative
 is a keybind there anyway); a server runs a player's line (`ServerChat`) on `ServerCommandHost`, the player an
 operator when it is in the operator list (creative or not), a teleport sending its client a correction, a mode change its status (creative

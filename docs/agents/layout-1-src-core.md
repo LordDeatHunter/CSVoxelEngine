@@ -151,19 +151,23 @@ OpenGLTest/
                                #   an immutable array swapped only when a focus changes chunk
     Commands/                  # GL-free chat commands, shared by singleplayer, the server and a client's autocomplete (see "Chat")
       CommandNode.cs           # one step of a command tree: children tried in order, Handler, Permission (holds for the subtree),
-                               #   Description, Syntax
+                               #   MultiplayerOnly (a root's), Description, Syntax
       LiteralNode.cs           # a fixed word (a command, a subcommand), case-insensitive, with a root's aliases
       ArgumentNode.cs          # an argument: its IArgumentType and the name its value is read back by
       Cmd.cs                   # starts a literal step (Cmd.Literal)
-      Arg.cs                   # starts an argument step: Word, Int, Number, Coordinates, Player, Entity, Item, Command
-      CommandBuilder.cs        # the fluent extensions: Then (a possible next step), Executes, Requires, Describe, Alias
+      Arg.cs                   # starts an argument step: Word, Int, Number, Coordinates, Player, PlayerName, Entity, Item, Command
+      CommandBuilder.cs        # the fluent extensions: Then (a possible next step), Executes, Requires, MultiplayerOnly,
+                               #   Describe, Alias
       CommandDispatcher.cs     # the trees and the one walk over them: Execute (answers unknown, refused, a bad token or the
                                #   usage), Suggest (the completions for the word at the caret, and the usage), Usage, Visible
       CommandContext.cs        # a parsed line for a handler: Source, Get<T>, Self, Player (an online player), Reply
-      CommandSource.cs         # who runs a line: name, rights, feet (the base of ~), Self, Host, Reply
+      CommandSource.cs         # who runs a line: name, rights, feet (the base of ~), Self, Host, Reply; Has/MayRun (a root
+                               #   exists here and the rights allow it)
       CommandPermission.cs     # Everyone / Operator
       CommandException.cs      # a handler's refusal, answered as a system line
-      ICommandHost.cs          # the world a command runs in: players, the clock, SpawnEntity, Towers, Announce
+      ICommandHost.cs          # the world a command runs in: players, the clock, SpawnEntity, Towers, Announce, Operators
+                               #   (null in singleplayer)
+      IOperatorAdmin.cs        # a server's operator list as /op and /deop change it: TryOp, TryDeop
       ICommandPlayer.cs        # a player a command acts on: Feet, modes, Teleport, Give, TrySetModes, Kill
       Suggestion.cs            # one completion: what it inserts and what the popup shows
       CommandSuggestions.cs    # Suggest's answer: ReplaceStart, the ranked completions, the usage hint
@@ -171,11 +175,13 @@ OpenGLTest/
       GameCommands.cs          # Create: the dispatcher with every game command registered
       Arguments/               # IArgumentType (TokenCount, Syntax, TryParse, CouldStart, Suggest) and its kinds: WordArgument,
                                #   IntArgument, NumberArgument, CoordinatesArgument (x y z with ~), PlayerArgument (exact or
-                               #   unique prefix), EntityArgument (EntityRegistry), ItemArgument (block/ and item/ pinned names,
-                               #   TryResolve; ContentItem), CommandNameArgument (/help's)
+                               #   unique prefix), PlayerNameArgument (any name, online or not), EntityArgument (EntityRegistry),
+                               #   ItemArgument (block/ and item/ pinned names, TryResolve; ContentItem), CommandNameArgument
+                               #   (/help's)
       Definitions/             # one class per command with its Register: HelpCommand, TeleportCommand (LineTo, the /tp a link
                                #   suggests), GiveCommand, SummonCommand, TimeCommand, GameModeCommand, FlyCommand, KillCommand,
-                               #   LocateCommand (Tower: the linked /locate answer)
+                               #   LocateCommand (Tower: the linked /locate answer), OperatorCommands (/op and /deop,
+                               #   multiplayer-only)
     Config/                    # every tuning constant, one static class per domain (all const or static
                                #   readonly, read concurrently by every thread; namespace VoxelEngine.Config)
       FootprintConfig.cs       # footprints: default visibility and persistence, fade share, cap, print size and tint
@@ -203,7 +209,7 @@ OpenGLTest/
                                #   pip, cave weights), the cave mobs and their depth tier, healthbars, damage numbers, the realm layer
                                #   difficulty step
       NetworkConfig.cs         # multiplayer cadences, movement, edit and intent rules (the attack and cast slack),
-                               #   timeouts, LOD streaming, ServerAllowCreative
+                               #   timeouts, LOD streaming
       ParticleConfig.cs        # falling leaves, mining debris, campfire, lava and torch embers and smoke, bubbles,
                                #   spring steam, the cave biome motes (CaveMote*)
       PlayerConfig.cs          # break overlay, camera and swing feel (sprint FOV, strafe tilt, hit-stop, throw

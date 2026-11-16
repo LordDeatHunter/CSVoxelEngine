@@ -42,7 +42,7 @@ internal sealed class PlayerSessions
             IsOperator = _state.IsOperator(client.Name),
         };
         // A returning player gets back their inventory and modes, and starts where they left
-        var restored = player.Restore(ServerPlayerSaves.Load(_state.World.SaveStore, client.Name), _state.MayBeCreative(client.Name));
+        var restored = player.Restore(ServerPlayerSaves.Load(_state.World.SaveStore, client.Name), _state.IsOperator(client.Name));
         // A tower conquered while this player was away leaves their map
         TowerMarking.ForgetConquered(player.Inventory.TowerMarks, _state.World.Towers);
         var spawn = restored ? player.Position : joinSpawn;
@@ -79,7 +79,7 @@ internal sealed class PlayerSessions
             // only, and flight only with it. Granted first, so this very state's move is
             // judged under the flight it was made in.
             var requested = (NetPlayerFlags)flags;
-            current.Creative = _state.MayBeCreative(client.Name) && requested.HasFlag(NetPlayerFlags.Creative);
+            current.Creative = _state.IsOperator(client.Name) && requested.HasFlag(NetPlayerFlags.Creative);
             current.Flying = current.Creative && requested.HasFlag(NetPlayerFlags.Flying);
             current.Yaw = yaw;
             current.Pitch = pitch;

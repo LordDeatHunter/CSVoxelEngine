@@ -47,6 +47,48 @@ public sealed class CommandDispatcherTests
     }
 
     [Fact]
+    public void MultiplayerOnlyCommandsExistOnlyWhereTheHostHasAnOperatorList()
+    {
+        // Singleplayer has no operator list: /op is refused as multiplayer-only and is neither offered nor helped
+        Run("/op Bob");
+        Assert.Equal(CommandDispatcher.MultiplayerOnlyReply, _host.LastReply);
+        var source = _host.SourceFor(_self);
+        Assert.DoesNotContain(_commands.Visible(source), root => root.Name == "op");
+        Assert.DoesNotContain(_commands.Suggest("/o", 2, source).Items, s => s.Insert == "op");
+
+        // A server's host has one: the command runs through it, for operators only
+        var admin = new RecordingOperators();
+        _host.Operators = admin;
+        Run("/op Bob");
+        Run("/deop Bob");
+        Assert.Equal(["op Bob", "deop Bob"], admin.Calls);
+        Assert.Contains(_commands.Visible(_host.SourceFor(_self)), root => root.Name == "op");
+
+        Run("/op Carol", CommandPermission.Everyone);
+        Assert.Equal(CommandDispatcher.OperatorsOnly, _host.LastReply);
+        Assert.Equal(2, admin.Calls.Count);
+    }
+
+    private sealed class RecordingOperators : IOperatorAdmin
+    {
+        public List<string> Calls { get; } = [];
+
+        public bool TryOp(string name, out string refusal)
+        {
+            Calls.Add("op " + name);
+            refusal = "";
+            return true;
+        }
+
+        public bool TryDeop(string name, out string refusal)
+        {
+            Calls.Add("deop " + name);
+            refusal = "";
+            return true;
+        }
+    }
+
+    [Fact]
     public void TildeCoordinatesAreRelativeToTheSourcesFeet()
     {
         Run("/TP ~1 ~ ~-2.5");

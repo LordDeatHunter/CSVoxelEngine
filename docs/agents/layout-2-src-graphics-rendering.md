@@ -248,10 +248,13 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   climb, takeoff and bounce, the lift credit)
         MoveVerdict.cs         # Accepted / Clamped / Rejected
         NetValidation.cs       # server movement, edit-reach, intent-eye and visible-face sanity rules
-        OperatorList.cs        # who may be creative: ops.json in the world folder plus --op, matched by save slug
+        OperatorList.cs        # the operators (the only players who may be creative): ops.json in the world folder plus --op,
+                               #   matched by save slug; Remove and ToJson for /op and /deop
         PlayerSessions.cs      # join (hello), PlayerState judging, status ticks, saves, unique
                                #   names, the player list, leave and the idle sweep
         RateLimiter.cs         # GL-free token bucket (a player's edit rate)
+        ServerOperators.cs     # the server's IOperatorAdmin: /op and /deop change the list, save ops.json, resend the
+                               #   status of every online player under that name (a deop ends creative); the host can't be deopped
         ServerPlayer.cs        # a connected player on the server: own Inventory, creative/flight flags, pose,
                                #   its PlayerContext, newest sequence id, mining progress, edit rate, attack pace,
                                #   cast pacing (Casting), its PlayerHealth/fall tracking/respawn eye, mob-hit sink,
@@ -265,7 +268,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         ServerCommandPlayer.cs # a connected player's ICommandPlayer: a teleport corrects its client, a mode
                                #   change sends its status (creative only while MayBeCreative), a grant syncs
         ServerState.cs         # what the components share: world, client and player tables,
-                               #   pending connections, clock, join spawn, creative rights
+                               #   pending connections, clock, join spawn, the operators and the hosting player
         ServerTransport.cs     # TCP listener, accept thread, per-connection reader threads
         StreamRequests.cs      # chunk, column and far-LOD region requests and the LOD queue
         WaystoneSessions.cs    # waystones for each player: discovery on a replayed Use (WaystoneOpened),

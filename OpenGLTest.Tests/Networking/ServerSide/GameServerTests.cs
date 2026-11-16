@@ -419,7 +419,7 @@ public sealed class GameServerTests : IDisposable
     /// the hotbar by itself), then drops back to survival.</summary>
     private void GrantAsSurvival(NetworkClient client, ushort id, int count)
     {
-        _server.AllowCreative = true;
+        _server.Operators.Add(client.PlayerName);
         SendModes(client, NetPlayerFlags.Creative);
         SendIntent(client, InventoryIntent.CreativeGrant(id, count));
         AwaitInventory(client);
@@ -437,7 +437,8 @@ public sealed class GameServerTests : IDisposable
     [Fact]
     public void EachPlayerHasAnInventoryOfItsOwn()
     {
-        _server.AllowCreative = true;
+        _server.Operators.Add("First");
+        _server.Operators.Add("Second");
         using var first = Connect("First");
         using var second = Connect("Second");
         AwaitInventory(first);
@@ -483,7 +484,7 @@ public sealed class GameServerTests : IDisposable
         Assert.Equal(0, mirror.IdAt(2));
 
         // Once the player owns it, the same equip goes through
-        _server.AllowCreative = true;
+        _server.Operators.Add(client.PlayerName);
         SendModes(client, NetPlayerFlags.Creative);
         SendIntent(client, InventoryIntent.CreativeGrant(Stone, 1));
         AwaitInventory(client);
@@ -498,22 +499,20 @@ public sealed class GameServerTests : IDisposable
         using var client = Connect("Tester");
         AwaitInventory(client);
 
-        // A client asking for creative on a server that does not allow it stays survival, and is
-        // told so
-        _server.AllowCreative = false;
+        // A client who is not an operator asking for creative stays survival, and is told so
         SendModes(client, NetPlayerFlags.Creative | NetPlayerFlags.Flying);
         SendIntent(client, InventoryIntent.CreativeGrant(Stone, 5));
         Assert.Equal(0, AwaitInventory(client).CountFor(Stone));
         Assert.False(PlayerOf(client).Creative);
         Assert.Equal(NetPlayerFlags.None, InboxOf(client).Status);
 
-        // Allowed, but this player never asked: still refused
-        _server.AllowCreative = true;
+        // Opped, but this player never asked: still refused
+        _server.Operators.Add(client.PlayerName);
         SendModes(client, NetPlayerFlags.None);
         SendIntent(client, InventoryIntent.CreativeGrant(Stone, 5));
         Assert.Equal(0, AwaitInventory(client).CountFor(Stone));
 
-        // Allowed and asked for: granted, and only then may the catalog clear it again
+        // Opped and asked for: granted, and only then may the catalog clear it again
         SendModes(client, NetPlayerFlags.Creative);
         SendIntent(client, InventoryIntent.CreativeGrant(Stone, 5));
         Assert.Equal(5, AwaitInventory(client).CountFor(Stone));
@@ -530,12 +529,11 @@ public sealed class GameServerTests : IDisposable
     [Fact]
     public void AnOperatorMayBeCreativeWhileOthersAreRefused()
     {
-        _server.AllowCreative = false;
         _server.Operators.Add("Op");
         using var op = Connect("Op");
         using var guest = Connect("Guest");
-        Assert.True(_server.MayBeCreative("Op"));
-        Assert.False(_server.MayBeCreative("Guest"));
+        Assert.True(_server.IsOperator("Op"));
+        Assert.False(_server.IsOperator("Guest"));
 
         // Both are told their status at join; forget it, so a status from here on can only be the
         // answer to the mode request
@@ -676,10 +674,66 @@ public sealed class GameServerTests : IDisposable
     }
 
     [Fact]
+    public void OpGrantsOperatorRightsAndDeopTakesThemWithCreative()
+    {
+        _server.Operators.Add("Op");
+        using var op = Connect("Op");
+        using var guest = Connect("Guest");
+        PumpFor(0.1);
+        DrainAll();
+        Assert.False(InboxOf(guest).Operator);
+
+        SendLine(op, "/op Guest");
+        AwaitSystemLine(op, m => m.Text.Contains("now an operator", StringComparison.Ordinal));
+        Assert.True(_server.IsOperator("Guest"));
+        // The guest's client learns it at once, without rejoining
+        PumpFor(0.1);
+        DrainAll();
+        Assert.True(InboxOf(guest).Operator);
+        SendLine(guest, "/gamemode creative");
+        AwaitSystemLine(guest, m => m.Text.Contains("now in creative", StringComparison.Ordinal));
+        Assert.True(PlayerOf(guest).Creative);
+
+        SendLine(op, "/deop Guest");
+        AwaitSystemLine(op, m => m.Text.Contains("no longer an operator", StringComparison.Ordinal));
+        Assert.False(_server.IsOperator("Guest"));
+        // Creative is an operator's right: it ends with the deop, and the client is told
+        Assert.False(PlayerOf(guest).Creative);
+        PumpFor(0.1);
+        DrainAll();
+        Assert.False(InboxOf(guest).Operator);
+        Assert.Equal(NetPlayerFlags.None, InboxOf(guest).Status);
+
+        // A player who is no operator cannot op anyone, itself included
+        SendLine(guest, "/op Guest");
+        AwaitSystemLine(guest, m => m.Text == CommandDispatcher.OperatorsOnly);
+        Assert.False(_server.IsOperator("Guest"));
+    }
+
+    [Fact]
+    public void TheHostingPlayerIsAnOperatorNobodyCanDeop()
+    {
+        _server.HostPlayer = "Host";
+        using var host = Connect("Host");
+        Assert.True(_server.IsOperator("Host"));
+        // The host's rights come from hosting, so they are never written to the world's operator file
+        Assert.False(_server.Operators.Contains("Host"));
+
+        SendLine(host, "/deop Host");
+        AwaitSystemLine(host, m => m.Text.Contains("stays an operator", StringComparison.Ordinal));
+        Assert.True(_server.IsOperator("Host"));
+
+        SendLine(host, "/op host");
+        AwaitSystemLine(host, m => m.Text.Contains("already an operator", StringComparison.Ordinal));
+        Assert.Equal(0, _server.Operators.Count);
+    }
+
+    [Fact]
     public void CraftingSpendsOnlyTheCraftingPlayersIngredients()
     {
         var (recipe, members, grants) = FirstGrantableRecipe();
-        _server.AllowCreative = true;
+        _server.Operators.Add("Crafter");
+        _server.Operators.Add("Bystander");
         using var crafter = Connect("Crafter");
         using var bystander = Connect("Bystander");
         AwaitInventory(crafter);
@@ -801,7 +855,7 @@ public sealed class GameServerTests : IDisposable
 
         // The first player moves two chunks off. It flies (noclip), so the move is never judged
         // against whatever terrain stands beside the spawn, and the speed cap only paces it.
-        _server.AllowCreative = true;
+        _server.Operators.Add("First");
         PumpFor(0.1);
         var moved = spawn + new Vector3(2f * Chunk.Size, 0f, 0f);
         var movedChunk = (moved / Chunk.Size).Floor();
@@ -944,7 +998,7 @@ public sealed class GameServerTests : IDisposable
 
         // The bystander flies well out of pickup range first (a few states, each within the speed
         // cap); the flight flag is what makes a ten-block climb in one state legal
-        _server.AllowCreative = true;
+        _server.Operators.Add("Bystander");
         for (var lift = 10; lift <= 40; lift += 10)
         {
             SendState(bystander, arena.Eye + new Vector3(0f, lift, 0f), NetPlayerFlags.Creative | NetPlayerFlags.Flying);
@@ -1731,7 +1785,7 @@ public sealed class GameServerTests : IDisposable
         Assert.Equal(Dirt, CellAt(arena.Front).Id);
 
         // A replayed sequence id is refused too, whatever it asks
-        _server.AllowCreative = true;
+        _server.Operators.Add(client.PlayerName);
         SendModes(client, NetPlayerFlags.Creative);
         PumpFor(0.05);
         var replay = InboxOf(client).Seq;
@@ -2184,7 +2238,7 @@ public sealed class GameServerTests : IDisposable
     {
         using var client = Connect("Mage");
         var arena = PrepareArena(client.Server!.Value.Spawn);
-        _server.AllowCreative = true;
+        _server.Operators.Add(client.PlayerName);
         SendModes(client, NetPlayerFlags.Creative);
         var player = PlayerOf(client);
         var sw = Stopwatch.StartNew();

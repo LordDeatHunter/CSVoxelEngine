@@ -32,6 +32,24 @@ public sealed class OperatorListTests : IDisposable
     private static OperatorList Parse(string json) => OperatorList.Parse(Encoding.UTF8.GetBytes(json));
 
     [Fact]
+    public void RemoveDropsEverySpellingOfANameAndTheFileRoundTrips()
+    {
+        var ops = new OperatorList();
+        Assert.True(ops.Add("Alice"));
+        Assert.False(ops.Add("ALICE!"));
+        ops.Add("Bob");
+
+        Assert.True(ops.Remove("alice"));
+        Assert.False(ops.Contains("Alice"));
+        Assert.False(ops.Remove("Alice"));
+        Assert.True(ops.Contains("Bob"));
+
+        // What /op and /deop save is what the server reads back on its next start
+        var reread = OperatorList.Parse(ops.ToJson());
+        Assert.Equal(ops.Names, reread.Names);
+    }
+
+    [Fact]
     public void NamesMatchBySlugAndBadInputIsEmpty()
     {
         var ops = new OperatorList();

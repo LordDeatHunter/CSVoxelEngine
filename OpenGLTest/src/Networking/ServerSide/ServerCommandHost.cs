@@ -8,7 +8,8 @@ namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>The server's world as commands see it: the connected players, the world's clock (a change goes out to
 /// every client at once), mobs and towers, and announcements broadcast as system lines. Main thread only.</summary>
-internal sealed class ServerCommandHost(ServerState state, ServerBroadcasts broadcasts, Action<string> announce) : ICommandHost
+internal sealed class ServerCommandHost(ServerState state, ServerBroadcasts broadcasts, Action<string> announce,
+    IOperatorAdmin operators) : ICommandHost
 {
     public IReadOnlyList<string> PlayerNames
     {
@@ -44,4 +45,6 @@ internal sealed class ServerCommandHost(ServerState state, ServerBroadcasts broa
     public TowerManager? Towers => state.World.Towers;
 
     public void Announce(string text) => announce(text);
+
+    public IOperatorAdmin Operators => operators;
 }

@@ -22,6 +22,9 @@ public static class Arg
     /// <summary>An online player; read it with <see cref="CommandContext.Player"/>.</summary>
     public static ArgumentNode Player(string name) => new(name, new PlayerArgument());
 
+    /// <summary>A player's name, online or not; the value is the <see cref="string"/> as typed.</summary>
+    public static ArgumentNode PlayerName(string name) => new(name, new PlayerNameArgument());
+
     /// <summary>A registered entity kind; the value is its <see cref="string"/> name.</summary>
     public static ArgumentNode Entity(string name) => new(name, new EntityArgument());
 

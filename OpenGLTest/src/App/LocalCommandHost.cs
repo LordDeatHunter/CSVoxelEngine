@@ -30,4 +30,6 @@ internal sealed class LocalCommandHost(World world, ChatView chat) : ICommandHos
     public TowerManager? Towers => world.Towers;
 
     public void Announce(string text) => chat.AddSystem(text);
+
+    public IOperatorAdmin? Operators => null;
 }

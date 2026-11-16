@@ -12,7 +12,7 @@ namespace VoxelEngine.Networking.Client;
 /// connected client sends every command line to the server, which runs it, so this host acts on nobody and is never
 /// asked for an effect. Main thread only.
 /// </summary>
-internal sealed class ClientCommandHost(World world, ChatView chat) : ICommandHost
+internal sealed class ClientCommandHost(World world, ChatView chat) : ICommandHost, IOperatorAdmin
 {
     public IReadOnlyList<string> PlayerNames
     {
@@ -36,6 +36,13 @@ internal sealed class ClientCommandHost(World world, ChatView chat) : ICommandHo
     public TowerManager? Towers => null;
 
     public void Announce(string text) => throw RunsOnTheServer();
+
+    // A server has an operator list, so its multiplayer-only commands complete here; the server runs them
+    public IOperatorAdmin Operators => this;
+
+    public bool TryOp(string name, out string refusal) => throw RunsOnTheServer();
+
+    public bool TryDeop(string name, out string refusal) => throw RunsOnTheServer();
 
     private static NotSupportedException RunsOnTheServer() => new("A connected client's commands run on the server.");
 }

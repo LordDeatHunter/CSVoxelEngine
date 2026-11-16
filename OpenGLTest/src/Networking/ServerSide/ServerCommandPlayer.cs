@@ -33,7 +33,7 @@ internal sealed class ServerCommandPlayer(ClientConnection client, ServerPlayer 
 
     public bool TrySetModes(bool creative, bool flying, out string refusal)
     {
-        if (creative && !state.MayBeCreative(player.Name))
+        if (creative && !state.IsOperator(player.Name))
         {
             refusal = $"{player.Name} may not be creative on this server";
             return false;

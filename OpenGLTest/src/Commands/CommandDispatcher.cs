@@ -16,6 +16,9 @@ public sealed class CommandDispatcher
     /// <summary>The answer to a node the source may not use.</summary>
     public const string OperatorsOnly = "That command is for operators only";
 
+    /// <summary>The answer to a multiplayer-only command run in singleplayer.</summary>
+    public const string MultiplayerOnlyReply = "That command is only available in multiplayer";
+
     private readonly List<LiteralNode> _roots = [];
 
     public IReadOnlyList<LiteralNode> Roots => _roots;
@@ -36,7 +39,7 @@ public sealed class CommandDispatcher
     public IEnumerable<LiteralNode> Visible(CommandSource source)
     {
         foreach (var root in _roots)
-            if (source.Allows(root.Permission))
+            if (source.MayRun(root))
                 yield return root;
     }
 
@@ -69,6 +72,11 @@ public sealed class CommandDispatcher
         if (root == null)
         {
             source.Reply($"Unknown command /{tokens[0]}. Type /help for the list", null);
+            return;
+        }
+        if (!source.Has(root))
+        {
+            source.Reply(MultiplayerOnlyReply, null);
             return;
         }
         if (!source.Allows(root.Permission))
@@ -130,7 +138,7 @@ public sealed class CommandDispatcher
         }
 
         var root = FindRoot(tokens[0]);
-        if (root == null || !source.Allows(root.Permission)) return CommandSuggestions.None;
+        if (root == null || !source.MayRun(root)) return CommandSuggestions.None;
         var usage = Usage(root, source);
         CommandNode node = root;
         var permission = root.Permission;

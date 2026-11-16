@@ -18,6 +18,7 @@ public static class GameCommands
         FlyCommand.Register(dispatcher);
         KillCommand.Register(dispatcher);
         LocateCommand.Register(dispatcher);
+        OperatorCommands.Register(dispatcher);
         return dispatcher;
     }
 }

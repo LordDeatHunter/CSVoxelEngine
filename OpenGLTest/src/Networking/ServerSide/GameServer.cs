@@ -60,9 +60,8 @@ namespace VoxelEngine.Networking.ServerSide;
 /// </para>
 /// <para>
 /// Creative (and with it flight, which the movement rules treat as noclip) is a per-player
-/// permission: a client's creative bit is only a request, granted to everyone while
-/// <see cref="AllowCreative"/> is on and otherwise only to the <see cref="Operators"/>
-/// (<see cref="MayBeCreative"/>), at join and on every state. A refused request is answered once
+/// permission: a client's creative bit is only a request, granted only to the <see cref="Operators"/>
+/// (<see cref="IsOperator"/>), at join and on every state. A refused request is answered once
 /// with a <see cref="NetMessage.PlayerStatus"/> carrying the modes the player really has.
 /// </para>
 /// <para>
@@ -109,26 +108,25 @@ public sealed class GameServer : IDisposable
     public int Port { get; }
 
     /// <summary>
-    /// Whether every player may be creative here. Without it only the <see cref="Operators"/> may
-    /// (<see cref="MayBeCreative"/>). Defaults to <see cref="NetworkConfig.ServerAllowCreative"/>.
-    /// </summary>
-    public bool AllowCreative { get => _state.AllowCreative; set => _state.AllowCreative = value; }
-
-    /// <summary>
-    /// The players who may be creative while <see cref="AllowCreative"/> is off: the world
-    /// folder's <see cref="OperatorList.FileName"/> plus every <c>--op</c> on the command line.
-    /// Empty by default, so nobody is.
+    /// The operators, the only players who may be creative and run operator commands: the world
+    /// folder's <see cref="OperatorList.FileName"/> plus every <c>--op</c> on the command line (or the
+    /// hosting player, for a world hosted from the game). Empty by default, so nobody is.
     /// </summary>
     public OperatorList Operators { get => _state.Operators; set => _state.Operators = value; }
 
     /// <summary>
-    /// Whether the player joining as <paramref name="name"/> may be creative: everyone while
-    /// <see cref="AllowCreative"/> is on, otherwise only an operator. A player's creative flag
-    /// (requested through the flags of its <see cref="NetMessage.PlayerState"/>, restored from its
-    /// save) is only ever set while this holds, flight only with creative, and creative grants and
-    /// clears are refused without it.
+    /// Whether the player joining as <paramref name="name"/> is an operator, and so may be creative. A
+    /// player's creative flag (requested through the flags of its <see cref="NetMessage.PlayerState"/>,
+    /// restored from its save) is only ever set while this holds, flight only with creative, and creative
+    /// grants and clears are refused without it.
     /// </summary>
-    public bool MayBeCreative(string name) => _state.MayBeCreative(name);
+    public bool IsOperator(string name) => _state.IsOperator(name);
+
+    /// <summary>
+    /// The player hosting this world from the game (<see cref="Hosting.HostedServer"/>): always an operator, never
+    /// written to <see cref="OperatorList.FileName"/> and never deopped. Null on a dedicated server.
+    /// </summary>
+    public string? HostPlayer { get => _state.HostPlayer; set => _state.HostPlayer = value; }
 
     /// <summary>The connected player with this id (tests and diagnostics; main thread only).</summary>
     public bool TryGetPlayer(int id, out ServerPlayer player) => _state.Players.TryGetValue(id, out player!);

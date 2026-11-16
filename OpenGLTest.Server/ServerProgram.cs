@@ -18,11 +18,10 @@ namespace VoxelEngine.Server;
 /// The dedicated server's entry point: loads content headlessly, asks which saved world to host (or
 /// creates a new one), asks for a port, then runs a headless <see cref="World"/> with a
 /// <see cref="GameServer"/> until Ctrl+C or a typed <c>stop</c>. The world is saved on shutdown
-/// exactly like a game world, so a server session persists its edits. <c>--allow-creative</c> lets
-/// every player turn creative on (<see cref="GameServer.AllowCreative"/>). Without it only the
-/// operators may (<see cref="GameServer.Operators"/>): the players named by each <c>--op &lt;name&gt;</c>
-/// argument (repeatable) and by the hosted world folder's <see cref="OperatorList.FileName"/>, a
-/// JSON array of names; everyone else stays in survival. The world's terrain comes from the
+/// exactly like a game world, so a server session persists its edits. Only the operators may turn
+/// creative on (<see cref="GameServer.Operators"/>): the players named by each <c>--op &lt;name&gt;</c>
+/// argument (repeatable), by the hosted world folder's <see cref="OperatorList.FileName"/>, a JSON
+/// array of names, and by <c>/op</c>; everyone else stays in survival. The world's terrain comes from the
 /// <see cref="IWorldSource"/> named by <c>--source &lt;name&gt;</c>, else by the world's
 /// <c>world.json</c> <c>source</c> field (<see cref="WorldInfo.Source"/>), else worldgen
 /// (<see cref="WorldSources"/>): <c>imported</c> reads the world folder's
@@ -35,8 +34,6 @@ public static class ServerProgram
 
     public static void Main(string[] args)
     {
-        var allowCreative = NetworkConfig.ServerAllowCreative
-            || Array.Exists(args, a => a.Equals("--allow-creative", StringComparison.OrdinalIgnoreCase));
         var sourceArg = ArgValue(args, SourceFlag);
         if (sourceArg == null && Array.Exists(args, a => a.Equals(SourceFlag, StringComparison.OrdinalIgnoreCase)))
         {
@@ -110,7 +107,6 @@ public static class ServerProgram
             worldSource: source);
         using var server = new GameServer(gameWorld, world.Name, world.Seed, port)
         {
-            AllowCreative = allowCreative,
             Operators = operators,
         };
         try
@@ -130,7 +126,7 @@ public static class ServerProgram
         Console.WriteLine();
         Console.WriteLine($"Serving '{world.Name}' (seed {world.Seed}) on port {server.BoundPort} (IPv4 and IPv6).");
         Console.WriteLine(SourceLine(source));
-        Console.WriteLine(CreativeLine(allowCreative, operators));
+        Console.WriteLine(CreativeLine(operators));
         Console.WriteLine("Type 'stop' or press Ctrl+C to shut down.");
 
         var stop = new ManualResetEventSlim(false);
@@ -274,16 +270,10 @@ public static class ServerProgram
         ? $"World source: {WorldSources.Imported} ({imported.MapDirectory}; generated outside the imported columns)"
         : $"World source: {WorldSources.Generated}";
 
-    // The startup line saying who may be creative: everyone, the listed operators, or nobody
-    private static string CreativeLine(bool allowCreative, OperatorList operators)
-    {
-        if (allowCreative)
-            return "Creative mode is allowed for everyone.";
-        if (operators.Count > 0)
-            return $"Creative mode is off; operators: {string.Join(", ", operators.Names)}";
-        return "Creative mode is off; operators: none; start with --allow-creative or --op <name>, "
-               + $"or list names in the world folder's {OperatorList.FileName}.";
-    }
+    // The startup line saying who may be creative: the listed operators, or nobody
+    private static string CreativeLine(OperatorList operators) => operators.Count > 0
+        ? $"Creative mode is for operators: {string.Join(", ", operators.Names)}"
+        : $"Creative mode is for operators: none; start with --op <name> or list names in the world folder's {OperatorList.FileName}.";
 
     // Whether this build reads the world's save format (MainMenuController's PLAY gate)
     private static bool IsHostable(WorldInfo world) => world.Version == WorldStore.CurrentVersion;

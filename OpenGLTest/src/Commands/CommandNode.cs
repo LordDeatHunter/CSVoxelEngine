@@ -23,6 +23,10 @@ public abstract class CommandNode(string name)
 
     public CommandPermission Permission { get; internal set; }
 
+    /// <summary>Whether this command exists only where the host has an operator list (a server, or a client
+    /// completing for one); only a root's is read.</summary>
+    public bool MultiplayerOnly { get; internal set; }
+
     /// <summary>One line for <c>/help</c>; only a root's is shown.</summary>
     public string Description { get; internal set; } = "";
 

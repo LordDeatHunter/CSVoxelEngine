@@ -14,7 +14,8 @@ internal sealed class ServerChat
     internal ServerChat(ServerState state, ServerBroadcasts broadcasts)
     {
         _state = state;
-        _host = new ServerCommandHost(state, broadcasts, BroadcastSystem);
+        _host = new ServerCommandHost(state, broadcasts, BroadcastSystem,
+            new ServerOperators(state, (client, text) => SendSystem(client, text, null)));
     }
 
     internal void OnChatSend(ClientConnection client, PacketReader reader)

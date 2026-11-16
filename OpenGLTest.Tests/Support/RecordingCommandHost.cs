@@ -42,6 +42,10 @@ public sealed class RecordingCommandHost : ICommandHost
 
     public void Announce(string text) => Announced.Add(text);
 
+    /// <summary>The operator list; null (the default) is singleplayer, where the multiplayer-only commands do not
+    /// exist.</summary>
+    public IOperatorAdmin? Operators { get; set; }
+
     /// <summary>A player added to this world.</summary>
     public RecordingCommandPlayer Add(string name, Vector3 feet = default, bool mayBeCreative = true)
     {

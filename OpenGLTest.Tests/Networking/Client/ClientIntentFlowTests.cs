@@ -40,7 +40,8 @@ public sealed class ClientIntentFlowTests : IDisposable
         TestContent.EnsureLoaded();
         WorldSeed.Apply(WorldSeed.Default);
         _server = new World(null!, null!, null!, null!, null!, null!, null, null, serverMode: true);
-        _host = new GameServer(_server, "Test World", WorldSeed.Default, 0) { AllowCreative = true };
+        _host = new GameServer(_server, "Test World", WorldSeed.Default, 0);
+        _host.Operators.Add("Client");
         _host.Start();
     }
 
