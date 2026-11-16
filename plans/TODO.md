@@ -491,12 +491,6 @@ single-arc player.
   `Capture`/`Restore` and a list in `StationSaveData`**), but primed TNT, falling blocks,
   projectiles, toppling trees and the sapling clock are still lost on a save & quit. All are
   transient and self-resolving; primed TNT mid-fuse is the only one with a real argument.
-- [ ] **`M-27` · Iceberg gaps** — P3, M.
-  Drifting icebergs (`AGENTS.md` "Icebergs") ignore item drops, mobs, projectiles, TNT blasts, the
-  punch/slice cones and the block raycast; the server judges a rider's hover against them but not
-  the endpoint collision; a body resting against a berg nudges it slightly; client mirrors
-  dead-reckon without collision; an imported (supplied) sea spawns none; and a block that lands or
-  hardens inside a berg's bounds is not refused.
 - [ ] **`M-28` · Great-lake gaps** — P3, M.
   The great-lake tier (`BIOMEGEN.md` §6 great lakes, `WorldGen/GreatLakes.cs`) leaves three gaps: an
   elevated great lake (surface above `SeaLevel`) mirrors against the single sea-level reflection

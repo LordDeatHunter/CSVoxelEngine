@@ -92,7 +92,7 @@ public sealed class TowerRecord
 
     /// <summary>
     /// A record from explicit floor data, ground floor first: each floor's band (<c>Bottom</c> exclusive, <c>Top</c>
-    /// inclusive), its pile cells (each starting with <see cref="MobConfig.SkeletonPileWaves"/> waves) and its door cells.
+    /// inclusive), its pile spot cells (each laying out <see cref="TowerDifficulty.PilesPerSpot"/> bone piles) and its door cells.
     /// <paramref name="hasSite"/> marks a record of a real world site, which is saved.
     /// </summary>
     public static TowerRecord Build((int CellX, int CellZ) key, int centerX, int centerZ, int outerRadius,
@@ -107,9 +107,13 @@ public sealed class TowerRecord
         for (var k = 0; k < floors.Count; k++)
         {
             var floor = floors[k];
-            var piles = new PileState[floor.Piles.Count];
+            var perSpot = TowerDifficulty.PilesPerSpot(k);
+            var piles = new PileState[floor.Piles.Count * perSpot];
             for (var i = 0; i < piles.Length; i++)
-                piles[i] = new PileState(floor.Piles[i], MobConfig.SkeletonPileWaves);
+            {
+                var (x, y, z) = floor.Piles[i / perSpot];
+                piles[i] = new PileState(TowerRules.PileSpot(x, y, z, i % perSpot, perSpot));
+            }
             states[k] = new TowerFloorState(k, floor.Bottom, floor.Top, new TowerFloorRef(key.CellX, key.CellZ, k), piles,
                 floor.Doors);
         }
@@ -127,11 +131,12 @@ public sealed class TowerRecord
     }
 
     /// <summary>
-    /// A client's display-only copy of the server's record: per floor its band, piles left, skeletons left and door bit,
-    /// and the altar's state, with no piles or door cells of its own. It never ticks.
+    /// A client's display-only copy of the server's record: per floor its band, piles left, skeletons left, door bit and
+    /// the spots of the piles to draw, and the altar's state, with no piles or door cells of its own. It never ticks.
     /// </summary>
     public static TowerRecord Mirror((int CellX, int CellZ) key, int centerX, int centerZ, int outerRadius,
-        IReadOnlyList<(int Bottom, int Top, int PilesLeft, int Alive, bool DoorOpen)> floors, TowerAltarState altarState)
+        IReadOnlyList<(int Bottom, int Top, int PilesLeft, int Alive, bool DoorOpen, Vector3[] Spots)> floors,
+        TowerAltarState altarState)
     {
         var states = new TowerFloorState[floors.Count];
         for (var k = 0; k < floors.Count; k++)
@@ -139,6 +144,7 @@ public sealed class TowerRecord
             var floor = floors[k];
             states[k] = new TowerFloorState(k, floor.Bottom, floor.Top, new TowerFloorRef(key.CellX, key.CellZ, k), [], [])
             {
+                MirrorSpots = floor.Spots,
                 PilesLeft = floor.PilesLeft,
                 Alive = floor.Alive,
                 DoorOpen = floor.DoorOpen,

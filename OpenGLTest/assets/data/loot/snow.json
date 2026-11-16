@@ -1,7 +1,7 @@
 {
   "pools": [
     {
-      "rolls": { "provider": "pile_count" },
+      "rolls": { "provider": "snow_layers" },
       "entries": [ { "item": "item/snow" } ]
     }
   ]

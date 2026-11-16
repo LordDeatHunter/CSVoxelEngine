@@ -10,6 +10,8 @@
     "textures": { "side": "oak_log_side", "inner": "hollow_oak_log_inner", "end": "hollow_oak_log_end" }
   },
   "facing": "horizontal",
+  // Placed upright on a floor or ceiling, or lying out of the wall it is placed against
+  "axisFromFace": true,
   // Half of oak_log's full-cube 24, so it mines in half the time
   "hardness": 12,
   "requiresTool": true,

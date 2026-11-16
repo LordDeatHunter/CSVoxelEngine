@@ -258,6 +258,11 @@ public static class ContentRegistry
                 type.SwayTopY = maxY;
             }
 
+            // A placed log lies on its side along the look: its two lying shapes, picked by the state byte
+            // (WoodState.LyingAxis) where the mesher would draw the upright cube
+            if (type.AxisFromFace && type.Renderer == BlockRenderer.TreeWood)
+                type.LyingModels = ModelBakeSteps.BakeLyingModels(type, baked);
+
             // A facing block (a wall torch) is authored facing north and turned about its own cell
             // to the other three; the mesher picks the model by the state byte's low two bits
             if (type.HasHorizontalFacing)
@@ -270,6 +275,9 @@ public static class ContentRegistry
                     HorizontalFacing.RotateModel(baked, 2, 1f),
                     HorizontalFacing.RotateModel(baked, 3, 1f),
                 ];
+                // A log authored along Z also stands upright: shapes 4-7 (the state byte's bit 2)
+                if (type.AxisFromFace)
+                    type.RotatedModels = HorizontalFacing.WithUpright(type.RotatedModels);
 
                 // An openable block's open model follows its four closed ones, indexed by the
                 // state byte's open bit beside the facing (DoorState.ShapeIndex)

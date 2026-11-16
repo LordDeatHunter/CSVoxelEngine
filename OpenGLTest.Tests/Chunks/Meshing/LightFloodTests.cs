@@ -14,10 +14,9 @@ namespace VoxelEngine.Tests.Chunks.Meshing;
 /// reference written here with no engine flood code: every sky cell at 15 and every lamp at its
 /// emission, then a plain FIFO breadth-first flood that decodes each cell's coordinates by
 /// division. The sun and block volumes must agree byte for byte on real generated terrain, so a
-/// faster flood (pruned seeds, index stepping) can never change a lit cell. With a covering block in
-/// the neighborhood (the battle tower's bricks) the reference applies the sky-cover rule on its own:
-/// no sun seed under the highest covering cell of a column, while a plain stone slab keeps the
-/// heightmap rule.
+/// faster flood (pruned seeds, index stepping) can never change a lit cell. The reference applies
+/// the opaque-cover rule independently: no sun seed under the highest light-blocking cell of a
+/// column, including ordinary stone above the terrain.
 /// </summary>
 public sealed class LightFloodTests
 {
@@ -38,6 +37,7 @@ public sealed class LightFloodTests
     [InlineData("OceanFloor")]
     [InlineData("LampLit")]
     [InlineData("RoofAboveTerrain")]
+    [InlineData("RoofAcrossNegativeSeam")]
     [InlineData("TowerSlabAboveTerrain")]
     [InlineData("NullCorners")]
     [InlineData("HillsideTunnels")]
@@ -49,9 +49,8 @@ public sealed class LightFloodTests
         var light = new ushort[LightCount];
         ChunkLighting.FillLightSnapshot(light, neighbors.Select(c => c?.Storage).ToArray());
 
-        var skyCover = ChunkLighting.AnySkyCover(neighbors);
-        var (sun, block, anyTinted) = Flood(center, light, skyCover);
-        var (expectedSun, expectedBlock, expectedTinted) = ReferenceFlood(center, light, skyCover);
+        var (sun, block, anyTinted) = Flood(center, light);
+        var (expectedSun, expectedBlock, expectedTinted) = ReferenceFlood(center, light);
 
         AssertSameVolume("sun", expectedSun, sun);
         AssertSameVolume("block", expectedBlock, block);
@@ -86,21 +85,15 @@ public sealed class LightFloodTests
             Assert.Contains(block, b => b != 0 && b >> 4 == 0);
         }
 
-        // Under a covering slab the sky is hidden even above the terrain height and only the lamp lights the cell;
-        // under the same slab of plain stone the heightmap rule still makes it sky
-        if (scene is "TowerSlabAboveTerrain" or "RoofAboveTerrain")
+        // Tower bricks and ordinary stone both hide sky above the terrain height.
+        if (scene is "TowerSlabAboveTerrain" or "RoofAboveTerrain" or "RoofAcrossNegativeSeam")
         {
-            Assert.Equal(scene == "TowerSlabAboveTerrain", skyCover);
-            var under = UnderSlabCenter(center);
-            if (skyCover)
-            {
-                Assert.True(sun[under] < 15, $"the cell under the tower slab still sees the sky (sun {sun[under]})");
+            var under = scene == "RoofAcrossNegativeSeam"
+                ? LightIndex(center, -8, CenterHeight(-1, -1) + 2, -8)
+                : UnderSlabCenter(center);
+            Assert.True(sun[under] < 15, $"the cell under {scene} still sees the sky (sun {sun[under]})");
+            if (scene == "TowerSlabAboveTerrain")
                 Assert.True((block[under] & 0x0F) > 0, "the lamp under the tower slab lights nothing");
-            }
-            else
-            {
-                Assert.Equal(15, sun[under]);
-            }
         }
     }
 
@@ -110,15 +103,37 @@ public sealed class LightFloodTests
         var wx = Size / 2;
         var wz = Size / 2;
         var wy = CenterHeight(0, 0) + 2;
+        return LightIndex(center, wx, wy, wz);
+    }
+
+    private static int LightIndex(Chunk center, int wx, int wy, int wz)
+    {
         var lx = wx - ((int)center.Position.X * Size - Chunk.LightBorder);
         var ly = wy - (center.LowerBoundY - Chunk.LightBorder);
         var lz = wz - ((int)center.Position.Z * Size - Chunk.LightBorder);
         return (lx * LightSize + ly) * LightSize + lz;
     }
 
+    [Theory]
+    [InlineData("glass")]
+    [InlineData("oak_leaves")]
+    [InlineData("cloud_block")]
+    [InlineData("water")]
+    [InlineData("cobblestone_slab")]
+    public void PassingRoofsLeaveTheSkyOpen(string block)
+    {
+        var neighbors = RoofAboveTerrain(block);
+        var center = neighbors[Center]!;
+        var light = new ushort[LightCount];
+        ChunkLighting.FillLightSnapshot(light, neighbors.Select(c => c?.Storage).ToArray());
+        Assert.True(BlockType.PassesLightById[Block(block)]);
+        var (sun, _, _) = Flood(center, light);
+        Assert.Equal(15, sun[UnderSlabCenter(center)]);
+    }
+
     // ---- the engine flood ----
 
-    private static (byte[] Sun, byte[] Block, bool AnyTinted) Flood(Chunk center, ushort[] light, bool skyCover)
+    private static (byte[] Sun, byte[] Block, bool AnyTinted) Flood(Chunk center, ushort[] light)
     {
         var sun = new byte[LightCount];
         var block = new byte[LightCount];
@@ -130,7 +145,7 @@ public sealed class LightFloodTests
         {
             Assert.True(ChunkLighting.FillColumns(WorldgenColumnSource.Instance,
                 (int)center.Position.X, (int)center.Position.Z, MeshScratch.Current.Columns));
-            var anyTinted = ChunkLighting.ComputeLight(center, light, sun, block, queue, skyCover);
+            var anyTinted = ChunkLighting.ComputeLight(center, light, sun, block, queue);
             return (sun, block, anyTinted);
         }
         finally
@@ -141,14 +156,13 @@ public sealed class LightFloodTests
 
     // ---- the naive reference ----
 
-    private static (byte[] Sun, byte[] Block, bool AnyTinted) ReferenceFlood(Chunk center, ushort[] light, bool skyCover)
+    private static (byte[] Sun, byte[] Block, bool AnyTinted) ReferenceFlood(Chunk center, ushort[] light)
     {
         var worldX0 = (int)center.Position.X * Size - Chunk.LightBorder;
         var worldZ0 = (int)center.Position.Z * Size - Chunk.LightBorder;
         var worldY0 = center.LowerBoundY - Chunk.LightBorder;
 
-        // Sun: every light-passing cell at or above its column's terrain height sees the sky, unless (with sky
-        // cover) a covering block stands anywhere above it in its volume column
+        // Sun: every passing cell above terrain sees sky unless an opaque cell stands above it.
         var sun = new byte[LightCount];
         var sunSeeds = new List<int>();
         for (var lx = 0; lx < LightSize; lx++)
@@ -156,10 +170,9 @@ public sealed class LightFloodTests
         {
             var height = ProbeHeight(worldX0 + lx, worldZ0 + lz);
             var highestCover = -1;
-            if (skyCover)
-                for (var ly = 0; ly < LightSize; ly++)
-                    if (BlockType.CoversSkyById[light[(lx * LightSize + ly) * LightSize + lz]])
-                        highestCover = ly;
+            for (var ly = 0; ly < LightSize; ly++)
+                if (worldY0 + ly >= height && !ChunkLighting.PassesLight(light[(lx * LightSize + ly) * LightSize + lz]))
+                    highestCover = ly;
             for (var ly = 0; ly < LightSize; ly++)
             {
                 var i = (lx * LightSize + ly) * LightSize + lz;
@@ -269,6 +282,7 @@ public sealed class LightFloodTests
         "OceanFloor" => OceanFloor(),
         "LampLit" => LampLit(),
         "RoofAboveTerrain" => RoofAboveTerrain("stone"),
+        "RoofAcrossNegativeSeam" => RoofAcrossNegativeSeam(),
         "TowerSlabAboveTerrain" => TowerSlabAboveTerrain(),
         "NullCorners" => NullCorners(),
         "HillsideTunnels" => HillsideTunnels(),
@@ -346,6 +360,16 @@ public sealed class LightFloodTests
         var target = neighbors[(1 * 3 + 1 + dy) * 3 + 1]!;
         var localY = roofY - target.LowerBoundY;
         Fill(target, 3, 12, localY, localY, 3, 12, Block(block));
+        return neighbors;
+    }
+
+    private static Chunk?[] RoofAcrossNegativeSeam()
+    {
+        var roofY = CenterHeight(-1, -1) + 3;
+        var neighbors = Neighborhood(-1, FloorDiv(roofY - 1, Size), -1);
+        for (var x = -20; x <= -4; x++)
+        for (var z = -20; z <= -4; z++)
+            SetWorld(neighbors, x, roofY, z, Block("stone"));
         return neighbors;
     }
 

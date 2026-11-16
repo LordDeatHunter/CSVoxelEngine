@@ -36,8 +36,11 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
         findSite ?? ((x, z) => TowerPlacement.TryFindAt(x, z, out var site) ? site : null);
     private readonly Dictionary<(int, int), TowerRecord> _records = [];
     private readonly SkeletonPileManager _piles = new();
+    // Pile spots of one floor, gathered while writing a snapshot
+    private readonly List<Vector3> _spotScratch = [];
+
     // Bound skeletons owed back to their floors, gathered once a frame
-    private readonly List<TowerFloorRef> _owedScratch = [];
+    private readonly List<OwedSkeleton> _owedScratch = [];
     private float _scanTimer;
     // The frame's targets, whose bodies a collapse never fills with rubble
     private IReadOnlyList<IMobTarget> _targets = [];
@@ -105,7 +108,7 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
         var alarmed = 0;
         foreach (var pile in floor.Piles)
         {
-            if (pile.Depleted || !TowerRules.PileTriggers(pile.Cell, floor.BottomY, floor.TopY, center,
+            if (pile.Depleted || !TowerRules.PileTriggers(pile.Spot, floor.BottomY, floor.TopY, center,
                     MobConfig.SkeletonChestAlarmBlocks)) continue;
             pile.Alarmed = true;
             alarmed++;
@@ -113,12 +116,14 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
         return alarmed;
     }
 
-    /// <summary>Owes one skeleton back to floor <paramref name="floor"/>, when that tower and floor are tracked.</summary>
-    public void Owe(TowerFloorRef floor)
+    /// <summary>Owes one skeleton back to floor <paramref name="owed"/>, when that tower and floor are tracked: it leaves
+    /// a bone pile where it stood, which rises again for the next target.</summary>
+    public void Owe(OwedSkeleton owed)
     {
+        var floor = owed.Floor;
         if (!_records.TryGetValue((floor.CellX, floor.CellZ), out var record)) return;
         if (floor.Floor < 0 || floor.Floor >= record.Floors.Length) return;
-        record.Floors[floor.Floor].Owed++;
+        record.Floors[floor.Floor].OwedPiles.Add(owed.Spot);
     }
 
     /// <summary>
@@ -129,7 +134,7 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
     /// skeletons.
     /// </summary>
     public void Update(float dt, ChunkManager chunks, SkeletonManager? skeletons, IReadOnlyList<IMobTarget> targets,
-        Func<TowerFloorRef, int>? pending, Action<List<TowerFloorRef>>? takeDiscarded)
+        Func<TowerFloorRef, int>? pending, Action<List<OwedSkeleton>>? takeDiscarded)
     {
         if (writer == null || skeletons == null) return;
         writer.BeginFrame();
@@ -158,8 +163,8 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
         if (record == null || floor < 0 || floor >= record.Floors.Length) return false;
 
         var state = record.Floors[floor];
-        foreach (var pile in state.Piles) pile.WavesLeft = 0;
-        state.Owed = 0;
+        foreach (var pile in state.Piles) pile.Raised = true;
+        state.OwedPiles.Clear();
         for (var i = 0; i < skeletons.Count; i++)
         {
             var skeleton = skeletons[i];
@@ -317,22 +322,29 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
     }
 
     /// <summary>
-    /// The look-at status line of the pile, door or altar block <paramref name="blockId"/> at (<paramref name="x"/>,
+    /// The look-at status line of the door or altar block <paramref name="blockId"/> at (<paramref name="x"/>,
     /// <paramref name="y"/>, <paramref name="z"/>), or null for any other block or a cell outside every tracked tower.
     /// Reads mirrors too. A door is named by the floor whose band holds it (a door sits on its own floor's stair).
     /// </summary>
     public string? Detail(ushort blockId, int x, int y, int z)
     {
-        if (blockId != TowerPalette.PileBlock && blockId != TowerPalette.DoorBlock && blockId != TowerPalette.AltarBlock)
-            return null;
+        if (blockId != TowerPalette.DoorBlock && blockId != TowerPalette.AltarBlock) return null;
         var record = RecordAt(x, z);
         if (record == null) return null;
         if (blockId == TowerPalette.AltarBlock) return TowerReadout.Altar(TowerRules.AltarVerdictOf(record));
         var k = record.FloorOf(y);
         var floor = record.Floors[k];
-        if (blockId == TowerPalette.PileBlock) return TowerReadout.Pile(floor);
         if (floor.DoorOpen) return null;
         return TowerReadout.Door(floor, k == 0 || record.Floors[k - 1].DoorOpen);
+    }
+
+    /// <summary>Appends where every bone pile of every tracked tower lies to <paramref name="into"/>: the authoritative
+    /// side's live piles, a client's mirrored spots.</summary>
+    internal void CollectPileSpots(List<Vector3> into)
+    {
+        foreach (var record in _records.Values)
+        foreach (var floor in record.Floors)
+            floor.CollectSpots(into);
     }
 
     /// <summary>The saved lock state of every tower built from a world site (<c>stations.json</c>), or null when there
@@ -346,9 +358,10 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
             var floors = new List<StationSaveData.TowerFloorData>(record.Floors.Length);
             foreach (var floor in record.Floors)
             {
-                var waves = new int[floor.Piles.Length];
-                for (var i = 0; i < waves.Length; i++) waves[i] = Math.Max(0, floor.Piles[i].WavesLeft);
-                floors.Add(new StationSaveData.TowerFloorData { Waves = waves, DoorOpen = floor.DoorOpen, Owed = floor.Owed });
+                var raised = new bool[floor.Piles.Length];
+                for (var i = 0; i < raised.Length; i++) raised[i] = floor.Piles[i].Raised;
+                var owed = floor.OwedPiles.ConvertAll(spot => new[] { spot.X, spot.Y, spot.Z });
+                floors.Add(new StationSaveData.TowerFloorData { Raised = raised, DoorOpen = floor.DoorOpen, OwedPiles = owed });
             }
             (towers ??= []).Add(new StationSaveData.TowerData
             {
@@ -409,17 +422,17 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
         {
             var data = saved[k];
             var floor = record.Floors[k];
-            if (data?.Waves is not { } waves || waves.Length != floor.Piles.Length) return false;
-            if (data.Owed is < 0 or > MobConfig.MobHardCap) return false;
-            foreach (var wave in waves)
-                if (wave is < 0 or > MobConfig.SkeletonPileWaves) return false;
+            if (data?.Raised is not { } raised || raised.Length != floor.Piles.Length) return false;
+            if (data.OwedPiles is not { } owed || owed.Count > MobConfig.MobHardCap) return false;
+            foreach (var spot in owed)
+                if (spot is not { Length: 3 } || !float.IsFinite(spot[0] + spot[1] + spot[2])) return false;
         }
         for (var k = 0; k < record.Floors.Length; k++)
         {
             var data = saved[k];
             var floor = record.Floors[k];
-            for (var i = 0; i < floor.Piles.Length; i++) floor.Piles[i].WavesLeft = data.Waves![i];
-            floor.Owed = data.Owed;
+            for (var i = 0; i < floor.Piles.Length; i++) floor.Piles[i].Raised = data.Raised![i];
+            foreach (var spot in data.OwedPiles!) floor.OwedPiles.Add(new Vector3(spot[0], spot[1], spot[2]));
             floor.PilesLeft = floor.CountPilesLeft();
             if (!data.DoorOpen) continue;
             floor.DoorOpen = true;
@@ -453,6 +466,16 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
                 writer.Write((byte)Math.Clamp(floor.PilesLeft, 0, byte.MaxValue));
                 writer.Write((byte)Math.Clamp(floor.Alive, 0, byte.MaxValue));
                 writer.Write(floor.DoorOpen);
+                _spotScratch.Clear();
+                floor.CollectSpots(_spotScratch);
+                var spots = Math.Min(_spotScratch.Count, byte.MaxValue);
+                writer.Write((byte)spots);
+                for (var i = 0; i < spots; i++)
+                {
+                    writer.Write(_spotScratch[i].X);
+                    writer.Write(_spotScratch[i].Y);
+                    writer.Write(_spotScratch[i].Z);
+                }
             }
             writer.Write((byte)record.AltarState);
         }
@@ -481,13 +504,18 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
             int floorCount = reader.ReadByte();
             if (floorCount is < 1 or > MobConfig.TowerMaxTier + 1)
                 throw new InvalidDataException($"tower snapshot with {floorCount} floors");
-            var floors = new (int Bottom, int Top, int PilesLeft, int Alive, bool DoorOpen)[floorCount];
+            var floors = new (int Bottom, int Top, int PilesLeft, int Alive, bool DoorOpen, Vector3[] Spots)[floorCount];
             for (var k = 0; k < floorCount; k++)
             {
                 var bottom = reader.ReadInt();
                 var top = reader.ReadInt();
                 if (top <= bottom) throw new InvalidDataException("tower snapshot with an empty floor band");
-                floors[k] = (bottom, top, reader.ReadByte(), reader.ReadByte(), reader.ReadBool());
+                var pilesLeft = reader.ReadByte();
+                var alive = reader.ReadByte();
+                var doorOpen = reader.ReadBool();
+                var spots = new Vector3[reader.ReadByte()];
+                for (var s = 0; s < spots.Length; s++) spots[s] = new Vector3(reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat());
+                floors[k] = (bottom, top, pilesLeft, alive, doorOpen, spots);
             }
             var altar = (TowerAltarState)reader.ReadByte();
             if (!Enum.IsDefined(altar)) throw new InvalidDataException($"tower snapshot with altar state {(byte)altar}");
@@ -541,7 +569,7 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
     }
 
     // Owes back every bound skeleton that despawned or was released, and every timed-out restore
-    private void CreditOwed(SkeletonManager skeletons, Action<List<TowerFloorRef>>? takeDiscarded)
+    private void CreditOwed(SkeletonManager skeletons, Action<List<OwedSkeleton>>? takeDiscarded)
     {
         skeletons.TakeReleased(_owedScratch);
         takeDiscarded?.Invoke(_owedScratch);
@@ -561,7 +589,7 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
             {
                 var floor = floors[k];
                 var previousOpen = k == 0 || floors[k - 1].DoorOpen;
-                if (TowerRules.FloorAwake(k, previousOpen)) floor.Living += _piles.Update(floor, dt, chunks, skeletons, targets);
+                if (TowerRules.FloorAwake(k, previousOpen)) floor.Living += _piles.Update(floor, chunks, skeletons, targets);
                 floor.PilesLeft = floor.CountPilesLeft();
                 floor.Alive = floor.Living + floor.Owed + (pending?.Invoke(floor.Ref) ?? 0);
                 if (floor.DoorOpen || !TowerRules.DoorMayOpen(k, previousOpen, floor.PilesLeft, floor.Alive)) continue;
@@ -613,21 +641,12 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
         return false;
     }
 
-    // Clears depleted piles and open doors, within the writer's frame budget; an unloaded cell waits for later
+    // Clears open doors, within the writer's frame budget; an unloaded cell waits for later
     private void Sweep(TowerBlockWriter blocks)
     {
         foreach (var record in _records.Values)
         foreach (var floor in record.Floors)
         {
-            foreach (var pile in floor.Piles)
-            {
-                if (!pile.Depleted || pile.Removed) continue;
-                var (x, y, z) = pile.Cell;
-                var result = blocks.TryClear(x, y, z, TowerPalette.PileBlock);
-                if (result == TowerWriteResult.Capped) return;
-                if (result != TowerWriteResult.Unloaded) pile.Removed = true;
-            }
-
             var door = floor.DoorRemaining;
             for (var i = door.Count - 1; i >= 0; i--)
             {

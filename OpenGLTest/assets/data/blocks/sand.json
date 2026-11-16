@@ -1,4 +1,8 @@
 {
+  "sfx": "hit_sand",
+  "stepSfx": "step_sand",
+  "footprintVisibility": 0.6,
+  "footprintPersistence": 60,
   "name": "Sand",
   "model": { "parent": "block/cube_all", "textures": { "all": "sand" } },
   "pebbleWeight": 0,

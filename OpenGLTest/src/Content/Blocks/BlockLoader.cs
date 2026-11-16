@@ -124,6 +124,8 @@ internal static class BlockLoader
             || definition.HasItem != false))
             throw new InvalidOperationException($"{path}: crucibleStand requires a supported model block with hasItem false");
         var facingFromLook = BlockSchemaParser.ParseFacingFromLook(definition, horizontalFacing, supportAttached, path);
+        var facesViewer = BlockSchemaParser.ParseFacesViewer(definition, facingFromLook, path);
+        var axisFromFace = BlockSchemaParser.ParseAxisFromFace(definition, renderer, horizontalFacing, path);
         var openHitboxes = BlockSchemaParser.ParseOpen(definition, horizontalFacing, path);
         var solid = !fluid && (definition.Solid ?? true);
         BlockFieldRules.ValidateStackSolidity(stack.StackSolidAt, solid, path);
@@ -152,6 +154,9 @@ internal static class BlockLoader
             DisplayName = definition.Name ?? name,
             Id = id,
             Sfx = ResolveSfx(path, definition.Sfx),
+            StepSfx = ResolveStepSfx(path, definition.StepSfx),
+            FootprintVisibility = Math.Clamp(definition.FootprintVisibility ?? FootprintConfig.DefaultVisibility, 0f, 1f),
+            FootprintPersistence = Math.Max(definition.FootprintPersistence ?? FootprintConfig.DefaultPersistenceSeconds, 0f),
             Hardness = hardness,
             RequiresTool = requiresTool,
             Tools = tools,
@@ -203,6 +208,8 @@ internal static class BlockLoader
             SupportAbove = supportAbove,
             HasHorizontalFacing = horizontalFacing,
             FacingFromLook = facingFromLook,
+            FacesViewer = facesViewer,
+            AxisFromFace = axisFromFace,
             Openable = openHitboxes != null,
             ReplaceableByPlacement = replaceableByPlacement,
             Falls = falls,
@@ -222,7 +229,9 @@ internal static class BlockLoader
         };
         // A facing block's selection boxes turn with it, exactly like its model will in BakeModels
         if (horizontalFacing)
-            type.RotatedHitboxes = HorizontalFacing.RotateBoxes(type.Hitboxes);
+            type.RotatedHitboxes = axisFromFace
+                ? HorizontalFacing.WithUpright(HorizontalFacing.RotateBoxes(type.Hitboxes))
+                : HorizontalFacing.RotateBoxes(type.Hitboxes);
         // ...and an openable block's open boxes follow the closed ones (DoorState.ShapeIndex)
         if (openHitboxes != null)
         {
@@ -297,6 +306,16 @@ internal static class BlockLoader
 
         Log.Warn($"Block '{path}' names sfx group '{name}', which has no .wav files under assets/sfx; using '{SfxLibrary.DefaultGroup}'.");
         return SfxLibrary.DefaultGroup;
+    }
+
+    // A step sound is optional and non-fatal like the hit one: unset or unknown is silence
+    internal static string? ResolveStepSfx(string path, string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        if (ContentRegistry.SfxGroups.ContainsKey(name)) return name;
+
+        Log.Warn($"Block '{path}' names step sfx group '{name}', which has no .wav files under assets/sfx; it stays silent.");
+        return null;
     }
 
     private static BlockModel ResolveModel(JsonElement model, string path)

@@ -57,6 +57,7 @@ internal sealed class PunchPose
     private Matrix4x4 TorsoRotation(float torsoPitch)
     {
         var mods = _model.Secondary.ComputeMods();
+        if (_model.ArmsSwapped) mods = mods.Mirrored();
         return Matrix4x4.CreateRotationX(torsoPitch) * Matrix4x4.CreateRotationY(mods.TorsoYaw)
                * Matrix4x4.CreateRotationZ(mods.TorsoRoll);
     }

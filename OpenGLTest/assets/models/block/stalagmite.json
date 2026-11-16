@@ -1,6 +1,6 @@
 {
   // A stone point rising from the cell floor: three tapering boxes, each face the stone tile
-  // (default UVs stretch it over the small boxes).
+  // (default UVs crop it to each box); the block's hitbox list mirrors these boxes.
   "textures": { "stone": "stone" },
   "elements": [
     {

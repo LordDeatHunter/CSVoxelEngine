@@ -151,4 +151,67 @@ public sealed class WaterFloatTests
         Assert.True(peak - 1f > 0.9f * landJump, $"the wading jump rose {peak - 1f}, the land jump {landJump}");
         Assert.True(wader.IsGrounded);
     }
+
+    [Fact]
+    public void SpaceSwimsStraightUpInShallowWaterWithoutWaitingForAStroke()
+    {
+        var shallow = MobTestWorld.Pool(3);
+        var camera = BodyAt(1.5f);
+        var keys = new ScriptedKeyboard();
+        keys.Press([Key.Space]);
+        var start = Feet(camera);
+        Run(camera, shallow, keys, 0.4f, c => Assert.True(c.VerticalVelocity > 0f));
+
+        Assert.Equal(0, camera.SwimStrokeCount);
+        Assert.True(Feet(camera) > start + 0.5f, $"rose only {Feet(camera) - start}");
+    }
+
+    [Fact]
+    public void SpaceStillWaitsForTheStrokeTimerInDeepWater()
+    {
+        var deep = MobTestWorld.Pool(12);
+        var camera = BodyAt(6f);
+        var keys = new ScriptedKeyboard();
+        keys.Press([Key.Space]);
+        Run(camera, deep, keys, 0.5f);
+        Assert.Equal(1, camera.SwimStrokeCount);
+        Run(camera, deep, keys, 0.4f);
+        Assert.Equal(1, camera.SwimStrokeCount);
+    }
+
+    [Fact]
+    public void HoldingSpaceInShallowWaterNeverHopsAlongTheSurface()
+    {
+        var shallow = MobTestWorld.Pool(3);
+        var surface = 3f + FluidState.SourceHeight;
+        var camera = BodyAt(1.5f);
+        var keys = new ScriptedKeyboard();
+        keys.Press([Key.Space]);
+        Run(camera, shallow, keys, 1.5f);
+
+        // Settled at the float: no rise above it, and no strokes, however long Space is held
+        var top = Feet(camera);
+        Run(camera, shallow, keys, 3f, c => top = MathF.Max(top, Feet(c)));
+        Assert.True(top < surface - PlayerConfig.WaterFloatRestShare * PlayerPhysics.PlayerHeight + 0.15f,
+            $"hopped up to feet {top}");
+        Assert.Equal(0, camera.SwimStrokeCount);
+    }
+
+    [Fact]
+    public void HoldingSpaceAndForwardClimbsOntoAOneDeepLedgeFromTwoDeepWaterAtOnce()
+    {
+        // Two-deep water for x < 10, then a ledge one block higher with one-deep water on it
+        var world = MobTestWorld.Pool(2);
+        var ledge = ContentRegistry.RequireBlock("stone").Id;
+        for (var x = 10; x < Chunk.Size; x++)
+            for (var z = 0; z < Chunk.Size; z++)
+                world.Chunks[Vector3.Zero].SetBlockRaw(x, 1, z, ledge, 0);
+        var camera = BodyAt(1f, x: 7.5f);
+        var keys = new ScriptedKeyboard();
+        keys.Press([Key.W, Key.Space]);
+        Run(camera, world, keys, 2.5f);
+
+        Assert.Equal(0, camera.SwimStrokeCount);
+        Assert.True(camera.Position.X > 10.2f, $"still at x {camera.Position.X}");
+    }
 }

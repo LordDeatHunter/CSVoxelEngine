@@ -129,7 +129,7 @@ internal sealed class IntentReplay
                 player.NoteAction(NetPlayerAction.Punch);
                 break;
             case NetIntentKind.Throw:
-                player.NoteAction(NetPlayerAction.Throw);
+                player.NoteAction(World.ThrowIsOffhand(context) ? NetPlayerAction.ThrowOffhand : NetPlayerAction.Throw);
                 break;
             case NetIntentKind.Attack:
                 player.NoteAction(NetAttacks.ActionOf(intent.Attack));
@@ -149,6 +149,9 @@ internal sealed class IntentReplay
                 // not place with never places here either. A waystone it claimed is discovered
                 // here, for this player, and its client told what to show.
                 var used = _state.World.TryUseSelected(World.InteractionReach, context, out var outcome, allowPlace: false);
+                // Other clients see the swing on the arm that used it
+                if (used && outcome is RightClickOutcome.Station or RightClickOutcome.ItemUse)
+                    player.NoteAction(_state.World.LastUseOffhand ? NetPlayerAction.PunchOffhand : NetPlayerAction.Punch);
                 if (outcome == RightClickOutcome.Waystone)
                 {
                     var cell = _state.World.LastWaystoneCell;
@@ -261,7 +264,10 @@ internal sealed class IntentReplay
         var face = intent.Normal;
         if (face != normal && !NetValidation.FaceFacesEye(intent.Cell, face, intent.Eye))
             return false;
-        return _state.World.TryPlaceSelectedBlockAt(player.Context, intent.Cell, face);
+        if (!_state.World.TryPlaceSelectedBlockAt(player.Context, intent.Cell, face, out var offhand))
+            return false;
+        player.NoteAction(offhand ? NetPlayerAction.PunchOffhand : NetPlayerAction.Punch);
+        return true;
     }
 
     private bool AttackFor(ServerPlayer player, in WorldIntent intent)

@@ -206,18 +206,14 @@ internal static class ChunkLighting
     /// slot is 0 and the byte is exactly the old level.
     /// </para>
     /// <para>
-    /// With <paramref name="skyCover"/> (some chunk of the 27-chunk neighborhood may hold a
-    /// <c>coversSky</c> block, <see cref="AnySkyCover"/>), a sun seed must also lie above the highest
-    /// covering cell of its volume column (<see cref="RaiseSeedsUnderSkyCover"/>). That is the battle
-    /// tower's dark interior: the tower stands above the heightmap, which must not be raised (the far
-    /// LOD, water and spawns read it), and its slabs, 7 apart, always fall inside a chunk's volume
-    /// (LightBorder 15 above it). Every seed still enters at 15, so the queued-seed exactness above
-    /// holds unchanged. The rule reads only the volume's own blocks, so a client's streamed copy lights
-    /// exactly like the server, and a collapse's light-radius remesh relights the ruin. Without the
-    /// flag nothing extra runs.
+    /// A sun seed must also lie above the highest light-blocking cell in its volume column
+    /// (<see cref="RaiseSeedsUnderSkyCover"/>). This shades ordinary opaque roofs and generated
+    /// overhangs without changing the terrain heightmap used by far LOD, water and spawns.
+    /// Every seed still enters at 15, and the rule reads only the volume's blocks, so streamed
+    /// and generated copies compute the same light.
     /// </para>
     /// </summary>
-    internal static bool ComputeLight(Chunk chunk, ushort[] ids, byte[] sun, byte[] block, int[] queue, bool skyCover)
+    internal static bool ComputeLight(Chunk chunk, ushort[] ids, byte[] sun, byte[] block, int[] queue)
     {
         var worldY0 = chunk.LowerBoundY - LightBorder;
 
@@ -252,7 +248,7 @@ internal static class ChunkLighting
                 seedStart[colRow + lz] = Math.Clamp(height - worldY0, 0, LightSize);
             }
         }
-        if (skyCover) RaiseSeedsUnderSkyCover(ids, seedStart);
+        RaiseSeedsUnderSkyCover(ids, seedStart);
 
         // Every passable seed is set to 15, but only the seeds touching a passable non-seed cell
         // are queued: the cell above a seed is a seed or opaque, the one below is a non-seed only
@@ -321,26 +317,14 @@ internal static class ChunkLighting
         return anyTinted;
     }
 
-    /// <summary>Whether any resolved chunk of a mesh build's 27-chunk neighborhood may hold a
-    /// <c>coversSky</c> block (<see cref="Chunk.MayHaveSkyCover"/>), which turns the sky-cover rule of
-    /// <see cref="ComputeLight"/> on.</summary>
-    internal static bool AnySkyCover(Chunk?[] neighbors)
-    {
-        foreach (var neighbor in neighbors)
-            if (neighbor is { MayHaveSkyCover: true })
-                return true;
-        return false;
-    }
-
     /// <summary>
-    /// Raises each volume column's first sun seed row to one above the highest covering cell at or
-    /// above it (<see cref="BlockType.CoversSkyById"/>), scanning top-down, so the cells under a tower
-    /// slab get no sky. A covering block never passes light, so the cell under a raised start stays
-    /// opaque, which is what the queued-seed rule of <see cref="ComputeLight"/> assumes.
+    /// Raises each volume column's first sun seed row to one above the highest light-blocking
+    /// cell at or above it, scanning top-down. Passing glass, leaves, fluids and partial blocks
+    /// still expose the cells below to sky. A covering block does not pass the flood either.
     /// </summary>
     private static void RaiseSeedsUnderSkyCover(ushort[] ids, Span<int> seedStart)
     {
-        var covers = BlockType.CoversSkyById;
+        var passes = BlockType.PassesLightById;
         for (var lx = 0; lx < LightSize; lx++)
         for (var lz = 0; lz < LightSize; lz++)
         {
@@ -349,7 +333,7 @@ internal static class ChunkLighting
             var columnBase = (lx * LightSize) * LightSize + lz;
             for (var ly = LightSize - 1; ly >= start; ly--)
             {
-                if (!covers[ids[columnBase + ly * LightSize]]) continue;
+                if (passes[ids[columnBase + ly * LightSize]]) continue;
                 seedStart[col] = ly + 1;
                 break;
             }

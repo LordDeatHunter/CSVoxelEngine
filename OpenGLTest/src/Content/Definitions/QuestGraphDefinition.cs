@@ -47,7 +47,10 @@ public sealed class QuestGraphDefinition
         /// <summary>Whether the details panel lists the requirements before the quest is complete; default true.</summary>
         public bool? Readable { get; set; }
 
-        /// <summary>What completes the quest, all of them. Required, at least one.</summary>
+        /// <summary>When true, meeting any one requirement completes the quest, instead of all of them; default false.</summary>
+        public bool? AnyOf { get; set; }
+
+        /// <summary>What completes the quest, all of them (or any one with <see cref="AnyOf"/>). Required, at least one.</summary>
         public List<RequirementDefinition>? Requirements { get; set; }
     }
 
@@ -59,6 +62,13 @@ public sealed class QuestGraphDefinition
 
         /// <summary>The item (or block item) an <c>obtain</c> or <c>craft</c> requirement names.</summary>
         public string? Item { get; set; }
+
+        /// <summary>A tag (<c>assets/data/tags/&lt;name&gt;.json</c>) an <c>obtain</c> or <c>craft</c> requirement names
+        /// instead of one item: any member counts, and an obtain sums what is held across them. Exclusive with <see cref="Item"/>.</summary>
+        public string? Tag { get; set; }
+
+        /// <summary>The display name of a <see cref="Tag"/> requirement ("Any Copper or Tin Cast"); default the tag name.</summary>
+        public string? Label { get; set; }
 
         /// <summary>The block a <c>break</c> or <c>place</c> requirement names.</summary>
         public string? Block { get; set; }

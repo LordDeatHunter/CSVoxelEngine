@@ -70,8 +70,8 @@ campfire particles, HUD icons left of the hearts (committed 16x16 icons), and th
 `effect` (`visual-examples/status-effects.json`). First guesses: burning 6 s, 5% a second, ignites and
 thaws; frostburn 8 s, 2% every 2 s, half speed, 0.6 attack, freezes. Known gaps: effects are not saved,
 other players' effects are not shown, the player slowdown is client-trusted, blade swing durations are
-not scaled by the attack factor, a blast does not consult effects, a slime's split children do not
-inherit them, and icebergs are not consulted when freezing.
+not scaled by the attack factor, a blast does not consult effects, and a slime's split children do not
+inherit them.
 
 `MG-5` shipped: what a cast does is part data. A shape names its `delivery` (`projectile`, the default,
 or `self`), an element its `impact` flags (`ignite`, `freeze`, `thaw`, `prime`, `light`, `grow`) and, with

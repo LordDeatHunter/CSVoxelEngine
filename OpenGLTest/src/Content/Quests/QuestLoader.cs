@@ -99,6 +99,7 @@ internal static class QuestLoader
                 Position = origin + position,
                 Shape = ReadShape(quest.Shape, parents[i].Length == 0, quest.Id!, path),
                 Readable = quest.Readable ?? true,
+                AnyOf = quest.AnyOf ?? false,
                 Graph = graph,
                 Parents = parents[i],
                 Children = [.. children[i]],
@@ -136,10 +137,23 @@ internal static class QuestLoader
                     throw new InvalidOperationException($"Quest '{quest}' in '{path}' names block '{definition.Block}', which is not a registered block.");
                 return new QuestRequirement(kind, block, null, count, BlockType.ById[block]!.DisplayName);
             default:
+                if (definition.Tag != null)
+                    return CompileTagRequirement(definition, kind, count, quest, path);
                 if (definition.Item == null || !ContentFiles.TryResolve(definition.Item, out var item) || ItemRegistry.TryGet(item) is not { } type)
                     throw new InvalidOperationException($"Quest '{quest}' in '{path}' names item '{definition.Item}', which is not a registered item or block item.");
                 return new QuestRequirement(kind, item, null, count, type.Name);
         }
+    }
+
+    private static QuestRequirement CompileTagRequirement(QuestGraphDefinition.RequirementDefinition definition,
+        QuestRequirementKind kind, int count, string quest, string path)
+    {
+        if (definition.Item != null)
+            throw new InvalidOperationException($"Quest '{quest}' in '{path}' names both item '{definition.Item}' and tag '{definition.Tag}'.");
+        if (!ContentRegistry.Tags.TryGetValue(definition.Tag!, out var members) || members.Count == 0)
+            throw new InvalidOperationException($"Quest '{quest}' in '{path}' names tag '{definition.Tag}', which is not a loaded, non-empty tag.");
+        var label = string.IsNullOrWhiteSpace(definition.Label) ? "Any " + definition.Tag!.Replace('_', ' ') : definition.Label;
+        return new QuestRequirement(kind, members.Min(), null, count, label, members);
     }
 
     private static string StripPrefix(string name, string prefix) =>

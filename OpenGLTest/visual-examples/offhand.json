@@ -1,0 +1,22 @@
+{
+  // Run with VOXEL_SCRIPT=visual-examples/offhand.json VOXEL_TIME=900 (dusk). Films the offhand slot left of the hotbar
+  // holding a lit torch and a lantern while a pickaxe is in the main hand. Shots land in visual/offhand/.
+  "steps": [
+    { "op": "wait", "seconds": 4 },
+    { "op": "give", "block": "torch", "count": 5 },
+    { "op": "swaphands" },
+    { "op": "give", "block": "item/copper_pickaxe" },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "torch-offhand" },
+    { "op": "player", "action": "punch" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "punch" },
+    { "op": "give", "block": "lantern" },
+    { "op": "swaphands" },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "lantern-offhand" },
+    { "op": "swaphands" },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "lantern-main" }
+  ]
+}

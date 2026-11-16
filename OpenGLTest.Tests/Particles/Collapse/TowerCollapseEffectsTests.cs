@@ -34,7 +34,7 @@ public sealed class TowerCollapseEffectsTests
         for (var z = 0; z < Chunk.Size; z++)
             center.SetBlockRaw(x, 0, z, Stone, 0);
         var towers = new TowerManager(null);
-        towers.Track(TowerRecord.Mirror((0, 0), CenterX, CenterZ, Radius, [(0, 12, 0, 0, true)], altar));
+        towers.Track(TowerRecord.Mirror((0, 0), CenterX, CenterZ, Radius, [(0, 12, 0, 0, true, [])], altar));
         var camera = new Camera(null, null, new Vector3(CenterX, 6f, CenterZ - 12f));
         var chips = new BlockDebrisSystem();
         var effects = new TowerCollapseEffects(camera, chips, chunks, towers, new Random(5));

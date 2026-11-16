@@ -104,14 +104,15 @@ public sealed class StationSaveData
     /// <summary>One tower floor's lock state.</summary>
     public sealed class TowerFloorData
     {
-        /// <summary>The waves each pile still raises, in the site's pile order.</summary>
-        public int[]? Waves { get; set; }
+        /// <summary>Whether each pile's skeleton has risen, in the site's pile order.</summary>
+        public bool[]? Raised { get; set; }
 
         /// <summary>Whether the door sealing this floor from the next has opened (it stays open).</summary>
         public bool DoorOpen { get; set; }
 
-        /// <summary>Bound skeletons that despawned or strayed and must be raised again.</summary>
-        public int Owed { get; set; }
+        /// <summary>The spots (<c>[x, y, z]</c>) of the bone piles of bound skeletons that despawned or strayed, each
+        /// rising again from where it stood.</summary>
+        public List<float[]>? OwedPiles { get; set; }
     }
 
     /// <summary>One waystone's registry row, keyed by its cell (see <see cref="Simulation.Waystones.WaystoneManager"/>).</summary>

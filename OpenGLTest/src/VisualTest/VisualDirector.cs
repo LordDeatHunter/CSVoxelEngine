@@ -206,6 +206,13 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 Advance();
                 break;
 
+            case "swaphands":
+                // What the F key does: the selected slot's item goes to the offhand and the offhand's comes back
+                world.Inventory.SwapHands();
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} swaphands");
+                Advance();
+                break;
+
             case "panel":
                 RunUi("panel", u => u.SetPanelOpen(step.On));
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} panel {(step.On ? "open" : "closed")}");

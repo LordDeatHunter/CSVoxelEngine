@@ -514,8 +514,7 @@ internal static class ChunkTerrainFill
         WorldgenStageTimer? timer, long genStart, bool recordStatistics)
     {
         // Carving removed an unknown number of blocks; a recount off the compact storage is cheaper than
-        // bookkeeping. The sky-cover flag comes from its palette (exactly the ids present), so only a
-        // chunk that really holds a coversSky block runs the light flood's cover rule.
+        // bookkeeping. The legacy tower-brick marker comes from its palette (exactly the ids present).
         var storage = ChunkBlocks.FromDense(blocks);
         chunk.Storage = storage;
         chunk.SolidCount = storage.CountNonAir();

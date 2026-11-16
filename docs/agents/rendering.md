@@ -430,6 +430,34 @@ outline holds steady at full and the crack overlay stays readable; the face high
 face of a beam: with both faces blended an alpha `a` read as `1-(1-a)^2` and the breath all but
 vanished. `SelectionPulseTests`, `visual-examples/selection-pulse.json` (`VOXEL_TIME=147`).
 
+**Sealed-room ambient.** Ambient is skylight bounce and nothing else: the world fragment scales the
+hemispheric ambient, the ore and water sky mirrors, the forcefield film and the falling-leaf light by
+`SkyGate(fSun)` (`fSun` itself, clamped), with no floor, so a fragment the sky does not reach (a sealed
+tower or cave, `fSun` 0) is lit by torch, point and emissive light alone: no sky or ambient term follows the solar
+clock (local lights keep their own variation, e.g. the block-light flicker). Before, a 12 % floor multiplied the day-varying `uAmbient`, so sealed rooms brightened by day.
+Outdoors and under real openings the gate is the baked skylight gradient, which still follows the clock.
+GL-free twin `SkyAmbient` (`SkyAmbientTests`: the composed color at `fSun` 0 is the local light for every
+day palette, and no shader keeps the old floor).
+Verified in-game with `visual-examples/sealed-room.json` (a 9x6x9 `tower_bricks` shell, `coversSky`: by `ChunkLighting`'s seeding rule sun is seeded at every
+air cell at or above the terrain height unless a `coversSky` block covers it, so an ordinary roof does not
+seal a room above the heightmap; the scenario writes with `setblock`, the player placement path was not traced or run),
+at `VOXEL_TIME` 255 (lighting time ~310, sun elevation 0.94) and 1454 (~1507, -0.94), `DayLengthSeconds` 2400. Interior skylight
+sampled 0 at both times. Unlit interior ROI means before the fix: about (4.4, 5.7, 9.6) by day and (0.26, 0.37, 1.0) at night
+(the ambient followed the clock); after: exactly 0 at both. A torch lights the room at both times and the open-air control
+still follows the clock. In the tunnel of `sealed-ambient.json` the noon/night mean red differs (2.85 vs 3.24), but so does the same sun
+2400 s later (255 vs 2655: 2.85 vs 3.31), consistent with the block-light flicker (`FlickAt`/`BlockFlicker`, scaling `torch`
+where there is block light, driven by `uTime`, the lighting clock including `VOXEL_TIME`); other time-driven local terms were not
+ruled out. Whole-frame means of the room shots include the selection highlight, so the interior ROI numbers are in the evidence bundle.
+
+Limits of the sealed-room rule: it follows the baked skylight, so it only darkens what the light flood leaves at
+sky 0. A roof of ordinary blocks over open terrain keeps its sun seeds (only `coversSky` blocks cover them; `setblock` and
+`BlockPlacer` share `PlaceBlockAt`, so this is not a scenario artifact), and widening sky coverage was not part of this change. A
+fragment with partial skylight is now slightly darker than before, since the floor is gone. The sea-level planar mirror reads
+the sky, so a sealed fragment loses that local reflection, while local water and SSR still work. Distant fog and the local
+flicker can still follow the clock. `SkyAmbientTests` is arithmetic on the C# twin plus a literal source guard (brittle by design);
+the in-game evidence is a manual GPU A/B (`sealed-room.json`), not an automated GPU regression, and the twin is kept in step with
+the shader by hand.
+
 **Leaf backlight.** A leaf-sway face (bit 5: canopy leaves and rooted plants; `test-vertex.glsl`
 hands the fragment the flag as the flat `fSwayFlag`, outside the guarded sway block) standing
 between the eye and the sun glows warm, as if lit through: the world fragment adds

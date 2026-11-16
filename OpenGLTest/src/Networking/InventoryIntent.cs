@@ -79,4 +79,6 @@ public readonly record struct InventoryIntent(
         new(NetInventoryAction.MoveSlot, Slot: fromSlot, Id: toSlot);
 
     public static InventoryIntent ClearSlot(int slot) => new(NetInventoryAction.ClearSlot, Slot: slot);
+
+    public static InventoryIntent SwapHands() => new(NetInventoryAction.SwapHands);
 }

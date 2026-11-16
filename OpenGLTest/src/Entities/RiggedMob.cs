@@ -289,7 +289,17 @@ public abstract class RiggedMob : Mob
             }
         }
 
+        // Rising from an auto-jump with a move intent, keep driving toward the goal: the jump left the
+        // ground, and without this the mob would rise and fall in the same column against the step.
+        else if (_velocity.Y > 0f && move != Vector3.Zero)
+        {
+            _velocity.X = MathUtils.Damp(_velocity.X, move.X * groundSpeed, MoveAccel, deltaTime);
+            _velocity.Z = MathUtils.Damp(_velocity.Z, move.Z * groundSpeed, MoveAccel, deltaTime);
+        }
+
         ApplyPhysics(deltaTime, chunks);
+        if (IsGrounded && !_inWater)
+            NoteWalked(MathF.Sqrt(_velocity.X * _velocity.X + _velocity.Z * _velocity.Z) * deltaTime);
 
         Animation.Update(deltaTime, LocomotionSpeed);
 
@@ -396,12 +406,15 @@ public abstract class RiggedMob : Mob
         var movement = _velocity * deltaTime;
         var half = HalfExtents;
 
-        Position = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);
-        Position = BoxSweep.MoveOnAxis(Position, movement.Z, 2, half, chunks, out var hitZ);
-        Position = BoxSweep.MoveOnAxis(Position, movement.Y, 1, half, chunks, out var hitY);
+        Position = BoxSweep.MoveBody(Position, movement, half, chunks, out var hitX, out var hitZ, out var hitY);
 
-        if (hitX) _velocity.X = 0f;
-        if (hitZ) _velocity.Z = 0f;
+        // While rising the sideways speed survives a wall hit, so an auto-jump from flush against a
+        // one-block step keeps pushing into the step's face until the body clears the top
+        if (movement.Y <= 0f)
+        {
+            if (hitX) _velocity.X = 0f;
+            if (hitZ) _velocity.Z = 0f;
+        }
         _hitWall = hitX || hitZ;
 
         if (hitY)

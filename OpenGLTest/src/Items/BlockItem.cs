@@ -22,6 +22,9 @@ public sealed class BlockItem : Item
 
     public override InventoryCategory StorageCategory => Block.Lantern ? InventoryCategory.Tools : InventoryCategory.Blocks;
 
+    // A lantern is stored as an instance (it carries its own fuel) but is listed with the blocks
+    public override InventoryCategory TabCategory => InventoryCategory.Blocks;
+
     public override ItemUseResult OnUse(ItemUseContext ctx, ItemStack? stack)
     {
         var world = ctx.World;

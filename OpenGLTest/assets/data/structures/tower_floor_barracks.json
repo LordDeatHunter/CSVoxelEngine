@@ -11,8 +11,8 @@
     "f": "oak_fence",
     "h": "cobblestone_slab",
     "w": "cobblestone_wall",
-    "L": "lantern",
-    "S": "skeleton_pile",
+    "L": "eternal_lantern",
+    "S": "tower_pile_spot",
     "E": { "block": "tower_chest", "facing": "east" },
     "W": { "block": "tower_chest", "facing": "west" }
   },

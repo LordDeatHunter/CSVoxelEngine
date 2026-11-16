@@ -256,6 +256,7 @@ internal sealed class PlayerPhysics
         if (camera.IsInLava && !camera.IsFlying) moveSpeed *= PlayerConfig.LavaSpeedFactor;
         var wish = new Vector2(moveInput.X * moveSpeed, moveInput.Z * moveSpeed);
         float accelRate;
+        var shallowRise = false;
         if (camera.IsFlying)
             accelRate = FlyAccelRate;
         else if (swimming)
@@ -264,9 +265,18 @@ internal sealed class PlayerPhysics
             accelRate = SwimGlideDrag;
             wish = Vector2.Zero;
             _swimStrokeTimer += deltaTime;
-            var strokeUp = keyboard.IsKeyPressed(Key.Space);
+            // In shallow water Space swims straight up at once, no stroke to wait for, and the WASD
+            // direction paddles steadily too, so a ledge ahead is pushed against and climbed out at once
+            shallowRise = !_diving && keyboard.IsKeyPressed(Key.Space)
+                          && PlayerBodyProbe.GroundedWithin(camera.Position, PlayerConfig.ShallowSwimDepth, chunkManager);
+            if (shallowRise)
+            {
+                accelRate = AirAccelRate;
+                wish = new Vector2(moveInput.X * moveSpeed, moveInput.Z * moveSpeed);
+            }
+            var strokeUp = keyboard.IsKeyPressed(Key.Space) && !shallowRise;
             var strokeDown = keyboard.IsKeyPressed(Key.ControlLeft);
-            if (_swimStrokeTimer >= SwimStrokeSeconds && (moving || strokeUp || strokeDown))
+            if (!shallowRise && _swimStrokeTimer >= SwimStrokeSeconds && (moving || strokeUp || strokeDown))
             {
                 _swimStrokeTimer = 0f;
                 SwimStrokeCount++;
@@ -349,6 +359,10 @@ internal sealed class PlayerPhysics
                         : MathF.Min(_verticalVelocity, _pendingSwimVertical);
                     _pendingSwimVertical = 0f;
                 }
+                // Only while the body is still well under: at the surface the rise would lift it out and
+                // hop it along the top, so there Space does nothing (a bank is left through SwimExitBoost)
+                if (shallowRise && camera.ImmersionShare > PlayerConfig.WaterFloatRestShare + 0.05f)
+                    _verticalVelocity = MathF.Max(_verticalVelocity, SwimUpSpeed);
                 _verticalVelocity = _diving
                     ? MathUtils.Damp(_verticalVelocity, SinkSpeed, SwimGlideDrag, deltaTime)
                     : MathUtils.Damp(_verticalVelocity, WaterImmersion.BuoyancySpeed(camera.ImmersionShare),
@@ -391,8 +405,8 @@ internal sealed class PlayerPhysics
         }
 
         var horizontalStart = camera.Position;
-        var afterX = BodyCollision.MoveOnAxis(camera.Position, frameMovement.X, 0, chunkManager, out var collidedX, camera.BodySolids);
-        var afterZ = BodyCollision.MoveOnAxis(afterX, frameMovement.Z, 2, chunkManager, out var collidedZ, camera.BodySolids);
+        var afterX = BodyCollision.MoveOnAxis(camera.Position, frameMovement.X, 0, chunkManager, out var collidedX);
+        var afterZ = BodyCollision.MoveOnAxis(afterX, frameMovement.Z, 2, chunkManager, out var collidedZ);
         camera.SetPosition(afterZ);
 
         // Auto-step: on foot and grounded, a low ledge is climbed instead of stopping the
@@ -401,7 +415,7 @@ internal sealed class PlayerPhysics
         var steppedThisFrame = false;
         if (!swimming && camera.IsGrounded && (collidedX || collidedZ)
             && BodyCollision.TryStepUp(horizontalStart, frameMovement,
-                camera.IsSprinting ? SprintStepHeight : WalkStepHeight, chunkManager, camera.BodySolids) is { } stepped)
+                camera.IsSprinting ? SprintStepHeight : WalkStepHeight, chunkManager) is { } stepped)
         {
             camera.SetPosition(stepped);
             steppedThisFrame = true;
@@ -421,7 +435,7 @@ internal sealed class PlayerPhysics
         }
 
         var feetBefore = camera.Position.Y - EyeHeight;
-        var afterY = BodyCollision.MoveOnAxis(camera.Position, frameMovement.Y, 1, chunkManager, out var collidedY, camera.BodySolids);
+        var afterY = BodyCollision.MoveOnAxis(camera.Position, frameMovement.Y, 1, chunkManager, out var collidedY);
         camera.SetPosition(afterY);
 
         if (collidedY)

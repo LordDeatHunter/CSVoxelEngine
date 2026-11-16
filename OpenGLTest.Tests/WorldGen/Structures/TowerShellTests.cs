@@ -237,7 +237,7 @@ public sealed class TowerShellTests
         {
             var cell = TowerGenerator.CellAt(s, x, y, z);
             var block = StructureCell.BlockOf(cell);
-            solid[box.Index(x, y, z)] = cell > 0 && BlockType.IsUnbreakable(block) && block != TowerPalette.PileBlock;
+            solid[box.Index(x, y, z)] = cell > 0 && BlockType.IsUnbreakable(block);
         }
 
         var labels = Label(solid, box.Sx, box.Sy, box.Sz);

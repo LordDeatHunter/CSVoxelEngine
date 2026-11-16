@@ -9,6 +9,8 @@
   },
   "hardness": 24,
   "renderer": "tree_wood",
+  // Placed upright on a floor or ceiling, or lying out of the wall it is placed against
+  "axisFromFace": true,
   "sfx": "hit_wood",
   "requiresTool": true,
   "tools": { "axe": 1 },

@@ -49,6 +49,11 @@ public static class GameSettings
     /// <summary>Whether the sprint key toggles instead of being held (see <see cref="SprintToggle"/>).</summary>
     public static bool SprintToggle { get; set; }
 
+    // Gameplay
+    /// <summary>Whether the [E] panel, the [P] quest book and the [M] map freeze the world like the pause menu does
+    /// (singleplayer only).</summary>
+    public static bool PauseInPanels { get; set; }
+
     // Map
     /// <summary>Whether the top-right minimap is round instead of square (the [M] map screen's toggle).</summary>
     public static bool MinimapRound { get; set; }
@@ -95,6 +100,7 @@ public static class GameSettings
         MouseSensitivity = 0.2f;
         FieldOfView = 70f;
         SprintToggle = false;
+        PauseInPanels = false;
         MinimapRound = false;
     }
 
@@ -141,6 +147,7 @@ public static class GameSettings
         if (dto.MouseSensitivity is { } sensitivity) MouseSensitivity = Math.Clamp(sensitivity, SettingsRows.SensitivityMin, SettingsRows.SensitivityMax);
         if (dto.FieldOfView is { } fov) FieldOfView = Math.Clamp(fov, SettingsRows.FovMin, SettingsRows.FovMax);
         if (dto.SprintToggle is { } sprintToggle) SprintToggle = sprintToggle;
+        if (dto.PauseInPanels is { } pauseInPanels) PauseInPanels = pauseInPanels;
         if (dto.MinimapRound is { } minimapRound) MinimapRound = minimapRound;
     }
 
@@ -170,6 +177,7 @@ public static class GameSettings
             MouseSensitivity = MouseSensitivity,
             FieldOfView = FieldOfView,
             SprintToggle = SprintToggle,
+            PauseInPanels = PauseInPanels,
             MinimapRound = MinimapRound,
         };
         try
@@ -208,6 +216,7 @@ public static class GameSettings
         public float? MouseSensitivity { get; set; }
         public float? FieldOfView { get; set; }
         public bool? SprintToggle { get; set; }
+        public bool? PauseInPanels { get; set; }
         public bool? MinimapRound { get; set; }
     }
 }

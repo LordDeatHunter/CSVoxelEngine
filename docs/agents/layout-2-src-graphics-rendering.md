@@ -255,6 +255,10 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   on every mining hit plus a bigger burst when the block breaks
       BubbleParticle.cs        # one exhaled bubble: a small billboard that rises off the player's mouth while the eye is submerged
       BubbleParticleRenderer.cs # draws every live BubbleParticle as a camera-facing billboard in one dynamic draw
+      Footprints/              # the footprints walkers leave on soft ground
+        FootprintRules.cs      # GL-free: a print's alpha over its life (hold, then fade) and its quad's corners
+        FootprintSystem.cs     # the live prints (one per Footsteps footfall, capped, aged, dropped with their block)
+        FootprintRenderer.cs   # draws them as flat dark quads on the ground (footprint-*.glsl, footprint.png)
       BubbleParticleSystem.cs  # live exhaled bubbles: spawns them at the player's mouth while the eye is submerged
       DebrisLook.cs            # what a BlockDebris chip looks like, i.e. which cached cube BlockCubeCache draws it with
       FireParticle.cs          # one fire particle: an ember, a smoke puff, a steam puff or a floor-conquered pulse mote
@@ -310,8 +314,6 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       DeathMessages.cs         # the death line from the blow PlayerHealth recorded
       FallTracker.cs           # GL-free fall-damage rule: peak/grounded chain fed one feet height at a time
                                #   (singleplayer's LocalPlayer.UpdateHealth and each ServerPlayer's accepted states)
-      IBodySolids.cs           # non-block solids a player body collides with (the iceberg boxes), read by
-                               #   BodyCollision, PlayerPhysics (Camera.BodySolids) and the server's grounded probe
       HeldItemPose.cs          # GL-free held-item sizing and the drawn sprite matrix (SpriteMatrix, BackOffset), shared
                                #   by PlayerPasses, the slice trail and the item debugger
       HeadMotion.cs            # the per-frame view juice (bob, roll, landing dip, hit kick, FOV punch, sprint FOV, throw
@@ -457,8 +459,6 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         ChestPasses.cs         # the chest draws: the shared chest model's base and lid for every chest cell
                                #   (Chunk.ChestCells), posed by ChestLids, one texture per chest.skin; the entity and
                                #   near-shadow passes
-        IcebergPasses.cs       # the iceberg draws: one mesh and skin per variant, ModelMatrix (wobble and rise/sink
-                               #   over IcebergShape.ModelMatrix), the entity, near-shadow and mirror passes
         MobPasses.cs           # the slime, goblin and hell mob draws (RenderSlimes, RenderGoblins, RenderHellMobs),
                                #   the slime mesh and skin, one RigMeshes per clip-animated kind, SlimeTransform,
                                #   a rigged kind's held item (EntityType.HeldMatrix) at its hand

@@ -73,7 +73,8 @@ leaves block per species, no per-tree registry or entity.
   rule is `TreeWoodShape.Connects`: same id, neither side detached, and one cell's parent points at
   the other — so siblings and two neighboring trees never weld, and the tree graph can be read back
   out of the blocks (`TreeGraph.FromWorld`). Placed wood is `WoodState.Detached`, a full cube that
-  never welds or fells.
+  never welds or fells; a log placed lying on its side keeps its axis in that cell's thickness code
+  (`LyingX` 14, `LyingZ` 13, see `axisFromFace`), which a detached cell never reads as a girth.
 - **Leaf state** (`LeafState`): bits 0-2 hydration, bit 3 `PersistentBit` (player-placed leaves,
   which never decay). Hydration is `leafCluster.hydration` minus the Manhattan distance to the
   nearest **live tip** whose cluster shape holds the cell (`LeafCluster.HydrationFromTip`, the one

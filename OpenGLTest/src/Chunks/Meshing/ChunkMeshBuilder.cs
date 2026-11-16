@@ -73,14 +73,11 @@ internal static class ChunkMeshBuilder
         {
             FillPaddedSnapshot(padded, paddedState, neighborBlocks, neighborStates);
             FillLightSnapshot(lightBlocks, neighborBlocks);
-            // Read before the neighbors are cleared: a tower brick anywhere in the volume's chunks turns the
-            // sky-cover rule on (27 field reads; nothing more for a plain neighborhood)
-            var skyCover = AnySkyCover(neighbors);
             var visibility = ChunkVisibility.Compute(neighborBlocks[13]!);
             scratch.ClearNeighbors();
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
-            var anyTinted = ComputeLight(chunk, lightBlocks, sunLight, blockLight, queue, skyCover);
+            var anyTinted = ComputeLight(chunk, lightBlocks, sunLight, blockLight, queue);
             // Keep the chunk's own cells of the flood for entity lighting: a fresh array owned
             // by this build alone, published by UpdateMesh with the mesh it belongs to. A chunk
             // lit by colored light appends a second half holding each cell's color slot.
@@ -477,9 +474,13 @@ internal static class ChunkMeshBuilder
             // byte's low two bits carry (see MultiblockShape), as does a facing block such as a
             // wall torch, turned about its own cell (see HorizontalFacing); an openable block also
             // reads its open bit (DoorState), picking one of its eight models.
-            var model = type.RotatedModels != null
-                ? type.RotatedModels[BlockType.ShapeIndex(paddedState[pIdx], type.RotatedModels.Length)]
-                : type.BakedModel;
+            // A placed log lying on its side draws its lying shape instead of the upright cube
+            var lyingAxis = type.LyingModels != null ? WoodState.LyingAxis(paddedState[pIdx]) : -1;
+            var model = lyingAxis >= 0
+                ? type.LyingModels![lyingAxis]
+                : type.RotatedModels != null
+                    ? type.RotatedModels[BlockType.ShapeIndex(paddedState[pIdx], type.RotatedModels.Length)]
+                    : type.BakedModel;
             if (model == null) continue;
 
             // A block with a flame (a torch) records the flame's exact chunk-local point, turned with

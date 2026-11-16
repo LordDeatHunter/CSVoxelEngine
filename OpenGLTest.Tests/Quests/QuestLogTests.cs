@@ -69,6 +69,32 @@ public class QuestLogTests
     }
 
     [Fact]
+    public void AnyOneRequirementCompletesAnAnyOfQuestButAllAreNeededOtherwise()
+    {
+        var book = Book(AnyOfQuest("any", null, Break("stone"), Break("dirt")), Quest("all", null, Break("stone"), Break("dirt")));
+        var log = new QuestLog(book);
+        log.OnBroke(Id("dirt"));
+
+        Assert.True(log.IsComplete(book.Of("any")));
+        Assert.False(log.IsComplete(book.Of("all")));
+    }
+
+    [Fact]
+    public void ATagRequirementCountsAnyMemberAndSumsWhatIsHeld()
+    {
+        var members = new[] { "item/copper_ingot", "item/tin_axe_head" };
+        var book = Book(Quest("tagged", null, ObtainTag("copper_tin_casts", 2)));
+        var inventory = Inventory.Empty();
+        var log = new QuestLog(book);
+        log.Bind(inventory);
+
+        inventory.Add(Id(members[0]));
+        Assert.False(log.IsComplete(book.Of("tagged")));
+        inventory.Add(Id(members[1]));
+        Assert.True(log.IsComplete(book.Of("tagged")));
+    }
+
+    [Fact]
     public void WhatWasHeldBeforeBindingCountsOnlyAtTheNextGain()
     {
         var book = Book(Quest("q", null, Obtain("item/flint", 3)));

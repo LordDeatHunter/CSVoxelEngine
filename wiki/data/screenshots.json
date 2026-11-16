@@ -71,7 +71,7 @@
   },
   "pack_ice_low": {
     "title": "Pack ice, ground level",
-    "caption": "Icebergs drift where the sea is just cold enough.",
+    "caption": "Open leads and floes where the sea is just cold enough.",
     "group": "biome"
   },
   "origin_valley": {

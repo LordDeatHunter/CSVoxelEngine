@@ -30,8 +30,6 @@ public sealed class NetEntityCodecTests
         new(NetEntityKind.Drop, 18, new Vector3(-4f, 70f, 4f), 0f, 0, 0, ushort.MaxValue, Vector3.Zero),
         new(NetEntityKind.FallingBlock, 19, new Vector3(4.5f, 80f, -4.5f), 0f, 0, 0, ushort.MaxValue, Vector3.Zero),
         new(NetEntityKind.PrimedTnt, 20, new Vector3(0.5f, 66f, 0.5f), 0f, 2500, 4000, ushort.MaxValue, Vector3.Zero),
-        new(NetEntityKind.Iceberg, 14, new Vector3(100f, 62f, -50f), NetEntity.YawFromTurns(3), -77,
-            NetEntity.PackIcebergAmmo(1.4f, 0.5f), 2, new Vector3(0.3f, 0f, 0.1f)),
     ];
 
     private static byte[] Frame()

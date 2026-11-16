@@ -184,6 +184,21 @@ public sealed class BlockDefinition
     public bool? FacingFromLook { get; set; }
 
     /// <summary>
+    /// With <c>facingFromLook</c>, the block's front turns toward the placing player (a chest: its latch faces the
+    /// one who placed it) instead of along the look, a half turn from it. Only legal with <c>facingFromLook</c>.
+    /// Omitted means false.
+    /// </summary>
+    public bool? FacesViewer { get; set; }
+
+    /// <summary>
+    /// A log's placement picks its axis from the face it is placed against: a floor or ceiling stands it upright, a
+    /// wall lays it along that wall's normal, whichever way the player faces (<c>Placement.LogState</c>). Only legal on tree wood
+    /// (a placed log's state byte holds the axis, <c>WoodState.LyingX</c>) and on a <c>facing: "horizontal"</c> block
+    /// authored along Z (a hollow log, which also bakes an upright shape). Omitted means false.
+    /// </summary>
+    public bool? AxisFromFace { get; set; }
+
+    /// <summary>
     /// Makes the block openable (a trapdoor, a door half): right-click flips the open bit in its
     /// state byte (<see cref="DoorState"/>) and the block is then drawn and hit with this object's
     /// <c>model</c> and <c>hitbox</c>, authored facing north like the closed ones. Only legal with
@@ -437,6 +452,23 @@ public sealed class BlockDefinition
     /// <c>assets/sfx</c>, falls back to <see cref="SfxLibrary.DefaultGroup"/> with a warning.
     /// </summary>
     public string? Sfx { get; set; }
+
+    /// <summary>
+    /// Sound group of the subtle footstep an entity walking on top of this block makes (see
+    /// <see cref="Footsteps"/>), e.g. <c>step_grass</c>. Null or unset is silent; an unknown group
+    /// warns and is silent.
+    /// </summary>
+    public string? StepSfx { get; set; }
+
+    /// <summary>
+    /// How clearly a footprint left on this block shows, 0 (none) to 1. Unset is the faint
+    /// <see cref="FootprintConfig.DefaultVisibility"/>; soft ground (dirt, mud) sets more, sand and snow most.
+    /// </summary>
+    public float? FootprintVisibility { get; set; }
+
+    /// <summary>Seconds a footprint left on this block lasts. Unset is the short
+    /// <see cref="FootprintConfig.DefaultPersistenceSeconds"/>; softer ground keeps its prints longer.</summary>
+    public float? FootprintPersistence { get; set; }
 
     /// <summary>
     /// How reflective the block's surface is. Omitting the whole object (every block but the

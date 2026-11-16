@@ -32,6 +32,10 @@ public class Inventory
     /// <summary>Hotbar slots along the bottom, switched with 1-10 / scroll.</summary>
     public const int SlotCount = 10;
 
+    /// <summary>The slot index that names the offhand wherever a hotbar slot index goes (the slot readers, the equip,
+    /// clear and move calls and their intents); it is never a valid selection.</summary>
+    public const int OffhandIndex = SlotCount;
+
     /// <summary>Shared pool caps: blocks and misc count every stacked unit, tools every instance.</summary>
     public const int BlockCapacity = 2048;
     public const int ToolCapacity = 8;
@@ -78,19 +82,50 @@ public class Inventory
     /// <summary>Which hotbar slot is in hand; always a valid index.</summary>
     public int SelectedIndex { get; private set; }
 
-    /// <summary>Block or item id in the selected hotbar slot, or 0 when it is empty.</summary>
-    public ushort SelectedBlockId => IdAt(SelectedIndex);
+    /// <summary>What sits in the offhand slot beside the hotbar; same reference form as a hotbar slot.</summary>
+    public HotbarSlot Offhand { get; internal set; }
 
-    public int SelectedCount => CountAt(SelectedIndex);
+    /// <summary>True while a use runs for the offhand (see <see cref="UseHand"/>): the <c>Selected*</c> readers and
+    /// <see cref="ConsumeSelected"/> then address the offhand slot instead of the selected hotbar slot.</summary>
+    public bool OffhandActive { get; private set; }
+
+    /// <summary>Runs a use for the offhand or the main hand until the returned scope is disposed.</summary>
+    public HandScope UseHand(bool offhand) => new(this, offhand);
+
+    internal bool SetOffhandActive(bool value)
+    {
+        var previous = OffhandActive;
+        OffhandActive = value;
+        return previous;
+    }
+
+    /// <summary>Block or item id in the selected hotbar slot, or 0 when it is empty.</summary>
+    public ushort SelectedBlockId => OffhandActive ? OffhandId : IdAt(SelectedIndex);
+
+    public int SelectedCount => OffhandActive ? OffhandCount : CountAt(SelectedIndex);
 
     /// <summary>Tool instance in the selected slot, or 0 when it holds no live tool.</summary>
-    public int SelectedToolInstance => ToolInstanceAt(SelectedIndex);
+    public int SelectedToolInstance => OffhandActive ? OffhandToolInstance : ToolInstanceAt(SelectedIndex);
+
+    /// <summary>Id shown in the offhand, or 0 when it is empty or its tool is gone.</summary>
+    public ushort OffhandId => IdOf(Offhand);
+
+    /// <summary>Count shown in the offhand: the pool total for stackables, 1 for a live tool, else 0.</summary>
+    public int OffhandCount => CountOf(Offhand);
+
+    public int OffhandToolInstance => ToolInstanceOf(Offhand);
+
+    /// <summary>The item in the offhand while it holds any, else null.</summary>
+    public Item? OffhandItem => OffhandId != 0 && OffhandCount > 0 ? ItemRegistry.TryGet(OffhandId) : null;
 
     /// <summary>The item in hand: the selected slot's item while it holds any, else null (a bare
     /// hand). What mining, attacks and uses read for the player holding this inventory.</summary>
     public Item? HeldItem => SelectedBlockId != 0 && SelectedCount > 0 ? ItemRegistry.TryGet(SelectedBlockId) : null;
 
-    public HotbarSlot SlotAt(int index) => _hotbar[Wrap(index)];
+    public HotbarSlot SlotAt(int index) => Raw(index);
+
+    // The slot an index names: a hotbar slot (wrapped) or, for OffhandIndex, the offhand
+    private HotbarSlot Raw(int index) => index == OffhandIndex ? Offhand : _hotbar[Wrap(index)];
 
     /// <summary>
     /// Whether the selected slot holds a block that can actually be placed. Pure items
@@ -318,6 +353,8 @@ public class Inventory
         for (var i = 0; i < _hotbar.Length; i++)
             if (_hotbar[i] is { IsTool: true } slot && slot.ToolInstance == instanceId)
                 _hotbar[i] = HotbarSlot.Empty;
+        if (Offhand is { IsTool: true } offhand && offhand.ToolInstance == instanceId)
+            Offhand = HotbarSlot.Empty;
         return true;
     }
 
@@ -349,7 +386,7 @@ public class Inventory
     /// displaying a zero count.</summary>
     public bool ConsumeSelected()
     {
-        var slot = _hotbar[SelectedIndex];
+        var slot = OffhandActive ? Offhand : _hotbar[SelectedIndex];
         if (slot.IsTool) return false;
         if (slot.Id == 0 || CountFor(slot.Id) <= 0) return false;
 
@@ -382,13 +419,10 @@ public class Inventory
     /// Points a hotbar slot at a stackable id. Clicking the id the slot already shows
     /// clears it (toggle off); anything else overwrites.
     /// </summary>
-    public void EquipStackable(int hotbarIndex, ushort id)
-    {
-        var i = Wrap(hotbarIndex);
-        _hotbar[i] = _hotbar[i] is { IsTool: false } slot && slot.Id == id && id != 0
+    public void EquipStackable(int hotbarIndex, ushort id) =>
+        Put(hotbarIndex, Raw(hotbarIndex) is { IsTool: false } slot && slot.Id == id && id != 0
             ? HotbarSlot.Empty
-            : new HotbarSlot(false, id, 0);
-    }
+            : new HotbarSlot(false, id, 0));
 
     /// <summary>
     /// Points a hotbar slot at one tool instance. Clicking the instance the slot already
@@ -396,38 +430,55 @@ public class Inventory
     /// </summary>
     public bool EquipTool(int hotbarIndex, int instanceId)
     {
-        var i = Wrap(hotbarIndex);
-        if (_hotbar[i] is { IsTool: true } slot && slot.ToolInstance == instanceId)
+        if (Raw(hotbarIndex) is { IsTool: true } slot && slot.ToolInstance == instanceId)
         {
-            _hotbar[i] = HotbarSlot.Empty;
+            Put(hotbarIndex, HotbarSlot.Empty);
             return true;
         }
         // Worn gear is not held in hand: only tools and items go on the hotbar
         var alive = _tools.Any(t => t.InstanceId == instanceId && t.Item is not GearItem);
-        _hotbar[i] = alive ? new HotbarSlot(true, 0, instanceId) : HotbarSlot.Empty;
+        Put(hotbarIndex, alive ? new HotbarSlot(true, 0, instanceId) : HotbarSlot.Empty);
         return alive;
     }
 
-    public void ClearSlot(int hotbarIndex) => _hotbar[Wrap(hotbarIndex)] = HotbarSlot.Empty;
+    public void ClearSlot(int hotbarIndex) => Put(hotbarIndex, HotbarSlot.Empty);
+
+    // Writes the slot an index names (see Raw)
+    private void Put(int index, HotbarSlot slot)
+    {
+        if (index == OffhandIndex) Offhand = slot;
+        else _hotbar[Wrap(index)] = slot;
+    }
+
+    /// <summary>Swaps the selected hotbar slot with the offhand (the swap-hands key). An empty pair changes nothing.</summary>
+    public bool SwapHands()
+    {
+        if (Offhand.IsEmpty && _hotbar[SelectedIndex].IsEmpty) return false;
+        (Offhand, _hotbar[SelectedIndex]) = (_hotbar[SelectedIndex], Offhand);
+        return true;
+    }
 
     /// <summary>
-    /// Moves what a hotbar slot shows into another slot and swaps it with what that slot held: the destination's
+    /// Moves what a hotbar slot (or the offhand, by <see cref="OffhandIndex"/>) shows into another slot and swaps it with what that slot held: the destination's
     /// previous contents go to the source (an empty destination leaves the source empty). Items stay in their pools.
     /// False, changing nothing, when the source shows nothing or both are the same slot.
     /// </summary>
     public bool MoveSlot(int fromIndex, int toIndex)
     {
-        var from = Wrap(fromIndex);
-        var to = Wrap(toIndex);
-        if (from == to || _hotbar[from].IsEmpty) return false;
-        (_hotbar[from], _hotbar[to]) = (_hotbar[to], _hotbar[from]);
+        var from = fromIndex == OffhandIndex ? OffhandIndex : Wrap(fromIndex);
+        var to = toIndex == OffhandIndex ? OffhandIndex : Wrap(toIndex);
+        if (from == to || Raw(from).IsEmpty) return false;
+        (var source, var target) = (Raw(from), Raw(to));
+        Put(from, target);
+        Put(to, source);
         return true;
     }
 
     /// <summary>Id shown in a hotbar slot, or 0 when it is empty or its tool is gone.</summary>
-    public ushort IdAt(int index)
+    public ushort IdAt(int index) => IdOf(Raw(index));
+
+    private ushort IdOf(HotbarSlot slot)
     {
-        var slot = _hotbar[Wrap(index)];
         if (slot.IsTool)
             return LiveTool(slot.ToolInstance)?.DefinitionId ?? 0;
         return slot.Id;
@@ -437,17 +488,19 @@ public class Inventory
     /// Count shown in a hotbar slot: the pool total for stackables (shared across slots),
     /// 1 for a live tool, 0 for empty or orphaned slots.
     /// </summary>
-    public int CountAt(int index)
+    public int CountAt(int index) => CountOf(Raw(index));
+
+    private int CountOf(HotbarSlot slot)
     {
-        var slot = _hotbar[Wrap(index)];
         if (slot.IsTool)
             return LiveTool(slot.ToolInstance) != null ? 1 : 0;
         return CountFor(slot.Id);
     }
 
-    public int ToolInstanceAt(int index)
+    public int ToolInstanceAt(int index) => ToolInstanceOf(Raw(index));
+
+    private int ToolInstanceOf(HotbarSlot slot)
     {
-        var slot = _hotbar[Wrap(index)];
         if (!slot.IsTool) return 0;
         return LiveTool(slot.ToolInstance) != null ? slot.ToolInstance : 0;
     }
@@ -749,6 +802,8 @@ public class Inventory
         for (var i = 0; i < _hotbar.Length; i++)
             if (_hotbar[i] is { IsTool: false } slot && slot.Id == id)
                 _hotbar[i] = HotbarSlot.Empty;
+        if (Offhand is { IsTool: false } offhand && offhand.Id == id)
+            Offhand = HotbarSlot.Empty;
     }
 
     /// <summary>

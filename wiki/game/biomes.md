@@ -48,7 +48,7 @@ A tundra: permafrost under the snow, sparse dead shrubs, leafless snags and occa
 
 ## Ocean
 
-Sand, then gravel, then stone with depth, with sea stacks near shores. In cold seas the water freezes into a walkable sheet of ice whose edge breaks into floes and open leads, and icebergs drift where the sea is just cold enough.
+Sand, then gravel, then stone with depth, with sea stacks near shores. In cold seas the water freezes into a walkable sheet of ice whose edge breaks into floes and open leads.
 
 <ShotGallery slugs="ocean_bay,pack_ice,pack_ice_low" />
 

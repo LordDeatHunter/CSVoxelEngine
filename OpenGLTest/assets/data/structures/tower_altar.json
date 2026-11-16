@@ -10,7 +10,7 @@
   "palette": {
     "b": "stone_bricks",
     "h": "cobblestone_slab",
-    "L": "lantern",
+    "L": "eternal_lantern",
     "C": { "block": "tower_chest", "facing": "north" }
   },
   "layers": [

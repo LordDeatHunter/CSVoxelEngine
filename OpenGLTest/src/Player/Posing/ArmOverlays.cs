@@ -49,7 +49,8 @@ internal sealed class ArmOverlays
         var right = side > 0f;
 
         // Jumping: arms out to the sides. A carried item keeps the right arm nearer the front.
-        var air = _model.AirBlend * (1f - _model.SwimBlend) * (right ? 1f - 0.6f * _model.HoldBlend : 1f);
+        // (the right slot is the left arm while the arms are swapped, which carries no main-hand item)
+        var air = _model.AirBlend * (1f - _model.SwimBlend) * (right != _model.ArmsSwapped ? 1f - 0.6f * _model.HoldBlend : 1f);
         if (air > 0.001f)
         {
             var rise = MathUtils.Clamp01(_model.AirVelocity / 11f);

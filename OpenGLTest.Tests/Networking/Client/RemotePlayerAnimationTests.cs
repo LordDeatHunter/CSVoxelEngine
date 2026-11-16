@@ -22,6 +22,24 @@ public sealed class RemotePlayerAnimationTests
     }
 
     [Fact]
+    public void AnOffhandActionSwingsTheLeftArmOnTheRemoteModel()
+    {
+        var eye = new Vector3(0f, 1.62f, 0f);
+        foreach (var action in new[] { NetPlayerAction.PunchOffhand, NetPlayerAction.ThrowOffhand })
+        {
+            var remote = NewRemote();
+            remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.None, 1);
+            remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, action, 2);
+            Assert.True(remote.Model.ArmsSwapped);
+        }
+
+        var main = NewRemote();
+        main.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.None, 1);
+        main.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Punch, 2);
+        Assert.False(main.Model.ArmsSwapped);
+    }
+
+    [Fact]
     public void ANewActionCounterPlaysTheSwingOnTheModelAndARepeatPlaysItAgain()
     {
         var remote = NewRemote();

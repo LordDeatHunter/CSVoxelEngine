@@ -53,8 +53,8 @@ internal sealed class UITextCache
     // Per hotbar slot, so two slots showing the same count keep independent entries and one slot
     // changing never invalidates another. Counts start at 0 and texts at null, and the null is
     // what marks a slot as never formatted — a real count of 0 still formats on its first call.
-    private readonly int[] _slotCounts = new int[Inventory.SlotCount];
-    private readonly string?[] _slotTexts = new string?[Inventory.SlotCount];
+    private readonly int[] _slotCounts = new int[Inventory.SlotCount + 1];
+    private readonly string?[] _slotTexts = new string?[Inventory.SlotCount + 1];
 
     /// <summary>The FPS line, <c>HudRenderer.DrawFps</c>'s text. Changes about once a second.</summary>
     internal string Fps(int fps)

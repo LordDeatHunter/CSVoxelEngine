@@ -111,6 +111,9 @@ public class PlayerModel
     private float _throwReleaseCharge;
     private float _time;
     private float _holdBlend;
+    private float _offhandBlend;
+    // Whether the swing, cast, throw or use that started last is the left hand's (a right-click the offhand took)
+    private bool _actionOffhand;
 
     // Secondary motion. Springs carry their own velocity so a landing, a hit or an item swap rings
     // out instead of easing: the landing dip (positive = body lowered), the hit flinch (positive =
@@ -220,14 +223,35 @@ public class PlayerModel
         Matrices = new BodyPartMatrices(this);
     }
 
+    /// <summary>
+    /// Whether the left arm is the one animating: an action the offhand took (its right-click placement, use, cast,
+    /// throw or draw) is playing. The pose and the arm matrices are then built for the swapped arms (the acting arm in
+    /// the right slot with the offhand's carry, the other in the left) and the arm matrices mirrored back onto their
+    /// own sides, so every action animates the arm holding the item without a left-handed copy of any of them.
+    /// A blade swing is always the main hand's, so it ends the swap.
+    /// </summary>
+    internal bool ArmsSwapped => _actionOffhand && !IsSlicing && !IsSwordSwinging
+        && (_mineT < 1f || _castT < 1f || _throwT < 1f || _bowReleaseT < 1f || _useCharge01.HasValue || _throwCharge01.HasValue);
+
     /// <summary>Whether the right hand currently holds something; eases the carrying pose in and out.</summary>
     public bool HoldingItem { get; set; }
 
     /// <summary>Raises the carrying arm for a hanging lantern.</summary>
     public bool HoldingLantern { get; set; }
-    internal float FirstPersonBack => HoldingLantern ? 0f : FirstPersonBodyBack;
+    internal float FirstPersonBack => HoldingLantern || HoldingOffhandLantern ? 0f : FirstPersonBodyBack;
     internal float CarryShoulder => HoldingLantern ? LanternConfig.CarryShoulder : HoldShoulder;
     internal float CarryElbow => HoldingLantern ? LanternConfig.CarryElbow : HoldElbow;
+
+    /// <summary>Whether the left hand currently holds something; eases the left arm's carrying pose in and out.</summary>
+    public bool HoldingOffhand { get; set; }
+
+    /// <summary>Raises the left carrying arm for a hanging lantern.</summary>
+    public bool HoldingOffhandLantern { get; set; }
+    internal float OffhandCarryShoulder => HoldingOffhandLantern ? LanternConfig.CarryShoulder : HoldShoulder;
+    internal float OffhandCarryElbow => HoldingOffhandLantern ? LanternConfig.CarryElbow : HoldElbow;
+
+    /// <summary>Smoothed 0..1 amount the left arm carries its item.</summary>
+    public float OffhandBlend => _offhandBlend;
 
     /// <summary>Smoothed 0..1 carrying amount.</summary>
     public float HoldBlend => _holdBlend;
@@ -499,6 +523,7 @@ public class PlayerModel
             PoseBuilder.RunBlendRate, deltaTime);
         _airVelocity = verticalVelocity;
         _holdBlend = MathUtils.Damp(_holdBlend, HoldingItem ? 1f : 0f, PoseBuilder.MoveBlendRate, deltaTime);
+        _offhandBlend = MathUtils.Damp(_offhandBlend, HoldingOffhand ? 1f : 0f, PoseBuilder.MoveBlendRate, deltaTime);
 
         // Stride rate grows with speed so feet roughly keep up with the ground, plus an
         // extra kick while running so the cadence lifts beyond a sped-up walk.
@@ -529,8 +554,9 @@ public class PlayerModel
     /// swing (bare hand, a quick tool) up to 1 for a heavy one (a slow tool): a heavy swing takes
     /// longer and leans the body harder into the blow.
     /// </summary>
-    public void Punch(float weight = 0f)
+    public void Punch(float weight = 0f, bool offhand = false)
     {
+        _actionOffhand = offhand;
         _mineWeight = MathUtils.Clamp01(weight);
         _mineSpeed = MathUtils.Lerp(1f, 0.7f, _mineWeight);
         _mineT = 0f;
@@ -544,6 +570,7 @@ public class PlayerModel
     /// </summary>
     public void StartSlice(int direction)
     {
+        _actionOffhand = false;
         _sliceDir = direction;
         _sliceT = 0f;
         _sliceStop.Reset();
@@ -557,6 +584,7 @@ public class PlayerModel
     /// </summary>
     public void StartSword(SwordSwing swing)
     {
+        _actionOffhand = false;
         _swordSwing = swing;
         _swordSeconds = SwordDuration(swing);
         _swordT = 0f;
@@ -578,13 +606,22 @@ public class PlayerModel
     public void StartAxeSplit() => StartSword(SwordSwing.AxeSplit);
 
     /// <summary>Starts the staff cast's gesture (<see cref="CastMotion"/>): the staff raised and thrust forward. Cosmetic.</summary>
-    public void Cast() => _castT = 0f;
+    public void Cast(bool offhand = false)
+    {
+        _actionOffhand = offhand;
+        _castT = 0f;
+    }
 
-    public void StartThrowCharge() => _throwCharge01 = 0f;
+    public void StartThrowCharge(bool offhand = false)
+    {
+        _actionOffhand = offhand;
+        _throwCharge01 = 0f;
+    }
 
     /// <summary>Starts the timed-use pose (see <see cref="VoxelEngine.Interaction.RightClickAction.TryBeginUseCharge()"/>).</summary>
-    public void StartUseCharge(UsePose pose = UsePose.Raise)
+    public void StartUseCharge(UsePose pose = UsePose.Raise, bool offhand = false)
     {
+        _actionOffhand = offhand;
         _usePose = pose;
         _useCharge01 = 0f;
         _bowReleaseT = 1f;
@@ -629,8 +666,9 @@ public class PlayerModel
 
     public void CancelThrowCharge() => _throwCharge01 = null;
 
-    public void ReleaseThrow(float charge01)
+    public void ReleaseThrow(float charge01, bool offhand = false)
     {
+        _actionOffhand = offhand;
         _throwReleaseCharge = MathUtils.Clamp01(charge01);
         _throwCharge01 = null;
         _throwT = 0f;
@@ -717,6 +755,12 @@ public class PlayerModel
     public Matrix4x4 GetHandAnchorMatrix(Vector3 eyePos, float yawDeg, float backOffset = 0f,
         float pitchDeg = 0f)
         => Matrices.GetHandAnchorMatrix(eyePos, yawDeg, backOffset, pitchDeg);
+
+    /// <summary>The left fist's anchor for the offhand item: positioned at the left fist, oriented in body space like
+    /// <see cref="GetHandAnchorMatrix"/>, without the jab and blade terms (the offhand never attacks).</summary>
+    public Matrix4x4 GetOffhandAnchorMatrix(Vector3 eyePos, float yawDeg, float backOffset = 0f,
+        float pitchDeg = 0f)
+        => Matrices.GetOffhandAnchorMatrix(eyePos, yawDeg, backOffset, pitchDeg);
 
     /// <summary>Mesh name per draw; arms/legs draw one mesh twice (left + right matrices).</summary>
     public static readonly string[] BodyParts =

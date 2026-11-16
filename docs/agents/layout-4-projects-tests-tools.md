@@ -35,7 +35,7 @@ OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple 
   ServerBroadcasts.cs                 # the cell journal (BlockChanges), entities under stable ids,
                                       #   stations and the day clock
   ServerChat.cs                       # chat relay; a player's command line runs on GameCommands with operator
-                                      #   rights while MayBeCreative, its answers system lines to that player
+                                      #   rights when listed as an operator, its answers system lines to that player
   ServerCommandHost.cs                # the server's ICommandHost: the players online, the clock (broadcast),
                                       #   mobs, towers, announcements broadcast
   ServerCommandPlayer.cs              # a connected player's ICommandPlayer: a teleport corrects its client, a mode
@@ -64,8 +64,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   SwapIn/RestoreReal for the registry-swap tests), SyntheticContentRoot (a
                                #   temp asset root with N extra stone copies, so ids pass 255), TestInventory (a pre-stocked Inventory),
                                #   MeshTestWorld, MobTestWorld, FlatWorldSource, StampedTree,
-                               #   WideTreeSpecies, TreeWorldgenFixture, IcebergTestWorld (a hand-built sea with a
-                               #   pack-ice strip), StubTarget, BoxSolids, SkyZoneFinder (sky zones under the seed),
+                               #   WideTreeSpecies, TreeWorldgenFixture, StubTarget, SkyZoneFinder (sky zones under the seed),
                                #   SyntheticGear (gear items with made-up abilities and modifiers), TowerSiteFixture
                                #   (synthetic tower sites of any radius, floor count and turn), CaveTestWorld
                                #   (a carved, evenly lit cave for the cave spawn searches), StorageCells (cells with
@@ -80,8 +79,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Chunks/                      # chunk storage, keys and map, the chunk manager and its mesh scheduling, the
                                #   column cache, fluid surfaces, lava vents, EntityLight; the replay probes
     MeshApplyRecoveryTests.cs  # interrupted applies preserve queued tails and return each owned buffer once
-    Meshing/                   # greedy and per-voxel meshing, smooth light, the light volume, plant sway,
-                               #   cell batches; the mesh-cost probe
+    Meshing/                   # greedy and per-voxel meshing, smooth light, the light volume,
+                               #   opaque-roof edit and restore lighting, plant sway, cell batches; the mesh-cost probe
     Sources/                   # the generated and imported world sources
     Streaming/                 # the generation workers, the scan frontier, the streaming foci
   Content/                     # the registry and its baked tables: blocks, models, shapes (panes,
@@ -115,7 +114,6 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     TowerMobs/                 # the skeleton's contract, bow band and line of sight, melee, undead, the ambient rattle's timer and range gate; the
                                #   Skeleton King's contract, leash, shockwave and volley fan, its brain's phases and choices
     Sandworms/                 # the sandworm's chain, brain and pose, its melee through the real punch path
-    Icebergs/                  # iceberg shape, motion, wobble, spawn band, contact, the berg (mirrors src/Entities/Icebergs)
     Slimes/                    # slime sizes, hops, knockback, split and merge (mirrors src/Entities/Slimes)
   Graphics/                    # shader defines and the chunk-draw shader guard, cutout mips, tile materials
   Interaction/                 # raycast and targeting, mining, combat and the slice combo,
@@ -160,7 +158,6 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   (MapSaveTests: round trip, damaged file, cave never saved, a world hands it to the next)
   Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
                                #   and felling, saplings, the stations, drops, the mob managers and spawning
-    Icebergs/                  # the iceberg manager, its spawner and icebergs in a headless World
     Camps/                     # goblin camps: the fire first, torch-bearing goblins round it, one a dark night
     Caves/                     # the cave spawn filter and rules, the cave mob manager (spawns by biome, tier, caps, attacks)
     Chests/                    # chests, tower chests, the underground ruin chests' cave biome tables (CaveChestTests) and
@@ -223,7 +220,7 @@ tools/                                # asset generators: models, animation clip
                                       #   shared clips) and palette skins, and the bone sprite, on the hell script's machinery;
                                       #   --check
   generate-chest-textures.py          # deterministic placeholder chest art: one 128 x 128 skin per chest variant for the
-                                      #   shared chest.bbmodel (textures/chests/) and the static twin's front/side/top tiles
+                                      #   shared chest.bbmodel (textures/chests/) and the static twin's six face tiles (front, back, left, right, top, bottom)
                                       #   cut from the same faces; stdlib PNG writer; listed in USER_TODO.md; --check
   generate-tower-lock-textures.py     # deterministic placeholder tower_door (portcullis cutout), skeleton_pile and
                                       #   tower_altar_top tiles, stdlib PNG writer, small palettes; listed in USER_TODO.md; --check
@@ -244,8 +241,6 @@ tools/                                # asset generators: models, animation clip
                                       #   palette skins, on the hell script's machinery; listed in USER_TODO.md; --check
   generate-skeleton-king-model.py     # deterministic skeleton_king .bbmodel (crowned rig with its club, clips) and palette
                                       #   skin, on the hell and skeleton scripts' machinery; listed in USER_TODO.md; --check
-  generate-iceberg-models.py          # deterministic iceberg_{small,medium,large}.bbmodel and iceberg.png; its header pins
-                                      #   the geometry rules (waterline, shelf, 8 px inset steps) and the UV layout
   generate-mold-models.ps1            # the twelve cast molds' block models under assets/models/block/, from their sprites' alpha silhouettes
   generate-sandworm-model.py          # deterministic sandworm .bbmodel, skin and fang sprite (placeholder art); --check
   generate-spell-sfx.py               # deterministic placeholder spell sounds (spell_cast/impact/fizzle.wav), --check

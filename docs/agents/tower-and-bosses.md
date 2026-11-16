@@ -1,6 +1,6 @@
-# Skeleton, battle tower, sandworm, icebergs
+# Skeleton, battle tower, sandworm
 
-The skeleton, the battle tower with its king, the sandworm boss and the icebergs.
+The skeleton, the battle tower with its king, and the sandworm boss.
 
 ### Skeleton
 
@@ -54,8 +54,9 @@ share `MobConfig.SkeletonHeight` as their body box.
   `MobMissiles` (`SkeletonManager.Arrows`, merged into `ThrowAction.RefreshProjectiles`): a non-immune target touched
   takes the skeleton's `ArrowDamage` and a small shove, an immune one stops the arrow unhurt.
 - **Tower difficulty** (`TowerDifficulty`, GL-free): a floor's tier (the floor index, 0..`MobConfig.TowerMaxTier`,
-  `TowerSite.Tier(k)`) changes only its piles, never a skeleton: `PackSize(tier)` is the wave size, `1 + tier /
-  TowerPackTiersPerExtra` (one more mob every 3 floors), and `PileNearLimit(tier)` is `SkeletonPileNearLimitBase` plus
+  `TowerSite.Tier(k)`) changes only its piles, never a skeleton: `PackSize(tier)` is `1 + tier /
+  TowerPackTiersPerExtra` (one more pack slot every 3 floors), `PilesPerSpot(tier)` is `PackSize` times
+  `TowerPilesPerPackSlot` (how many one-skeleton piles each pile spot lays out), and `PileNearLimit(tier)` is `SkeletonPileNearLimitBase` plus
   `SkeletonPileNearLimitPerTier` per floor (1 more per floor). A skeleton's health and melee and arrow damage are the
   fixed numbers of its kind on every floor; it carries no tier, so none is saved or sent.
 - **Forced spawn only**: `SkeletonManager.Spawn(position)` is the one way a skeleton appears (a scenario's `spawn` op,
@@ -97,7 +98,7 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
 (the cave biome byte, CB-3) and 29 (the cave mobs, CB-4) came after it.
 - **Dark interiors (BT-10)**: the floors get no sun. The three palette bricks carry `coversSky`, so a mesh build over a
   tower chunk starts every sun seed above the slab over it ("Sky cover (BT-10)" under "Chunk meshing"); a floor is lit only
-  by its template lanterns and the torches a player brings, identically in singleplayer, on a server and on a client. The
+  by its template eternal lanterns (`eternal_lantern`: the lantern's model with a plain block emission, no fuel, no item, `unbreakable`, so only the collapse clears it, and `TowerRuin` turns it to air rather than rubble) and the torches a player brings, identically in singleplayer, on a server and on a client. The
   ruin's rubble does not cover, so the collapse's remesh lets the sun back in.
 - **The sealed roof**: the parapet stands `TowerParapetHeight` (4) over the roof slab, solid but for its merlon layer, and
   a forcefield dome closes it: `TowerDome` (GL-free, pure) is half a spheroid standing on that merlon layer, as wide as the
@@ -124,27 +125,34 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
   so the point query still equals the stamp. `tower_door` (a solid, cutout, `cullSelf` portcullis `cube_all` that passes
   light) fills the headroom over the two door half-steps of every floor (`TowerSite.DoorCells(k)`, stamped by
   `TowerShell.CorridorAt` through the closed-form `TowerShell.IsDoorStep`): door `k` seals floor `k` from floor `k + 1`, the
-  last one the roof, and the ground entrance stays open. `skeleton_pile` (non-solid, a low hitbox, never replaceable) is
-  the `S` palette key of the three `tower_floor_*.json` templates, found per floor by `TowerSite.PileCells(k)` (a template
-  scan, kept by its consumer). Both tiles are placeholders from `tools/generate-tower-lock-textures.py` (USER_TODO.md).
+  last one the roof, and the ground entrance stays open. `tower_pile_spot` is
+  the `S` palette key of the three `tower_floor_*.json` templates, a marker that is never written (`TowerGenerator.TemplateCell`
+  returns nothing for it), found per floor by `TowerSite.PileCells(k)` (a template scan, kept by its consumer). The old
+  `skeleton_pile` block is gone (a save that still names it loads those cells as air). Both tiles are placeholders from
+  `tools/generate-tower-lock-textures.py` (USER_TODO.md).
 - **`TowerManager`** (`Simulation/Tower/`, owned by `World` as `World.Towers`, main thread, ticked by `MobDirector.Update`
   right after the skeletons on authoritative worlds only) keeps one `TowerRecord` per tower keyed by its placement cell,
   with a `TowerFloorState` per floor. A record is materialized lazily: every `MobConfig.TowerScanSeconds`, a target whose
   eye chunk is loaded and who stands in no record asks `TowerPlacement.TryFindAt` (the generation workers have usually
   cached the verdict already). `TowerRecord.Build` takes explicit floor data, which is the test and loopback seam.
-- **Piles** (`SkeletonPileManager`): on an awake floor (floor 0, or the floor below's door open), a pile whose cell holds
-  the pile block raises a wave of `TowerDifficulty.PackSize(k)` skeletons (`SkeletonManager.Spawn`, around the
-  pile by `TowerRules.SpawnPoints`) when a **non-immune** target stands within `SkeletonPileTriggerBlocks` on that floor's
-  band, every `SkeletonPileWaveSeconds`, for `SkeletonPileWaves` waves, then it is depleted. A pile never raises past `TowerDifficulty.PileNearLimit(k)` living skeletons within
-  `SkeletonPileNearRadiusBlocks` of it (`SkeletonManager.LivingCountNear`; `SkeletonPileNearLimitBase` 5 on floor 0, plus
-  `SkeletonPileNearLimitPerTier` 1 per floor): a wave is trimmed to the room left and waits for kills when there is none, and
-  owed respawns obey the same limit. **Opening a chest alarms the nearby piles** (`TowerManager.AlarmPilesNear`, called where the chest opens: `ChestInput.Open` in singleplayer, `ChestSessions.OnOpen` on the server): every pile with a wave left on the chest's awake floor within `SkeletonChestAlarmBlocks` is `PileState.Alarmed` (never saved) and raises its next wave at once, ignoring its trigger range, its cooldown and the near limit (only the hard cap still holds). A wave counts only if one
-  skeleton rose (the near limit and the hard cap keep it for later). A pile in an unloaded chunk freezes; a loaded cell without the pile
-  block counts as depleted.
+- **Piles** (`SkeletonPileManager`) are entity-style spots, not blocks: each pile lies at a free position (`TowerRules.PileSpot`,
+  a golden-angle spiral round its template pile spot, a pure function of the cell) and holds exactly **one** skeleton, so
+  every skeleton of a floor has its own pile. A spot lays out `TowerDifficulty.PilesPerSpot(k)` piles (`PackSize(k)` times
+  `TowerPilesPerPackSlot`). On an awake floor (floor 0, or the floor below's door open) a pile whose chunk is loaded raises its
+  skeleton (`SkeletonManager.Spawn`, bound to the floor, at the pile, or the nearest open column when walled in) when a
+  **non-immune** target stands within `SkeletonPileTriggerBlocks` on that floor's band, and is then gone (`PileState.Raised`).
+  A pile never raises past `TowerDifficulty.PileNearLimit(k)` living skeletons within `SkeletonPileNearRadiusBlocks` of it
+  (`SkeletonManager.LivingCountNear`; `SkeletonPileNearLimitBase` 5 on floor 0, plus `SkeletonPileNearLimitPerTier` 1 per
+  floor): it waits for kills. **Opening a chest alarms the nearby piles** (`TowerManager.AlarmPilesNear`, called where the chest
+  opens: `ChestInput.Open` in singleplayer, `ChestSessions.OnOpen` on the server): every unraised pile on the chest's awake
+  floor within `SkeletonChestAlarmBlocks` is `PileState.Alarmed` (never saved) and raises at once, ignoring its trigger range
+  and the near limit (only the hard cap still holds). A pile in an unloaded chunk freezes. The client draws every pile
+  (`StationPasses.RenderBonePiles`, the `block/skeleton_pile` model at each spot, spots read from the station snapshot).
 - **Bound skeletons are never immortal.** Each raised skeleton is tagged with its `TowerFloorRef`. It despawns like any
   mob, and past `TowerSkeletonLeashBlocks` from the tower's center the manager releases it (`SkeletonManager.Release`);
-  either way `SkeletonManager.TakeReleased` reports it once and the floor's **owed** count grows. Owed skeletons are raised
-  again at any of the floor's piles (depleted ones too) the next time a target triggers one. So a half-cleared tower far
+  either way `SkeletonManager.TakeReleased` reports it once, with where it stood (`OwedSkeleton`), and the floor gets an **owed
+  pile** (`TowerFloorState.OwedPiles`, saved) lying there, so a despawned skeleton shows as a bone pile where it vanished. An
+  owed pile rises like any other (a trigger in range) and is then gone. So a half-cleared tower far
   away holds no cap room, and a skeleton that wandered off can never soft-lock a door. A killed one is never owed.
 - **Idle skeletons crumble back into their piles.** A bound skeleton that has chased nobody (no target noticed, or its
   sight of one lost: `MobInterest.IdleSeconds`) for `MobConfig.SkeletonPileReturnIdleSeconds` reads
@@ -163,17 +171,17 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
   `TryReplace` to any block and state, a replaced chest spilling through its `spillChest` hook), then
   every edit-path hook (player-placed unmark, `MarkAreaDirty` over the light radius, fluid and leaf-decay schedules, a falls
   block toppling above, the LOD notify, the support pop, the canopy branch), capped at `TowerMaxBlockWritesPerFrame`; the
-  raw write journals the cell to clients as `BlockChanges`. Each frame a sweep writes the depleted piles and the open
+  raw write journals the cell to clients as `BlockChanges`. Each frame a sweep writes the open
   doors' remaining cells: a written or gone cell leaves the set, an unloaded one stays for later and never blocks the rest,
   and the cap ends the sweep. BT-8's collapse writes through it too, after the sweep and under the same cap.
-- **Saves and the wire**: `stations.json`'s `Towers` (`StationSaveData.TowerData`: the cell, and per floor the waves left
-  per pile in `PileCells` order, the door bit and owed), restored before the entities through `TowerPlacement.TryGetSite`
-  (an entry whose site, floor count or pile count no longer matches is dropped and counted). Only site-built records are
+- **Saves and the wire**: `stations.json`'s `Towers` (`StationSaveData.TowerData`: the cell, and per floor whether each pile has
+  risen in the site's pile order, the door bit and the owed piles' spots), restored before the entities through `TowerPlacement.TryGetSite`
+  (an entry whose site, floor count or pile count no longer matches is dropped and counted, which also resets a tower saved
+  before piles became entities). Only site-built records are
   saved. Every record rides the end of `StationState` (protocol 26; 27 appends its altar state byte). The client's manager has no writer: it never ticks,
-  never raises a skeleton or opens a door, and each snapshot replaces its `TowerRecord.Mirror`s; door and pile cells reach
-  it through `BlockChanges`.
-- **Look-at line** (`TowerManager.Detail`, `TowerReadout`, on both sides): a pile reads "Floor 2: 3 piles, 4 skeletons", a
-  sealed door "Floor 2 sealed: clear floor 1 first", "... 2 piles left" or "... 5 skeletons left" (floors counted from 1).
+  never raises a skeleton or opens a door, and each snapshot replaces its `TowerRecord.Mirror`s; door cells reach
+  it through `BlockChanges`, and each floor's pile spots ride the snapshot (a count byte and three floats each, protocol 59).
+- **Look-at line** (`TowerManager.Detail`, `TowerReadout`, on both sides): a sealed door "Floor 2 sealed: clear floor 1 first", "... 2 piles left" or "... 5 skeletons left" (floors counted from 1).
 - **Scenario**: the `towerclear` op (`World.ClearTowerFloor`) clears a floor at once and the `towerdefeat` op
   (`World.DefeatTower`, `TowerManager.DefeatAt`) marks the king killed, so the real collapse runs;
   `visual-examples/battle-tower.json` (`VOXEL_TIME=147`) films the tower, the piles, a sealed and an opened door, floor 1
@@ -407,99 +415,3 @@ the sand surface is simply not exposed.
   `GameServerTests`.
 - Known gaps: the death is only a shrink and a sink; the worm hurts players only (no mobs, no blocks); the numbers are first
   guesses from the scenario, not a play-tested balance; the item debugger shows the three parts stacked at the origin.
-
-### Icebergs
-
-Drifting icebergs float on the open sea at the pack-ice edge. They are entities, never blocks, and
-**not mobs**: an `Iceberg` (`src/Entities/Icebergs/`) has no health, is never a punch, slice or
-projectile target, draws no healthbar and counts toward none of the mob caps (`MobCaps`); the
-`IcebergManager` (`src/Simulation/Icebergs/`, owned by `World`, main thread only) keeps its own
-`IcebergConfig.NaturalCap` (the ring spawner) and `MaxAlive` (every forced spawn: a scenario, a
-save restore). All tuning lives in `Config/IcebergConfig.cs`.
-
-- **Content.** `assets/data/entities/iceberg.json` names no `hp` and lists its size classes as
-  `variants` (`iceberg_small`, `_medium`, `_large`.bbmodel, generated with their shared skin by
-  `tools/generate-iceberg-models.py`, byte-identical re-runs, `--check`). Model y = 0 is the
-  **waterline**; every cube is axis-aligned and snapped to 8 px vertically, the one cube crossing
-  the waterline is a **shelf** whose top is 8 px up (a swimmer can climb onto it), and every cube
-  above it is an 8 px **step** inset from the one below on all four sides, so walking auto-step
-  (`PlayerPhysics.WalkStepHeight`, half a block) climbs to the top from any side;
-  `BodySolidsTests.ASwimmerCanBoardEveryIcebergVariant` enforces it.
-- **Shape and placement.** `IcebergShape` reads a variant's collision boxes from the model's own
-  cubes through `EntityModel.CubeBoxes` (the frame the baked mesh uses) and is the one definition
-  of a berg's placement: `RotateQuarter` turns a box (each quarter turn maps (x, z) to (z, -x),
-  exactly `Matrix4x4.CreateRotationY(pi/2)` on a row vector, so the boxes stay axis-aligned) and
-  `ModelMatrix` is the matrix the renderer draws with (`IcebergShapeTests` checks they agree for
-  every turn). A berg rolls a variant, a **horizontal-only** scale (`ScaleMin..ScaleMax`, so step
-  heights and freeboard stay exactly as authored), a quarter-turn yaw and a seed, all fixed for
-  life; its center's Y is fixed at the waterline. Its mass is `Density * Volume * scale^2`.
-- **Motion.** `IcebergMotion`: the velocity eases (`WaterDragRate`) toward a drift along the world
-  wind (`Wind.Direction`, turned by a seed-hashed angle within `DriftSpreadRadians`, at
-  `DriftSpeed`), a push adds `PlayerPushForce` along the summed contact normals over the mass (the
-  same push moves a big berg less), capped at `MaxSpeed`. A berg moves along X then Z; a move
-  whose leading face enters a cell layer holding a solid or unloaded cell anywhere across the
-  berg's bounds (the pack ice, shallows, land), or whose bounds would overlap another berg, or
-  whose boxes would push into a standing (not riding, flying or dead) target's body, stops that
-  axis. A berg only moves while a target is within `SimulateRadiusBlocks` and every chunk under it
-  is loaded.
-- **Pushing** is derived from positions, with nothing on the wire: a target in side contact with a
-  berg box (`IcebergContact.TrySideContact`, within `ContactSlackBlocks`) pushes it along the
-  contact normal, unless it rides the berg, flies or is dead (`IMobTarget.IsFlying` / `IsDead`,
-  default members the camera and `ServerPlayer` override).
-- **Standing on a berg.** The player body collides with berg boxes through one seam,
-  `Player/IBodySolids.cs`: `BodyCollision.BodyCollides` / `MoveOnAxis` / `TryStepUp` /
-  `PushOutOfBox` take an optional `IBodySolids`, `PlayerPhysics` passes `Camera.BodySolids` (the
-  world's `IcebergManager`), so walking, auto-step, the swim exit and landing all treat the boxes
-  as solid. The rider is carried client-side (`IcebergManager.CarryAndPushOut`, after the bergs
-  moved): a body riding a berg's boxes where they stood before the move is moved by the berg's
-  displacement through the body collision with its own berg ignored (terrain and other bergs still
-  stop it), then a body left inside any box is pushed out. Singleplayer runs it after
-  `IcebergManager.Update` (`MobDirector.UpdateIcebergs`), a client after its mirrors dead-reckoned
-  (`MobDirector.AnimateIcebergMirrors`). A placement into a cell a berg box overlaps is refused
-  (`IcebergManager.OverlapsCell`, beside the falling-cube check); the air above a low ledge is free.
-- **Wobble** (`IcebergWobble`) is render only: bob, pitch and roll as two sines each of hashed
-  periods and phases, a pure function of (seed, lighting clock), smaller for a bigger berg. The
-  collision boxes never bob, so a rider's feet may visually bob by its small amplitude.
-- **Spawning and life.** Every `SpawnIntervalSeconds`, below the natural cap, the spawner tries
-  ring points around a target in turn (`IcebergSpawner.TryFindSite`): the stored column must be
-  `Biome.Ocean` at `WorldGenerationConfig.SeaLevel` (no river or lake), its climate in the band
-  (`IcebergSpawnRule.InBand`: cold from `SpawnColdMin`, a little below `PackIceColdStart`, up to
-  `FreezeColdThreshold`, and the top water not frozen by `SnowGenerator.IsFrozenWater`), the berg's
-  whole placed bounds loaded and free of solids (deep and wide enough) and no target within
-  `SpawnClearRadiusBlocks`. The climate read is an injectable `IcebergClimate`; the default reads
-  worldgen and none for a column a world source supplies. A fresh berg rises out of the sea over
-  `EmergeSeconds` (render only); past `DespawnRadiusBlocks` from every target it is removed; when
-  its rolled life runs out and nobody rides it or stands within the clear radius it sinks over
-  `SinkSeconds` (no longer colliding) and is removed. With nobody online nothing spawns, moves or
-  despawns.
-- **Saves and the wire.** `entities.json` carries an optional `Icebergs` list (variant, scale,
-  turns, seed, waterline center, velocity, life left); a saved berg is restored once every chunk
-  under its placed bounds is loaded. On a server each berg rides `EntityList` as
-  `NetEntityKind.Iceberg` (see "Multiple players and chat"); a client mirrors it without
-  simulation (`Iceberg.Mirror`, fully emerged, dead-reckoned along its velocity for at most
-  `MirrorMaxLeadSeconds` past a snapshot, `IcebergManager.ReplaceMirrors` / `AnimateMirrors`).
-- **Rendering.** `Rendering/Actors/IcebergPasses.cs` builds one mesh and skin per variant
-  (`EntityModel.FromData`) and draws each berg with `IcebergPasses.ModelMatrix` (the wobble's tilt
-  about the waterline center, then `IcebergShape.ModelMatrix` at the center raised by the bob and
-  lowered by the rise or sink) in the entity pass (before contact AO), the near shadow cascade and
-  the water mirror (whose reuse motion signal reads each berg's center). The wobble clock
-  (`IcebergPasses.Time`) is set once a frame before the shadows, so the three agree.
-- **Debugger.** The item debugger's ENTITIES tab offers one mode per variant for the iceberg
-  (`ITEM_DEBUGGER_SELECT=iceberg ITEM_DEBUGGER_ANIM=iceberg_large`).
-
-Tests: `Entities/Icebergs/` (shape, motion, wobble, spawn band, contact, the berg),
-`Simulation/Icebergs/` (`IcebergManagerTests`: drift stopped by the ice and by other bergs, frozen
-over unloaded chunks, a small berg pushed farther than a large one, carry, push-out, mirrors,
-despawn and sinking; `IcebergSpawnerTests`; `IcebergWorldTests`: the spawn op, standing on a berg,
-the placement refusal and the save restore), `Player/BodySolidsTests`, the hover rule in
-`MovementRulesTests`, the codec and protocol tests and `GameServerTests.AnIcebergReachesTheClientsEntityList`.
-`visual-examples/icebergs.json` (`VOXEL_TIME=147`) films the three sizes, the wobble, the drift,
-standing on a berg, a push and the reflection.
-
-Known gaps (TODO `M-27`): no natural bergs on a column a world source supplies (no worldgen climate there);
-item drops, mobs, projectiles, TNT blasts, the punch and slice cones and the block raycast ignore
-bergs; the server's endpoint-collision rule is not judged against bergs (only the hover rule is);
-a body merely resting against a berg nudges it a hair until contact breaks; mirrors dead-reckon
-without collision; a rider's feet visually bob by the wobble; and a block that lands or hardens
-inside a berg's bounds (a falling block, a fluid crust, a felled tree) is not refused and is
-carried inside it.

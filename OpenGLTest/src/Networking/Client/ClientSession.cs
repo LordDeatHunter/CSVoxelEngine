@@ -304,8 +304,10 @@ internal sealed class ClientSession
                     for (var slot = 0; slot < worn.Length; slot++) worn[slot] = BlockTables.RequireAssigned(reader.ReadId());
                     var heldId = BlockTables.RequireAssigned(reader.ReadId());
                     var heldLit = reader.ReadBool();
+                    var offhandId = BlockTables.RequireAssigned(reader.ReadId());
+                    var offhandLit = reader.ReadBool();
                     remoteScratch.Add(new RemotePlayerSnapshot(id, name, eye, yaw, pitch, flags, action, actionSeq,
-                        VoxelEngine.Player.ArmorLook.FromWire(worn), heldId, heldLit));
+                        VoxelEngine.Player.ArmorLook.FromWire(worn), heldId, heldLit, offhandId, offhandLit));
                 }
                 w.ClientMirror.SyncRemotePlayers(remoteScratch, netPlayerId);
                 break;

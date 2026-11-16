@@ -113,6 +113,55 @@ internal static class ModelBakeSteps
     /// because a turned quad shades flat (see <see cref="HorizontalFacing.RotateModel"/>) while
     /// the authored north bake would take per-corner AO, so one facing would shade unlike the rest.
     /// </summary>
+    /// <summary>
+    /// The two lying shapes of an upright full-cube log model: along X (index 0) and along Z (index 1). Each face keeps
+    /// its own standard corner order and UVs, so the faces still shade with per-corner AO; only the tile changes (the
+    /// end tile on the two faces across the axis, the bark tile on the rest) and, where the axis runs along a bark
+    /// face's U direction, the UV corners are walked a quarter turn so the grain follows the axis.
+    /// </summary>
+    internal static BakedModel[] BakeLyingModels(BlockType type, BakedModel upright)
+    {
+        var byFace = new BakedQuad[6];
+        foreach (var quad in upright.Quads)
+            byFace[quad.Face] = quad;
+        if (upright.Quads.Length != 6 || byFace.Any(quad => quad == null))
+            throw new InvalidOperationException(
+                $"The model of log '{type.Name}' must be one quad per cube face to lie on its side.");
+
+        var side = byFace[0].Tile;
+        var end = byFace[4].Tile;
+        var lying = new BakedModel[2];
+        for (var axis = 0; axis < 2; axis++)
+        {
+            // Along X the ends are the west and east faces (2, 3); along Z the north and south faces (0, 1)
+            var endFaces = axis == 0 ? (2, 3) : (0, 1);
+            var quads = new BakedQuad[6];
+            for (var face = 0; face < 6; face++)
+            {
+                var quad = byFace[face];
+                if (face == endFaces.Item1 || face == endFaces.Item2)
+                {
+                    quads[face] = quad with { Tile = end };
+                    continue;
+                }
+
+                // A side face's grain runs along V (up the wall; along Z on the top and bottom): it turns a quarter
+                // when the log's axis lies along its U instead
+                var alongU = axis == 0 ? face is 0 or 1 or 4 or 5 : face is 2 or 3;
+                var uvs = quad.Uvs;
+                quads[face] = quad with
+                {
+                    Tile = side,
+                    Uvs = alongU ? [uvs[1], uvs[2], uvs[3], uvs[0]] : uvs,
+                };
+            }
+
+            lying[axis] = upright with { Quads = quads, FaceTiles = [.. quads.Select(q => q.Tile)] };
+        }
+
+        return lying;
+    }
+
     internal static void ValidateFacingBake(BlockType type, BakedModel baked)
     {
         if (baked.Quads.Any(quad => quad.IsFullFace))

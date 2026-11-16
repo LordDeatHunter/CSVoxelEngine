@@ -135,6 +135,9 @@ public enum NetInventoryAction : byte
     MoveSlot = 13,
     /// <summary>Empties a hotbar slot: <c>Slot</c>. The item stays in its pool.</summary>
     ClearSlot = 14,
+    /// <summary>Swaps the selected hotbar slot with the offhand. The offhand is named by slot index
+    /// <c>Inventory.OffhandIndex</c> in <c>Equip</c>, <c>MoveSlot</c> and <c>ClearSlot</c>.</summary>
+    SwapHands = 15,
 }
 
 /// <summary>
@@ -160,9 +163,7 @@ public static class NetFraming
     /// <see cref="NetEntityKind.FallingBlock"/>), which a client draws as display-only mirrors.
     /// 7: each <see cref="NetMessage.PlayerList"/> entry ends with the player's last
     /// <see cref="NetPlayerAction"/> and its counter, and the player flags carry cosmetic movement bits.
-    /// 8: <see cref="NetMessage.EntityList"/> also carries icebergs (<see cref="NetEntityKind.Iceberg"/>);
-    /// an older client would neither draw nor collide with them while the server judges a rider's
-    /// hover against them. 9: <see cref="NetMessage.PlayerStatus"/> ends with the player's air.
+    /// 8: reserved (an entity kind since removed). 9: <see cref="NetMessage.PlayerStatus"/> ends with the player's air.
     /// 10: an <see cref="NetIntentKind.Attack"/> intent may carry the sword's swings
     /// (<see cref="NetAttackKind.SwordCut"/>, <see cref="NetAttackKind.SwordBackCut"/>,
     /// <see cref="NetAttackKind.SwordChop"/>) and the player list their <see cref="NetPlayerAction"/>s; an
@@ -289,8 +290,15 @@ public static class NetFraming
     /// 55: the jungle's animals, <see cref="NetEntityKind.CorpseBloom"/> (its posture byte says whether it is open) and
     /// <see cref="NetEntityKind.Centipede"/>, in <see cref="NetMessage.EntityList"/>; an older client would not draw them.
     /// 56: the inventory snapshot carries the battle towers the player marked with tower maps (<c>TowerMarks</c>); an older
-    /// client would never show a mark on its map.</summary>
-    public const int ProtocolVersion = 56;
+    /// client would never show a mark on its map.
+    /// 57: <see cref="NetEntityKind"/> 6 is retired; an older client would still expect that entry kind in
+    /// <see cref="NetMessage.EntityList"/>.
+    /// 58: the offhand slot: the inventory snapshot carries it, <see cref="NetInventoryAction.SwapHands"/> is new, the
+    /// equip, move and clear intents may name it, and each <see cref="NetMessage.PlayerList"/> entry ends with the offhand's
+    /// held item and lit flag; an older peer would misread the frame.
+    /// 59: each floor of a battle tower in the station snapshot ends with the spots of its bone piles (a count byte, then
+    /// three floats each); an older peer would misread the frame.</summary>
+    public const int ProtocolVersion = 59;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

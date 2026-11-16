@@ -46,6 +46,25 @@ internal static class BoxSweep
         return position;
     }
 
+    /// <summary>
+    /// Moves a mob body by <paramref name="movement"/>: X, Z, then Y when falling or level, but Y first
+    /// when rising, so a body hopping up a one-block step clears the block at its feet before it
+    /// moves sideways instead of hitting the step's face at foot level. Reports each axis's hit.
+    /// </summary>
+    internal static Vector3 MoveBody(Vector3 start, Vector3 movement, Vector3 halfExtents, ChunkManager chunks,
+        out bool hitX, out bool hitZ, out bool hitY)
+    {
+        var position = start;
+        hitY = false;
+        var rising = movement.Y > 0f;
+        if (rising) position = MoveOnAxis(position, movement.Y, 1, halfExtents, chunks, out hitY);
+
+        position = MoveOnAxis(position, movement.X, 0, halfExtents, chunks, out hitX);
+        position = MoveOnAxis(position, movement.Z, 2, halfExtents, chunks, out hitZ);
+        if (!rising) position = MoveOnAxis(position, movement.Y, 1, halfExtents, chunks, out hitY);
+        return position;
+    }
+
     /// <summary>The vector with <paramref name="delta"/> added to one axis (0 X, 1 Y, 2 Z).</summary>
     internal static Vector3 OffsetAxis(Vector3 value, int axis, float delta)
     {

@@ -32,22 +32,25 @@ public static class HeldItemPose
 
     /// <summary>
     /// The model matrix the held sprite of <paramref name="type"/> is drawn with in
-    /// <paramref name="player"/>'s right hand: the hand anchor at the given eye, look and first-person
+    /// <paramref name="player"/>'s right hand (the left one when <paramref name="offhand"/>): the hand anchor at the given eye, look and first-person
     /// back offset, the item's display transform with the pose's rotation offset, and the shipped
     /// sprite scale and grip. The one definition of the drawn sprite's matrix.
     /// </summary>
     internal static Matrix4x4 SpriteMatrix(PlayerModel player, Item type, Vector3 eye, float yawDeg,
-        float pitchDeg, float backOffset) =>
-        Pose(player.GetHandAnchorMatrix(eye, yawDeg, backOffset, pitchDeg),
+        float pitchDeg, float backOffset, bool offhand = false) =>
+        Pose(offhand ? player.GetOffhandAnchorMatrix(eye, yawDeg, backOffset, pitchDeg)
+                : player.GetHandAnchorMatrix(eye, yawDeg, backOffset, pitchDeg),
             type.DisplayMatrix(player.HeldItemRotationOffset), HeldItemScale, HeldItemGrip);
 
-    /// <summary>A lantern hangs upright below the hand's grip, regardless of the wrist's rotation.</summary>
-    internal static Matrix4x4 LanternMatrix(Matrix4x4 hand, float yawDeg, float scale = HeldBlockScale)
+    /// <summary>A lantern hangs upright below the hand's grip, regardless of the wrist's rotation. The left hand
+    /// (<paramref name="offhand"/>) mirrors the grip and the tilt so the lantern hangs inward of that arm too.</summary>
+    internal static Matrix4x4 LanternMatrix(Matrix4x4 hand, float yawDeg, float scale = HeldBlockScale, bool offhand = false)
     {
-        var grip = Vector3.Transform(new Vector3(-0.06f, 0.02f, -0.10f), hand);
+        var side = offhand ? -1f : 1f;
+        var grip = Vector3.Transform(new Vector3(-0.06f * side, 0.02f, -0.10f), hand);
         // Pivot at the chain's top. A small outward tilt clears the forearm while the grip stays in the fingers.
         return Matrix4x4.CreateTranslation(0f, -.5f, 0f) * Matrix4x4.CreateScale(scale)
-            * Matrix4x4.CreateRotationZ(LanternConfig.HangTilt)
+            * Matrix4x4.CreateRotationZ(LanternConfig.HangTilt * side)
             * Matrix4x4.CreateRotationY(-MathUtils.ToRadians(yawDeg + 90f)) * Matrix4x4.CreateTranslation(grip);
     }
 

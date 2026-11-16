@@ -266,6 +266,7 @@ public sealed class VisualScenario
                     : throw new InvalidOperationException(
                         $"Step {index} (select) needs 'slot' from 1 to {Inventory.SlotCount}."),
             },
+            "swaphands" => new VisualStep { Op = "swaphands" },
             "panel" => new VisualStep { Op = "panel", On = ReadOpen(element) },
             "tab" => new VisualStep
             {

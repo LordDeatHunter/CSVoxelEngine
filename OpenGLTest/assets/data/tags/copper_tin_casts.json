@@ -1,0 +1,7 @@
+{
+  // Everything cast from molten copper or tin (recipes/cast/): the "first cast" quest accepts any one.
+  "items": [
+    "item/copper_ingot", "item/copper_axe_head", "item/copper_dagger", "item/copper_pickaxe_head", "item/copper_ring", "item/copper_sword_head",
+    "item/tin_ingot", "item/tin_axe_head", "item/tin_pickaxe_head", "item/tin_ring", "item/tin_sword_head"
+  ]
+}

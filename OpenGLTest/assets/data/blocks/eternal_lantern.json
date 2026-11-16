@@ -1,0 +1,15 @@
+{
+  // The battle tower's own lamp: a lantern that needs no fuel. It is worldgen-only (no item, no loot, so
+  // it is not the fuelled `lantern` item) and unbreakable, so only the tower's collapse clears it. It
+  // hangs under whatever the template put above it (state 0) and shares the lantern's model and tile; the
+  // glow is a plain block emission like the torch's, so a tower floor stays lit without anyone feeding it.
+  "name": "Eternal Lantern",
+  "model": "block/lantern",
+  "solid": false,
+  "castsAO": false,
+  "light": { "emission": 14 },
+  "hitbox": { "min": [0.3125, 0.125, 0.3125], "max": [0.6875, 1, 0.6875] },
+  "hasItem": false,
+  "loot": "none",
+  "unbreakable": true
+}

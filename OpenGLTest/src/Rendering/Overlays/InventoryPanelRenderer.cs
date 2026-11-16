@@ -98,20 +98,17 @@ internal sealed class InventoryPanelRenderer
         // the visible range: that would double the LINQ sort). In creative the Blocks/Tools/Misc
         // tabs list the whole catalog instead of the player's stock.
         IReadOnlyList<CreativeCatalog.CatalogEntry>? catalog = null;
-        IReadOnlyList<Inventory.ToolRow>? tools = null;
         IReadOnlyList<CraftingRecipe>? recipes = null;
-        IReadOnlyList<Inventory.StackRow>? rows = null;
+        IReadOnlyList<InventoryTabs.TabRow>? rows = null;
         int rowCount;
         if (hits != null)
             rowCount = hits.Count;
         else if (creative && view.Tab != InventoryCategory.Crafting)
             rowCount = (catalog = CreativeCatalog.Entries(view.Tab, inventory)).Count;
-        else if (view.Tab is InventoryCategory.Tools or InventoryCategory.Gear)
-            rowCount = (tools = view.Tab == InventoryCategory.Gear ? inventory.GearEntries() : inventory.ToolEntries()).Count;
         else if (view.Tab == InventoryCategory.Crafting)
             rowCount = (recipes = inventory.ListedRecipes(creative)).Count;
         else
-            rowCount = (rows = inventory.StackEntries(view.Tab)).Count;
+            rowCount = (rows = InventoryTabs.Entries(inventory, view.Tab)).Count;
 
         // Clamp the stored offset with this frame's row count, exactly as
         // InventoryPanelInput.HandleInventoryClick does, so the drawn list and the click always agree.
@@ -157,17 +154,6 @@ internal sealed class InventoryPanelRenderer
                     DrawCatalogRow(i, offset, rowCount, inventory, catalog[i].Id, catalog[i].Name, catalog[i].Count,
                         false, headingDegrees, time);
             }
-            else if (tools != null)
-            {
-                for (var i = first; i < end; i++)
-                {
-                    var selected = view.SelectedToolInstance == tools[i].InstanceId;
-                    var mark = EquippedMark.Of(inventory, tools[i].ItemId, tools[i].InstanceId);
-                    DrawEntryRow(i, offset, tools[i].ItemId, tools[i].Name, mark.CountLabel("1"), selected, false,
-                        headingDegrees, time, RowRarity(inventory, tools[i].ItemId, tools[i].InstanceId), mark.Accent,
-                        inventory.ToolDurabilityFraction(tools[i].InstanceId), hotbarSlot: mark.HotbarSlot);
-                }
-            }
             else if (recipes != null)
             {
                 for (var i = first; i < end; i++)
@@ -185,10 +171,14 @@ internal sealed class InventoryPanelRenderer
             {
                 for (var i = first; i < end; i++)
                 {
-                    var mark = EquippedMark.Of(inventory, rows[i].Id, 0);
-                    DrawEntryRow(i, offset, rows[i].Id, rows[i].Name, rows[i].Count.ToString(),
-                        view.SelectedId == rows[i].Id, false, headingDegrees, time, RowRarity(inventory, rows[i].Id, 0),
-                        mark.Accent, hotbarSlot: mark.HotbarSlot);
+                    var row = rows[i];
+                    var mark = EquippedMark.Of(inventory, row.Id, row.InstanceId);
+                    // An instance row is picked by its instance and shows its own wear; a stack is picked by its id
+                    var instance = row.InstanceId != 0;
+                    DrawEntryRow(i, offset, row.Id, row.Name, instance ? mark.CountLabel("1") : row.Count.ToString(),
+                        instance ? view.SelectedToolInstance == row.InstanceId : view.SelectedId == row.Id, false,
+                        headingDegrees, time, RowRarity(inventory, row.Id, row.InstanceId), mark.Accent,
+                        instance ? inventory.ToolDurabilityFraction(row.InstanceId) : null, hotbarSlot: mark.HotbarSlot);
                 }
             }
         }
@@ -411,19 +401,14 @@ internal sealed class InventoryPanelRenderer
         ushort id = 0;
         string name = "";
         string stock = "";
-        if (view.Tab == InventoryCategory.Tools)
+        var pickedItem = inventory.ToolItemId(view.SelectedToolInstance);
+        if (pickedItem != 0 && InventoryTabs.TabOf(pickedItem) == view.Tab)
         {
-            if (view.SelectedToolInstance != 0)
-            {
-                id = inventory.ToolItemId(view.SelectedToolInstance);
-                if (id != 0)
-                {
-                    name = Inventory.DisplayName(id);
-                    stock = "tool in hand";
-                }
-            }
+            id = pickedItem;
+            name = Inventory.DisplayName(id);
+            stock = "tool in hand";
         }
-        else if (view.SelectedId != 0 && inventory.CountFor(view.SelectedId) > 0)
+        else if (view.Tab != InventoryCategory.Tools && view.SelectedId != 0 && inventory.CountFor(view.SelectedId) > 0)
         {
             id = view.SelectedId;
             name = Inventory.DisplayName(id);

@@ -93,11 +93,6 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   close, the locked wobble), the viewed cells on the wire (the end of StationState)
       HellMobManager.cs        # the hell mobs: AI tick, the brute's blow at its impact, the casters' fire bolts
                                #   (MobMissiles; damage + burning), loot, despawn, the hell-only ring spawn (packs by layer)
-      Icebergs/                # the iceberg simulation, namespace VoxelEngine.Simulation.Icebergs
-        IcebergManager.cs      # the live bergs: forced and ring spawns, drift and push, the terrain/berg/body
-                               #   collision, the life cycle, IBodySolids, the rider carry and push-out, client mirrors
-        IcebergSpawner.cs      # where a berg may spawn: ocean at sea level, the band (injectable IcebergClimate),
-                               #   the footprint clear and loaded, no target near
       KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible
                                #   slot and its melt loop, plus the multiblock integrity sweep
       Smithing/                # the iron works, namespace VoxelEngine.Simulation.Smithing (see "The bloomery and the anvil")
@@ -149,8 +144,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       Tower/                   # the battle tower's simulation, namespace VoxelEngine.Simulation.Tower
         SkeletonManager.cs     # the skeletons: forced spawn only (Spawn(position), under the hard cap), the rake at
                                #   its impact, the arrows (MobMissiles), loot, despawn, client mirrors; no ring spawn; reports a
-                               #   bound skeleton's despawn, leash release or idle crumble back to its piles (TakeReleased)
-                               #   so its floor owes it
+                               #   bound skeleton's despawn, leash release or idle crumble back to its piles (TakeReleased,
+                               #   with where it stood) so its floor owes it a pile there
         TowerManager.cs        # the floor locks (see "Battle tower"): records materialized near a player, the recount, owed
                                #   and leash, the door judgement, the capped sweep, ClearFloor, Detail, stations.json and the wire;
                                #   the roof altar: JudgeAltar, BeginRitual, UpdateAltars/SettleAltars, the BossDefeated event;
@@ -170,9 +165,10 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   and Mirror (the client's copy)
         TowerFloorState.cs     # one floor: band, piles, door cells and the ones still to sweep, living, owed, piles left,
                                #   alive and the door bit
-        PileState.cs           # one skeleton pile: cell, waves left, cooldown, removed
-        SkeletonPileManager.cs # a floor's piles: waves of TowerDifficulty.PackSize skeletons for a non-immune target in
-                               #   range, then depleted; owed skeletons re-raised at any pile; never writes blocks
+        PileState.cs           # one bone pile (an entity-style spot, not a block): free position, raised, alarmed
+        OwedSkeleton.cs        # a despawned bound skeleton: its floor and the spot it stood, which becomes a pile
+        SkeletonPileManager.cs # a floor's piles: each raises its one skeleton for a non-immune target in range, then is
+                               #   gone; owed piles (where skeletons despawned) rise the same way; never writes blocks
         TowerRules.cs          # GL-free: the pile trigger, floor awake, the door rule, spawn points round a pile, the leash,
                                #   the altar verdict (AltarVerdictOf), the collapse gate (CollapseDue)
         TowerBlockWriter.cs    # the capped writer past `unbreakable` (Chunk.CollapseWriteAt plus every edit-path hook): the
@@ -270,9 +266,11 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   immutable, sorted, empty metals dropped; the last charged input
         CrucibleMetal.cs       # one metal in a crucible: material id, molten ml, pending ml
         CraftingSession.cs     # the crafting tab's open recipe, copies and fed reservations
-        CreativeCatalog.cs     # GL-free browsable catalog of every item, grouped by pool and name-sorted
+        CreativeCatalog.cs     # GL-free browsable catalog of every item, grouped by tab and name-sorted
+        InventoryTabs.cs       # GL-free: which panel tab lists an id (TabOf) and what a tab lists (Entries: stacks and instances together), apart from the storage pool
         HotbarLayout.cs        # hotbar strip geometry shared by the draw, its hit-test and the panel
         HotbarSlot.cs          # one hotbar slot: a stackable id or a tool instance (the default is empty)
+        HandScope.cs           # using-scope that points Inventory's Selected* readers at the offhand while a use runs
         Inventory.cs, ItemStack.cs  # the three pools, the hotbar, stacks and their components
         InventoryCategory.cs   # which storage pool an id belongs to (Blocks, Tools, Misc, Crafting)
         InventoryCrafting.cs   # GL-free crafting rules behind Inventory's Craftable/CanCraftBatch/TryCraft forwarders

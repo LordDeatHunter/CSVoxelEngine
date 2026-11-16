@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -228,7 +229,7 @@ public sealed class StationNetCodecTests
             (10, 18, new[] { (38, 11, -20), (42, 11, -20) }, new[] { (40, 13, -24) }),
             (18, 26, new[] { (38, 19, -20) }, new[] { (40, 21, -24) }),
         ], hasSite: false));
-        record.Floors[0].Piles[0].WavesLeft = 0;
+        record.Floors[0].Piles[0].Raised = true;
         record.Floors[0].PilesLeft = record.Floors[0].CountPilesLeft();
         record.Floors[0].Alive = 3;
         record.Floors[1].PilesLeft = record.Floors[1].CountPilesLeft();
@@ -266,7 +267,12 @@ public sealed class StationNetCodecTests
 
         // The mirror reads the same look-at lines as the server
         Assert.Equal(server.Detail(TowerPalette.DoorBlock, 40, 13, -24), client.Detail(TowerPalette.DoorBlock, 40, 13, -24));
-        Assert.Equal(server.Detail(TowerPalette.PileBlock, 38, 19, -20), client.Detail(TowerPalette.PileBlock, 38, 19, -20));
+        var spots = new List<Vector3>();
+        var mirrored = new List<Vector3>();
+        server.CollectPileSpots(spots);
+        client.CollectPileSpots(mirrored);
+        Assert.NotEmpty(spots);
+        Assert.Equal(spots, mirrored);
         Assert.NotNull(client.Detail(TowerPalette.DoorBlock, 40, 13, -24));
         var (ax, ay, az) = record.AltarCell;
         Assert.Equal(server.Detail(TowerPalette.AltarBlock, ax, ay, az), client.Detail(TowerPalette.AltarBlock, ax, ay, az));
@@ -294,7 +300,7 @@ public sealed class StationNetCodecTests
         for (var k = 0; k < floors; k++)
         {
             writer.Write(bottom).Write(top);
-            writer.Write((byte)0).Write((byte)0).Write(false);
+            writer.Write((byte)0).Write((byte)0).Write(false).Write((byte)0);
         }
         writer.Write((byte)TowerAltarState.Dormant);
         using var reader = new PacketReader(writer.ToArray());
@@ -310,7 +316,7 @@ public sealed class StationNetCodecTests
         writer.Write(0).Write(0).Write(8).Write(8).Write(9);
         writer.Write((byte)1);
         writer.Write(10).Write(18);
-        writer.Write((byte)0).Write((byte)0).Write(false);
+        writer.Write((byte)0).Write((byte)0).Write(false).Write((byte)0);
         writer.Write((byte)(TowerAltarState.Defeated + 1));
         using var reader = new PacketReader(writer.ToArray());
         Assert.Equal(NetMessage.StationState, reader.Message);

@@ -6,10 +6,11 @@
     // never does: both boxes are inset one pixel from the cell, and they fill the block's hitbox exactly (the world
     // model's latch, one pixel proud of the front, is only painted here: the front tile carries it across the seam
     // between lid and body). UVs are left to the defaults, which crop each face out of its tile. The textures are
-    // #front (the north face of both boxes), #side (the other three sides and the underside) and #top (the lid top);
-    // tools/generate-chest-textures.py cuts all three from the model's skin.
+    // one per face, each cut from the skin face the world chest draws there: #front (north, with the latch), #back
+    // (south), #left (west), #right (east), #top (the lid top) and #bottom (the underside); a shared side tile would
+    // make the popped block show other art than the chest does. tools/generate-chest-textures.py cuts all six.
     "textures": {
-        "particle": "#side"
+        "particle": "#left"
     },
     "elements": [
         {
@@ -17,10 +18,10 @@
             "to": [15, 10, 15],
             "faces": {
                 "north": { "texture": "#front" },
-                "south": { "texture": "#side" },
-                "west": { "texture": "#side" },
-                "east": { "texture": "#side" },
-                "down": { "texture": "#side", "uv": [1, 6, 15, 16] }
+                "south": { "texture": "#back" },
+                "west": { "texture": "#left" },
+                "east": { "texture": "#right" },
+                "down": { "texture": "#bottom" }
             }
         },
         {
@@ -28,9 +29,9 @@
             "to": [15, 14, 15],
             "faces": {
                 "north": { "texture": "#front" },
-                "south": { "texture": "#side" },
-                "west": { "texture": "#side" },
-                "east": { "texture": "#side" },
+                "south": { "texture": "#back" },
+                "west": { "texture": "#left" },
+                "east": { "texture": "#right" },
                 "up": { "texture": "#top" }
             }
         }

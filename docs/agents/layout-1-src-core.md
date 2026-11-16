@@ -67,6 +67,9 @@ OpenGLTest/
       SfxMixer.cs              # mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline
       SoundFalloff.cs          # GL-free: a positional sound's distance gain and the earshot a server sends within
       SpatialVoices.cs         # the pool of OpenAL 3D sources positional one-shots play on (oldest taken when full)
+      FootstepSfx.cs           # GL-free footstep rules: when a footfall is audible, the mob stride accumulator
+      Footsteps.cs             # plays the block-underfoot step group at the player's gait footfalls and each walking
+                               #   mob's (Mob.TryTakeFootfall); raises FootfallTaken for anything following the steps
       WorldSounds.cs           # where a World's components send sounds (SoundEvent): played here, or on a server
                                #   queued for the players in earshot (see "World sounds")
     Chunks/                    # chunk storage and lifecycle, the column cache and column terrain, the light
@@ -175,11 +178,10 @@ OpenGLTest/
                                #   LocateCommand (Tower: the linked /locate answer)
     Config/                    # every tuning constant, one static class per domain (all const or static
                                #   readonly, read concurrently by every thread; namespace VoxelEngine.Config)
+      FootprintConfig.cs       # footprints: default visibility and persistence, fade share, cap, print size and tint
       AudioConfig.cs           # ambience bed paths, volumes and fades; the sfx volume
       BloomeryConfig.cs        # iron smelting: the bloomery's heat band, bellows pump, smelt and burn times, the anvil's slack
       HudConfig.cs             # selection outline and pulse, hotbar name fade, pop and flash, the loading screen
-      IcebergConfig.cs         # icebergs: caps and the spawn ring, the spawn band, size and mass, drift and push,
-                               #   wobble, life cycle, the client mirror's lead
       RarityStyleConfig.cs     # the rarity chrome's per-rarity layer strengths (opacity, wash, glow, sheen, sparkle,
                                #   pulse depth) and its shape and motion knobs; Common all zero
       JuiceConfig.cs           # landing and footstep dust, slime splat, hit sparks, death poof, blast shake and
@@ -411,6 +413,7 @@ OpenGLTest/
       Lighting/                # the block-light palette, its two-slot tint code and the campfire flicker
         BlockLightPalette.cs   # GL-free 8-slot block-light color palette (slot 0 = the default warm torch color)
         LightFlicker.cs        # GL-free per-cell flicker phase + curve for the campfire point lights
+        FireLight.cs           # one dynamic point light: cell, linear color, strength (a held block uses its own light.color and emission)
         LightTint.cs           # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
       Post/                    # the post pass and screen-space effects: tonemap, eye
                                #   adaptation, biome grade, contact AO, godrays, sun dazzle, lens flare, underwater wobble
@@ -523,16 +526,6 @@ OpenGLTest/
         IBonePose.cs           # a pose of a Blockbench rig: each bone's animated local transform
         RigPose.cs             # GL-free: composes a pose down the rig's parent chain into a part's world matrix
         ClipPose.cs            # one clip sampled at one time as a pose, no layers (a chest's lid); default = rest
-      Icebergs/                # drifting icebergs (not mobs): the berg and its GL-free rules, see "Icebergs"
-        Iceberg.cs             # one berg: variant, horizontal scale, quarter turns, seed, waterline center,
-                               #   velocity, cached world boxes, emerge/sink, the client mirror's dead reckoning
-        IcebergContact.cs      # GL-free box rules: overlap, riding, side contact and its push direction; the one
-                               #   player body box (BodyMin/BodyMax) BodyCollision builds from
-        IcebergMotion.cs       # GL-free drift along the wind, the push over the mass, the speed cap
-        IcebergShape.cs        # a variant's collision boxes from its model cubes; the one turn rule (RotateQuarter),
-                               #   ModelMatrix, Place, mass
-        IcebergSpawnRule.cs    # GL-free spawn band: open water from SpawnColdMin to the freeze threshold
-        IcebergWobble.cs       # GL-free render-only bob, pitch and roll of (seed, lighting clock)
       SkyMobs/                 # the sky islands' mobs (see "Sky mobs"): the shared base, the two kinds, the zone difficulty
       Wildlife/                # the animals of the wild (see "Wildlife"): Animal (heeding, idle habits, gaits), the
                                #   WildlifeSpecies table, Deer (watches, bolts, grazes), Boar (neutral until crowded or
@@ -570,7 +563,7 @@ OpenGLTest/
         SkeletonKingAttack.cs  # None / Slam / Volley / Summon
         BoneBurst.cs           # GL-free: the king's volley as a burst, its bones due one after another over a window
         SkeletonKingHome.cs    # where a king is leashed: its tower (or none), the altar-top feet, the leash radius
-        TowerDifficulty.cs     # GL-free: the floor tier's pile wave size (PackSize), the living-skeleton limit near a pile (PileNearLimit), clamp
+        TowerDifficulty.cs     # GL-free: the floor tier's pack size (PackSize) and piles per pile spot (PilesPerSpot), the living-skeleton limit near a pile (PileNearLimit), clamp
         TowerFloorRef.cs       # the tower (by placement cell) and floor whose lock a bound skeleton counts toward
       Sandworms/               # the desert boss (see "Sandworm"): the mob, its chain, its brain and its pose
         Sandworm.cs            # the mob: the head is its position, the exposed segments by the sand surface, the segment hit tests and

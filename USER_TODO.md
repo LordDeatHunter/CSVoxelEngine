@@ -135,18 +135,16 @@ Every chest is drawn in the world with one shared Blockbench model, `assets/mode
 base, a hinged lid with a latch, the `open`, `close` and `wobble` clips), and differs only in its skin: a 128x128 PNG
 under `assets/textures/chests/`, laid out like the model's own texture (open the model in Blockbench and paint on it,
 or over a copy of `chest_wooden.png`; the model embeds the wooden skin). The inventory icon, the held block, drops and
-break particles use the static `block/chest` model instead: 32x32 tiles, front/side/top each, which should match the
+break particles use the static `block/chest` model instead: 32x32 tiles, one per face (front, back, left, right, top, bottom), which should match the
 skin. All of it is generated placeholder art from `tools/generate-chest-textures.py` (a skin's faces are cut into its
 three tiles); do not re-run the script once a file is hand-painted.
 
 - [ ] **Chest model** — `chest.bbmodel`: the shape and the three clips are a first pass (the open swing, the close
   slam with its bounce, the locked rattle); retune freely in Blockbench, the group names `Base` and `Lid` and the
   clip names must stay.
-- [ ] **Wooden chest** — `chests/chest_wooden.png` (also embedded in the model); `chest_wooden_front.png`,
-  `chest_wooden_side.png`, `chest_wooden_top.png`.
-- [ ] **Iron chest** — `chests/chest_iron.png`; `chest_iron_front.png`, `chest_iron_side.png`, `chest_iron_top.png`.
-- [ ] **Bronze chest** — `chests/chest_bronze.png`; `chest_bronze_front.png`, `chest_bronze_side.png`,
-  `chest_bronze_top.png`.
+- [ ] **Wooden chest** — `chests/chest_wooden.png` (also embedded in the model); `chest_wooden_{front,back,left,right,top,bottom}.png`.
+- [ ] **Iron chest** — `chests/chest_iron.png`; `chest_iron_{front,back,left,right,top,bottom}.png`.
+- [ ] **Bronze chest** — `chests/chest_bronze.png`; `chest_bronze_{front,back,left,right,top,bottom}.png`.
 - [ ] **Ruin chests** — `chests/chest_ruin_surface.png`, `chest_ruin_underground.png`, `chest_ruin_sky.png`,
   `chest_ruin_hell.png`; `chest_ruin_surface_*`, `chest_ruin_underground_*`, `chest_ruin_sky_*`, `chest_ruin_hell_*`
   (front, side and top each).
@@ -207,8 +205,7 @@ All three made by `tools/generate-tower-lock-textures.py`: re-running puts the p
 
 ### Battle tower chest
 
-- [ ] **Tower chest** — `chests/chest_tower.png` (the skin) and `chest_tower_front.png`, `chest_tower_side.png`,
-  `chest_tower_top.png`. The worldgen-only `tower_chest` (BT-5) currently reuses the underground ruin chest's skin
+- [ ] **Tower chest** — `chests/chest_tower.png` (the skin) and `chest_tower_{front,back,left,right,top,bottom}.png`. The worldgen-only `tower_chest` (BT-5) currently reuses the underground ruin chest's skin
   (`chest.skin`: `chest_ruin_underground`) and its `chest_ruin_underground_*` tiles; same layouts as the other chests
   (see "Chests"). Repoint `tower_chest.json`'s `chest.skin` and textures when they land.
 
@@ -315,3 +312,8 @@ placeholders back (`--check` compares).
   `tools/generate-map-icons.py`. Keep the arrow pointing straight up and near white, and every icon centered.
 - [ ] **Quest check badge** — `quest_check.png`, 64x64, a green disc with a white check, drawn untinted at the top-right
   of a complete quest's node.
+
+## Particles
+
+- [ ] **Footprint** - `OpenGLTest/assets/textures/particles/footprint.png`, 16x16, a placeholder boot print (white shape
+  on transparent, toe at the top, drawn left-footed and mirrored for the right); `FootprintRenderer` tints it dark.

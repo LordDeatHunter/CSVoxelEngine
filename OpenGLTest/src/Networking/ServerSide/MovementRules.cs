@@ -58,13 +58,12 @@ public static class MovementRules
     /// player whose server-granted flight flag is <paramref name="flying"/>.
     /// <paramref name="accepted"/> is the eye the player stands at afterwards: <paramref name="to"/>
     /// when accepted, the clamped point when clamped, and <paramref name="from"/> when rejected.
-    /// <paramref name="state"/> carries the hover time across calls. <paramref name="solids"/> (the
-    /// server's icebergs) only count as ground for the hover rule and the airtime budget: a rider is
-    /// never a hoverer. <paramref name="airJumps"/> is how many air jumps the player's worn gear
+    /// <paramref name="state"/> carries the hover time across calls.
+    /// <paramref name="airJumps"/> is how many air jumps the player's worn gear
     /// grants per airtime (the cloud boots: 1), each widening the budget by one jump's climb.
     /// </summary>
     public static MoveVerdict Judge(Vector3 from, Vector3 to, double delta, bool flying, ChunkManager chunks,
-        MovementState state, out Vector3 accepted, IBodySolids? solids = null, int airJumps = 0)
+        MovementState state, out Vector3 accepted, int airJumps = 0)
     {
         state.TickLiftCredit(delta);
         var verdict = NetValidation.AcceptMove(from, to, delta, NetworkConfig.NetMaxMoveBlocksPerSecond,
@@ -82,8 +81,6 @@ public static class MovementRules
             return verdict;
         }
 
-        // Blocks only: a client stands on its mirror of a berg, which lags the server's own by up to
-        // a snapshot, so a body touching a berg cannot be judged here (a documented gap).
         if (BodyCollision.BodyCollides(bounded, chunks) && !BodyCollision.BodyCollides(from, chunks))
         {
             accepted = from;
@@ -105,7 +102,7 @@ public static class MovementRules
             return MoveVerdict.Rejected;
         }
 
-        var grounded = PlayerBodyProbe.Grounded(bounded, chunks, solids);
+        var grounded = PlayerBodyProbe.Grounded(bounded, chunks);
         var inWater = PlayerBodyProbe.InWater(bounded, chunks);
         var hovering = !grounded && !inWater && bounded.Y >= from.Y - HoverSinkToleranceBlocks;
         state.AirborneStillSeconds = hovering ? state.AirborneStillSeconds + delta : 0;
@@ -116,7 +113,7 @@ public static class MovementRules
             return MoveVerdict.Rejected;
         }
 
-        if (!RiseWithinBudget(from, bounded, grounded || inWater, airJumps, chunks, state, solids))
+        if (!RiseWithinBudget(from, bounded, grounded || inWater, airJumps, chunks, state))
         {
             accepted = from;
             return MoveVerdict.Rejected;
@@ -139,7 +136,7 @@ public static class MovementRules
     // that would take it past AirRiseBudget. The sum is kept on a refusal, so every further rise in
     // the same airtime is refused too until the body lands.
     private static bool RiseWithinBudget(Vector3 from, Vector3 to, bool supported, int airJumps,
-        ChunkManager chunks, MovementState state, IBodySolids? solids)
+        ChunkManager chunks, MovementState state)
     {
         if (supported)
         {
@@ -166,7 +163,7 @@ public static class MovementRules
         if (state.LastDescentBlocks > 0f)
         {
             var reach = MathF.Max(state.LastDescentBlocks, step);
-            if (PlayerBodyProbe.GroundedWithin(from, reach, chunks, solids))
+            if (PlayerBodyProbe.GroundedWithin(from, reach, chunks))
             {
                 state.AirRiseBlocks = 0f;
                 state.BounceCredit = PlayerBodyProbe.BounceWithin(from, reach + NetworkConfig.NetGroundProbeBlocks, chunks);

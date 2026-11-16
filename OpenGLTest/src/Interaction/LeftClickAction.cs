@@ -720,8 +720,8 @@ internal sealed class LeftClickAction
     private bool UpdatePunch(PlayerContext player)
     {
         var held = HeldItem();
-        _punchGap = Mining.HitGapSeconds(held,
-            (Camera.Effects?.AttackFactor ?? 1f) * player.Inventory.Equipment.Stats.AttackSpeedFactor);
+        _punchGap = Mining.PunchGapSeconds(held, Camera.Effects?.AttackFactor ?? 1f,
+            player.Inventory.Equipment.Stats.AttackSpeedFactor);
 
         if (TryFindPunchTarget(player.Eye, player.ViewDirection, out var target))
         {

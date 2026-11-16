@@ -19,7 +19,7 @@ public static class AttackPacing
     /// <paramref name="next"/> with <paramref name="held"/> in hand.</summary>
     public static float MinGapSeconds(NetAttackKind previous, NetAttackKind next, Item? held, float speedFactor = 1f)
     {
-        if (next == NetAttackKind.Punch) return Mining.HitGapSeconds(held, speedFactor);
+        if (next == NetAttackKind.Punch) return Mining.PunchGapSeconds(held, 1f, speedFactor);
         if (!NetAttacks.IsSword(next)) return PlayerModel.SliceDuration;
         // A sword swing starts when the swing before it in the chain has finished: the previous attack's own
         // length when that was a sword swing, and the shortest swing's when the last attack was something else

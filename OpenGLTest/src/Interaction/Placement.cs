@@ -1,5 +1,8 @@
+using System;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Shapes;
+using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine.Interaction;
 
@@ -59,17 +62,47 @@ public static class Placement
     /// <summary>
     /// <see cref="TryMount(ushort, byte, Vector3, bool, out ushort, out byte)"/> for a placement made
     /// looking along <paramref name="viewDirection"/>: a placed block that takes its facing from the
-    /// look (<see cref="BlockType.FacingFromLook"/>, stairs) faces <see cref="LookFacing"/> of it,
+    /// look (<see cref="BlockType.FacingFromLook"/>, stairs) faces <see cref="LookFacing"/> of it (or back at the player
+    /// with <see cref="BlockType.FacesViewer"/>, a chest),
     /// whatever face was hit. Everything else mounts exactly as the overload without a look.
     /// </summary>
     public static bool TryMount(ushort blockId, byte state, Vector3 normal, bool fillsHitCell, Vector3 viewDirection,
         out ushort placedId, out byte placedState)
     {
         if (!TryMount(blockId, state, normal, fillsHitCell, out placedId, out placedState)) return false;
-        if (BlockType.ById[placedId] is { FacingFromLook: true })
-            placedState = (byte)LookFacing(viewDirection);
+        if (BlockType.ById[placedId] is { AxisFromFace: true } log)
+        {
+            placedState = LogState(log, normal);
+            return true;
+        }
+
+        if (BlockType.ById[placedId] is { FacingFromLook: true } type)
+        {
+            var facing = LookFacing(viewDirection);
+            // Facings pair up north/south and west/east, so the half turn toward the player flips the low bit
+            placedState = (byte)(type.FacesViewer ? facing ^ 1 : facing);
+        }
         return true;
     }
+
+    /// <summary>
+    /// The state a log placed against a face with outward normal <paramref name="normal"/> starts with: a floor or ceiling
+    /// stands it upright (a trunk's detached state, or bit 2 of a hollow log's facing); a wall lays it along that wall's
+    /// normal, pointing out of the wall (a trunk's <see cref="WoodState.LyingX"/> or <see cref="WoodState.LyingZ"/>, a
+    /// hollow log's facing, whose north and south run along Z). The player's own facing never matters.
+    /// </summary>
+    public static byte LogState(BlockType log, Vector3 normal)
+    {
+        var facing = HorizontalFacing.FacingOf(normal);
+        var upright = facing < 0;
+        if (log.Renderer == BlockRenderer.TreeWood)
+            return upright ? WoodState.Detached : facing < 2 ? WoodState.LyingZ : WoodState.LyingX;
+
+        return (byte)(upright ? UprightHollow : facing);
+    }
+
+    /// <summary>The state of a hollow log standing upright: bit 2 over a facing, picking one of its four upright shapes.</summary>
+    public const byte UprightHollow = 4;
 
     /// <summary>
     /// The horizontal facing a look along <paramref name="viewDirection"/> points at: the dominant

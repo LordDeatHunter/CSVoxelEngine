@@ -10,6 +10,8 @@
     "textures": { "side": "stone_pine_log_side", "inner": "hollow_stone_pine_log_inner", "end": "hollow_stone_pine_log_end" }
   },
   "facing": "horizontal",
+  // Placed upright on a floor or ceiling, or lying out of the wall it is placed against
+  "axisFromFace": true,
   // Half of stone_pine_log's full-cube 24, so it mines in half the time
   "hardness": 12,
   "requiresTool": true,

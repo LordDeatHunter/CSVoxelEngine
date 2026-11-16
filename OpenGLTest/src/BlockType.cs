@@ -154,8 +154,7 @@ public sealed record BlockType
     // Blocks no gameplay path may remove (IsUnbreakable); only Chunk.CollapseWriteAt replaces one
     internal static bool[] UnbreakableById = new bool[256];
 
-    // Blocks that hide the sky from the cells under them in a light volume (coversSky: the battle
-    // tower's bricks); ChunkLighting reads it per cell while it scans a covered neighborhood
+    // Legacy authored marker on battle-tower bricks. Sky cover itself follows !PassesLightById.
     internal static bool[] CoversSkyById = new bool[256];
 
     /// <summary>The ids whose <see cref="CoversSkyById"/> is true, as a vectorized search set over a ushort
@@ -184,6 +183,27 @@ public sealed record BlockType
     /// resolved from the block's <c>sfx</c> JSON and defaulting to
     /// <see cref="SfxLibrary.DefaultGroup"/>.</summary>
     public string Sfx { get; init; } = SfxLibrary.DefaultGroup;
+
+    /// <summary>Sound group of the footstep an entity walking over this block makes, null for silence
+    /// (see <see cref="Footsteps"/>).</summary>
+    public string? StepSfx { get; init; }
+
+    /// <summary>The footstep group of a block id, null for air, an unknown id or a silent block.</summary>
+    public static string? StepSfxOf(ushort blockId) => ById[blockId]?.StepSfx;
+
+    /// <summary>How clearly a footprint shows on this block (0..1).</summary>
+    public float FootprintVisibility { get; init; } = FootprintConfig.DefaultVisibility;
+
+    /// <summary>Seconds a footprint on this block lasts.</summary>
+    public float FootprintPersistence { get; init; } = FootprintConfig.DefaultPersistenceSeconds;
+
+    /// <summary>The footprint tier of a block id; the faint default for air or an unknown id.</summary>
+    public static void FootprintOf(ushort blockId, out float visibility, out float persistence)
+    {
+        var type = ById[blockId];
+        visibility = type?.FootprintVisibility ?? FootprintConfig.DefaultVisibility;
+        persistence = type?.FootprintPersistence ?? FootprintConfig.DefaultPersistenceSeconds;
+    }
 
     /// <summary>Damage this block takes before breaking; one hit deals the held tool's power.</summary>
     public float Hardness { get; init; } = DefaultHardness;
@@ -476,6 +496,18 @@ public sealed record BlockType
     /// <summary>Whether a placement faces this <see cref="HasHorizontalFacing"/> block along the
     /// placing player's horizontal look (stairs); see <see cref="Placement.LookFacing"/>.</summary>
     public bool FacingFromLook { get; init; }
+
+    /// <summary>With <see cref="FacingFromLook"/>, the front faces the placing player rather than along the look (a chest).</summary>
+    public bool FacesViewer { get; init; }
+
+    /// <summary>Whether a placement picks this log's axis from the face it is placed against (<c>axisFromFace</c>): upright on a
+    /// floor or ceiling, otherwise lying along the wall's normal. See <see cref="Placement.TryMount(ushort, byte, System.Numerics.Vector3, bool, System.Numerics.Vector3, out ushort, out byte)"/>.</summary>
+    public bool AxisFromFace { get; init; }
+
+    /// <summary>For tree wood with <see cref="AxisFromFace"/>, the full-cube model of a placed log lying along X (index 0)
+    /// and along Z (index 1): the bark tile on the four sides with its grain along the axis, the end tile on the two
+    /// ends. Null otherwise. See <see cref="WoodState.LyingAxis"/>.</summary>
+    public BakedModel[]? LyingModels { get; internal set; }
 
     /// <summary>The <see cref="Hitboxes"/> turned to each horizontal facing, indexed like
     /// <see cref="RotatedModels"/>; null unless <see cref="HasHorizontalFacing"/>.</summary>

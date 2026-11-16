@@ -192,6 +192,9 @@ public abstract class Item
     public virtual InventoryCategory StorageCategory =>
         UseResultId != 0 || MaxDurability > 0 ? InventoryCategory.Tools : InventoryCategory.Misc;
 
+    /// <summary>Which panel tab lists this item (<see cref="InventoryTabs"/>), apart from the pool it is stored in.</summary>
+    public virtual InventoryCategory TabCategory => StorageCategory;
+
     /// <summary>
     /// Whether holding this item should make the block selection raycast see fluids. Only an
     /// item that scoops one needs to aim at water; for everything else the water is aimed

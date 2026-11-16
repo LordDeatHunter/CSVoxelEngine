@@ -96,7 +96,8 @@ public sealed class HollowLogTests
             var type = BlockType.ById[hollow]!;
             var bark = BlockType.ById[species.WoodId]!.Side;
             var models = type.RotatedModels!;
-            for (var facing = 0; facing < models.Length; facing++)
+            // The four horizontal facings; the upright shapes are LogPlacementTests's
+            for (var facing = 0; facing < 4; facing++)
             {
                 var axis = AxisOf(facing);
                 var outer = 0;
@@ -169,7 +170,7 @@ public sealed class HollowLogTests
         {
             var type = BlockType.ById[hollow]!;
             var shapes = type.RotatedHitboxes!;
-            for (var facing = 0; facing < shapes.Length; facing++)
+            for (var facing = 0; facing < 4; facing++)
             {
                 var axis = AxisOf(facing);
                 var boxes = shapes[facing];

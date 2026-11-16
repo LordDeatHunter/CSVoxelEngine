@@ -1,27 +1,22 @@
 namespace VoxelEngine.Simulation.Tower;
 
 /// <summary>
-/// One skeleton pile of a tower floor: its cell, how many waves it still raises, the time until it may raise again and
-/// whether its depleted block has been cleared from the world. Main thread only.
+/// One bone pile of a tower floor, an entity-style spot rather than a block: it lies at a free position on the floor,
+/// holds exactly one skeleton, and is visible until that skeleton rises. Main thread only.
 /// </summary>
-public sealed class PileState((int X, int Y, int Z) cell, int wavesLeft)
+public sealed class PileState(System.Numerics.Vector3 spot, bool raised = false)
 {
-    /// <summary>The pile's world cell.</summary>
-    public (int X, int Y, int Z) Cell { get; } = cell;
+    /// <summary>Where the pile lies: its center on the floor surface, not aligned to the block grid.</summary>
+    public System.Numerics.Vector3 Spot { get; } = spot;
 
-    /// <summary>The waves it still raises; 0 once depleted (saved).</summary>
-    public int WavesLeft { get; set; } = wavesLeft;
+    /// <summary>Whether its skeleton has risen (saved). A raised pile is gone for good: the skeleton, if it later
+    /// despawns, leaves a fresh pile where it stood (<see cref="TowerFloorState.OwedPiles"/>).</summary>
+    public bool Raised { get; set; } = raised;
 
-    /// <summary>Seconds until it may raise a wave (or owed skeletons) again; it may at 0 or below.</summary>
-    public float Cooldown { get; set; }
-
-    /// <summary>Whether a chest opened nearby has forced it awake: its next wave rises at once, ignoring its trigger
-    /// range, cooldown and the near-pile skeleton limit. Cleared once a wave rises; never saved.</summary>
+    /// <summary>Whether a chest opened nearby has forced it awake: its skeleton rises at once, ignoring its trigger
+    /// range and the near-pile skeleton limit. Cleared once it rises; never saved.</summary>
     public bool Alarmed { get; set; }
 
-    /// <summary>Whether its block has been cleared from the world after it depleted (or was already gone).</summary>
-    public bool Removed { get; set; }
-
-    /// <summary>Whether it has no wave left.</summary>
-    public bool Depleted => WavesLeft <= 0;
+    /// <summary>Whether it has raised its skeleton.</summary>
+    public bool Depleted => Raised;
 }

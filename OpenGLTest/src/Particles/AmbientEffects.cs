@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.StatusEffects;
+using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.TowerMobs;
@@ -73,30 +74,44 @@ internal sealed class AmbientEffects
     // Every cell whose flame the particle system and the point lights draw: campfires plus kilns
     // (and goblin torches in the full update), rebuilt once per update so both consumers read one list
     private readonly List<Vector3> _fireCells = [];
-    private readonly List<Vector3> _lightCells = [];
+    private readonly List<FireLight> _lightCells = [];
 
     /// <summary>Warm point lights include carried items and fueled lanterns without spawning campfire particles.</summary>
-    internal IReadOnlyList<Vector3> LightCells
+    internal IReadOnlyList<FireLight> LightCells
     {
         get
         {
             _lightCells.Clear();
-            if (_world.LocalPlayer.LocalContext().Health?.IsDead != true && Simulation.Lanterns.LanternManager.Emits(_world.Inventory))
-                AddHeldLight(_world.Camera.Position, _world.Camera.PlayerYaw, _world.Camera.Pitch, _world.Player);
+            if (_world.LocalPlayer.LocalContext().Health?.IsDead != true)
+            {
+                if (Simulation.Lanterns.LanternManager.EmitsFrom(_world.Inventory, offhand: false))
+                    AddHeldLight(_world.Camera.Position, _world.Camera.PlayerYaw, _world.Camera.Pitch, _world.Player, offhand: false, HeldBlockId(offhand: false));
+                if (Simulation.Lanterns.LanternManager.EmitsFrom(_world.Inventory, offhand: true))
+                    AddHeldLight(_world.Camera.Position, _world.Camera.PlayerYaw, _world.Camera.Pitch, _world.Player, offhand: true, HeldBlockId(offhand: true));
+            }
             foreach (var remote in _world.RemotePlayers)
-                if (remote.HeldLit) AddHeldLight(remote.Eye, remote.Yaw, remote.Pitch, remote.Model);
+            {
+                if (remote.HeldLit) AddHeldLight(remote.Eye, remote.Yaw, remote.Pitch, remote.Model, offhand: false, remote.HeldId);
+                if (remote.OffhandLit) AddHeldLight(remote.Eye, remote.Yaw, remote.Pitch, remote.Model, offhand: true, remote.OffhandId);
+            }
             _world.Lanterns.AppendLights(_chunkManager, _lightCells);
-            _lightCells.AddRange(_fireCells);
+            foreach (var cell in _fireCells) _lightCells.Add(FireLight.Warm(cell));
             return _lightCells;
         }
     }
 
-    private void AddHeldLight(Vector3 eye, float yaw, float pitch, Player.PlayerModel model)
+    private ushort HeldBlockId(bool offhand)
     {
-        var hand = model.GetHandAnchorMatrix(eye, yaw, 0f, pitch);
+        using var hand = _world.Inventory.UseHand(offhand);
+        return _world.Inventory.SelectedBlockId;
+    }
+
+    private void AddHeldLight(Vector3 eye, float yaw, float pitch, Player.PlayerModel model, bool offhand, ushort heldId)
+    {
+        var hand = offhand ? model.GetOffhandAnchorMatrix(eye, yaw, 0f, pitch) : model.GetHandAnchorMatrix(eye, yaw, 0f, pitch);
         var point = Vector3.Transform(Vector3.Zero, hand);
-        if (model.HoldingLantern) point = Vector3.Transform(Vector3.Zero, Player.HeldItemPose.LanternMatrix(hand, yaw));
-        _lightCells.Add(point - Rendering.FrameLighting.FireLightOffset);
+        if (offhand ? model.HoldingOffhandLantern : model.HoldingLantern) point = Vector3.Transform(Vector3.Zero, Player.HeldItemPose.LanternMatrix(hand, yaw, offhand: offhand));
+        _lightCells.Add(FireLight.OfBlock(point - Rendering.FrameLighting.FireLightOffset, heldId));
     }
 
     /// <summary>Refills <see cref="_fireCells"/> with the lit campfires and kilns; both update

@@ -76,8 +76,7 @@ public sealed class QuestLog
     public void OnGained(ushort id)
     {
         if (_held == null) return;
-        var held = _held(id);
-        Advance(r => r.Counts(QuestRequirementKind.Obtain, id), _ => held);
+        Advance(r => r.Counts(QuestRequirementKind.Obtain, id), (r, _) => HeldOf(r));
     }
 
     public void OnCrafted(ushort id, int count) => Add(QuestRequirementKind.Craft, id, count);
@@ -86,18 +85,18 @@ public sealed class QuestLog
 
     public void OnPlaced(ushort blockId) => Add(QuestRequirementKind.Place, blockId, 1);
 
-    public void OnKilled(string entity) => Advance(r => r.CountsKill(entity), have => have + 1);
+    public void OnKilled(string entity) => Advance(r => r.CountsKill(entity), (_, have) => have + 1);
 
     private void Add(QuestRequirementKind kind, ushort id, int count)
     {
         if (count <= 0) return;
-        Advance(r => r.Counts(kind, id), have => have + count);
+        Advance(r => r.Counts(kind, id), (_, have) => have + count);
     }
 
     // Moves every matching requirement of the quests open and unlocked before the event to next(have)
     // (never down, never past its count), then completes the quests that are done. The open set is taken
     // first, so a quest the event itself unlocks only counts what is held (CheckHeld), not the event again.
-    private void Advance(Func<QuestRequirement, bool> matches, Func<int, int> next)
+    private void Advance(Func<QuestRequirement, bool> matches, Func<QuestRequirement, int, int> next)
     {
         var open = Book.Quests.Where(q => !_complete[q.Index] && IsUnlocked(q)).ToList();
         foreach (var quest in open)
@@ -108,7 +107,7 @@ public sealed class QuestLog
             {
                 var requirement = quest.Requirements[r];
                 if (!matches(requirement)) continue;
-                var value = Math.Max(progress[r], Math.Min(requirement.Count, next(progress[r])));
+                var value = Math.Max(progress[r], Math.Min(requirement.Count, next(requirement, progress[r])));
                 if (value == progress[r]) continue;
                 progress[r] = value;
                 moved = true;
@@ -122,8 +121,10 @@ public sealed class QuestLog
     private void TryComplete(QuestType quest)
     {
         var progress = _progress[quest.Index];
+        var met = 0;
         for (var r = 0; r < quest.Requirements.Count; r++)
-            if (progress[r] < quest.Requirements[r].Count) return;
+            if (progress[r] >= quest.Requirements[r].Count) met++;
+        if (met == 0 || (!quest.AnyOf && met < quest.Requirements.Count)) return;
 
         _complete[quest.Index] = true;
         Changed = true;
@@ -144,9 +145,18 @@ public sealed class QuestLog
         {
             var requirement = quest.Requirements[r];
             if (requirement.Kind != QuestRequirementKind.Obtain) continue;
-            progress[r] = Math.Max(progress[r], Math.Min(requirement.Count, _held(requirement.Id)));
+            progress[r] = Math.Max(progress[r], Math.Min(requirement.Count, HeldOf(requirement)));
         }
         TryComplete(quest);
+    }
+
+    // What the player holds toward an obtain requirement: the one item, or the sum across a tag's members
+    private int HeldOf(QuestRequirement requirement)
+    {
+        if (requirement.Members == null) return _held!(requirement.Id);
+        var held = 0;
+        foreach (var member in requirement.Members) held += _held!(member);
+        return held;
     }
 
     /// <summary>Completes a quest and its unlock cascade as if its requirements were met (the scenario seam);

@@ -40,7 +40,7 @@ internal sealed class PlayerSessions
         var player = new ServerPlayer(client.Id, client.Name, joinSpawn)
         {
             LastStateAt = _state.Elapsed,
-            IsOperator = _state.MayBeCreative(client.Name),
+            IsOperator = _state.IsOperator(client.Name),
         };
         // A returning player gets back their inventory and modes, and starts where they left
         var restored = player.Restore(ServerPlayerSaves.Load(_state.World.SaveStore, client.Name), _state.MayBeCreative(client.Name));
@@ -98,11 +98,9 @@ internal sealed class PlayerSessions
                 // always advances, so refused states cannot accumulate time until a
                 // teleport fits.
                 var chunks = _state.World.GetChunkManager();
-                // A rider standing on an iceberg is grounded, never a hoverer
-                var solids = _state.World.BodySolids;
                 var gap = _state.Elapsed - current.LastStateAt;
                 var verdict = MovementRules.Judge(current.Position, position, gap, current.Flying, chunks,
-                    current.Movement, out var accepted, solids, airJumps: current.AirJumps);
+                    current.Movement, out var accepted, airJumps: current.AirJumps);
                 current.Position = accepted;
                 switch (verdict)
                 {
@@ -115,10 +113,10 @@ internal sealed class PlayerSessions
                         break;
                     case MoveVerdict.Clamped:
                         Log.Warn($"net: clamped a move from {client.Name} (#{client.Id})");
-                        PumpOnJump(current, current.ObserveAcceptedState(chunks, gap, solids));
+                        PumpOnJump(current, current.ObserveAcceptedState(chunks, gap));
                         break;
                     default:
-                        PumpOnJump(current, current.ObserveAcceptedState(chunks, gap, solids));
+                        PumpOnJump(current, current.ObserveAcceptedState(chunks, gap));
                         break;
                 }
             }
@@ -322,7 +320,9 @@ internal sealed class PlayerSessions
             VoxelEngine.Player.ArmorLook.From(player.Inventory.Equipment).CopyTo(worn);
             foreach (var piece in worn) writer.WriteId(piece);
             writer.WriteId(player.Inventory.HeldItem?.Id ?? 0);
-            writer.Write(!player.IsDead && VoxelEngine.Simulation.Lanterns.LanternManager.Emits(player.Inventory));
+            writer.Write(!player.IsDead && VoxelEngine.Simulation.Lanterns.LanternManager.EmitsFrom(player.Inventory, offhand: false));
+            writer.WriteId(player.Inventory.OffhandItem?.Id ?? 0);
+            writer.Write(!player.IsDead && VoxelEngine.Simulation.Lanterns.LanternManager.EmitsFrom(player.Inventory, offhand: true));
         }
         _state.Broadcast(writer.ToArray());
     }

@@ -88,13 +88,11 @@ public sealed class MeshBuildCostProbe
 
         Measure("B (every second lamp blue)", manager, center);
 
-        // C1, the sky cover's worst case: one tower brick in a neighbor's corner cell, outside the light volume, raises
-        // the neighborhood's flag, so every volume column is scanned from the top down and none is covered
+        // C1: an opaque block outside the light volume must not affect this build's light.
         var brick = Block("tower_bricks");
         var west = manager.Chunks[center.Position + new System.Numerics.Vector3(-1, 0, 0)];
         west.SetBlockRaw(0, 0, 0, brick, 0);
-        Assert.True(ChunkLighting.AnySkyCover([west]));
-        Measure("C1 (sky-cover flag, one brick outside the volume)", manager, center);
+        Measure("C1 (one brick outside the volume)", manager, center);
 
         // C2: a full brick roof at the top of the volume (local y 14 of the chunk above), so each column's scan stops
         // at its first cell and everything under the roof gets no sun: the tower chunk's rebuild cost

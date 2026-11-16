@@ -41,10 +41,34 @@
       "title": "Grind Stone",
       "description": "Build a quern to crush ore before it goes in the kiln.",
       "icon": "quern",
-      "pos": [4, 1],
-      "parents": ["mold"],
+      "pos": [2, 3],
       "requirements": [
         { "type": "craft", "item": "quern" }
+      ]
+    },
+    {
+      "id": "ore_chunk",
+      "title": "Raw Ore",
+      "description": "Mine a chunk of copper or tin ore.",
+      "icon": "item/malachite_ore",
+      "pos": [2, 5],
+      "anyOf": true,
+      "requirements": [
+        { "type": "obtain", "item": "item/malachite_ore" },
+        { "type": "obtain", "item": "item/tin_ore" }
+      ]
+    },
+    {
+      "id": "crushed_ore",
+      "title": "Crushed Hopes",
+      "description": "Grind a copper or tin chunk to powder in the quern.",
+      "icon": "item/crushed_copper",
+      "pos": [4, 4],
+      "parents": ["quern", "ore_chunk"],
+      "anyOf": true,
+      "requirements": [
+        { "type": "obtain", "item": "item/crushed_copper" },
+        { "type": "obtain", "item": "item/crushed_tin" }
       ]
     },
     {
@@ -60,13 +84,13 @@
     },
     {
       "id": "copper",
-      "title": "Copper Age",
-      "description": "Melt copper in the kiln and cast your first ingot.",
+      "title": "First Pour",
+      "description": "Melt crushed copper or tin in the kiln and cast anything from it: an ingot, a tool head, a ring.",
       "icon": "item/copper_ingot",
-      "pos": [6, 0],
-      "parents": ["crucible", "quern"],
+      "pos": [6, 1],
+      "parents": ["crucible", "mold", "crushed_ore"],
       "requirements": [
-        { "type": "obtain", "item": "item/copper_ingot" }
+        { "type": "obtain", "tag": "copper_tin_casts", "label": "Any Copper or Tin Cast" }
       ]
     },
     {
@@ -74,7 +98,7 @@
       "title": "Shiny Tools",
       "description": "Trade the flint for copper.",
       "icon": "item/copper_pickaxe",
-      "pos": [8, -1.5],
+      "pos": [8, -0.5],
       "parents": ["copper"],
       "requirements": [
         { "type": "craft", "item": "item/copper_pickaxe" },
@@ -82,23 +106,12 @@
       ]
     },
     {
-      "id": "tin",
-      "title": "The Other Half",
-      "description": "Cast a tin ingot.",
-      "icon": "item/tin_ingot",
-      "pos": [6, 2],
-      "parents": ["crucible", "quern"],
-      "requirements": [
-        { "type": "obtain", "item": "item/tin_ingot" }
-      ]
-    },
-    {
       "id": "bronze",
       "title": "Bronze Age",
       "description": "Alloy copper and tin into bronze.",
       "icon": "item/bronze_ingot",
-      "pos": [10, 0],
-      "parents": ["copper_tools", "tin"],
+      "pos": [10, 1],
+      "parents": ["copper_tools"],
       "requirements": [
         { "type": "obtain", "item": "item/bronze_ingot", "count": 2 }
       ]

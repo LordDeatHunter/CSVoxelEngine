@@ -68,10 +68,12 @@ internal sealed class PoseBuilder
         // stay slightly bent at rest and flex forward as the arm swings.
         var leftKnee = -(Math.Max(0f, MathF.Sin(_model.WalkPhase - 0.7f)) * kneeAmp * _model.MoveBlend + 0.03f);
         var rightKnee = -(Math.Max(0f, MathF.Sin(_model.WalkPhase + MathF.PI - 0.7f)) * kneeAmp * _model.MoveBlend + 0.03f);
-        var leftShoulder = PlayerModel.RestShoulderForward - swing + MathF.Sin(_model.PoseTime * 1.7f) * 0.02f;
+        var leftShoulder = PlayerModel.RestShoulderForward - swing + MathF.Sin(_model.PoseTime * 1.7f) * 0.02f
+            + _model.OffhandBlend * _model.OffhandCarryShoulder;
         var rightShoulder = PlayerModel.RestShoulderForward + swing - MathF.Sin(_model.PoseTime * 1.7f) * 0.02f
             + _model.HoldBlend * _model.CarryShoulder;
-        var leftElbow = (Math.Max(0f, MathF.Sin(_model.WalkPhase)) * elbowAmp * _model.MoveBlend) + PlayerModel.RestElbow;
+        var leftElbow = (Math.Max(0f, MathF.Sin(_model.WalkPhase)) * elbowAmp * _model.MoveBlend) + PlayerModel.RestElbow
+            + _model.OffhandBlend * _model.OffhandCarryElbow;
         var rightElbow = (Math.Max(0f, -MathF.Sin(_model.WalkPhase)) * elbowAmp * _model.MoveBlend) + PlayerModel.RestElbow
             + _model.HoldBlend * _model.CarryElbow;
 
@@ -85,7 +87,7 @@ internal sealed class PoseBuilder
         // after the two are blended so a swing still plays while running or falling. The swim
         // stroke and the body mods (landing, crouch, flinch, sway) sit between the two.
         if (_model.AirBlend <= 0.001f)
-            return Finish(ground, pitchDeg);
+            return Finish(SwapArms(ground), pitchDeg);
 
         var rise = MathUtils.Clamp01(_model.AirVelocity / 11f);
         var fall = MathUtils.Clamp01(-_model.AirVelocity / 12f);
@@ -97,10 +99,11 @@ internal sealed class PoseBuilder
             MathUtils.Lerp(JumpKneeFront, SprintJumpKneeFront, _model.AirRun) - rise * 0.25f + fall * 0.7f);
         var airRightKnee = Math.Min(MinKneeBend,
             MathUtils.Lerp(JumpKneeBack, SprintJumpKneeBack, _model.AirRun) - rise * 0.2f + fall * 0.9f);
-        var airLeftShoulder = MathUtils.Lerp(JumpShoulder, SprintJumpShoulderFront, _model.AirRun);
+        var airLeftShoulder = MathUtils.Lerp(JumpShoulder, SprintJumpShoulderFront, _model.AirRun)
+            + _model.OffhandBlend * _model.OffhandCarryShoulder;
         var airRightShoulder = MathUtils.Lerp(JumpShoulder, SprintJumpShoulderBack, _model.AirRun)
             + _model.HoldBlend * _model.CarryShoulder;
-        var airLeftElbow = JumpElbow;
+        var airLeftElbow = JumpElbow + _model.OffhandBlend * _model.OffhandCarryElbow;
         var airRightElbow = JumpElbow + _model.HoldBlend * _model.CarryElbow;
         var airTorso = -MathUtils.Lerp(JumpTorso, SprintJumpTorso, _model.AirRun);
         var air = new Pose(airLeftHip, airRightHip, airLeftKnee, airRightKnee,
@@ -118,8 +121,14 @@ internal sealed class PoseBuilder
             MathUtils.Lerp(ground.RightElbow, air.RightElbow, t),
             MathUtils.Lerp(ground.TorsoPitch, air.TorsoPitch, t),
             MathUtils.Lerp(ground.Bob, 0f, t));
-        return Finish(blended, pitchDeg);
+        return Finish(SwapArms(blended), pitchDeg);
     }
+
+    // While the left arm acts, the acting arm is built in the right slot (every action is authored for it), so the
+    // two arms' idle joints trade places; BodyPartMatrices mirrors each slot back onto its own side.
+    private Pose SwapArms(in Pose pose) => !_model.ArmsSwapped ? pose
+        : new Pose(pose.LeftHip, pose.RightHip, pose.LeftKnee, pose.RightKnee, pose.RightShoulder, pose.LeftShoulder,
+            pose.RightElbow, pose.LeftElbow, pose.TorsoPitch, pose.Bob);
 
     // Flight, then swim, then the body mods, the jab, the throw, the cast and the use over the base pose
     private Pose Finish(in Pose basePose, float pitchDeg) =>

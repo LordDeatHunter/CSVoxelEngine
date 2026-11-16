@@ -12,7 +12,7 @@ and crab; `EntityType.Attitude`, `EntityLoader.ParseAttitude` refuses anything e
 "Map and minimap"), and an optional
 `model` Blockbench project (default `assets/models/entity/<name>.bbmodel`), or instead of `model`
 a non-empty `variants` list of projects, one per size class or look (`EntityType.Variants` /
-`VariantPaths`, whose first entry is always `Model`; the icebergs use it), and an optional `held` item every spawn
+`VariantPaths`, whose first entry is always `Model`), and an optional `held` item every spawn
 holds: `{ "item", "part", "display" }`, a pure item drawn from its own extruded sprite at the hand of that group
 (`EntityAnimator.HandAnchor`, the bottom of its lowest cube, so it swings with the limb), posed by the item file's
 `display` shape and parser (`ItemLoader.ParseDisplay`, `Item.ComposeDisplay`). The loader checks the item and that every
@@ -223,6 +223,9 @@ stones never pile up as pickups. The rules:
   `visual-examples/goblins.json` film them from a hovering camera.
 - **Movement.** Goblins auto-jump a one-block step they walked into, float and paddle in water like
   the slime, and are shoved away when they overlap the player on the ground.
+  Every ground mob (`RiggedMob.SweepBody`, `Slime`) moves through `BoxSweep.MoveBody`: while rising it sweeps Y
+  first and keeps its sideways speed through a wall hit (`RiggedMob.Walk` also keeps driving the move while
+  rising), so a mob flush against a one-block step climbs it instead of bouncing in place (`StepUpTests`).
 The launch velocity comes from **`GoblinAim.TryLaunchVelocity`**, the low arc of the exact ballistic
 solve under `ThrownProjectile.Gravity`. Always pass that constant, never a second gravity. It is an alias of `BodyMotion.Gravity`, the one gravity every loose body (drops, primed TNT, falling blocks, debris, goblins, slimes) falls under. The level
 range of a stone is `v²/g` (`GoblinStoneSpeed` 20 against gravity 28 gives about 14.3 blocks). The

@@ -27,7 +27,10 @@ internal sealed class ServerState(World world)
     internal bool AllowCreative { get; set; } = NetworkConfig.ServerAllowCreative;
     internal OperatorList Operators { get; set; } = new();
 
-    internal bool MayBeCreative(string name) => AllowCreative || Operators.Contains(name);
+    /// <summary>Operators run commands whatever the game mode; creative alone grants no command rights.</summary>
+    internal bool IsOperator(string name) => Operators.Contains(name);
+
+    internal bool MayBeCreative(string name) => AllowCreative || IsOperator(name);
 
     internal void Broadcast(byte[] payload)
     {

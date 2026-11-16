@@ -163,6 +163,32 @@ internal static class BlockSchemaParser
     }
 
     /// <summary>
+    /// Reads a block's <c>facesViewer</c>: it turns the look-derived facing a half turn, so it needs
+    /// <c>facingFromLook</c> to have a look facing to turn.
+    /// </summary>
+    internal static bool ParseFacesViewer(BlockDefinition definition, bool facingFromLook, string path)
+    {
+        if (!(definition.FacesViewer ?? false)) return false;
+        if (!facingFromLook)
+            throw new InvalidOperationException($"Block '{path}' sets facesViewer without facingFromLook.");
+        return true;
+    }
+
+    /// <summary>
+    /// Reads a block's <c>axisFromFace</c>: it picks a log's axis, so it needs tree wood or a horizontal facing to
+    /// carry one.
+    /// </summary>
+    internal static bool ParseAxisFromFace(BlockDefinition definition, BlockRenderer renderer, bool horizontalFacing,
+        string path)
+    {
+        if (!(definition.AxisFromFace ?? false)) return false;
+        if (renderer != BlockRenderer.TreeWood && !horizontalFacing)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets axisFromFace without renderer \"tree_wood\" or facing: \"horizontal\"; it has no axis to turn.");
+        return true;
+    }
+
+    /// <summary>
     /// Reads a block's <c>open</c> object: its open boxes, or null for a block that does not open.
     /// The open bit shares the state byte with the facing, so an openable block needs one, and
     /// both the open model and the open boxes must be written.

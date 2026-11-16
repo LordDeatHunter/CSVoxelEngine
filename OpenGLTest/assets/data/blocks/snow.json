@@ -1,4 +1,8 @@
 {
+  "sfx": "hit_snow",
+  "stepSfx": "step_snow",
+  "footprintVisibility": 0.6,
+  "footprintPersistence": 60,
   "name": "Snow",
   "model": { "parent": "block/cube_all", "textures": { "all": "snow" } },
   "hardness": 1,

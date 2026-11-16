@@ -15,7 +15,7 @@ namespace VoxelEngine.App;
 /// <see cref="RowEquip.DropOnEquipment"/>); a creative player owning none of it is granted one first. A listed row
 /// released on the open chest's card deposits it. A hotbar slot's drag moves it to another slot, deposits it in an open chest,
 /// or empties its slot anywhere else on the panel; a chest row's drag takes its whole slot into the inventory when released
-/// on the panel or the hotbar. A release elsewhere changes nothing. An unlifted release is left
+/// on the panel or the hotbar; a worn piece on the Gear tab's equipment card comes off when released on the panel or the hotbar. A release elsewhere changes nothing. An unlifted release is left
 /// to the click. Applied here at once and, while
 /// connected, sent as the intent the server replays. Owned by <see cref="InventoryPanelInput"/>; main thread only.
 /// </summary>
@@ -34,6 +34,13 @@ internal sealed class RowDragInput(
             var inventory = world.Inventory;
             if (inventory.IdAt(slot) != 0)
                 inventoryView.Drag = new RowDrag(inventory.IdAt(slot), inventory.ToolInstanceAt(slot), canvas, slot);
+            return;
+        }
+        if (inventoryView.Tab == InventoryCategory.Gear && !panel.Chest.IsOpen
+            && EquipmentCardLayout.SlotAt(canvas, renderManager.Ui.ScreenSize) is { } gearSlot
+            && world.Inventory.Equipment.StackAt(gearSlot) is { } worn)
+        {
+            inventoryView.Drag = new RowDrag(worn.DefinitionId, worn.InstanceId, canvas, fromEquipSlot: gearSlot);
             return;
         }
         if (ChestRowAt(world, window) is { } chestRow)
@@ -67,6 +74,11 @@ internal sealed class RowDragInput(
         if (drag.FromSlot >= 0)
         {
             DropHotbarSlot(world, drag.FromSlot, window);
+            return true;
+        }
+        if (drag.FromEquipSlot >= 0)
+        {
+            DropEquipmentSlot(world, drag.FromEquipSlot, window);
             return true;
         }
         if (drag.FromChestSlot >= 0)
@@ -112,7 +124,7 @@ internal sealed class RowDragInput(
         var screen = renderManager.Ui.ScreenSize;
         if (panel.Chest.IsOpen && ChestCardLayout.Contains(canvas, screen))
         {
-            if (world.Camera.IsCreative) return;
+            if (DepositRefused(world)) return;
             var instance = inventory.ToolInstanceAt(from);
             if (instance != 0) panel.Chest.DepositInstance(instance);
             else panel.Chest.DepositStack(inventory.IdAt(from), wholeStack: true);
@@ -122,6 +134,17 @@ internal sealed class RowDragInput(
         if (!InventoryPanelLayout.IsOverInventory(canvas, screen)) return;
         inventory.ClearSlot(from);
         Send(InventoryIntent.ClearSlot(from));
+    }
+
+    // A worn piece dragged off its slot comes off when released anywhere else on the [E] panel or the hotbar
+    private void DropEquipmentSlot(World world, int slot, Vector2 window)
+    {
+        var canvas = renderManager.Ui.ToCanvas(window);
+        var screen = renderManager.Ui.ScreenSize;
+        if (EquipmentCardLayout.SlotAt(canvas, screen) is not null) return;
+        if (!InventoryPanelLayout.IsOverInventory(canvas, screen) && renderManager.Ui.Hud.HotbarSlotAt(window) is not >= 0) return;
+        if (world.Inventory.Equipment.Unequip(slot))
+            Send(InventoryIntent.UnequipGear(slot));
     }
 
     // A chest row dropped anywhere on the inventory panel or the hotbar takes its whole slot into the inventory; onto the
@@ -135,11 +158,14 @@ internal sealed class RowDragInput(
             panel.Chest.Withdraw(world, slot, all: true);
     }
 
+    // A creative player's chest deposit is refused (it owns everything); a lantern still takes the fuel it is given
+    private bool DepositRefused(World world) => world.Camera.IsCreative && world.ChestPanel.LanternInstance == null;
+
     // A listed row dropped on the open chest's card deposits what it names, as a click with shift would; a creative
     // player's deposit is refused, as a row click's is, and a stackable the player does not hold moves nothing
     private void DepositListedRow(World world, RowDrag drag)
     {
-        if (world.Camera.IsCreative) return;
+        if (DepositRefused(world)) return;
         if (drag.ToolInstance != 0) panel.Chest.DepositInstance(drag.ToolInstance);
         else if (world.Inventory.CountFor(drag.Id) > 0 && !ChestTransfer.IsInstance(drag.Id))
             panel.Chest.DepositStack(drag.Id, wholeStack: true);

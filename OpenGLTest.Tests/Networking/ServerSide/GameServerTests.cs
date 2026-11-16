@@ -14,7 +14,6 @@ using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.HellMobs;
-using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
@@ -1290,48 +1289,6 @@ public sealed class GameServerTests : IDisposable
     }
 
     [Fact]
-    public void AnIcebergReachesTheClientsEntityList()
-    {
-        using var client = Connect("Watcher");
-        var spawn = client.Server!.Value.Spawn;
-        var icebergs = _world.IcebergManager!;
-        var chunks = _world.GetChunkManager();
-
-        // A small berg hanging in the open air high over the player, once the cells there are loaded
-        var center = spawn + new Vector3(0.5f, 40f, 0.5f);
-        Iceberg? served = null;
-        var sw = Stopwatch.StartNew();
-        while (served == null && sw.Elapsed.TotalSeconds < 60)
-        {
-            served = icebergs.Spawn(chunks, 0, IcebergConfig.ScaleMax, 1, 77, center, IcebergConfig.LifeMaxSeconds);
-            if (served == null)
-                Tick(0.05);
-        }
-        Assert.NotNull(served);
-
-        var inbox = InboxOf(client);
-        NetEntity? carried = null;
-        sw.Restart();
-        while (carried == null && sw.Elapsed.TotalSeconds < 5)
-        {
-            _server.Pump(0.01);
-            Thread.Sleep(5);
-            DrainAll();
-            if (inbox.Entities?.Find(e => e.Kind == NetEntityKind.Iceberg) is { Kind: NetEntityKind.Iceberg } found)
-                carried = found;
-        }
-
-        Assert.NotNull(carried);
-        var entry = carried!.Value;
-        NetEntity.UnpackIcebergAmmo(entry.Ammo, out var scale, out _);
-        Assert.Equal(served.Variant, entry.ItemId);
-        Assert.Equal(served.Seed, entry.Health);
-        Assert.Equal(served.Turns, NetEntity.TurnsFromYaw(entry.Yaw));
-        Assert.Equal(served.Scale, scale, 2);
-        Assert.True(Vector3.Distance(served.Center, entry.Position) < 1f);
-    }
-
-    [Fact]
     public void ASlimesSizeReachesTheClientsEntityListAndItsMirror()
     {
         using var client = Connect("Watcher");
@@ -1464,7 +1421,6 @@ public sealed class GameServerTests : IDisposable
         _world.Towers.Track(record);
         foreach (var (x, y, z) in door)
             SetCell(new Vector3(x, y, z), TowerPalette.DoorBlock);
-        SetCell(new Vector3(pile.Item1, pile.Item2, pile.Item3), TowerPalette.PileBlock);
 
         bool Broadcasts(int from, (int X, int Y, int Z) cell, ushort id) =>
             inbox.Broadcast.Skip(from).Any(c => c.X == cell.X && c.Y == cell.Y && c.Z == cell.Z && c.Id == id);
@@ -1669,7 +1625,7 @@ public sealed class GameServerTests : IDisposable
             hasSite: false);
         Assert.Equal(((int)arena.Front.X, (int)arena.Front.Y, (int)arena.Front.Z), record.AltarCell);
         if (cleared) record.Floors[0].DoorOpen = true;
-        else record.Floors[0].Owed = 1;
+        else record.Floors[0].OwedPiles.Add(arena.Front);
         _world.Towers.Track(record);
         SetCell(arena.Front, TowerPalette.AltarBlock);
         return record;

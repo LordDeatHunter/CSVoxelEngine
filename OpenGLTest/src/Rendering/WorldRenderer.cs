@@ -3,6 +3,7 @@ using System.Numerics;
 using Silk.NET.Windowing;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Entities;
@@ -128,9 +129,8 @@ internal sealed class WorldRenderer
     {
         // Depth-only sun pass first: every world draw below samples the shadow map it fills. It
         // times itself as the shadowNear and shadowFar rows.
-        renderManager.IcebergPasses.Time = _world.LightingTime;
         renderManager.Shadows.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes,
-            _lodManager.RegionList, goblins: Goblins, icebergs: _world.Icebergs, hellMobs: _world.HellMobs,
+            _lodManager.RegionList, goblins: Goblins, hellMobs: _world.HellMobs,
             skyMobs: _world.SkyMobs, sandworms: _world.Sandworms, skeletons: _world.Skeletons,
             skeletonKings: _world.SkeletonKings, caveMobs: _world.CaveMobs, wildlife: _world.Wildlife,
             chestChunks: _chunkManager.ChestChunks, chestLids: _world.ChestLids);
@@ -144,7 +144,7 @@ internal sealed class WorldRenderer
             _chunkManager.CaveCull);
         renderManager.Reflection.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList,
             new ReflectionEntities(_dropManager.Drops, _projectiles, _tntManager.Primed, _falling.Falling, Slimes, Goblins,
-                _toppling, Player, _world.Icebergs));
+                _toppling, Player));
         renderManager.GpuTimer.EndGpuPass(ProfileSection.Reflection);
         FrameProfiler.End(ProfileSection.Reflection);
 
@@ -186,6 +186,7 @@ internal sealed class WorldRenderer
         renderManager.Stations.RenderQuerns(Camera, _querns);
         renderManager.Stations.RenderStumpLogs(Camera, _world.Stumps);
         renderManager.Stations.RenderIngotPiles(Camera, _world.IngotPiles);
+        renderManager.Stations.RenderBonePiles(Camera, _world.Towers);
         renderManager.Stations.RenderKilns(Camera, _kilns);
         renderManager.Stations.RenderSmithing(Camera, _world.Smithing);
         renderManager.Stations.RenderCastings(Camera, _casting);
@@ -201,7 +202,6 @@ internal sealed class WorldRenderer
         renderManager.Mobs.RenderRealmMobs(Camera, _world.SkeletonKings);
         renderManager.Mobs.RenderRealmMobs(Camera, _world.CaveMobs);
         renderManager.Mobs.RenderSandworms(Camera, _world.Sandworms);
-        renderManager.IcebergPasses.RenderIcebergs(Camera.GetViewProjection(), _world.Icebergs);
         renderManager.Players.RenderRemotePlayers(Camera, _remotePlayers);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
@@ -234,6 +234,8 @@ internal sealed class WorldRenderer
         renderManager.Players.RenderPlayer(Camera, Player);
         renderManager.Players.RenderHeldItem(Camera, Player, LocalPlayer.HeldId, LocalPlayer.HasHeld,
             (float)Now, Compass.HeadingFromYaw(Camera.Yaw));
+        renderManager.Players.RenderHeldItem(Camera, Player, LocalPlayer.OffhandId, LocalPlayer.HasOffhand,
+            (float)Now, Compass.HeadingFromYaw(Camera.Yaw), offhand: true);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 
@@ -316,6 +318,7 @@ internal sealed class WorldRenderer
         renderManager.Billboards.RenderDamageNumbers(Camera, DamageNumbers);
         if (_goblins != null)
             renderManager.Billboards.RenderNoticePips(Camera, _goblins.Goblins);
+        renderManager.Billboards.RenderFootprints(Camera, _world.Footprints.Prints);
         renderManager.Billboards.RenderLeafParticles(Camera, _leaves.Particles);
         renderManager.Billboards.RenderFireParticles(Camera, _fire.Particles);
         // Lava embers are a second batch; the renderer re-uploads with BufferSubData, so two
@@ -428,6 +431,13 @@ internal sealed class WorldRenderer
         var type = BlockType.ById[blockId];
         // A stump's two stacked boxes would pop as one slab wearing its first quad's tile, so it pops as its model too
         if (type is { IsStump: true, BakedModel: { } stumpModel }) return stumpModel;
+        // A log lying on its side pops with its grain along the axis, not as an upright cube
+        if (type is { LyingModels: { } lying })
+        {
+            var logState = _chunkManager.GetStateGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
+            return WoodState.LyingAxis(logState) is var axis and >= 0 ? lying[axis] : null;
+        }
+
         if (type is not { HasHorizontalFacing: true, RotatedModels: { } models }) return null;
         var state = _chunkManager.GetStateGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
         return models[BlockType.ShapeIndex(state, models.Length)];

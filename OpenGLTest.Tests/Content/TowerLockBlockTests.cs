@@ -13,13 +13,14 @@ public sealed class TowerLockBlockTests
     public TowerLockBlockTests() => TestContent.EnsureLoaded();
 
     private static BlockType Door => ContentRegistry.RequireBlock("tower_door");
-    private static BlockType Pile => ContentRegistry.RequireBlock("skeleton_pile");
+    private static BlockType Pile => ContentRegistry.RequireBlock("tower_pile_spot");
     private static BlockType Altar => ContentRegistry.RequireBlock("tower_altar");
+    private static BlockType EternalLantern => ContentRegistry.RequireBlock("eternal_lantern");
 
     [Fact]
     public void TheLockBlocksAreUnbreakableWorldgenOnlyBlocks()
     {
-        foreach (var type in new[] { Door, Pile, Altar })
+        foreach (var type in new[] { Door, Pile, Altar, EternalLantern })
         {
             Assert.True(BlockType.IsUnbreakable(type.Id), type.Name);
             Assert.False(type.HasItem, type.Name);
@@ -28,9 +29,17 @@ public sealed class TowerLockBlockTests
     }
 
     [Fact]
+    public void TheEternalLanternGlowsWithoutFuelAndIsNotTheFuelledLantern()
+    {
+        Assert.True(BlockType.Emission[EternalLantern.Id] > 0);
+        Assert.False(EternalLantern.Lantern);
+        Assert.False(BlockType.IsSolid(EternalLantern.Id));
+    }
+
+    [Fact]
     public void NoRecipeOrLootTableHandsOutALockBlock()
     {
-        foreach (var type in new[] { Door, Pile, Altar })
+        foreach (var type in new[] { Door, Pile, Altar, EternalLantern })
         {
             Assert.DoesNotContain(ContentRegistry.Recipes, r => r.ResultId == type.Id);
             foreach (var table in ContentRegistry.LootTables.Values)

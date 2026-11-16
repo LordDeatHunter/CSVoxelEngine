@@ -61,6 +61,9 @@ public sealed class PlayerSaveData
         /// <summary>The hotbar slots in slot order.</summary>
         public List<HotbarSlotData>? Hotbar { get; set; }
 
+        /// <summary>The offhand slot; absent in saves that predate it, which load with an empty offhand.</summary>
+        public HotbarSlotData? Offhand { get; set; }
+
         public int? SelectedIndex { get; set; }
 
         /// <summary>The next tool instance id to hand out, so restored and new instances

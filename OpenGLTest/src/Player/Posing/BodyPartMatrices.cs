@@ -84,8 +84,9 @@ internal sealed class BodyPartMatrices
             // the torso round.
             var authored = side > 0f ? MathUtils.Clamp01(MathF.Max(MathF.Max(blade.Stroke, CastMotion.Weight(_model.CastProgress)),
                 MathF.Max(_model.ThrowArm.ThrowArmWeight(), _model.Jab.PunchActivity()))) : 0f;
-            if (authored > 0f && mods.TorsoYaw != 0f)
-                upper = LimbFrames.FrameOf(Matrix4x4.CreateFromQuaternion(upper) * Matrix4x4.CreateRotationY(-mods.TorsoYaw * authored));
+            var slotTwist = _model.ArmsSwapped ? -mods.TorsoYaw : mods.TorsoYaw;
+            if (authored > 0f && slotTwist != 0f)
+                upper = LimbFrames.FrameOf(Matrix4x4.CreateFromQuaternion(upper) * Matrix4x4.CreateRotationY(-slotTwist * authored));
         }
 
         // A shoulder sits where it rests on the torso, slid in toward the body as the arm lifts (the socket), plus its
@@ -121,24 +122,43 @@ internal sealed class BodyPartMatrices
 
         // Child joints ride their parent: the elbow offset is the file's forearm pivot minus
         // its upper-arm pivot, so reshaped limbs keep working.
-        Quaternion upperL = default, foreL = default, upperR = default, foreR = default;
-        if (part is "UpperArmL" or "ForearmL")
-            ArmFrames(Pivot("UpperArmL"), pose.LeftShoulder, 0f, pose.LeftElbow, out upperL, out foreL);
-        else if (part is "UpperArmR" or "ForearmR")
-            ArmFrames(Pivot("UpperArmR"), rightShoulder, rightArmYaw, rightElbow, out upperR, out foreR);
+        Matrix4x4 Arm(string side, bool forearm)
+        {
+            var upperPivot = Pivot("UpperArm" + side);
+            Quaternion upper, fore;
+            if (side == "R")
+                ArmFrames(upperPivot, rightShoulder, rightArmYaw, rightElbow, out upper, out fore);
+            else
+                ArmFrames(upperPivot, pose.LeftShoulder, 0f, pose.LeftElbow, out upper, out fore);
+            return forearm
+                ? Matrix4x4.CreateFromQuaternion(fore)
+                  * Matrix4x4.CreateTranslation(Pivot("Forearm" + side) - upperPivot)
+                  * UpperArm(upperPivot, upper)
+                : UpperArm(upperPivot, upper);
+        }
+
+        // While the left arm acts, the pose's right slot is the acting arm: each arm is the other slot's, mirrored
+        // across the torso (about the torso frame, so the shoulder stays on the torso through its twist).
+        Matrix4x4 Mirrored(Matrix4x4 slotArm)
+        {
+            Matrix4x4.Invert(torsoFrame, out var inverse);
+            var flip = Matrix4x4.CreateScale(-1f, 1f, 1f);
+            return flip * (slotArm * inverse) * flip * torsoFrame;
+        }
+
+        var swapped = _model.ArmsSwapped;
+        Matrix4x4 ArmPart(string side, bool forearm) => swapped
+            ? Mirrored(Arm(side == "L" ? "R" : "L", forearm))
+            : Arm(side, forearm);
 
         return part switch
         {
             "Torso" => Torso(),
             "Head" => Head(),
-            "UpperArmL" => UpperArm(Pivot("UpperArmL"), upperL),
-            "UpperArmR" => UpperArm(Pivot("UpperArmR"), upperR),
-            "ForearmL" => Matrix4x4.CreateFromQuaternion(foreL)
-                * Matrix4x4.CreateTranslation(Pivot("ForearmL") - Pivot("UpperArmL"))
-                * UpperArm(Pivot("UpperArmL"), upperL),
-            "ForearmR" => Matrix4x4.CreateFromQuaternion(foreR)
-                * Matrix4x4.CreateTranslation(Pivot("ForearmR") - Pivot("UpperArmR"))
-                * UpperArm(Pivot("UpperArmR"), upperR),
+            "UpperArmL" => ArmPart("L", false),
+            "UpperArmR" => ArmPart("R", false),
+            "ForearmL" => ArmPart("L", true),
+            "ForearmR" => ArmPart("R", true),
             "ThighL" => Thigh(Pivot("ThighL"), pose.LeftHip),
             "ThighR" => Thigh(Pivot("ThighR"), pose.RightHip),
             "ShinL" => Matrix4x4.CreateFromAxisAngle(swingAxis, pose.LeftKnee)
@@ -151,6 +171,22 @@ internal sealed class BodyPartMatrices
         };
     }
 
+    /// <summary>The body of <see cref="PlayerModel.GetOffhandAnchorMatrix"/>: the left fist, oriented in body space.</summary>
+    internal Matrix4x4 GetOffhandAnchorMatrix(Vector3 eyePos, float yawDeg, float backOffset = 0f, float pitchDeg = 0f)
+    {
+        var forearm = GetPartMatrix("ForearmL", eyePos, yawDeg, pitchDeg, backOffset);
+        var fist = Vector3.Transform(new Vector3(0f, _model.HandDepth(), 0f), forearm);
+        var yawRad = -(_model.DrawnBodyYaw(yawDeg) + 90f) * MathF.PI / 180f;
+        if (!_model.ArmsSwapped)
+            return Matrix4x4.CreateRotationY(yawRad + _model.SwayYaw) * Matrix4x4.CreateTranslation(fist);
+
+        // The left hand is the one acting: the right hand's aim-following rotation, mirrored across the body
+        var pitchRad = MathUtils.ToRadians(pitchDeg);
+        var punchYaw = _model.Jab.PunchArmYaw(pitchRad, _model.GetPose(pitchDeg).TorsoPitch) + _model.SwayYaw;
+        return Matrix4x4.CreateRotationX(pitchRad * _model.Jab.PunchActivity())
+               * Matrix4x4.CreateRotationY(yawRad - punchYaw) * Matrix4x4.CreateTranslation(fist);
+    }
+
     /// <summary>The body of <see cref="PlayerModel.GetHandAnchorMatrix"/>.</summary>
     internal Matrix4x4 GetHandAnchorMatrix(Vector3 eyePos, float yawDeg, float backOffset = 0f, float pitchDeg = 0f)
     {
@@ -160,6 +196,9 @@ internal sealed class BodyPartMatrices
         var pitchRad = MathUtils.ToRadians(pitchDeg);
         // The jab is thrown along the aim rather than the body, so the tool takes the look pitch
         // and the jab's swing for the length of the swing, then drops both as the arm settles.
+        // (the left hand takes the jab while the arms are swapped, and the right hand just carries)
+        if (_model.ArmsSwapped)
+            return Matrix4x4.CreateRotationY(yawRad + _model.SwayYaw) * Matrix4x4.CreateTranslation(fist);
         var punch = _model.Jab.PunchActivity();
         var rotation = Matrix4x4.CreateRotationX(pitchRad * punch)
                        * Matrix4x4.CreateRotationY(yawRad + _model.Jab.PunchArmYaw(pitchRad, _model.GetPose(pitchDeg).TorsoPitch) + _model.SwayYaw);

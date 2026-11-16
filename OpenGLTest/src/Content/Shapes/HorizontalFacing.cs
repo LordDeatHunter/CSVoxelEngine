@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Models;
@@ -102,6 +103,53 @@ public static class HorizontalFacing
                 rotated[facing][i] = RotateBox(boxes[i], facing);
         }
         return rotated;
+    }
+
+    // A quarter turn about the X axis through the cell's middle that stands a shape authored along Z upright:
+    // (x, y, z) -> (x, z, 1 - y), a proper rotation, so a quad keeps its winding and UVs ride along
+    private static Vector3 UprightPoint(Vector3 p) => new(p.X, p.Z, 1f - p.Y);
+
+    private static Vector3 UprightDirection(Vector3 v) => new(v.X, v.Z, -v.Y);
+
+    /// <summary>
+    /// <paramref name="facings"/> (the four turned shapes of a block authored along Z) followed by four copies of that
+    /// shape stood upright, so a state byte with bit 2 set (<see cref="BlockType.ShapeIndex"/> over eight shapes) picks
+    /// the upright one. Like <see cref="RotateModel"/>, every output quad shades flat.
+    /// </summary>
+    public static BakedModel[] WithUpright(BakedModel[] facings)
+    {
+        var quads = new BakedQuad[facings[0].Quads.Length];
+        for (var i = 0; i < quads.Length; i++)
+        {
+            var quad = facings[0].Quads[i];
+            var normal = UprightDirection(quad.Normal);
+            quads[i] = quad with
+            {
+                Positions = [.. quad.Positions.Select(UprightPoint)],
+                Normal = normal,
+                Face = ModelBaker.DominantFace(normal),
+                CullFace = quad.CullFace < 0
+                    ? quad.CullFace
+                    : ModelBaker.DominantFace(UprightDirection(Chunk.CubeFaces[quad.CullFace].normal)),
+                IsFullFace = false,
+            };
+        }
+
+        var upright = facings[0] with { Quads = quads };
+        return [.. facings, upright, upright, upright, upright];
+    }
+
+    /// <summary>The boxes of <see cref="RotateBoxes"/> followed by four copies of the first set stood upright, matching
+    /// <see cref="WithUpright(BakedModel[])"/>.</summary>
+    public static BlockHitbox[][] WithUpright(BlockHitbox[][] facings)
+    {
+        var upright = facings[0].Select(box =>
+        {
+            var a = UprightPoint(box.Min);
+            var c = UprightPoint(box.Max);
+            return new BlockHitbox(Vector3.Min(a, c), Vector3.Max(a, c));
+        }).ToArray();
+        return [.. facings, upright, upright, upright, upright];
     }
 
     /// <summary>

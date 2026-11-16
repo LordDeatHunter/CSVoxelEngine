@@ -175,7 +175,7 @@ internal sealed class QuestBookRenderer : IDisposable
         y = DrawWrapped(quest.Description, left, y, width, Rgba.White) + 14f;
         _ui.DrawRect(new Vector2(panel.Center.X, y), new Vector2(width, 1.5f), SlotBorderColor);
         y += 22f;
-        _ui.DrawTextCenteredY(QuestText.Requirements, left, y, _ui.CountScale, AccentGold);
+        _ui.DrawTextCenteredY(quest.AnyOf ? QuestText.RequirementsAnyOf : QuestText.Requirements, left, y, _ui.CountScale, AccentGold);
         y += 28f;
 
         if (!quest.Readable && !done)

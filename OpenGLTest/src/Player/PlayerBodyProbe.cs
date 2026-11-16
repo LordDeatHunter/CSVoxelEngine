@@ -36,11 +36,10 @@ public static class PlayerBodyProbe
     /// (<see cref="BodyCollision.BodyCollides"/>), or its feet stand in a sink block's soft layer
     /// (<see cref="SinkLayerTop"/>), which the client's physics treats as ground while the body
     /// sinks through it. A body already inside a solid reads grounded too, so a buried player is
-    /// never billed a fall. <paramref name="solids"/> adds the non-block solids (the server's
-    /// icebergs), so a rider stands on its berg.
+    /// never billed a fall.
     /// </summary>
-    public static bool Grounded(Vector3 eye, ChunkManager chunks, IBodySolids? solids = null) =>
-        BodyCollision.BodyCollides(eye - new Vector3(0f, NetworkConfig.NetGroundProbeBlocks, 0f), chunks, solids)
+    public static bool Grounded(Vector3 eye, ChunkManager chunks) =>
+        BodyCollision.BodyCollides(eye - new Vector3(0f, NetworkConfig.NetGroundProbeBlocks, 0f), chunks)
         || SinkLayerTop(eye, chunks) != null;
 
     /// <summary>
@@ -49,8 +48,8 @@ public static class PlayerBodyProbe
     /// collides, so it straddles any ground top within that distance. The server reads it at the
     /// low point of a descent-then-rise, whose landing fell between two states.
     /// </summary>
-    public static bool GroundedWithin(Vector3 eye, float reach, ChunkManager chunks, IBodySolids? solids = null) =>
-        BodyCollision.BodyCollides(eye - new Vector3(0f, reach + NetworkConfig.NetGroundProbeBlocks, 0f), chunks, solids);
+    public static bool GroundedWithin(Vector3 eye, float reach, ChunkManager chunks) =>
+        BodyCollision.BodyCollides(eye - new Vector3(0f, reach + NetworkConfig.NetGroundProbeBlocks, 0f), chunks);
 
     /// <summary>
     /// Whether a bounce block (a slime block) lies under the body's footprint within

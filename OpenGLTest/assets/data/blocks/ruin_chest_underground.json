@@ -6,16 +6,15 @@
   // Crystal, Fungal, MagmaDeep; each flavoured table nests "ruin_underground" and adds its cave's own pool. It is picked as a wooden
   // chest and drops nothing but its contents.
   "name": "Miner's Chest",
-  "model": { "parent": "block/chest", "textures": { "front": "chest_ruin_underground_front", "side": "chest_ruin_underground_side", "top": "chest_ruin_underground_top" } },
+  "model": { "parent": "block/chest", "textures": { "front": "chest_ruin_underground_front", "back": "chest_ruin_underground_back", "left": "chest_ruin_underground_left", "right": "chest_ruin_underground_right", "bottom": "chest_ruin_underground_bottom", "top": "chest_ruin_underground_top" } },
   "facing": "horizontal",
   "facingFromLook": true,
+  "facesViewer": true,
   "hardness": 4,
   "sfx": "hit_wood",
   "castsAO": false,
   "collidesByHitbox": true,
   "hitbox": { "min": [0.0625, 0, 0.0625], "max": [0.9375, 0.875, 0.9375] },
-  "hasItem": false,
-  "pickAs": "wooden_chest",
   "loot": "none",
   "chest": {
     "slots": 18,

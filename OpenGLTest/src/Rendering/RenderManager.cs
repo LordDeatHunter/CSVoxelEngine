@@ -10,6 +10,7 @@ using VoxelEngine.Effects.Sky;
 using VoxelEngine.Effects.Water;
 using VoxelEngine.Graphics;
 using VoxelEngine.Particles;
+using VoxelEngine.Particles.Footprints;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering.Actors;
 using VoxelEngine.Rendering.Atmosphere;
@@ -165,6 +166,7 @@ public class RenderManager : IDisposable
     private LeafParticleRenderer? _leaves;
     private FireParticleRenderer? _fire;
     private BubbleParticleRenderer? _bubbles;
+    private FootprintRenderer? _footprints;
     private SliceTrailRenderer? _sliceTrails;
 
     // Entity healthbars: one five-heart billboard row above every live slime.
@@ -328,9 +330,6 @@ public class RenderManager : IDisposable
     /// goblin rig, its part meshes and its skin.</summary>
     internal MobPasses Mobs { get; private set; }
 
-    /// <summary>The iceberg draws: one mesh and skin per iceberg variant.</summary>
-    internal IcebergPasses IcebergPasses { get; private set; }
-
     /// <summary>The chest draws: the shared chest model's base and lid for every chest cell, each on its
     /// block's skin.</summary>
     internal ChestPasses Chests { get; private set; }
@@ -379,6 +378,8 @@ public class RenderManager : IDisposable
     internal LeafParticleRenderer? Leaves => _leaves;
     internal FireParticleRenderer? Fire => _fire;
     internal BubbleParticleRenderer? Bubbles => _bubbles;
+
+    internal FootprintRenderer? Footprints => _footprints;
     /// <summary>This frame's splash ripples for the water shader; packed before <see cref="BeginFrame"/>.</summary>
     internal RippleField WaterRipples { get; } = new();
     internal SliceTrailRenderer? SliceTrails => _sliceTrails;
@@ -573,6 +574,7 @@ public class RenderManager : IDisposable
         _leaves = new LeafParticleRenderer(gl);
         _fire = new FireParticleRenderer(gl);
         _bubbles = new BubbleParticleRenderer(gl);
+        _footprints = new FootprintRenderer(gl);
         _sliceTrails = new SliceTrailRenderer(gl, linearOutput: true);
         _healthbars = new EntityHealthbarRenderer(gl);
 
@@ -585,7 +587,6 @@ public class RenderManager : IDisposable
         Stations = new StationPasses(gl, this);
         Players = new PlayerPasses(gl, this);
         Mobs = new MobPasses(gl, this);
-        IcebergPasses = new IcebergPasses(gl, this);
         Chests = new ChestPasses(gl, this);
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes, atlasIsSrgb: true);
         // The damage numbers are laid out from the HUD's font; without one there is nothing to draw
@@ -1057,7 +1058,6 @@ public class RenderManager : IDisposable
         itemMeshes.Dispose();
         Stations.Dispose();
         Players.Dispose();
-        IcebergPasses.Dispose();
         Chests.Dispose();
         Mobs.Dispose();
         worldShader.Dispose();
@@ -1078,6 +1078,7 @@ public class RenderManager : IDisposable
         _leaves?.Dispose();
         _fire?.Dispose();
         _bubbles?.Dispose();
+        _footprints?.Dispose();
         _sliceTrails?.Dispose();
         _healthbars?.Dispose();
         _damageNumbers?.Dispose();
