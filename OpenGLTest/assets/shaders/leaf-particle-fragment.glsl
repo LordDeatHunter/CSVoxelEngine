@@ -24,7 +24,7 @@ void main() {
     if (tex.a < 0.5) discard;
 
     float ndl = clamp(uSunDir.y, 0.0, 1.0);
-    vec3 light = uAmbient * (0.12 + 0.88 * fSun) + uSunColor * (fSun * uSunIntensity * (0.35 + 0.65 * ndl));
+    vec3 light = uAmbient * clamp(fSun, 0.0, 1.0) + uSunColor * (fSun * uSunIntensity * (0.35 + 0.65 * ndl));
     vec3 col = tex.rgb * fTint.rgb * light;
 
     float f = clamp((fDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
