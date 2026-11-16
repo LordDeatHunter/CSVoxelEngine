@@ -18,7 +18,9 @@ public static class GiveCommand
     private static void Give(CommandContext context, ICommandPlayer player, int count)
     {
         var item = context.Get<ContentItem>("item");
-        player.Give(item.Id, count);
-        context.Reply($"Gave {count} x {item.Name} to {player.Name}");
+        var credited = player.Give(item.Id, count);
+        if (credited <= 0)
+            throw new CommandException($"No room in {player.Name}'s inventory for {item.Name}");
+        context.Reply($"Gave {credited} x {item.Name} to {player.Name}");
     }
 }

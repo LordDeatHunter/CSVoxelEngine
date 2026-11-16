@@ -21,8 +21,9 @@ public interface ICommandPlayer
     /// <summary>Moves the player so its feet stand at <paramref name="feet"/>.</summary>
     void Teleport(Vector3 feet);
 
-    /// <summary>Puts <paramref name="count"/> of the block or item <paramref name="id"/> into the player's inventory.</summary>
-    void Give(ushort id, int count);
+    /// <summary>Puts up to <paramref name="count"/> of the block or item <paramref name="id"/> into the player's inventory
+    /// and returns how many were accepted.</summary>
+    int Give(ushort id, int count);
 
     /// <summary>Sets the player's modes (flight only alongside creative), or refuses with the reason when the host
     /// does not let this player have them.</summary>

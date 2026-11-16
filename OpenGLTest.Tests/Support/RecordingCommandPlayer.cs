@@ -25,7 +25,11 @@ public sealed class RecordingCommandPlayer(string name, Vector3 feet) : ICommand
 
     public void Teleport(Vector3 feet) => Feet = feet;
 
-    public void Give(ushort id, int count) => Given.Add((id, count));
+    public int Give(ushort id, int count)
+    {
+        Given.Add((id, count));
+        return count;
+    }
 
     public bool TrySetModes(bool creative, bool flying, out string refusal)
     {
