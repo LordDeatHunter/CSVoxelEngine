@@ -144,8 +144,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       Tower/                   # the battle tower's simulation, namespace VoxelEngine.Simulation.Tower
         SkeletonManager.cs     # the skeletons: forced spawn only (Spawn(position), under the hard cap), the rake at
                                #   its impact, the arrows (MobMissiles), loot, despawn, client mirrors; no ring spawn; reports a
-                               #   bound skeleton's despawn, leash release or idle crumble back to its piles (TakeReleased)
-                               #   so its floor owes it
+                               #   bound skeleton's despawn, leash release or idle crumble back to its piles (TakeReleased,
+                               #   with where it stood) so its floor owes it a pile there
         TowerManager.cs        # the floor locks (see "Battle tower"): records materialized near a player, the recount, owed
                                #   and leash, the door judgement, the capped sweep, ClearFloor, Detail, stations.json and the wire;
                                #   the roof altar: JudgeAltar, BeginRitual, UpdateAltars/SettleAltars, the BossDefeated event;
@@ -165,9 +165,10 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   and Mirror (the client's copy)
         TowerFloorState.cs     # one floor: band, piles, door cells and the ones still to sweep, living, owed, piles left,
                                #   alive and the door bit
-        PileState.cs           # one skeleton pile: cell, waves left, cooldown, removed
-        SkeletonPileManager.cs # a floor's piles: waves of TowerDifficulty.PackSize skeletons for a non-immune target in
-                               #   range, then depleted; owed skeletons re-raised at any pile; never writes blocks
+        PileState.cs           # one bone pile (an entity-style spot, not a block): free position, raised, alarmed
+        OwedSkeleton.cs        # a despawned bound skeleton: its floor and the spot it stood, which becomes a pile
+        SkeletonPileManager.cs # a floor's piles: each raises its one skeleton for a non-immune target in range, then is
+                               #   gone; owed piles (where skeletons despawned) rise the same way; never writes blocks
         TowerRules.cs          # GL-free: the pile trigger, floor awake, the door rule, spawn points round a pile, the leash,
                                #   the altar verdict (AltarVerdictOf), the collapse gate (CollapseDue)
         TowerBlockWriter.cs    # the capped writer past `unbreakable` (Chunk.CollapseWriteAt plus every edit-path hook): the

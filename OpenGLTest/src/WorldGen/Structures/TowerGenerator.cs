@@ -78,6 +78,8 @@ public static class TowerGenerator
         var cell = template.CellAt(turns, lx, ly, lz);
         if (cell < 0) return cell;
         var block = StructureCell.BlockOf(cell);
+        // A pile spot marks where bone piles lie, as entities: it writes nothing
+        if (block == TowerPalette.PileSpotBlock) return StructureCell.None;
         if (block == TowerPalette.DefaultBrick) return StructureCell.WithBlock(cell, s.Palette.Brick);
         // The template's state for a chest is its facing alone (bits 0-1), so the tier bits OR on cleanly
         if (block == TowerPalette.ChestBlock)
@@ -85,13 +87,14 @@ public static class TowerGenerator
         return cell;
     }
 
-    /// <summary>The skeleton pile cells floor <paramref name="floor"/>'s dressing template stands, in template order (layer,
-    /// then row, then column, after the template's turn): the cells where both the turned template and the merged cell are the
-    /// pile block. Scans the template, so a consumer keeps the result.</summary>
+    /// <summary>The bone pile spot cells floor <paramref name="floor"/>'s dressing template marks, in template order (layer,
+    /// then row, then column, after the template's turn): the cells where the turned template holds the pile marker block,
+    /// which is never written (the piles are entities). Scans the template, so a consumer keeps the result.</summary>
     internal static IReadOnlyList<(int X, int Y, int Z)> PileCells(TowerSite s, int floor)
     {
         RequireFloor(s, floor);
-        return TemplateBlockCells(s, s.FloorTemplates[floor], s.FloorTurns[floor], s.FloorY(floor) + 1, TowerPalette.PileBlock);
+        return TemplateBlockCells(s, s.FloorTemplates[floor], s.FloorTurns[floor], s.FloorY(floor) + 1, TowerPalette.PileSpotBlock,
+            mergedToo: false);
     }
 
     /// <summary>The tower chest cells floor <paramref name="floor"/>'s dressing template stands, in template order, each
@@ -113,9 +116,9 @@ public static class TowerGenerator
             throw new ArgumentOutOfRangeException(nameof(floor), floor, "A tower's floors run from 0 to its floor count - 1.");
     }
 
-    // The cells where both the turned template (its layer 0 at world y0) and the merged cell are the block
+    // The cells where the turned template (its layer 0 at world y0) holds the block and, with mergedToo, the merged cell is it too
     private static IReadOnlyList<(int X, int Y, int Z)> TemplateBlockCells(TowerSite s, StructureTemplate template, int turns,
-        int y0, ushort block)
+        int y0, ushort block, bool mergedToo = true)
     {
         var x0 = StructureStamper.OriginOf(s.CenterX, template);
         var z0 = StructureStamper.OriginOf(s.CenterZ, template);
@@ -127,6 +130,11 @@ public static class TowerGenerator
             var cell = template.CellAt(turns, lx, ly, lz);
             if (cell < 0 || StructureCell.BlockOf(cell) != block) continue;
             int x = x0 + lx, y = y0 + ly, z = z0 + lz;
+            if (!mergedToo)
+            {
+                cells.Add((x, y, z));
+                continue;
+            }
             var merged = CellAt(s, x, y, z);
             if (merged >= 0 && StructureCell.BlockOf(merged) == block) cells.Add((x, y, z));
         }

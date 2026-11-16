@@ -54,8 +54,9 @@ share `MobConfig.SkeletonHeight` as their body box.
   `MobMissiles` (`SkeletonManager.Arrows`, merged into `ThrowAction.RefreshProjectiles`): a non-immune target touched
   takes the skeleton's `ArrowDamage` and a small shove, an immune one stops the arrow unhurt.
 - **Tower difficulty** (`TowerDifficulty`, GL-free): a floor's tier (the floor index, 0..`MobConfig.TowerMaxTier`,
-  `TowerSite.Tier(k)`) changes only its piles, never a skeleton: `PackSize(tier)` is the wave size, `1 + tier /
-  TowerPackTiersPerExtra` (one more mob every 3 floors), and `PileNearLimit(tier)` is `SkeletonPileNearLimitBase` plus
+  `TowerSite.Tier(k)`) changes only its piles, never a skeleton: `PackSize(tier)` is `1 + tier /
+  TowerPackTiersPerExtra` (one more pack slot every 3 floors), `PilesPerSpot(tier)` is `PackSize` times
+  `TowerPilesPerPackSlot` (how many one-skeleton piles each pile spot lays out), and `PileNearLimit(tier)` is `SkeletonPileNearLimitBase` plus
   `SkeletonPileNearLimitPerTier` per floor (1 more per floor). A skeleton's health and melee and arrow damage are the
   fixed numbers of its kind on every floor; it carries no tier, so none is saved or sent.
 - **Forced spawn only**: `SkeletonManager.Spawn(position)` is the one way a skeleton appears (a scenario's `spawn` op,
@@ -124,27 +125,34 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
   so the point query still equals the stamp. `tower_door` (a solid, cutout, `cullSelf` portcullis `cube_all` that passes
   light) fills the headroom over the two door half-steps of every floor (`TowerSite.DoorCells(k)`, stamped by
   `TowerShell.CorridorAt` through the closed-form `TowerShell.IsDoorStep`): door `k` seals floor `k` from floor `k + 1`, the
-  last one the roof, and the ground entrance stays open. `skeleton_pile` (non-solid, a low hitbox, never replaceable) is
-  the `S` palette key of the three `tower_floor_*.json` templates, found per floor by `TowerSite.PileCells(k)` (a template
-  scan, kept by its consumer). Both tiles are placeholders from `tools/generate-tower-lock-textures.py` (USER_TODO.md).
+  last one the roof, and the ground entrance stays open. `tower_pile_spot` is
+  the `S` palette key of the three `tower_floor_*.json` templates, a marker that is never written (`TowerGenerator.TemplateCell`
+  returns nothing for it), found per floor by `TowerSite.PileCells(k)` (a template scan, kept by its consumer). The old
+  `skeleton_pile` block is gone (a save that still names it loads those cells as air). Both tiles are placeholders from
+  `tools/generate-tower-lock-textures.py` (USER_TODO.md).
 - **`TowerManager`** (`Simulation/Tower/`, owned by `World` as `World.Towers`, main thread, ticked by `MobDirector.Update`
   right after the skeletons on authoritative worlds only) keeps one `TowerRecord` per tower keyed by its placement cell,
   with a `TowerFloorState` per floor. A record is materialized lazily: every `MobConfig.TowerScanSeconds`, a target whose
   eye chunk is loaded and who stands in no record asks `TowerPlacement.TryFindAt` (the generation workers have usually
   cached the verdict already). `TowerRecord.Build` takes explicit floor data, which is the test and loopback seam.
-- **Piles** (`SkeletonPileManager`): on an awake floor (floor 0, or the floor below's door open), a pile whose cell holds
-  the pile block raises a wave of `TowerDifficulty.PackSize(k)` skeletons (`SkeletonManager.Spawn`, around the
-  pile by `TowerRules.SpawnPoints`) when a **non-immune** target stands within `SkeletonPileTriggerBlocks` on that floor's
-  band, every `SkeletonPileWaveSeconds`, for `SkeletonPileWaves` waves, then it is depleted. A pile never raises past `TowerDifficulty.PileNearLimit(k)` living skeletons within
-  `SkeletonPileNearRadiusBlocks` of it (`SkeletonManager.LivingCountNear`; `SkeletonPileNearLimitBase` 5 on floor 0, plus
-  `SkeletonPileNearLimitPerTier` 1 per floor): a wave is trimmed to the room left and waits for kills when there is none, and
-  owed respawns obey the same limit. **Opening a chest alarms the nearby piles** (`TowerManager.AlarmPilesNear`, called where the chest opens: `ChestInput.Open` in singleplayer, `ChestSessions.OnOpen` on the server): every pile with a wave left on the chest's awake floor within `SkeletonChestAlarmBlocks` is `PileState.Alarmed` (never saved) and raises its next wave at once, ignoring its trigger range, its cooldown and the near limit (only the hard cap still holds). A wave counts only if one
-  skeleton rose (the near limit and the hard cap keep it for later). A pile in an unloaded chunk freezes; a loaded cell without the pile
-  block counts as depleted.
+- **Piles** (`SkeletonPileManager`) are entity-style spots, not blocks: each pile lies at a free position (`TowerRules.PileSpot`,
+  a golden-angle spiral round its template pile spot, a pure function of the cell) and holds exactly **one** skeleton, so
+  every skeleton of a floor has its own pile. A spot lays out `TowerDifficulty.PilesPerSpot(k)` piles (`PackSize(k)` times
+  `TowerPilesPerPackSlot`). On an awake floor (floor 0, or the floor below's door open) a pile whose chunk is loaded raises its
+  skeleton (`SkeletonManager.Spawn`, bound to the floor, at the pile, or the nearest open column when walled in) when a
+  **non-immune** target stands within `SkeletonPileTriggerBlocks` on that floor's band, and is then gone (`PileState.Raised`).
+  A pile never raises past `TowerDifficulty.PileNearLimit(k)` living skeletons within `SkeletonPileNearRadiusBlocks` of it
+  (`SkeletonManager.LivingCountNear`; `SkeletonPileNearLimitBase` 5 on floor 0, plus `SkeletonPileNearLimitPerTier` 1 per
+  floor): it waits for kills. **Opening a chest alarms the nearby piles** (`TowerManager.AlarmPilesNear`, called where the chest
+  opens: `ChestInput.Open` in singleplayer, `ChestSessions.OnOpen` on the server): every unraised pile on the chest's awake
+  floor within `SkeletonChestAlarmBlocks` is `PileState.Alarmed` (never saved) and raises at once, ignoring its trigger range
+  and the near limit (only the hard cap still holds). A pile in an unloaded chunk freezes. The client draws every pile
+  (`StationPasses.RenderBonePiles`, the `block/skeleton_pile` model at each spot, spots read from the station snapshot).
 - **Bound skeletons are never immortal.** Each raised skeleton is tagged with its `TowerFloorRef`. It despawns like any
   mob, and past `TowerSkeletonLeashBlocks` from the tower's center the manager releases it (`SkeletonManager.Release`);
-  either way `SkeletonManager.TakeReleased` reports it once and the floor's **owed** count grows. Owed skeletons are raised
-  again at any of the floor's piles (depleted ones too) the next time a target triggers one. So a half-cleared tower far
+  either way `SkeletonManager.TakeReleased` reports it once, with where it stood (`OwedSkeleton`), and the floor gets an **owed
+  pile** (`TowerFloorState.OwedPiles`, saved) lying there, so a despawned skeleton shows as a bone pile where it vanished. An
+  owed pile rises like any other (a trigger in range) and is then gone. So a half-cleared tower far
   away holds no cap room, and a skeleton that wandered off can never soft-lock a door. A killed one is never owed.
 - **Idle skeletons crumble back into their piles.** A bound skeleton that has chased nobody (no target noticed, or its
   sight of one lost: `MobInterest.IdleSeconds`) for `MobConfig.SkeletonPileReturnIdleSeconds` reads
@@ -163,17 +171,17 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
   `TryReplace` to any block and state, a replaced chest spilling through its `spillChest` hook), then
   every edit-path hook (player-placed unmark, `MarkAreaDirty` over the light radius, fluid and leaf-decay schedules, a falls
   block toppling above, the LOD notify, the support pop, the canopy branch), capped at `TowerMaxBlockWritesPerFrame`; the
-  raw write journals the cell to clients as `BlockChanges`. Each frame a sweep writes the depleted piles and the open
+  raw write journals the cell to clients as `BlockChanges`. Each frame a sweep writes the open
   doors' remaining cells: a written or gone cell leaves the set, an unloaded one stays for later and never blocks the rest,
   and the cap ends the sweep. BT-8's collapse writes through it too, after the sweep and under the same cap.
-- **Saves and the wire**: `stations.json`'s `Towers` (`StationSaveData.TowerData`: the cell, and per floor the waves left
-  per pile in `PileCells` order, the door bit and owed), restored before the entities through `TowerPlacement.TryGetSite`
-  (an entry whose site, floor count or pile count no longer matches is dropped and counted). Only site-built records are
+- **Saves and the wire**: `stations.json`'s `Towers` (`StationSaveData.TowerData`: the cell, and per floor whether each pile has
+  risen in the site's pile order, the door bit and the owed piles' spots), restored before the entities through `TowerPlacement.TryGetSite`
+  (an entry whose site, floor count or pile count no longer matches is dropped and counted, which also resets a tower saved
+  before piles became entities). Only site-built records are
   saved. Every record rides the end of `StationState` (protocol 26; 27 appends its altar state byte). The client's manager has no writer: it never ticks,
-  never raises a skeleton or opens a door, and each snapshot replaces its `TowerRecord.Mirror`s; door and pile cells reach
-  it through `BlockChanges`.
-- **Look-at line** (`TowerManager.Detail`, `TowerReadout`, on both sides): a pile reads "Floor 2: 3 piles, 4 skeletons", a
-  sealed door "Floor 2 sealed: clear floor 1 first", "... 2 piles left" or "... 5 skeletons left" (floors counted from 1).
+  never raises a skeleton or opens a door, and each snapshot replaces its `TowerRecord.Mirror`s; door cells reach
+  it through `BlockChanges`, and each floor's pile spots ride the snapshot (a count byte and three floats each, protocol 59).
+- **Look-at line** (`TowerManager.Detail`, `TowerReadout`, on both sides): a sealed door "Floor 2 sealed: clear floor 1 first", "... 2 piles left" or "... 5 skeletons left" (floors counted from 1).
 - **Scenario**: the `towerclear` op (`World.ClearTowerFloor`) clears a floor at once and the `towerdefeat` op
   (`World.DefeatTower`, `TowerManager.DefeatAt`) marks the king killed, so the real collapse runs;
   `visual-examples/battle-tower.json` (`VOXEL_TIME=147`) films the tower, the piles, a sealed and an opened door, floor 1

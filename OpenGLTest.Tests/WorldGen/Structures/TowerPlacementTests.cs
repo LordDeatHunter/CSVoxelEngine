@@ -370,7 +370,7 @@ public sealed class TowerPlacementTests
     }
 
     [Fact]
-    public void EveryFloorHasPilesStandingOnItsSlabWhereThePointQuerySaysSo()
+    public void EveryFloorHasPileSpotsOnItsSlabThatTheStampNeverWrites()
     {
         foreach (var s in TowerSiteFixture.SyntheticSites())
         for (var k = 0; k < s.Floors; k++)
@@ -380,7 +380,8 @@ public sealed class TowerPlacementTests
             Assert.Equal(piles.Count, piles.Distinct().Count());
             foreach (var (x, y, z) in piles)
             {
-                Assert.Equal(TowerPalette.PileBlock, StructureCell.BlockOf(TowerGenerator.CellAt(s, x, y, z)));
+                var cell = TowerGenerator.CellAt(s, x, y, z);
+                Assert.True(cell < 0 || StructureCell.BlockOf(cell) != TowerPalette.PileSpotBlock);
                 Assert.Equal(s.FloorY(k) + 1, y);
             }
         }

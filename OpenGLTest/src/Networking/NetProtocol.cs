@@ -295,8 +295,10 @@ public static class NetFraming
     /// <see cref="NetMessage.EntityList"/>.
     /// 58: the offhand slot: the inventory snapshot carries it, <see cref="NetInventoryAction.SwapHands"/> is new, the
     /// equip, move and clear intents may name it, and each <see cref="NetMessage.PlayerList"/> entry ends with the offhand's
-    /// held item and lit flag; an older peer would misread the frame.</summary>
-    public const int ProtocolVersion = 58;
+    /// held item and lit flag; an older peer would misread the frame.
+    /// 59: each floor of a battle tower in the station snapshot ends with the spots of its bone piles (a count byte, then
+    /// three floats each); an older peer would misread the frame.</summary>
+    public const int ProtocolVersion = 59;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

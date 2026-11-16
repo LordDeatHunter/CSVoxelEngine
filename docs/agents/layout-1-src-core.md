@@ -559,7 +559,7 @@ OpenGLTest/
         SkeletonKingAttack.cs  # None / Slam / Volley / Summon
         BoneBurst.cs           # GL-free: the king's volley as a burst, its bones due one after another over a window
         SkeletonKingHome.cs    # where a king is leashed: its tower (or none), the altar-top feet, the leash radius
-        TowerDifficulty.cs     # GL-free: the floor tier's pile wave size (PackSize), the living-skeleton limit near a pile (PileNearLimit), clamp
+        TowerDifficulty.cs     # GL-free: the floor tier's pack size (PackSize) and piles per pile spot (PilesPerSpot), the living-skeleton limit near a pile (PileNearLimit), clamp
         TowerFloorRef.cs       # the tower (by placement cell) and floor whose lock a bound skeleton counts toward
       Sandworms/               # the desert boss (see "Sandworm"): the mob, its chain, its brain and its pose
         Sandworm.cs            # the mob: the head is its position, the exposed segments by the sand surface, the segment hit tests and

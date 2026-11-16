@@ -17,6 +17,7 @@ using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Ingots;
 using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.Simulation.Stumps;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI;
 
 namespace VoxelEngine.Rendering.Actors;
@@ -271,6 +272,48 @@ internal sealed class StationPasses : IDisposable
             }
         }
     }
+
+    // The bone pile's model, built on first sight: it belongs to no block, since a pile is not one
+    private Mesh? _bonePileMesh;
+
+    private Mesh BuildBonePileMesh()
+    {
+        var model = ModelBaker.Bake(ContentRegistry.ModelFiles!.Resolve("block/skeleton_pile"));
+        return Primitives.CreateBlockModel(_gl, model);
+    }
+
+    // Reused per frame: the tower's bone pile spots
+    private readonly List<Vector3> _pileSpots = [];
+
+    /// <summary>
+    /// Draws every battle tower bone pile (entities lying at free positions on the floors, not blocks): the skeleton pile
+    /// block's model at each spot, turned by a hash of the spot so a floor's piles do not all face one way. Skips the
+    /// shadow pass, like the other station draws.
+    /// </summary>
+    internal void RenderBonePiles(Camera camera, TowerManager towers)
+    {
+        if (camera == null || towers == null) return;
+        _pileSpots.Clear();
+        towers.CollectPileSpots(_pileSpots);
+        if (_pileSpots.Count == 0) return;
+
+        _owner.WorldShader.Use();
+        _owner.BindWorldTextures();
+        var mesh = _bonePileMesh ??= BuildBonePileMesh();
+
+        var viewProj = camera.GetViewProjection();
+        var maxDistanceSquared = BonePileDrawDistance * BonePileDrawDistance;
+        foreach (var spot in _pileSpots)
+        {
+            if (Vector3.DistanceSquared(spot, camera.Position) > maxDistanceSquared) continue;
+            var yaw = (uint)(spot.X * 1031f + spot.Z * 2053f) % 628u / 100f;
+            var model = Matrix4x4.CreateRotationY(yaw) * Matrix4x4.CreateTranslation(spot + new Vector3(0f, 0.5f, 0f));
+            _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(spot + new Vector3(0f, 0.5f, 0f)));
+            mesh.Render();
+        }
+    }
+
+    private const float BonePileDrawDistance = 96f;
 
     /// <summary>
     /// The crucible bowl a kiln holds, as a standalone mesh: the chunk meshes only the kiln's
@@ -576,6 +619,7 @@ internal sealed class StationPasses : IDisposable
     {
         _quernTop?.Dispose();
         _crucibleMesh?.Dispose();
+        _bonePileMesh?.Dispose();
         foreach (var quad in _moltenQuads.Values)
             quad.Dispose();
         _moltenQuads.Clear();

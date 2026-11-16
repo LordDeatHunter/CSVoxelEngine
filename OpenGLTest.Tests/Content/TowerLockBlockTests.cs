@@ -13,7 +13,7 @@ public sealed class TowerLockBlockTests
     public TowerLockBlockTests() => TestContent.EnsureLoaded();
 
     private static BlockType Door => ContentRegistry.RequireBlock("tower_door");
-    private static BlockType Pile => ContentRegistry.RequireBlock("skeleton_pile");
+    private static BlockType Pile => ContentRegistry.RequireBlock("tower_pile_spot");
     private static BlockType Altar => ContentRegistry.RequireBlock("tower_altar");
     private static BlockType EternalLantern => ContentRegistry.RequireBlock("eternal_lantern");
 

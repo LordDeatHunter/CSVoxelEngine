@@ -1,10 +1,11 @@
 using System.Collections.Generic;
+using System.Numerics;
 using VoxelEngine.Entities.TowerMobs;
 
 namespace VoxelEngine.Simulation.Tower;
 
 /// <summary>
-/// The lock state of one tower floor: its band, its skeleton piles, the door cells that seal it from the floor above,
+/// The lock state of one tower floor: its band, its bone piles, the door cells that seal it from the floor above,
 /// how many of its skeletons live or are owed back, and whether its door is open. On the authoritative side the piles,
 /// door cells and counts are live; a client's mirror keeps only the band, the counts and the door bit read from the
 /// wire, with no piles and no door cells. Main thread only.
@@ -48,8 +49,15 @@ public sealed class TowerFloorState
     /// <summary>The living skeletons bound to this floor, recounted each frame.</summary>
     public int Living { get; set; }
 
-    /// <summary>Bound skeletons that despawned or strayed and must be raised again (saved).</summary>
-    public int Owed { get; set; }
+    /// <summary>The bone piles of bound skeletons that despawned or strayed, each where its skeleton stood: it rises
+    /// again from there for the next target (saved).</summary>
+    public List<Vector3> OwedPiles { get; } = [];
+
+    /// <summary>Bound skeletons that despawned or strayed and must be raised again.</summary>
+    public int Owed => OwedPiles.Count;
+
+    /// <summary>The spots of the piles a mirror draws, read from the wire; empty on the authoritative side.</summary>
+    public Vector3[] MirrorSpots { get; init; } = [];
 
     /// <summary>The piles that still have a wave; computed on the authoritative side, read from the wire on a mirror.</summary>
     public int PilesLeft { get; set; }
@@ -61,7 +69,17 @@ public sealed class TowerFloorState
     /// <summary>Whether the door sealing this floor from the next is open (saved; it stays open).</summary>
     public bool DoorOpen { get; set; }
 
-    /// <summary>The piles in <see cref="Piles"/> that still have a wave.</summary>
+    /// <summary>Appends where every bone pile lying on this floor is drawn to <paramref name="into"/>: the site's piles
+    /// whose skeleton has not risen, the owed ones and, on a mirror, the spots read from the wire.</summary>
+    internal void CollectSpots(List<Vector3> into)
+    {
+        foreach (var pile in Piles)
+            if (!pile.Raised) into.Add(pile.Spot);
+        into.AddRange(OwedPiles);
+        into.AddRange(MirrorSpots);
+    }
+
+    /// <summary>The piles in <see cref="Piles"/> whose skeleton has not risen.</summary>
     internal int CountPilesLeft()
     {
         var left = 0;

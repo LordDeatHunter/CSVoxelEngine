@@ -13,7 +13,7 @@
     "c": "cobblestone",
     "h": "cobblestone_slab",
     "L": "eternal_lantern",
-    "S": "skeleton_pile",
+    "S": "tower_pile_spot",
     "C": { "block": "tower_chest", "facing": "south" },
     "D": { "block": "tower_chest", "facing": "north" }
   },

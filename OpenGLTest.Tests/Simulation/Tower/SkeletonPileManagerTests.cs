@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.TowerMobs;
@@ -10,9 +11,9 @@ using Xunit;
 namespace VoxelEngine.Tests.Simulation.Tower;
 
 /// <summary>
-/// The skeleton piles (<see cref="SkeletonPileManager"/>): a non-immune target in range raises waves of the floor tier's
-/// pack, bound to the floor, until the pile depletes; an immune or distant target, a full hard cap, an unloaded chunk
-/// and a pile whose block is gone raise nothing; owed skeletons rise again at a depleted pile.
+/// The bone piles (<see cref="SkeletonPileManager"/>): each pile of a spot raises exactly one skeleton, bound to the
+/// floor, once a non-immune target is in range, and is then gone; an immune or distant target, a full hard cap and an
+/// unloaded chunk raise nothing; an owed skeleton lies as a pile where it stood and rises again from there.
 /// </summary>
 public sealed class SkeletonPileManagerTests
 {
@@ -42,52 +43,67 @@ public sealed class SkeletonPileManagerTests
         return TowerRecord.Build((3, -2), 8, 8, 12, floors, hasSite: false).Floors[tier];
     }
 
-    private static ChunkManager WorldWithPile()
+    private static ChunkManager World() => StoneFloor();
+
+    private static int PileCount => TowerDifficulty.PilesPerSpot(Tier);
+
+    [Fact]
+    public void AFloorLaysOutOnePileForEachSkeletonItsSpotHolds()
     {
-        var chunks = StoneFloor();
-        chunks.Chunks[Vector3.Zero].SetBlockRaw(LoadedPile.X, LoadedPile.Y, LoadedPile.Z, TowerPalette.PileBlock, 0);
-        return chunks;
+        var floor = FloorWithPile(LoadedPile);
+
+        Assert.Equal(PileCount, floor.Piles.Length);
+        Assert.Equal(PileCount, floor.CountPilesLeft());
+        Assert.Equal(floor.Piles.Length, floor.Piles.Select(p => p.Spot).Distinct().Count());
     }
 
     [Fact]
-    public void ATargetInRangeRaisesAPackOfTheFloorsTierTaggedWithTheFloor()
+    public void PilesLieAtFreePositionsNotOnTheBlockGrid()
     {
-        var chunks = WorldWithPile();
+        var floor = FloorWithPile(LoadedPile);
+
+        Assert.Contains(floor.Piles, p => p.Spot.X % 1f != 0.5f || p.Spot.Z % 1f != 0.5f);
+        Assert.All(floor.Piles, p => Assert.Equal(LoadedPile.Y, p.Spot.Y));
+    }
+
+    [Fact]
+    public void ATargetInRangeRaisesOneSkeletonPerPileTaggedWithTheFloor()
+    {
+        var chunks = World();
         var skeletons = new SkeletonManager(Type);
         var floor = FloorWithPile(LoadedPile);
 
-        new SkeletonPileManager().Update(floor, Dt, chunks, skeletons, [PlayerAt(8.5f, 11.5f)]);
+        var raised = new SkeletonPileManager().Update(floor, chunks, skeletons, [PlayerAt(8.5f, 11.5f)]);
 
-        Assert.Equal(TowerDifficulty.PackSize(Tier), skeletons.Mobs.Count);
-        Assert.All(skeletons.Mobs, s =>
-        {
-            Assert.Equal(floor.Ref, s.Floor);
-        });
-        Assert.Equal(MobConfig.SkeletonPileWaves - 1, floor.Piles[0].WavesLeft);
+        Assert.Equal(System.Math.Min(PileCount, TowerDifficulty.PileNearLimit(Tier)), raised);
+        Assert.Equal(raised, skeletons.Mobs.Count);
+        Assert.All(skeletons.Mobs, s => Assert.Equal(floor.Ref, s.Floor));
+        Assert.Equal(PileCount - raised, floor.CountPilesLeft());
     }
 
     [Fact]
-    public void APileDepletesAfterItsWaves()
+    public void ARaisedPileNeverRaisesAgain()
     {
-        var chunks = WorldWithPile();
+        var chunks = World();
         var skeletons = new SkeletonManager(Type);
         var floor = FloorWithPile(LoadedPile);
         var piles = new SkeletonPileManager();
         IMobTarget[] targets = [PlayerAt(8.5f, 11.5f)];
 
-        for (var i = 0; i < MobConfig.SkeletonPileWaves + 3; i++)
-            piles.Update(floor, MobConfig.SkeletonPileWaveSeconds, chunks, skeletons, targets);
+        var first = piles.Update(floor, chunks, skeletons, targets);
+        foreach (var skeleton in skeletons.Mobs) skeleton.TakeDamage(skeleton.Health);
+        skeletons.Update(5f, chunks, new DropManager(), targets);
+        var later = 0;
+        for (var i = 0; i < 20; i++) later += piles.Update(floor, chunks, skeletons, targets);
 
-        Assert.True(floor.Piles[0].Depleted);
-        Assert.Equal(0, floor.CountPilesLeft());
-        var expected = System.Math.Min(MobConfig.MobHardCap, MobConfig.SkeletonPileWaves * TowerDifficulty.PackSize(Tier));
-        Assert.Equal(expected, skeletons.Mobs.Count);
+        Assert.Equal(PileCount, first + later + floor.CountPilesLeft());
+        Assert.Equal(0, floor.Owed);
     }
 
     [Fact]
     public void AnImmuneOrDistantTargetRaisesNothing()
     {
-        var chunks = WorldWithPile();
+        var chunks = World();
         var skeletons = new SkeletonManager(Type);
         var floor = FloorWithPile(LoadedPile);
         var piles = new SkeletonPileManager();
@@ -95,26 +111,26 @@ public sealed class SkeletonPileManagerTests
         var distant = PlayerAt(8.5f, 8.5f + MobConfig.SkeletonPileTriggerBlocks * 2f);
 
         for (var i = 0; i < 10; i++)
-            piles.Update(floor, MobConfig.SkeletonPileWaveSeconds, chunks, skeletons, [immune, distant]);
+            piles.Update(floor, chunks, skeletons, [immune, distant]);
 
         Assert.Empty(skeletons.Mobs);
-        Assert.Equal(MobConfig.SkeletonPileWaves, floor.Piles[0].WavesLeft);
+        Assert.Equal(PileCount, floor.CountPilesLeft());
     }
 
     [Fact]
-    public void AFullHardCapKeepsTheWave()
+    public void AFullHardCapKeepsThePiles()
     {
-        var chunks = WorldWithPile();
+        var chunks = World();
         var caps = new MobCaps();
         var skeletons = new SkeletonManager(Type, caps);
         var floor = FloorWithPile(LoadedPile);
         while (caps.ForcedRoom > 0)
             Assert.NotNull(skeletons.Spawn(new Vector3(2.5f, 2f, 2.5f), spawnIn: false));
 
-        new SkeletonPileManager().Update(floor, Dt, chunks, skeletons, [PlayerAt(8.5f, 11.5f)]);
+        new SkeletonPileManager().Update(floor, chunks, skeletons, [PlayerAt(8.5f, 11.5f)]);
 
         Assert.Equal(MobConfig.MobHardCap, skeletons.Mobs.Count);
-        Assert.Equal(MobConfig.SkeletonPileWaves, floor.Piles[0].WavesLeft);
+        Assert.Equal(PileCount, floor.CountPilesLeft());
         Assert.DoesNotContain(skeletons.Mobs, s => s.Floor != null);
     }
 
@@ -130,27 +146,13 @@ public sealed class SkeletonPileManagerTests
         var piles = new SkeletonPileManager();
 
         for (var i = 0; i < 10; i++)
-            piles.Update(floor, MobConfig.SkeletonPileWaveSeconds, chunks, skeletons, [PlayerAt(8.5f, unloaded.Z + 2.5f)]);
+            piles.Update(floor, chunks, skeletons, [PlayerAt(8.5f, unloaded.Z + 2.5f)]);
 
         Assert.Empty(skeletons.Mobs);
-        Assert.Equal(MobConfig.SkeletonPileWaves, floor.Piles[0].WavesLeft);
+        Assert.Equal(PileCount, floor.CountPilesLeft());
     }
 
-    [Fact]
-    public void APileWhoseBlockIsGoneCountsAsDepleted()
-    {
-        // The floor names a pile at a loaded cell that holds no pile block
-        var chunks = StoneFloor();
-        var skeletons = new SkeletonManager(Type);
-        var floor = FloorWithPile(LoadedPile);
-
-        new SkeletonPileManager().Update(floor, Dt, chunks, skeletons, [PlayerAt(8.5f, 11.5f)]);
-
-        Assert.True(floor.Piles[0].Depleted);
-        Assert.Empty(skeletons.Mobs);
-    }
-
-    // Fills the pile's surroundings with `count` living skeletons, as an earlier wave would have left them
+    // Fills the pile's surroundings with `count` living skeletons, as earlier piles would have left them
     private static void CrowdPile(SkeletonManager skeletons, int count)
     {
         for (var i = 0; i < count; i++)
@@ -158,51 +160,35 @@ public sealed class SkeletonPileManagerTests
     }
 
     [Fact]
-    public void AWaveIsTrimmedToTheRoomLeftUnderTheNearPileLimit()
+    public void PilesRaiseOnlyUpToTheRoomLeftUnderTheNearPileLimit()
     {
-        var chunks = WorldWithPile();
+        var chunks = World();
         var skeletons = new SkeletonManager(Type);
         var floor = FloorWithPile(LoadedPile);
         var limit = TowerDifficulty.PileNearLimit(Tier);
         CrowdPile(skeletons, limit - 1);
 
-        new SkeletonPileManager().Update(floor, Dt, chunks, skeletons, [PlayerAt(8.5f, 11.5f)]);
+        new SkeletonPileManager().Update(floor, chunks, skeletons, [PlayerAt(8.5f, 11.5f)]);
 
         Assert.Equal(limit, skeletons.LivingCountNear(new Vector3(8.5f, 1.5f, 8.5f), MobConfig.SkeletonPileNearRadiusBlocks));
     }
 
     [Fact]
-    public void AFullPileRaisesNothingAndKeepsItsWaveUntilSkeletonsDie()
+    public void AnAlarmedPileRaisesAtOnceDespiteItsLimitAndNoTargetInRange()
     {
-        var chunks = WorldWithPile();
-        var skeletons = new SkeletonManager(Type);
-        var floor = FloorWithPile(LoadedPile);
-        CrowdPile(skeletons, TowerDifficulty.PileNearLimit(Tier));
-        var crowd = skeletons.Mobs.Count;
-
-        new SkeletonPileManager().Update(floor, Dt, chunks, skeletons, [PlayerAt(8.5f, 11.5f)]);
-
-        Assert.Equal(crowd, skeletons.Mobs.Count);
-        Assert.Equal(MobConfig.SkeletonPileWaves, floor.Piles[0].WavesLeft);
-    }
-
-    [Fact]
-    public void AnAlarmedPileRaisesAtOnceDespiteItsLimitItsCooldownAndNoTargetInRange()
-    {
-        var chunks = WorldWithPile();
+        var chunks = World();
         var skeletons = new SkeletonManager(Type);
         var floor = FloorWithPile(LoadedPile);
         var pile = floor.Piles[0];
         CrowdPile(skeletons, TowerDifficulty.PileNearLimit(Tier));
         var crowd = skeletons.Mobs.Count;
-        pile.Cooldown = MobConfig.SkeletonPileWaveSeconds;
         pile.Alarmed = true;
 
-        new SkeletonPileManager().Update(floor, Dt, chunks, skeletons, [PlayerAt(200f, 200f)]);
+        new SkeletonPileManager().Update(floor, chunks, skeletons, [PlayerAt(200f, 200f)]);
 
-        Assert.Equal(crowd + TowerDifficulty.PackSize(Tier), skeletons.Mobs.Count);
+        Assert.Equal(crowd + 1, skeletons.Mobs.Count);
         Assert.False(pile.Alarmed);
-        Assert.Equal(MobConfig.SkeletonPileWaves - 1, pile.WavesLeft);
+        Assert.True(pile.Raised);
     }
 
     [Fact]
@@ -213,27 +199,23 @@ public sealed class SkeletonPileManagerTests
     }
 
     [Fact]
-    public void OwedSkeletonsRiseAgainAtADepletedPile()
+    public void AnOwedSkeletonLiesAsAPileWhereItStoodAndRisesFromThere()
     {
-        var chunks = WorldWithPile();
+        var chunks = World();
         var skeletons = new SkeletonManager(Type);
         var floor = FloorWithPile(LoadedPile);
-        floor.Piles[0].WavesLeft = 0;
-        var pack = TowerDifficulty.PackSize(Tier);
-        var owed = pack + 1;
-        floor.Owed = owed;
-        var piles = new SkeletonPileManager();
-        IMobTarget[] targets = [PlayerAt(8.5f, 11.5f)];
+        foreach (var pile in floor.Piles) pile.Raised = true;
+        var spot = new Vector3(8.3f, 1f, 8.7f);
+        floor.OwedPiles.Add(spot);
+        var visible = new List<Vector3>();
+        floor.CollectSpots(visible);
+        Assert.Equal([spot], visible);
 
-        piles.Update(floor, Dt, chunks, skeletons, targets);
-        Assert.Equal(pack, skeletons.Mobs.Count);
-        Assert.Equal(owed - pack, floor.Owed);
+        new SkeletonPileManager().Update(floor, chunks, skeletons, [PlayerAt(8.5f, 11.5f)]);
 
-        for (var i = 0; i < 4 && floor.Owed > 0; i++)
-            piles.Update(floor, MobConfig.SkeletonPileWaveSeconds, chunks, skeletons, targets);
         Assert.Equal(0, floor.Owed);
-        Assert.Equal(owed, skeletons.Mobs.Count);
-        Assert.All(skeletons.Mobs, s => Assert.Equal(floor.Ref, s.Floor));
-        Assert.True(floor.Piles[0].Depleted);
+        var risen = Assert.Single(skeletons.Mobs);
+        Assert.Equal(floor.Ref, risen.Floor);
+        Assert.InRange(risen.Position.X, spot.X - 0.5f, spot.X + 0.5f);
     }
 }

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Entities;
@@ -168,9 +169,9 @@ public sealed class SkeletonManagerTests
         Assert.True(bound.IsDying);
         Assert.True(unbound.IsDying);
 
-        var released = new List<TowerFloorRef>();
+        var released = new List<OwedSkeleton>();
         manager.TakeReleased(released);
-        Assert.Equal([floor], released);
+        Assert.Equal([floor], released.Select(o => o.Floor));
 
         // Taking clears the report
         released.Clear();
@@ -194,9 +195,9 @@ public sealed class SkeletonManagerTests
         // Now far from every target too: a dying skeleton never despawns a second time
         manager.Update(Dt, chunks, drops, [PlayerAt(8.5f + MobConfig.SkeletonDespawnRadiusBlocks * 2f, 8.5f)]);
 
-        var released = new List<TowerFloorRef>();
+        var released = new List<OwedSkeleton>();
         manager.TakeReleased(released);
-        Assert.Equal([floor], released);
+        Assert.Equal([floor], released.Select(o => o.Floor));
 
         // An unbound skeleton released reports nothing
         var unbound = manager.Spawn(OnFloor(8.5f, 8.5f), spawnIn: false)!;
@@ -231,9 +232,9 @@ public sealed class SkeletonManagerTests
 
         // Reported once, so its floor owes exactly one skeleton back
         for (var i = 0; i < 60; i++) idle.Update(Dt, chunks, drops, []);
-        var released = new List<TowerFloorRef>();
+        var released = new List<OwedSkeleton>();
         idle.TakeReleased(released);
-        Assert.Equal([floor], released);
+        Assert.Equal([floor], released.Select(o => o.Floor));
 
         // A target in sight keeps a bound skeleton standing however long the fight lasts
         var watched = new SkeletonManager(Type);

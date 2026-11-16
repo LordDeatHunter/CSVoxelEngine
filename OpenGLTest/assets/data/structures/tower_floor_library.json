@@ -12,7 +12,7 @@
     "t": "oak_planks_slab",
     "T": "torch",
     "L": "eternal_lantern",
-    "S": "skeleton_pile",
+    "S": "tower_pile_spot",
     "W": { "block": "tower_chest", "facing": "west" },
     "E": { "block": "tower_chest", "facing": "east" }
   },

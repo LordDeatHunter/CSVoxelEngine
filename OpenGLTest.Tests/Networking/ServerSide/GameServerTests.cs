@@ -1421,7 +1421,6 @@ public sealed class GameServerTests : IDisposable
         _world.Towers.Track(record);
         foreach (var (x, y, z) in door)
             SetCell(new Vector3(x, y, z), TowerPalette.DoorBlock);
-        SetCell(new Vector3(pile.Item1, pile.Item2, pile.Item3), TowerPalette.PileBlock);
 
         bool Broadcasts(int from, (int X, int Y, int Z) cell, ushort id) =>
             inbox.Broadcast.Skip(from).Any(c => c.X == cell.X && c.Y == cell.Y && c.Z == cell.Z && c.Id == id);
@@ -1626,7 +1625,7 @@ public sealed class GameServerTests : IDisposable
             hasSite: false);
         Assert.Equal(((int)arena.Front.X, (int)arena.Front.Y, (int)arena.Front.Z), record.AltarCell);
         if (cleared) record.Floors[0].DoorOpen = true;
-        else record.Floors[0].Owed = 1;
+        else record.Floors[0].OwedPiles.Add(arena.Front);
         _world.Towers.Track(record);
         SetCell(arena.Front, TowerPalette.AltarBlock);
         return record;

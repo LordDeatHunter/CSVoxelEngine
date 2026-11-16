@@ -599,18 +599,17 @@ public static class MobConfig
     // --- Tower difficulty (TowerDifficulty) ---
     /// <summary>The highest tower floor tier (floors 0..TowerMaxTier).</summary>
     public const int TowerMaxTier = 7;
-    /// <summary>One more mob in a pile's wave every this many floor tiers.</summary>
+    /// <summary>One more pile at each pile spot of a floor every this many floor tiers.</summary>
     public const int TowerPackTiersPerExtra = 3;
 
     // --- Battle tower locks (TowerBlockWriter, SkeletonPileManager, TowerManager) ---
-    /// <summary>The most cells the tower block writer clears in one frame (opened doors, spent piles).</summary>
+    /// <summary>The most cells the tower block writer clears in one frame (opened doors).</summary>
     public const int TowerMaxBlockWritesPerFrame = 32;
-    /// <summary>How close, horizontally, a target on a pile's floor must come before the pile raises skeletons.</summary>
+    /// <summary>How close, horizontally, a target on a pile's floor must come before the pile raises its skeleton.</summary>
     public const float SkeletonPileTriggerBlocks = 8f;
-    /// <summary>How many waves of skeletons one pile raises before it is spent.</summary>
-    public const int SkeletonPileWaves = 2;
-    /// <summary>Seconds a pile waits after a wave before it raises the next one.</summary>
-    public const float SkeletonPileWaveSeconds = 6f;
+    /// <summary>How many piles one pack slot of a pile spot lays out: every pile holds exactly one skeleton, so a spot
+    /// holds <c>PackSize(tier)</c> times this many.</summary>
+    public const int TowerPilesPerPackSlot = 2;
     /// <summary>How close, horizontally, a pile on a chest's floor must be for opening that chest to force it awake.</summary>
     public const float SkeletonChestAlarmBlocks = 16f;
     /// <summary>How many living skeletons may stand near a pile on the ground floor before it raises another.</summary>

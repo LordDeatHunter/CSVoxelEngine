@@ -41,10 +41,10 @@ public sealed class TowerManagerSaveTests
         var record = saved.Track(site);
         Assert.True(record.Floors.Length >= 3);
         Assert.All(record.Floors, f => Assert.NotEmpty(f.Piles));
-        foreach (var pile in record.Floors[0].Piles) pile.WavesLeft = 0;
+        foreach (var pile in record.Floors[0].Piles) pile.Raised = true;
         record.Floors[0].DoorOpen = true;
-        record.Floors[1].Piles[0].WavesLeft = MobConfig.SkeletonPileWaves - 1;
-        record.Floors[2].Owed = 3;
+        record.Floors[1].Piles[0].Raised = true;
+        record.Floors[2].OwedPiles.AddRange([new System.Numerics.Vector3(1.5f, 4f, 2.25f), new System.Numerics.Vector3(3f, 4f, 3f)]);
 
         var restored = new TowerManager(null);
         Assert.Equal(0, restored.Restore(RoundTrip(saved.Capture())));
@@ -58,9 +58,9 @@ public sealed class TowerManagerSaveTests
         {
             var was = record.Floors[k];
             var now = back.Floors[k];
-            Assert.Equal(was.Piles.Select(p => p.WavesLeft), now.Piles.Select(p => p.WavesLeft));
-            Assert.Equal(was.Piles.Select(p => p.Cell), now.Piles.Select(p => p.Cell));
-            Assert.Equal(was.Owed, now.Owed);
+            Assert.Equal(was.Piles.Select(p => p.Raised), now.Piles.Select(p => p.Raised));
+            Assert.Equal(was.Piles.Select(p => p.Spot), now.Piles.Select(p => p.Spot));
+            Assert.Equal(was.OwedPiles, now.OwedPiles);
             Assert.Equal(was.DoorOpen, now.DoorOpen);
             Assert.Equal(now.CountPilesLeft(), now.PilesLeft);
             // An open door is swept again, a closed one has nothing to sweep
@@ -137,13 +137,13 @@ public sealed class TowerManagerSaveTests
         var badCell = Copy();
         badCell.Cell = [site.CellX];
         var extraFloor = Copy();
-        extraFloor.Floors!.Add(new StationSaveData.TowerFloorData { Waves = [] });
+        extraFloor.Floors!.Add(new StationSaveData.TowerFloorData { Raised = [], OwedPiles = [] });
         var badWave = Copy();
-        badWave.Floors![0].Waves![0] = MobConfig.SkeletonPileWaves + 1;
+        badWave.Floors![0].OwedPiles = [[1f, 2f]];
         var badOwed = Copy();
-        badOwed.Floors![0].Owed = -1;
+        badOwed.Floors![0].OwedPiles = [.. Enumerable.Repeat(new float[3], MobConfig.MobHardCap + 1)];
         var badPiles = Copy();
-        badPiles.Floors![0].Waves = [.. badPiles.Floors[0].Waves!, 0];
+        badPiles.Floors![0].Raised = [.. badPiles.Floors[0].Raised!, false];
 
         var towers = new TowerManager(null);
         var bad = new List<StationSaveData.TowerData> { noTower, badCell, extraFloor, badWave, badOwed, badPiles };

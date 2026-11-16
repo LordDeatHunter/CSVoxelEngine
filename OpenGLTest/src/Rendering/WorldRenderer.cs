@@ -186,6 +186,7 @@ internal sealed class WorldRenderer
         renderManager.Stations.RenderQuerns(Camera, _querns);
         renderManager.Stations.RenderStumpLogs(Camera, _world.Stumps);
         renderManager.Stations.RenderIngotPiles(Camera, _world.IngotPiles);
+        renderManager.Stations.RenderBonePiles(Camera, _world.Towers);
         renderManager.Stations.RenderKilns(Camera, _kilns);
         renderManager.Stations.RenderSmithing(Camera, _world.Smithing);
         renderManager.Stations.RenderCastings(Camera, _casting);

@@ -17,7 +17,7 @@ public sealed class TowerRulesTests
     [Fact]
     public void APileWakesOnlyForATargetInRangeOnItsOwnFloor()
     {
-        var pile = (X: 10, Y: 1, Z: 10);
+        var pile = new Vector3(10.5f, 1f, 10.5f);
         const int bottom = 0, top = 6;
         var center = new Vector3(10.5f, 3f, 10.5f);
 

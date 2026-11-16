@@ -137,9 +137,9 @@ internal sealed class WorldPersistence
     private readonly List<EntitySaveData.DropData> _pendingDrops = [];
     private double _entityRestoreTimer;
 
-    // The tower floors of saved skeletons a restore timeout discarded, owed back to their floors
-    // (TakeDiscardedTowerSkeletons), so a reload never opens a door early
-    private readonly List<TowerFloorRef> _discardedTowerSkeletons = [];
+    // The saved skeletons of tower floors a restore timeout discarded, owed back to their floors with the spot each
+    // was saved at (TakeDiscardedTowerSkeletons), so a reload never opens a door early
+    private readonly List<OwedSkeleton> _discardedTowerSkeletons = [];
 
     // Scratch for CaptureEntities' nearest-first drop order, reused across saves
     private readonly List<(float dist2, ItemDrop drop)> _dropSort = [];
@@ -240,7 +240,7 @@ internal sealed class WorldPersistence
         Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s), {discardedDrops} drop(s) whose chunks never loaded or that a full cap kept out");
         foreach (var mob in _pendingMobs)
             if (TowerFloorOf(mob) is { } floor)
-                _discardedTowerSkeletons.Add(floor);
+                _discardedTowerSkeletons.Add(OwedSkeleton.At(floor, SavedBodyCenter(mob)));
         _pendingMobs.Clear();
     }
 
@@ -257,7 +257,7 @@ internal sealed class WorldPersistence
 
     /// <summary>Appends the tower floors of the saved skeletons a restore timeout discarded to
     /// <paramref name="into"/>, then forgets them: each is owed back to its floor.</summary>
-    internal void TakeDiscardedTowerSkeletons(List<TowerFloorRef> into)
+    internal void TakeDiscardedTowerSkeletons(List<OwedSkeleton> into)
     {
         into.AddRange(_discardedTowerSkeletons);
         _discardedTowerSkeletons.Clear();
@@ -273,6 +273,10 @@ internal sealed class WorldPersistence
                 return true;
         return false;
     }
+
+    // A saved mob's body center
+    private static Vector3 SavedBodyCenter(EntitySaveData.MobData mob) =>
+        mob.Position is { Length: 3 } p ? new Vector3(p[0], p[1], p[2]) : Vector3.Zero;
 
     // The tower floor a saved skeleton counts toward, or null for an untagged or other entry
     private static TowerFloorRef? TowerFloorOf(EntitySaveData.MobData mob) =>

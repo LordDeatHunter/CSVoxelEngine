@@ -1,0 +1,14 @@
+{
+  // The marker a battle tower floor template uses to name where bone piles lie. The tower
+  // generator never writes it (a pile spot writes nothing: the piles are entity-style spots,
+  // one skeleton each at a free position, drawn by StationPasses with the block/skeleton_pile
+  // model), so it exists only as a template palette key.
+  "name": "Tower Pile Spot",
+  "model": { "parent": "block/cube_all", "textures": { "all": "skeleton_pile" } },
+  "solid": false,
+  "castsAO": false,
+  "sfx": "hit_rock",
+  "hasItem": false,
+  "loot": "none",
+  "unbreakable": true
+}

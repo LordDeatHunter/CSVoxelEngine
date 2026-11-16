@@ -62,19 +62,22 @@ public sealed class TowerManagerTests
     {
         var rig = Setup();
 
-        Assert.Equal(1, rig.Towers.AlarmPilesNear((6, 1, 6)));
+        Assert.Equal(rig.Floor0.Piles.Length, rig.Towers.AlarmPilesNear((6, 1, 6)));
         Assert.True(rig.Floor0.Piles[0].Alarmed);
         Assert.False(rig.Floor1.Piles[0].Alarmed);
 
-        rig.Floor0.Piles[0].Alarmed = false;
-        rig.Floor0.Piles[0].WavesLeft = 0;
+        foreach (var pile in rig.Floor0.Piles)
+        {
+            pile.Alarmed = false;
+            pile.Raised = true;
+        }
         Assert.Equal(0, rig.Towers.AlarmPilesNear((6, 1, 6)));
         Assert.False(rig.Floor0.Piles[0].Alarmed);
 
         // Floor 1 sleeps until door 0 opens, so a chest up there wakes nothing yet
         Assert.Equal(0, rig.Towers.AlarmPilesNear((6, 7, 6)));
         rig.Floor0.DoorOpen = true;
-        Assert.Equal(1, rig.Towers.AlarmPilesNear((6, 7, 6)));
+        Assert.Equal(rig.Floor1.Piles.Length, rig.Towers.AlarmPilesNear((6, 7, 6)));
     }
 
     // Two floors in the origin chunk: floor 0 (band 0..6) and floor 1 (band 6..12), a pile and a two-cell door each
@@ -82,8 +85,6 @@ public sealed class TowerManagerTests
     {
         var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         var chunk = chunks.Chunks[Vector3.Zero];
-        foreach (var (x, y, z) in new[] { Pile0, Pile1 })
-            chunk.SetBlockRaw(x, y, z, TowerPalette.PileBlock, 0);
         foreach (var (x, y, z) in new[] { Door0A, Door0B, Door1A, Door1B })
             chunk.SetBlockRaw(x, y, z, TowerPalette.DoorBlock, 0);
 
@@ -105,7 +106,7 @@ public sealed class TowerManagerTests
 
     private static void Deplete(TowerFloorState floor)
     {
-        foreach (var pile in floor.Piles) pile.WavesLeft = 0;
+        foreach (var pile in floor.Piles) pile.Raised = true;
     }
 
     private static Skeleton Bound(Rig rig, TowerFloorState floor, Vector3 at)
@@ -126,7 +127,7 @@ public sealed class TowerManagerTests
 
         // A target raises every wave: the pile depletes, but its skeletons live
         IMobTarget[] near = [OnFloor0()];
-        for (var i = 0; i < MobConfig.SkeletonPileWaves + 2; i++) rig.Update(near, MobConfig.SkeletonPileWaveSeconds);
+        for (var i = 0; i < 5; i++) rig.Update(near);
         Assert.True(rig.Floor0.Piles[0].Depleted);
         Assert.NotEmpty(rig.Skeletons.Mobs);
         Assert.Equal(rig.Skeletons.Mobs.Count, rig.Floor0.Living);
@@ -135,16 +136,15 @@ public sealed class TowerManagerTests
 
         // Every skeleton dead, but one owed back
         foreach (var skeleton in rig.Skeletons.Mobs) skeleton.TakeDamage(skeleton.Health);
-        rig.Floor0.Owed = 1;
+        rig.Floor0.OwedPiles.Add(new System.Numerics.Vector3(8.5f, 1f, 8.5f));
         rig.Update([]);
         Assert.False(rig.Floor0.DoorOpen);
 
-        rig.Floor0.Owed = 0;
+        rig.Floor0.OwedPiles.Clear();
         rig.Update([]);
         Assert.True(rig.Floor0.DoorOpen);
         Assert.Equal(BlockType.Air, rig.At(Door0A));
         Assert.Equal(BlockType.Air, rig.At(Door0B));
-        Assert.Equal(BlockType.Air, rig.At(Pile0));
         // The floor above is untouched
         Assert.Equal(TowerPalette.DoorBlock, rig.At(Door1A));
     }
@@ -194,12 +194,12 @@ public sealed class TowerManagerTests
         // Floor 1's pile sleeps for a target standing beside it until door 0 opens
         var rig = Setup();
         IMobTarget[] onFloor1 = [OnFloor1()];
-        for (var i = 0; i < 5; i++) rig.Update(onFloor1, MobConfig.SkeletonPileWaveSeconds);
+        for (var i = 0; i < 5; i++) rig.Update(onFloor1);
         Assert.Empty(rig.Skeletons.Mobs);
-        Assert.Equal(MobConfig.SkeletonPileWaves, rig.Floor1.Piles[0].WavesLeft);
+        Assert.False(rig.Floor1.Piles[0].Raised);
 
         Deplete(rig.Floor0);
-        rig.Update(onFloor1, MobConfig.SkeletonPileWaveSeconds);
+        rig.Update(onFloor1);
         Assert.True(rig.Floor0.DoorOpen);
         Assert.NotEmpty(rig.Skeletons.Mobs);
         Assert.All(rig.Skeletons.Mobs, s => Assert.Equal(rig.Floor1.Ref, s.Floor));
@@ -233,7 +233,7 @@ public sealed class TowerManagerTests
         Assert.Equal(1, rig.Floor0.Owed);
         Assert.False(rig.Floor0.DoorOpen);
 
-        rig.Update([OnFloor0()], MobConfig.SkeletonPileWaveSeconds);
+        rig.Update([OnFloor0()]);
         Assert.Equal(0, rig.Floor0.Owed);
         Assert.Contains(rig.Skeletons.Mobs, s => !s.IsDying && !s.IsDead && s.Floor == rig.Floor0.Ref);
         Assert.False(rig.Floor0.DoorOpen);
@@ -257,7 +257,7 @@ public sealed class TowerManagerTests
         Assert.False(rig.Floor0.DoorOpen);
 
         // The next target on the floor raises it again from the pile, its wounds gone
-        rig.Update([OnFloor0()], MobConfig.SkeletonPileWaveSeconds);
+        rig.Update([OnFloor0()]);
         Assert.Equal(0, rig.Floor0.Owed);
         var risen = Assert.Single(rig.Skeletons.Mobs, s => !s.IsDying && !s.IsDead && s.Floor == rig.Floor0.Ref);
         Assert.Equal(risen.MaxHealth, risen.Health);
@@ -272,7 +272,7 @@ public sealed class TowerManagerTests
         var mine = Bound(rig, rig.Floor0, at);
         var above = Bound(rig, rig.Floor1, at + Vector3.UnitY * 6f);
         var unbound = rig.Skeletons.Spawn(at, spawnIn: false)!;
-        rig.Floor0.Owed = 2;
+        rig.Floor0.OwedPiles.AddRange([new Vector3(8.5f, 1f, 8.5f), new Vector3(9.5f, 1f, 8.5f)]);
 
         Assert.True(rig.Towers.ClearFloor(at, 0, rig.Skeletons.Mobs));
 
@@ -301,7 +301,6 @@ public sealed class TowerManagerTests
         Assert.NotNull(door1);
         Assert.Contains("Floor 2", door1);
         Assert.Contains("floor 1", door1);
-        Assert.Contains("Floor 2", rig.Towers.Detail(TowerPalette.PileBlock, Pile1.X, Pile1.Y, Pile1.Z));
 
         Assert.Null(rig.Towers.Detail(ContentRegistry.RequireBlock("stone").Id, Pile0.X, Pile0.Y, Pile0.Z));
         Assert.Null(rig.Towers.Detail(TowerPalette.DoorBlock, Door0A.X + 500, Door0A.Y, Door0A.Z));

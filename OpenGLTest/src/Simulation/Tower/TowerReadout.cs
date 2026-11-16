@@ -7,10 +7,6 @@ namespace VoxelEngine.Simulation.Tower;
 /// </summary>
 public static class TowerReadout
 {
-    /// <summary>A pile's line: how many of its floor's piles still raise skeletons and how many skeletons are left.</summary>
-    public static string Pile(TowerFloorState floor) =>
-        $"Floor {floor.Floor + 1}: {Count(floor.PilesLeft, "pile")}, {Count(floor.Alive, "skeleton")}";
-
     /// <summary>
     /// A closed door's line: the floor it seals and what still holds it shut, the floor below first
     /// (<paramref name="previousOpen"/> false), then the floor's piles, then its skeletons.

@@ -16,17 +16,35 @@ public static class TowerRules
         [(0, 0), (1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
 
     /// <summary>
-    /// Whether a target whose eye is at <paramref name="eye"/> wakes the pile at <paramref name="pile"/>: its eye lies
-    /// within <paramref name="radius"/> of the pile cell's center horizontally and inside the pile's floor band
+    /// Whether a target whose eye is at <paramref name="eye"/> wakes the pile lying at <paramref name="pile"/>: its eye lies
+    /// within <paramref name="radius"/> of the pile horizontally and inside the pile's floor band
     /// (above <paramref name="bottomY"/>, at most <paramref name="topY"/>), so a player on another floor never raises it.
     /// </summary>
-    public static bool PileTriggers((int X, int Y, int Z) pile, int bottomY, int topY, Vector3 eye, float radius)
+    public static bool PileTriggers(Vector3 pile, int bottomY, int topY, Vector3 eye, float radius)
     {
         if (eye.Y <= bottomY || eye.Y > topY) return false;
-        var dx = eye.X - (pile.X + 0.5f);
-        var dz = eye.Z - (pile.Z + 0.5f);
+        var dx = eye.X - pile.X;
+        var dz = eye.Z - pile.Z;
         return dx * dx + dz * dz <= radius * radius;
     }
+
+    /// <summary>
+    /// Where the <paramref name="index"/>th of <paramref name="count"/> bone piles lies around the pile spot cell
+    /// (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>): on the floor, at a free position (not on the
+    /// block grid) along a spiral around the cell's center, each a golden angle from the last so they never line up,
+    /// the whole spiral turned by a hash of the cell. A pure function, so a floor lays out the same piles every time.
+    /// </summary>
+    public static Vector3 PileSpot(int x, int y, int z, int index, int count)
+    {
+        var phase = (uint)(x * 73856093 ^ z * 19349663 ^ y * 83492791) % 1024u / 1024f * MathF.Tau;
+        var angle = phase + index * 2.3999632f;
+        var radius = count <= 1 ? 0f : MathF.Min(PileSpiralMax, PileSpiralStart + PileSpiralStep * MathF.Sqrt(index));
+        return new Vector3(x + 0.5f + MathF.Cos(angle) * radius, y, z + 0.5f + MathF.Sin(angle) * radius);
+    }
+
+    private const float PileSpiralStart = 0.25f;
+    private const float PileSpiralStep = 0.25f;
+    private const float PileSpiralMax = 1.1f;
 
     /// <summary>
     /// Whether a target whose eye is at <paramref name="eye"/> stands on the floor between <paramref name="bottomY"/>
@@ -54,8 +72,8 @@ public static class TowerRules
         FloorAwake(floor, previousDoorOpen) && pilesLeft == 0 && alive == 0;
 
     /// <summary>
-    /// The body centers of up to <paramref name="count"/> skeletons a pile at (<paramref name="x"/>, <paramref name="y"/>,
-    /// <paramref name="z"/>) raises: the pile's own column first, then the four sides, then the diagonals, keeping only
+    /// The body centers of up to <paramref name="count"/> skeletons that rise at the cell (<paramref name="x"/>, <paramref name="y"/>,
+    /// <paramref name="z"/>) when its own column is walled in: the cell's own column first, then the four sides, then the diagonals, keeping only
     /// the columns whose cells at <paramref name="y"/> and <paramref name="y"/> + 1 are open (<paramref name="isOpen"/>).
     /// </summary>
     public static List<Vector3> SpawnPoints(int x, int y, int z, int count, Func<int, int, int, bool> isOpen)

@@ -29,8 +29,8 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
     private readonly EntityType? _warriorType;
     // The role the next ordinary spawn takes: they alternate, so every wave is half archers, half warriors
     private SkeletonRole _nextRole = SkeletonRole.Archer;
-    // The floors of bound skeletons that despawned or were released since the last TakeReleased
-    private readonly List<TowerFloorRef> _released = [];
+    // The bound skeletons that despawned or were released since the last TakeReleased, with where each stood
+    private readonly List<OwedSkeleton> _released = [];
     // Each arrow carries its archer's damage
     private readonly MobMissiles _arrows = new();
     private readonly ushort _arrowItemId;
@@ -116,13 +116,13 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
     internal void Release(Skeleton skeleton)
     {
         if (skeleton.IsDying || skeleton.IsDead) return;
-        if (skeleton.Floor is { } floor) _released.Add(floor);
+        if (skeleton.Floor is { } floor) _released.Add(OwedSkeleton.At(floor, skeleton.Position));
         skeleton.BeginDying();
     }
 
-    /// <summary>Appends the floors of the bound skeletons that despawned or were released since the last call to
-    /// <paramref name="into"/>, then forgets them.</summary>
-    internal void TakeReleased(List<TowerFloorRef> into)
+    /// <summary>Appends the bound skeletons that despawned or were released since the last call, each with the spot it
+    /// stood on, to <paramref name="into"/>, then forgets them.</summary>
+    internal void TakeReleased(List<OwedSkeleton> into)
     {
         into.AddRange(_released);
         _released.Clear();
@@ -131,7 +131,7 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
     /// <inheritdoc />
     protected override void OnDespawn(Skeleton mob)
     {
-        if (mob.Floor is { } floor) _released.Add(floor);
+        if (mob.Floor is { } floor) _released.Add(OwedSkeleton.At(floor, mob.Position));
     }
 
     /// <summary>Test seam: launches an arrow as if a skeleton had shot it, carrying <paramref name="damage"/>.</summary>
