@@ -168,6 +168,53 @@ public sealed class StationSaveTests
         Assert.False(into.Querns.HasAny);
     }
 
+    [Theory]
+    [InlineData(null, false, false, 0)]
+    [InlineData("null", false, false, 0)]
+    [InlineData("{ \"Querns\": [] }", true, false, 0)]
+    [InlineData("{ \"Querns\": [ { \"Cell\": [5, 2, 3], \"Input\": \"item/no_such_item\" } ] }", true, false, 1)]
+    [InlineData("not json", false, true, 0)]
+    public void StationReaderMarksOnlyRejectedJsonBeforeReplacement(string? json, bool hasStations,
+        bool archivesOriginal, int expectedSkipped)
+    {
+        var directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"station-save-{System.Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(directory);
+        var path = System.IO.Path.Combine(directory, StationSaveCodec.FileName);
+        var original = json == null ? null : Encoding.UTF8.GetBytes(json);
+        if (original != null)
+            System.IO.File.WriteAllBytes(path, original);
+
+        var store = new ChunkSaveStore(directory);
+        var stopped = false;
+        try
+        {
+            var parsed = StationSaveReader.Read(store);
+            Assert.Equal(hasStations, parsed != null);
+            if (parsed != null)
+                Assert.Equal(expectedSkipped, Stations.Empty().Restore(parsed));
+            else
+                Assert.Equal(0, expectedSkipped);
+
+            store.EnqueueFile(StationSaveCodec.FileName, StationSaveCodec.ToBytes(parsed ?? new StationSaveData()));
+            var writerStopped = store.Shutdown(System.TimeSpan.FromSeconds(10));
+            stopped = true;
+            Assert.True(writerStopped);
+
+            var archivePath = path + ".bad";
+            Assert.Equal(archivesOriginal, System.IO.File.Exists(archivePath));
+            if (archivesOriginal)
+                Assert.True(original!.SequenceEqual(System.IO.File.ReadAllBytes(archivePath)));
+            Assert.NotNull(StationSaveCodec.TryParse(System.IO.File.ReadAllBytes(path)));
+        }
+        finally
+        {
+            if (!stopped)
+                store.Shutdown(System.TimeSpan.FromSeconds(10));
+            if (System.IO.Directory.Exists(directory))
+                System.IO.Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Fact]
     public void ADamagedOrMissingFileParsesToNothing()
     {

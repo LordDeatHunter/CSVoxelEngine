@@ -479,7 +479,7 @@ public class World
             {
                 // Held until the Loading -> Playing flip, then spawned as their chunks load
                 savedEntities = EntitySaveCodec.TryParse(saveStore.ReadFile(EntitySaveCodec.FileName));
-                savedStations = StationSaveCodec.TryParse(saveStore.ReadFile(StationSaveCodec.FileName));
+                savedStations = StationSaveReader.Read(saveStore);
             }
             LocalPlayer.RecordSpawn();
             _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry, saveStore);
