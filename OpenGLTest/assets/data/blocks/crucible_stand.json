@@ -5,7 +5,7 @@
   "name": "Crucible",
   "model": "block/crucible",
   "hardness": 1,
-  "sfx": "hit_stone",
+  "sfx": "hit_rock",
   "solid": false,
   "castsAO": false,
   "hasItem": false,
