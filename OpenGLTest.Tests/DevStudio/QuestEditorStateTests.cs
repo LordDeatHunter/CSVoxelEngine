@@ -614,6 +614,48 @@ public sealed class QuestEditorStateTests : IDisposable
         Assert.Equal(name, editor.SelectedLabel);
     }
 
+    [Theory]
+    [InlineData("obtain", IconKind.Item, true)]
+    [InlineData("craft", IconKind.Block, true)]
+    [InlineData("obtain", IconKind.Entity, false)]
+    [InlineData("break", IconKind.Block, true)]
+    [InlineData("place", IconKind.Item, false)]
+    [InlineData("kill", IconKind.Entity, true)]
+    [InlineData("kill", IconKind.Block, false)]
+    public void ARequirementTakesOnlyTheKindsItsTypeCanName(string type, IconKind kind, bool accepts) =>
+        Assert.Equal(accepts, QuestEditorState.Accepts(type, kind));
+
+    [Fact]
+    public void ADroppedEntryAddsARequirementItsOwnTypeAcceptsAsOneStep()
+    {
+        var editor = Editor(Quest("root", null, Break("stone")));
+
+        foreach (var (kind, target) in new[] { (IconKind.Item, "item/flint"), (IconKind.Block, "dirt"), (IconKind.Entity, "slime") })
+        {
+            var type = QuestEditorState.RequirementTypeFor(kind);
+            Assert.True(QuestEditorState.Accepts(type, kind));
+            editor.AddRequirement("root", type, target);
+            Assert.Equal(target, QuestEditorState.TargetOf(editor.Find("root")!.Quest.Requirements![^1]));
+        }
+
+        Assert.Equal(4, editor.Find("root")!.Quest.Requirements!.Count);
+        Assert.Null(editor.Error);
+        Assert.True(editor.Undo());
+        Assert.Equal(3, editor.Find("root")!.Quest.Requirements!.Count);
+    }
+
+    [Fact]
+    public void AQuestAddedFromAnEntityAsksToKillItAndCompiles()
+    {
+        var editor = Editor(Quest("root", null, Break("stone")));
+
+        var added = editor.AddQuest(Vector2.One, title: "Slime", requirement: QuestEditorState.MakeRequirement("kill", "slime"));
+
+        var requirement = Assert.Single(editor.Find(added)!.Quest.Requirements!);
+        Assert.Equal(("kill", "slime"), (requirement.Type, requirement.Entity));
+        Assert.Null(editor.Error);
+    }
+
     [Fact]
     public void AnAddedQuestCompilesAsItIsWithAFreshIdThatNoPendingFileHolds()
     {

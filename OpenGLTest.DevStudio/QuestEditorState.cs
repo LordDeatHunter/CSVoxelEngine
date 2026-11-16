@@ -249,7 +249,8 @@ public sealed class QuestEditorState
     /// <summary>Adds a quest at the absolute grid point and selects it. Its icon and its one obtain requirement name
     /// <paramref name="icon"/> (default stone), so it compiles as it is; its title is <paramref name="title"/>, default
     /// "New Quest". With a <paramref name="parent"/>, it already depends on that quest.</summary>
-    public string AddQuest(Vector2 grid, string? icon = null, string? title = null, string? parent = null)
+    public string AddQuest(Vector2 grid, string? icon = null, string? title = null, string? parent = null,
+        QuestRequirementDefinition? requirement = null)
     {
         var id = UniqueId("quest");
         icon ??= DefaultIcon;
@@ -261,7 +262,7 @@ public sealed class QuestEditorState
             Icon = icon,
             Pos = [position.X, position.Y],
             Parents = parent != null && Find(parent) != null ? [parent] : null,
-            Requirements = [new QuestRequirementDefinition { Type = "obtain", Item = icon }],
+            Requirements = [requirement ?? new QuestRequirementDefinition { Type = "obtain", Item = icon }],
         }, null, null));
         // Recorded before the selection moves to the new quest, so an undo restores the selection it was added under
         Recompile();
@@ -441,6 +442,36 @@ public sealed class QuestEditorState
             Type = "obtain",
             Item = q.Icon ?? DefaultIcon,
         }));
+
+    /// <summary>Adds a requirement of <paramref name="type"/> naming <paramref name="target"/>, as one change.</summary>
+    public void AddRequirement(string id, string type, string target) =>
+        Edit(id, q => (q.Requirements ??= []).Add(MakeRequirement(type, target)));
+
+    /// <summary>A requirement of <paramref name="type"/> naming <paramref name="target"/> in the field that type reads.</summary>
+    public static QuestRequirementDefinition MakeRequirement(string type, string target)
+    {
+        var requirement = new QuestRequirementDefinition { Type = type };
+        ApplyTarget(requirement, target);
+        return requirement;
+    }
+
+    /// <summary>Whether a requirement of <paramref name="type"/> can name an icon grid entry of <paramref name="kind"/>:
+    /// obtain and craft take an item or a block (its block item), break and place a block, kill an entity.</summary>
+    public static bool Accepts(string? type, IconKind kind) => type?.ToLowerInvariant() switch
+    {
+        "obtain" or "craft" => kind is IconKind.Item or IconKind.Block,
+        "break" or "place" => kind == IconKind.Block,
+        "kill" => kind == IconKind.Entity,
+        _ => false,
+    };
+
+    /// <summary>The requirement a dropped entry of <paramref name="kind"/> adds: obtain an item, break a block, kill an entity.</summary>
+    public static string RequirementTypeFor(IconKind kind) => kind switch
+    {
+        IconKind.Block => "break",
+        IconKind.Entity => "kill",
+        _ => "obtain",
+    };
 
     public void RemoveRequirement(string id, int index) => EditRequirement(id, index, (q, _) =>
     {

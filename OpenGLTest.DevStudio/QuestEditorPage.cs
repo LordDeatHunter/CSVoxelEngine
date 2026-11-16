@@ -114,8 +114,13 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private int _gestureSerial;
     private Vector2 _lastClickAt;
     private Vector2 _screen = new(1600f, 900f);
-    // A grid slot pressed in the left panel: a click picks it, a drag onto the canvas adds a quest with it
+    // A grid slot pressed in the left panel: a click picks it, a drag onto the canvas adds a quest with it, onto a
+    // requirement row names it there, onto the requirements area adds a requirement for it, onto the icon row sets the icon
     private IconEntry? _iconDrag;
+    // Where the last layout put the selected quest's drop targets (empty when no single quest is selected)
+    private readonly List<(UiRect Rect, int Index)> _requirementRows = [];
+    private UiRect? _requirementsArea;
+    private UiRect? _iconRow;
     private Vector2 _iconPressAt;
     // The renderer of the last draw, for placing a clicked caret by the drawn text's widths
     private UIRenderer? _ui;
@@ -246,7 +251,29 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         DrawDetailsText(ui);
         DrawStatus(ui);
         DrawDropdowns(ui, pointer);
+        DrawDropTarget(ui, pointer);
         DrawDraggedIcon(ui, pointer, time);
+    }
+
+    // While an entry is dragged over the panel, the target it would land on: gold where it fits, red where it does not
+    private void DrawDropTarget(UIRenderer ui, Vector2? pointer)
+    {
+        if (_iconDrag is not { } entry || pointer is not { } p || !IconDragging(p)) return;
+        if (DropTargetAt(p, entry) is not { } target) return;
+        ui.DrawBorder(target.Rect.Center, target.Rect.Size + new Vector2(4f), 2f, target.Fits ? DevStudioUi.Accent : ErrorColor);
+    }
+
+    // The panel target under the point for a dragged entry: a requirement row (fits when its type takes the kind), the
+    // rest of the requirements area (always fits: it adds one), or the icon row (fits for an item or a block)
+    private (UiRect Rect, bool Fits, int Row, bool Icon)? DropTargetAt(Vector2 point, IconEntry entry)
+    {
+        if (State.SelectedQuest is not { } quest) return null;
+        foreach (var (rect, index) in _requirementRows)
+            if (rect.Contains(point) && Requirement(quest, index) is { } requirement)
+                return (rect, QuestEditorState.Accepts(requirement.Type, entry.Kind), index, false);
+        if (_requirementsArea is { } area && area.Contains(point)) return (area, true, -1, false);
+        if (_iconRow is { } icon && icon.Contains(point)) return (icon, entry.Kind != IconKind.Entity, -1, true);
+        return null;
     }
 
     // The slot being dragged rides the pointer once it has left the click radius
@@ -294,7 +321,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         var left = Pad * 2f;
         var width = PanelWidth - Pad * 2f;
         var top = Pad + DevStudioUi.TabRowH + 6f;
-        _fields.Add((Rect(left, top, width, FieldH), Field.IconSearch, 0, $"search {Icons.Visible.Count} icons"));
+        _fields.Add((Rect(left, top, width, FieldH), Field.IconSearch, 0, $"search ({Icons.Visible.Count})"));
         var third = (width - Gap * 2f) / 3f;
         string[] labels = ["ITEMS", "BLOCKS", "ENTITIES"];
         for (var k = 0; k < labels.Length; k++)
@@ -312,6 +339,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             _dropdownQuest = State.SelectedQuestId;
         }
         _list = null;
+        _requirementRows.Clear();
+        _requirementsArea = null;
+        _iconRow = null;
         if (State.SelectedLink != null)
         {
             BuildLinkPanel();
@@ -359,7 +389,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
         // The icon row: the icon is drawn in DrawDetailsText, the button arms the grid for it
         AddButton(Rect(PanelRight - 110f, y, 110f, ButtonH), Action.PickIcon, "PICK ICON", true, State.PickRequirement < 0);
+        _iconRow = Rect(left, y, width, ButtonH);
         y += ButtonH + Gap + LabelH;
+        var areaTop = y - LabelH;
 
         var requirements = quest.Requirements ?? [];
         if (_typeDropdowns.Count > requirements.Count) _typeDropdowns.RemoveRange(requirements.Count, _typeDropdowns.Count - requirements.Count);
@@ -368,6 +400,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         for (var i = 0; i < requirements.Count; i++)
         {
             var requirement = requirements[i];
+            var rowTop = y;
             _typeDropdowns[i].Box = Rect(left, y, typeWidth, FieldH);
             var row = i;
             _dropdowns.Add((_typeDropdowns[i], Array.IndexOf(QuestEditorState.RequirementTypes, requirement.Type?.ToLowerInvariant()),
@@ -385,6 +418,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             AddButton(Rect(left + 130f, y, 90f, ButtonH), Action.Pick, pickLabel, true, State.PickRequirement == i, i);
             AddButton(Rect(PanelRight - 60f, y, 60f, ButtonH), Action.Remove, "X", requirements.Count > 1, false, i);
             y += ButtonH + Gap;
+            _requirementRows.Add((Rect(left, rowTop, width, y - Gap - rowTop), i));
 
             if (requirement.Tag != null)
             {
@@ -394,6 +428,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             y += 4f;
         }
         AddButton(Rect(left, y, width, ButtonH), Action.AddRequirement, "+ REQUIREMENT", true, false);
+        _requirementsArea = Rect(left, areaTop, width, y + ButtonH - areaTop);
 
         var bottom = _screen.Y - Pad * 2f - ButtonH;
         var dirty = State.IsQuestDirty(quest.Id!);
@@ -1002,14 +1037,46 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             Pick(entry);
             return;
         }
-        if (!OverCanvas(point)) return;
-        if (entry.Kind == IconKind.Entity)
+        if (DropTargetAt(point, entry) is { } target)
         {
-            Status = "An entity has no icon: drop it on a kill requirement";
+            DropOnPanel(entry, target.Fits, target.Row, target.Icon);
             return;
         }
-        if (State.AddQuest(QuestBookLayout.ToGrid(point, Camera, _screen), entry.Key, entry.Name) is { } added)
-            Status = $"Added {added} ({entry.Key})";
+        if (!OverCanvas(point)) return;
+        var grid = QuestBookLayout.ToGrid(point, Camera, _screen);
+        // An entity has no icon: its quest keeps the default one and asks to kill it
+        var added = entry.Kind == IconKind.Entity
+            ? State.AddQuest(grid, title: entry.Name, requirement: QuestEditorState.MakeRequirement("kill", entry.Key))
+            : State.AddQuest(grid, entry.Key, entry.Name);
+        Status = $"Added {added} ({entry.Key})";
+    }
+
+    private void DropOnPanel(IconEntry entry, bool fits, int row, bool icon)
+    {
+        if (State.SelectedQuestId is not { } quest) return;
+        if (!fits)
+        {
+            Status = icon
+                ? "An entity has no icon: pick an item or a block"
+                : $"A {State.SelectedQuest!.Requirements![row].Type} requirement cannot name {entry.Kind.ToString().ToLowerInvariant()} {entry.Key}";
+            return;
+        }
+        if (icon)
+        {
+            State.SetIcon(quest, entry.Key);
+            Status = $"Icon: {entry.Key}";
+        }
+        else if (row >= 0)
+        {
+            State.SetRequirementTarget(quest, row, entry.Key);
+            Status = $"Requirement {row + 1} now names {entry.Key}";
+        }
+        else
+        {
+            var type = QuestEditorState.RequirementTypeFor(entry.Kind);
+            State.AddRequirement(quest, type, entry.Key);
+            Status = $"Added: {type} {entry.Key}";
+        }
     }
 
     /// <summary>A left-grid click: the selected quest's icon, or the armed requirement's target.</summary>
