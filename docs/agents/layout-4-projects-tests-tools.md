@@ -1,21 +1,21 @@
 # Layout, part 4: other projects, tests, tools
 
-File tree (part 4 of 4): the item debugger, the dedicated server, the wiki exporter, the test project, `USER_TODO.md` and `tools/`.
+File tree (part 4 of 4): DevStudio, the dedicated server, the wiki exporter, the test project, `USER_TODO.md` and `tools/`.
 
 ```
-OpenGLTest.ItemDebugger/              # the item/entity/tree preview tool (ITEMS, ENTITIES and TREES tabs)
-  VoxelEngine.ItemDebugger.csproj     # the project file (references the game project)
+OpenGLTest.DevStudio/              # the item/entity/tree preview tool (ITEMS, ENTITIES and TREES tabs)
+  VoxelEngine.DevStudio.csproj     # the project file (references the game project)
   GlobalUsings.cs                     # VoxelEngine.Core and the Shader alias
-  AnimationClock.cs                   # the playback controls of the item debugger's timeline
-  DebuggerTab.cs                      # which grid the item debugger's left panel shows, and
+  AnimationClock.cs                   # the playback controls of DevStudio's timeline
+  StudioTab.cs                      # which grid DevStudio's left panel shows, and
                                       #   so what the scene previews: the player holding an item
-  DebugSceneRenderer.cs               # a minimal standalone renderer for the item debugger: content registry, block atlas
+  DebugSceneRenderer.cs               # a minimal standalone renderer for DevStudio: content registry, block atlas
   EntityPreviewState.cs               # GL-free state of the ENTITIES tab
-  ItemDebuggerProgram.cs              # standalone item-debugger entry point: a window showing the player model holding the selected item
-  ItemDebuggerUi.cs                   # immediate-mode UI for the item debugger: an item grid on the left
+  DevStudioProgram.cs              # standalone dev-studio entry point: a window showing the player model holding the selected item
+  DevStudioUi.cs                   # immediate-mode UI for DevStudio: an item grid on the left
   ItemDisplayEditor.cs                # editable copy of the selected item's display block plus the debugger-only renderer tweaks
   ItemJsonDisplayWriter.cs            # writes an item's display block back into its JSON file
-  PlayerPreviewState.cs               # GL-free state behind the item debugger's player animations (the ITEMS tab)
+  PlayerPreviewState.cs               # GL-free state behind DevStudio's player animations (the ITEMS tab)
   SliceTrailSampler.cs                # the delegate that poses the previewed blade for PlayerPreviewState's slice trail
   TreePreviewState.cs                 # GL-free state of the TREES tab: species, seed, step, per-step
                                       #   snapshots, ground plane and framing bounds
@@ -25,7 +25,7 @@ OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple 
   GlobalUsings.cs                     # VoxelEngine.Core and VoxelEngine.Config
   ServerProgram.cs                    # content load, world/port prompts, ServerLaunch, the tick loop and the signals
 OpenGLTest.WikiExport/                # headless exporter for the wiki (wiki/): grows every tree species step by step
-                                      #   over flat ground (the item debugger's TREES setup) and writes per-step cell
+                                      #   over flat ground (DevStudio's TREES setup) and writes per-step cell
                                       #   diffs; CI runs it before the wiki build (`dotnet run --project
                                       #   OpenGLTest.WikiExport -- <outDir>`)
   Program.cs                          # content load, then TreeExporter.WriteAll to the output directory
@@ -35,7 +35,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                       #   of the code it tests (by the type under test), a probe beside
                                       #   the area it probes, a helper of several areas in Support/;
                                       #   namespaces mirror the test folders (VoxelEngine.Tests.<folder>)
-  VoxelEngine.Tests.csproj            # the test project (references the game, the server and the item debugger)
+  VoxelEngine.Tests.csproj            # the test project (references the game, the server and DevStudio)
   GlobalUsings.cs                     # VoxelEngine.Core, VoxelEngine.Chunks, VoxelEngine.Content and VoxelEngine.Tests.Support
   Support/                     # cross-area fixtures: TestContent (the headless content load, and
                                #   SwapIn/RestoreReal for the registry-swap tests), SyntheticContentRoot (a
@@ -97,7 +97,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   placement, support, doors and stairs, multiblocks, the selection
                                #   outline; its own helper
                                #   SupportTestWorld
-  ItemDebugger/                # the OpenGLTest.ItemDebugger project: the timeline, the
+  DevStudio/                # the OpenGLTest.DevStudio project: the timeline, the
                                #   preview states, the display editor and its JSON writer
   Items/                       # item uses (acorn, firestarter, heal, grow-tree,
                                #   timed use), the staff slot binding and the hierarchy; its own helper StubItemUseWorld

@@ -2,10 +2,10 @@ using System;
 using System.IO;
 using System.Numerics;
 using System.Text.Json;
-using VoxelEngine.ItemDebugger;
+using VoxelEngine.DevStudio;
 using Xunit;
 
-namespace VoxelEngine.Tests.ItemDebugger;
+namespace VoxelEngine.Tests.DevStudio;
 
 public sealed class ItemJsonDisplayWriterTests : IDisposable
 {
@@ -15,7 +15,7 @@ public sealed class ItemJsonDisplayWriterTests : IDisposable
         AllowTrailingCommas = true,
     };
 
-    private readonly string _directory = Directory.CreateTempSubdirectory("item-debugger-tests").FullName;
+    private readonly string _directory = Directory.CreateTempSubdirectory("dev-studio-tests").FullName;
 
     [Fact]
     public void ReplacesExistingDisplayPreservingCommentsAndOtherFields()

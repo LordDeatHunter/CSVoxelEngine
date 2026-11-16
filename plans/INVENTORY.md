@@ -15,7 +15,7 @@ Nothing.
 - [ ] **`I-3` Armor and visible accessories on the player model** - P1, M. Done: flat tinted armor shells over each covered
   body part (`ArmorLook`, `PlayerPasses.DrawPart`) and the worn pieces on the wire (protocol 21), for the local player, the
   mirror and remote players. Left: Blockbench-authored per-piece armor meshes in place of the tinted shells, accessories
-  flagged `visible` (a trinket is never drawn today), armor in the shadow pass, and an item debugger equipment mode.
+  flagged `visible` (a trinket is never drawn today), armor in the shadow pass, and a DevStudio equipment mode.
   **Hook:** `PlayerPasses.DrawPart`, `PlayerRig.BuildArmorMesh`, `ShadowPass`, `EntityPreviewState`/`PlayerPreviewState`.
 
 Accessory abilities, the ring ladder and the set rule change are done (AGENTS.md "Gear and equipment"); `I-3` and `I-6` stay here.

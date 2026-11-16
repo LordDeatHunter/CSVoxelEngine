@@ -43,7 +43,7 @@ uniform sampler2DArray uTextureAtlas;
 // the reflective tiles have real art here; every other slice is flat and fully permissive.
 uniform sampler2DArray uMaterialAtlas;
 // Entries in the tile-material buffer below, and the switch for the whole reflective path:
-// it stays 0 wherever that buffer is not bound (the item debugger), so the buffer is never read.
+// it stays 0 wherever that buffer is not bound (DevStudio), so the buffer is never read.
 uniform int uMaterialCount;
 uniform float uOreSpecScale;  // SurfaceShadingConfig.OreSpecLinearScale
 // Ore twinkle (OreTwinkle is the twin): the flash strength (0, the default, switches it off), the
@@ -55,11 +55,11 @@ uniform vec2 uOreTwinkleRate;
 uniform float uOreTwinkleWidth;
 uniform vec2 uOreTwinkleFade;
 // Snow glints: the snow tile's atlas slice, the glint strength (0, the default and the
-// ItemDebugger's, switches the term off) and the share of texels carrying a glinting facet.
+// DevStudio's, switches the term off) and the share of texels carrying a glinting facet.
 uniform float uSnowLayer;
 uniform float uSnowSparkle;
 uniform float uSnowSparkleDensity;
-// Leaf backlight (LeafBacklight is the twin): the strength (0, the default and the ItemDebugger's,
+// Leaf backlight (LeafBacklight is the twin): the strength (0, the default and the DevStudio's,
 // switches it off), the exponent of the lobe around the sun, how far toward the sun the
 // light-through test looks, in blocks, and the linear tint of the light a leaf lets through.
 uniform float uLeafBacklight;
@@ -67,13 +67,13 @@ uniform float uLeafBacklightPower;
 uniform float uLeafBacklightReach;
 uniform vec3 uLeafBacklightTint;
 // Grass wind shimmer (GrassShimmer is the twin): the strength (0, the default and the
-// ItemDebugger's, switches it off), the band wavelength in blocks and the distance fade window.
+// DevStudio's, switches it off), the band wavelength in blocks and the distance fade window.
 uniform float uGrassShimmer;
 uniform float uGrassShimmerWavelength;
 uniform float uGrassShimmerFadeNear;
 uniform float uGrassShimmerFadeFar;
 // Ice glint (IceGlint is the twin): the ice tile's atlas slice, the sun highlight's strength (0, the
-// default and the ItemDebugger's, switches the whole term off), its Blinn exponent and the share of
+// default and the DevStudio's, switches the whole term off), its Blinn exponent and the share of
 // the mirrored sky a face takes at a full graze.
 uniform float uIceLayer;
 uniform float uIceGlint;
@@ -81,11 +81,11 @@ uniform float uIceShine;
 uniform float uIceSheen;
 // Glass sheen (GlassSheen is the twin): the glass tile's atlas slice (glass blocks and panes share
 // it) and the share of the mirrored sky a face takes at a full graze; 0, the default and the
-// ItemDebugger's, switches it off.
+// DevStudio's, switches it off.
 uniform float uGlassLayer;
 uniform float uGlassSheen;
 // Forcefield (ForcefieldShimmer is the twin): the forcefield tile's atlas slice (the battle tower's roof dome), the film's
-// strength (0, the default and the ItemDebugger's, leaves the plain tile), its linear color (lit like an albedo), the alpha weights
+// strength (0, the default and the DevStudio's, leaves the plain tile), its linear color (lit like an albedo), the alpha weights
 // (x the bare film, y the rim at a graze, z the honeycomb, w the rising band), honeycomb cells per block and the
 // distance window the honeycomb and the band fade out over.
 uniform float uForcefieldLayer;
@@ -129,10 +129,10 @@ uniform vec4 uSkyShape;       // x horizon band, y haze width, z haze strength, 
 // 0 dry, 1 fully underwater/in lava: blends the dome-sampled fog back to the flat uFogColor.
 uniform float uFogWet;
 // Deep-water darkness (DeepWaterFog): how much the wet fog color is dimmed per channel with the
-// eye's depth below the water surface; 0 (dry, in lava, and the ItemDebugger's default) leaves it.
+// eye's depth below the water surface; 0 (dry, in lava, and the DevStudio's default) leaves it.
 uniform vec3 uDeepWaterDim;
 // The path-aware underwater fog (UnderwaterPath is the twin). All inert while uUnderwater is 0
-// (dry, in lava, the ItemDebugger): the world Y of the water surface over the eye, the fog range
+// (dry, in lava, the DevStudio): the world Y of the water surface over the eye, the fog range
 // (near, far) of the air above it, and how much that water is open sea (OpenWater: 0 a pond, 1 a
 // sea), which shades the fog by the view direction with uOceanFogShade (looking down, looking
 // up, the |dir.y| where the shade reaches those ends).
@@ -167,7 +167,7 @@ uniform float uShadowWorldTexelFar;
 uniform float uShadowBiasScaleFar;
 // Cloud shadows: an R8 coverage map baked from CloudField's level grid (unit 8), the cloud
 // layer's base height, the field size and this frame's drift. uCloudShadowStrength 0 (the
-// default, and the ItemDebugger's) switches the whole path off.
+// default, and the DevStudio's) switches the whole path off.
 uniform sampler2D uCloudShadowMap;
 uniform float uCloudShadowStrength;
 uniform float uCloudHeight;
@@ -228,12 +228,12 @@ uniform float uWaterFlowPeriod;   // seconds per flow-map phase; 0 turns the flo
 uniform float uWaterFallScroll;   // blocks/s the streaks run down a falling face
 uniform float uWaterFallStreak;   // tangent tilt of the falling streaks; 0 turns them off
 // Shore foam: the view-ray water depth at which the band ends (0, the default and the
-// ItemDebugger's, turns it off), its opacity at the contact line and its linear albedo.
+// DevStudio's, turns it off), its opacity at the contact line and its linear albedo.
 uniform float uWaterFoamWidth;
 uniform float uWaterFoamStrength;
 uniform vec3 uWaterFoamColor;
 // Sun glitter (WaterGlitter is the twin): the sparkle strength as a multiple of the direct sun (0,
-// the default and the ItemDebugger's, switches it off), glitter cells per block, the share of cells
+// the default and the DevStudio's, switches it off), glitter cells per block, the share of cells
 // holding a sparkle, the facets' tilt off the wave normal in radians, how many times a second each
 // cell re-rolls its facet, and the distance fade window.
 uniform float uWaterGlitter;
@@ -247,7 +247,7 @@ uniform vec2 uWaterGlitterFade;
 // x, surface y, center z, leading edge radius in blocks; wave = peak slope, wavelength in blocks,
 // seed, phase in cycles. uRippleTrain = the train's length, its lead ahead of the edge and its rise
 // behind it (all in wavelengths) and the chirp; uRippleLevel = how far a surface may stand from the
-// ripple's own and still take it. A count of 0 (the default and the ItemDebugger's) costs nothing.
+// ripple's own and still take it. A count of 0 (the default and the DevStudio's) costs nothing.
 const int MaxRipples = 16;   // == ParticleConfig.RippleShaded
 uniform int uRippleCount;
 uniform vec4 uRippleShape[MaxRipples];
@@ -260,14 +260,14 @@ uniform vec3 uLodLeafColor;
 // Atlas slice of the lava tile: fluid fragments on this layer glow instead of refracting.
 uniform float uLavaLayer;
 // The lava spritesheet: uLavaFrames animation frames in consecutive layers from uLavaLayer, cycled at uLavaFps.
-// One frame (the ItemDebugger's default) is the plain tile.
+// One frame (the DevStudio's default) is the plain tile.
 uniform float uLavaFrames;
 uniform float uLavaFps;
 uniform float uLavaNormalScale;  // slope-to-normal gain of the lava swell (SurfaceShadingConfig.LavaNormalScale)
 uniform float uLavaCatchLight;   // strength of the point-light catch-light on lava
 uniform float uLavaCatchPower;   // Blinn exponent of that catch-light
 // How far the lava glow breathes above and below its own brightness on the slow noise field
-// (LavaPulse is the twin); 0, the default and the ItemDebugger's, switches it off.
+// (LavaPulse is the twin); 0, the default and the DevStudio's, switches it off.
 uniform float uLavaPulse;
 
 out vec4 FragColor;

@@ -5,7 +5,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering;
 
-namespace VoxelEngine.ItemDebugger;
+namespace VoxelEngine.DevStudio;
 
 /// <summary>
 /// Editable copy of the selected item's <c>display</c> block plus the debugger-only renderer

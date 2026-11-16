@@ -2,7 +2,7 @@ using System.Numerics;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 
-namespace VoxelEngine.ItemDebugger;
+namespace VoxelEngine.DevStudio;
 
 /// <summary>
 /// Poses the previewed blade for one <see cref="PlayerPreviewState"/> step: <paramref name="blade"/> is the

@@ -10,8 +10,8 @@ namespace VoxelEngine.Chunks.Meshing;
 /// <summary>
 /// Meshes an arbitrary set of cells (a grown tree, its ground, a felled crown) with the real chunk
 /// mesher, so tree-wood tubes, wide-trunk shells and their pixel rim, leaves and the biome tint
-/// all come out exactly as they do in game; <see cref="TopplingTree.BuildMeshData"/> and the item
-/// debugger's TREES tab both mesh through it. Every chunk the cells touch is a
+/// all come out exactly as they do in game; <see cref="TopplingTree.BuildMeshData"/> and DevStudio's
+/// TREES tab both mesh through it. Every chunk the cells touch is a
 /// scratch chunk at its <b>real</b> chunk position, inside a throwaway manager whose whole 3D box
 /// is padded by a one-chunk ring of empty, ready chunks (edge and corner diagonals included, since
 /// the beveled-shell cull reads edge neighbors). Chunks therefore see each other across every

@@ -50,7 +50,7 @@ internal static class SliceMotion
 
     // On top of that, through the main part of the cut the held blade is drawn with this much added to its own display
     // rotation (PlayerModel.HeldItemRotationOffset): the same [pitch, yaw, roll] degrees the item JSON's display.rotation
-    // and the item debugger's Rot sliders use, so a value found by sliding them at a mid-cut frame transfers here as is.
+    // and DevStudio's Rot sliders use, so a value found by sliding them at a mid-cut frame transfers here as is.
     // The blade's rest display is yaw -90 / roll 45; mid-cut it reads right at yaw -145 / roll 70. The yaw part mirrors
     // for the return swing (for a display yaw of -90 the mirror image of yaw -90 + d is yaw -90 - d), the roll does not.
     internal const float SliceBladeDisplayYawDegrees = -55f;

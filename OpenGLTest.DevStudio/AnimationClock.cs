@@ -1,6 +1,6 @@
 using System;
 
-namespace VoxelEngine.ItemDebugger;
+namespace VoxelEngine.DevStudio;
 
 /// <summary>
 /// What an <see cref="AnimationClock"/> drives: a preview that can be restarted from a known state and
@@ -27,7 +27,7 @@ public interface IPreviewDriver
 }
 
 /// <summary>
-/// The playback controls of the item debugger's timeline: how far through the animation it is
+/// The playback controls of DevStudio's timeline: how far through the animation it is
 /// (<see cref="Time"/>, which a slider can scrub), how fast it plays (<see cref="Speed"/>, x0 to x4 in tenths)
 /// and whether it loops. GL-free and tested. The driver is only ever stepped in fixed
 /// <see cref="Step"/>-second slices, so seeking to a time (restart, then step up to it) lands on exactly the frame

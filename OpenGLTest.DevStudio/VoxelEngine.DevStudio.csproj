@@ -6,8 +6,8 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <LangVersion>default</LangVersion>
         <Nullable>annotations</Nullable>
-        <AssemblyName>VoxelEngine.ItemDebugger</AssemblyName>
-        <RootNamespace>VoxelEngine.ItemDebugger</RootNamespace>
+        <AssemblyName>VoxelEngine.DevStudio</AssemblyName>
+        <RootNamespace>VoxelEngine.DevStudio</RootNamespace>
         <!-- Match the game's runtime behavior so the preview is the shipping renderer. -->
         <RollForward>LatestMajor</RollForward>
         <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>

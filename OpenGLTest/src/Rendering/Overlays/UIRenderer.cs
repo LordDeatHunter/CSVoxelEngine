@@ -31,7 +31,7 @@ namespace VoxelEngine.Rendering.Overlays;
 /// <para>This class owns the UI's GL resources and their creation and disposal order (the ui
 /// program, the count font, the text batch buffers, the item-icon textures and frame meshes; the
 /// HUD's crosshair and heart sprites are created and deleted through <see cref="HudRenderer"/> at
-/// their original points) and the shared draw primitives every page and the item debugger use.
+/// their original points) and the shared draw primitives every page and DevStudio use.
 /// The pages are the components it builds and exposes as internal properties -
 /// <see cref="HudRenderer"/>, <see cref="TopStripRenderer"/>, <see cref="InventoryPanelRenderer"/>,
 /// <see cref="CraftCardRenderer"/>, <see cref="SpellBuilderRenderer"/>, <see cref="WaystoneRenderer"/>, <see cref="MenuRenderer"/>,
@@ -80,7 +80,7 @@ public class UIRenderer : IDisposable
     private readonly Dictionary<ushort, Mesh[]> _itemFrames = new();
     private readonly int _locAlphaCutoff;
     private readonly int _locSrgbTex;
-    // Whether the shared block atlas is SRGB8_ALPHA8 (the game) or linear (the ItemDebugger);
+    // Whether the shared block atlas is SRGB8_ALPHA8 (the game) or linear (the DevStudio);
     // decides whether its icons are re-encoded for the gamma framebuffer.
     private readonly bool _atlasIsSrgb;
 
@@ -572,7 +572,7 @@ public class UIRenderer : IDisposable
     public BitmapFont? Font => _font;
 
     /// <summary>Draw scale mapping a digit's cap-height to <paramref name="pixels"/>, for
-    /// callers that do not hold the font (the item debugger) and size their own text with it.</summary>
+    /// callers that do not hold the font (DevStudio) and size their own text with it.</summary>
     public float CapHeightScale(float pixels) => _font?.ScaleForCapHeight(pixels) ?? 1f;
 
     /// <summary>Pixel width of <paramref name="text"/> at a draw scale, for anchoring.</summary>
@@ -796,7 +796,7 @@ public class UIRenderer : IDisposable
     /// <summary>
     /// A pure item's flat 2D sprite, sized to <paramref name="pixels"/> square and drawn with the
     /// frame the given moment picks (frame 0 for a plain sprite). This is what the hotbar and
-    /// inventory rows show; the item debugger uses it for its grid so icons read as sprites.
+    /// inventory rows show; DevStudio uses it for its grid so icons read as sprites.
     /// Air, blocks and unknown ids draw nothing.
     /// </summary>
     public void DrawItemSprite(Vector2 center, float pixels, ushort itemId, float headingDegrees,

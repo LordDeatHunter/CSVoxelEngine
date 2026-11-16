@@ -19,7 +19,7 @@ public enum WildlifeKind : byte
 /// <summary>
 /// The one table of the wild animals: each <see cref="WildlifeKind"/>'s entity name, how to build its
 /// <see cref="Animal"/>, its content contract and its body height, so the manager, the saves, the network
-/// mirror, the renderer and the item debugger all take a new species from here instead of naming it.
+/// mirror, the renderer and DevStudio all take a new species from here instead of naming it.
 /// </summary>
 public static class WildlifeSpecies
 {

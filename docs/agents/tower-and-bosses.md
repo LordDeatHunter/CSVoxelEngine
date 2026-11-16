@@ -74,7 +74,7 @@ share `MobConfig.SkeletonHeight` as their body box.
 - **Plumbing**: `World.Skeletons`, `MobDirector` (update, damage billing, status block actions, `RefreshMobs`, the
   `spawn` op name `skeleton`), `ThrowAction` (the arrows), `MobPasses.RenderRealmMobs` and the
   near shadow cascade (`ShadowPass.RenderShadows`' `skeletons`), `entities.json` by kind name, the
-  `EntityList` kind (protocol 25) and `ClientMirror`'s reconcile, and the item debugger's ENTITIES tab. Tests:
+  `EntityList` kind (protocol 25) and `ClientMirror`'s reconcile, and DevStudio's ENTITIES tab. Tests:
   `SkeletonTests`, `SkeletonManagerTests`, `UndeadStrikeTests`, the realm round trip in
   `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`, `RealmMobMirrorTests`,
   `NetworkEntitySyncTests.ASkeletonMirrorTakesItsLookFromTheSnapshotAndIsReplacedWhenTheLookDiffers` and the loopback
@@ -414,4 +414,4 @@ the sand surface is simply not exposed.
   `SummonItemTests`, the mirror in `NetworkEntitySyncTests`, the save round trip in `WorldLifecycleTests` and the loopback in
   `GameServerTests`.
 - Known gaps: the death is only a shrink and a sink; the worm hurts players only (no mobs, no blocks); the numbers are first
-  guesses from the scenario, not a play-tested balance; the item debugger shows the three parts stacked at the origin.
+  guesses from the scenario, not a play-tested balance; DevStudio shows the three parts stacked at the origin.

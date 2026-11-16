@@ -31,8 +31,8 @@ namespace VoxelEngine.Rendering;
 /// item caches, the chunk and LOD geometry pools, the chunk draw batch, the shadow cascades and
 /// the sky and particle renderers. The passes that draw with them are the components it builds,
 /// exposed as internal properties (<see cref="Terrain"/>, <see cref="Lighting"/>, ...) and called
-/// directly by <see cref="WorldRenderer"/> and Program. It also carries the static facade the item
-/// debugger and the tests read. Render thread only.
+/// directly by <see cref="WorldRenderer"/> and Program. It also carries the static facade DevStudio
+/// and the tests read. Render thread only.
 /// </summary>
 public class RenderManager : IDisposable
 {
@@ -106,20 +106,20 @@ public class RenderManager : IDisposable
     private BlockCubeCache blockCubes;
     private ItemMeshCache itemMeshes;
 
-    // The item-debugger and test facade over the passes' statics: the item debugger loads the same
+    // The dev-studio and test facade over the passes' statics: DevStudio loads the same
     // player model and poses its preview with the same held-item numbers, and the tests place the
     // fire light with the same offset.
-    /// <summary>Re-exports <see cref="PlayerPasses.PlayerModelPath"/> for the item debugger.</summary>
+    /// <summary>Re-exports <see cref="PlayerPasses.PlayerModelPath"/> for DevStudio.</summary>
     public const string PlayerModelPath = PlayerPasses.PlayerModelPath;
-    /// <summary>Re-exports <see cref="HeldItemPose.HeldItemScale"/> for the item debugger and its tests.</summary>
+    /// <summary>Re-exports <see cref="HeldItemPose.HeldItemScale"/> for DevStudio and its tests.</summary>
     public const float HeldItemScale = HeldItemPose.HeldItemScale;
-    /// <summary>Re-exports <see cref="HeldItemPose.HeldItemGrip"/> for the item debugger and its tests.</summary>
+    /// <summary>Re-exports <see cref="HeldItemPose.HeldItemGrip"/> for DevStudio and its tests.</summary>
     public static Vector3 HeldItemGrip => HeldItemPose.HeldItemGrip;
-    /// <summary>Re-exports <see cref="HeldItemPose.HeldBlockScale"/> for the item debugger and its tests.</summary>
+    /// <summary>Re-exports <see cref="HeldItemPose.HeldBlockScale"/> for DevStudio and its tests.</summary>
     public const float HeldBlockScale = HeldItemPose.HeldBlockScale;
-    /// <summary>Re-exports <see cref="HeldItemPose.HeldBlockGrip"/> for the item debugger and its tests.</summary>
+    /// <summary>Re-exports <see cref="HeldItemPose.HeldBlockGrip"/> for DevStudio and its tests.</summary>
     public static Vector3 HeldBlockGrip => HeldItemPose.HeldBlockGrip;
-    /// <summary>Re-exports <see cref="HeldItemPose.Pose"/> for the item debugger, whose preview
+    /// <summary>Re-exports <see cref="HeldItemPose.Pose"/> for DevStudio, whose preview
     /// poses the held item exactly as the game draws it.</summary>
     public static Matrix4x4 PoseHeldItem(Matrix4x4 hand, Matrix4x4 displayTransform, float scale,
         Vector3 grip) => HeldItemPose.Pose(hand, displayTransform, scale, grip);
@@ -655,7 +655,7 @@ public class RenderManager : IDisposable
         program.SetUniform("uCloudHeight", SkyConfig.CloudHeight);
         program.SetUniform("uCloudField", SkyConfig.CloudFieldSize);
         // Doubles as the switch for the whole reflective path: left at 0 the shader never reads
-        // the material buffer, which is what keeps the ItemDebugger (same shaders, no buffer)
+        // the material buffer, which is what keeps the DevStudio (same shaders, no buffer)
         // and a world with no reflective tiles safe.
         program.SetUniform("uMaterialCount", materialSsbo != 0 ? TileMaterials.ByLayer.Length : 0);
         program.SetUniform("uOreSpecScale", SurfaceShadingConfig.OreSpecLinearScale);
@@ -668,11 +668,11 @@ public class RenderManager : IDisposable
         program.SetUniform("uOreTwinkleFade",
             new Vector2(SurfaceShadingConfig.OreTwinkleFadeNearBlocks, SurfaceShadingConfig.OreTwinkleFadeFarBlocks));
         // The snow glints key off the snow block's own tile; strength 0 (a program that never sets
-        // it, like the ItemDebugger's) leaves the term off whatever slice that is.
+        // it, like the DevStudio's) leaves the term off whatever slice that is.
         program.SetUniform("uSnowLayer", (float)ContentRegistry.RequireBlock("snow").Top);
         program.SetUniform("uSnowSparkle", SurfaceShadingConfig.SnowSparkleStrength);
         program.SetUniform("uSnowSparkleDensity", SurfaceShadingConfig.SnowSparkleDensity);
-        // Leaves lit through from behind (LeafBacklight); strength 0 (the ItemDebugger) leaves it off
+        // Leaves lit through from behind (LeafBacklight); strength 0 (the DevStudio) leaves it off
         program.SetUniform("uLeafBacklight", SurfaceShadingConfig.LeafBacklightStrength);
         program.SetUniform("uLeafBacklightPower", SurfaceShadingConfig.LeafBacklightPower);
         program.SetUniform("uLeafBacklightReach", SurfaceShadingConfig.LeafBacklightReachBlocks);

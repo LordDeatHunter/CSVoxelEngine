@@ -5,7 +5,7 @@ The tree species schema and the tree growth engine, rasterizer, worldgen, leaf d
 ### Tree species schema (`assets/data/trees/<species>.json`)
 
 One file per species; the file name is the species name (`TreeSpeciesRegistry.ByName`, which
-`ITEM_DEBUGGER_SELECT` and the `grow` op match). `ContentRegistry.Load` reads the folder **after
+`DEV_STUDIO_SELECT` and the `grow` op match). `ContentRegistry.Load` reads the folder **after
 the blocks** (`TreeSpeciesLoader.LoadTreeSpecies`; a missing folder is an empty registry), compiles each file through
 the pure `TreeSpeciesCompiler.Compile` (DTO `TreeSpeciesDefinition.cs`) into an immutable
 `TreeSpecies`, and every error starts `Tree species '<path>'`. Block references take an optional
@@ -15,7 +15,7 @@ plains and the steppe, which borrows the oak's wood — `TreeSpeciesRegistry.For
 shared wood to the leafy owner, so the growth item never turns an oak into a snag) and the sparse
 `stone_pine` (the savanna, its umbrella crown an acacia stand-in) generate in the world; the `palm`
 generates only through its `worldgen.oasis` disc; `baobab` has **no `worldgen` block** and is
-only ever grown (`TreeGrowthWriter`, the `grow` op, the item debugger); and the hell's `fungal_tree`
+only ever grown (`TreeGrowthWriter`, the `grow` op, DevStudio); and the hell's `fungal_tree`
 and leafless `charred_tree` have no `worldgen` block either: `HellTrees` plants them from the hell
 biome palettes (see "Hell flora"); nor do the sky's broad `sky_oak` and glowing `crystal_tree`, which
 `SkyTrees` plants from the sky biome palettes (see "Sky biomes"). See
@@ -92,7 +92,7 @@ leaves block per species, no per-tree registry or entity.
 parent direction, children, the girth-free `PipePx`, the displayed `ThicknessPx`, `IsFeature`, a
 `FloorPx` that a tree rebuilt from the world never thins below). `ITreeSpace.IsFree` is the obstacle
 view, implemented by `VirtualTreeSpace` (a ground-height delegate, optional carved cells and an
-occupied set; `FromTerrain` reads `ColumnCache.Get`) for worldgen and the item debugger, and by
+occupied set; `FromTerrain` reads `ColumnCache.Get`) for worldgen and DevStudio, and by
 `WorldTreeSpace` for live chunks. `TreeGrower.Pulse` sends one Dynamic-Trees style signal up from
 the root: each step it weighs the six directions (sideways 1, up `upProbability`, existing limbs
 followed by their `PipePx`, no forks under `lowestBranchHeight`, never down, blocked cells masked)
@@ -106,8 +106,8 @@ the species name) through one `SplitMix64` stream:
 - `GrowToMaturity` draws the maturity step count and the per-tree energy first, runs that many
   pulses, one final bottom-up `Thicken` (so the girth profile sees the final height), then the
   species' `features` on the same stream;
-- `GrowSteps(..., steps, applyFeatures)` replays exactly that stream for any pulse count (the item
-  debugger's scrub path); `GrowSteps(MaturityStepsAt(...), applyFeatures: true)` *is*
+- `GrowSteps(..., steps, applyFeatures)` replays exactly that stream for any pulse count (DevStudio's
+  scrub path); `GrowSteps(MaturityStepsAt(...), applyFeatures: true)` *is*
   `GrowToMaturity`, and without features a shorter grow's nodes are a prefix of a longer one's.
   `MaturityStepsAt` and `TreeEnergyAt` replay the two rolls on their own;
 - `GrowFurther` is the reactive path: `Thicken`, N pulses under a node cap, `Thicken`, and the
@@ -118,7 +118,7 @@ the species name) through one `SplitMix64` stream:
 nodes, then feature nodes), then the shells, which end the wood at `woodCount`, then the leaves
 (`LeafCluster.Collect`, which never lands a leaf on a shell). The thickness code is
 `ThicknessCode(px)` = `ceil(px) - 1` clamped at the full cube. Worldgen stamping, the first far-LOD
-ring, reactive growth, the felling and decay tests and the item debugger all share it.
+ring, reactive growth, the felling and decay tests and DevStudio all share it.
 `ReachOf(species)` is the tree's (horizontal, up, down) bound from its root — the energy plus the
 leaf radius, widened by the shell radius and the buttress reach — which sizes chunk-border margins
 and the decay schedule.
@@ -283,7 +283,7 @@ seed, then forgets it — so a sapling becomes a tree over a few minutes. A cell
 waits, and a cell whose wood is gone (mined, or grown over) is forgotten. In memory only: a reload
 leaves a half-grown sapling standing until it is grown again by hand (see the known gaps).
 
-**The item debugger's TREES tab** (`OpenGLTest.ItemDebugger/TreePreviewState.cs`, see "Build and
+**DevStudio's TREES tab** (`OpenGLTest.DevStudio/TreePreviewState.cs`, see "Build and
 run") grows any species pulse by pulse over flat grass at a fixed seed through `GrowSteps`, and
 meshes it with `CellBatchMesher` (`src/Chunks/Meshing/CellBatchMesher.cs`): the real chunk mesher over as many
 scratch chunks as the cells span, each at its real position inside an empty one-chunk ring, so a

@@ -109,9 +109,9 @@ overshoot or jiggle.
   at about a right angle, the shoulders wound back toward the throwing side, then a whip forward and a
   settle) and the **swim stroke**. The hand anchor follows the forearm frame, so the held item does too.
 - **Offhand actions** (`PlayerModel.ArmsSwapped`): every action is authored for the right arm, so while one the offhand took (a right-click placement, use, cast, throw or draw; `Punch`, `Cast`, `StartThrowCharge` and `StartUseCharge` take an `offhand` flag, a blade swing clears it) plays, `PoseBuilder.SwapArms` trades the idle arm joints, the acting arm runs in the right slot and `BodyPartMatrices` mirrors each slot's arm chain onto the other side across the torso frame (`PoseMods.Mirrored` flips the torso twist and roll the IK and the authored-yaw correction see; the arm-driven twist and pull roll flip too). The hand anchors follow: the left anchor takes the aim-following rotation mirrored, the right one just carries. The swap ends with the action. Remote players play it too: the server notes `NetPlayerAction.PunchOffhand` for an offhand placement or use (`World.TryPlaceSelectedBlockAt(..., out offhand)` tries the main hand then the offhand like the client's click, `LastUseOffhand`) and `ThrowOffhand` for an offhand throw (`ThrowAction.OffhandThrows`: the offhand throwable only when the main hand holds none); a cast has no offhand variant, since the server casts only the main hand's staff.
-- **Bow draw** (`UsePose.Bow`, `BowPose`): an item whose `use.pose` is `bow` (the `bow`) holds a two-handed draw while the timed use charges: the right (item) arm goes out forward through `ArmOverlays`, the left arm is folded back to the cheek, and the torso twists side-on and leans back a little (`SecondaryMotion`), all weighted by the use charge (`BowPose.BodyWeight`/`DrawWeight`). It holds at full draw and, when the button is let go (`PlayerModel.CancelUseCharge` from a real draw), the string arm snaps back within `BowPose.SnapShare` of `ReleaseSeconds` and the rest follows; the camera narrows with the draw like a throw's charge (`Camera.ThrowCharge` is fed `Player.BowCharge`). The item debugger's `BOW` mode and the `draw`/`loose` player ops of `animations.json` show it.
-- **Axe split** (`SwordSwing.AxeSplit`, `PlayerModel.StartAxeSplit`): an axe blow on a log standing on a stump plays the finisher's overhead shape (`SwordMotion.AxeSplit`, the chop's pose at `StumpConfig.SplitSwingSeconds`, a slow blow) and the split lands at its impact share (`LeftClickAction.UpdateSplit`). The item debugger's `AXE SPLIT` mode and the `player` op's `axesplit` action show it; `visual-examples/stump.json` films the whole split.
-- **Cast feedback** (MG-10, cosmetic only): a staff cast plays `PlayerModel.Cast`, `PlayerModel.CastDuration` (0.45 s) of `CastMotion` (GL-free pure functions of the cast clock): the right arm raises the staff over the head-front, thrusts it straight forward with a snap (an ease-out) and a small forward lean (`CastMotion.Lean` into `SecondaryMotion`'s torso pitch), recoils a little and eases back, its weight 0 at both ends so the arm leaves and returns to the base pose without a jump; `PoseBuilder` lays it after the throw, and `BodyPartMatrices` counts it as an authored right arm. `LocalPlayer.CastSwing` (the right-click chain's staff branch, and the `player` op's `cast` action, gesture only) adds a light view pinch (`SpellConfig.CastFovKickDegrees`). The server rebroadcasts an accepted cast as `NetPlayerAction.Cast`, which `RemotePlayer` replays. The rest is `Magic/SpellFeedback`, the `SpellCaster.Feedback` hook (never built on a headless server): for the local player's own accepted cast the `spell_cast` sound (`spell_fizzle` on a fizzle, singleplayer only, since a client never learns of one) and a burst of `SpellSparks` at the bolt's launch point in the element's status tint (`SpellSparks.ColorOf`, else `BoltDefaultColor`; gray on a fizzle); on a client a cosmetic preview of the bolt (`SpellBoltPreview`: `SpellProjectile`'s flight and stop test, trail and impact sparks and the impact sound, never a strike, effect or cell write) and a default-colored burst where a remote player cast (its `spell_cast` sound plays at that player from `ClientMirror.SyncRemotePlayers`). `SpellEffects` plays `spell_impact` where a real bolt lands, positionally, at most once an update; on a server it goes to the players near it except the caster (see "World sounds"). The wavs come from `tools/generate-spell-sfx.py`. The item debugger's `CAST` mode (`ITEM_DEBUGGER_PLAYER_ANIM=cast`, with `ITEM_DEBUGGER_SELECT=wooden_staff`) and `visual-examples/animations-cast.json` (`VOXEL_TIME=147`) show it. Remote players' bolts stay invisible.
+- **Bow draw** (`UsePose.Bow`, `BowPose`): an item whose `use.pose` is `bow` (the `bow`) holds a two-handed draw while the timed use charges: the right (item) arm goes out forward through `ArmOverlays`, the left arm is folded back to the cheek, and the torso twists side-on and leans back a little (`SecondaryMotion`), all weighted by the use charge (`BowPose.BodyWeight`/`DrawWeight`). It holds at full draw and, when the button is let go (`PlayerModel.CancelUseCharge` from a real draw), the string arm snaps back within `BowPose.SnapShare` of `ReleaseSeconds` and the rest follows; the camera narrows with the draw like a throw's charge (`Camera.ThrowCharge` is fed `Player.BowCharge`). DevStudio's `BOW` mode and the `draw`/`loose` player ops of `animations.json` show it.
+- **Axe split** (`SwordSwing.AxeSplit`, `PlayerModel.StartAxeSplit`): an axe blow on a log standing on a stump plays the finisher's overhead shape (`SwordMotion.AxeSplit`, the chop's pose at `StumpConfig.SplitSwingSeconds`, a slow blow) and the split lands at its impact share (`LeftClickAction.UpdateSplit`). DevStudio's `AXE SPLIT` mode and the `player` op's `axesplit` action show it; `visual-examples/stump.json` films the whole split.
+- **Cast feedback** (MG-10, cosmetic only): a staff cast plays `PlayerModel.Cast`, `PlayerModel.CastDuration` (0.45 s) of `CastMotion` (GL-free pure functions of the cast clock): the right arm raises the staff over the head-front, thrusts it straight forward with a snap (an ease-out) and a small forward lean (`CastMotion.Lean` into `SecondaryMotion`'s torso pitch), recoils a little and eases back, its weight 0 at both ends so the arm leaves and returns to the base pose without a jump; `PoseBuilder` lays it after the throw, and `BodyPartMatrices` counts it as an authored right arm. `LocalPlayer.CastSwing` (the right-click chain's staff branch, and the `player` op's `cast` action, gesture only) adds a light view pinch (`SpellConfig.CastFovKickDegrees`). The server rebroadcasts an accepted cast as `NetPlayerAction.Cast`, which `RemotePlayer` replays. The rest is `Magic/SpellFeedback`, the `SpellCaster.Feedback` hook (never built on a headless server): for the local player's own accepted cast the `spell_cast` sound (`spell_fizzle` on a fizzle, singleplayer only, since a client never learns of one) and a burst of `SpellSparks` at the bolt's launch point in the element's status tint (`SpellSparks.ColorOf`, else `BoltDefaultColor`; gray on a fizzle); on a client a cosmetic preview of the bolt (`SpellBoltPreview`: `SpellProjectile`'s flight and stop test, trail and impact sparks and the impact sound, never a strike, effect or cell write) and a default-colored burst where a remote player cast (its `spell_cast` sound plays at that player from `ClientMirror.SyncRemotePlayers`). `SpellEffects` plays `spell_impact` where a real bolt lands, positionally, at most once an update; on a server it goes to the players near it except the caster (see "World sounds"). The wavs come from `tools/generate-spell-sfx.py`. DevStudio's `CAST` mode (`DEV_STUDIO_PLAYER_ANIM=cast`, with `DEV_STUDIO_SELECT=wooden_staff`) and `visual-examples/animations-cast.json` (`VOXEL_TIME=147`) show it. Remote players' bolts stay invisible.
 - **Axe chop** (`SwordSwing.AxeChop`, a fourth swing that is not in the sword's chain): an item in the `axe`
   tag (`Mining.IsAxe`) swings a chop from the side (a flat sweep across the front from the right, the elbow straightening into the blow) instead of a punch whenever `LocalPlayer.PunchSwing` runs, through
   `PlayerModel.StartAxeChop(seconds)` over the same `SwordMotion` shape machinery and `BladeSwingFrame`. An axe has one edge, so its shape's `BladeRoll` is the sword's plus a half turn: the edge (the sprite's -X side) leads the right-to-left sweep instead of trailing it, and its `DisplayRoll` is the sword's negated, since the half turn mirrors that lean: the shaft stays out past the hand through the strike rather than folding back across the body (checked by filming `player axechop` from the shoulder view and cropping the head). Its length
@@ -140,7 +140,7 @@ overshoot or jiggle.
   cell's parent direction: horizontal across a trunk or root, vertical across a horizontal limb; as wide as the cell,
   deeper with the damage but scaled to the node's width so a twig is never severed, always a core left), subtracts it from every box of the cell and draws the pieces
   whole with the walls in end grain; `RecordChop` remeshes for it exactly as for a full cube.
-  The item debugger's `AXE` mode and `visual-examples/animations-axe.json` (`VOXEL_TIME=147`) show it.
+  DevStudio's `AXE` mode and `visual-examples/animations-axe.json` (`VOXEL_TIME=147`) show it.
 - **Slice** (`SliceMotion.SlicePhase`): a whole-body motion in uneven phases of the same 0.7 s: a slow
   wind-up that coils the body (to 0.26), a strike about twice as fast as before centered on the impact
   (0.26..0.49, a steeper `EaseInOutCubic` through the middle) and a long eased recovery, so the contrast
@@ -166,7 +166,7 @@ overshoot or jiggle.
   degrees in the item JSON's `display.rotation` order `[pitch, yaw, roll]`, which `Item.DisplayMatrix(offset)` and
   the debugger's `ItemDisplayEditor.DisplayMatrix(offset)` add to the item's own rotation, so the blade is drawn
   at yaw -145 / roll 70 mid-cut and at its JSON yaw -90 / roll 45 at rest. **That is how a mid-animation held-item
-  pose is tuned**: in the item debugger scrub the timeline to the frame, slide Rot yaw / Rot roll until it reads
+  pose is tuned**: in DevStudio scrub the timeline to the frame, slide Rot yaw / Rot roll until it reads
   right, and put the difference from the JSON values into those constants; the sliders keep showing the JSON
   values (what SAVE TO JSON writes), since the offset is the pose's, not the item's. The yaw part mirrors for the
   return swing and the roll does not: for a display yaw of -90 that makes the return's blade the exact mirror image
@@ -200,7 +200,7 @@ overshoot or jiggle.
   for the first-person view as much as the third (the comment above the shapes has the two rules: a forward fold
   tips the arm down with the torso, a turn toward the sword side swings that shoulder behind the eye), so every
   impact is on screen while a wind-up may rise out of the frame and a follow-through may leave it. Each
-  swing's damage lands at its own `Impact`, which the hit-stop holds at. The item debugger's CUT, B-CUT and CHOP
+  swing's damage lands at its own `Impact`, which the hit-stop holds at. DevStudio's CUT, B-CUT and CHOP
   modes and `visual-examples/animations-sword.json` (`VOXEL_TIME=147`, the three swings from the shoulder camera,
   then the cut and the chop in first person) show them; `PlayerModelTests` holds the shapes (the cut comes down
   from high right to low left, the back cut rises the other way, the chop goes over the head and straight down
@@ -229,8 +229,8 @@ overshoot or jiggle.
   bent forward, the hands sweeping out and in together) and its legs hang with a faint flutter. It eases
   in over the swim pose through `MathUtils.Damp` and back out during a stroke (a floater swimming off
   strokes in the swim pose) or once the body stops floating. `LocalPlayer.UpdatePlayerModel` feeds the swim
-  pose only from `Float` up (a wader walks with no water pose) and `floating` in `Float`. The item
-  debugger's `SURFACE` mode (`ITEM_DEBUGGER_PLAYER_ANIM=surface`) previews it, `SurfaceFloatPoseTests`
+  pose only from `Float` up (a wader walks with no water pose) and `floating` in `Float`. DevStudio's
+  `SURFACE` mode (`DEV_STUDIO_PLAYER_ANIM=surface`) previews it, `SurfaceFloatPoseTests`
   locks it down and `visual-examples/water-depth.json` (`VOXEL_TIME=147`) films a poured puddle (wade),
   the deep sea's float, a stroke hop and a dive (swim) from the shoulder camera.
 - **Player model** (`PlayerModel.cs`): the existing `Pose` is post-processed by `SwimPose.ApplySwim` and
@@ -266,8 +266,8 @@ overshoot or jiggle.
   `PlayerModel.HitStop`, which holds that swing at its impact pose (full extension, or
   `SliceImpactProgress`) and then replays the rest faster, so the swing still ends when it would have:
   the slice combo, the jab pace and `AttackPacing` never see it, and the world, mobs and movement
-  never stop. `Camera.HoldPunchFov` holds the pinch while `PlayerModel.IsHitStopped`. The item
-  debugger never requests one. `visual-examples/hit-stop.json` films it.
+  never stop. `Camera.HoldPunchFov` holds the pinch while `PlayerModel.IsHitStopped`. DevStudio
+  never requests one. `visual-examples/hit-stop.json` films it.
 - **Death** plays for `RespawnPrompt.DelaySeconds` (the view tips over, the body falls), then the
   **death screen** (`MenuRenderer.DrawDeathScreen`, `DeathScreenLayout`, drawn by
   `UiPasses.RenderDeathScreen`) covers the world with the death line and a RESPAWN button, in
@@ -434,7 +434,7 @@ overshoot or jiggle.
   in server mode) runs the local trail and one per remote player: a remote's held item is not on the
   wire, so while it swings the client assumes, and `PlayerPasses.RenderRemotePlayers` draws, the first
   item with that attack pattern (`SliceTrailSystem.AssumedBlade` over `ItemRegistry.FindByAttack`). The
-  item debugger's trail is fed per fixed step, so a scrub rebuilds it (see "Build and run").
+  DevStudio's trail is fed per fixed step, so a scrub rebuilds it (see "Build and run").
   `visual-examples/slice-trail.json` (`VOXEL_TIME=147`, using the `player` op's `slicereturn` action)
   films every swing; `SliceTrailTests`, `SliceTrailRibbonTests`, `SliceTrailGlowTests`,
   `SliceTrailSystemTests`, `SliceTrailContentTests` and `ServerWorldTests.AServerModeWorldFeedsNoSliceTrail`
@@ -451,8 +451,8 @@ overshoot or jiggle.
 - **Verification**: `visual-examples/animations.json` (run with `VOXEL_TIME=147`) films the player's
   poses from the shoulder camera and the mobs' spawn, hit and death; its `damage`, `view` and
   `player` ops (`hurt`, `punch`, `slice`, `slicereturn`, `cut`, `backcut`, `chop`, `axechop`, `equip`, `charge`, `release`, `throw`, `draw`, `loose`, `cast`, `die`, `revive`) exist for it. For
-  iterating on a single animation prefer the **item debugger** (see "Build and run"): its ITEMS tab has a
+  iterating on a single animation prefer the **DevStudio** (see "Build and run"): its ITEMS tab has a
   button for every player animation and its ENTITIES tab previews the goblin and slime life-cycles,
-  including the slime's code-driven squash, with `ITEM_DEBUGGER_PLAYER_ANIM` / `ITEM_DEBUGGER_ANIM` and
-  `ITEM_DEBUGGER_SHOT_AT` for scripted captures. A new player animation gets a mode in
+  including the slime's code-driven squash, with `DEV_STUDIO_PLAYER_ANIM` / `DEV_STUDIO_ANIM` and
+  `DEV_STUDIO_SHOT_AT` for scripted captures. A new player animation gets a mode in
   `PlayerPreviewState`, a new mob animation a mode in `EntityPreviewState`.

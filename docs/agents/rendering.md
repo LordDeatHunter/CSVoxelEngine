@@ -405,7 +405,7 @@ tooltip. `ui-fragment.glsl` has a `uChrome` mode with five vec4 uniforms (`uChro
 `uChromeLayers`, `uChromeShape`, `uChromeMotion`). With `uChrome` 1 the quad is a row or the tooltip box:
 `fTexCoord` runs 0..1 across it with y down, so the unit square needs no new vertex data. `RarityChromeRenderer`
 (`Ui.Chrome`, built by `UIRenderer`) draws one such quad over the row or box fill and sets `uChrome` back to 0
-right after it, so every rect, icon and text draw (and the ItemDebugger, where GL's default 0 holds) keeps the
+right after it, so every rect, icon and text draw (and the DevStudio, where GL's default 0 holds) keeps the
 plain path. The layers are a rarity-colored border band and a soft inner glow, both breathing by the pulse; a
 wash fading in from the row's left or the tooltip's top; a slanted white sheen that sweeps across once a
 `SheenPeriodSeconds` (`MathUtils.Sweep`, staggered `SheenRowStaggerSeconds` per row so it cascades down a list)
@@ -474,7 +474,7 @@ sun and dry eyes. Whether sunlight reaches the leaf from behind is the shadow ma
 from the dark side read as self-shadowed at their own position), so a crown's thin, sunlit rim
 lights up while leaves deep in its own shadow stay dark; the shadow pass is untouched.
 `LeafBacklight.Weight` is the GL-free twin (`LeafBacklightTests`); `uLeafBacklight` 0 (the
-ItemDebugger) switches it off. `visual-examples/leaf-backlight.json` (`VOXEL_TIME=1100`, a morning
+DevStudio) switches it off. `visual-examples/leaf-backlight.json` (`VOXEL_TIME=1100`, a morning
 sun behind an oak crown).
 
 **Grass wind shimmer.** Soft bright bands lie across the wind on the grass tops and roll downwind
@@ -496,7 +496,7 @@ is two octaves of the shader's `ValueNoise` drifting slowly against each other, 
 the surface brighten and dim over seconds on top of the existing fast sine pulse; applied in linear
 light, the dim phase reaches the clipped molten texels too. `LavaPulse` is the GL-free twin (its
 `Hash12`/`ValueNoise` are float ports of the shader's; `LavaPulseTests`: bounded, identity at zero
-strength, smooth, slow); `uLavaPulse` 0 (the ItemDebugger) switches it off. `lava.json` ends with
+strength, smooth, slow); `uLavaPulse` 0 (the DevStudio) switches it off. `lava.json` ends with
 two shots of the pool 2.5 s apart (`pulse_a`, `pulse_b`).
 
 **Glass sheen.** Glass blocks and panes share the glass tile (`uGlassLayer`) and draw blended in the
@@ -507,7 +507,7 @@ alone would vanish under glass's low tile alpha, so the sky is folded into the b
 writes alpha `a + F - aF` (`glassAlpha`, which replaces `texAlpha` at the end) and color
 `(c a (1 - F) + sky F) / alpha`, which straight-alpha blended over any background is exactly the
 plain glass composite mixed toward the sky by F. `GlassSheen` is the GL-free twin (`GlassSheenTests`
-proves that identity); `uGlassSheen` 0 (the ItemDebugger) switches it off.
+proves that identity); `uGlassSheen` 0 (the DevStudio) switches it off.
 `visual-examples/glass-sheen.json` (`VOXEL_TIME=147`) places glass and panes on the frozen plain and
 frames them head-on, grazing and from above.
 
@@ -526,7 +526,7 @@ out over `uForcefieldFade` before a cell turns subpixel, so a far dome is only t
 tuning is `SurfaceShadingConfig.Forcefield*`; the shape literals (the lattice, the edge width, the
 flicker and band rates) are written in both the shader and `ForcefieldShimmer`, its GL-free twin
 (`ForcefieldShimmerTests`: faintest head-on, the background always dominates, the honeycomb repeats, the
-film moves, nothing but the film far away). `uForcefield` 0 (the ItemDebugger) leaves the plain
+film moves, nothing but the film far away). `uForcefield` 0 (the DevStudio) leaves the plain
 placeholder tile. Like glass it writes depth, so particles behind the dome are hidden.
 `visual-examples/tower-dome.json` (`VOXEL_TIME=147`, and 1494 for night) films it.
 

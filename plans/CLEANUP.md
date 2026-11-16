@@ -21,7 +21,7 @@ Nothing.
 
 - [ ] `src/World.cs` (~1,000 lines, has a stated reason): check whether anything is still worth
   extracting; AGENTS.md names no next candidate.
-- [ ] ItemDebugger `ItemDebuggerUi.cs` / `ItemDebuggerProgram.cs` (~665 lines each): borderline.
+- [ ] DevStudio `DevStudioUi.cs` / `DevStudioProgram.cs` (~665 lines each): borderline.
 - [ ] Test files over 700 lines (GameServerTests, LodManagerTests, TreeGrowthTests,
   TreeGrowerTests, GeometryAllocatorTests, MeshingTests, PlayerModelTests, LeafDecayTests): split
   by rule area. Lower priority.

@@ -12,8 +12,8 @@ namespace VoxelEngine.Particles;
 /// tip edge, wispy streaks) from <c>slice-trail-fragment.glsl</c>, whose GL-free twin is
 /// <see cref="SliceTrailGlow"/>. Additive light needs no sort, depth is tested but never written,
 /// and back-face culling is off because the ribbon is seen from both sides. Binds no texture.
-/// With <c>linearOutput</c> the sRGB trail color is decoded for the game's HDR target; the item
-/// debugger, which renders in display space, passes false. Main thread only.
+/// With <c>linearOutput</c> the sRGB trail color is decoded for the game's HDR target; DevStudio
+///, which renders in display space, passes false. Main thread only.
 /// </summary>
 public sealed class SliceTrailRenderer : IDisposable
 {

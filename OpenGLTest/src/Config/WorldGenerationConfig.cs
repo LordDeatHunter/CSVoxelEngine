@@ -13,7 +13,7 @@ public static class WorldGenerationConfig
     // Every noise channel and worldgen hash derives its seed from this one (TerrainNoise,
     // NoiseCaves, WormCarver, the feature generators). It is runtime state, not a constant: a world
     // sets it through WorldSeed.Apply between worlds (never while one is live), and it defaults to
-    // WorldSeed.Default, so tests, the item debugger and scripted runs see the old fixed seed.
+    // WorldSeed.Default, so tests, DevStudio and scripted runs see the old fixed seed.
     public static int Seed => WorldSeed.Value;
 
     // --- Deterministic worldgen caches (GenerationalCache) ---

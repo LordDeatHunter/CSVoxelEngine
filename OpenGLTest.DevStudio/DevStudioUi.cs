@@ -6,7 +6,7 @@ using VoxelEngine.Data;
 using VoxelEngine.Items;
 using VoxelEngine.Rendering.Overlays;
 
-namespace VoxelEngine.ItemDebugger;
+namespace VoxelEngine.DevStudio;
 
 public enum DebugButton
 {
@@ -56,7 +56,7 @@ public sealed class DebugSlider
 }
 
 /// <summary>
-/// Immediate-mode UI for the item debugger: an item grid on the left, transform sliders and
+/// Immediate-mode UI for DevStudio: an item grid on the left, transform sliders and
 /// animation-preview buttons on the right. Three tab buttons at the top of the left panel switch
 /// the grid between items, entities and tree species. On the entities tab the right panel holds
 /// one button per mode of the selected entity (its clips, then HURT) and nothing else; on the
@@ -65,7 +65,7 @@ public sealed class DebugSlider
 /// <see cref="Draw"/> and kept so the next frame's mouse-down can hit-test it, mirroring how the
 /// game's panels work.
 /// </summary>
-public sealed class ItemDebuggerUi
+public sealed class DevStudioUi
 {
     public readonly record struct GridEntry(ushort Id, string Name, bool IsBlock);
 
@@ -109,15 +109,15 @@ public sealed class ItemDebuggerUi
     private int _columns = 5;
     private int _visibleRows = 1;
     // One scroll position per tab, so switching back to ITEMS finds the grid where it was left.
-    private readonly int[] _scrollByTab = new int[Enum.GetValues<DebuggerTab>().Length];
-    private DebuggerTab _tab;
+    private readonly int[] _scrollByTab = new int[Enum.GetValues<StudioTab>().Length];
+    private StudioTab _tab;
     private int _gridCount;
 
     private readonly List<(Vector2 Center, Vector2 Size, int Entry)> _slots = new();
     private readonly List<DebugSlider> _sliders = new();
     private readonly List<(Vector2 Center, Vector2 Size, DebugButton Button, int Arg, string Label, bool Enabled, bool Active)> _buttons = new();
 
-    public ItemDebuggerUi()
+    public DevStudioUi()
     {
         var entries = new List<GridEntry>();
         foreach (var (id, item) in ItemRegistry.ById)
@@ -194,7 +194,7 @@ public sealed class ItemDebuggerUi
         slider.Min + Fraction(slider, x) * (slider.Max - slider.Min);
 
     public void Draw(UIRenderer ui, ItemDisplayEditor editor, EntityPreviewState entities, TreePreviewState trees,
-        DebuggerTab tab, PlayerPreviewState player, Vector2 screen, string status, bool firstPerson,
+        StudioTab tab, PlayerPreviewState player, Vector2 screen, string status, bool firstPerson,
         AnimationClock? timeline = null)
     {
         _tab = tab;
@@ -204,17 +204,17 @@ public sealed class ItemDebuggerUi
         BuildTabs(tab);
         var count = tab switch
         {
-            DebuggerTab.Entities => entities.Entries.Count,
-            DebuggerTab.Trees => trees.Entries.Count,
+            StudioTab.Entities => entities.Entries.Count,
+            StudioTab.Trees => trees.Entries.Count,
             _ => Entries.Count,
         };
         BuildGrid(screen, count, tab);
         switch (tab)
         {
-            case DebuggerTab.Entities:
+            case StudioTab.Entities:
                 BuildEntityControls(entities, screen);
                 break;
-            case DebuggerTab.Trees:
+            case StudioTab.Trees:
                 BuildTreeControls(trees, screen);
                 break;
             default:
@@ -223,7 +223,7 @@ public sealed class ItemDebuggerUi
         }
 
         // The timeline runs along the bottom of the viewport between the two panels (ITEMS and ENTITIES only).
-        if (timeline != null && tab != DebuggerTab.Trees)
+        if (timeline != null && tab != StudioTab.Trees)
             BuildTimeline(timeline, screen);
 
         DrawPanel(ui, new Vector2(Pad + PanelWidth * 0.5f, screen.Y * 0.5f),
@@ -235,11 +235,11 @@ public sealed class ItemDebuggerUi
 
         switch (tab)
         {
-            case DebuggerTab.Entities:
+            case StudioTab.Entities:
                 DrawEntityGrid(ui, entities);
                 DrawEntityTitle(ui, entities, screen);
                 break;
-            case DebuggerTab.Trees:
+            case StudioTab.Trees:
                 DrawTreeGrid(ui, trees);
                 DrawTreeTitle(ui, trees, screen);
                 break;
@@ -251,29 +251,29 @@ public sealed class ItemDebuggerUi
         DrawControls(ui);
     }
 
-    private void BuildTabs(DebuggerTab tab)
+    private void BuildTabs(StudioTab tab)
     {
         var width = (PanelWidth - Pad * 2f - ButtonGap * 2f) / 3f;
         var y = Pad + 6f + ButtonH * 0.5f;
         var left = Pad + Pad;
         AddButton(new Vector2(left + width * 0.5f, y), new Vector2(width, ButtonH), DebugButton.TabItems,
-            "ITEMS", true, tab == DebuggerTab.Items);
+            "ITEMS", true, tab == StudioTab.Items);
         AddButton(new Vector2(left + width * 1.5f + ButtonGap, y), new Vector2(width, ButtonH),
-            DebugButton.TabEntities, "ENTITIES", true, tab == DebuggerTab.Entities);
+            DebugButton.TabEntities, "ENTITIES", true, tab == StudioTab.Entities);
         AddButton(new Vector2(left + width * 2.5f + ButtonGap * 2f, y), new Vector2(width, ButtonH),
-            DebugButton.TabTrees, "TREES", true, tab == DebuggerTab.Trees);
+            DebugButton.TabTrees, "TREES", true, tab == StudioTab.Trees);
     }
 
-    private void BuildGrid(Vector2 screen, int count, DebuggerTab tab)
+    private void BuildGrid(Vector2 screen, int count, StudioTab tab)
     {
         _slots.Clear();
         _gridCount = count;
 
         var available = PanelWidth - Pad * 2f;
-        var slotSize = tab != DebuggerTab.Items
+        var slotSize = tab != StudioTab.Items
             ? new Vector2((available - (EntityColumns - 1) * SlotGap) / EntityColumns, SlotSize)
             : new Vector2(SlotSize);
-        _columns = tab != DebuggerTab.Items
+        _columns = tab != StudioTab.Items
             ? EntityColumns
             : Math.Max(1, (int)((available + SlotGap) / (SlotSize + SlotGap)));
         var strideX = slotSize.X + SlotGap;

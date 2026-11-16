@@ -19,8 +19,8 @@
     <ItemGroup>
         <!-- The test project drives internal seams (GenerateMeshData(greedy), BakesGreedy, TiledUv) -->
         <InternalsVisibleTo Include="VoxelEngine.Tests" />
-        <!-- The item debugger previews mobs the way a client drives them (NetworkSetState) -->
-        <InternalsVisibleTo Include="VoxelEngine.ItemDebugger" />
+        <!-- DevStudio previews mobs the way a client drives them (NetworkSetState) -->
+        <InternalsVisibleTo Include="VoxelEngine.DevStudio" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Mono.Nat" Version="3.0.4" />

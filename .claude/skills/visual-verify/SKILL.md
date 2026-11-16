@@ -5,7 +5,7 @@ description: Drive and screenshot the CSVoxelEngine game with VOXEL_SCRIPT scena
 
 # Visual verification
 
-**Animations, held items and models: start in the item debugger, not a scenario** - see the `item-debugger`
+**Animations, held items and models: start in DevStudio, not a scenario** - see the `dev-studio`
 skill (modes, timeline, env vars, how to tune a pose from the sliders). Use a `VOXEL_SCRIPT` scenario
 (below) only to see them in the real world, with the camera, terrain and lighting around them. When you add
 or change an animation, give it a debugger mode.

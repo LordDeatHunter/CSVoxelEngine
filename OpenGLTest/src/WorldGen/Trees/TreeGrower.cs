@@ -289,7 +289,7 @@ public static class TreeGrower
     /// counts as 0) from the same <see cref="SeedFor"/> stream worldgen uses: the maturity roll is
     /// still drawn first, so the energy and every later draw match a worldgen tree, but its step
     /// count is discarded. A final <see cref="Thicken"/> follows, then the species' features when
-    /// <paramref name="applyFeatures"/> is set. This is the item debugger's scrub path.
+    /// <paramref name="applyFeatures"/> is set. This is DevStudio's scrub path.
     /// <para>
     /// <c>GrowSteps(..., MaturityStepsAt(...), applyFeatures: true)</c> is exactly
     /// <see cref="GrowToMaturity(TreeSpecies, int, int, int, ITreeSpace, int)"/>. Pulses only

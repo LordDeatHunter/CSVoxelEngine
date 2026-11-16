@@ -62,7 +62,7 @@ internal sealed class RarityChromeRenderer
         shader.SetUniform(_locShape, inputs.Shape);
         shader.SetUniform(_locMotion, inputs.Motion);
         _ui.DrawMesh(_ui.UnitSquare, UIRenderer.RectTransform(center, new Vector2(inputs.Box.X, inputs.Box.Y)));
-        // Every other ui draw (rects, icons, text, the ItemDebugger) must see the plain path.
+        // Every other ui draw (rects, icons, text, the DevStudio) must see the plain path.
         shader.SetUniform(_locChrome, 0);
     }
 }

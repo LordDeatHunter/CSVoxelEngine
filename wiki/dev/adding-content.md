@@ -36,7 +36,7 @@ Cook, crush, melt, cast and alloy recipes live in their own subfolders; see [Con
 
 ## A new mob
 
-Add `assets/data/entities/<name>.json` and a Blockbench `.bbmodel` with its skin PNG next to it. Entity models must be authored in Blockbench. Use the item debugger's ENTITIES tab to check the clips before writing any gameplay code.
+Add `assets/data/entities/<name>.json` and a Blockbench `.bbmodel` with its skin PNG next to it. Entity models must be authored in Blockbench. Use DevStudio's ENTITIES tab to check the clips before writing any gameplay code.
 
 ## Checking your work
 

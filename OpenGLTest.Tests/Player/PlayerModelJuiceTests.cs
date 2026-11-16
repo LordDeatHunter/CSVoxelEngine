@@ -1,5 +1,5 @@
 using System;
-using VoxelEngine.ItemDebugger;
+using VoxelEngine.DevStudio;
 using VoxelEngine.Player;
 using Xunit;
 

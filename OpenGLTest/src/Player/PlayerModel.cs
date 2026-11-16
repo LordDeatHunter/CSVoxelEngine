@@ -323,7 +323,7 @@ public class PlayerModel
 
     /// <summary>
     /// Degrees the pose adds to the held item's own display rotation, in the item JSON's <c>[pitch, yaw, roll]</c>
-    /// order (what <c>Item.DisplayMatrix</c> and the item debugger's Rot sliders take), so a value found by sliding
+    /// order (what <c>Item.DisplayMatrix</c> and DevStudio's Rot sliders take), so a value found by sliding
     /// them at a frame of an animation transfers here unchanged. Zero at rest; through the main part of a blade swing
     /// it is that swing's mid-cut turn (<see cref="SliceMotion.SliceBladeDisplayYawDegrees"/>,
     /// <see cref="SliceMotion.SliceBladeDisplayRollDegrees"/> for the slice, the yaw mirrored for the return swing;

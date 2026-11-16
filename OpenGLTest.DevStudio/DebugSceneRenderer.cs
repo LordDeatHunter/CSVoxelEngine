@@ -21,10 +21,10 @@ using VoxelEngine.Rendering.Overlays;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace VoxelEngine.ItemDebugger;
+namespace VoxelEngine.DevStudio;
 
 /// <summary>
-/// A minimal standalone renderer for the item debugger: content registry, block atlas, the
+/// A minimal standalone renderer for DevStudio: content registry, block atlas, the
 /// world shader and the player/item meshes, without the game's chunk and LOD geometry pools
 /// (which would allocate hundreds of megabytes to draw one model). Player and held-item
 /// matrices come straight from <see cref="PlayerModel"/> and <see cref="RenderManager.PoseHeldItem"/>,

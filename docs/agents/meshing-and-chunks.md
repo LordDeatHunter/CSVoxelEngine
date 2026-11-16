@@ -56,7 +56,7 @@ an SSBO at binding 1 (binding 0 is `ChunkDrawBatch`'s `ChunkInfo`). Material is 
 than by block precisely so the feature stays off the vertex - no new attribute, no wider `Vertex`,
 no change to the greedy merge key - at the cost that two blocks sharing a texture share its
 material, which `TileMaterials.Build` warns about instead of silently resolving. `uMaterialCount`
-is the switch for the whole path and stays 0 wherever the buffer is not bound (the ItemDebugger
+is the switch for the whole path and stays 0 wherever the buffer is not bound (the DevStudio
 loads the same shaders), so an unbound buffer is never read. `test-vertex.glsl` emits the `fTangent`
 / `fBitangent` frame the normal map is read in, and it has to agree with `ChunkFaceTables.TiledUv`'s per-face
 UV orientation or the relief comes out rotated or mirrored per face. `visual-examples/ores.json` is the screenshot check, and wants a `VOXEL_TIME` since the highlight
@@ -66,7 +66,7 @@ lifts an add on the near-black body far more than it did in display space and sm
 specks into gray. Every other (non-ore, non-water) tile is plain diffuse: the SH-23 grazing sky
 rim was removed because it tinted grazing foliage teal. The one exception is the **snow sparkle**,
 not part of the material system: the snow block's tile (`uSnowLayer`, its `Top`, set in
-`InitWorldProgram`; `uSnowSparkle` 0 switches it off, as in the ItemDebugger) gets a separate term
+`InitWorldProgram`; `uSnowSparkle` 0 switches it off, as in the DevStudio) gets a separate term
 (`SnowGlint`): a `SnowSparkleDensity` share of texels, hashed (`Pcg3d`) from the texel's place on
 the face's own plane in texture-pixel space (`SnowTexels` must equal the tile size,
 `SnowSparkleTests`), carries a random cosine-weighted facet, and its whole texel flashes with
@@ -77,7 +77,7 @@ Sunlit snow sits ~2x past the tonemap clip for most of a day, so the glints only
 under the clip, i.e. a low sun: `visual-examples/snow-sparkle.json` at `VOXEL_TIME=405`.
 
 The **ice glint** is a second such tile term, on the ice block's tile (`uIceLayer`; `uIceGlint` 0
-switches it off, as in the ItemDebugger): a fresnel sheen of the sky the face mirrors
+switches it off, as in the DevStudio): a fresnel sheen of the sky the face mirrors
 (`SkySample` of the reflected view ray, blended to `uFogColor` by `uFogWet`, dimmed by skylight)
 mixed over the lit ice by `IceSheenStrength * Schlick`, the way the ore mixes its sky, plus a
 Blinn sun highlight (`IceGlintShine`) of `IceGlintStrength` times the direct sun, added in linear

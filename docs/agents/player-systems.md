@@ -304,8 +304,8 @@ the groups `Base` and `Lid`, the lid hinged along its back edge and carrying the
 as the static block model is (`ChestModel.Root`, the state's low two bits), lit by one light sample and cast into the near
 shadow cascade; it is not drawn in the water mirror. Chests differ only in their skin: `chest.skin` (required, checked at
 load) names a PNG under `assets/textures/chests/` laid out like the model's own texture (128 x 128 over 64 x 64 UV units,
-two texels per model pixel like a block tile). The model embeds the wooden skin, which is what Blockbench and the item
-debugger show. The JSON `models/block/chest.json` stays the block's static twin (the inventory icon, the held block, drops
+two texels per model pixel like a block tile). The model embeds the wooden skin, which is what Blockbench and DevStudio
+show. The JSON `models/block/chest.json` stays the block's static twin (the inventory icon, the held block, drops
 and break particles): two boxes that fill the hitbox exactly, the latch only painted on. `tools/generate-chest-textures.py`
 writes every skin and cuts the twin's three tiles from the same faces; the skin layout in it is the one the model's faces
 were mapped to in Blockbench.
@@ -318,7 +318,7 @@ server world's `ChestLids.SetViewed`, they ride the end of every `StationState` 
 frames coming while a chest is open) and a client reads them back in `ClientMirror.ApplyNetworkStations`. Nothing is
 saved: every lid is shut after a load. `ChestLids.Wobble(x, y, z)` plays the `wobble` clip, a locked chest's rattle (the
 body rocks, the lid jumps against its latch), on a shut and resting chest only. No chest is locked yet, so nothing in
-play calls it: the `chestwobble` scenario op and the item debugger's Chest entry show it. A lid is posed by `ClipPose`
+play calls it: the `chestwobble` scenario op and DevStudio's Chest entry show it. A lid is posed by `ClipPose`
 (one clip at one time, no blending) through `RigPose` (see "Entity animation"). `ChestLidTests`,
 `ChestServerTests.AChestStandsOpenForEveryoneWhileAnyPlayerLooksIntoItAndShutsWhenTheLastLeaves`; the `lid-` shots of
 `visual-examples/chests.json`.

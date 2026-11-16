@@ -375,7 +375,7 @@ const LENS_GUIDE = `Recommended scout lenses by kind (adapt them to the task; br
 - god-class-split:
   (a) JOBS MAP: every member of the target grouped into candidate responsibilities, with line ranges, the fields each group reads and
       writes, and a coupling table of which groups call which;
-  (b) SURFACE: every reference to the target's members from other files (the game, OpenGLTest.ItemDebugger, OpenGLTest.Server, the tests)
+  (b) SURFACE: every reference to the target's members from other files (the game, OpenGLTest.DevStudio, OpenGLTest.Server, the tests)
       and every doc or cref mention (AGENTS.md, .claude/skills, plans/PERF.md, TODO.md, XML crefs);
   (c) INVARIANTS: the AGENTS.md rules and the code-level order, threading, GL-thread and allocation constraints the moved code carries,
       and which tests exercise it;
@@ -560,7 +560,7 @@ You are fact-checking the architect's plan against the code before anyone edits.
 1. every named file, type and member exists where the step says (line ranges roughly right);
 2. every member the step moves has its dependencies covered: the fields, helpers, nested types, constants and usings it needs are moved with
    it, reachable from the new owner the way the step says, or deliberately left behind; name each uncovered one;
-3. no caller of a moved member is missing from the call-site updates (grep every project, the tests, the ItemDebugger and the Server);
+3. no caller of a moved member is missing from the call-site updates (grep every project, the tests, the DevStudio and the Server);
 4. no new class, folder or namespace name collides with an existing type or namespace segment;
 5. every destination folder stays at or under ~22 files;
 6. no step changes the order of statements or calls on an update or render path, or moves a GL call off the render thread;

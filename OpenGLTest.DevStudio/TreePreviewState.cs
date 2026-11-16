@@ -5,10 +5,10 @@ using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace VoxelEngine.ItemDebugger;
+namespace VoxelEngine.DevStudio;
 
 /// <summary>
-/// GL-free state behind the item debugger's TREES tab: which <see cref="TreeSpecies"/> is
+/// GL-free state behind DevStudio's TREES tab: which <see cref="TreeSpecies"/> is
 /// previewed, at which growth step and from which seed. The selected species is grown pulse by
 /// pulse (<see cref="TreeGrower.GrowSteps"/>) over flat ground at an explicit seed — never the
 /// global <see cref="WorldSeed"/> — so scrubbing the step back and forth always shows the same

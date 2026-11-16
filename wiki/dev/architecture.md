@@ -5,7 +5,7 @@
 | Project | Role |
 |---|---|
 | `OpenGLTest/` (`VoxelEngine.csproj`) | The game. All code is under the `VoxelEngine` namespace, one sub-namespace per folder. |
-| `OpenGLTest.ItemDebugger/` | Preview tool for held items, player animations, entity models and trees. |
+| `OpenGLTest.DevStudio/` | Preview tool for held items, player animations, entity models and trees. |
 | `OpenGLTest.Server/` | The dedicated CLI server. |
 | `OpenGLTest.Tests/` | xUnit tests, headless (no window). |
 | `tools/` | Deterministic asset generators (tiles, sprites, models, clips). |

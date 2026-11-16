@@ -356,7 +356,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       FallTracker.cs           # GL-free fall-damage rule: peak/grounded chain fed one feet height at a time
                                #   (singleplayer's LocalPlayer.UpdateHealth and each ServerPlayer's accepted states)
       HeldItemPose.cs          # GL-free held-item sizing and the drawn sprite matrix (SpriteMatrix, BackOffset), shared
-                               #   by PlayerPasses, the slice trail and the item debugger
+                               #   by PlayerPasses, the slice trail and DevStudio
       HeadMotion.cs            # the per-frame view juice (bob, roll, landing dip, hit kick, FOV punch, sprint FOV, throw
                                #   zoom, strafe tilt, crouch drop, death view, damage arc and droplet aging) folded into
                                #   Roll/BobHeight/BobStrafe/CurrentFov
@@ -451,11 +451,11 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   grid into an R8 map bound ONCE on unit 8 (nothing else may
                                #   bind that unit); CloudShadow in test-fragment.glsl projects
                                #   each fragment up the sun ray to CloudHeight and dims the sun
-                               #   term there, off while uCloudShadowStrength is 0 (ItemDebugger,
+                               #   term there, off while uCloudShadowStrength is 0 (DevStudio,
                                #   clouds turned off); visual-examples/cloud-shadows.json
                                #   owns the two ChunkGeometryPools and the ChunkDrawBatch every chunk
                                #   pass draws through; builds the pass components below and carries
-                               #   the static facade the item debugger and tests read (PlayerModelPath,
+                               #   the static facade DevStudio and tests read (PlayerModelPath,
                                #   the held-item sizing, PoseHeldItem, FireLightOffset, GroundAmbientOf)
       RenderTargets.cs         # the HDR scene target (RGBA16F color, sampleable depth, the color-only FBO the
                                #   contact AO draws through), the scene copies and the half-res rays target, all

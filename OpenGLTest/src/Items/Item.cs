@@ -46,8 +46,8 @@ public abstract class Item
 
     /// <summary>
     /// File name (no extension) of the JSON under <c>assets/data/items</c> this item was built
-    /// from; empty for synthetic items and block items, which own no item JSON. The item
-    /// debugger writes a pure item's <c>display</c> block back to this file.
+    /// from; empty for synthetic items and block items, which own no item JSON. DevStudio
+    /// writes a pure item's <c>display</c> block back to this file.
     /// </summary>
     public string SourceName { get; internal init; } = "";
 

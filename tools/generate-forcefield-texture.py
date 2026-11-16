@@ -2,7 +2,7 @@
 
 Writes OpenGLTest/assets/textures/blocks/tower_forcefield.png: the roof dome's forcefield (TowerDome), a faint cyan
 honeycomb, nearly clear. It is only the fallback where the world shader's own shimmer is off (the forcefield term in
-test-fragment.glsl, ForcefieldShimmer; the ItemDebugger), since the block draws translucent and the shader replaces its
+test-fragment.glsl, ForcefieldShimmer; the DevStudio), since the block draws translucent and the shader replaces its
 color and alpha.
 
 No randomness and no image library: every texel comes from integer geometry, and the PNG writer below (stdlib zlib and

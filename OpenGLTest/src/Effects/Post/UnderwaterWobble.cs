@@ -7,8 +7,8 @@ namespace VoxelEngine.Effects.Post;
 /// GL-free twin of the underwater screen wobble (post-fragment.glsl's <c>uUnderwater</c>): while the
 /// eye is under water the whole image sways gently, every pixel read from a point offset by two slow
 /// waves across the screen. The post pass feeds that offset point to FXAA, so the anti-aliasing reads
-/// around the same displaced coordinate the pixel shows. Zero strength (dry air, lava, the item
-/// debugger, which never runs this pass) leaves every pixel where it is.
+/// around the same displaced coordinate the pixel shows. Zero strength (dry air, lava, DevStudio
+///, which never runs this pass) leaves every pixel where it is.
 /// </summary>
 public static class UnderwaterWobble
 {

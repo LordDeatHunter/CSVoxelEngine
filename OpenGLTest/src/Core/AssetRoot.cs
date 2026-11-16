@@ -6,7 +6,7 @@ namespace VoxelEngine.Core;
 
 /// <summary>
 /// Finds the engine's <c>assets</c> directory for the programs that do not run from the game
-/// project's folder: the dedicated server, the item debugger and the test fixture. Each keeps its
+/// project's folder: the dedicated server, DevStudio and the test fixture. Each keeps its
 /// own search rule. The game itself opens assets relative to its working directory and never
 /// calls this.
 /// </summary>
@@ -43,7 +43,7 @@ public static class AssetRoot
 
     /// <summary>
     /// Points the process at the engine's <c>assets</c> directory before any content loads (the
-    /// item debugger). The engine opens every asset by the relative path <c>assets/...</c>, so the
+    /// DevStudio). The engine opens every asset by the relative path <c>assets/...</c>, so the
     /// working directory has to contain it. Searches the working directory, then the base
     /// directory, each up to <c>SearchDepth</c> levels up. The engine source tree is preferred over
     /// a copied build output, because <c>[SAVE]</c> writes item JSON back through that same

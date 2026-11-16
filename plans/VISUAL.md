@@ -24,6 +24,6 @@ Tracks particles, animations and other non-gameplay feel work. Last updated 2026
 
 ## Reference
 
-- Iterate on animations in the item debugger first (`item-debugger` skill), then film with a `VOXEL_SCRIPT` scenario (`visual-verify` skill).
+- Iterate on animations in DevStudio first (`dev-studio` skill), then film with a `VOXEL_SCRIPT` scenario (`visual-verify` skill).
 - Cosmetic effects never run on a headless server; a client must reproduce them from mirrored state (see "Animation juice" in `AGENTS.md`).
 - Time-driven curves belong in `MathUtils`, not inline.

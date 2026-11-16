@@ -22,7 +22,7 @@ Repository: C# / .NET 9 Minecraft-style voxel engine using Silk.NET. Working dir
 AGENTS.md is already in your context. It is small: it holds the non-negotiable rules, the standing code-organization rules and a topic index into docs/agents/.
 TOKEN RULE: never read a whole docs file. Find the section with  grep -n "^#\\|^\\*\\*" docs/agents/<file>.md  and Read only that range (offset/limit).
 To find where a type or file lives:  grep -rn "<name>" docs/agents/  (the layout-*.md files list every source file with its purpose), then read the source.
-Skills (.claude/skills/*/SKILL.md) are short procedures: read only the ones your task needs (add-content, edit-path-checklist, shader-sync, functional-tests, visual-verify, item-debugger, biome-worldgen, crlf-safe-edit).
+Skills (.claude/skills/*/SKILL.md) are short procedures: read only the ones your task needs (add-content, edit-path-checklist, shader-sync, functional-tests, visual-verify, dev-studio, biome-worldgen, crlf-safe-edit).
 The code is C# 14 and needs the .NET 10 SDK, which is the system "dotnet" (~/.dotnet is a 9.0.100 SDK that cannot compile it); prefix with DOTNET_ROLL_FORWARD=LatestMajor:
   build: DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release
   tests: DOTNET_ROLL_FORWARD=LatestMajor dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release --filter "<filter>"
@@ -84,7 +84,7 @@ Process:
 3. Implement. Follow AGENTS.md's non-negotiables and standing rules (namespaces mirror folders, American English, no dead code, early returns, constants in Config/, new content as JSON). Use the relevant skill for block-edit paths, shaders and content.
 4. Tests: add a test only where there is a rule to lock down (functional-tests skill), never a constant or layout pin.
 5. Docs, in the same change: edit the docs/agents/ section that owns what you changed (and its layout-*.md line if a file was added, moved or removed); record any placeholder art in USER_TODO.md; tick or add the plans/ item if one exists for this work. Keep the edits minimal and in the surrounding style. Do not touch AGENTS.md unless the index, a non-negotiable or a standing rule changed.
-6. Visible result? Write or extend ONE small VOXEL_SCRIPT scenario in OpenGLTest/visual-examples/ (3-5 screenshots, reuse the VOXEL_TIME of the nearest existing scenario; see the visual-verify skill and grep docs/agents/dev-tools.md for the ops). Give each screenshot one concrete expectation in visualCheck.expect. Animations, held items and models: also add or check the item debugger mode (item-debugger skill).
+6. Visible result? Write or extend ONE small VOXEL_SCRIPT scenario in OpenGLTest/visual-examples/ (3-5 screenshots, reuse the VOXEL_TIME of the nearest existing scenario; see the visual-verify skill and grep docs/agents/dev-tools.md for the ops). Give each screenshot one concrete expectation in visualCheck.expect. Animations, held items and models: also add or check DevStudio mode (dev-studio skill).
 7. Do NOT build, run tests or launch the game: the verify agent does that. You may run a quick compile-only check if you are unsure about an API, but keep it to that.
 No branches, no commits, no stashes. Work in the current working tree.`
 

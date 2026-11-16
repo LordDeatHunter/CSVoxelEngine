@@ -120,7 +120,7 @@ OpenGLTest/
       PlayerPlacedIndex.cs     # the player-placed cells bucketed by chunk, the restored-placement queue and its adoption, the unload snapshot's placed indices
       Meshing/                 # the mesh build: the greedy pass, the procedural emitters, the light volume and corner light
         CellBatchMesher.cs     # GL-free: meshes any TreeCell set with the real chunk mesher over scratch chunks
-                               #   at their real positions inside an empty ring (the item debugger's TREES tab)
+                               #   at their real positions inside an empty ring (DevStudio's TREES tab)
         ChunkFaceTables.cs     # the mesher's per-face tables (neighbor/AO deltas, the AO neighbor table AONeighbors,
                                #   ShadeLut, SmoothLightDivisor) and the shared corner/UV helpers (BoxFaceCorners,
                                #   TiledUv, CropUv, VertexAO)
@@ -392,7 +392,7 @@ OpenGLTest/
     Core/                      # GL-free utilities: math, springs, vectors, color space, logging, the frame
                                #   profiler, launch mode, voxel coordinates, file IO, the assets-directory lookup and the
                                #   vendored FastNoiseLite (never reformat)
-      AssetRoot.cs             # the assets-directory lookup the server, the item debugger and
+      AssetRoot.cs             # the assets-directory lookup the server, DevStudio and
                                #   the test fixture share
       BodyMotion.cs            # GL-free, state-free velocity steps every loose body shares (drops, TNT, falling
                                #   blocks, projectiles, goblins, slimes, debris): gravity, sinking, floating,

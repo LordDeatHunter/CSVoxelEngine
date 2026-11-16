@@ -8,9 +8,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoxelEngine.Tests", "OpenGL
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OpenGLTest", "OpenGLTest", "{44486EBC-36CE-BEBB-F5AC-9FC6AE93CBD1}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OpenGLTest.ItemDebugger", "OpenGLTest.ItemDebugger", "{297E1F7F-FC7A-6612-0C4C-3BA0F187E652}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OpenGLTest.DevStudio", "OpenGLTest.DevStudio", "{297E1F7F-FC7A-6612-0C4C-3BA0F187E652}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoxelEngine.ItemDebugger", "OpenGLTest.ItemDebugger\VoxelEngine.ItemDebugger.csproj", "{BC19C8D6-FFAB-4279-9CBD-2A08DCA41AB5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoxelEngine.DevStudio", "OpenGLTest.DevStudio\VoxelEngine.DevStudio.csproj", "{BC19C8D6-FFAB-4279-9CBD-2A08DCA41AB5}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OpenGLTest.Server", "OpenGLTest.Server", "{E5007977-0127-BB9E-6F56-E9E051152AFD}"
 EndProject

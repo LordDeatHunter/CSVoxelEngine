@@ -201,7 +201,7 @@ All three made by `tools/generate-tower-lock-textures.py`: re-running puts the p
   (its own script, so re-running it touches nothing else). 32x32 RGBA, mostly transparent (alpha
   ~10%, edges ~45%): the roof dome's `cube_all` block draws translucent, and in the game the world
   shader replaces its color and alpha with its own shimmer, so this tile only shows where that term
-  is off (the ItemDebugger). Keep it faint and seamless; it needs no detail.
+  is off (the DevStudio). Keep it faint and seamless; it needs no detail.
 
 ### Battle tower chest
 

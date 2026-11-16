@@ -123,7 +123,7 @@ internal sealed class SelectionPasses : IDisposable
         // A biome-tinted block's pop takes the field at the mined cell, so it matches the
         // terrain it jumps out of (the emitter flags the tinted quads and keeps the rgb shade only).
         // The field comes from the world's column source (a client's is streamed, and a column
-        // that has not arrived draws untinted); no world (the item debugger) means worldgen.
+        // that has not arrived draws untinted); no world (DevStudio) means worldgen.
         var columns = _owner.LightSource?.ColumnSource ?? WorldgenColumnSource.Instance;
         _owner.WorldShader.SetUniform(_owner.LocBiomeTint, type.BiomeTint is { } bt
             && BiomeTint.TryCellTint(columns, bt.Palette, (int)MathF.Floor(blockPosition.X),

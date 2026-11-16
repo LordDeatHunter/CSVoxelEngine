@@ -20,10 +20,10 @@ Other developer variables: `VOXEL_SPAWN` (`x,y,z`), `VOXEL_LOOK` (`yaw,pitch`), 
 
 `X` toggles the debug line and the frame profiler overlay, which shows each section's average and worst cost over the last second and the CPU against GPU time. Measure only in Release.
 
-## Item debugger
+## DevStudio
 
 ```powershell
-dotnet run --project OpenGLTest.ItemDebugger -c Release
+dotnet run --project OpenGLTest.DevStudio -c Release
 ```
 
-Its ITEMS tab previews held items and every player animation on a timeline with scrubbing, its ENTITIES tab previews each mob's clips, and its TREES tab grows any species step by step. Use it first for any animation or model change. Scripted captures use `ITEM_DEBUGGER_SELECT`, `ITEM_DEBUGGER_ANIM`, `ITEM_DEBUGGER_SHOT` and related variables.
+Its ITEMS tab previews held items and every player animation on a timeline with scrubbing, its ENTITIES tab previews each mob's clips, and its TREES tab grows any species step by step. Use it first for any animation or model change. Scripted captures use `DEV_STUDIO_SELECT`, `DEV_STUDIO_ANIM`, `DEV_STUDIO_SHOT` and related variables.

@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
-using VoxelEngine.ItemDebugger;
+using VoxelEngine.DevStudio;
 using VoxelEngine.Player;
 using Xunit;
 
-namespace VoxelEngine.Tests.ItemDebugger;
+namespace VoxelEngine.Tests.DevStudio;
 
 /// <summary>
-/// The item debugger's timeline: speed x0..x4 in tenths, fixed-step stepping, loop on/off, and scrubbing that lands on
+/// DevStudio's timeline: speed x0..x4 in tenths, fixed-step stepping, loop on/off, and scrubbing that lands on
 /// exactly the frames playing would. A fake driver pins the clock's own rules; the real preview states are checked
 /// for being drivable (a duration, a restart that reproduces the same frames, replay handed over to the clock).
 /// </summary>

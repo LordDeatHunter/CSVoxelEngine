@@ -17,11 +17,11 @@ holds: `{ "item", "part", "display" }`, a pure item drawn from its own extruded 
 (`EntityAnimator.HandAnchor`, the bottom of its lowest cube, so it swings with the limb), posed by the item file's
 `display` shape and parser (`ItemLoader.ParseDisplay`, `Item.ComposeDisplay`). The loader checks the item and that every
 variant has the group; `EntityType.HeldItemId`/`HeldPart`/`HeldTransform` carry it and `EntityType.HeldMatrix` is the one
-world matrix the entity pass (`MobPasses.DrawRigParts`), the shadow casters (`ShadowPass.DrawRigCaster`) and the item
-debugger's entity preview draw it with (the skeleton warrior's copper dagger). `ContentRegistry.Load` parses them into
+world matrix the entity pass (`MobPasses.DrawRigParts`), the shadow casters (`ShadowPass.DrawRigCaster`) and DevStudio's
+entity preview draw it with (the skeleton warrior's copper dagger). `ContentRegistry.Load` parses them into
 `EntityType`s published on `EntityRegistry` (`RequireEntity`/`TryGet`), and parses each entity's
 `.bbmodel` once, GL-free, into `EntityType.Model` (a `BbmodelData`: parts, skin pixels and animation
-clips). The entity, the renderer and the item debugger all share that one parse. A broken entity model
+clips). The entity, the renderer and DevStudio all share that one parse. A broken entity model
 therefore fails content load, and with it every test through `TestContent`. Entity models reuse
 `BbmodelLoader`, which takes an optional required-group list: the player rig passes `RequiredParts`,
 entities pass none. The slime draws through `EntityModel`, which bakes the whole project into one mesh
@@ -302,7 +302,7 @@ target stands lower (`LedgeCautionTests`).
 ### Modeled, not wired
 
 Three entities have an entity file, a Blockbench model and clips but **no class, spawn rule, loot or wire kind**: they
-load and show in the item debugger's ENTITIES tab, and nothing in the game raises them. All three were built in
+load and show in DevStudio's ENTITIES tab, and nothing in the game raises them. All three were built in
 Blockbench through its MCP plugin (no generator, the skin embedded; `USER_TODO.md`), face -Z, stand on y = 0 and have
 no rest rotations, so parts the clips fold lie flat along an axis.
 - **Crab** (`crab.json`, hp 14; `plans/TODO.md` `P-61`): the beach's neutral mob, about one block across. `Body`
@@ -335,8 +335,8 @@ no rest rotations, so parts the clips fold lie flat along an axis.
 
 The animals of the wild are `Animal`s (`Entities/Wildlife/`): `RealmMob`s that are not hostile by nature, run by one
 `WildlifeManager` (a `RealmMobManager<Animal>`). `WildlifeSpecies` is the one table of them (`WildlifeKind`, entity
-name, factory, content contract, body size), so the manager, the saves, the client mirror, the renderer and the item
-debugger take a new species from it instead of naming it; adding one means a class, a row there, a
+name, factory, content contract, body size), so the manager, the saves, the client mirror, the renderer and DevStudio
+take a new species from it instead of naming it; adding one means a class, a row there, a
 `WildlifeSpawnRules` rule, a `NetEntityKind` after the last one and its numbers in `Config/WildlifeConfig`.
 
 - **Budget.** Animals fill their own cap beside the hostile one (`IMobPopulation.IsWildlife`, `MobCaps.WildlifeCap`:

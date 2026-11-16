@@ -13,10 +13,10 @@ using VoxelEngine.Platform;
 using VoxelEngine.Player;
 using VoxelEngine.VisualTest;
 
-namespace VoxelEngine.ItemDebugger;
+namespace VoxelEngine.DevStudio;
 
 /// <summary>
-/// Standalone item-debugger entrypoint: a window showing the player model in its carrying pose
+/// Standalone dev-studio entrypoint: a window showing the player model in its carrying pose
 /// with the selected item in the right hand. Left-drag orbits the camera, right-drag moves the
 /// model, middle-drag pans, the wheel zooms (or scrolls the item grid), and the UI edits the
 /// item's display transform and previews the walk/mine/jump animations. Three tabs: ITEMS (the
@@ -24,29 +24,29 @@ namespace VoxelEngine.ItemDebugger;
 /// Blockbench clips (and the hurt flash) through <see cref="EntityPreviewState"/>, and TREES,
 /// which grows the selected tree species pulse by pulse over flat grass at a fixed seed through
 /// <see cref="TreePreviewState"/>, framed on the tree's bounds (the wheel zooms that framing).
-/// <c>ITEM_DEBUGGER_SELECT</c> resolves an item, then an entity, then a species (a <c>tree/</c>
-/// prefix forces the species), and <c>ITEM_DEBUGGER_TREE_STEP</c> (an integer or <c>mature</c>)
+/// <c>DEV_STUDIO_SELECT</c> resolves an item, then an entity, then a species (a <c>tree/</c>
+/// prefix forces the species), and <c>DEV_STUDIO_TREE_STEP</c> (an integer or <c>mature</c>)
 /// pins the shown growth step for a scripted capture.
 /// </summary>
-public static class ItemDebuggerProgram
+public static class DevStudioProgram
 {
     private static IWindow _window = null!;
     private static GL _gl = null!;
     private static InputManager _input = null!;
     private static DebugSceneRenderer _scene = null!;
-    private static ItemDebuggerUi _ui = null!;
+    private static DevStudioUi _ui = null!;
     // No initializer: it snapshots EntityRegistry, so it is built in OnLoad once the scene
     // renderer has loaded the content; a static initializer would see an empty registry.
     private static EntityPreviewState _entities = null!;
     // No initializer for the same reason: it snapshots TreeSpeciesRegistry.
     private static TreePreviewState _trees = null!;
-    private static DebuggerTab _tab;
+    private static StudioTab _tab;
     // The player model the ITEMS tab poses; the preview state replaces it on a restart, so it is read through here.
     private static PlayerModel Player => _playerAnim.Model;
     // The timeline of each animated tab: progress, speed and loop over the state's one play.
     private static readonly AnimationClock PlayerClock = new();
     private static readonly AnimationClock EntityClock = new();
-    private static AnimationClock ActiveClock => _tab == DebuggerTab.Entities ? EntityClock : PlayerClock;
+    private static AnimationClock ActiveClock => _tab == StudioTab.Entities ? EntityClock : PlayerClock;
     // The player's animation modes (idle, walk, jump, swim, punch, slice, throw, ...), driving Player.
     private static PlayerPreviewState _playerAnim = null!;
     private static readonly ItemDisplayEditor Editor = new();
@@ -82,11 +82,11 @@ public static class ItemDebuggerProgram
 
     // Set to a PNG path to render a few frames, save one screenshot and quit. Used for
     // scripted verification of the tool without a human at the window.
-    private const string ScreenshotVariable = "ITEM_DEBUGGER_SHOT";
+    private const string ScreenshotVariable = "DEV_STUDIO_SHOT";
     private static string? _screenshotPath;
-    // Seconds of simulated animation to run before the screenshot (ITEM_DEBUGGER_SHOT_AT); null = the
+    // Seconds of simulated animation to run before the screenshot (DEV_STUDIO_SHOT_AT); null = the
     // usual early frame.
-    private const string ShotAtVariable = "ITEM_DEBUGGER_SHOT_AT";
+    private const string ShotAtVariable = "DEV_STUDIO_SHOT_AT";
     private static double? _shotAt;
     private static double _simulated;
     private static int _frameCount;
@@ -99,11 +99,11 @@ public static class ItemDebuggerProgram
         if (double.TryParse(Environment.GetEnvironmentVariable(ShotAtVariable)?.Trim(), NumberStyles.Float,
                 CultureInfo.InvariantCulture, out var shotAt) && shotAt >= 0.0)
             _shotAt = shotAt;
-        Log.WriteLine($"Item debugger assets: {Directory.GetCurrentDirectory()}");
+        Log.WriteLine($"DevStudio assets: {Directory.GetCurrentDirectory()}");
 
         var options = WindowOptions.Default with
         {
-            Title = "Item Debugger",
+            Title = "Dev Studio",
             Size = new Vector2D<int>(1600, 900),
             PreferredDepthBufferBits = 24,
             API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Default,
@@ -128,7 +128,7 @@ public static class ItemDebuggerProgram
         _scene = new DebugSceneRenderer(_gl);
         _entities = new EntityPreviewState();
         _trees = new TreePreviewState();
-        _ui = new ItemDebuggerUi();
+        _ui = new DevStudioUi();
         _playerAnim = new PlayerPreviewState(new PlayerModel { Rig = _scene.Rig, HoldingItem = true });
         _playerAnim.TrailSampler = SampleTrail;
         PlayerClock.Attach(_playerAnim);
@@ -136,24 +136,24 @@ public static class ItemDebuggerProgram
 
         if (_ui.Entries.Count > 0)
             Editor.Select(_ui.Entries[0].Id);
-        var select = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_SELECT")?.Trim();
+        var select = Environment.GetEnvironmentVariable("DEV_STUDIO_SELECT")?.Trim();
         if (!string.IsNullOrEmpty(select))
         {
             // Items, then entities, then tree species; "tree/<name>" skips straight to the species,
             // since a bare name such as "cactus" is also a block.
             var forceTree = select.StartsWith(TreePreviewState.NamePrefix, StringComparison.OrdinalIgnoreCase);
             if (!forceTree && TrySelectByName(select))
-                _tab = DebuggerTab.Items;
+                _tab = StudioTab.Items;
             else if (!forceTree && _entities.SelectByName(select))
-                _tab = DebuggerTab.Entities;
+                _tab = StudioTab.Entities;
             else if (_trees.SelectByName(select))
-                _tab = DebuggerTab.Trees;
+                _tab = StudioTab.Trees;
             else
-                Log.Warn($"ITEM_DEBUGGER_SELECT: no item, entity or tree species named '{select}'.");
+                Log.Warn($"DEV_STUDIO_SELECT: no item, entity or tree species named '{select}'.");
         }
 
         // The tree growth step to show: an integer (clamped to the species' range) or "mature".
-        var treeStep = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_TREE_STEP")?.Trim();
+        var treeStep = Environment.GetEnvironmentVariable("DEV_STUDIO_TREE_STEP")?.Trim();
         if (!string.IsNullOrEmpty(treeStep))
         {
             if (string.Equals(treeStep, "mature", StringComparison.OrdinalIgnoreCase))
@@ -161,31 +161,31 @@ public static class ItemDebuggerProgram
             else if (int.TryParse(treeStep, NumberStyles.Integer, CultureInfo.InvariantCulture, out var step))
                 _trees.SetStep(step);
             else
-                Log.Warn($"ITEM_DEBUGGER_TREE_STEP: '{treeStep}' is neither an integer step nor 'mature'.");
+                Log.Warn($"DEV_STUDIO_TREE_STEP: '{treeStep}' is neither an integer step nor 'mature'.");
         }
 
-        // A player animation (ITEM_DEBUGGER_PLAYER_ANIM=slice, throw, swim, ...) selects the ITEMS tab.
-        var playerAnim = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_PLAYER_ANIM")?.Trim();
+        // A player animation (DEV_STUDIO_PLAYER_ANIM=slice, throw, swim, ...) selects the ITEMS tab.
+        var playerAnim = Environment.GetEnvironmentVariable("DEV_STUDIO_PLAYER_ANIM")?.Trim();
         if (!string.IsNullOrEmpty(playerAnim))
         {
-            if (_playerAnim.SetMode(playerAnim)) _tab = DebuggerTab.Items;
-            else Log.Warn($"ITEM_DEBUGGER_PLAYER_ANIM: '{playerAnim}' is not a player animation " +
+            if (_playerAnim.SetMode(playerAnim)) _tab = StudioTab.Items;
+            else Log.Warn($"DEV_STUDIO_PLAYER_ANIM: '{playerAnim}' is not a player animation " +
                           $"({string.Join(", ", PlayerPreviewState.AllModes)}).");
         }
 
         // A clip name of the selected entity, or "hurt".
-        var anim = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_ANIM")?.Trim();
+        var anim = Environment.GetEnvironmentVariable("DEV_STUDIO_ANIM")?.Trim();
         if (!string.IsNullOrEmpty(anim) && !_entities.SetMode(anim))
-            Log.Warn($"ITEM_DEBUGGER_ANIM: '{anim}' is not a mode of " +
+            Log.Warn($"DEV_STUDIO_ANIM: '{anim}' is not a mode of " +
                      $"{_entities.Selected?.DisplayName ?? "any entity"} ({string.Join(", ", _entities.Modes)}).");
 
-        if (string.Equals(Environment.GetEnvironmentVariable("ITEM_DEBUGGER_VIEW")?.Trim(), "first",
+        if (string.Equals(Environment.GetEnvironmentVariable("DEV_STUDIO_VIEW")?.Trim(), "first",
                 StringComparison.OrdinalIgnoreCase))
             _firstPerson = true;
 
         // The orbit camera's yaw and pitch in degrees: yaw 0 looks at the player's back (the model faces -Z),
         // 90 from its right side... 180 from the front, which is where a limb coming off the body shows.
-        var orbit = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_ORBIT")?.Trim();
+        var orbit = Environment.GetEnvironmentVariable("DEV_STUDIO_ORBIT")?.Trim();
         if (!string.IsNullOrEmpty(orbit))
         {
             var parts = orbit.Split(',');
@@ -197,26 +197,26 @@ public static class ItemDebuggerProgram
                 _orbitPitch = Math.Clamp(op, -85f, 85f);
             }
             else
-                Log.Warn($"ITEM_DEBUGGER_ORBIT: '{orbit}' is not 'yaw,pitch' in degrees.");
+                Log.Warn($"DEV_STUDIO_ORBIT: '{orbit}' is not 'yaw,pitch' in degrees.");
         }
 
-        var look = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_LOOK")?.Trim();
+        var look = Environment.GetEnvironmentVariable("DEV_STUDIO_LOOK")?.Trim();
         if (!string.IsNullOrEmpty(look) && TryParseLook(look, out var lookYaw, out var lookPitch))
         {
             _lookYaw = lookYaw;
             _lookPitch = lookPitch;
         }
 
-        // Playback options: ITEM_DEBUGGER_SPEED=<0..4> and ITEM_DEBUGGER_LOOP=<0|1> apply to both timelines.
-        var speed = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_SPEED")?.Trim();
+        // Playback options: DEV_STUDIO_SPEED=<0..4> and DEV_STUDIO_LOOP=<0|1> apply to both timelines.
+        var speed = Environment.GetEnvironmentVariable("DEV_STUDIO_SPEED")?.Trim();
         if (!string.IsNullOrEmpty(speed))
         {
             if (float.TryParse(speed, NumberStyles.Float, CultureInfo.InvariantCulture, out var speedValue))
                 PlayerClock.Speed = EntityClock.Speed = speedValue;
             else
-                Log.Warn($"ITEM_DEBUGGER_SPEED: '{speed}' is not a number.");
+                Log.Warn($"DEV_STUDIO_SPEED: '{speed}' is not a number.");
         }
-        var loop = Environment.GetEnvironmentVariable("ITEM_DEBUGGER_LOOP")?.Trim();
+        var loop = Environment.GetEnvironmentVariable("DEV_STUDIO_LOOP")?.Trim();
         if (loop is "0" or "1")
             PlayerClock.Loop = EntityClock.Loop = loop == "1";
         // The mode may have been picked above: start both timelines from its beginning.
@@ -238,7 +238,7 @@ public static class ItemDebuggerProgram
     // Space pauses or resumes the animation timeline of the tab being shown.
     private static void OnKeyDown(IKeyboard keyboard, Key key, int scancode)
     {
-        if (key != Key.Space || _tab == DebuggerTab.Trees) return;
+        if (key != Key.Space || _tab == StudioTab.Trees) return;
 
         ActiveClock.Paused = !ActiveClock.Paused;
     }
@@ -276,7 +276,7 @@ public static class ItemDebuggerProgram
             return;
         }
 
-        // With ITEM_DEBUGGER_SHOT_AT the simulation steps a fixed 1/60 s a frame, so a scripted capture
+        // With DEV_STUDIO_SHOT_AT the simulation steps a fixed 1/60 s a frame, so a scripted capture
         // lands on the same instant of an animation every run.
         var dt = _shotAt != null ? 1.0 / 60.0 : Math.Clamp(deltaTime, 0.0, 0.05);
         _time += _shotAt != null ? dt : deltaTime;
@@ -290,7 +290,7 @@ public static class ItemDebuggerProgram
         {
             if (_leftDrag && mouse.IsButtonPressed(MouseButton.Left))
             {
-                if (_firstPerson && _tab == DebuggerTab.Items) Look(motion);
+                if (_firstPerson && _tab == StudioTab.Items) Look(motion);
                 else Orbit(motion);
             }
 
@@ -304,21 +304,21 @@ public static class ItemDebuggerProgram
             {
                 var slider = _ui.Slider(label);
                 if (slider != null && mouse.IsButtonPressed(MouseButton.Left))
-                    slider.Set(ItemDebuggerUi.ValueAt(slider, mouse.Position.X));
+                    slider.Set(DevStudioUi.ValueAt(slider, mouse.Position.X));
                 else
                     _dragSlider = null;
             }
         }
 
         // Dragging the progress slider scrubs: the clocks stop and the slider owns the time.
-        PlayerClock.Scrubbing = EntityClock.Scrubbing = _dragSlider == ItemDebuggerUi.ProgressSlider;
+        PlayerClock.Scrubbing = EntityClock.Scrubbing = _dragSlider == DevStudioUi.ProgressSlider;
 
         switch (_tab)
         {
-            case DebuggerTab.Entities:
+            case StudioTab.Entities:
                 EntityClock.Update((float)dt);
                 break;
-            case DebuggerTab.Trees:
+            case StudioTab.Trees:
                 // A tree only changes on a step, seed or species change; nothing animates per frame.
                 break;
             default:
@@ -336,14 +336,14 @@ public static class ItemDebuggerProgram
         var projection = Matrix4x4.CreatePerspectiveFieldOfView(FieldOfViewY, aspect, NearPlane, FarPlane);
         switch (_tab)
         {
-            case DebuggerTab.Entities:
+            case StudioTab.Entities:
             {
                 // First person has no meaning without the player, so the entity tab always orbits.
                 var entityView = BuildView(EntityOrbitTarget, out var cameraEye);
                 _scene.RenderEntity(entityView * projection, cameraEye, _entities, (float)_time, size);
                 break;
             }
-            case DebuggerTab.Trees:
+            case StudioTab.Trees:
                 RenderTreeScene(aspect, size);
                 break;
             default:
@@ -353,7 +353,7 @@ public static class ItemDebuggerProgram
 
         _scene.Ui.Begin(size);
         _ui.Draw(_scene.Ui, Editor, _entities, _trees, _tab, _playerAnim, new Vector2(size.X, size.Y), _status,
-            _firstPerson && _tab == DebuggerTab.Items, _tab == DebuggerTab.Trees ? null : ActiveClock);
+            _firstPerson && _tab == StudioTab.Items, _tab == StudioTab.Trees ? null : ActiveClock);
         _scene.Ui.End();
         _gl.BindVertexArray(0);
 
@@ -413,7 +413,7 @@ public static class ItemDebuggerProgram
     private static bool SampleTrail(PlayerModel model, out Matrix4x4 blade, out Matrix4x4 owner)
     {
         blade = owner = Matrix4x4.Identity;
-        if (_tab != DebuggerTab.Items || !Editor.HasSelection || !Editor.IsPureItem) return false;
+        if (_tab != StudioTab.Items || !Editor.HasSelection || !Editor.IsPureItem) return false;
         if (ItemRegistry.TryGet(Editor.SelectedId) is not { Attack: AttackPattern.Slice or AttackPattern.Sword } item)
             return false;
 
@@ -432,12 +432,12 @@ public static class ItemDebuggerProgram
         // A scripted instant: wait until that much animation has been simulated.
         if (_shotAt is { } at && _simulated < at) return;
 
-        Console.WriteLine($"[item-debugger] capturing {size.X}x{size.Y} to {path}");
+        Console.WriteLine($"[dev-studio] capturing {size.X}x{size.Y} to {path}");
         Console.Out.Flush();
         var pixels = VisualCapture.ReadPixels(_gl, size.X, size.Y);
         VisualCapture.QueueSave(pixels, size.X, size.Y, path);
         VisualCapture.WaitForPending();
-        Console.WriteLine("[item-debugger] capture done");
+        Console.WriteLine("[dev-studio] capture done");
         Console.Out.Flush();
         _closing = true;
     }
@@ -507,7 +507,7 @@ public static class ItemDebuggerProgram
     {
         var forward = -OrbitDirection();
         var right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
-        var distance = _tab == DebuggerTab.Trees ? TreeViewDistance(WindowAspect()) : _distance;
+        var distance = _tab == StudioTab.Trees ? TreeViewDistance(WindowAspect()) : _distance;
         return (right, Vector3.Cross(right, forward), distance * 0.0016f);
     }
 
@@ -532,7 +532,7 @@ public static class ItemDebuggerProgram
             if (_ui.SliderAt(position) is { } slider)
             {
                 _dragSlider = slider.Label;
-                slider.Set(ItemDebuggerUi.ValueAt(slider, position.X));
+                slider.Set(DevStudioUi.ValueAt(slider, position.X));
                 return;
             }
             if (_ui.SlotAt(position) is { } slot)
@@ -540,11 +540,11 @@ public static class ItemDebuggerProgram
                 // The slot index belongs to whichever grid the active tab shows.
                 switch (_tab)
                 {
-                    case DebuggerTab.Entities:
+                    case StudioTab.Entities:
                         _entities.Select(slot);
                         EntityClock.Reset();
                         break;
-                    case DebuggerTab.Trees:
+                    case StudioTab.Trees:
                         _trees.Select(slot);
                         break;
                     default:
@@ -602,7 +602,7 @@ public static class ItemDebuggerProgram
     {
         if (_ui.OverGrid(new Vector2(mouse.Position.X, mouse.Position.Y)))
             _ui.ScrollBy(wheel.Y > 0 ? -1 : 1);
-        else if (_tab == DebuggerTab.Trees)
+        else if (_tab == StudioTab.Trees)
             _treeZoom = Math.Clamp(_treeZoom * (wheel.Y > 0 ? 0.9f : 1.1f), 0.3f, 3f);
         else
             _distance = Math.Clamp(_distance - wheel.Y * 0.4f, 1.2f, 20f);
@@ -613,13 +613,13 @@ public static class ItemDebuggerProgram
         switch (button)
         {
             case DebugButton.TabItems:
-                _tab = DebuggerTab.Items;
+                _tab = StudioTab.Items;
                 break;
             case DebugButton.TabEntities:
-                _tab = DebuggerTab.Entities;
+                _tab = StudioTab.Entities;
                 break;
             case DebugButton.TabTrees:
-                _tab = DebuggerTab.Trees;
+                _tab = StudioTab.Trees;
                 break;
             case DebugButton.TreeStepDown:
                 _trees.StepBy(-1);

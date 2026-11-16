@@ -8,10 +8,10 @@ using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Player.Posing;
 
-namespace VoxelEngine.ItemDebugger;
+namespace VoxelEngine.DevStudio;
 
 /// <summary>
-/// GL-free state behind the item debugger's player animations (the ITEMS tab): which animation the
+/// GL-free state behind DevStudio's player animations (the ITEMS tab): which animation the
 /// <see cref="PlayerModel"/> is showing and the synthetic inputs that drive it, so every pose the game
 /// can put the player in can be looked at without a world. The modes are data (<see cref="AllModes"/>):
 /// <b>continuous</b> poses (idle, walk, run, sneak, a jump loop, swimming) feed the model the speed and

@@ -36,7 +36,7 @@ public static class ChestModel
     /// <summary>Whether <see cref="Load"/> has run; false in a run whose content has no chest model to load.</summary>
     public static bool IsLoaded => _rig != null;
 
-    /// <summary>The parsed project, for a viewer that builds its own rig from it (the item debugger).</summary>
+    /// <summary>The parsed project, for a viewer that builds its own rig from it (DevStudio).</summary>
     public static BbmodelData Data => _data ?? throw NotLoaded();
 
     /// <summary>The file <see cref="Data"/> was parsed from.</summary>

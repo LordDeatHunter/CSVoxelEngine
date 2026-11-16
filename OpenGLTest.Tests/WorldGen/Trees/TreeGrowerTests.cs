@@ -654,7 +654,7 @@ public sealed class TreeGrowerTests
         }
     }
 
-    // --- GrowSteps: the item debugger's scrub path ---
+    // --- GrowSteps: DevStudio's scrub path ---
 
     private static List<(int X, int Y, int Z)> NodeCells(TreeGraph graph)
     {

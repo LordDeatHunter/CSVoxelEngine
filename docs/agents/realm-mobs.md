@@ -44,8 +44,8 @@ torso) checked at startup (`Hellbrute.ValidateContent`, `Cinderwitch.ValidateCon
   hazards work as for the goblin.
 - **Plumbing**: `World.HellMobs`, `MobDirector` (update, damage billing, `RefreshMobs`, the `spawn` op names),
   `MobPasses.RenderRealmMobs` and the near shadow cascade (no mirror: hell lies far under the water plane),
-  `entities.json` by kind name, the `EntityList` kinds above and `ClientMirror`'s reconcile, and the item
-  debugger's ENTITIES tab. Tests: `HellMobTests`, `HellMobManagerTests`, the hell round trip in
+  `entities.json` by kind name, the `EntityList` kinds above and `ClientMirror`'s reconcile, and DevStudio's
+  ENTITIES tab. Tests: `HellMobTests`, `HellMobManagerTests`, the hell round trip in
   `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`, `NetworkEntitySyncTests` and the loopback
   `GameServerTests.HellMobsReachTheClientsEntityListAndItsMirrorKeepsTheirLayerAndAttacks` (a deep, scaled
   mob keeps its scaled pool on the client, since the mirror reads its layer from where it stands).
@@ -142,7 +142,7 @@ Both models, their skins and the `cloud_shard` sprite come from `tools/generate-
 - **Plumbing**: `World.SkyMobs`, `MobDirector` (update, damage billing, `RefreshMobs`, the `spawn` op names
   `galeraptor`/`cloudgolem`, exact feet with `[x, y, z]`), `MobPasses.RenderRealmMobs` and the near shadow
   cascade, `entities.json` by kind name, the `EntityList` kinds (protocol 18) and `ClientMirror`'s reconcile,
-  and the item debugger's ENTITIES tab (its `fly` mode moves the mirror like `walk`). Tests: `SkyMobTests`,
+  and DevStudio's ENTITIES tab (its `fly` mode moves the mirror like `walk`). Tests: `SkyMobTests`,
   `SkyMobManagerTests`, the realm round trip in `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`,
   `NetworkEntitySyncTests.SkyMobsMirrorByKindAndAFlyerKeepsItsHeight` and the loopback
   `GameServerTests.SkyMobsReachTheClientsEntityListByKindAndAFlyerAtItsHeight`.
@@ -196,7 +196,7 @@ under the torso) checked at startup (each kind's `ValidateContent` over `EntityC
 - **Plumbing**: `World.CaveMobs`, `MobDirector` (update, damage billing, status block actions, `RefreshMobs`, the `spawn` op
   names `shardling`/`sporeling`/`magmaborn` with the optional `tier`), `ThrowAction` (the shards), `MobPasses.RenderRealmMobs`
   and the near shadow cascade, `entities.json` by kind name with the tier, the `EntityList` kinds (protocol 29) and
-  `ClientMirror`'s reconcile (a different tier replaces the mirror), and the item debugger's ENTITIES tab (tier 0). Tests:
+  `ClientMirror`'s reconcile (a different tier replaces the mirror), and DevStudio's ENTITIES tab (tier 0). Tests:
   `CaveMobTests`, `CaveMobManagerTests`, `CaveSpawnFilterTests`, `CaveSpawnRulesTests`, `GoblinCaveSpawnTests`, the realm round
   trip in `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`, `RealmMobMirrorTests`,
   `NetworkEntitySyncTests.ACaveMobMirrorTakesItsTierFromTheSnapshotNotWhereItIsFirstSeen` and the loopback
@@ -276,12 +276,12 @@ MCP plugin (no generator, the skin embedded; `USER_TODO.md`).
   (plain and the echoes; the rest stay empty) and `BiomeCaveSpawnChance` where a kind lives, in packs of up to
   `CavePackMaxSize`. On the surface they are rare: at night only, every `SurfaceSpawnIntervalSeconds` one try with
   `SurfaceSpawnChance` on the dry surface ring of a target that is not underground. **The broodmother never spawns
-  naturally**: it waits for the spider den (plans/TODO.md `P-60`); the `spawn` op and the item debugger raise it.
+  naturally**: it waits for the spider den (plans/TODO.md `P-60`); the `spawn` op and DevStudio raise it.
 - **Plumbing**: the cave mobs' own (saves by kind name with the tier, the `spawn` op names `spider` and
   `spider_broodmother`, `MobPasses`' rig list), plus `NetEntityKind.Spider` 64 and `SpiderBroodmother` 65 (protocol
   39; since protocol 48 the attack count names bite and web shot by its remainder of 2): the item field packs the
   held face above the tier byte (`CrawlerMob.PackStance`, 0 = airborne) and the yaw is
-  the heading's angle on that face, which `ClientMirror` hands to `CrawlerMob.MirrorSurface`. The item debugger's ENTITIES tab
+  the heading's angle on that face, which `ClientMirror` hands to `CrawlerMob.MirrorSurface`. DevStudio's ENTITIES tab
   shows both with the legs walking on the spot (no world: the ground slides back under the body). Tests: `SpiderTests`.
   `visual-examples/spiders.json` (`VOXEL_TIME=147`) films a surface chase, a climb up a pillar and both kinds in a cave.
 - Known gaps: the web shot replays the `bite` clip and is drawn as a spider silk sprite (no clip or sprite of its own

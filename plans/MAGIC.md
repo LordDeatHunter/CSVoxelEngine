@@ -147,7 +147,7 @@ at the bolt's launch point (gray on a fizzle), and on a client it launches a cos
 anything); on a client it also flies those previews and bursts default-colored sparks where a remote player
 cast. `SpellEffects` plays `spell_impact` where a bolt lands within `ImpactSoundRangeBlocks` of the camera
 (once an update, never on a server). The three wavs come from `tools/generate-spell-sfx.py` (stdlib,
-byte-identical re-runs, `--check`). The item debugger has a CAST mode and the `player` scenario op a `cast`
+byte-identical re-runs, `--check`). DevStudio has a CAST mode and the `player` scenario op a `cast`
 action (`visual-examples/animations-cast.json`). Known gaps: remote players' bolts are invisible; a remote
 cast gets a default-colored burst and no sound (the element is not on the wire); a client never shows a
 fizzle (the roll is the server's); the sounds are not positional (the impact is only range-gated); the

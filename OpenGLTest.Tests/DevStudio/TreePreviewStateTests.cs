@@ -2,15 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using VoxelEngine.ItemDebugger;
+using VoxelEngine.DevStudio;
 using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
 
-namespace VoxelEngine.Tests.ItemDebugger;
+namespace VoxelEngine.Tests.DevStudio;
 
 /// <summary>
-/// The item debugger's TREES tab state: deterministic scrubbing (same species, seed and step give
+/// DevStudio's TREES tab state: deterministic scrubbing (same species, seed and step give
 /// the same cells, in any visiting order), the step clamp, the mature step being the worldgen
 /// tree, features from maturity on, a new seed leaving the step alone, framing that contains the
 /// tree and fits the view, the ground plane, name lookup and the rebuild version. Behavior only:

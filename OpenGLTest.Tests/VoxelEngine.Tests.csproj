@@ -14,7 +14,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\OpenGLTest\VoxelEngine.csproj" />
-        <ProjectReference Include="..\OpenGLTest.ItemDebugger\VoxelEngine.ItemDebugger.csproj" />
+        <ProjectReference Include="..\OpenGLTest.DevStudio\VoxelEngine.DevStudio.csproj" />
         <ProjectReference Include="..\OpenGLTest.Server\VoxelEngine.Server.csproj" />
         <ProjectReference Include="..\OpenGLTest.WikiExport\VoxelEngine.WikiExport.csproj" />
     </ItemGroup>

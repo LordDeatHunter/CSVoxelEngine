@@ -17,10 +17,10 @@ using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Player;
 
-namespace VoxelEngine.ItemDebugger;
+namespace VoxelEngine.DevStudio;
 
 /// <summary>
-/// GL-free state behind the item debugger's ENTITIES tab: which entity is previewed and which
+/// GL-free state behind DevStudio's ENTITIES tab: which entity is previewed and which
 /// mode it is shown in. The modes are data-driven. A model with clips offers one per clip in file
 /// order (idle and walk drive the locomotion layer at rest and at the walk reference speed; any other
 /// clip is a one-shot that replays after <see cref="RestBetweenPlays"/>, and the preview consumes the

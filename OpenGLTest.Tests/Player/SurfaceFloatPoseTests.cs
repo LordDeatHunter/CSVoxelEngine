@@ -1,6 +1,6 @@
 using System;
 using System.Numerics;
-using VoxelEngine.ItemDebugger;
+using VoxelEngine.DevStudio;
 using VoxelEngine.Player;
 using Xunit;
 

@@ -15,7 +15,7 @@ uniform float uStreakSpan;
 uniform float uFadeNear;
 uniform float uFadeFar;
 uniform int uStreakLanes;
-// 1 decodes the sRGB tint for the game's linear HDR target, 0 keeps it (the item debugger draws in display space)
+// 1 decodes the sRGB tint for the game's linear HDR target, 0 keeps it (DevStudio draws in display space)
 uniform int uLinearOutput;
 
 out vec4 FragColor;

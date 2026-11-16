@@ -409,7 +409,7 @@ single-arc player.
   `PlayerModel` exists and is currently never seen; also helps showcase shots.
 - [ ] **`V-10` · Mob / entity rendering** — P2, L.
   The goblin is the first articulated rig (nested Blockbench groups, keyframe clips, layered
-  `EntityAnimator`), and the item debugger previews every clip. Still open: the slime is one
+  `EntityAnimator`), and DevStudio previews every clip. Still open: the slime is one
   baked mesh with a procedural squash, **no death animation**, and no hurt pose beyond the flash.
 - [ ] **`V-11` · Ambient critter particles (fireflies, insects)** — P2, S.
 - [ ] **`V-12` · Spell & ability VFX** — P3, L. Projectiles, cast gestures, impact, wards; for

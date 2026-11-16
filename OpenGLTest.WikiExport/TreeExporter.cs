@@ -7,7 +7,7 @@ using VoxelEngine.WorldGen.Trees.Shape;
 namespace VoxelEngine.WikiExport;
 
 /// <summary>
-/// Grows each tree species step by step over flat ground, exactly like the item debugger's TREES tab
+/// Grows each tree species step by step over flat ground, exactly like DevStudio's TREES tab
 /// (the default seed, a root at (0, 1, 0), features from the maturity step on), and records the
 /// per-step cell differences the wiki's growth slider replays.
 /// </summary>

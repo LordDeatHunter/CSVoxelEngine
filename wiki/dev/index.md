@@ -22,6 +22,6 @@ The code uses C# 14 features, so you need the **.NET 10 SDK** (the projects stil
 - [Content schemas](/dev/content-schemas): block, item, recipe, loot, tree and spell JSON.
 - [Worldgen](/dev/worldgen): determinism rules, biomes, layers and caches.
 - [Saves and multiplayer](/dev/saves-and-multiplayer)
-- [Testing and visual checks](/dev/testing): xUnit, scenarios and the item debugger.
+- [Testing and visual checks](/dev/testing): xUnit, scenarios and DevStudio.
 - [Adding content](/dev/adding-content)
 - [This wiki](/dev/wiki): how the site is generated.

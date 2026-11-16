@@ -15,7 +15,7 @@ provides it, but **macOS (stuck at GL 4.1) is no longer supported**. The opaque 
 (the Hi-Z occlusion cull, which zeroes culled commands in the indirect buffer in place; see "Chunk
 drawing"), another 4.3+ core feature.
 
-The game is one project under `OpenGLTest/`; the item debugger (`OpenGLTest.ItemDebugger/`) and the dedicated server (`OpenGLTest.Server/`) are separate executables that reference it, as is the wiki data exporter (`OpenGLTest.WikiExport/`, see the `layout-*` docs). Historical naming quirks to be aware of:
+The game is one project under `OpenGLTest/`; DevStudio (`OpenGLTest.DevStudio/`) and the dedicated server (`OpenGLTest.Server/`) are separate executables that reference it, as is the wiki data exporter (`OpenGLTest.WikiExport/`, see the `layout-*` docs). Historical naming quirks to be aware of:
 
 - The solution is `VoxelEngine.sln`, the project folder is `OpenGLTest/`, the csproj is `OpenGLTest/VoxelEngine.csproj`, and all code lives under the `VoxelEngine` root namespace with one sub-namespace per folder (see "Code organization"). Keep a new file in the namespace its folder maps to.
 - Verification is by building and running the game **and** by the xUnit tests in `OpenGLTest.Tests/` (headless, no window: `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release`) plus the scripted visual scenarios under `OpenGLTest/visual-examples/` (see `VOXEL_SCRIPT` below). There is no CI.
@@ -52,7 +52,7 @@ purpose). When you change code, edit the doc section that owns it (and nothing e
 | Topic | File | Related skill |
 |---|---|---|
 | Launch flow, main menu, save folder, persistence rules, autosave, teardown | `launch-and-saves.md` | |
-| `VOXEL_*` env vars, scenario ops, item debugger, `X` profiler overlay | `dev-tools.md` | `visual-verify`, `item-debugger`, `perf-capture` |
+| `VOXEL_*` env vars, scenario ops, DevStudio, `X` profiler overlay | `dev-tools.md` | `visual-verify`, `dev-studio`, `perf-capture` |
 | HUD, minimap and the [M] map, swimming, drowning, lava, regen, mana, status effects (player), gear, chests, waystones, quests and the quest book | `player-systems.md` | |
 | Water rendering, linear lighting, fog, sky, godrays, AO, per-tile shader terms | `rendering.md` | `shader-sync` |
 | Vertex layout, texture arrays, material atlas, greedy mesher, biome tint, chunk drawing, Hi-Z cull | `meshing-and-chunks.md` | `shader-sync` |
@@ -67,7 +67,7 @@ purpose). When you change code, edit the doc section that owns it (and nothing e
 | Mob base and shared rules, spawn pacing, slime, goblin, wildlife (deer, boar, crow, dragonfly) | `entities.md` | |
 | Hell, sky, cave mobs, flying rules, crawlers (spiders, scorpion) | `realm-mobs.md` | |
 | Skeleton, battle tower, Skeleton King, sandworm | `tower-and-bosses.md` | |
-| Clips, `EntityAnimator`, player and camera juice | `animation.md` | `item-debugger` |
+| Clips, `EntityAnimator`, player and camera juice | `animation.md` | `dev-studio` |
 | File tree (every source file, one line each) | `layout-1-src-core.md` (src root, App, Audio, Chunks, Config, Content, Core, Data, Effects, Entities), `layout-2-src-graphics-rendering.md` (Graphics ... Rendering), `layout-3-src-saves-worldgen.md` (Saves ... WorldGen), `layout-4-projects-tests-tools.md` (other projects, tests, tools) | `code-cleanup` |
 
 Cross-references inside the docs such as `see "Chunk drawing" below` name a section; use the table to find its file.
@@ -118,8 +118,8 @@ touch a file that violates one of them, fixing it is in scope.
   `ShadowPass`, `TerrainPasses`, `ReflectionPass`, `UiPasses`). `UIRenderer.cs` (801
   lines, down from 2,504) has a stated reason too: it owns the UI's GL resources and their
   creation and disposal order (the ui program, the count font, the text batch buffers, the
-  item-icon textures and frame meshes) and the shared draw primitives every page and the item
-  debugger use; its pages live in the components it builds and exposes as internal properties
+  item-icon textures and frame meshes) and the shared draw primitives every page and DevStudio
+  use; its pages live in the components it builds and exposes as internal properties
   (`HudRenderer`, `TopStripRenderer`, `InventoryPanelRenderer`, `CraftCardRenderer`,
   `MenuRenderer`, `LoadingScreenRenderer`, `ChatRenderer`, `MapRenderer`). `Chunk.cs` (690 lines, down from 1,944) is under the smell line now: its ids live in `Chunks/ChunkBlocks` (palette storage) and it owns the volatile reference to them, the volatile state byte and light snapshot, the raw writers and edit API, the save/network snapshots and its GPU slices, with its worldgen fill in `WorldGen/ChunkTerrainFill`, its restore from a snapshot in `Chunks/ChunkRestore`, its mesh build in `Chunks/Meshing/ChunkMeshBuilder` and `ChunkLighting`, and the face and AO tables in `ChunkFaceTables`. `Camera.cs` (684 lines, down from 1,175) is under the smell line now: it is the player's public facade, the one type `PlayerPhysics`, `World` and its components, the renderer passes, the server and the tests compile against, and it owns the pose, the mouse look, the eye fluid state, the mode setters and the `IMobTarget` side; its view juice, F5 rig, mode toggles, view-projection cache, spawn overrides and falling-cube shove live in `HeadMotion`, `ShoulderRig`, `ModeToggles`, `ViewProjectionCache`, `SpawnOverrides` and `BodyCollision`, and about 290 of its lines are the XML docs of the members it forwards to them. `Program.cs` (628 lines, down from 2,297) has a
   stated reason too: it is the process entry point and the app's composition root: `Main` registers the
@@ -142,20 +142,20 @@ touch a file that violates one of them, fixing it is in scope.
   BlockType) are in `VoxelEngine` itself. The tests mirror their own tree the same way:
   `OpenGLTest.Tests/Chunks/` is `VoxelEngine.Tests.Chunks` and the shared fixtures in
   `Support/` are `VoxelEngine.Tests.Support` (no test sits at the project root); the server and
-  the item debugger are flat (`VoxelEngine.Server`, `VoxelEngine.ItemDebugger`). Moving a file
+  DevStudio are flat (`VoxelEngine.Server`, `VoxelEngine.DevStudio`). Moving a file
   means changing its namespace line and letting the compiler name the usings to add. Never
   park a new file in the root namespace out of convenience; never add an unrelated type to
   whichever namespace a file happened to have. Each project keeps a short, deliberate
   `GlobalUsings.cs` at its root beside the csproj (`OpenGLTest/GlobalUsings.cs`,
   `OpenGLTest.Tests/GlobalUsings.cs`, `OpenGLTest.Server/GlobalUsings.cs`,
-  `OpenGLTest.ItemDebugger/GlobalUsings.cs`) listing only the namespaces most of that
+  `OpenGLTest.DevStudio/GlobalUsings.cs`) listing only the namespaces most of that
   project's files need: `VoxelEngine.Core` everywhere (the `Vector2Utils`/`Vector3Utils`
   extension methods, `MathUtils`, `Log`) and `VoxelEngine.Config` everywhere (the per-domain tuning
-  constants, read by the game, the server, the item debugger and the tests alike), plus `VoxelEngine.Chunks`,
+  constants, read by the game, the server, DevStudio and the tests alike), plus `VoxelEngine.Chunks`,
   `VoxelEngine.Content` and `VoxelEngine.Tests.Support` in the test project. Everything else is
   an explicit `using` in the files that use it, including a using that only an XML `cref`
   needs (a doc build, `-p:GenerateDocumentationFile=true`, counts it as used; the plain build
-  checks neither crefs nor unused usings). The game and the item debugger also carry
+  checks neither crefs nor unused usings). The game and DevStudio also carry
   `global using Shader = VoxelEngine.Graphics.Shader;`, because `Silk.NET.OpenGL` has a
   `Shader` struct too; `Plane` likewise clashes with `System.Numerics.Plane`, so a cref to the
   engine's is written `VoxelEngine.Data.Plane`. The vendored `Core/FastNoiseLite.cs` carries

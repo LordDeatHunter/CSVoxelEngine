@@ -5,7 +5,7 @@ namespace VoxelEngine.Player;
 
 /// <summary>
 /// The held item's sizing and the one definition of its model matrix, GL-free. The game's held item
-/// (<c>PlayerPasses.RenderHeldItem</c>), the slice trail and the item debugger all pose the held shape
+/// (<c>PlayerPasses.RenderHeldItem</c>), the slice trail and DevStudio all pose the held shape
 /// through this class, so none of them can drift from what is drawn.
 /// </summary>
 public static class HeldItemPose
@@ -13,7 +13,7 @@ public static class HeldItemPose
     // Held-item sizing, in blocks. The sprite is unit-sized and the cube is full-block;
     // both are shrunk to sit in the palm. The grips lift the shape just clear of the
     // forearm with a nudge outward (+X, away from the body) and forward (-Z).
-    // RenderManager re-exports them so the item debugger can show and tune the same defaults
+    // RenderManager re-exports them so DevStudio can show and tune the same defaults
     // the game ships.
     internal const float HeldItemScale = 0.5f;
     internal static readonly Vector3 HeldItemGrip = new(0.03f, 0.10f, -0.04f);
@@ -22,7 +22,7 @@ public static class HeldItemPose
 
     /// <summary>
     /// The held-item model matrix: uniform scale, the item's display transform, the grip nudge,
-    /// then the hand anchor. Shared by the game's held item and the item debugger so the
+    /// then the hand anchor. Shared by the game's held item and DevStudio so the
     /// preview can never drift from what the game draws. Blocks pass
     /// <see cref="Matrix4x4.Identity"/> as <paramref name="displayTransform"/>: their shape is
     /// the block's own baked model, not a display-configured sprite.

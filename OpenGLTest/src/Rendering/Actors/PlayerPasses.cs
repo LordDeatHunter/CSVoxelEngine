@@ -241,8 +241,8 @@ internal sealed class PlayerPasses : IDisposable
     /// item as its sprite posed by the item's display transform (canted tools by default,
     /// the compass facing back up at the holder). Positioned at the fist through the hand
     /// anchor, so it rides the carrying pose, the walk swing and the punch. The sizing and the
-    /// sprite's matrix are <see cref="HeldItemPose"/>'s, shared with the slice trail and the item
-    /// debugger.
+    /// sprite's matrix are <see cref="HeldItemPose"/>'s, shared with the slice trail and DevStudio
+    ///.
     /// </summary>
     internal void RenderHeldItem(Camera camera, PlayerModel player, ushort selectedId, bool hasHeld,
         float timeSeconds, float headingDegrees, bool offhand = false)

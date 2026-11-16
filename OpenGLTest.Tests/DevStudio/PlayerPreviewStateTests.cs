@@ -1,15 +1,15 @@
 using System;
 using System.Numerics;
-using VoxelEngine.ItemDebugger;
+using VoxelEngine.DevStudio;
 using VoxelEngine.Items;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using Xunit;
 
-namespace VoxelEngine.Tests.ItemDebugger;
+namespace VoxelEngine.Tests.DevStudio;
 
 /// <summary>
-/// The item debugger's player animation modes: every mode exists, drives the real <see cref="PlayerModel"/>,
+/// DevStudio's player animation modes: every mode exists, drives the real <see cref="PlayerModel"/>,
 /// and one-shots replay. Behavior only: no pose numbers.
 /// </summary>
 public sealed class PlayerPreviewStateTests

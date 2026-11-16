@@ -4,7 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
-using VoxelEngine.ItemDebugger;
+using VoxelEngine.DevStudio;
 using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.Player.Posing;

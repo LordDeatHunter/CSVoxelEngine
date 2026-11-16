@@ -22,7 +22,7 @@ bent chain shows no gap.
 
 Clip contract: idle, bite (its "impact" event is the moment the jaws snap shut) and hurt, all on Head and Jaw. Every
 clip also holds Body and Tail in the display layout (laid out behind the head, one after another), which the game
-never plays (the chain places the parts) but the wiki viewer and the item debugger do, so the model reads as a worm
+never plays (the chain places the parts) but the wiki viewer and DevStudio do, so the model reads as a worm
 instead of three parts stacked at the origin.
 Sign convention (BbmodelLoader.ReadAnimations): a rotation (x, y, z) in degrees maps to engine Euler
 (-x, -y, z); a positive x on Head or Jaw tips the snout down, so a positive Jaw x opens the mouth.

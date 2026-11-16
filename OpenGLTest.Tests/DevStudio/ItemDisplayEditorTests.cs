@@ -1,12 +1,12 @@
 using System.Numerics;
-using VoxelEngine.ItemDebugger;
+using VoxelEngine.DevStudio;
 using VoxelEngine.Rendering;
 using Xunit;
 
-namespace VoxelEngine.Tests.ItemDebugger;
+namespace VoxelEngine.Tests.DevStudio;
 
 /// <summary>
-/// The item debugger's slider state: RESET PREVIEW puts every slider back (the display ones to what the item loaded
+/// DevStudio's slider state: RESET PREVIEW puts every slider back (the display ones to what the item loaded
 /// with, the preview-only renderer overrides to their defaults), RELOAD FROM JSON only the display ones.
 /// </summary>
 public sealed class ItemDisplayEditorTests

@@ -55,7 +55,7 @@ public sealed class EntityDefinition
 
     /// <summary>
     /// An item every spawn holds in one hand (the skeleton warrior's copper dagger), drawn from its own
-    /// sprite at that hand by the entity, shadow and item-debugger passes. Omitted holds nothing.
+    /// sprite at that hand by the entity, shadow and dev-studio passes. Omitted holds nothing.
     /// </summary>
     public HeldDefinition? Held { get; set; }
 
