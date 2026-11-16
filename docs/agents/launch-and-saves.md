@@ -166,7 +166,9 @@ pure function of the seed: only **deltas** and the seed are written.
   snapshots a call, the rest on following frames) after the fluid tick, under the one `save`
   profiler row, which is entered nowhere else.
 - **Player and entities.** `player.json` never stores a position before the spawn settled, so a
-  world closed mid-load searches the surface again next time. Saved mobs and drops are spawned
+  world closed mid-load searches the surface again next time. Non-finite position, look, respawn
+  eye, or lighting-clock values are ignored field by field while other valid player data is kept.
+  Saved mobs and drops are spawned
   once loading finishes, each only when its chunk is loaded; a restore is a forced spawn, so it
   may pass the natural mob cap but a mob waits while the hard cap (`MobHardCap`, which sizes the
   healthbar buffers) is full; an entry that waits stays pending and is saved again, and is

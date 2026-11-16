@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.CaveMobs;
@@ -205,6 +206,13 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
     }
 
+    private void WriteRawPlayerFile(string json)
+    {
+        var store = new ChunkSaveStore(_dir);
+        store.EnqueueFile(PlayerSaveCodec.FileName, Encoding.UTF8.GetBytes(json));
+        Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+    }
+
     private void WriteEntitiesFile(EntitySaveData data)
     {
         var store = new ChunkSaveStore(_dir);
@@ -286,6 +294,22 @@ public sealed class WorldLifecycleTests : IDisposable
         var reopened = NewWorld(null, clientMode: true);
         snapshot.AssertMatches(ColumnCache.Get(CacheProbeX, CacheProbeZ));
         Assert.True(reopened.SaveAndDispose());
+    }
+
+    [Fact]
+    public void StoreBackedWorldIgnoresNonFiniteSavedLookAndClockFields()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        WriteRawPlayerFile($"{{\"Position\":[0,{High},0],\"Yaw\":1e1000,\"Pitch\":-1e1000,\"RespawnEye\":[1,1e1000,1],\"LightingClock\":1e9999,\"Health\":37}}");
+
+        var world = NewWorld(new ChunkSaveStore(_dir));
+        Assert.Equal(new Vector3(0f, High, 0f), world.Camera.Position);
+        Assert.True(float.IsFinite(world.Camera.Yaw));
+        Assert.True(float.IsFinite(world.Camera.Pitch));
+        Assert.Equal(37, world.Health);
+        Assert.True(RunUntil(world, () => world.IsPlaying, LoadWallSeconds));
+        Assert.True(double.IsFinite(world.LightingTime));
+        Assert.True(world.SaveAndDispose());
     }
 
     [Fact]
