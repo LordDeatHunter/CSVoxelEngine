@@ -40,8 +40,9 @@ public sealed record ServerLaunchResult(
 /// order: the save-format gate, the world source (built before the folder is locked, so a refused source leaves it
 /// untouched), the save store (which takes the folder's lock), the operators (the caller's plus the
 /// world's <see cref="OperatorList.FileName"/>), the seed, the headless server-mode <see cref="World"/>, and the
-/// listening <see cref="GameServer"/>. A failure after the world is built saves and closes it, so nothing is left
-/// live or locked. Main thread only, and only while no other world is live.
+/// listening <see cref="GameServer"/>. The caller's list is reusable base configuration; each server gets its own
+/// merged list with only that world's saved operators. A failure after the world is built saves and closes it, so
+/// nothing is left live or locked. Main thread only, and only while no other world is live.
 /// </summary>
 public static class ServerLaunch
 {
@@ -88,14 +89,16 @@ public static class ServerLaunch
                 $"'{world.Name}' is open in another session (the game or a server); close it first. ({e.Message})");
         }
 
-        operators.AddAll(OperatorList.Parse(save.ReadFile(OperatorList.FileName)));
+        var launchOperators = new OperatorList();
+        launchOperators.AddAll(operators);
+        launchOperators.AddAll(OperatorList.Parse(save.ReadFile(OperatorList.FileName)));
 
         WorldSeed.Apply(world.Seed);
         var gameWorld = new World(null!, null!, null!, null!, null!, null!, null, save, serverMode: true,
             worldSource: source);
         var server = new GameServer(gameWorld, world.Name, world.Seed, port)
         {
-            Operators = operators,
+            Operators = launchOperators,
             HostPlayer = hostPlayer,
         };
         try

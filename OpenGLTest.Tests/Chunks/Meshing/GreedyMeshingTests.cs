@@ -101,7 +101,7 @@ public sealed class GreedyMeshingTests
     [Fact]
     public void SlabTopIsOneQuadWithTiledUvs()
     {
-        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+        var (manager, center) = MeshTestWorld.DarkRoofArea(MeshTestWorld.HighAbove);
         var stone = Block("stone");
         for (var x = 5; x < 8; x++)
         for (var z = 5; z < 7; z++)
@@ -130,7 +130,7 @@ public sealed class GreedyMeshingTests
     [Fact]
     public void WallSideRunsAlongZAndUp()
     {
-        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+        var (manager, center) = MeshTestWorld.DarkRoofArea(MeshTestWorld.HighAbove);
         var stone = Block("stone");
         for (var y = 8; y < 10; y++)
         for (var z = 4; z < 7; z++)
@@ -154,7 +154,7 @@ public sealed class GreedyMeshingTests
     [Fact]
     public void PillarOnAFloorSplitsTheTopFace()
     {
-        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+        var (manager, center) = MeshTestWorld.DarkRoofArea(MeshTestWorld.HighAbove);
         var stone = Block("stone");
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)

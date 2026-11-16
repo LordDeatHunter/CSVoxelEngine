@@ -3,10 +3,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen;
 using Xunit;
 
 namespace VoxelEngine.Tests.Networking.ServerSide;
@@ -197,7 +200,15 @@ public sealed class ServerWorldTests : IDisposable
     public void AServerDropIsCollectedByTheNearestPlayerIntoTheirOwnInventory()
     {
         WorldSeed.Apply(WorldSeed.Default);
-        _world = new World(null!, null!, null!, null!, null!, null!, null, new ChunkSaveStore(_dir), serverMode: true);
+        var spawn = SpawnOverrides.SpawnPosition();
+        var floorY = (int)MathF.Floor(spawn.Y - Camera.EyeHeight) - 1;
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        // This test is about who receives a thrown drop, so supply a dry, solid floor in every
+        // chunk column and avoid unrelated generated-world loot while keeping the real server path.
+        var source = new FlatWorldSource(int.MinValue, int.MaxValue, int.MinValue, int.MaxValue, floorY,
+            stone, Biome.Forest, warmth: 0.5f, wetness: 0.5f);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, new ChunkSaveStore(_dir), serverMode: true,
+            worldSource: source);
         var sw = Stopwatch.StartNew();
         var last = 0.0;
         while (!_world.IsLoaded && sw.Elapsed.TotalSeconds < 45)
@@ -216,15 +227,28 @@ public sealed class ServerWorldTests : IDisposable
         _world.ServerPlayers = [near, far];
 
         // Someone else's stone dropped straight down at the near player's feet
-        var stone = ContentRegistry.RequireBlock("stone").Id;
         var dropper = Inventory.Empty();
         dropper.Add(stone, 1);
         Assert.True(_world.ThrowSelected(false, eye, -Vector3.UnitY, dropper));
         Assert.Equal(0, dropper.CountFor(stone));
+        var dropped = Assert.Single(_world.Drops);
+        var collectorLift = Vector3.UnitY * DropManager.CollectHeightOffset;
 
         sw.Restart();
         while (_world.Drops.Count > 0 && sw.Elapsed.TotalSeconds < 10)
         {
+            // A real throw has a random pop and pickup grace. Keep Near above this instance while
+            // it settles, and move Far alongside at a fixed separation so Near remains strictly
+            // nearest by DropManager's actual eye-minus-lift collection metric on every tick.
+            near.Position = dropped.Position + collectorLift;
+            far.Position = near.Position + Vector3.UnitX * 2.5f;
+            var collectionTarget = near.Position - collectorLift;
+            var nearDistanceSquared = Vector3.DistanceSquared(dropped.Position, collectionTarget);
+            var farDistanceSquared = Vector3.DistanceSquared(dropped.Position, far.Position - collectorLift);
+            Assert.True(nearDistanceSquared < farDistanceSquared,
+                "Near must remain the closest willing collector while the thrown stone is eligible for pickup");
+            Assert.True(nearDistanceSquared <= DropManager.PickupRange * DropManager.PickupRange,
+                "Near must remain within the real server pickup range");
             _world.Update(1.0 / 60, null);
             Thread.Sleep(1);
         }
