@@ -18,7 +18,7 @@ the stab. `towerclear` (`{ "op": "towerclear", "floor": k }`, floor 0 by default
 `visual-examples/chests.json` films it with the lid's open and close.
 
 The **DevStudio** (`dotnet run --project OpenGLTest.DevStudio -c Release`, same working-directory
-rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
+rule) previews held items, entities and trees and edits the quest graphs. Its left panel has four tabs. **ITEMS** is the item grid with the
 display sliders, and the player body: its mode buttons are **every player animation**
 (`OpenGLTest.DevStudio/PlayerPreviewState.cs`, GL-free and tested): the poses IDLE WALK RUN SNEAK JUMP
 S-JUMP LAND SWIM FLOAT SURFACE FLY, and the swings and reactions PUNCH HEAVY SLICE BACK CUT B-CUT CHOP THROW HURT EQUIP DEATH and CAST (the staff gesture),
@@ -64,7 +64,7 @@ preview consumes their events itself. The GL-free, tested state behind the tab i
 `OpenGLTest.DevStudio/EntityPreviewState.cs`.
 
 **TREES** lists every `TreeSpeciesRegistry` species and grows the selected one pulse by pulse over a
-flat grass plane, at a fixed seed (`WorldSeed.Default` at first; the debugger never calls
+flat grass plane, at a fixed seed (`WorldSeed.Default` at first; DevStudio never calls
 `WorldSeed.Apply`). The Step slider runs 0..the species' `MaturityStepsMax` and scrubs the growth
 deterministically: each step is regrown from scratch in a fresh `VirtualTreeSpace` through
 `TreeGrower.GrowSteps`, so dragging back and forth shows the same tree at the same step. STEP - and
@@ -77,17 +77,36 @@ by `CellBatchMesher` (`OpenGLTest/src/Chunks/Meshing/CellBatchMesher.cs`): the r
 chunks at the cells' real chunk positions, padded by a ring of empty chunks, so thin tree-wood tubes,
 wide-trunk shells, the pixel-rim bevel, leaves and the biome tint look as in game, with no clipping at
 16-block seams. `DebugSceneRenderer.RenderTree` rebuilds the meshes only when the state's `Version`
-moves, and `ToDisplaySpaceTint` rebakes the biome-tinted vertex colors for the debugger, which
+moves, and `ToDisplaySpaceTint` rebakes the biome-tinted vertex colors for DevStudio, which
 samples its atlas without the sRGB decode. The camera frames the union of the current and the
 fully grown tree's bounds (`TreePreviewState.FitDistance`), so it stays steady while you scrub, and
 the wheel off the grid zooms that framing. The GL-free, tested state is
 `OpenGLTest.DevStudio/TreePreviewState.cs`.
 
+**QUESTS** edits `assets/data/quests/*.json` (see "Quests (U-15)"). The canvas between the panels is the in-game book's
+own drawing (`QuestBookRenderer.DrawGraph`, every quest shown, none complete) over the quests as edited: click a node to
+select it, drag it to move it (snapped to `QuestEditorState.SnapStep`, Alt for none), shift-drag to move its whole graph's
+`origin`, Ctrl+click another node to toggle it as a parent of the selected one (a self link or one closing a cycle is
+refused in the status line), double-click empty canvas to add a quest there, drag empty canvas to pan, wheel to zoom. The
+top bar picks the graph (`<`/`>`), edits its title, adds a graph file (`NEW GRAPH`, `graph_N.json`) or a quest at the
+view center, and saves. The right panel edits the selected quest's id (committed on Enter or leaving the field; a rename
+follows every parent link), title, description, shape (AUTO/HEX/CIRCLE), readable, any-of, icon and requirements: a type
+button cycles obtain/craft/break/place/kill, the target field takes an item (or `#tag`, which adds a label field), a block
+or an entity, `-`/`+` set the count, PICK arms the left grid for the target (NEXT MOB steps a kill through the registered
+entities), and a plain grid click sets the icon. Delete removes the selected quest and every link to it, Ctrl+S saves,
+Escape clears the selection. Every edit recompiles through `QuestLoader.Compile`: an error is listed in red under the
+canvas and its quest ringed, and SAVE refuses until it compiles. A save writes only the changed files through
+`QuestGraphWriter`, in the shipped files' layout with their header comment kept, so an unedited graph writes back
+unchanged (`QuestGraphWriterTests`); closing with unsaved edits only logs a warning. The rules are
+`OpenGLTest.DevStudio/QuestEditorState.cs` (GL-free, `QuestEditorStateTests`), the page is `QuestEditorPage.cs`. The game
+reads the files at startup, so restart it to play an edit.
+
 Environment variables for scripted captures:
 - `DEV_STUDIO_SELECT=<item|entity|species>` tries the item grid first, then an entity by name or
   display name (switching to ENTITIES), then a tree species by file name (switching to TREES). A
   `tree/` prefix (`TreePreviewState.NamePrefix`) skips the first two, which is how `tree/cactus`
-  reaches the species past the `cactus` block. An unknown name logs a warning.
+  reaches the species past the `cactus` block. `quest/<id>` opens QUESTS with that quest selected and
+  framed. An unknown name logs a warning.
 - `DEV_STUDIO_TREE_STEP=<n|mature>` pins the TREES step (an integer, clamped to the slider range,
   or `mature`). Without it a selected species shows its mature tree.
 - `DEV_STUDIO_ANIM=<clip|hurt|hop|spawn|death|...>` picks the entity mode. An unknown mode logs a

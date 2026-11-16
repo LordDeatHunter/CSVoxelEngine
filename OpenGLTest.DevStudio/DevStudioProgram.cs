@@ -6,6 +6,7 @@ using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
+using VoxelEngine.App;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Items;
 using VoxelEngine.Particles;
@@ -23,10 +24,11 @@ namespace VoxelEngine.DevStudio;
 /// above), ENTITIES, which swaps the player for a registered entity and previews each of its
 /// Blockbench clips (and the hurt flash) through <see cref="EntityPreviewState"/>, and TREES,
 /// which grows the selected tree species pulse by pulse over flat grass at a fixed seed through
-/// <see cref="TreePreviewState"/>, framed on the tree's bounds (the wheel zooms that framing).
+/// <see cref="TreePreviewState"/>, framed on the tree's bounds (the wheel zooms that framing). QUESTS edits the
+/// quest graphs under <c>assets/data/quests</c> (<see cref="QuestEditorPage"/>) and saves them back.
 /// <c>DEV_STUDIO_SELECT</c> resolves an item, then an entity, then a species (a <c>tree/</c>
-/// prefix forces the species), and <c>DEV_STUDIO_TREE_STEP</c> (an integer or <c>mature</c>)
-/// pins the shown growth step for a scripted capture.
+/// prefix forces the species, a <c>quest/</c> prefix selects a quest on the QUESTS tab), and
+/// <c>DEV_STUDIO_TREE_STEP</c> (an integer or <c>mature</c>) pins the shown growth step for a scripted capture.
 /// </summary>
 public static class DevStudioProgram
 {
@@ -40,6 +42,9 @@ public static class DevStudioProgram
     private static EntityPreviewState _entities = null!;
     // No initializer for the same reason: it snapshots TreeSpeciesRegistry.
     private static TreePreviewState _trees = null!;
+    // Built in OnLoad too: the quest editor compiles against the loaded blocks, items and entities.
+    private static QuestEditorPage _quests = null!;
+    private const string QuestPrefix = "quest/";
     private static StudioTab _tab;
     // The player model the ITEMS tab poses; the preview state replaces it on a restart, so it is read through here.
     private static PlayerModel Player => _playerAnim.Model;
@@ -126,6 +131,10 @@ public static class DevStudioProgram
         _gl.DepthFunc(DepthFunction.Lequal);
 
         _scene = new DebugSceneRenderer(_gl);
+        _input = new InputManager(_window);
+        _quests = new QuestEditorPage(QuestEditorState.Load(Path.Combine("assets", "data", "quests")),
+            new TextFieldKeys(_input));
+        _quests.Frame(new Vector2(_window.Size.X, _window.Size.Y));
         _entities = new EntityPreviewState();
         _trees = new TreePreviewState();
         _ui = new DevStudioUi();
@@ -137,7 +146,19 @@ public static class DevStudioProgram
         if (_ui.Entries.Count > 0)
             Editor.Select(_ui.Entries[0].Id);
         var select = Environment.GetEnvironmentVariable("DEV_STUDIO_SELECT")?.Trim();
-        if (!string.IsNullOrEmpty(select))
+        if (select?.StartsWith(QuestPrefix, StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var id = select[QuestPrefix.Length..];
+            if (_quests.State.Find(id) != null)
+            {
+                _tab = StudioTab.Quests;
+                _quests.State.Select(id);
+                _quests.Frame(new Vector2(_window.Size.X, _window.Size.Y), id);
+            }
+            else
+                Log.Warn($"DEV_STUDIO_SELECT: no quest with id '{id}'.");
+        }
+        else if (!string.IsNullOrEmpty(select))
         {
             // Items, then entities, then tree species; "tree/<name>" skips straight to the species,
             // since a bare name such as "cactus" is also a block.
@@ -223,7 +244,6 @@ public static class DevStudioProgram
         PlayerClock.Reset();
         EntityClock.Reset();
 
-        _input = new InputManager(_window);
         if (_input.Mouse is { } mouse)
         {
             mouse.MouseDown += OnMouseDown;
@@ -232,12 +252,23 @@ public static class DevStudioProgram
             mouse.Scroll += OnScroll;
         }
         if (_input.Keyboard is { } keyboard)
+        {
             keyboard.KeyDown += OnKeyDown;
+            keyboard.KeyChar += (_, c) =>
+            {
+                if (_tab == StudioTab.Quests) _quests.KeyChar(c);
+            };
+        }
     }
 
-    // Space pauses or resumes the animation timeline of the tab being shown.
+    // The QUESTS tab takes its own keys; elsewhere Space pauses or resumes the animation timeline of the tab shown.
     private static void OnKeyDown(IKeyboard keyboard, Key key, int scancode)
     {
+        if (_tab == StudioTab.Quests)
+        {
+            _quests.KeyDown(key, Held(Key.ControlLeft, Key.ControlRight));
+            return;
+        }
         if (key != Key.Space || _tab == StudioTab.Trees) return;
 
         ActiveClock.Paused = !ActiveClock.Paused;
@@ -318,8 +349,8 @@ public static class DevStudioProgram
             case StudioTab.Entities:
                 EntityClock.Update((float)dt);
                 break;
-            case StudioTab.Trees:
-                // A tree only changes on a step, seed or species change; nothing animates per frame.
+            case StudioTab.Trees or StudioTab.Quests:
+                // A tree only changes on a step, seed or species change, a quest graph on an edit; nothing animates.
                 break;
             default:
                 UpdateAnimation((float)dt);
@@ -346,14 +377,24 @@ public static class DevStudioProgram
             case StudioTab.Trees:
                 RenderTreeScene(aspect, size);
                 break;
+            case StudioTab.Quests:
+                // No scene: the quest canvas covers the window
+                _gl.Viewport(0, 0, (uint)size.X, (uint)size.Y);
+                _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+                break;
             default:
                 RenderItemScene(projection, size);
                 break;
         }
 
         _scene.Ui.Begin(size);
+        if (_tab == StudioTab.Quests)
+            _quests.DrawCanvas(_scene.Ui, _haveMouse ? _lastMouse : null, (float)_time);
         _ui.Draw(_scene.Ui, Editor, _entities, _trees, _tab, _playerAnim, new Vector2(size.X, size.Y), _status,
-            _firstPerson && _tab == StudioTab.Items, _tab == StudioTab.Trees ? null : ActiveClock);
+            _firstPerson && _tab == StudioTab.Items, _tab is StudioTab.Items or StudioTab.Entities ? ActiveClock : null,
+            _quests.HighlightedIcon);
+        if (_tab == StudioTab.Quests)
+            _quests.DrawPanels(_scene.Ui, (float)_time);
         _scene.Ui.End();
         _gl.BindVertexArray(0);
 
@@ -547,11 +588,20 @@ public static class DevStudioProgram
                     case StudioTab.Trees:
                         _trees.Select(slot);
                         break;
+                    case StudioTab.Quests:
+                        _quests.Pick(_ui.Entries[slot].Id);
+                        break;
                     default:
                         Editor.Select(_ui.Entries[slot].Id);
                         _status = "";
                         break;
                 }
+                return;
+            }
+            if (_tab == StudioTab.Quests)
+            {
+                _quests.MouseDown(position, _time, Held(Key.ControlLeft, Key.ControlRight),
+                    Held(Key.ShiftLeft, Key.ShiftRight));
                 return;
             }
             _leftDrag = true;
@@ -567,6 +617,7 @@ public static class DevStudioProgram
     {
         if (button == MouseButton.Left)
         {
+            _quests.MouseUp();
             _leftDrag = false;
             _dragSlider = null;
             SetCursorCaptured(false);
@@ -577,6 +628,7 @@ public static class DevStudioProgram
 
     private static void OnMouseMove(IMouse mouse, Vector2 position)
     {
+        if (_tab == StudioTab.Quests) _quests.MouseMove(position, Held(Key.AltLeft, Key.AltRight));
         if (!_haveMouse)
         {
             _lastMouse = position;
@@ -602,6 +654,8 @@ public static class DevStudioProgram
     {
         if (_ui.OverGrid(new Vector2(mouse.Position.X, mouse.Position.Y)))
             _ui.ScrollBy(wheel.Y > 0 ? -1 : 1);
+        else if (_tab == StudioTab.Quests)
+            _quests.Scroll(new Vector2(mouse.Position.X, mouse.Position.Y), wheel.Y);
         else if (_tab == StudioTab.Trees)
             _treeZoom = Math.Clamp(_treeZoom * (wheel.Y > 0 ? 0.9f : 1.1f), 0.3f, 3f);
         else
@@ -620,6 +674,9 @@ public static class DevStudioProgram
                 break;
             case DebugButton.TabTrees:
                 _tab = StudioTab.Trees;
+                break;
+            case DebugButton.TabQuests:
+                _tab = StudioTab.Quests;
                 break;
             case DebugButton.TreeStepDown:
                 _trees.StepBy(-1);
@@ -690,8 +747,13 @@ public static class DevStudioProgram
         }
     }
 
+    private static bool Held(Key a, Key b) =>
+        _input?.Keyboard is { } keyboard && (keyboard.IsKeyPressed(a) || keyboard.IsKeyPressed(b));
+
     private static void OnClosing()
     {
+        if (_quests?.State.Dirty == true)
+            Log.Warn("DevStudio closed with unsaved quest edits; they are lost.");
         _scene?.Dispose();
         _input?.Dispose();
         Log.Shutdown();

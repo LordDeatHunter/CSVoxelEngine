@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using VoxelEngine.Content.Quests;
@@ -63,45 +64,12 @@ internal sealed class QuestBookRenderer : IDisposable
     internal void Draw(QuestBookView view, QuestLog log, float time)
     {
         var canvas = _ui.ScreenSize;
-        var camera = view.Camera;
-        _ui.DrawRect(canvas * 0.5f, canvas, Backdrop);
-        DrawGrid(canvas, camera);
-
         var book = log.Book;
-        var edge = QuestConfig.EdgeThickness * camera.Zoom;
-        foreach (var quest in book.Quests)
-        {
-            if (!log.IsVisible(quest)) continue;
-            var to = QuestBookLayout.ToCanvas(quest.Position, camera, canvas);
-            foreach (var parent in quest.Parents)
-            {
-                var from = QuestBookLayout.ToCanvas(book.Quests[parent].Position, camera, canvas);
-                DrawLine(from, to, edge, log.IsComplete(quest) ? EdgeDone : EdgeOpen);
-            }
-        }
-
         var hovered = view.Hover is { } pointer && !view.Dragging
-            ? QuestBookLayout.NodeAt(log, camera, canvas, pointer)
+            ? QuestBookLayout.NodeAt(log, view.Camera, canvas, pointer)
             : null;
-        var size = QuestBookLayout.NodeSize(camera);
-        // The 3D block icons depth-test among themselves; one clear before the first
-        _ui.EnsureDepthCleared();
-        var complete = 0;
-        foreach (var quest in book.Quests)
-        {
-            if (log.IsComplete(quest)) complete++;
-            if (!log.IsVisible(quest)) continue;
-            DrawNode(quest, QuestBookLayout.ToCanvas(quest.Position, camera, canvas), size, log.IsComplete(quest),
-                quest == view.Selected, quest == hovered, camera.Zoom, time);
-        }
-
-        // Each graph's title rides above its root
-        foreach (var quest in book.Quests)
-        {
-            if (quest.Parents.Count > 0) continue;
-            var top = QuestBookLayout.ToCanvas(quest.Position, camera, canvas) - new Vector2(0f, size * 0.5f + 16f);
-            _ui.DrawTextMiddle(book.Graphs[quest.Graph], top, _ui.CountScale, TextDim);
-        }
+        DrawGraph(book, view.Camera, log.IsVisible, log.IsComplete, view.Selected, hovered, time);
+        var complete = book.Quests.Count(log.IsComplete);
 
         var header = QuestBookLayout.Header;
         _ui.DrawTextCenteredY(QuestText.Title, header.X, header.Y, _ui.HeadScale, AccentGold);
@@ -112,6 +80,47 @@ internal sealed class QuestBookRenderer : IDisposable
 
         if (view.Selected is { } selected)
             DrawDetails(selected, log, view.Camera, canvas, time);
+    }
+
+    /// <summary>The book's backdrop, grid, parent edges, nodes and graph titles over the whole canvas: what the quest
+    /// book and the DevStudio quest editor both draw. A quest <paramref name="visible"/> refuses is skipped, and one
+    /// <paramref name="complete"/> accepts draws done (a lit node, a green edge in, a check badge).</summary>
+    internal void DrawGraph(QuestBook book, VoxelEngine.Saves.QuestViewData camera, Func<QuestType, bool> visible,
+        Func<QuestType, bool> complete, QuestType? selected, QuestType? hovered, float time)
+    {
+        var canvas = _ui.ScreenSize;
+        _ui.DrawRect(canvas * 0.5f, canvas, Backdrop);
+        DrawGrid(canvas, camera);
+
+        var edge = QuestConfig.EdgeThickness * camera.Zoom;
+        foreach (var quest in book.Quests)
+        {
+            if (!visible(quest)) continue;
+            var to = QuestBookLayout.ToCanvas(quest.Position, camera, canvas);
+            foreach (var parent in quest.Parents)
+            {
+                var from = QuestBookLayout.ToCanvas(book.Quests[parent].Position, camera, canvas);
+                DrawLine(from, to, edge, complete(quest) ? EdgeDone : EdgeOpen);
+            }
+        }
+
+        var size = QuestBookLayout.NodeSize(camera);
+        // The 3D block icons depth-test among themselves; one clear before the first
+        _ui.EnsureDepthCleared();
+        foreach (var quest in book.Quests)
+        {
+            if (!visible(quest)) continue;
+            DrawNode(quest, QuestBookLayout.ToCanvas(quest.Position, camera, canvas), size, complete(quest),
+                quest == selected, quest == hovered, camera.Zoom, time);
+        }
+
+        // Each graph's title rides above its root
+        foreach (var quest in book.Quests)
+        {
+            if (quest.Parents.Count > 0) continue;
+            var top = QuestBookLayout.ToCanvas(quest.Position, camera, canvas) - new Vector2(0f, size * 0.5f + 16f);
+            _ui.DrawTextMiddle(book.Graphs[quest.Graph], top, _ui.CountScale, TextDim);
+        }
     }
 
     // A faint grid that pans and zooms with the book; dropped once its lines would crowd together

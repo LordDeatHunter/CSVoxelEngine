@@ -587,7 +587,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   the [M] map screen (regions, pins, the waystone and pointer readouts, the buttons); owns the pin sprites
         MapRegionTextures.cs   # one single-slice RGBA8 array texture per 8x8 chunk-column region of the map's layer, patched per rescanned tile
         QuestBookRenderer.cs   # the [P] quest book (grid, edges, node frames and icons, the details panel) and the quest toast card;
-                               #   owns the node textures
+                               #   owns the node textures; DrawGraph (backdrop, grid, edges, nodes, graph titles) is shared with
+                               #   DevStudio's quest editor
         WaystoneRenderer.cs    # the waystone screen: the discovery popup, the rename dialog and the teleport list (rows with realm
                                #   tag and distance, lost rows dimmed, search field, the mana footer)
         TopStripRenderer.cs    # the top-center HUD strip (compass or clock) and the look-at label below it

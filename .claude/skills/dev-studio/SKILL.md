@@ -1,6 +1,6 @@
 ---
 name: dev-studio
-description: Preview and debug CSVoxelEngine's player animations, held items, entity (goblin, slime) models and clips, and tree species with the DevStudio tool - run recipe, every env var for scripted screenshots, the timeline (progress, speed, loop), how to tune a pose from its sliders, and how to add a mode for a new animation. Use for any animation, held-item or model work before a world scenario.
+description: Preview and debug CSVoxelEngine's player animations, held items, entity (goblin, slime) models and clips, and tree species, and edit the quest graphs, with the DevStudio tool - run recipe, every env var for scripted screenshots, the timeline (progress, speed, loop), how to tune a pose from its sliders, and how to add a mode for a new animation. Use for any animation, held-item or model work before a world scenario.
 ---
 
 # DevStudio
@@ -42,6 +42,10 @@ dotnet run --project ../OpenGLTest.DevStudio -c Release --no-build
   The shared chest model is listed last as `Chest` (`DEV_STUDIO_SELECT=chest`): `open close wobble`, each clip
   alone on its own clock, as a chest's lid plays it in the game.
 - **TREES**: a species grown pulse by pulse at a fixed seed (Step slider, STEP -/+, MATURE, REGROW).
+- **QUESTS**: a visual editor for `assets/data/quests/*.json` (add, delete, drag, link with Ctrl+click,
+  fields, requirements, icon from the grid, SAVE / Ctrl+S, refused while it does not compile). Prefer it
+  over hand-editing quest JSON when the user wants to lay out or restructure graphs; controls in
+  `docs/agents/dev-tools.md`.
 - **Timeline** (ITEMS and ENTITIES, bottom strip): Progress slider (seconds; dragging scrubs and stops the
   clock), Speed (x0..x4 in 0.1 steps, 0 pauses), LOOP ON/OFF (off = play once and hold the last frame).
   `AnimationClock` steps the state in fixed 1/60 s slices and a scrub restarts the state and steps up to
@@ -51,7 +55,7 @@ dotnet run --project ../OpenGLTest.DevStudio -c Release --no-build
 ## Env vars (scripted captures)
 | var | meaning |
 |---|---|
-| `DEV_STUDIO_SELECT=<item\|entity\|species>` | item grid first, then entity by name/display name (switches to ENTITIES), then tree species (`tree/<name>` forces a species) |
+| `DEV_STUDIO_SELECT=<item\|entity\|species>` | item grid first, then entity by name/display name (switches to ENTITIES), then tree species (`tree/<name>` forces a species); `quest/<id>` opens QUESTS on that quest |
 | `DEV_STUDIO_PLAYER_ANIM=<mode>` | a player animation (selects ITEMS); unknown logs the list |
 | `DEV_STUDIO_ANIM=<clip\|hurt\|hop\|spawn\|death>` | the entity mode |
 | `DEV_STUDIO_TREE_STEP=<n\|mature>` | the TREES step |

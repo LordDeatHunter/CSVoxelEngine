@@ -3,19 +3,25 @@
 File tree (part 4 of 4): DevStudio, the dedicated server, the wiki exporter, the test project, `USER_TODO.md` and `tools/`.
 
 ```
-OpenGLTest.DevStudio/              # the item/entity/tree preview tool (ITEMS, ENTITIES and TREES tabs)
-  VoxelEngine.DevStudio.csproj     # the project file (references the game project)
+OpenGLTest.DevStudio/                 # the preview and authoring tool (ITEMS, ENTITIES, TREES and QUESTS tabs)
+  VoxelEngine.DevStudio.csproj        # the project file (references the game project)
   GlobalUsings.cs                     # VoxelEngine.Core and the Shader alias
   AnimationClock.cs                   # the playback controls of DevStudio's timeline
-  StudioTab.cs                      # which grid DevStudio's left panel shows, and
+  StudioTab.cs                        # which grid DevStudio's left panel shows, and
                                       #   so what the scene previews: the player holding an item
   DebugSceneRenderer.cs               # a minimal standalone renderer for DevStudio: content registry, block atlas
   EntityPreviewState.cs               # GL-free state of the ENTITIES tab
-  DevStudioProgram.cs              # standalone dev-studio entry point: a window showing the player model holding the selected item
-  DevStudioUi.cs                   # immediate-mode UI for DevStudio: an item grid on the left
-  ItemDisplayEditor.cs                # editable copy of the selected item's display block plus the debugger-only renderer tweaks
+  DevStudioProgram.cs                 # standalone DevStudio entry point: a window showing the player model holding the selected item
+  DevStudioUi.cs                      # immediate-mode UI for DevStudio: an item grid on the left
+  ItemDisplayEditor.cs                # editable copy of the selected item's display block plus the preview-only renderer tweaks
   ItemJsonDisplayWriter.cs            # writes an item's display block back into its JSON file
   PlayerPreviewState.cs               # GL-free state behind DevStudio's player animations (the ITEMS tab)
+  QuestEditorPage.cs                  # the QUESTS tab: the graph canvas (QuestBookRenderer.DrawGraph), top bar,
+                                      #   quest fields and requirement rows, and their mouse and keyboard handling
+  QuestEditorState.cs                 # GL-free quest editing rules: add, delete, move, link (cycle-safe), rename,
+                                      #   fields, requirements, the lenient preview book, compile errors and save
+  QuestGraphDocument.cs               # one quest graph file being edited: path, header comment, definition, dirty
+  QuestGraphWriter.cs                 # writes a quest graph back in the shipped files' hand-written JSON layout
   SliceTrailSampler.cs                # the delegate that poses the previewed blade for PlayerPreviewState's slice trail
   TreePreviewState.cs                 # GL-free state of the TREES tab: species, seed, step, per-step
                                       #   snapshots, ground plane and framing bounds
@@ -97,8 +103,9 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   placement, support, doors and stairs, multiblocks, the selection
                                #   outline; its own helper
                                #   SupportTestWorld
-  DevStudio/                # the OpenGLTest.DevStudio project: the timeline, the
-                               #   preview states, the display editor and its JSON writer
+  DevStudio/                   # the OpenGLTest.DevStudio project: the timeline, the
+                               #   preview states, the display editor and its JSON writer, the quest editor
+                               #   and the quest graph writer
   Items/                       # item uses (acorn, firestarter, heal, grow-tree,
                                #   timed use), the staff slot binding and the hierarchy; its own helper StubItemUseWorld
   Juice/                       # game-feel rules: blast shake, damage direction and fringe,

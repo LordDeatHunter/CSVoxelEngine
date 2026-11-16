@@ -417,7 +417,8 @@ quest once any one requirement is met instead of all) and `requirements`, each `
 `data/tags` file, optional `label` for its display name) instead of an `item`: any member counts and an obtain sums the held
 counts across them (`copper_tin_casts` for the first-pour quest). The loader refuses, naming the file, a duplicate or blank id, an unknown or repeated parent, a parent cycle, an unknown
 icon, item, block or entity, a count below 1, a bad shape, type or position, and a quest with no requirements
-(`QuestLoaderTests`, which also proves every shipped quest can unlock).
+(`QuestLoaderTests`, which also proves every shipped quest can unlock). DevStudio's QUESTS tab edits and saves these files
+visually (see "DevStudio" in `dev-tools.md`).
 
 The rules are `QuestLog`'s (GL-free, one per player; `QuestLogTests`):
 - a quest is **unlocked** once every parent is complete (a root always is); the book shows complete and unlocked quests only,

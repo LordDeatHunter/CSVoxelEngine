@@ -17,6 +17,7 @@ public enum DebugButton
     TabItems,
     TabEntities,
     TabTrees,
+    TabQuests,
     TreeStepDown,
     TreeStepUp,
     TreeMature,
@@ -77,16 +78,17 @@ public sealed class DevStudioUi
     public const string ProgressSlider = "Progress (s)";
     public const string SpeedSlider = "Speed (x)";
 
-    private const float Pad = 12f;
-    private const float PanelWidth = 330f;
+    // The side panels' margin and width, which the QUESTS page lays its canvas and its right panel out by.
+    internal const float Pad = 12f;
+    internal const float PanelWidth = 330f;
     private const float SlotSize = 46f;
     private const float SlotGap = 8f;
     private const float HeaderH = 52f;
     private const float SliderRowH = 42f;
     private const float TrackH = 10f;
-    private const float ButtonH = 34f;
-    private const float ButtonGap = 8f;
-    private const float TextCap = 12f;
+    internal const float ButtonH = 34f;
+    internal const float ButtonGap = 8f;
+    internal const float TextCap = 12f;
     // The tab buttons' row, which pushes the grid header and the grid down.
     private const float TabRowH = ButtonH + ButtonGap;
     // Entities and tree species have no icon, so their slots are wide enough to hold the name.
@@ -96,9 +98,9 @@ public sealed class DevStudioUi
 
     private static readonly Rgba Panel = Rgba.Gray(0.03f, 0.74f);
     private static readonly Rgba PanelLine = Rgba.Gray(0.45f, 0.6f);
-    private static readonly Rgba TextDim = Rgba.Gray(0.62f);
+    internal static readonly Rgba TextDim = Rgba.Gray(0.62f);
     private static readonly Rgba SlotBg = Rgba.Gray(0.09f, 0.72f);
-    private static readonly Rgba Accent = new(232, 184, 72);
+    internal static readonly Rgba Accent = new(232, 184, 72);
     private static readonly Rgba Track = Rgba.Gray(0.2f, 0.9f);
     private static readonly Rgba Knob = Rgba.White;
     private static readonly Rgba ButtonBg = Rgba.Gray(0.18f, 0.92f);
@@ -195,7 +197,7 @@ public sealed class DevStudioUi
 
     public void Draw(UIRenderer ui, ItemDisplayEditor editor, EntityPreviewState entities, TreePreviewState trees,
         StudioTab tab, PlayerPreviewState player, Vector2 screen, string status, bool firstPerson,
-        AnimationClock? timeline = null)
+        AnimationClock? timeline = null, ushort questIcon = 0)
     {
         _tab = tab;
         _sliders.Clear();
@@ -217,13 +219,16 @@ public sealed class DevStudioUi
             case StudioTab.Trees:
                 BuildTreeControls(trees, screen);
                 break;
+            case StudioTab.Quests:
+                // The quest page builds and draws its own right panel and canvas
+                break;
             default:
                 BuildControls(editor, player, screen, firstPerson);
                 break;
         }
 
         // The timeline runs along the bottom of the viewport between the two panels (ITEMS and ENTITIES only).
-        if (timeline != null && tab != StudioTab.Trees)
+        if (timeline != null && tab is StudioTab.Items or StudioTab.Entities)
             BuildTimeline(timeline, screen);
 
         DrawPanel(ui, new Vector2(Pad + PanelWidth * 0.5f, screen.Y * 0.5f),
@@ -243,25 +248,33 @@ public sealed class DevStudioUi
                 DrawTreeGrid(ui, trees);
                 DrawTreeTitle(ui, trees, screen);
                 break;
+            case StudioTab.Quests:
+                DrawGrid(ui, questIcon, "ICONS");
+                break;
             default:
-                DrawGrid(ui, editor);
+                DrawGrid(ui, editor.SelectedId, "ITEMS");
                 DrawTitle(ui, editor, screen, status);
                 break;
         }
         DrawControls(ui);
     }
 
+    private static readonly (DebugButton Button, StudioTab Tab, string Label)[] Tabs =
+    [
+        (DebugButton.TabItems, StudioTab.Items, "ITEMS"),
+        (DebugButton.TabEntities, StudioTab.Entities, "ENTITIES"),
+        (DebugButton.TabTrees, StudioTab.Trees, "TREES"),
+        (DebugButton.TabQuests, StudioTab.Quests, "QUESTS"),
+    ];
+
     private void BuildTabs(StudioTab tab)
     {
-        var width = (PanelWidth - Pad * 2f - ButtonGap * 2f) / 3f;
+        var width = (PanelWidth - Pad * 2f - ButtonGap * (Tabs.Length - 1)) / Tabs.Length;
         var y = Pad + 6f + ButtonH * 0.5f;
         var left = Pad + Pad;
-        AddButton(new Vector2(left + width * 0.5f, y), new Vector2(width, ButtonH), DebugButton.TabItems,
-            "ITEMS", true, tab == StudioTab.Items);
-        AddButton(new Vector2(left + width * 1.5f + ButtonGap, y), new Vector2(width, ButtonH),
-            DebugButton.TabEntities, "ENTITIES", true, tab == StudioTab.Entities);
-        AddButton(new Vector2(left + width * 2.5f + ButtonGap * 2f, y), new Vector2(width, ButtonH),
-            DebugButton.TabTrees, "TREES", true, tab == StudioTab.Trees);
+        for (var i = 0; i < Tabs.Length; i++)
+            AddButton(new Vector2(left + width * (i + 0.5f) + ButtonGap * i, y), new Vector2(width, ButtonH),
+                Tabs[i].Button, Tabs[i].Label, true, tab == Tabs[i].Tab);
     }
 
     private void BuildGrid(Vector2 screen, int count, StudioTab tab)
@@ -270,10 +283,11 @@ public sealed class DevStudioUi
         _gridCount = count;
 
         var available = PanelWidth - Pad * 2f;
-        var slotSize = tab != StudioTab.Items
+        var itemGrid = tab is StudioTab.Items or StudioTab.Quests;
+        var slotSize = !itemGrid
             ? new Vector2((available - (EntityColumns - 1) * SlotGap) / EntityColumns, SlotSize)
             : new Vector2(SlotSize);
-        _columns = tab != StudioTab.Items
+        _columns = !itemGrid
             ? EntityColumns
             : Math.Max(1, (int)((available + SlotGap) / (SlotSize + SlotGap)));
         var strideX = slotSize.X + SlotGap;
@@ -495,15 +509,15 @@ public sealed class DevStudioUi
     private static void DrawPanel(UIRenderer ui, Vector2 center, Vector2 size) =>
         ui.DrawRect(center, size, Panel);
 
-    private void DrawGrid(UIRenderer ui, ItemDisplayEditor editor)
+    private void DrawGrid(UIRenderer ui, ushort selectedId, string header)
     {
-        DrawGridHeader(ui, $"ITEMS  ({Entries.Count})");
+        DrawGridHeader(ui, $"{header}  ({Entries.Count})");
 
         // Flat sprites for items, cubes for blocks: the same mix the inventory rows show.
         foreach (var (center, size, index) in _slots)
         {
             var entry = Entries[index];
-            DrawSlot(ui, center, size, entry.Id == editor.SelectedId);
+            DrawSlot(ui, center, size, entry.Id == selectedId);
 
             if (entry.IsBlock)
                 ui.DrawBlockIcon(center, SlotSize * 0.74f, entry.Id);
@@ -619,7 +633,7 @@ public sealed class DevStudioUi
 
     /// <summary>The text scale (and the cap height it gives) for <paramref name="text"/> at
     /// <paramref name="cap"/>, shrunk only as far as it takes to fit <paramref name="maxWidth"/>.</summary>
-    private static (float Scale, float Cap) FitText(UIRenderer ui, string text, float cap, float maxWidth)
+    internal static (float Scale, float Cap) FitText(UIRenderer ui, string text, float cap, float maxWidth)
     {
         var scale = ui.CapHeightScale(cap);
         var width = ui.MeasureTextWidth(text, scale);
@@ -628,21 +642,25 @@ public sealed class DevStudioUi
         return (ui.CapHeightScale(cap), cap);
     }
 
+    /// <summary>One studio button: dimmed when disabled, gold when active, its label shrunk to fit.</summary>
+    internal static void DrawButton(UIRenderer ui, Vector2 center, Vector2 size, string label, bool enabled, bool active)
+    {
+        var background = !enabled ? ButtonOff : active ? Accent : ButtonBg;
+        ui.DrawRect(center, size, background);
+        ui.DrawBorder(center, size, 1f, PanelLine);
+
+        var (labelScale, cap) = FitText(ui, label, TextCap, size.X - 8f);
+        var width = ui.MeasureTextWidth(label, labelScale);
+        ui.DrawText(label, new Vector2(center.X - width * 0.5f, center.Y - cap * 0.5f), labelScale,
+            enabled ? Rgba.White : TextDim);
+    }
+
     private void DrawControls(UIRenderer ui)
     {
         var scale = ui.CapHeightScale(TextCap);
 
         foreach (var (center, size, _, _, label, enabled, active) in _buttons)
-        {
-            var background = !enabled ? ButtonOff : active ? Accent : ButtonBg;
-            ui.DrawRect(center, size, background);
-            ui.DrawBorder(center, size, 1f, PanelLine);
-
-            var (labelScale, cap) = FitText(ui, label, TextCap, size.X - 8f);
-            var width = ui.MeasureTextWidth(label, labelScale);
-            ui.DrawText(label, new Vector2(center.X - width * 0.5f, center.Y - cap * 0.5f), labelScale,
-                enabled ? Rgba.White : TextDim);
-        }
+            DrawButton(ui, center, size, label, enabled, active);
 
         foreach (var slider in _sliders)
         {

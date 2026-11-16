@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Quests;
 using VoxelEngine.Quests;
@@ -44,12 +45,18 @@ internal static class QuestBookLayout
     public static float NodeSize(QuestViewData camera) => QuestConfig.NodeSize * camera.Zoom;
 
     /// <summary>The visible quest whose node is under <paramref name="point"/>, or null.</summary>
-    public static QuestType? NodeAt(QuestLog log, QuestViewData camera, Vector2 canvas, Vector2 point)
+    public static QuestType? NodeAt(QuestLog log, QuestViewData camera, Vector2 canvas, Vector2 point) =>
+        NodeAt(log.Book.Quests, log.IsVisible, camera, canvas, point);
+
+    /// <summary>The quest of <paramref name="quests"/> that <paramref name="visible"/> accepts whose node is under
+    /// <paramref name="point"/>, or null; the DevStudio quest editor hit-tests every quest through it.</summary>
+    public static QuestType? NodeAt(IReadOnlyList<QuestType> quests, Func<QuestType, bool> visible, QuestViewData camera,
+        Vector2 canvas, Vector2 point)
     {
         var radius = NodeSize(camera) * 0.5f;
-        foreach (var quest in log.Book.Quests)
+        foreach (var quest in quests)
         {
-            if (!log.IsVisible(quest)) continue;
+            if (!visible(quest)) continue;
             if (Vector2.DistanceSquared(ToCanvas(quest.Position, camera, canvas), point) <= radius * radius)
                 return quest;
         }
