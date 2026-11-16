@@ -41,7 +41,14 @@ public class QuestLoaderTests
         { "bad reveal", [Revealing(Quest("a", null, Break("stone")), "sometimes")] },
         { "numeric reveal", [Revealing(Quest("a", null, Break("stone")), "1")] },
         { "bad unlock", [Unlocking(Quest("a", ["b"], Break("stone")), "sometimes"), Quest("b", null, Break("stone"))] },
+        { "unknown icon entity", [WithIcon(Quest("a", null, Break("stone")), "entity/not_a_mob")] },
     };
+
+    private static QuestDefinition WithIcon(QuestDefinition quest, string icon)
+    {
+        quest.Icon = icon;
+        return quest;
+    }
 
     private static QuestDefinition Revealing(QuestDefinition quest, string reveal)
     {
@@ -76,6 +83,17 @@ public class QuestLoaderTests
         Assert.Equal(QuestShape.Circle, book.Of("child").Shape);
         Assert.Equal(new System.Numerics.Vector2(1, 2), book.Of("root").Position);
         Assert.Equal([book.Of("child").Index], book.Of("root").Children.ToArray());
+    }
+
+    [Fact]
+    public void AnEntityIconNamesTheEntityInsteadOfABlockOrItem()
+    {
+        var book = Book(WithIcon(Quest("hunt", null, Kill("slime")), "entity/slime"), Quest("dig", null, Break("stone")));
+
+        Assert.Equal("slime", book.Of("hunt").IconEntity);
+        Assert.Equal(0, book.Of("hunt").IconId);
+        Assert.Null(book.Of("dig").IconEntity);
+        Assert.NotEqual(0, book.Of("dig").IconId);
     }
 
     private static QuestLabelDefinition Label(string? size = null, string? color = null, string? text = "Hello") =>

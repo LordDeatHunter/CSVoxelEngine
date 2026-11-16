@@ -408,7 +408,8 @@ waystone, ticked in `World.UpdateClient`) until its own streamed chunk there is 
 **Quests (U-15).** Quests are data: `assets/data/quests/<id>.json`, one file per quest (`QuestDefinition`), loaded last
 in `ContentRegistry.Load` by `QuestLoader` into `QuestRegistry.Book` (a `QuestBook` of compiled `QuestType`s). A quest's id
 is its file name (saves and the wire name a quest by it; an `id` key in the file is never read). A quest has a `title`,
-`description`, `icon` (a block or item, `item/`/`block/` prefix allowed), `pos` (`[x, y]` grid steps in the book),
+`description`, `icon` (a block or item, `item/`/`block/` prefix allowed, or `entity/<name>` to draw that entity's model in
+its rest pose, `EntityIconRenderer` laid out by `EntityIconLayout`), `pos` (`[x, y]` grid steps in the book),
 `parents` (quest ids), `shape` (`hex` or `circle`; default hex for a quest with no
 parents, circle otherwise), `reveal` (when the quest shows in the book as a locked preview before it unlocks:
 `unlocked`, the default, not before; `always`; `anyParentShown` or `allParentsShown`, while one or every parent shows, done

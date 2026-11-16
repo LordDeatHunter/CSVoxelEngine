@@ -182,7 +182,7 @@ internal sealed class QuestBookRenderer : IDisposable
         _ui.DrawTexture(center, new Vector2(size), frame,
             hovered ? NodeHover : done ? NodeDone : locked ? NodeLocked : NodeOpen);
         var icon = QuestConfig.NodeIconSize * zoom;
-        _ui.DrawIdIcon(center, icon, quest.IconId, 0f, time);
+        _ui.DrawQuestIcon(center, icon, quest, time);
         if (locked)
         {
             // A locked preview: the icon shaded over and a "?" on top; 3D icons wrote depth, so clear it for the shade
@@ -207,7 +207,7 @@ internal sealed class QuestBookRenderer : IDisposable
         var width = panel.Size.X - PanelPad * 2f;
         var y = panel.Top + PanelPad + 16f;
 
-        _ui.DrawIdIcon(new Vector2(left + 20f, y + 4f), 40f, quest.IconId, 0f, time);
+        _ui.DrawQuestIcon(new Vector2(left + 20f, y + 4f), 40f, quest, time);
         _ui.DrawTextCenteredY(_ui.FittedText(quest.Title, _ui.HeadScale, width - 56f), left + 52f, y, _ui.HeadScale, AccentGold);
         var done = log.IsComplete(quest);
         if (log.IsPreview(quest))
@@ -337,7 +337,7 @@ internal sealed class QuestBookRenderer : IDisposable
         _ui.DrawRect(new Vector2(card.Left + 3f, card.Center.Y), new Vector2(6f, card.Size.Y - 4f), AccentGold);
         var iconCenter = new Vector2(card.Left + 16f + 26f, card.Center.Y);
         _ui.DrawTexture(iconCenter, new Vector2(56f), quest.Shape == QuestShape.Hex ? _hexTexture : _circleTexture, NodeDone);
-        _ui.DrawIdIcon(iconCenter, 32f, quest.IconId, 0f, time);
+        _ui.DrawQuestIcon(iconCenter, 32f, quest, time);
         var textLeft = iconCenter.X + 40f;
         var textWidth = card.Right - textLeft - 12f;
         _ui.DrawTextCenteredY(QuestText.ToastHeading, textLeft, card.Center.Y - 14f, _ui.CountScale, AccentGold);

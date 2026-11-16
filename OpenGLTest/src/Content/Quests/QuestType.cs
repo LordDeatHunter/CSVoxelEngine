@@ -20,8 +20,11 @@ public sealed class QuestType
 
     public required string Description { get; init; }
 
-    /// <summary>The block or item id drawn in the node.</summary>
+    /// <summary>The block or item id drawn in the node; 0 when the icon is an entity.</summary>
     public required ushort IconId { get; init; }
+
+    /// <summary>The file name of the entity drawn in the node instead of a block or item, or null.</summary>
+    public string? IconEntity { get; init; }
 
     /// <summary>Absolute grid position in the quest book (graph origin plus the quest's own position).</summary>
     public required Vector2 Position { get; init; }

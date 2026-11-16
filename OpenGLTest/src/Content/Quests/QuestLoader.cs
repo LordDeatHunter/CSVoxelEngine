@@ -130,8 +130,8 @@ internal static class QuestLoader
             var (quest, path) = entries[i];
             var position = ReadVector(quest.Pos, "pos", path)
                            ?? throw new InvalidOperationException($"Quest '{quest.Id}' in '{path}' has no pos.");
-            if (quest.Icon == null || !ContentFiles.TryResolve(quest.Icon, out var icon))
-                throw new InvalidOperationException($"Quest '{quest.Id}' in '{path}' has icon '{quest.Icon}', which is not a registered block or item.");
+            if (!TryResolveIcon(quest.Icon, out var icon, out var iconEntity))
+                throw new InvalidOperationException($"Quest '{quest.Id}' in '{path}' has icon '{quest.Icon}', which is not a registered block, item or entity/<name>.");
             if (quest.Requirements is not { Count: > 0 } requirements)
                 throw new InvalidOperationException($"Quest '{quest.Id}' in '{path}' has no requirements.");
 
@@ -142,6 +142,7 @@ internal static class QuestLoader
                 Title = string.IsNullOrWhiteSpace(quest.Title) ? quest.Id! : quest.Title,
                 Description = quest.Description ?? "",
                 IconId = icon,
+                IconEntity = iconEntity,
                 Position = position,
                 Shape = ReadShape(quest.Shape, parents[i].Length == 0, quest.Id!, path),
                 Reveal = ReadName(quest.Reveal, QuestReveal.Unlocked, RevealNames, "reveal", $"Quest '{quest.Id}'", path),
@@ -155,6 +156,25 @@ internal static class QuestLoader
         }
         return new QuestBook(compiled, [.. (labels ?? []).Select(l => CompileLabel(l.Label, l.Path))]);
     }
+
+    /// <summary>Resolves a quest icon: a block or item (<paramref name="id"/>), or <c>entity/&lt;name&gt;</c> naming a
+    /// registered entity (<paramref name="entity"/>, its file name, with <paramref name="id"/> 0).</summary>
+    public static bool TryResolveIcon(string? icon, out ushort id, out string? entity)
+    {
+        id = 0;
+        entity = null;
+        if (icon == null) return false;
+        if (icon.StartsWith(EntityIconPrefix, StringComparison.Ordinal))
+        {
+            if (EntityRegistry.TryGet(icon[EntityIconPrefix.Length..]) is not { } type) return false;
+            entity = type.Name;
+            return true;
+        }
+        return ContentFiles.TryResolve(icon, out id);
+    }
+
+    /// <summary>The prefix of a quest icon that names an entity.</summary>
+    public const string EntityIconPrefix = "entity/";
 
     private static QuestRequirement CompileRequirement(QuestRequirementDefinition definition, string quest, string path)
     {

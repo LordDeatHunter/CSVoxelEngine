@@ -329,6 +329,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         MapLayout.cs           # world <-> canvas (north up), the minimap's box and rim clamp, the screen's buttons and lines
         MapScreenView.cs       # open flag, transition, center and zoom, follow-the-player until panned, the press and drag
       Quests/                  # the [P] quest book, GL-free (QuestBookRenderer draws it, QuestBookInput drives it)
+        EntityIconLayout.cs    # an entity icon's turn (facing the screen's left, from above) and its fit: the rest pose's turned bounds centered and scaled to a unit span
         QuestBookLayout.cs     # grid <-> canvas, zoom about the pointer, pan by a drag, the node and link hit tests (also over a plain quest list, for DevStudio), the details panel and its EQUIP button
         QuestTracker.cs        # the equipped quest: one at a time, open and readable only, unequipped on completion
         QuestBookView.cs       # open flag, transition, the bound pan/zoom, the selection, the press and drag

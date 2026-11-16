@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Quests;
 using VoxelEngine.Data;
 using VoxelEngine.Items;
 using VoxelEngine.Rendering.Overlays;
@@ -200,8 +201,7 @@ public sealed class DevStudioUi
 
     public void Draw(UIRenderer ui, ItemDisplayEditor editor, EntityPreviewState entities, TreePreviewState trees,
         StudioTab tab, PlayerPreviewState player, Vector2 screen, string status, bool firstPerson,
-        AnimationClock? timeline = null, QuestIconPicker? questIcons = null, ushort questIcon = 0,
-        EntityThumbnails? thumbnails = null)
+        AnimationClock? timeline = null, QuestIconPicker? questIcons = null, QuestType? questIcon = null)
     {
         _tab = tab;
         _sliders.Clear();
@@ -215,11 +215,7 @@ public sealed class DevStudioUi
             StudioTab.Quests => questIcons?.Visible.Count ?? 0,
             _ => Entries.Count,
         };
-        // The quest grid draws entities as thumbnails in the icon slots; only without them would it need wide name slots
-        var nameSlots = tab is StudioTab.Entities or StudioTab.Trees
-                        || (tab == StudioTab.Quests && thumbnails == null
-                            && questIcons?.Visible.All(e => e.Kind == IconKind.Entity) == true && count > 0);
-        BuildGrid(screen, count, tab, nameSlots);
+        BuildGrid(screen, count, tab, tab is StudioTab.Entities or StudioTab.Trees);
         switch (tab)
         {
             case StudioTab.Entities:
@@ -258,7 +254,7 @@ public sealed class DevStudioUi
                 DrawTreeTitle(ui, trees, screen);
                 break;
             case StudioTab.Quests when questIcons != null:
-                DrawQuestIcons(ui, questIcons, questIcon, thumbnails);
+                DrawQuestIcons(ui, questIcons, questIcon);
                 break;
             default:
                 DrawGrid(ui, editor.SelectedId, "ITEMS");
@@ -535,14 +531,14 @@ public sealed class DevStudioUi
         }
     }
 
-    // The quest grid: cubes for blocks, sprites for items, an entity's thumbnail (or, without one, its name); the quest
-    // page draws the header (search and filters) over it
-    private void DrawQuestIcons(UIRenderer ui, QuestIconPicker icons, ushort selectedId, EntityThumbnails? thumbnails)
+    // The quest grid: cubes for blocks, sprites for items, models for entities, the selected quest's icon highlighted;
+    // the quest page draws the header (search and filters) over it
+    private void DrawQuestIcons(UIRenderer ui, QuestIconPicker icons, QuestType? selected)
     {
         foreach (var (center, size, index) in _slots)
         {
             var entry = icons.Visible[index];
-            DrawSlot(ui, center, size, entry.Kind != IconKind.Entity && entry.Id == selectedId);
+            DrawSlot(ui, center, size, selected != null && entry.Is(selected));
             switch (entry.Kind)
             {
                 case IconKind.Block:
@@ -551,13 +547,8 @@ public sealed class DevStudioUi
                 case IconKind.Item:
                     ui.DrawItemSprite(center, SlotSize * 0.72f, entry.Id, 0f, 0f);
                     break;
-                case IconKind.Entity when thumbnails != null && thumbnails.TryGet(entry.Key, out var thumbnail):
-                    ui.DrawTexture(center, new Vector2(SlotSize * 0.9f), thumbnail);
-                    break;
-                default:
-                    var (scale, cap) = FitText(ui, entry.Name, TextCap, size.X - 6f);
-                    var width = ui.MeasureTextWidth(entry.Name, scale);
-                    ui.DrawText(entry.Name, new Vector2(center.X - width * 0.5f, center.Y - cap * 0.5f), scale, Rgba.White);
+                case IconKind.Entity:
+                    ui.EntityIcons.Draw(center, SlotSize * 0.8f, entry.Key);
                     break;
             }
         }

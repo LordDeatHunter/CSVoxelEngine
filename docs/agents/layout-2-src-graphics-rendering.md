@@ -585,6 +585,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   highlight (RenderBlockSelection) and the crack overlay (RenderBlockBreaking)
         SpellBuilderRenderer.cs # the spell table's builder page: staff slots, the known parts by kind, the live
                                 #   cost/verdict/fizzle/factors, BIND and CLEAR (or the hold-a-staff hint)
+        EntityIconRenderer.cs  # an entity drawn as a UI icon (a quest's entity icon, DevStudio's icon grid): its rig meshes in
+                               #   the rest pose through the UI shader, built per kind on first use (UIRenderer.EntityIcons)
         MapRenderer.cs         # the top-right minimap (square scissored or round via uClipCircle, pins held to the rim) and
                                #   the [M] map screen (regions, pins, the waystone and pointer readouts, the buttons); owns the pin sprites
         MapRegionTextures.cs   # one single-slice RGBA8 array texture per 8x8 chunk-column region of the map's layer, patched per rescanned tile

@@ -34,8 +34,7 @@ namespace VoxelEngine.DevStudio;
 /// move and edited in the right panel (text with \n for a line break, SIZE, COLOR). With several quests selected, the right panel lists them instead (icon and title, scrolled by the wheel
 /// when too long; a click on a row opens that quest alone) over a DELETE button. A requirement's type and the quest's reveal mode (SHOW) are <see cref="DropdownState"/>s. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
 /// </summary>
-internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys, QuestIconPicker icons,
-    EntityThumbnails thumbnails)
+internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys, QuestIconPicker icons)
 {
     private enum Field { Id, Title, Description, Target, Label, LabelText, IconSearch }
 
@@ -139,8 +138,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     /// <summary>Whether a text field has the keyboard (so Space and Delete are typing, not commands).</summary>
     public bool HasFocus => _focus != null;
 
-    /// <summary>The block or item the left grid highlights: the selected quest's icon.</summary>
-    public ushort HighlightedIcon => State.SelectedQuestId is { } id && State.Preview.TryGet(id, out var quest) ? quest.IconId : (ushort)0;
+    /// <summary>The quest whose icon the left grid highlights: the selected one.</summary>
+    public QuestType? HighlightedIcon => State.SelectedQuestId is { } id && State.Preview.TryGet(id, out var quest) ? quest : null;
 
     /// <summary>Frames every quest (or the one with <paramref name="id"/>) in the canvas between the side panels.</summary>
     public void Frame(Vector2 screen, string? id = null)
@@ -265,7 +264,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     }
 
     // The panel target under the point for a dragged entry: a requirement row (fits when its type takes the kind), the
-    // rest of the requirements area (always fits: it adds one), or the icon row (fits for an item or a block)
+    // rest of the requirements area (always fits: it adds one), or the icon row (always fits)
     private (UiRect Rect, bool Fits, int Row, bool Icon)? DropTargetAt(Vector2 point, IconEntry entry)
     {
         if (State.SelectedQuest is not { } quest) return null;
@@ -273,7 +272,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             if (rect.Contains(point) && Requirement(quest, index) is { } requirement)
                 return (rect, QuestEditorState.Accepts(requirement.Type, entry.Kind), index, false);
         if (_requirementsArea is { } area && area.Contains(point)) return (area, true, -1, false);
-        if (_iconRow is { } icon && icon.Contains(point)) return (icon, entry.Kind != IconKind.Entity, -1, true);
+        if (_iconRow is { } icon && icon.Contains(point)) return (icon, true, -1, true);
         return null;
     }
 
@@ -281,16 +280,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private void DrawDraggedIcon(UIRenderer ui, Vector2? pointer, float time)
     {
         if (_iconDrag is not { } entry || pointer is not { } p || !IconDragging(p)) return;
-        if (entry.Kind == IconKind.Entity)
-        {
-            if (thumbnails.TryGet(entry.Key, out var thumbnail))
-                ui.DrawTexture(p, new Vector2(QuestConfig.NodeIconSize * 1.4f), thumbnail);
-            else
-                ui.DrawTextMiddle(entry.Name, p, ui.CapHeightScale(DevStudioUi.TextCap), Rgba.White);
-            return;
-        }
         ui.ClearDepthForOverlay();
-        ui.DrawIdIcon(p, QuestConfig.NodeIconSize, entry.Id, 0f, time);
+        if (entry.Kind == IconKind.Entity)
+            ui.EntityIcons.Draw(p, QuestConfig.NodeIconSize, entry.Key);
+        else
+            ui.DrawIdIcon(p, QuestConfig.NodeIconSize, entry.Id, 0f, time);
     }
 
     private bool IconDragging(Vector2 point) => Vector2.Distance(point, _iconPressAt) >= QuestConfig.DragThreshold;
@@ -480,7 +474,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             var hovered = _pointer is { } p && inner.Contains(p);
             ui.DrawRect(inner.Center, inner.Size, hovered ? Rgba.Gray(0.24f, 0.9f) : Rgba.Gray(0.1f, 0.85f));
             if (!State.Preview.TryGet(ids[row], out var quest)) continue;
-            ui.DrawIdIcon(new Vector2(inner.Left + 16f, inner.Center.Y), 24f, quest.IconId, 0f, 0f);
+            ui.DrawQuestIcon(new Vector2(inner.Left + 16f, inner.Center.Y), 24f, quest, 0f);
             var title = quest.Title == quest.Id ? quest.Id : $"{quest.Title} ({quest.Id})";
             // One smaller size for every row, shrunk further only for a title that still does not fit
             const float rowCap = 10f;
@@ -638,8 +632,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         // The icon row and the requirements heading sit over the PICK ICON button
         var pick = _buttons.First(b => b.Action == Action.PickIcon).Rect;
         ui.DrawText("ICON", new Vector2(left, pick.Top - LabelH + 2f), scale, DevStudioUi.TextDim);
-        if (State.Preview.TryGet(quest.Id!, out var compiled) && compiled.IconId != 0)
-            ui.DrawIdIcon(new Vector2(left + 14f, pick.Center.Y), 26f, compiled.IconId, 0f, 0f);
+        if (State.Preview.TryGet(quest.Id!, out var compiled) && (compiled.IconId != 0 || compiled.IconEntity != null))
+            ui.DrawQuestIcon(new Vector2(left + 14f, pick.Center.Y), 26f, compiled, 0f);
         ui.DrawText(quest.Icon ?? "", new Vector2(left + 34f, pick.Center.Y - DevStudioUi.TextCap * 0.5f),
             DevStudioUi.FitText(ui, quest.Icon ?? "", DevStudioUi.TextCap, pick.Left - left - 40f).Scale, Rgba.White);
         ui.DrawText("REQUIREMENTS", new Vector2(left, pick.Bottom + Gap + 2f), scale, DevStudioUi.TextDim);
@@ -1059,9 +1053,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         }
         if (!OverCanvas(point)) return;
         var grid = QuestBookLayout.ToGrid(point, Camera, _screen);
-        // An entity has no icon: its quest keeps the default one and asks to kill it
+        // An entity's quest shows the entity and asks to kill it
         var added = entry.Kind == IconKind.Entity
-            ? State.AddQuest(grid, title: entry.Name, requirement: QuestEditorState.MakeRequirement("kill", entry.Key))
+            ? State.AddQuest(grid, entry.Icon, entry.Name, requirement: QuestEditorState.MakeRequirement("kill", entry.Key))
             : State.AddQuest(grid, entry.Key, entry.Name);
         Status = $"Added {added} ({entry.Key})";
     }
@@ -1071,15 +1065,13 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         if (State.SelectedQuestId is not { } quest) return;
         if (!fits)
         {
-            Status = icon
-                ? "An entity has no icon: pick an item or a block"
-                : $"A {State.SelectedQuest!.Requirements![row].Type} requirement cannot name {entry.Kind.ToString().ToLowerInvariant()} {entry.Key}";
+            Status = $"A {State.SelectedQuest!.Requirements![row].Type} requirement cannot name {entry.Kind.ToString().ToLowerInvariant()} {entry.Key}";
             return;
         }
         if (icon)
         {
-            State.SetIcon(quest, entry.Key);
-            Status = $"Icon: {entry.Key}";
+            State.SetIcon(quest, entry.Icon);
+            Status = $"Icon: {entry.Icon}";
         }
         else if (row >= 0)
         {
@@ -1106,13 +1098,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             State.PickRequirement = -1;
             return;
         }
-        if (entry.Kind == IconKind.Entity)
-        {
-            Status = "An entity has no icon: pick an item or a block";
-            return;
-        }
-        State.SetIcon(quest, entry.Key);
-        Status = $"Icon: {entry.Key}";
+        State.SetIcon(quest, entry.Icon);
+        Status = $"Icon: {entry.Icon}";
     }
 
     private Vector2 GridTravel(Vector2 travel) => travel / (QuestConfig.GridSpacing * Camera.Zoom);

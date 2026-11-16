@@ -645,15 +645,18 @@ public sealed class QuestEditorStateTests : IDisposable
     }
 
     [Fact]
-    public void AQuestAddedFromAnEntityAsksToKillItAndCompiles()
+    public void AQuestAddedFromAnEntityShowsItAsksToKillItAndCompiles()
     {
         var editor = Editor(Quest("root", null, Break("stone")));
+        var slime = new IconEntry(IconKind.Entity, 0, "Slime", "slime");
 
-        var added = editor.AddQuest(Vector2.One, title: "Slime", requirement: QuestEditorState.MakeRequirement("kill", "slime"));
+        var added = editor.AddQuest(Vector2.One, slime.Icon, slime.Name, requirement: QuestEditorState.MakeRequirement("kill", slime.Key));
 
         var requirement = Assert.Single(editor.Find(added)!.Quest.Requirements!);
         Assert.Equal(("kill", "slime"), (requirement.Type, requirement.Entity));
         Assert.Null(editor.Error);
+        Assert.True(editor.Preview.TryGet(added, out var compiled));
+        Assert.True(slime.Is(compiled));
     }
 
     [Fact]

@@ -869,7 +869,8 @@ public sealed class QuestEditorState
                 Id = quest.Id!,
                 Title = string.IsNullOrWhiteSpace(quest.Title) ? quest.Id! : quest.Title,
                 Description = quest.Description ?? "",
-                IconId = quest.Icon != null && ContentFiles.TryResolve(quest.Icon, out var icon) ? icon : (ushort)0,
+                IconId = QuestLoader.TryResolveIcon(quest.Icon, out var icon, out var iconEntity) ? icon : (ushort)0,
+                IconEntity = iconEntity,
                 Position = quest.Pos is { Length: 2 } p ? new Vector2(p[0], p[1]) : Vector2.Zero,
                 Shape = quest.Shape?.ToLowerInvariant() switch
                 {

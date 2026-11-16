@@ -4,6 +4,7 @@ using System.IO;
 using System.Numerics;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
+using VoxelEngine.Content.Quests;
 using VoxelEngine.Data;
 using VoxelEngine.Graphics;
 using VoxelEngine.Items;
@@ -156,6 +157,8 @@ public class UIRenderer : IDisposable
     internal HudRenderer Hud { get; }
     /// <summary>The top-right minimap and the [M] map screen.</summary>
     internal MapRenderer Map { get; }
+    /// <summary>Entities drawn as icons (a quest whose icon is an entity).</summary>
+    internal EntityIconRenderer EntityIcons { get; }
     /// <summary>The rarity chrome over list rows and the hover tooltip.</summary>
     internal RarityChromeRenderer Chrome { get; }
 
@@ -249,6 +252,7 @@ public class UIRenderer : IDisposable
         Quests = new QuestBookRenderer(gl, this);
         TopStrip = new TopStripRenderer(gl, this);
         Map = new MapRenderer(gl, this);
+        EntityIcons = new EntityIconRenderer(gl, this);
     }
 
     /// <summary>Starts a UI pass at scale 1, the canvas being the window itself. Must be paired
@@ -767,6 +771,15 @@ public class UIRenderer : IDisposable
         return fitted;
     }
 
+    /// <summary>A quest's icon: its entity's model when the icon names one, otherwise its block or item.</summary>
+    internal void DrawQuestIcon(Vector2 center, float size, QuestType quest, float timeSeconds)
+    {
+        if (quest.IconEntity != null)
+            EntityIcons.Draw(center, size, quest.IconEntity);
+        else
+            DrawIdIcon(center, size, quest.IconId, 0f, timeSeconds);
+    }
+
     internal void DrawIdIcon(Vector2 center, float size, ushort id, float headingDegrees, float timeSeconds)
     {
         if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
@@ -955,6 +968,7 @@ public class UIRenderer : IDisposable
         Hud.Dispose();
         Quests.Dispose();
         Map.Dispose();
+        EntityIcons.Dispose();
         foreach (var icon in _itemIcons.Values)
             _gl.DeleteTexture(icon);
         foreach (var frames in _itemFrames.Values)

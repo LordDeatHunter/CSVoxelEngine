@@ -45,7 +45,6 @@ public static class DevStudioProgram
     // Built in OnLoad too: the quest editor compiles against the loaded blocks, items and entities.
     private static QuestEditorPage _quests = null!;
     // The QUESTS tab's entity pictures, drawn once at load
-    private static EntityThumbnails _thumbnails = null!;
     private const string QuestPrefix = "quest/";
     private static StudioTab _tab;
     // The player model the ITEMS tab poses; the preview state replaces it on a restart, so it is read through here.
@@ -136,10 +135,8 @@ public static class DevStudioProgram
         _input = new InputManager(_window);
         _ui = new DevStudioUi();
         var icons = QuestIconPicker.FromContent(_ui.Entries);
-        _thumbnails = new EntityThumbnails(_gl, _scene,
-            System.Linq.Enumerable.Select(System.Linq.Enumerable.Where(icons.All, e => e.Kind == IconKind.Entity), e => e.Key));
         _quests = new QuestEditorPage(QuestEditorState.Load(Path.Combine("assets", "data", "quests")),
-            new TextFieldKeys(_input), icons, _thumbnails);
+            new TextFieldKeys(_input), icons);
         _quests.Frame(new Vector2(_window.Size.X, _window.Size.Y));
         _entities = new EntityPreviewState();
         _trees = new TreePreviewState();
@@ -397,7 +394,7 @@ public static class DevStudioProgram
             _quests.DrawCanvas(_scene.Ui, _haveMouse ? _lastMouse : null, (float)_time);
         _ui.Draw(_scene.Ui, Editor, _entities, _trees, _tab, _playerAnim, new Vector2(size.X, size.Y), _status,
             _firstPerson && _tab == StudioTab.Items, _tab is StudioTab.Items or StudioTab.Entities ? ActiveClock : null,
-            _quests.Icons, _quests.HighlightedIcon, _thumbnails);
+            _quests.Icons, _quests.HighlightedIcon);
         if (_tab == StudioTab.Quests)
             _quests.DrawPanels(_scene.Ui, _haveMouse ? _lastMouse : null, (float)_time);
         _scene.Ui.End();
@@ -773,7 +770,6 @@ public static class DevStudioProgram
     {
         if (_quests?.State.Dirty == true)
             Log.Warn("DevStudio closed with unsaved quest edits; they are lost.");
-        _thumbnails?.Dispose();
         _scene?.Dispose();
         _input?.Dispose();
         Log.Shutdown();
