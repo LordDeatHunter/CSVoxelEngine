@@ -423,6 +423,9 @@ public sealed class QuestEditorState
     /// unknown one, which <see cref="Error"/> reports).</summary>
     public static int RevealOf(QuestDefinition quest) => IndexOf(QuestLoader.RevealNames, quest.Reveal, 0);
 
+    /// <summary>Whether the quest has no parents: always unlocked and shown, whatever its UNLOCK and SHOW say.</summary>
+    public static bool IsRoot(QuestDefinition quest) => quest.Parents is not { Length: > 0 };
+
     /// <summary>Sets when the quest unlocks: <paramref name="mode"/> indexes <see cref="QuestLoader.UnlockNames"/>, and the
     /// first (the default, every parent done) clears the field.</summary>
     public void SetUnlock(string id, int mode) =>
@@ -726,6 +729,11 @@ public sealed class QuestEditorState
     public void Recompile()
     {
         var live = Live.ToList();
+        // A root is always unlocked and shown, so it keeps neither field: a root that gains its first parent starts at the
+        // defaults, and the cleanup is part of the same change (and undo step) as the edit that made it a root
+        foreach (var document in live)
+            if (IsRoot(document.Quest))
+                document.Quest.Reveal = document.Quest.Unlock = null;
         var liveLabels = Labels.Where(d => !d.Deleted).ToList();
         Preview = BuildPreview(live, liveLabels);
         var text = new StringBuilder();

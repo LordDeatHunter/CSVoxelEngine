@@ -82,7 +82,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private readonly DropdownState _labelColor = new([.. QuestLoader.LabelColorNames.Select(n => n.ToUpperInvariant())]);
     private string? _dropdownLabel;
     // Every dropdown the last layout placed: its state, the option it shows, and what picking an option does
-    private readonly List<(DropdownState Dropdown, int Selected, Action<int> Choose)> _dropdowns = [];
+    private readonly List<(DropdownState Dropdown, int Selected, Action<int> Choose, bool Enabled)> _dropdowns = [];
     private string? _focusQuest;
     private string? _focusLabel;
 
@@ -296,9 +296,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     {
         var scale = ui.CapHeightScale(DevStudioUi.TextCap);
         foreach (var open in new[] { false, true })
-            foreach (var (dropdown, selected, _) in _dropdowns)
+            foreach (var (dropdown, selected, _, enabled) in _dropdowns)
                 if (dropdown.IsOpen == open)
-                    DropdownRenderer.Draw(ui, dropdown, selected, pointer, scale);
+                    DropdownRenderer.Draw(ui, dropdown, selected, pointer, scale, enabled);
     }
 
     private void BuildTopBar()
@@ -379,12 +379,16 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         var questId = quest.Id!;
         const float showLabel = 86f;
         _unlockDropdown.Box = Rect(left + showLabel, y, width - showLabel, FieldH);
-        _dropdowns.Add((_unlockDropdown, QuestEditorState.UnlockOf(quest), mode => State.SetUnlock(questId, mode)));
+        // A root is always unlocked and shown: both read ALWAYS and stay put (QuestEditorState keeps a root's fields empty)
+        var root = QuestEditorState.IsRoot(quest);
+        AddDropdown(_unlockDropdown, root ? (int)QuestUnlock.Always : QuestEditorState.UnlockOf(quest),
+            mode => State.SetUnlock(questId, mode), !root);
         y += FieldH + Gap;
 
         // SHOW: when the quest appears as a locked preview before it unlocks
         _revealDropdown.Box = Rect(left + showLabel, y, width - showLabel, FieldH);
-        _dropdowns.Add((_revealDropdown, QuestEditorState.RevealOf(quest), mode => State.SetReveal(questId, mode)));
+        AddDropdown(_revealDropdown, root ? (int)QuestReveal.Always : QuestEditorState.RevealOf(quest),
+            mode => State.SetReveal(questId, mode), !root);
         y += FieldH + Gap + LabelH;
 
         // The icon row: the icon is drawn in DrawDetailsText, the button arms the grid for it
@@ -403,8 +407,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             var rowTop = y;
             _typeDropdowns[i].Box = Rect(left, y, typeWidth, FieldH);
             var row = i;
-            _dropdowns.Add((_typeDropdowns[i], Array.IndexOf(QuestEditorState.RequirementTypes, requirement.Type?.ToLowerInvariant()),
-                type => State.SetRequirementType(questId, row, QuestEditorState.RequirementTypes[type])));
+            AddDropdown(_typeDropdowns[i], Array.IndexOf(QuestEditorState.RequirementTypes, requirement.Type?.ToLowerInvariant()),
+                type => State.SetRequirementType(questId, row, QuestEditorState.RequirementTypes[type]));
             // A row near the bottom opens its list upward, so it stays on screen
             _typeDropdowns[i].OpensUp = y + FieldH * (TypeLabels.Length + 1) > _screen.Y - Pad;
             _fields.Add((Rect(left + typeWidth + Gap, y, width - typeWidth - Gap, FieldH), Field.Target, i,
@@ -489,6 +493,13 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             DevStudioUi.Accent);
     }
 
+    private void AddDropdown(DropdownState dropdown, int selected, Action<int> choose, bool enabled = true)
+    {
+        // A disabled dropdown never stays open
+        if (!enabled) dropdown.Close();
+        _dropdowns.Add((dropdown, selected, choose, enabled));
+    }
+
     // A selected label: its TEXT field, SIZE and COLOR, and SAVE / REVERT / DELETE LABEL at the bottom
     private void BuildLabelPanel(string name)
     {
@@ -504,10 +515,10 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         var y = AddField(Field.LabelText, 0, "text (\\n: new line)", left, Pad + 40f, width);
         const float labelWidth = 86f;
         _labelSize.Box = Rect(left + labelWidth, y, width - labelWidth, FieldH);
-        _dropdowns.Add((_labelSize, QuestEditorState.SizeOf(document.Label), size => State.SetLabelSize(name, size)));
+        AddDropdown(_labelSize, QuestEditorState.SizeOf(document.Label), size => State.SetLabelSize(name, size));
         y += FieldH + Gap;
         _labelColor.Box = Rect(left + labelWidth, y, width - labelWidth, FieldH);
-        _dropdowns.Add((_labelColor, QuestEditorState.ColorOf(document.Label), color => State.SetLabelColor(name, color)));
+        AddDropdown(_labelColor, QuestEditorState.ColorOf(document.Label), color => State.SetLabelColor(name, color));
 
         var bottom = _screen.Y - Pad * 2f - ButtonH;
         var half = (width - Gap) * 0.5f;
@@ -825,15 +836,15 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     // An open type list takes the click first (a pick, or dismissing it); then a click on a closed box opens it
     private bool ClickDropdowns(Vector2 point)
     {
-        foreach (var (dropdown, _, choose) in _dropdowns)
+        foreach (var (dropdown, _, choose, _) in _dropdowns)
         {
             if (!dropdown.IsOpen) continue;
             if (dropdown.Click(point, out var chosen) == DropdownClick.Chosen) choose(chosen);
             return true;
         }
-        foreach (var (dropdown, _, _) in _dropdowns)
+        foreach (var (dropdown, _, _, enabled) in _dropdowns)
         {
-            if (dropdown.Click(point, out _) != DropdownClick.Toggled) continue;
+            if (!enabled || dropdown.Click(point, out _) != DropdownClick.Toggled) continue;
             Blur();
             return true;
         }

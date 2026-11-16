@@ -657,6 +657,53 @@ public sealed class QuestEditorStateTests : IDisposable
     }
 
     [Fact]
+    public void ARootKeepsNoRevealOrUnlockEvenWhenSet()
+    {
+        var root = Quest("root", null, Break("stone"));
+        root.Reveal = "always";
+        root.Unlock = "always";
+        var editor = Editor(root);
+
+        Assert.Null(editor.Find("root")!.Quest.Reveal);
+        Assert.Null(editor.Find("root")!.Quest.Unlock);
+        editor.SetUnlock("root", (int)QuestUnlock.AnyParentDone);
+        editor.SetReveal("root", (int)QuestReveal.Always);
+        Assert.Null(editor.Find("root")!.Quest.Unlock);
+        Assert.Null(editor.Find("root")!.Quest.Reveal);
+        Assert.True(QuestEditorState.IsRoot(editor.Find("root")!.Quest));
+    }
+
+    [Fact]
+    public void ARootThatGainsAParentStartsAtTheDefaultsAndAChildKeepsItsSettings()
+    {
+        var child = Quest("child", ["a"], Break("stone"));
+        child.Unlock = "anyParentDone";
+        var editor = Editor(Quest("a", null, Break("stone")), Quest("b", null, Break("stone")), child);
+
+        Assert.Null(editor.AddParent("b", "a"));
+        Assert.Equal(0, QuestEditorState.UnlockOf(editor.Find("b")!.Quest));
+        Assert.Equal(0, QuestEditorState.RevealOf(editor.Find("b")!.Quest));
+
+        Assert.Null(editor.AddParent("child", "b"));
+        Assert.Equal("anyParentDone", editor.Find("child")!.Quest.Unlock);
+    }
+
+    [Fact]
+    public void UnlinkingAQuestsLastParentClearsItsModesInTheSameUndoStep()
+    {
+        var child = Quest("child", ["root"], Break("stone"));
+        child.Unlock = "always";
+        var editor = Editor(Quest("root", null, Break("stone")), child);
+
+        Assert.Null(editor.RemoveLink("child", "root"));
+        Assert.Null(editor.Find("child")!.Quest.Unlock);
+
+        Assert.True(editor.Undo());
+        Assert.Equal("always", editor.Find("child")!.Quest.Unlock);
+        Assert.False(editor.CanUndo);
+    }
+
+    [Fact]
     public void AnAddedQuestCompilesAsItIsWithAFreshIdThatNoPendingFileHolds()
     {
         var editor = Editor(Quest("quest_1", null, Break("stone")));
