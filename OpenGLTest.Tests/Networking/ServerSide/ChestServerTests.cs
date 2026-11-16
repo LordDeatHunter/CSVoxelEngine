@@ -6,14 +6,17 @@ using System.Numerics;
 using System.Net.Sockets;
 using System.Threading;
 using VoxelEngine.Audio;
+using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
+using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation.Chests;
 using VoxelEngine.Simulation.Lanterns;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen;
 using Xunit;
 
 namespace VoxelEngine.Tests.Networking.ServerSide;
@@ -34,7 +37,12 @@ public sealed class ChestServerTests : IDisposable
     {
         TestContent.EnsureLoaded();
         WorldSeed.Apply(WorldSeed.Default);
-        _world = new World(null!, null!, null!, null!, null!, null!, null, null, serverMode: true);
+        var spawn = SpawnOverrides.SpawnPosition();
+        var floorY = (int)MathF.Floor(spawn.Y - Camera.EyeHeight) - 1;
+        // Supply every chunk column so the source cannot fall back to generated terrain elsewhere.
+        var source = new FlatWorldSource(int.MinValue, int.MaxValue, int.MinValue, int.MaxValue, floorY,
+            ContentRegistry.RequireBlock("stone").Id, Biome.Forest, warmth: 0.5f, wetness: 0.5f);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null, serverMode: true, worldSource: source);
         _server = new GameServer(_world, "Test World", WorldSeed.Default, 0);
         _server.Start();
     }
