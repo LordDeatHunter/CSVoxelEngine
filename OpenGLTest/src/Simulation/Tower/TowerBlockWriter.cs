@@ -20,7 +20,7 @@ namespace VoxelEngine.Simulation.Tower;
 /// order:
 /// <list type="bullet">
 /// <item>raw writer: <see cref="Chunk.CollapseWriteAt"/> (through <see cref="Chunk.SetBlockRaw"/>), which marks
-/// the chunk for the save and, on a server, journals the cell to the clients (<see cref="Chunk.CellWritten"/>);
+/// the chunk for the save and, on a server, journals the cell to the clients (<see cref="Chunk.WriteHook"/>);
 /// the state byte is the given one (zero for a clear);</item>
 /// <item>player-placed: <see cref="ChunkManager.UnmarkPlayerPlaced"/>;</item>
 /// <item>remesh: <see cref="ChunkManager.MarkAreaDirty"/> over the light radius, asynchronous, never a loop of

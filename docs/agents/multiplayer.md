@@ -441,7 +441,7 @@ client is read, logged and refused, answered with the named cell's state when it
 request with a `PlayerStatus` (`ServerPlayer.ShouldReportModes`), and the client takes those modes
 (`Camera.SetModes`). The server also broadcasts every station block entity it runs as a
 `StationState` on the entity cadence (and one empty snapshot after the last one goes). It **journals every raw cell
-write** (`Chunk.CellWritten` -> `ServerBroadcasts.OnCellWritten`, set in `Start`, cleared in `Stop`) and broadcasts the coalesced
+write** (the server world's own `ChunkManager.CellWrites` hook, shared by every chunk it makes as `Chunk.WriteHook`, -> `ServerBroadcasts.OnCellWritten`, set in `Start`, cleared in `Stop`; per world, so a client world in the same process is never journaled) and broadcasts the coalesced
 batch as `BlockChanges` each `Pump`, so its own simulation — explosions, fluid flow, leaf decay,
 felling, tree growth — reaches clients too. It broadcasts the live mobs, drops, primed TNT and
 falling blocks every `NetEntitySyncSeconds` (`EntityList`, with stable ids by object identity). Client input is

@@ -23,7 +23,7 @@ OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple 
                                       #   core it runs is in the game's Networking/ServerSide/
   VoxelEngine.Server.csproj           # the project file (references the game project)
   GlobalUsings.cs                     # VoxelEngine.Core and VoxelEngine.Config
-  ServerProgram.cs                    # content load, world/port prompts, headless World + tick loop
+  ServerProgram.cs                    # content load, world/port prompts, ServerLaunch, the tick loop and the signals
 OpenGLTest.WikiExport/                # headless exporter for the wiki (wiki/): grows every tree species step by step
                                       #   over flat ground (the item debugger's TREES setup) and writes per-step cell
                                       #   diffs; CI runs it before the wiki build (`dotnet run --project
@@ -115,6 +115,9 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   imported-world streaming
     Client/                    # client streaming, the mesh gate, predictions and intent flow, the entity
                                #   mirror, remote players, worldgen isolation
+    Hosting/                   # the shared server launch's refusals (locked, old format, port in use) leave nothing live or
+                               #   locked, a hosted world serves its host over loopback and releases the world on Stop,
+                               #   the LAN address pick (HostingTests)
     ServerSide/                # the server player and its status (the eye's cave biome: ServerPlayerCaveBiomeTests),
                                #   movement and intent rules, operators, the loopback GameServer and the server-mode World
   Particles/                   # every particle system and the dust, splash and pop emitters

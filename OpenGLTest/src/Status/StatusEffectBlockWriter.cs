@@ -23,7 +23,7 @@ namespace VoxelEngine.Status;
 /// Every write runs the block-edit hooks (the edit-path checklist):
 /// <list type="bullet">
 /// <item>raw writer: <see cref="Chunk.SetBlockRaw"/>, which marks the chunk for the save and, on a
-/// server, journals the cell to the clients (<see cref="Chunk.CellWritten"/>); the state byte is the
+/// server, journals the cell to the clients (<see cref="Chunk.WriteHook"/>); the state byte is the
 /// new block's own (0, or a fluid source), never the old one's;</item>
 /// <item>remesh: <see cref="ChunkManager.MarkAreaDirty"/> over the light radius, asynchronous like the
 /// leaf decay, never a loop of immediate remeshes;</item>

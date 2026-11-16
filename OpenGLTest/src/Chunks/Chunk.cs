@@ -374,17 +374,18 @@ public class Chunk : IDisposable
         }
 
         MarkModified();
-        if (CellWritten is { } written)
+        if (WriteHook?.Written is { } written)
             written((int)Position.X * Size + x, (int)Position.Y * Size + y, (int)Position.Z * Size + z, id, state);
         return previous;
     }
 
     /// <summary>
-    /// A server sets this to observe every raw cell write (an edit or a simulation step) in world
-    /// coordinates, so it can broadcast the change to clients. Null on a client and in singleplayer;
-    /// worldgen never fires it, because it fills a dense work array and hands the chunk its storage.
+    /// The owning world's <see cref="CellWriteHook"/>, which a server observes to hear every raw cell write (an
+    /// edit or a simulation step) in world coordinates, so it can broadcast the change to clients. Set by the
+    /// <see cref="ChunkManager"/> that makes the chunk; null on a loose chunk. Worldgen never fires it, because it
+    /// fills a dense work array and hands the chunk its storage.
     /// </summary>
-    public static Action<int, int, int, ushort, byte>? CellWritten { get; set; }
+    public CellWriteHook? WriteHook { get; set; }
 
     /// <summary>Flags the chunk as holding unsaved edits (see <see cref="ModifiedSinceSave"/>).
     /// The test keeps the hot fluid-tick path from rewriting a field it already set.</summary>
@@ -450,7 +451,7 @@ public class Chunk : IDisposable
         chunkManager.ChopDamage.Clear((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
         chunkManager.ImmediateRemeshWithBorders(Position, worldPos);
         MarkNeighborsDirty(worldPos, chunkManager);
-        CellWritten?.Invoke((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z, 0, 0);
+        WriteHook?.Written?.Invoke((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z, 0, 0);
         return true;
     }
 
@@ -510,7 +511,7 @@ public class Chunk : IDisposable
         var removed = _blocks.Get(i);
         if (removed == 0 || BlockType.IsUnbreakable(removed)) return 0;
         ClearCell(i);
-        CellWritten?.Invoke((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z, 0, 0);
+        WriteHook?.Written?.Invoke((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z, 0, 0);
         return removed;
     }
 

@@ -142,7 +142,7 @@ public sealed class GameServer : IDisposable
         _transport.Running = true;
         // Every raw cell write on the server (an edit or a simulation step) is journaled and sent
         // to clients, so explosions, fluid flow, decay and felling all reach them.
-        Chunk.CellWritten = _broadcasts.OnCellWritten;
+        _state.World.GetChunkManager().CellWrites.Written = _broadcasts.OnCellWritten;
         _transport.StartAcceptThread();
     }
 
@@ -331,7 +331,7 @@ public sealed class GameServer : IDisposable
         if (!_transport.Running)
             return;
         _transport.Running = false;
-        Chunk.CellWritten = null;
+        _state.World.GetChunkManager().CellWrites.Written = null;
         // Before the world's SaveAndDispose shuts its store down: everyone still online is saved
         _sessions.SaveAllPlayers();
 

@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Threading;
 using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Content;
 using VoxelEngine.Graphics;
 using VoxelEngine.Networking;
+using VoxelEngine.Networking.Hosting;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Saves;
 
@@ -62,66 +62,18 @@ public static class ServerProgram
 
         var port = PromptPort();
 
-        if (WorldSeed.WorldIsLive)
+        // The command line's operators; the launch adds the world's own list
+        var launch = ServerLaunch.Start(world, port, OperatorList.FromArgs(args), sourceArg);
+        if (!launch.Started)
         {
-            Console.WriteLine("A world is already live in this process; cannot start a second.");
-            return;
-        }
-
-        // Resolved before the save store takes the folder's lock, so a refused source leaves the
-        // folder untouched
-        var sourceName = sourceArg ?? world.Source;
-        IWorldSource source;
-        try
-        {
-            source = WorldSources.Create(sourceName, world.Directory);
-        }
-        catch (Exception e) when (e is ArgumentException or IOException or InvalidDataException
-                                      or UnauthorizedAccessException)
-        {
-            Console.WriteLine($"Cannot use world source '{sourceName}': {e.Message}");
-            return;
-        }
-
-        ChunkSaveStore save;
-        try
-        {
-            // The store takes the folder's session lock: a world the game or another server still
-            // has open is refused here, before anything could race its writer.
-            save = new ChunkSaveStore(world.Directory);
-        }
-        catch (IOException e)
-        {
-            Console.WriteLine("That world is open in another session (the game or another server); close it first.");
-            Console.WriteLine($"  ({e.Message})");
-            return;
-        }
-
-        // Read through the store, which owns the folder (and validates the file name): the command
-        // line's operators plus the world's own list
-        var operators = OperatorList.FromArgs(args);
-        operators.AddAll(OperatorList.Parse(save.ReadFile(OperatorList.FileName)));
-
-        WorldSeed.Apply(world.Seed);
-        var gameWorld = new World(null!, null!, null!, null!, null!, null!, null, save, serverMode: true,
-            worldSource: source);
-        using var server = new GameServer(gameWorld, world.Name, world.Seed, port)
-        {
-            Operators = operators,
-        };
-        try
-        {
-            server.Start();
-        }
-        catch (SocketException e)
-        {
-            // Most often the port is already in use. Nothing was served yet, but the world was
-            // opened, so it is closed cleanly before exiting.
-            Console.WriteLine($"Could not listen on port {port}: {e.Message}");
-            gameWorld.SaveAndDispose();
+            Console.WriteLine(launch.Message);
             Log.Shutdown();
             return;
         }
+        var gameWorld = launch.World!;
+        var source = launch.Source!;
+        using var server = launch.Server!;
+        var operators = server.Operators;
 
         Console.WriteLine();
         Console.WriteLine($"Serving '{world.Name}' (seed {world.Seed}) on port {server.BoundPort} (IPv4 and IPv6).");
@@ -225,7 +177,7 @@ public static class ServerProgram
             Console.WriteLine(worlds.Count == 0 ? "No saved worlds yet." : "Saved worlds:");
             for (var i = 0; i < worlds.Count; i++)
                 Console.WriteLine($"  {i + 1}. {worlds[i].Name} (seed {worlds[i].Seed})"
-                    + (IsHostable(worlds[i]) ? "" : " (old format, cannot be hosted)"));
+                    + (ServerLaunch.IsHostable(worlds[i]) ? "" : " (old format, cannot be hosted)"));
             Console.Write("Choose a world number, or N for a new world: ");
 
             var line = Console.ReadLine();
@@ -238,7 +190,7 @@ public static class ServerProgram
             if (int.TryParse(line, out var index) && index >= 1 && index <= worlds.Count)
             {
                 var chosen = worlds[index - 1];
-                if (IsHostable(chosen))
+                if (ServerLaunch.IsHostable(chosen))
                     return chosen;
                 // The same refusal the main menu makes: a world in another save format would be
                 // half-loaded and its chunks regenerated over, so it is never opened.
@@ -274,9 +226,6 @@ public static class ServerProgram
     private static string CreativeLine(OperatorList operators) => operators.Count > 0
         ? $"Creative mode is for operators: {string.Join(", ", operators.Names)}"
         : $"Creative mode is for operators: none; start with --op <name> or list names in the world folder's {OperatorList.FileName}.";
-
-    // Whether this build reads the world's save format (MainMenuController's PLAY gate)
-    private static bool IsHostable(WorldInfo world) => world.Version == WorldStore.CurrentVersion;
 
     private static WorldInfo CreateWorld(WorldStore store)
     {

@@ -228,6 +228,13 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         RemotePlayer.cs        # another player as the client sees them: pose smoothing + a PlayerModel
         WaystoneMirror.cs      # GL-free: the waystone rows the server sent, its activation answer and the trip awaiting
                                #   its landing correction
+      Hosting/                 # opening a saved world as a server, for the dedicated server and for hosting from the game
+        HostedServer.cs        # a world hosted from the game: TryStart, the per-frame Tick (world, then pump) on the main
+                               #   thread, Stop (saves, releases the folder), the LAN JoinLine and the LoopbackAddress
+        LanAddress.cs          # GL-free: the address others join at (up, non-loopback IPv4, gateway adapter and private
+                               #   range preferred, never link-local); NetworkInterfaceInfo
+        ServerLaunch.cs        # the shared launch: save-format gate (IsHostable), world source, save store lock, operators,
+                               #   seed, the server-mode World and the listening GameServer; a typed ServerLaunchFailure
       ServerSide/              # the server's side of a session: GameServer and its components, the connected player
                                #   and the rules its intents and moves are judged by (the dedicated CLI is OpenGLTest.Server)
         AttackPacing.cs        # GL-free: the shortest gap from one attack to the next (a punch's pace, a

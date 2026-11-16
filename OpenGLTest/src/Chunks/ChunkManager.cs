@@ -433,19 +433,23 @@ public class ChunkManager
     /// restored one for the main thread to adopt its player-placed cells, which must happen after
     /// the chunk is published (see <see cref="QueueChunk"/>).
     /// </summary>
+    /// <summary>This world's raw cell writes, shared by every chunk made here (<see cref="Chunk.WriteHook"/>); a
+    /// server observes it to journal them for its clients.</summary>
+    public CellWriteHook CellWrites { get; } = new();
+
     internal Chunk CreateChunk(Vector3 pos, long key)
     {
         var cx = MathUtils.FloorToInt(pos.X);
         var cz = MathUtils.FloorToInt(pos.Z);
         if (_saveStore != null && _saveStore.TryLoad(key, out var snapshot))
         {
-            var restored = new Chunk(_gl, pos, generateBlockData: false);
+            var restored = new Chunk(_gl, pos, generateBlockData: false) { WriteHook = CellWrites };
             restored.RestoreFrom(snapshot, WorldSource.GetColumn(cx, cz));
             return restored;
         }
 
         // The default source's Fill is the GenerateBlockData call the constructor used to make
-        var chunk = new Chunk(_gl, pos, generateBlockData: false);
+        var chunk = new Chunk(_gl, pos, generateBlockData: false) { WriteHook = CellWrites };
         WorldSource.Fill(chunk);
         return chunk;
     }
@@ -483,7 +487,7 @@ public class ChunkManager
         if (Chunks.ContainsPacked(key))
             return;
 
-        var chunk = new Chunk(_gl, pos, generateBlockData: false);
+        var chunk = new Chunk(_gl, pos, generateBlockData: false) { WriteHook = CellWrites };
         chunk.RestoreFrom(snapshot, streamedColumns: true);
         Chunks.SetPacked(key, chunk);
         Interlocked.Increment(ref _loadedChunkCount);

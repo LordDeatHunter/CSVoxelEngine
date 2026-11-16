@@ -78,11 +78,13 @@ OpenGLTest/
                                #   blocks, projectiles, goblins, slimes, debris): StepSize, OffsetAxis, IsColliding, MoveOnAxis
       BurningFluid.cs          # GL-free burning-fluid (lava) cell test over a box, behind MobLava.BodyInLava and
                                #   PlayerBodyProbe.InLava
+      CellWriteHook.cs         # one world's raw-cell-write observer (Written), shared by every chunk its ChunkManager makes;
+                               #   a server journals its own world's writes through it, never another world's
       CellKey.cs               # packs a world block cell into one long (fluid and leaf-decay schedules, tree growth sets),
                                #   forwarding to ChunkKey's one 21-bit bit math
       Chunk.cs                 # one 16^3 chunk: the volatile reference to its id storage (ChunkBlocks), the per-block
                                #   state byte, the published light snapshot, the raw writers and edit API, save/network
-                               #   snapshots, and its GPU slices (UpdateMesh, MarkMeshedHeadless); GenerateBlockData,
+                               #   snapshots, its WriteHook, and its GPU slices (UpdateMesh, MarkMeshedHeadless); GenerateBlockData,
                                #   RestoreFrom and GenerateMeshData forward to WorldGen/ChunkTerrainFill, ChunkRestore
                                #   and Meshing/ChunkMeshBuilder
       ChunkBlocks.cs           # a chunk's palette-compressed ids: Uniform (one id), Indexed (256-id palette + one index
@@ -95,7 +97,8 @@ OpenGLTest/
                                #   dictionaries hash one integer instead of three floats; the one 21-bit bit math, which CellKey shares at block scale
       ChunkManager.cs          # the chunk lifecycle and composition root: load/restore/stream-in/unload against a focus list
                                #   (unload only outside every focus's radius), saves of edited chunks, the world cell queries;
-                               #   composes ChunkMeshScheduler, ChunkRenderLists and PlayerPlacedIndex and forwards their public members
+                               #   composes ChunkMeshScheduler, ChunkRenderLists and PlayerPlacedIndex and forwards their public members;
+                               #   owns the world's CellWrites hook
       ChunkMap.cs              # the loaded-chunk table (ChunkManager.Chunks): a ConcurrentDictionary keyed on a packed ChunkKey long
       ChunkRenderLists.cs      # Renderable / TranslucentRenderable / ChestChunks swap-remove bookkeeping, MeshVersion and VisibilityVersion (behind ChunkManager's forwarders)
       ChunkVisibilityGraph.cs  # the cave cull: the walk from the camera's chunk over the chunks' visibility sets, stamping the chunks a line of sight reaches

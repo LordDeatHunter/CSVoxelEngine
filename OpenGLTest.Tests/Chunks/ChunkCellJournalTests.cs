@@ -22,7 +22,7 @@ public sealed class ChunkCellJournalTests
     public void SlowLavaAndWaterReplicateTheirActualAuthoritativeWrites()
     {
         var manager = new ChunkManager(null!);
-        var source = new Chunk(null!, Vector3.Zero, false) { IsBlockDataReady = true };
+        var source = new Chunk(null!, Vector3.Zero, false) { IsBlockDataReady = true, WriteHook = manager.CellWrites };
         manager.Chunks[Vector3.Zero] = source;
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var lava = ContentRegistry.RequireBlock("lava").Id;
@@ -37,16 +37,12 @@ public sealed class ChunkCellJournalTests
         var fluids = new FluidManager();
         fluids.ScheduleAround(4, 1, 8);
         fluids.ScheduleAround(12, 1, 8);
-        Chunk.CellWritten = (x, y, z, id, state) => changes.Add(new NetCellChange(x, y, z, id, state));
-        try
+        manager.CellWrites.Written = (x, y, z, id, state) => changes.Add(new NetCellChange(x, y, z, id, state));
+        for (var tick = 1; tick <= 4; tick++)
         {
-            for (var tick = 1; tick <= 4; tick++)
-            {
-                fluids.Update(SimulationConfig.FluidTickSeconds, manager, new DropManager());
-                if (tick < 4) Assert.DoesNotContain(changes, c => c.Id == lava);
-            }
+            fluids.Update(SimulationConfig.FluidTickSeconds, manager, new DropManager());
+            if (tick < 4) Assert.DoesNotContain(changes, c => c.Id == lava);
         }
-        finally { Chunk.CellWritten = null; }
         Assert.Contains(changes, c => c.Id == water);
         Assert.Contains(changes, c => c.Id == lava && !FluidState.IsSource(c.State));
         foreach (var change in changes)
@@ -71,21 +67,18 @@ public sealed class ChunkCellJournalTests
     {
         var seen = new ConcurrentQueue<(int X, int Y, int Z, ushort Id, byte State)>();
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        var chunk = new Chunk(null!, new Vector3(2f, 3f, 4f), generateBlockData: false);
+        var hook = new CellWriteHook { Written = (x, y, z, id, state) => seen.Enqueue((x, y, z, id, state)) };
+        var chunk = new Chunk(null!, new Vector3(2f, 3f, 4f), generateBlockData: false) { WriteHook = hook };
+        // Another world's chunk is not heard: each world reports only to its own hook
+        var other = new Chunk(null!, new Vector3(2f, 3f, 4f), generateBlockData: false) { WriteHook = new CellWriteHook() };
 
-        Chunk.CellWritten = (x, y, z, id, state) => seen.Enqueue((x, y, z, id, state));
-        try
-        {
-            chunk.SetBlockRaw(1, 2, 3, stone, 4);
-            chunk.ClearBlockAt(new Vector3(33, 50, 67));
-        }
-        finally
-        {
-            Chunk.CellWritten = null;
-        }
+        chunk.SetBlockRaw(1, 2, 3, stone, 4);
+        chunk.ClearBlockAt(new Vector3(33, 50, 67));
+        other.SetBlockRaw(5, 5, 5, stone, 0);
 
         // Chunk (2,3,4) starts at world (32,48,64).
         Assert.Contains((33, 50, 67, stone, (byte)4), seen);
         Assert.Contains((33, 50, 67, BlockType.Air, (byte)0), seen);
+        Assert.DoesNotContain(seen, w => w.X == 37 && w.Y == 53 && w.Z == 69);
     }
 }
