@@ -2,7 +2,7 @@
   "title": "Sticky Situation",
   "description": "Defeat a slime.",
   "icon": "item/slimeball",
-  "pos": [6, -7],
+  "pos": [4, -3],
   "requirements": [
     { "type": "kill", "entity": "slime" }
   ]

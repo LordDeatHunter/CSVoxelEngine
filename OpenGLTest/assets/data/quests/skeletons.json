@@ -2,7 +2,7 @@
   "title": "Bone Collector",
   "description": "Put two skeletons back to rest.",
   "icon": "item/bone",
-  "pos": [6, -3],
+  "pos": [6, -7],
   "requirements": [
     { "type": "kill", "entity": "skeleton", "count": 2 }
   ]

@@ -2,7 +2,7 @@
   "title": "First Pour",
   "description": "Melt crushed copper or tin in the kiln and cast anything from it: an ingot, a tool head, a ring.",
   "icon": "item/copper_ingot",
-  "pos": [-8, 3],
+  "pos": [-7, 3],
   "parents": ["crucible", "mold", "crushed_ore", "brickwork"],
   "requirements": [
     { "type": "obtain", "tag": "copper_tin_casts", "label": "Any Copper or Tin Cast" }

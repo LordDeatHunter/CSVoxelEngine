@@ -2,7 +2,7 @@
   "title": "Cut to Size",
   "description": "Saw logs into planks.",
   "icon": "oak_planks",
-  "pos": [-7, -9],
+  "pos": [-11.5, -3],
   "parents": ["timber"],
   "requirements": [
     { "type": "craft", "item": "oak_planks", "count": 8 }

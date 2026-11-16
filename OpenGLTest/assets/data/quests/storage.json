@@ -2,7 +2,7 @@
   "title": "Pack Rat",
   "description": "Build a chest to keep what your pockets cannot.",
   "icon": "wooden_chest",
-  "pos": [-5, -6.5],
+  "pos": [-11.5, -5],
   "parents": ["timber"],
   "requirements": [
     { "type": "craft", "item": "wooden_chest" }

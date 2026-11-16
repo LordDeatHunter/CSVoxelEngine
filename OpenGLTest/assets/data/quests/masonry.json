@@ -2,8 +2,8 @@
   "title": "Masonry",
   "description": "Dress stone into bricks.",
   "icon": "stone_bricks",
-  "pos": [-4, -3],
-  "parents": ["stone_age"],
+  "pos": [-4, -5],
+  "parents": ["stone_age", "quest_1"],
   "requirements": [
     { "type": "craft", "item": "stone_bricks", "count": 8 }
   ]

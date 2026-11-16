@@ -2,7 +2,7 @@
   "title": "Regicide",
   "description": "Something waits at the top of the battle tower.",
   "icon": "item/bone_charm",
-  "pos": [8, -3],
+  "pos": [8, -7],
   "parents": ["skeletons"],
   "reveal": "anyParentShown",
   "readable": false,

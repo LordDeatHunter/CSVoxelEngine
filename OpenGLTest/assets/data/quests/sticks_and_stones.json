@@ -2,7 +2,7 @@
   "title": "Sticks and Stones",
   "description": "Every tool starts on the ground. Pick up branches and a piece of flint.",
   "icon": "item/branch",
-  "pos": [-10, -4],
+  "pos": [-8, -6],
   "requirements": [
     { "type": "obtain", "item": "item/branch", "count": 4 },
     { "type": "obtain", "item": "item/flint" }

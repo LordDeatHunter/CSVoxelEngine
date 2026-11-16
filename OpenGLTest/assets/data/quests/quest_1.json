@@ -1,0 +1,9 @@
+{
+  "title": "Firestarter",
+  "icon": "item/firestarter",
+  "pos": [-6, -6],
+  "parents": ["sticks_and_stones"],
+  "requirements": [
+    { "type": "obtain", "item": "item/firestarter" }
+  ]
+}
