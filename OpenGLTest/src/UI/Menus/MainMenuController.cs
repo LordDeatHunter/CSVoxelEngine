@@ -100,7 +100,18 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
         if (!View.WorldsLocked)
             View.Notice = null;
         View.Servers.Clear();
-        Guarded(() => View.Servers.AddRange(serverStore.List()));
+        View.ServerListFailed = false;
+        Guarded(() =>
+        {
+            if (!serverStore.TryList(out var servers))
+            {
+                View.ServerListFailed = true;
+                SetErrorNotice();
+                return;
+            }
+
+            View.Servers.AddRange(servers);
+        });
         View.ServerScrollOffset = 0f;
         View.SelectedServerRow = -1;
         View.Focus = MenuField.None;

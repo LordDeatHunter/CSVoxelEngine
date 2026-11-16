@@ -329,7 +329,9 @@ internal sealed class MenuRenderer
     private void DrawMultiplayerPage(MainMenuView view, Vector2 screen)
     {
         DrawListPage(view, screen, "MULTIPLAYER", MainMenuPage.Multiplayer, view.Servers.Count,
-            view.ServerScrollOffset, "No servers yet - add one", ServerRow);
+            view.ServerScrollOffset,
+            view.ServerListFailed ? "Server list unavailable" : "No servers yet - add one",
+            ServerRow);
         DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 0), MainMenuLayout.QuadButtonSize, "ADD SERVER");
         DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 1), MainMenuLayout.QuadButtonSize, "DIRECT CONNECT");
         DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 2), MainMenuLayout.QuadButtonSize, "HOST");

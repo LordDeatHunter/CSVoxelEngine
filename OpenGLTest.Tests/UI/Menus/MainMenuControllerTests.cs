@@ -409,6 +409,72 @@ public sealed class MainMenuControllerTests : IDisposable
     }
 
     [Fact]
+    public void FailedTouchReadDoesNotBlockConnectOrReplaceSavedBytes()
+    {
+        _servers.Add("Alpha", "10.0.0.1", 25566);
+        var controller = NewController();
+        controller.OpenMultiplayer();
+        var server = Assert.Single(controller.View.Servers);
+        var original = File.ReadAllBytes(_serverPath);
+        var originalLastPlayed = server.LastPlayedUnixMs;
+        _servers.ReadAllText = _ => throw new IOException("injected server-list read failure");
+
+        var action = controller.Click(Hit(MainMenuHitKind.Connect, 0));
+        var request = controller.TakeConnectRequest();
+        var after = File.ReadAllBytes(_serverPath);
+        var bytesUnchanged = original.SequenceEqual(after);
+        var timestampUnchanged = server.LastPlayedUnixMs == originalLastPlayed;
+        Assert.True(action == MainMenuAction.Connect && request is { Address.Host: "10.0.0.1" }
+                    && bytesUnchanged && timestampUnchanged,
+            $"action={action}; connectRequest={request.HasValue}; bytesUnchanged={bytesUnchanged}; " +
+            $"timestampUnchanged={timestampUnchanged}; beforeLength={original.Length}; afterLength={after.Length}");
+    }
+
+    [Fact]
+    public void FailedServerListReadShowsTheStoreErrorNotice()
+    {
+        _servers.Add("Alpha", "10.0.0.1", 25566);
+        var controller = NewController();
+        _servers.ReadAllText = _ => throw new IOException("injected server-list read failure");
+
+        controller.OpenMultiplayer();
+
+        Assert.True(controller.View.ServerListFailed);
+        Assert.Empty(controller.View.Servers);
+        Assert.Equal(MainMenuController.StoreErrorNotice, controller.View.Notice);
+    }
+
+    [Fact]
+    public void ReopeningServerListAfterReadRecoveryRestoresRowsAndClearsFailure()
+    {
+        _servers.Add("Alpha", "10.0.0.1", 25566);
+        var controller = NewController();
+        _servers.ReadAllText = _ => throw new IOException("injected server-list read failure");
+        controller.OpenMultiplayer();
+        Assert.True(controller.View.ServerListFailed);
+
+        _servers.ReadAllText = File.ReadAllText;
+        controller.OpenMultiplayer();
+
+        Assert.False(controller.View.ServerListFailed);
+        Assert.Null(controller.View.Notice);
+        Assert.Equal("Alpha", Assert.Single(controller.View.Servers).Name);
+    }
+
+    [Fact]
+    public void FailedServerListReadPreservesWorldsLockedNotice()
+    {
+        var controller = NewController();
+        controller.LockWorlds("worlds are locked");
+        _servers.ReadAllText = _ => throw new IOException("injected server-list read failure");
+
+        controller.OpenMultiplayer();
+
+        Assert.True(controller.View.ServerListFailed);
+        Assert.Equal("worlds are locked", controller.View.Notice);
+    }
+
+    [Fact]
     public void DeletingAServerConfirmsThenRemovesIt()
     {
         _servers.Add("Alpha", "10.0.0.1", 25566);
