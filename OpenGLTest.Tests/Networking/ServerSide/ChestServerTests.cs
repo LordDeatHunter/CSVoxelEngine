@@ -408,14 +408,16 @@ public sealed class ChestServerTests : IDisposable
         Assert.True(_inboxes[a].Contents!.IsEmpty);
         Assert.True(_inboxes[b].Contents!.IsEmpty);
 
+        var aAnswers = _inboxes[a].Answers;
         var bAnswers = _inboxes[b].Answers;
         Move(a, ChestMove.DepositStack(Flint, 0));
-        TickUntil(() => _inboxes[b].Answers > bAnswers, "the other viewer never saw the deposit");
+        TickUntil(() => _inboxes[a].Answers > aAnswers && _inboxes[b].Answers > bAnswers,
+            "both viewers never saw the deposit");
         Assert.Equal(5, _inboxes[a].Contents!.CountOf(Flint));
         Assert.Equal(5, _inboxes[b].Contents!.CountOf(Flint));
         Assert.Equal(0, PlayerOf(a).Inventory.CountFor(Flint));
 
-        var aAnswers = _inboxes[a].Answers;
+        aAnswers = _inboxes[a].Answers;
         Move(b, ChestMove.Withdraw(0, 0));
         TickUntil(() => _inboxes[a].Answers > aAnswers, "the first viewer never saw the withdraw");
         Assert.True(_inboxes[a].Contents!.IsEmpty);
