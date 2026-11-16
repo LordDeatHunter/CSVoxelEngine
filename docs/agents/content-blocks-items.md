@@ -303,12 +303,29 @@ stands on the other's latch side with the same facing and opposite hinges; nothi
 the state bytes, so breaking one leaves a working single door. `BlockPlacer.PlaceBlockAtFace` asks
 `DoubleDoor.PlacedState`: a door placed on a single same-facing door's latch side takes the opposite hinge and that
 door's open bit; beside its hinge, beside a door facing another way or beside an already paired door it is a plain
-left-hinged door. The toggle writes the new open bit to all four cells of a pair, each keeping its own hinge. A blast
+left-hinged door. The toggle writes the new open bit to all four cells of a pair, each keeping its own hinge.
+**The swing** (`Simulation/Doors/`): the state byte still flips at once; `DoorSwings` (GL-free, every side its own,
+never saved or sent) carries the `DoorConfig.SwingSeconds` in between. `Start` is called before the state write by
+the toggle (`BlockInteractions.SetOpenWithOtherHalf`: singleplayer, a predicting client, the server's replay) and by
+`ClientMirror.ApplyNetworkBlockChanges` when a server change flips a door's open bit (chunk streaming never starts
+one); a call for the other half or the same direction is a no-op, and a reversed swing turns back from where the
+panel stands. While it swings, the door's two cells are in `ChunkManager.SwingingCells`: the mesher leaves them out
+(the write's own remesh already does), `BodyCollision.BodyCollides` and `BoxSweep` skip their boxes, and
+`DoorPasses` draws both halves as one panel from the shut models turned by `DoorSwingShape.PanelMatrix`, a quarter
+turn about a pin half a panel thickness in from the hinge-side end, which lands exactly on the open boxes (entity
+pass and near shadow cascade). `DoorPush` moves what stands in the way with the same matrix
+(`DoorSwingShape.TryPush`: a body touching the face the panel leads with is carried clear of it, at most
+`DoorConfig.MaxPushBlocks` a tick, through its own collision): the local player on singleplayer and on each client
+(positions are client-owned), the mobs (`Mob.Nudge`) and drops (`ItemDrop.Nudge`) on the authoritative side. The tick
+after the panel arrives the cells go back to the chunk with one remesh; on that last tick a body on either side is
+cleared and a pinned player is squeezed out of the boxes (`BodyCollision.PushOutOfBox`), so a door never traps
+anyone. A door broken or unloaded mid-swing ends its swing at once. Trapdoors still flip. A blast
 clears cells without these hooks, so it can leave one half standing (like a multiblock without
 a sweep); breaking that orphan drops the door as usual. The door's pull sits on the center line because of the mirrored uv.
 `DoorTests` covers placement, the two-cell refusal, breaking either half, the shared toggle and the double door (the
-mirrored second door, the placements that stay plain, the four-cell toggle, the mirrored shapes);
-`doors.json` shoots two doors, one clicked open.
+mirrored second door, the placements that stay plain, the four-cell toggle, the mirrored shapes), the loose-body
+collision and the swing (the panel matrix against the boxes, the lifecycle and reversal, a body swept out);
+`doors.json` shoots two doors, one clicked open, then a double door open, mid-swing and shut.
 
 **Stone bricks** (`stone_bricks`, four from four stone) are a plain `cube_all` building block on
 `stone_bricks`' own tile.

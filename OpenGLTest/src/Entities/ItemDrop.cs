@@ -23,7 +23,7 @@ public class ItemDrop
     private const float ItemSizeMultiplier = 1.5f;
 
     /// <summary>Half the edge length; the drop collides as a cube this far from its center.</summary>
-    private const float HalfExtent = Size * 0.5f;
+    internal const float HalfExtent = Size * 0.5f;
 
     private const float SpinRadiansPerSecond = 1.5f;
 
@@ -132,6 +132,15 @@ public class ItemDrop
     /// <summary>The drop's water-splash memory, stepped by the world from its bottom each frame
     /// (<see cref="WaterSplash.Track"/>).</summary>
     internal WaterSplashTracker Splash { get; } = new();
+
+    /// <summary>Slides the drop horizontally by <paramref name="delta"/> through the shared block sweep, so the
+    /// swinging door that moves it can never push it into a solid cell.</summary>
+    internal void Nudge(Vector3 delta, ChunkManager chunks)
+    {
+        var half = new Vector3(HalfExtent);
+        Position = BoxSweep.MoveOnAxis(Position, delta.X, 0, half, chunks, out _);
+        Position = BoxSweep.MoveOnAxis(Position, delta.Z, 2, half, chunks, out _);
+    }
 
     /// <summary>Adds <paramref name="impulse"/> (blocks per second) to an idle drop's velocity: a blast's
     /// shove (<see cref="BlastImpulse"/>). A drop already flying at a player ignores it.</summary>

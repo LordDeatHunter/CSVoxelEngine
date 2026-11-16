@@ -39,6 +39,7 @@ using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Caves;
 using VoxelEngine.Simulation.Chests;
+using VoxelEngine.Simulation.Doors;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.Simulation.Smithing;
@@ -578,6 +579,7 @@ public class World
                 _lodManager, _debris, clientMode, serverMode);
             Throws = new ThrowAction(this, _chunkManager, _dropManager, _goblins, _hellMobs, _caveMobs, _skeletons, _kings, _mobs,
                 _projectiles, clientMode);
+            DoorSwings = new DoorSwings(_chunkManager);
             Interactions = new BlockInteractions(this, _chunkManager, _dropManager, _campfires, _querns, _kilns,
                 _casting, _fluidManager, _leafDecay);
             ItemUse = new WorldItemUse(this, _chunkManager, _dropManager, _fluidManager, _leafDecay, _falling,
@@ -961,6 +963,10 @@ public class World
     /// player's panel, or a server's players), shut when the last one leaves.</summary>
     public ChestLids ChestLids { get; } = new(ChestModel.Open, ChestModel.Close, ChestModel.Wobble);
 
+    /// <summary>The doors that are swinging open or shut right now: drawn turning and moving the bodies in their
+    /// way until the panel arrives. Every side runs its own from the state flips it sees.</summary>
+    public DoorSwings DoorSwings { get; }
+
     /// <summary>The waystone registry (names, first discoverers, lost flags); authoritative worlds only.</summary>
     public WaystoneManager Waystones => _waystones;
 
@@ -1136,6 +1142,9 @@ public class World
         _querns.Animate((float)deltaTime);
         Stumps.Animate((float)deltaTime);
         ChestLids.Update((float)deltaTime, ChestPanel.OpenCell);
+        // A client owns its own body, so its doors move it; the mobs and drops are the server's to move
+        DoorSwings.Update((float)deltaTime);
+        DoorPush.PushPlayer(DoorSwings.Active, Camera, _chunkManager);
         _slimes?.AnimateMirrors((float)deltaTime, _debris);
         _goblins?.AnimateMirrors((float)deltaTime, _debris, _chunkManager, DayCycle.NightFactor(LightingTime));
         _hellMobs?.AnimateMirrors((float)deltaTime, _debris);
@@ -1278,6 +1287,12 @@ public class World
         Lanterns.Update((float)deltaTime, _chunkManager, _dropManager);
         Lanterns.UpdateHeld((float)deltaTime, this, _serverMode);
         ChestLids.Update((float)deltaTime, ChestPanel.OpenCell);
+        // A swinging door moves what stands in its way: the mobs and drops here, and the local body (a server's
+        // players move their own, each on its client)
+        DoorSwings.Update((float)deltaTime);
+        DoorPush.PushBodies(DoorSwings.Active, Mobs, _dropManager.Drops, _chunkManager);
+        if (!_serverMode)
+            DoorPush.PushPlayer(DoorSwings.Active, Camera, _chunkManager);
         _waystones.Update(_chunkManager);
         _kilns.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
         _smithing.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);

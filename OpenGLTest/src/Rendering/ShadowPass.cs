@@ -13,6 +13,7 @@ using VoxelEngine.Rendering.Actors;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Chests;
+using VoxelEngine.Simulation.Doors;
 using VoxelEngine.UI;
 
 namespace VoxelEngine.Rendering;
@@ -99,7 +100,8 @@ internal sealed class ShadowPass
         IReadOnlyList<RiggedMob>? skyMobs = null, IReadOnlyList<Sandworm>? sandworms = null,
         IReadOnlyList<RiggedMob>? skeletons = null, IReadOnlyList<RiggedMob>? skeletonKings = null,
         IReadOnlyList<RiggedMob>? caveMobs = null, IReadOnlyList<RiggedMob>? wildlife = null,
-        IReadOnlyList<Chunk>? chestChunks = null, ChestLids? chestLids = null)
+        IReadOnlyList<Chunk>? chestChunks = null, ChestLids? chestLids = null,
+        IReadOnlyList<DoorSwing>? doorSwings = null)
     {
         // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
         // still sample this map even though the world diffuse has stopped using it.
@@ -214,6 +216,9 @@ internal sealed class ShadowPass
         // The chests are no part of the chunk casters above: they are drawn from the chest model, lids as they stand
         if (chestChunks != null && chestLids != null && chestChunks.Count > 0)
             _owner.Chests.DrawCasters(chestChunks, chestLids, frustum, _owner.NearShadow.ViewProj);
+        // ...nor are the doors that are mid-swing, which their chunks leave out until the panel arrives
+        if (doorSwings is { Count: > 0 })
+            _owner.Doors.DrawCasters(doorSwings, frustum, _owner.NearShadow.ViewProj);
 
         foreach (var tree in trees)
         {

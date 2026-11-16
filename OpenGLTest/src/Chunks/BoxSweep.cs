@@ -14,7 +14,9 @@ namespace VoxelEngine.Chunks;
 /// A solid cell is the whole cell, except an openable block's (a door, a trapdoor;
 /// <see cref="BlockType.Openable"/>), which is only its current panel boxes, so a body walks through an open
 /// door and is stopped by a shut one; a caller that must rest on whole cells (a falling cube, which turns
-/// back into a block where it lands) passes <c>wholeCells</c> and keeps every solid cell full.
+/// back into a block where it lands) passes <c>wholeCells</c> and keeps every solid cell full. A door that is
+/// mid-swing (<see cref="ChunkManager.SwingingCells"/>) has no boxes at all: its moving panel shoves the bodies
+/// instead (<c>DoorPush</c>).
 /// The player's body is not a solid box (<c>BodyCollision.BodyCollides</c>), so it keeps its own
 /// sweep and shares only <see cref="StepSize"/> and <see cref="OffsetAxis"/>. Main thread.
 /// </summary>
@@ -98,7 +100,8 @@ internal static class BoxSweep
             // Solid, not merely non-air: see the class summary
             var id = chunks.GetBlockGlobal(x, y, z);
             if (!BlockType.IsSolid(id)) continue;
-            if (wholeCells || !BlockType.OpenableById[id] || TreeWoodShape.OverlapsShape(id, chunks, x, y, z, min, max))
+            if (wholeCells || !BlockType.OpenableById[id]) return true;
+            if (!chunks.SwingingCells.Contains(x, y, z) && TreeWoodShape.OverlapsShape(id, chunks, x, y, z, min, max))
                 return true;
         }
 

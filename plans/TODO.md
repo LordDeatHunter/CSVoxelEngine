@@ -439,6 +439,11 @@ single-arc player.
   Pitch the block-hit sound a little lower on harder blocks so stone sounds heavier than dirt;
   one multiplier in `SfxManager`. Open question: whether per-hardness pitch beats authoring
   distinct hit groups (`sfx` on the block JSON), and how it interacts with random variants.
+- [ ] **`M-30` · Door and trapdoor sounds** — P3, S.
+  A door or trapdoor opening and shutting is silent. *Hook:* `DoorSwings.Start` already knows the cell and the
+  direction (raise an event like `ChestLids.LidStarted`, played by each side that sees the swing, never sent); a
+  trapdoor toggles in `BlockInteractions.TryToggleOpenable`.
+  **Needed from you:** `door_open` / `door_close` clips in `assets/sfx/`, same format as `chest_open.wav`.
 - [ ] **`M-26` · Footstep sounds by surface** — P2, S.
   Every footfall plays a step sound from the surface under the feet, quieter or silent while
   sneaking. *Hook:* `FootstepDust.FootfallsBetween` already finds the footfalls in

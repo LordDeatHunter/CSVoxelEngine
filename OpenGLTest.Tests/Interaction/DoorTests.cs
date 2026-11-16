@@ -3,6 +3,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Interaction;
+using VoxelEngine.Simulation.Doors;
 using Xunit;
 
 namespace VoxelEngine.Tests.Interaction;
@@ -11,7 +12,9 @@ namespace VoxelEngine.Tests.Interaction;
 /// Two-cell blocks (the door, <see cref="TallBlock"/>): the lower half is the item and the drop,
 /// placement needs both cells and writes both with one state, breaking either takes the other down
 /// and drops one door, and a click on either half swings both. Two doors whose free edges meet form a double
-/// door (<see cref="DoubleDoor"/>): the second one hangs mirrored and a click on either swings both.
+/// door (<see cref="DoubleDoor"/>): the second one hangs mirrored and a click on either swings both. A toggled
+/// door swings (<see cref="DoorSwings"/>): its panel turns from one set of boxes onto the other, its cells leave
+/// the block collision meanwhile and it moves the bodies in its way.
 /// </summary>
 [Collection("Worldgen seed")]
 public sealed class DoorTests : IDisposable
@@ -301,6 +304,142 @@ public sealed class DoorTests : IDisposable
         var passed = BoxSweep.MoveOnAxis(start, through.Z, 2, half, _world.Manager, out var hitOpen);
         Assert.False(hitOpen);
         Assert.Equal(start.Z + through.Z, passed.Z, 3);
+    }
+
+    [Fact]
+    public void TheSwingingPanelStartsOnTheShutBoxesAndArrivesOnTheOpenOnes()
+    {
+        var cell = new Vector3(7, -3, 12);
+        foreach (var type in BlockType.Types.Values.Where(t => t.SideHinged && t.UpperHalfId != 0))
+        for (var facing = 0; facing < 4; facing++)
+        foreach (var hingeRight in new[] { false, true })
+        foreach (var open in new[] { false, true })
+        {
+            var state = DoorState.Encode(facing, open, hingeRight);
+            var (min, max) = DoorSwingShape.ClosedBounds(type);
+            var matrix = DoorSwingShape.PanelMatrix(type, cell, state, open ? 1f : 0f);
+            var a = Vector3.Transform(min, matrix);
+            var b = Vector3.Transform(max, matrix);
+            var boxes = Bounds(type.RotatedHitboxes![BlockType.ShapeIndex(state, type.RotatedHitboxes.Length)]);
+            AssertNear(cell + boxes.Min, Vector3.Min(a, b));
+            AssertNear(cell + boxes.Max, Vector3.Max(a, b));
+        }
+
+        static void AssertNear(Vector3 expected, Vector3 actual) =>
+            Assert.True(Vector3.Distance(expected, actual) < 1e-4f, $"expected {expected}, got {actual}");
+    }
+
+    [Fact]
+    public void AToggledDoorSwingsSmoothlyAndGoesBackToItsCellsWhenThePanelArrives()
+    {
+        _world = new SupportTestWorld();
+        var door = Door();
+        _world.Load(8, _world.Top, 8);
+        var (x, y, z) = PlaceDoor(door.Id, 4, 8, 0);
+        var swings = _world.World.DoorSwings;
+        var swinging = _world.Manager.SwingingCells;
+        const float dt = 1f / 60f;
+
+        ClickBoxes(x, y, z);
+        // The state is already the open one; the two cells are the moving panel's until it arrives
+        Assert.True(DoorState.IsOpen(_world.StateAt(x, y, z)));
+        Assert.True(swinging.Contains(x, y, z) && swinging.Contains(x, y + 1, z));
+
+        var last = 0f;
+        var ticks = 0;
+        do
+        {
+            swings.Update(dt);
+            var swing = Assert.Single(swings.Active);
+            Assert.True(swing.Opening);
+            Assert.True(swing.Open >= last, "an opening panel never turns back");
+            last = swing.Open;
+            Assert.True(++ticks < 600, "the swing never ended");
+        } while (!swings.Active[0].Done);
+        Assert.Equal(1f, last, 3);
+        Assert.True(ticks > 3, "the door snapped open instead of swinging");
+
+        swings.Update(dt);
+        Assert.Empty(swings.Active);
+        Assert.False(swinging.Contains(x, y, z) || swinging.Contains(x, y + 1, z));
+
+        // Shut it and turn it back midway: the panel carries on from where it stands
+        ClickBoxes(x, y, z);
+        for (var i = 0; i < ticks / 2; i++)
+            swings.Update(dt);
+        var midway = Assert.Single(swings.Active).Open;
+        Assert.InRange(midway, 0.05f, 0.95f);
+        ClickBoxes(x, y, z);
+        swings.Update(dt);
+        var turnedBack = Assert.Single(swings.Active);
+        Assert.True(turnedBack.Opening);
+        Assert.InRange(turnedBack.Open - midway, 0f, 0.2f);
+
+        // A door broken mid-swing stops swinging at once
+        Assert.True(_world.Break(x, y, z));
+        swings.Update(dt);
+        Assert.Empty(swings.Active);
+        Assert.False(swinging.Contains(x, y, z) || swinging.Contains(x, y + 1, z));
+    }
+
+    [Fact]
+    public void BothDoorsOfADoubleDoorSwingTogether()
+    {
+        _world = new SupportTestWorld();
+        var door = Door();
+        _world.Load(8, _world.Top, 8);
+        var first = PlaceDoor(door.Id, 4, 8, 0);
+        var latch = DoubleDoor.LatchSide(_world.StateAt(first.X, first.Y, first.Z));
+        PlaceDoorAt(door.Id, new Vector3(4, 0, 8) + latch, 0);
+
+        ClickBoxes(first.X, first.Y + 1, first.Z);
+        _world.World.DoorSwings.Update(1f / 60f);
+        var swings = _world.World.DoorSwings.Active;
+        Assert.Equal(2, swings.Count);
+        Assert.Equal(swings[0].Open, swings[1].Open);
+        Assert.NotEqual(DoorState.HingeRight(swings[0].State), DoorState.HingeRight(swings[1].State));
+    }
+
+    [Fact]
+    public void AShuttingDoorSweepsABodyOutOfItsDoorway()
+    {
+        _world = new SupportTestWorld();
+        var door = Door();
+        _world.Load(8, _world.Top, 8);
+        var (x, y, z) = PlaceDoor(door.Id, 4, 8, 0);
+        var swings = _world.World.DoorSwings;
+        const float dt = 1f / 60f;
+        ClickBoxes(x, y, z);
+        for (var i = 0; i < 600 && (swings.Active.Count > 0 || i == 0); i++)
+            swings.Update(dt);
+
+        // A body standing in the open doorway, right where the shut panel stands
+        var half = new Vector3(0.25f, 0.4f, 0.25f);
+        var shut = Bounds(door.RotatedHitboxes![BlockType.ShapeIndex(DoorState.Encode(0, false), door.RotatedHitboxes.Length)]);
+        var body = new Vector3(x + 0.5f, y + half.Y + 0.01f, z + (shut.Min.Z + shut.Max.Z) * 0.5f);
+        Assert.False(BoxSweep.IsColliding(body, half, _world.Manager));
+
+        ClickBoxes(x, y, z);
+        var moved = false;
+        for (var i = 0; i < 600; i++)
+        {
+            swings.Update(dt);
+            if (swings.Active.Count == 0) break;
+            // While the door swings its cell has no boxes: only the panel moves the body, through the block sweep
+            if (!DoorSwingShape.TryPush(swings.Active[0], body, half.X, body.Y - half.Y, body.Y + half.Y, out var delta))
+                continue;
+            Assert.True(delta.Length() <= DoorConfig.MaxPushBlocks + 1e-4f);
+            Assert.Equal(0f, delta.Y);
+            body = BoxSweep.MoveOnAxis(body, delta.X, 0, half, _world.Manager, out _);
+            body = BoxSweep.MoveOnAxis(body, delta.Z, 2, half, _world.Manager, out _);
+            moved = true;
+        }
+
+        // The panel is a block again, and the body is clear of it
+        Assert.True(moved);
+        Assert.Empty(swings.Active);
+        Assert.False(DoorState.IsOpen(_world.StateAt(x, y, z)));
+        Assert.False(BoxSweep.IsColliding(body, half, _world.Manager));
     }
 
     [Fact]

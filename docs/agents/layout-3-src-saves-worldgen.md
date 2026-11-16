@@ -91,6 +91,14 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   move a click or the wire names, and the reach-checked open and apply both sides share
         ChestLids.cs           # GL-free: which chests stand open (at least one viewer) and what each lid plays (open,
                                #   close, the locked wobble), the viewed cells on the wire (the end of StationState)
+      Doors/                   # the swinging doors
+        DoorSwings.cs          # GL-free: the doors that are mid-swing (started by the toggle and by a server's block
+                               #   change), their eased progress, the reverse midway, SwingingCells and the final remesh
+        DoorSwing.cs           # one door mid-swing as reported each tick: lower cell, id, target state, how open, done
+        DoorSwingShape.cs      # GL-free geometry: the shut panel turned about its hinge pin (PanelMatrix, shared by the
+                               #   draw and the push) and the shove a body in the panel's way gets (TryPush)
+        DoorPush.cs            # moves the local player, the mobs and the drops out of a swinging door's way through
+                               #   their own collision, and squeezes a pinned player out of the arrived panel
       HellMobManager.cs        # the hell mobs: AI tick, the brute's blow at its impact, the casters' fire bolts
                                #   (MobMissiles; damage + burning), loot, despawn, the hell-only ring spawn (packs by layer)
       KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible

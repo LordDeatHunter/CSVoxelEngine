@@ -334,6 +334,9 @@ public class RenderManager : IDisposable
     /// block's skin.</summary>
     internal ChestPasses Chests { get; private set; }
 
+    /// <summary>The swinging doors' draws: each door that is mid-swing as one turning panel.</summary>
+    internal DoorPasses Doors { get; private set; }
+
     /// <summary>The depth-only sun shadow passes: the near and far cascades' casters; owns the
     /// CHUNK_DRAW shadow program's uniform locations.</summary>
     internal ShadowPass Shadows { get; private set; }
@@ -588,6 +591,7 @@ public class RenderManager : IDisposable
         Players = new PlayerPasses(gl, this);
         Mobs = new MobPasses(gl, this);
         Chests = new ChestPasses(gl, this);
+        Doors = new DoorPasses(gl, this);
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes, atlasIsSrgb: true);
         // The damage numbers are laid out from the HUD's font; without one there is nothing to draw
         if (ui.Font is { } font)
@@ -1059,6 +1063,7 @@ public class RenderManager : IDisposable
         Stations.Dispose();
         Players.Dispose();
         Chests.Dispose();
+        Doors.Dispose();
         Mobs.Dispose();
         worldShader.Dispose();
         chunkShader.Dispose();

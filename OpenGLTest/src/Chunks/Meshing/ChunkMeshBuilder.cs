@@ -91,7 +91,7 @@ internal static class ChunkMeshBuilder
                 packed[Idx(x, y, z)] = (byte)(sunLight[li] << 4 | (b & BlockLevelMask));
                 if (anyTinted) packed[BlockCount + Idx(x, y, z)] = (byte)(b >> 4);
             }
-            return GenerateMeshDataFromSnapshot(chunk, padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy, chunkManager.ChopDamage)
+            return GenerateMeshDataFromSnapshot(chunk, padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy, chunkManager.ChopDamage, chunkManager.SwingingCells)
                 with { Light = packed, Visibility = visibility };
         }
         finally
@@ -277,7 +277,7 @@ internal static class ChunkMeshBuilder
     /// replays its baked model's quads.
     /// </summary>
     private static ChunkMeshData GenerateMeshDataFromSnapshot(Chunk chunk, ushort[] padded, byte[] paddedState,
-        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy, WoodDamage chopDamage)
+        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy, WoodDamage chopDamage, SwingingCells swinging)
     {
         // Rented, not allocated: ChunkManager returns them once the mesh is on the GPU
         var vertices = pool.RentVertices();
@@ -469,6 +469,11 @@ internal static class ChunkMeshBuilder
                 (chests ??= []).Add((ushort)Idx(x, y, z));
                 continue;
             }
+
+            // A door that is mid-swing is drawn turning by the door pass (DoorPasses) until its panel arrives
+            if (type.SideHinged && swinging.Contains((int)chunk.Position.X * Chunk.Size + x,
+                    (int)chunk.Position.Y * Chunk.Size + y, (int)chunk.Position.Z * Chunk.Size + z))
+                continue;
 
             // ...and the anchor draws that whole model, pre-rotated to the facing its state
             // byte's low two bits carry (see MultiblockShape), as does a facing block such as a

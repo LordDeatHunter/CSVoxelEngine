@@ -97,6 +97,8 @@ internal static class BodyCollision
             // A layered-snow cell only collides once its stack fills the cell; every other
             // block answers as before. See BlockType.IsSolidCell.
             if (!BlockType.IsSolidCell(blockId, chunkManager.GetStateGlobal(x, y, z))) continue;
+            // A door that is mid-swing collides through its moving panel alone (DoorPush)
+            if (BlockType.OpenableById[blockId] && chunkManager.SwingingCells.Contains(x, y, z)) continue;
             // A pass-through block (leaves) never blocks the body; it only scales the walk
             // while the body overlaps it (see BlockMoveFactor).
             if (BlockType.MovementSpeedOf(blockId) > 0f) continue;

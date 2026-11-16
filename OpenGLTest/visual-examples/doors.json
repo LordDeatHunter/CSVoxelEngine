@@ -19,6 +19,11 @@
   //   doors-one-open    the right one clicked open on its upper half: both halves swing together
   //                     a quarter turn about the left-hand hinge, into the cell
   //   doors-oblique     the same from the front right
+  //   Then a third door at (3, 12, -3), on the free edge of the open one: it hangs mirrored and joins it open.
+  //   double-open       the double door standing open, a panel along each outer side
+  //   double-midswing   the far door clicked: both panels a part of the way shut
+  //   double-closed     both shut, hinges on the outside
+  //   double-oblique    the same from the front right
   "steps": [
     { "op": "fly", "on": true },
     { "op": "teleport", "pos": [157.5, 32, 283.5], "yaw": -90, "pitch": -30 },
@@ -62,6 +67,25 @@
     { "op": "screenshot", "name": "doors-one-open", "hideHud": true },
     { "op": "teleport", "pos": [162.5, 14.5, 284.5], "yaw": -128, "pitch": -12 },
     { "op": "wait", "seconds": 0.5 },
-    { "op": "screenshot", "name": "doors-oblique", "hideHud": true }
+    { "op": "screenshot", "name": "doors-oblique", "hideHud": true },
+
+    { "op": "teleport", "pos": [157.5, 13.63, 283.5], "yaw": -63, "pitch": -5 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "give", "block": "oak_door", "count": 1 },
+    { "op": "look", "yaw": -45, "pitch": -20.9 },
+    { "op": "place" },
+    { "op": "look", "yaw": -55, "pitch": -5 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "double-open", "hideHud": true },
+    { "op": "look", "yaw": -41.4, "pitch": -2.9 },
+    { "op": "place" },
+    { "op": "look", "yaw": -55, "pitch": -5 },
+    { "op": "wait", "seconds": 0.13 },
+    { "op": "screenshot", "name": "double-midswing", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "double-closed", "hideHud": true },
+    { "op": "teleport", "pos": [162.5, 14.5, 284.5], "yaw": -128, "pitch": -12 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "double-oblique", "hideHud": true }
   ]
 }

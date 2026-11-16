@@ -483,6 +483,8 @@ internal sealed class BlockInteractions
     private void SetOpenWithOtherHalf(Vector3 cell, ushort id, byte state, bool open)
     {
         var target = DoorState.WithOpen(state, open);
+        // Before the write, so the remesh it triggers already leaves a swinging door to the door pass
+        _world.DoorSwings.Start((int)cell.X, (int)cell.Y, (int)cell.Z, id, target);
         ToggleOpenCell(cell, target);
         if (TallBlock.TryGetPartner(id, cell, out var partner, out var partnerId)
             && _chunkManager.TryGetCell((int)partner.X, (int)partner.Y, (int)partner.Z, out var held, out _)

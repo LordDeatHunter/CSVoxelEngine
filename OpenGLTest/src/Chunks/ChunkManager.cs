@@ -81,6 +81,10 @@ public class ChunkManager
     /// <summary>The permanent chop damage of natural trunk cells, which the mesher reads (see <see cref="WoodDamage"/>).</summary>
     public WoodDamage ChopDamage { get; } = new();
 
+    /// <summary>The cells of the doors that are mid-swing, which the mesher and the body sweeps leave to the moving
+    /// panel (see <see cref="Chunks.SwingingCells"/>).</summary>
+    public SwingingCells SwingingCells { get; } = new();
+
     /// <inheritdoc cref="ChunkRenderLists.MeshVersion"/>
     public int MeshVersion => _renderLists.MeshVersion;
 

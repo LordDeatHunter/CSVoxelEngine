@@ -133,6 +133,7 @@ OpenGLTest/
         ChunkMeshScheduler.cs  # the dirty set, the per-frame dirty scan, the thread-pool mesh runners, the completed queue and budgeted upload,
                                #   the immediate remesh paths (behind ChunkManager.Update, MarkDirty, ImmediateRemesh*)
         ThinWoodBite.cs        # the chop slit of a thin (node-and-tubes) wood cell: the bite box, box subtraction, emission
+        SwingingCells.cs       # the cells of the doors that are mid-swing (thread-safe): out of the chunk mesh and the body sweeps until the panel arrives
         WoodDamage.cs          # the permanent chop damage per natural trunk cell (damage + first-hit side face) the mesher reads, and the damage -> slit depth rule
       ChunkMesher.cs         # the binary greedy pass, the biome-tinted cube face and model-tint helpers, and the box-face/quad primitives the emitters share
         FaceLight.cs           # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
@@ -236,6 +237,7 @@ OpenGLTest/
                                #   the sky biomes and their flora (L-13: SkyBiome*, Meadow*/Frost* rates, vines,
                                #   the tree cells and chances) and the cloud sea (CloudSea*: its band from
                                #   SkyConfig.SkyCloudSea*, cover and detail noises)
+      DoorConfig.cs            # the side-hinged doors' swing: its length and the per-tick push cap
       SpiderConfig.cs          # the giant spider and the broodmother: body, bite, cave and surface spawn chances
       StatusEffectConfig.cs    # status effects: the duration scale cap, the block writer's reach and write caps,
                                #   the mob tint strength, the particle emitter cap and rate

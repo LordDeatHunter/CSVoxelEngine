@@ -136,6 +136,9 @@ internal sealed class ClientMirror
             if (_chunkManager.TryGetCell(change.X, change.Y, change.Z, out var id, out var state)
                 && id == change.Id && state == change.State)
                 continue;
+            // A door someone else opened or shut swings here too (before the write, like the local toggle)
+            if (id == change.Id && DoorState.IsOpen(state) != DoorState.IsOpen(change.State))
+                _world.DoorSwings.Start(change.X, change.Y, change.Z, id, change.State);
             chunk.SetBlockRaw(change.X & Chunk.SizeMask, change.Y & Chunk.SizeMask, change.Z & Chunk.SizeMask,
                 change.Id, change.State);
             _netTouchedChunks.Add(chunk.Position);
