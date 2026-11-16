@@ -125,8 +125,9 @@ internal sealed class ServerBroadcasts
         for (var i = 0; i < drops.Count; i++)
         {
             var drop = drops[i];
-            NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.Drop, IdFor(drop), drop.Position, 0f, 0, 0,
-                drop.BlockId, drop.Velocity, Instance: drop.Instance == null ? null
+            // A stuck drop sends what it is stuck in and, in the velocity field, the heading of its tip
+            NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.Drop, IdFor(drop), drop.Position, 0f, 0, (int)drop.Stick,
+                drop.BlockId, drop.IsStuck ? drop.StuckHeading : drop.Velocity, Instance: drop.Instance == null ? null
                     : VoxelEngine.UI.InventoryPanel.InventorySaveCodec.ExportInstance(drop.Instance, new List<string>())));
         }
 

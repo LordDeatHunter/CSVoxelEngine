@@ -230,8 +230,13 @@ internal sealed class ClientMirror
         _dropManager.Clear();
         foreach (var netEntity in entities)
         {
-            if (netEntity.Kind == NetEntityKind.Drop)
-                _dropManager.SpawnRestored(BlockTables.RequireAssigned(netEntity.ItemId), netEntity.Position, netEntity.Velocity, 0f, netEntity.Instance == null ? null
+            if (netEntity.Kind != NetEntityKind.Drop) continue;
+            var itemId = BlockTables.RequireAssigned(netEntity.ItemId);
+            if (netEntity.Ammo is (int)DropStick.Terrain or (int)DropStick.Body)
+                _dropManager.SpawnRestoredStuck(itemId, netEntity.Position, netEntity.Velocity,
+                    netEntity.Ammo == (int)DropStick.Body, 0f);
+            else
+                _dropManager.SpawnRestored(itemId, netEntity.Position, netEntity.Velocity, 0f, netEntity.Instance == null ? null
                     : UI.InventoryPanel.InventorySaveCodec.ImportInstance(0, netEntity.Instance, new List<string>()));
         }
 

@@ -4,4 +4,5 @@
   "entityDamage": 3,
   "throwDamage": 6,
   "throwAligned": true,
-  "throwChargeNeeded": 0.5 }
+  "throwChargeNeeded": 0.5,
+  "throwSticks": true }

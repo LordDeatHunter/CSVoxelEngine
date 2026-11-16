@@ -53,6 +53,13 @@ public sealed class ItemDefinition
     public float? ThrowChargeNeeded { get; set; }
 
     /// <summary>
+    /// A throw of this item stays where it lands instead of turning into a spinning drop: stuck in the
+    /// terrain it hit, tip first, until someone walks up and takes it back, or stuck in the mob it hit,
+    /// riding along until that mob dies and drops it. Needs <see cref="ThrowDamage"/>.
+    /// </summary>
+    public bool ThrowSticks { get; set; }
+
+    /// <summary>
     /// A block whose small cube a throw of this item draws in place of the item's sprite (a flint or obsidian shard
     /// flies as the same stone cube it rests as on the ground), named like <c>use.block</c>, e.g. <c>block/pebble</c>.
     /// Needs <see cref="ThrowDamage"/>.

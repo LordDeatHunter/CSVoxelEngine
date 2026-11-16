@@ -162,6 +162,9 @@ internal static class ItemLoader
             if (definition.ThrowAligned && throwDamage == null)
                 throw new InvalidOperationException($"Item '{path}' sets throwAligned but has no throwDamage.");
 
+            if (definition.ThrowSticks && throwDamage == null)
+                throw new InvalidOperationException($"Item '{path}' sets throwSticks but has no throwDamage.");
+
             var throwChargeNeeded = definition.ThrowChargeNeeded ?? 0f;
             if (definition.ThrowChargeNeeded.HasValue && throwDamage == null)
                 throw new InvalidOperationException($"Item '{path}' sets throwChargeNeeded but has no throwDamage.");
@@ -203,7 +206,8 @@ internal static class ItemLoader
                 Shrapnel: shrapnel,
                 OnHit: onHit,
                 HeldModel: heldModel,
-                ThrowChargeNeeded: throwChargeNeeded));
+                ThrowChargeNeeded: throwChargeNeeded,
+                ThrowSticks: definition.ThrowSticks));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, ushort>(ContentRegistry.ItemIds, StringComparer.Ordinal));

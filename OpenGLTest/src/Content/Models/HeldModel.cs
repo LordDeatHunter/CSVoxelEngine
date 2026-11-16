@@ -23,6 +23,9 @@ public sealed class HeldModel
     /// <summary>Every cuboid of the project, in model space (blocks), as one pivotless part.</summary>
     public PlayerRig.RigPart Part { get; } = new();
 
+    /// <summary>How far the tip stands above the model's origin, in blocks of model space: the highest cube top.</summary>
+    public float TipHeight { get; private set; }
+
     /// <summary>Top-first RGBA skin the cuboid faces sample.</summary>
     public byte[] TexturePixels { get; private init; } = [];
     public int TextureWidth { get; private init; }
@@ -53,6 +56,8 @@ public sealed class HeldModel
                     Max = cube.Max + part.Pivot,
                     Faces = cube.Faces,
                 });
+        foreach (var cube in model.Part.Cubes)
+            model.TipHeight = MathF.Max(model.TipHeight, cube.Max.Y);
         if (model.Part.Cubes.Count == 0)
             throw new InvalidOperationException($"Model '{path}' has no cubes.");
         return model;

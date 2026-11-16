@@ -266,7 +266,8 @@ internal sealed class ThrowAction
     /// </summary>
     internal void UpdateThrown(float deltaTime)
     {
-        if (_thrown.Count == 0) return;
+        // A javelin stuck in a mob that died (or left) falls out of it
+        if (!_clientMode) _dropManager.ReleaseOrphans(_mobs);
         for (var i = _thrown.Count - 1; i >= 0; i--)
         {
             var projectile = _thrown[i];
@@ -274,7 +275,10 @@ internal sealed class ThrowAction
             if (hit != null)
             {
                 if (!_clientMode)
+                {
                     Strikes.StrikeMob(hit, projectile.Damage, projectile.Origin);
+                    LeaveInMob(projectile, hit);
+                }
                 else
                     // The cosmetic copy's connect sparks where it stops on the mirrored mob
                     Strikes.SpawnHitSparks(hit, projectile.Origin);
@@ -284,8 +288,32 @@ internal sealed class ThrowAction
 
             if (alive) continue;
             if (!_clientMode)
-                _dropManager.SpawnAt(projectile.ItemId, projectile.Position, pickupDelaySeconds: PlayerConfig.ThrownPickupDelaySeconds);
+                Land(projectile);
             _thrown.RemoveAt(i);
         }
+    }
+
+    private static bool Sticks(ThrownProjectile projectile) => ItemRegistry.TryGet(projectile.ItemId)?.ThrowSticks == true;
+
+    // A throw that came to rest: one that sticks stays in the terrain it hit, tip first; anything else (and a
+    // sticking one that ran out of life in the air) becomes a loose drop
+    private void Land(ThrownProjectile projectile)
+    {
+        if (Sticks(projectile) && projectile.Landed)
+            _dropManager.SpawnStuck(projectile.ItemId, projectile.Position, projectile.Heading,
+                pickupDelaySeconds: PlayerConfig.ThrownPickupDelaySeconds);
+        else
+            _dropManager.SpawnAt(projectile.ItemId, projectile.Position, pickupDelaySeconds: PlayerConfig.ThrownPickupDelaySeconds);
+    }
+
+    // A sticking throw that struck a mob: it stays in the body until the mob dies, and falls at once when the
+    // throw itself killed it. Anything else is spent on the hit, as before.
+    private void LeaveInMob(ThrownProjectile projectile, Mob hit)
+    {
+        if (!Sticks(projectile)) return;
+        if (hit.IsDead)
+            _dropManager.SpawnAt(projectile.ItemId, projectile.Position, pickupDelaySeconds: PlayerConfig.ThrownPickupDelaySeconds);
+        else
+            _dropManager.SpawnStuck(projectile.ItemId, projectile.Position, projectile.Heading, hit);
     }
 }

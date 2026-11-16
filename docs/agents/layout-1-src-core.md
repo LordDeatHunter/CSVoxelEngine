@@ -516,7 +516,8 @@ OpenGLTest/
       MobCaps.cs, IMobPopulation.cs  # the natural and hard mob caps every kind shares, over the
                                      #   living count each registered manager reports
       IMobTarget.cs            # what a mob chases and hurts: eye, immunity, TakeHit (Camera, ServerPlayer)
-      ItemDrop.cs              # a collectable left behind by mining: usually a block, sometimes a pure item (see Item)
+      ItemDrop.cs              # a collectable left behind by mining: usually a block, sometimes a pure item (see Item); also a stuck throw
+      DropStick.cs             # what a thrown item that stays where it landed is stuck in (none, terrain, a mob's body)
       LedgeProbe.cs            # GL-free ledge caution: the drop to the first ground ahead, safe-step rule
       EntityContract.cs        # the startup checks of a clip-animated kind's model: the humanoid groups, a clip,
                                #   a clip's timeline event (RequireHumanoid), each naming the model file

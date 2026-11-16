@@ -145,6 +145,9 @@ public abstract class Item
     /// <summary>The share of the throw charge (0..1) a release needs to throw this item; an earlier release cancels.</summary>
     public float ThrowChargeNeeded { get; internal init; }
 
+    /// <summary>Whether a thrown copy stays stuck where it lands (terrain or a mob) rather than becoming a loose drop.</summary>
+    public bool ThrowSticks { get; internal init; }
+
     /// <summary>Whether a release at <paramref name="charge01"/> throws this item rather than canceling the wind-up.</summary>
     public bool ThrowsAt(float charge01) => IsThrowable && charge01 >= ThrowChargeNeeded;
 
@@ -311,6 +314,7 @@ public abstract class Item
         IngotBlockId = spec.IngotBlockId;
         HeldModel = spec.HeldModel;
         ThrowChargeNeeded = spec.ThrowChargeNeeded;
+        ThrowSticks = spec.ThrowSticks;
         Rarity = spec.Rarity;
     }
 
