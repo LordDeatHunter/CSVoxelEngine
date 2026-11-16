@@ -414,7 +414,10 @@ parents, circle otherwise), `reveal` (when the quest shows in the book as a lock
 `unlocked`, the default, not before; `always`; `anyParentShown` or `allParentsShown`, while one or every parent shows, done
 or not; `anyParentDone`, once one parent is done; `anyParentDoneAllShown`, once one is done and every other shows;
 `QuestReveal`, worked out by `QuestLog.IsVisible` from the parents' state and memoized until a completion changes,
-`QuestRevealTests`; a preview still unlocks, and makes progress, only once every parent is done), `readable` (default true; false hides the requirement list until it is complete), `anyOf` (default false; true completes the
+`QuestRevealTests`; a preview still unlocks, and makes progress, only by its `unlock` mode), `unlock` (when the quest shows its details and
+makes progress, so it can be earned: `allParentsDone`, the default, `anyParentDone` or `always`; `QuestUnlock`, read by
+`QuestLog.IsUnlocked`, so the progress gate, the unlock cascade's held-item check, the preview state and EQUIP all follow
+it, `QuestUnlockTests`; `torches` unlocks on either parent), `readable` (default true; false hides the requirement list until it is complete), `anyOf` (default false; true completes the
 quest once any one requirement is met instead of all) and `requirements`, each `{ "type": obtain|craft|break|place|kill,
 "item"|"block"|"entity": name, "count": n }` (count default 1). An obtain or craft requirement may name a `tag` (a
 `data/tags` file, optional `label` for its display name) instead of an `item`: any member counts and an obtain sums the held

@@ -38,6 +38,10 @@ public sealed class QuestDefinition : IFileNamedDefinition
     /// (see <see cref="VoxelEngine.Content.Quests.QuestReveal"/>).</summary>
     public string? Reveal { get; set; }
 
+    /// <summary>When the quest unlocks (shows its details and can be earned): <c>allParentsDone</c> (the default),
+    /// <c>anyParentDone</c> or <c>always</c> (see <see cref="VoxelEngine.Content.Quests.QuestUnlock"/>).</summary>
+    public string? Unlock { get; set; }
+
     /// <summary>Whether the details panel lists the requirements before the quest is complete; default true.</summary>
     public bool? Readable { get; set; }
 

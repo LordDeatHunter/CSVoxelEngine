@@ -420,8 +420,16 @@ public sealed class QuestEditorState
 
     /// <summary>The index in <see cref="QuestLoader.RevealNames"/> of the quest's reveal mode (0, the default, for an
     /// unknown one, which <see cref="Error"/> reports).</summary>
-    public static int RevealOf(QuestDefinition quest) => quest.Reveal == null ? 0
-        : Math.Max(0, QuestLoader.RevealNames.ToList().FindIndex(n => string.Equals(n, quest.Reveal, StringComparison.OrdinalIgnoreCase)));
+    public static int RevealOf(QuestDefinition quest) => IndexOf(QuestLoader.RevealNames, quest.Reveal, 0);
+
+    /// <summary>Sets when the quest unlocks: <paramref name="mode"/> indexes <see cref="QuestLoader.UnlockNames"/>, and the
+    /// first (the default, every parent done) clears the field.</summary>
+    public void SetUnlock(string id, int mode) =>
+        Edit(id, q => q.Unlock = mode <= 0 || mode >= QuestLoader.UnlockNames.Count ? null : QuestLoader.UnlockNames[mode]);
+
+    /// <summary>The index in <see cref="QuestLoader.UnlockNames"/> of the quest's unlock mode (0, the default, for an
+    /// unknown one, which <see cref="Error"/> reports).</summary>
+    public static int UnlockOf(QuestDefinition quest) => IndexOf(QuestLoader.UnlockNames, quest.Unlock, 0);
 
     public void ToggleReadable(string id) => Edit(id, q => q.Readable = q.Readable == false ? null : false);
 
@@ -831,6 +839,7 @@ public sealed class QuestEditorState
                     _ => parents[i].Length == 0 ? QuestShape.Hex : QuestShape.Circle,
                 },
                 Reveal = (QuestReveal)RevealOf(quest),
+                Unlock = (QuestUnlock)UnlockOf(quest),
                 Readable = quest.Readable ?? true,
                 AnyOf = quest.AnyOf ?? false,
                 Parents = parents[i],

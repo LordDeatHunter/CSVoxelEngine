@@ -73,6 +73,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private static readonly string[] RevealLabels =
         ["WHEN UNLOCKED", "ALWAYS", "A PARENT SHOWN", "ALL PARENTS SHOWN", "A PARENT DONE", "A DONE + ALL SHOWN"];
     private readonly DropdownState _revealDropdown = new(RevealLabels);
+    // When the selected quest unlocks, in QuestLoader.UnlockNames order
+    private static readonly string[] UnlockLabels = ["ALL PARENTS DONE", "ANY PARENT DONE", "ALWAYS"];
+    private readonly DropdownState _unlockDropdown = new(UnlockLabels);
     // The selected label's SIZE and COLOR, in QuestLoader.LabelSizeNames / LabelColorNames order
     private readonly DropdownState _labelSize = new([.. QuestLoader.LabelSizeNames.Select(n => n.ToUpperInvariant())]);
     private readonly DropdownState _labelColor = new([.. QuestLoader.LabelColorNames.Select(n => n.ToUpperInvariant())]);
@@ -281,6 +284,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         {
             _typeDropdowns.Clear();
             _revealDropdown.Close();
+            _unlockDropdown.Close();
             _dropdownQuest = State.SelectedQuestId;
         }
         _list = null;
@@ -319,9 +323,14 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
         // SHOW: when the quest appears as a locked preview (its label is drawn in DrawDetailsText)
         var questId = quest.Id!;
-        const float showLabel = 70f;
+        const float showLabel = 86f;
         _revealDropdown.Box = Rect(left + showLabel, y, width - showLabel, FieldH);
         _dropdowns.Add((_revealDropdown, QuestEditorState.RevealOf(quest), mode => State.SetReveal(questId, mode)));
+        y += FieldH + Gap;
+
+        // UNLOCK: when the quest shows its details and can be earned
+        _unlockDropdown.Box = Rect(left + showLabel, y, width - showLabel, FieldH);
+        _dropdowns.Add((_unlockDropdown, QuestEditorState.UnlockOf(quest), mode => State.SetUnlock(questId, mode)));
         y += FieldH + Gap + LabelH;
 
         // The icon row: the icon is drawn in DrawDetailsText, the button arms the grid for it
@@ -562,6 +571,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         ui.DrawText("REQUIREMENTS", new Vector2(left, pick.Bottom + Gap + 2f), scale, DevStudioUi.TextDim);
         ui.DrawText("SHOW", new Vector2(left, _revealDropdown.Box.Center.Y - DevStudioUi.TextCap * 0.5f), scale,
             DevStudioUi.TextDim);
+        ui.DrawText("UNLOCK", new Vector2(left, _unlockDropdown.Box.Center.Y - DevStudioUi.TextCap * 0.5f),
+            DevStudioUi.FitText(ui, "UNLOCK", DevStudioUi.TextCap, _unlockDropdown.Box.Left - left - 4f).Scale, DevStudioUi.TextDim);
 
         foreach (var (rect, action, arg, _, _, _) in _buttons)
         {

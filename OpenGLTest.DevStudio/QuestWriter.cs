@@ -11,7 +11,7 @@ namespace VoxelEngine.DevStudio;
 
 /// <summary>
 /// Writes a quest to its <c>&lt;id&gt;.json</c> in the shipped files' hand-written layout: two-space indent, the fields in
-/// schema order (<c>title, description, icon, pos, shape, parents, reveal, readable, anyOf, requirements</c>), <c>pos</c>
+/// schema order (<c>title, description, icon, pos, shape, parents, reveal, unlock, readable, anyOf, requirements</c>), <c>pos</c>
 /// and <c>parents</c> as inline arrays and each requirement as one line. A field at its loader default (no shape, readable
 /// true, anyOf false, count 1) is left out, and so is the id, which is the file name. A label file is written the same way
 /// (<c>text, pos, size, color</c>, the default size and color left out). CRLF line endings, UTF-8 without a BOM.
@@ -42,6 +42,7 @@ public static class QuestWriter
         if (quest.Parents is { Length: > 0 } parents)
             fields.Add($"\"parents\": [{string.Join(", ", Array.ConvertAll(parents, Text))}]");
         if (quest.Reveal != null) fields.Add($"\"reveal\": {Text(quest.Reveal)}");
+        if (quest.Unlock != null) fields.Add($"\"unlock\": {Text(quest.Unlock)}");
         if (quest.Readable == false) fields.Add("\"readable\": false");
         if (quest.AnyOf == true) fields.Add("\"anyOf\": true");
 

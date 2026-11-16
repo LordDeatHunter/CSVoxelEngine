@@ -100,7 +100,7 @@ generic `EditorDocument`), and the selection box and group drags stay quest-only
 scrolls a long list, a click on a row opens that quest alone) over DELETE N QUESTS; Delete removes every selected quest
 as one undo step. The right panel edits the selected quest's id (committed on Enter or leaving the field; a rename
 follows every parent link), title, description, shape (AUTO/HEX/CIRCLE), readable, any-of, SHOW (the `reveal` mode, a
-dropdown), icon and requirements: a type
+dropdown), UNLOCK (the `unlock` mode, a dropdown), icon and requirements: a type
 dropdown (the reusable `UI/Widgets/DropdownState`, drawn by `DropdownRenderer`) picks obtain/craft/break/place/kill, the target field takes an item (or `#tag`, which adds a label field), a block
 or an entity, `-`/`+` set the count, PICK arms the left grid for the target (NEXT MOB steps a kill through the registered
 entities), and a plain grid click sets the icon. Dragging a grid slot onto the canvas adds a quest where it is dropped,

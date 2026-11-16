@@ -58,19 +58,20 @@ internal static class QuestLoader
         var position = ReadVector(label.Pos, "pos", path)
                        ?? throw new InvalidOperationException($"Quest label '{label.Id}' in '{path}' has no pos.");
         return new QuestLabel(label.Id!, label.Text, position,
-            ReadName(label.Size, QuestLabelSize.Medium, LabelSizeNames, "size", label.Id!, path),
-            ReadName(label.Color, QuestLabelColor.Gray, LabelColorNames, "color", label.Id!, path));
+            ReadName(label.Size, QuestLabelSize.Medium, LabelSizeNames, "size", $"Quest label '{label.Id}'", path),
+            ReadName(label.Color, QuestLabelColor.Gray, LabelColorNames, "color", $"Quest label '{label.Id}'", path));
     }
 
-    // A lowercase enum name (any case) to its member; null is the default
-    private static T ReadName<T>(string? value, T fallback, IReadOnlyList<string> names, string field, string label, string path)
+    // An enum's JSON name (any case) to its member, null being the default; anything else is refused naming the owner
+    // ("Quest 'x'", "Quest label 'x'") and its file
+    private static T ReadName<T>(string? value, T fallback, IReadOnlyList<string> names, string field, string owner, string path)
         where T : struct, Enum
     {
         if (value == null) return fallback;
         var index = names.ToList().FindIndex(n => string.Equals(n, value, StringComparison.OrdinalIgnoreCase));
         if (index < 0)
             throw new InvalidOperationException(
-                $"Quest label '{label}' in '{path}' has {field} '{value}'; expected {string.Join(", ", names)}.");
+                $"{owner} in '{path}' has {field} '{value}'; expected {string.Join(", ", names)}.");
         return Enum.GetValues<T>()[index];
     }
 
@@ -143,7 +144,8 @@ internal static class QuestLoader
                 IconId = icon,
                 Position = position,
                 Shape = ReadShape(quest.Shape, parents[i].Length == 0, quest.Id!, path),
-                Reveal = ReadReveal(quest.Reveal, quest.Id!, path),
+                Reveal = ReadName(quest.Reveal, QuestReveal.Unlocked, RevealNames, "reveal", $"Quest '{quest.Id}'", path),
+                Unlock = ReadName(quest.Unlock, QuestUnlock.AllParentsDone, UnlockNames, "unlock", $"Quest '{quest.Id}'", path),
                 Readable = quest.Readable ?? true,
                 AnyOf = quest.AnyOf ?? false,
                 Parents = parents[i],
@@ -212,19 +214,14 @@ internal static class QuestLoader
         _ => throw new InvalidOperationException($"Quest '{quest}' in '{path}' has shape '{shape}'; expected hex or circle.")
     };
 
-    /// <summary>A reveal name (the camelCase <see cref="QuestReveal"/> member, any case) to the mode; null is the default.</summary>
-    internal static QuestReveal ReadReveal(string? reveal, string quest, string path)
-    {
-        if (reveal == null) return QuestReveal.Unlocked;
-        if (Enum.TryParse<QuestReveal>(reveal, true, out var mode) && Enum.IsDefined(mode) && !int.TryParse(reveal, out _))
-            return mode;
-        throw new InvalidOperationException(
-            $"Quest '{quest}' in '{path}' has reveal '{reveal}'; expected {string.Join(", ", RevealNames)}.");
-    }
+    /// <summary>The JSON names of every reveal mode, in declaration order (camelCase).</summary>
+    internal static IReadOnlyList<string> RevealNames { get; } = CamelNames<QuestReveal>();
 
-    /// <summary>The JSON names of every reveal mode, in declaration order.</summary>
-    internal static IReadOnlyList<string> RevealNames { get; } =
-        [.. Enum.GetNames<QuestReveal>().Select(n => char.ToLowerInvariant(n[0]) + n[1..])];
+    /// <summary>The JSON names of every unlock mode, in declaration order (camelCase).</summary>
+    internal static IReadOnlyList<string> UnlockNames { get; } = CamelNames<QuestUnlock>();
+
+    private static string[] CamelNames<T>() where T : struct, Enum =>
+        [.. Enum.GetNames<T>().Select(n => char.ToLowerInvariant(n[0]) + n[1..])];
 
     private static Vector2? ReadVector(float[]? values, string field, string path)
     {

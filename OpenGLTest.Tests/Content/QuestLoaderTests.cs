@@ -40,11 +40,18 @@ public class QuestLoaderTests
         { "bad type", [Quest("a", null, new QuestRequirementDefinition { Type = "dance", Item = "stone" })] },
         { "bad reveal", [Revealing(Quest("a", null, Break("stone")), "sometimes")] },
         { "numeric reveal", [Revealing(Quest("a", null, Break("stone")), "1")] },
+        { "bad unlock", [Unlocking(Quest("a", ["b"], Break("stone")), "sometimes"), Quest("b", null, Break("stone"))] },
     };
 
     private static QuestDefinition Revealing(QuestDefinition quest, string reveal)
     {
         quest.Reveal = reveal;
+        return quest;
+    }
+
+    private static QuestDefinition Unlocking(QuestDefinition quest, string unlock)
+    {
+        quest.Unlock = unlock;
         return quest;
     }
 

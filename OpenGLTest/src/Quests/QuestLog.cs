@@ -11,8 +11,8 @@ namespace VoxelEngine.Quests;
 /// One player's quest progress against a <see cref="QuestBook"/>: which quests are complete and how far
 /// each requirement of the rest has come. The rules:
 /// <list type="bullet">
-/// <item>a quest is unlocked once every parent is complete (a root always is), and only an unlocked quest
-/// makes progress or completes;</item>
+/// <item>a quest is unlocked by its <see cref="QuestType.Unlock"/> mode (every parent complete by default, any one,
+/// or always; a root always is), and only an unlocked quest makes progress or completes;</item>
 /// <item>a quest shows in the book once complete or unlocked, or earlier as a locked preview when its
 /// <see cref="QuestType.Reveal"/> mode says so (worked out from what its parents show and have done);</item>
 /// <item>an <c>obtain</c> requirement reads the inventory only when an item is gained
@@ -49,13 +49,16 @@ public sealed class QuestLog
 
     public bool IsComplete(QuestType quest) => _complete[quest.Index];
 
-    /// <summary>Whether every parent is complete, so the quest shows and makes progress.</summary>
-    public bool IsUnlocked(QuestType quest)
+    /// <summary>Whether the quest is unlocked, so it shows its details and makes progress: by its
+    /// <see cref="QuestType.Unlock"/> mode, once every parent is done (the default), once any one is, or always; a root
+    /// always is.</summary>
+    public bool IsUnlocked(QuestType quest) => quest.Unlock switch
     {
-        foreach (var parent in quest.Parents)
-            if (!_complete[parent]) return false;
-        return true;
-    }
+        _ when quest.Parents.Count == 0 => true,
+        QuestUnlock.Always => true,
+        QuestUnlock.AnyParentDone => quest.Parents.Any(p => _complete[p]),
+        _ => quest.Parents.All(p => _complete[p]),
+    };
 
     /// <summary>Whether the quest book draws the quest: complete, unlocked, or revealed early as a locked preview.</summary>
     public bool IsVisible(QuestType quest) => Shown(quest.Index);

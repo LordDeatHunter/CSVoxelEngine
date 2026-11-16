@@ -4,6 +4,7 @@
   "icon": "torch",
   "pos": [-2, -5],
   "parents": ["coal"],
+  "unlock": "anyParentDone",
   "requirements": [
     { "type": "craft", "item": "torch", "count": 8 },
     { "type": "place", "block": "torch", "count": 4 }

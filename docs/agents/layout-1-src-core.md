@@ -367,6 +367,7 @@ OpenGLTest/
         QuestShape.cs          # Hex / Circle node frame
         QuestLabel.cs          # one compiled quest book label: text, position, size, color
         QuestLabelSize.cs, QuestLabelColor.cs # a label's size (small/medium/large) and color names
+        QuestUnlock.cs         # when a quest unlocks (all parents done, any parent done, always)
         QuestReveal.cs         # when a quest shows as a locked preview before it unlocks (unlocked, always, a parent or
                                #   all parents shown, a parent done, a parent done with all shown)
       StatusEffects/           # status effects (MG-4b): the compiled effect, its block actions, loader and registry
