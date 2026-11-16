@@ -461,14 +461,12 @@ internal sealed class StationPasses : IDisposable
     private const float OreRowBackShift = 0.27f;
     private const float AnvilTopY = 15f / 16f;
     private const float AnvilPieceSize = 0.36f;
-    private const float AnvilPieceShrinkPerHit = 0.12f;
     // Radians each piece of an anvil's metal stack turns against the one below, so the pile reads as separate pieces
     private const float AnvilStackTwist = 0.18f;
 
     /// <summary>
     /// Draws the iron works' props: the ore and fuel standing in each bloomery's shaft (and, once a run is done, its
-    /// blooms and slag, in the ore row), and the bloom lying on each anvil, smaller with every hammer hit, or the metal
-    /// stacked on it, one piece per unit. Nothing
+    /// blooms, in the ore row), and the metal stacked on each anvil, one piece per unit. Nothing
     /// is drawn for the anvil or the shaft themselves: they are the block's own model.
     /// </summary>
     internal void RenderSmithing(Camera camera, SmithingStations smithing)
@@ -493,28 +491,13 @@ internal sealed class StationPasses : IDisposable
             DrawRow(state.FuelItemId, state.Fuel, rowBase, along, yaw, light, viewProj, ref atlasBound);
             var oreRow = rowBase - back * OreRowBackShift;
             DrawRow(state.Profile.OreId, state.Ore, oreRow, along, yaw, light, viewProj, ref atlasBound);
-            // The output waits where the ore stood, blooms first
+            // The output waits where the ore stood
             DrawRow(state.Profile.BloomId, state.Blooms, oreRow, along, yaw, light, viewProj, ref atlasBound);
-            DrawRow(state.Profile.SlagId, state.Slag, oreRow - back * 0.1f, along, yaw, light, viewProj, ref atlasBound);
         }
 
         foreach (var (cell, state) in smithing.Anvils.View())
-        {
             if (state.MetalCount > 0)
-            {
                 DrawAnvilStack(cell, state.MetalId, state.MetalCount, viewProj, ref atlasBound);
-                continue;
-            }
-            if (!state.HasPiece || BindStationMesh(state.Profile.InputId, ref atlasBound) is not { } piece) continue;
-
-            var fraction = MathF.Max(0.3f, 1f - state.Hits * AnvilPieceShrinkPerHit);
-            var size = AnvilPieceSize * fraction;
-            var placed = Matrix4x4.CreateScale(size)
-                         * SpritePose.LyingFaceUp(0f)
-                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, AnvilTopY + SpritePose.RestingLift(size), 0.5f));
-            _owner.SetDrawUniforms(placed, placed * viewProj, 1f, _owner.LightAt(cell + new Vector3(0.5f, 1.2f, 0.5f)));
-            piece.Render();
-        }
     }
 
     // A metal stack on an anvil: one face-up piece per unit, each resting on the one below and turned a little against

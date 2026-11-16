@@ -1,6 +1,6 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
-using VoxelEngine.Content.Stations;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 using VoxelEngine.Networking;
@@ -11,8 +11,8 @@ using Xunit;
 namespace VoxelEngine.Tests.Simulation.Smithing;
 
 /// <summary>
-/// The bloomery's rules: what it takes and in what order, how a run turns ore into a bloom or burns it to slag
-/// depending on the heat the bellows keep, how the bellows reach it, what survives a save and the wire, and the
+/// The bloomery's rules: what it takes and in what order, how a run turns ore into blooms at any heat from the band up
+/// and runs back under it, how a bellows against a tuyere heats it, what survives a save and the wire, and the
 /// integrity sweep. The run is driven the way a player drives it: heat is held where the test wants it each step.
 /// </summary>
 public sealed class BloomeryManagerTests
@@ -27,7 +27,10 @@ public sealed class BloomeryManagerTests
 
     private static ushort OreId => Bloomery.Bloomery!.OreId;
 
-    private static float Mid => (BloomeryConfig.BandMin + BloomeryConfig.BandMax) * 0.5f;
+    private static float Good => (BloomeryConfig.BandMin + 1f) * 0.5f;
+
+    // A fall that works the bellows: a jump on the spot
+    private const float JumpDrop = 1.1f;
 
     private static (ChunkManager Manager, BloomeryManager Bloomeries, DropManager Drops) Built(int facing = 0)
     {
@@ -52,6 +55,21 @@ public sealed class BloomeryManagerTests
         {
             state.Heat = heat;
             BloomeryManager.Tick(state, Step);
+        }
+    }
+
+    // Every cell around the volume (one ring out on the sides, any height in it) and whether a bellows there works it
+    private static IEnumerable<((int X, int Y, int Z) Cell, bool Works)> Ring(int facing)
+    {
+        var size = Bloomery.MultiblockSize;
+        for (var dx = -1; dx <= size; dx++)
+        for (var dy = 0; dy < size; dy++)
+        for (var dz = -1; dz <= size; dz++)
+        {
+            var inside = dx >= 0 && dx < size && dz >= 0 && dz < size;
+            if (inside) continue;
+            var cell = ((int)Anchor.X + dx, (int)Anchor.Y + dy, (int)Anchor.Z + dz);
+            yield return (cell, Bloomery.Bloomery!.IsTuyere((dx, dy, dz), facing, size));
         }
     }
 
@@ -92,63 +110,64 @@ public sealed class BloomeryManagerTests
     }
 
     [Fact]
-    public void AFireKeptInTheBandTurnsEveryOreUnitIntoABloom()
+    public void AFireKeptAtTheBandTurnsEveryOreUnitIntoABloom()
     {
         var (_, bloomeries, _) = Built();
         var state = Loaded(bloomeries, ore: 2, fuel: 2);
         Assert.True(bloomeries.Ignite(Anchor));
 
-        Run(state, BloomeryConfig.SecondsPerOre * 2 + 1f, Mid);
+        Run(state, BloomeryConfig.SecondsPerOre * 2 + 1f, Good);
 
         Assert.Equal(0, state.Ore);
         Assert.Equal(2, state.Blooms);
-        Assert.Equal(0, state.Slag);
     }
 
     [Fact]
-    public void AColdFireStallsTheSmeltAndLosesNothing()
+    public void AMaxedFireStillYieldsBloomsAndBurnsNoFasterThanACalmOne()
     {
         var (_, bloomeries, _) = Built();
-        var state = Loaded(bloomeries, ore: 1, fuel: 2);
+        var maxed = Loaded(bloomeries, ore: 2, fuel: 4);
         Assert.True(bloomeries.Ignite(Anchor));
+        var calm = new BloomeryManager.BloomeryState
+            { Profile = maxed.Profile, Lit = true, Ore = 2, BurnLeft = maxed.BurnLeft, FuelSeconds = maxed.FuelSeconds, Fuel = maxed.Fuel };
 
-        Run(state, BloomeryConfig.SecondsPerOre * 3, BloomeryConfig.BandMin - 0.2f);
+        Run(maxed, BloomeryConfig.SecondsPerOre * 2 + 1f, 1f);
+        Run(calm, BloomeryConfig.SecondsPerOre * 2 + 1f, Good);
 
-        Assert.Equal(1, state.Ore);
-        Assert.Equal(0f, state.UnitProgress);
-        Assert.Equal(0, state.Blooms + state.Slag);
+        Assert.Equal(2, maxed.Blooms);
+        Assert.Equal(calm.Blooms, maxed.Blooms);
+        Assert.Equal(calm.Fuel, maxed.Fuel);
+        Assert.Equal(calm.BurnLeft, maxed.BurnLeft, 3);
     }
 
     [Fact]
-    public void AnOverheatedUnitBurnsToSlagInsteadOfABloom()
+    public void AColdFireRunsTheUnitBackFasterTheColderAndLosesNoOre()
     {
         var (_, bloomeries, _) = Built();
-        var state = Loaded(bloomeries, ore: 1, fuel: 4);
+        var cool = Loaded(bloomeries, ore: 1, fuel: 4);
         Assert.True(bloomeries.Ignite(Anchor));
+        var cold = new BloomeryManager.BloomeryState
+            { Profile = cool.Profile, Lit = true, Ore = 1, BurnLeft = 1000f };
 
-        Run(state, BloomeryConfig.SecondsPerOre + 1f, 1f);
+        // Both half smelted, then left under the band
+        Run(cool, BloomeryConfig.SecondsPerOre * 0.5f, Good);
+        cold.UnitProgress = cool.UnitProgress;
+        var halfway = cool.UnitProgress;
+        Run(cool, 1f, BloomeryConfig.BandMin * 0.8f);
+        Run(cold, 1f, BloomeryConfig.BandMin * 0.2f);
 
-        Assert.Equal(0, state.Ore);
-        Assert.Equal(0, state.Blooms);
-        Assert.Equal(BloomeryConfig.SlagPerBurntUnit, state.Slag);
+        Assert.True(cool.UnitProgress < halfway);
+        Assert.True(cold.UnitProgress < cool.UnitProgress);
+
+        // Long enough cold and the unit is back at the start, never under it, its ore still there
+        Run(cool, BloomeryConfig.SecondsPerOre * 10f, 0f);
+        Assert.Equal(0f, cool.UnitProgress);
+        Assert.Equal(1, cool.Ore);
+        Assert.Equal(0, cool.Blooms);
     }
 
     [Fact]
-    public void ABriefOverheatDoesNotBurnTheUnit()
-    {
-        var (_, bloomeries, _) = Built();
-        var state = Loaded(bloomeries, ore: 1, fuel: 2);
-        Assert.True(bloomeries.Ignite(Anchor));
-
-        Run(state, BloomeryConfig.BurnSeconds * 0.5f, 1f);
-        Run(state, BloomeryConfig.SecondsPerOre, Mid);
-
-        Assert.Equal(1, state.Blooms);
-        Assert.Equal(0, state.Slag);
-    }
-
-    [Fact]
-    public void WithoutPumpsTheHeatDecaysAndWhenTheFuelIsGoneTheFireGoesOutCold()
+    public void WithoutLandingsTheHeatDecaysAndWhenTheFuelIsGoneTheFireGoesOutCold()
     {
         var (_, bloomeries, _) = Built();
         var state = Loaded(bloomeries, ore: 1, fuel: 1);
@@ -164,28 +183,12 @@ public sealed class BloomeryManagerTests
     }
 
     [Fact]
-    public void AnOverheatedFireEatsItsFuelFasterThanACalmOne()
-    {
-        var (_, bloomeries, _) = Built();
-        var calm = Loaded(bloomeries, ore: 1, fuel: 4);
-        Assert.True(bloomeries.Ignite(Anchor));
-        var hot = new BloomeryManager.BloomeryState { Profile = calm.Profile, Lit = true, Ore = 1, BurnLeft = calm.BurnLeft };
-
-        var calmBefore = calm.BurnLeft;
-        var hotBefore = hot.BurnLeft;
-        Run(calm, 4f, Mid);
-        Run(hot, 4f, 1f);
-
-        Assert.True(hotBefore - hot.BurnLeft > calmBefore - calm.BurnLeft);
-    }
-
-    [Fact]
     public void NewOreWaitsUntilTheLastRunsOutputIsCollected()
     {
         var (_, bloomeries, _) = Built();
         var state = Loaded(bloomeries, ore: 1, fuel: 2);
         Assert.True(bloomeries.Ignite(Anchor));
-        Run(state, BloomeryConfig.SecondsPerOre + 1f, Mid);
+        Run(state, BloomeryConfig.SecondsPerOre + 1f, Good);
         Assert.Equal(1, state.Blooms);
 
         Assert.False(bloomeries.TryAddOre(Anchor, OreId));
@@ -198,28 +201,71 @@ public sealed class BloomeryManagerTests
     }
 
     [Fact]
-    public void ABellowsPumpHeatsOnlyALitBloomeryInRangeAndNotFasterThanItsCooldown()
+    public void OnlyABellowsAgainstATuyereHeatsTheBloomeryAndNeverFasterThanItsCooldown()
     {
         var (_, bloomeries, _) = Built();
         var state = Loaded(bloomeries, ore: 1, fuel: 2);
-        var center = Anchor + new Vector3(1f, 1f, 1f);
+        var ring = Ring(0).ToList();
+        var tuyere = ring.First(r => r.Works).Cell;
+        Assert.Contains(ring, r => !r.Works);
 
-        Assert.False(bloomeries.Pump(center));
+        // Unlit: nothing to heat
+        Assert.False(bloomeries.PressBellows(tuyere, JumpDrop));
 
         Assert.True(bloomeries.Ignite(Anchor));
         state.Heat = 0.3f;
-        Assert.False(bloomeries.Pump(center + new Vector3(BloomeryConfig.PumpRangeBlocks + 1f, 0f, 0f)));
+        foreach (var (cell, _) in ring.Where(r => !r.Works))
+            Assert.False(bloomeries.PressBellows(cell, JumpDrop));
         Assert.Equal(0.3f, state.Heat);
 
-        Assert.True(bloomeries.Pump(center + new Vector3(1f, 0f, 0f)));
+        Assert.True(bloomeries.PressBellows(tuyere, JumpDrop));
         Assert.True(state.Heat > 0.3f);
 
         var pumped = state.Heat;
-        Assert.False(bloomeries.Pump(center));
+        Assert.False(bloomeries.PressBellows(tuyere, JumpDrop));
         Assert.Equal(pumped, state.Heat);
 
         BloomeryManager.Tick(state, BloomeryConfig.PumpCooldownSeconds + 0.01f);
-        Assert.True(bloomeries.Pump(center));
+        Assert.True(bloomeries.PressBellows(tuyere, JumpDrop));
+    }
+
+    [Fact]
+    public void AFartherFallOnTheBellowsHeatsMoreAndASettleNotAtAll()
+    {
+        var (_, bloomeries, _) = Built();
+        var state = Loaded(bloomeries, ore: 1, fuel: 2);
+        Assert.True(bloomeries.Ignite(Anchor));
+        var tuyere = Ring(0).First(r => r.Works).Cell;
+
+        state.Heat = 0.2f;
+        Assert.False(bloomeries.PressBellows(tuyere, BloomeryConfig.BellowsMinFallBlocks * 0.5f));
+        Assert.Equal(0.2f, state.Heat);
+
+        Assert.True(bloomeries.PressBellows(tuyere, JumpDrop));
+        var fromJump = state.Heat - 0.2f;
+        state.Heat = 0.2f;
+        state.PumpCooldown = 0f;
+        Assert.True(bloomeries.PressBellows(tuyere, JumpDrop + 3f));
+        Assert.True(state.Heat - 0.2f > fromJump);
+    }
+
+    [Fact]
+    public void TheTuyeresTurnWithTheStructure()
+    {
+        // Each facing keeps the same number of tuyeres, and at least one of them moves to another cell
+        var north = Ring(0).Where(r => r.Works).Select(r => r.Cell).ToHashSet();
+        Assert.NotEmpty(north);
+        for (var facing = 1; facing < 4; facing++)
+        {
+            var turned = Ring(facing).Where(r => r.Works).Select(r => r.Cell).ToHashSet();
+            Assert.Equal(north.Count, turned.Count);
+            Assert.False(turned.SetEquals(north), $"facing {facing} should move the tuyeres");
+
+            var (_, bloomeries, _) = Built(facing);
+            Loaded(bloomeries, ore: 1, fuel: 1);
+            Assert.True(bloomeries.Ignite(Anchor));
+            Assert.True(bloomeries.PressBellows(turned.First(), JumpDrop));
+        }
     }
 
     [Fact]
@@ -228,9 +274,8 @@ public sealed class BloomeryManagerTests
         var (_, bloomeries, _) = Built(facing: 2);
         var state = Loaded(bloomeries, ore: 3, fuel: 2);
         Assert.True(bloomeries.Ignite(Anchor));
-        Run(state, 5f, Mid);
+        Run(state, 5f, Good);
         state.Blooms = 1;
-        state.Slag = 1;
 
         var saved = new BloomeryManager();
         Assert.Equal(0, saved.Restore(bloomeries.Capture()));
@@ -257,7 +302,6 @@ public sealed class BloomeryManagerTests
         Assert.Equal(a.Heat, b.Heat);
         Assert.Equal(a.UnitProgress, b.UnitProgress);
         Assert.Equal(a.Blooms, b.Blooms);
-        Assert.Equal(a.Slag, b.Slag);
     }
 
     [Fact]

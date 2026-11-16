@@ -3,6 +3,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.StatusEffects;
@@ -444,7 +445,8 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
     /// <summary>An <c>effect</c> step: the effect name is validated here rather than at parse time, so
     /// parsing stays registry-free; an unknown name warns and the step is skipped.</summary>
     // A bloomery at the step's anchor, built the way the converter builds one (a 2x2x2 of its structure, converted
-    // in place) and loaded with the step's ore and fuel; a lit one burns at the step's heat
+    // in place) and loaded with the step's ore and fuel; a lit one burns at the step's heat, and with "bellows" a
+    // bellows stands against each tuyere
     private void BuildBloomery(VisualStep step)
     {
         var type = ContentRegistry.RequireBlock("bloomery");
@@ -459,6 +461,8 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
             chunk.PlaceBlockAt(cell, type.MultiblockSourceId, chunks, 0);
         }
         Multiblock.Convert(chunks, anchor, step.State & 3, type, touched);
+        if (step.Bellows)
+            PlaceBellows(chunks, anchor, step.State & 3, type, touched);
         foreach (var chunkPos in touched)
             if (chunks.Chunks.TryGetValue(chunkPos, out var chunk))
                 chunk.RemeshAfterBatchEdit(chunks);
@@ -474,7 +478,25 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
             bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z)!.Heat = step.Heat;
     }
 
-    // An anvil at the step's cell, with a bloom on it that has taken the step's hits, or the step's metal stacked on it
+    // A bellows on every cell where a tuyere of the bloomery at anchor (turned to facing) works it
+    private void PlaceBellows(ChunkManager chunks, Vector3 anchor, int facing, BlockType bloomery, HashSet<Vector3> touched)
+    {
+        var bellows = ContentRegistry.RequireBlock("bellows");
+        var size = bloomery.MultiblockSize;
+        for (var dx = -1; dx <= size; dx++)
+        for (var dy = 0; dy < size; dy++)
+        for (var dz = -1; dz <= size; dz++)
+        {
+            if (!bloomery.Bloomery!.IsTuyere((dx, dy, dz), facing, size)) continue;
+            var cell = anchor + new Vector3(dx, dy, dz);
+            var chunk = chunks.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z)
+                ?? throw new InvalidOperationException($"Step {_step + 1} builds at {cell}, which is not in a loaded chunk.");
+            chunk.PlaceBlockAt(cell, bellows.Id, chunks, 0);
+            touched.Add(chunk.Position);
+        }
+    }
+
+    // An anvil at the step's cell with the step's metal stacked on it, and the step's recipe picked with its hits
     private void BuildAnvil(VisualStep step)
     {
         var type = ContentRegistry.RequireBlock("anvil");
@@ -485,18 +507,18 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
         chunk.PlaceBlockAt(cell, type.Id, chunks, 0);
         var anvils = world.Smithing.Anvils;
         anvils.Ensure(cell, type.Id);
-        if (!step.On) return;
-        if (step.Metal != null)
-        {
-            var metal = ContentRegistry.RequireItem(step.Metal).Id;
-            for (var i = 0; i < step.Count; i++)
-                if (!anvils.TryStack(cell, metal))
-                    throw new InvalidOperationException(
-                        $"Step {_step + 1} stacks {step.Count} {step.Metal}, which is not a forge metal or more than its stack holds.");
-            return;
-        }
-        anvils.TryPlace(cell, type.Anvil!.InputId);
-        anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!.Hits = Math.Clamp(step.Hits, 0, type.Anvil.Hits - 1);
+        if (step.Metal == null) return;
+        var metal = ContentRegistry.RequireItem(step.Metal).Id;
+        for (var i = 0; i < step.Count; i++)
+            if (!anvils.TryStack(cell, metal))
+                throw new InvalidOperationException(
+                    $"Step {_step + 1} stacks {step.Count} {step.Metal}, which is not a forge metal or more than its stack holds.");
+        if (step.Select == null) return;
+        if (!anvils.TrySelect(cell, ContentRegistry.RequireItem(step.Select).Id))
+            throw new InvalidOperationException(
+                $"Step {_step + 1} picks {step.Select}, which no forge recipe offers for {step.Count} {step.Metal}.");
+        var state = anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!;
+        state.Hits = Math.Clamp(step.Hits, 0, state.Selected!.Hits - 1);
     }
 
     private void ApplyEffect(VisualStep step)

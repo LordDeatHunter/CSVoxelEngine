@@ -137,15 +137,17 @@ public abstract class Mob
     /// landing also bills its fall (<see cref="MobFallDamage"/> over <see cref="SafeFallBlocks"/>)
     /// unless the feet were <paramref name="inWater"/>; only a mob's own physics lands, which runs in
     /// the authoritative simulation alone, so a client's mirror never takes fall damage. A flyer
-    /// (<see cref="Flies"/>) never falls, so it never bills one either.
+    /// (<see cref="Flies"/>) never falls, so it never bills one either. A dry walker's landing is also kept for a
+    /// bellows it may have landed on (<see cref="TryTakeBellowsLanding"/>).
     /// </summary>
     protected void NoteLanding(float impactSpeed, float gravity, bool inWater = false)
     {
         if (!inWater && !Flies)
         {
-            var damage = MobFallDamage.Damage(LandingDust.FallFromImpactSpeed(impactSpeed, gravity),
-                SafeFallBlocks, MaxHealth);
+            var fall = LandingDust.FallFromImpactSpeed(impactSpeed, gravity);
+            var damage = MobFallDamage.Damage(fall, SafeFallBlocks, MaxHealth);
             if (damage > 0) TakeDamage(damage);
+            _bellowsFall = MathF.Max(_bellowsFall, fall);
         }
 
         if (impactSpeed <= _landingSpeed) return;
@@ -164,6 +166,21 @@ public abstract class Mob
         fallBlocks = LandingDust.FallFromImpactSpeed(_landingSpeed, _landingGravity);
         _landingSpeed = 0f;
         return impactSpeed > 0f;
+    }
+
+    // The fall of the hardest dry landing since the last bellows take; kept apart from the dust's, which a headless
+    // server never takes
+    private float _bellowsFall;
+
+    /// <summary>
+    /// True once per dry, non-flying landing noted since the last take, with the height the body fell: what the
+    /// authoritative world reads to work a bellows the mob landed on (<see cref="World.PressBellows"/>).
+    /// </summary>
+    public bool TryTakeBellowsLanding(out float fallBlocks)
+    {
+        fallBlocks = _bellowsFall;
+        _bellowsFall = 0f;
+        return fallBlocks > 0f;
     }
 
     private float _strideWalked;

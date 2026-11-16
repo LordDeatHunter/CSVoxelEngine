@@ -1,56 +1,48 @@
 namespace VoxelEngine.Config;
 
 /// <summary>
-/// Iron smelting tuning: the bloomery's heat model (<see cref="VoxelEngine.Simulation.Smithing.BloomeryRules"/>),
-/// its bellows (the player's jumps) and the anvil the bloom is hammered on
-/// (<see cref="VoxelEngine.Simulation.Smithing.AnvilManager"/>). What a particular bloomery or anvil holds comes
-/// from its block JSON (<c>bloomery</c> and <c>anvil</c> objects); these numbers are shared by all of them.
+/// Iron smelting tuning: the bloomery's heat model (<see cref="VoxelEngine.Simulation.Smithing.BloomeryRules"/>), its
+/// bellows (a block a body lands on) and the anvil the blooms are forged on
+/// (<see cref="VoxelEngine.Simulation.Smithing.AnvilManager"/>). What a particular bloomery holds comes from its block
+/// JSON (<c>bloomery</c> object) and what a forge takes from its recipe; these numbers are shared by all of them.
 /// </summary>
 public static class BloomeryConfig
 {
     /// <summary>Heat (0..1) a bloomery starts at when a strike lights it.</summary>
     public const float IgnitionHeat = 0.5f;
 
-    /// <summary>Heat lost per second while lit: the player has to keep the bellows going.</summary>
+    /// <summary>Heat lost per second while lit: somebody has to keep landing on the bellows.</summary>
     public const float HeatDecayPerSecond = 0.05f;
 
-    /// <summary>Heat one bellows pump (one jump beside the bloomery) adds, up to 1.</summary>
-    public const float PumpHeat = 0.12f;
+    /// <summary>Heat a landing on the bellows adds before its fall counts: what a jump on the spot already gives.</summary>
+    public const float BellowsBaseHeat = 0.06f;
 
-    /// <summary>Shortest gap between two pumps that both count, so a held jump key or a lag burst never
-    /// pumps faster than a person can jump.</summary>
+    /// <summary>Heat each block of the landing's fall adds on top of <see cref="BellowsBaseHeat"/>.</summary>
+    public const float BellowsHeatPerBlock = 0.05f;
+
+    /// <summary>Most heat one landing adds, however far the body fell.</summary>
+    public const float BellowsMaxHeat = 0.35f;
+
+    /// <summary>Shortest fall (blocks) that works the bellows, so stepping on it or settling onto it does not; a jump
+    /// on the spot drops more than this.</summary>
+    public const float BellowsMinFallBlocks = 0.4f;
+
+    /// <summary>Shortest gap between two landings that both count on one bloomery, so a lag burst or a crowd of mobs
+    /// never pumps faster than a body can jump.</summary>
     public const float PumpCooldownSeconds = 0.35f;
 
-    /// <summary>How far from a bloomery's center (in blocks) a jump still works its bellows.</summary>
-    public const float PumpRangeBlocks = 3.5f;
-
-    /// <summary>Heat below which the ore does not smelt: the fire is too cold, progress stalls.</summary>
+    /// <summary>Heat below which the ore does not smelt: the fire is too cold and the unit's progress runs back.</summary>
     public const float BandMin = 0.35f;
 
-    /// <summary>Heat above which the ore overheats: it burns instead of forming iron, and the fuel burns faster.</summary>
-    public const float BandMax = 0.8f;
+    /// <summary>Seconds of progress a cold fire takes back per second when it is out entirely; a fire just under
+    /// <see cref="BandMin"/> takes back almost nothing, so the colder, the faster the unit unsmelts.</summary>
+    public const float ColdReverseRate = 1.5f;
 
-    /// <summary>Seconds one ore unit smelts for while the heat sits inside the band.</summary>
+    /// <summary>Seconds one ore unit smelts for while the heat is at or over the band.</summary>
     public const float SecondsPerOre = 12f;
 
-    /// <summary>Seconds of overheating during one unit's smelt after which it burns to slag instead of
-    /// becoming a bloom.</summary>
-    public const float BurnSeconds = 3f;
-
-    /// <summary>How much faster the fuel burns while the heat is above the band.</summary>
-    public const float OverheatFuelFactor = 2f;
-
-    /// <summary>Slag one burnt ore unit leaves.</summary>
-    public const int SlagPerBurntUnit = 1;
-
-    /// <summary>Slag one bloom gives up when it is hammered into wrought iron.</summary>
-    public const int SlagPerBloom = 1;
-
-    /// <summary>Wrought iron one bloom hammers into.</summary>
-    public const int IronPerBloom = 1;
-
-    /// <summary>Most blooms (or slag) a saved bloomery may claim to hold: its output never exceeds its ore cap, so
-    /// this only bounds a corrupt save.</summary>
+    /// <summary>Most blooms a saved bloomery may claim to hold: its output never exceeds its ore cap, so this only
+    /// bounds a corrupt save.</summary>
     public const int MaxStoredOutput = 64;
 
     /// <summary>Slack in seconds a server allows on the anvil's hit gap, for network jitter.</summary>

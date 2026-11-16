@@ -1,8 +1,10 @@
 {
-  // A sword blade, drawn out of four wrought iron on the anvil; hilted in recipes/iron_sword.json.
-  // Forged with a smithing hammer from wrought iron stacked on an anvil (see AnvilManager).
-  "metal": "item/wrought_iron",
+  // A sword blade, drawn out of four blooms on the anvil; hilted in recipes/iron_sword.json.
+  // Picked on an anvil holding blooms, then hammered out with a smithing hammer (see AnvilManager).
+  "metal": "item/bloom",
   "metalCount": 4,
   "result": "item/iron_sword_head",
-  "count": 1
+  "count": 1,
+  "hits": 6,
+  "byproduct": { "item": "item/slag", "count": 4 }
 }

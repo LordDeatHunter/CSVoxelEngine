@@ -3,5 +3,6 @@
   "metal": "item/refined_vulcanite",
   "metalCount": 3,
   "result": "item/vulcanite_axe_head",
-  "count": 1
+  "count": 1,
+  "hits": 5
 }

@@ -391,8 +391,13 @@ public sealed record BlockType
     /// bloomery. Only ever set on a <see cref="BlockRenderer.Multiblock"/> block.</summary>
     public BloomeryProfile? Bloomery { get; init; }
 
-    /// <summary>The anvil profile of this block (its <c>anvil</c> object), or null when it is not an anvil.</summary>
-    public AnvilProfile? Anvil { get; init; }
+    /// <summary>Whether this block is an anvil (its <c>anvil</c> flag): forge metal stacks on it and a smithing hammer
+    /// forges it (<see cref="Simulation.Smithing.AnvilManager"/>).</summary>
+    public bool IsAnvil { get; init; }
+
+    /// <summary>Whether this block is a bloomery's bellows (its <c>bellows</c> flag): a body landing on it beside a
+    /// lit bloomery's tuyere heats that bloomery (<see cref="Simulation.Smithing.BloomeryManager.PressBellows"/>).</summary>
+    public bool IsBellows { get; init; }
 
     /// <summary>The chest profile of this block (its <c>chest</c> object), or null when it is not a chest. A chest is a
     /// block entity: it holds stacks, spills them when it breaks and, for a ruin chest, rolls its loot on first use.</summary>

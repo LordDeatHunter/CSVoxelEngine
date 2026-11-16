@@ -114,7 +114,6 @@ public class World
     private readonly KilnManager _kilns = new();
     private readonly SmithingStations _smithing = new();
     private readonly TowerManager _towers;
-    private int _lastJumpCount;
     private readonly CastingManager _casting = new();
     private readonly FireParticleSystem _fire = new();
     // Embers and smoke over exposed lava: a separately tuned instance so a lava lake never
@@ -1051,9 +1050,14 @@ public class World
     /// <summary>Whether this world is a multiplayer client's mirror (the server decides outcomes).</summary>
     internal bool IsClientMode => _clientMode;
 
-    /// <summary>One bellows pump from a body at <paramref name="position"/> (a jump): heats every lit bloomery in
-    /// range. The server calls it for each player's jump; singleplayer calls it itself. A client never does.</summary>
-    public bool PumpBellows(Vector3 position) => !_clientMode && _smithing.Bloomeries.Pump(position);
+    /// <summary>A body whose feet are at <paramref name="feet"/> (footprint <paramref name="halfWidth"/> to each side)
+    /// landed after a fall of <paramref name="fallBlocks"/>: when it came down on a bellows
+    /// (<see cref="BellowsProbe"/>), the lit bloomeries with a tuyere against it heat up. The local player's landings
+    /// come from <see cref="LocalPlayer"/>, the mobs' from <see cref="Update"/> and a server's players' from their
+    /// accepted states. A client never presses.</summary>
+    public bool PressBellows(Vector3 feet, float halfWidth, float fallBlocks) =>
+        !_clientMode && BellowsProbe.TryFind(_chunkManager, feet, halfWidth, out var cell)
+        && _smithing.Bloomeries.PressBellows(cell, fallBlocks);
 
     /// <summary>One hammer hit on the anvil at <paramref name="cell"/> (the server replaying a
     /// <see cref="NetIntentKind.Hammer"/> intent): the hit counts when a piece lies on it and its gap has run down to
@@ -1300,13 +1304,10 @@ public class World
         _waystones.Update(_chunkManager);
         _kilns.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
         _smithing.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
-        // Every jump of the local body works a bellows (a server pumps per player instead, see PumpBellows)
-        if (Camera.JumpCount != _lastJumpCount)
-        {
-            _lastJumpCount = Camera.JumpCount;
-            if (!_serverMode)
-                _smithing.Bloomeries.Pump(Camera.Position);
-        }
+        // A mob landing on a bellows works it like a player does (see PressBellows)
+        foreach (var mob in _mobs)
+            if (mob.TryTakeBellowsLanding(out var fall))
+                PressBellows(mob.Position - new Vector3(0f, mob.BodyHalfHeight, 0f), mob.BodyHalfExtent, fall);
         // A pour bound to a connected player (its PlayerContext) drains that player's crucible; the
         // world's own inventory and camera stand for the local player
         _casting.Update((float)deltaTime, _chunkManager, _dropManager, Inventory,

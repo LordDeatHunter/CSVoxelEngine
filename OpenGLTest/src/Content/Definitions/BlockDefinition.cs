@@ -337,9 +337,13 @@ public sealed class BlockDefinition
     /// <see cref="Kiln"/>.</summary>
     public BloomeryDefinition? Bloomery { get; set; }
 
-    /// <summary>Marks the block as an anvil: a bloom laid on it is hammered into wrought iron. Not legal on a
-    /// multiblock.</summary>
-    public AnvilDefinition? Anvil { get; set; }
+    /// <summary>Marks the block as an anvil: forge metal (blooms, vulcanite) stacks on it and a smithing hammer
+    /// forges the picked recipe out of the stack (<c>recipes/forge/</c>). Only legal on a plain model block.</summary>
+    public bool? Anvil { get; set; }
+
+    /// <summary>Marks the block as a bloomery's bellows: a body landing on it beside one of a lit bloomery's
+    /// tuyeres heats that bloomery, more the farther it fell. Default false.</summary>
+    public bool? Bellows { get; set; }
 
     /// <summary>
     /// Marks <c>texture</c> as a spritesheet of animation frames (the lava). The atlas slices each frame into its
@@ -562,24 +566,9 @@ public sealed class BlockDefinition
         /// <summary>The item a well-smelted unit becomes. Required.</summary>
         public string? Bloom { get; set; }
 
-        /// <summary>The item an overheated unit burns to. Required.</summary>
-        public string? Slag { get; set; }
-    }
-
-    /// <summary>The <c>"anvil"</c> object: <c>{"hits": 3, "input": ..., "result": ..., "slag": ...}</c>.</summary>
-    public sealed class AnvilDefinition
-    {
-        /// <summary>Hammer hits the input takes, 1..32. Default 3.</summary>
-        public int? Hits { get; set; }
-
-        /// <summary>The item laid on the anvil. Required.</summary>
-        public string? Input { get; set; }
-
-        /// <summary>What the hits make of it. Required.</summary>
-        public string? Result { get; set; }
-
-        /// <summary>What the hits squeeze out of it. Required.</summary>
-        public string? Slag { get; set; }
+        /// <summary>The cells, in the volume's authored (north-facing) local space, just outside the structure where a
+        /// bellows works it: each sits against a tuyere, a hole in the bloomery's wall. Required, at least one.</summary>
+        public int[][]? Tuyeres { get; set; }
     }
 
     /// <summary>

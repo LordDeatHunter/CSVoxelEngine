@@ -1,15 +1,16 @@
 {
-  // A stone anvil (six cobblestone, recipes/anvil.json): the block a bloom is hammered on, and the forge wrought iron
-  // stacked on it is worked into parts and armor (recipes/forge/, AnvilManager). Base, waist and a top with a
-  // horn (models/block/anvil.json, tile hand-authored). The body collides with its hitbox boxes.
+  // A stone anvil (six cobblestone, recipes/anvil.json): the forge. Blooms (or vulcanite) stacked on it are worked into
+  // parts and armor: a smithing hammer's right-click picks the recipe, its hits forge it (recipes/forge/, AnvilManager).
+  // Base, waist and a top with a horn (models/block/anvil.json, tile hand-authored). The body collides with its hitbox
+  // boxes.
   "name": "Anvil",
   "model": "block/anvil",
   "hardness": 5,
   "sfx": "hit_rock",
   "requiresTool": true,
   "tools": { "pickaxe": 1 },
-  // Hammering a bloom on it (BloomeryConfig, AnvilManager): three hits at the hammer's own pace.
-  "anvil": { "hits": 3, "input": "item/bloom", "result": "item/wrought_iron", "slag": "item/slag" },
+  // The hits each forge takes are the recipe's own, at the hammer's own pace.
+  "anvil": true,
   "castsAO": false,
   "collidesByHitbox": true,
   "hitbox": [

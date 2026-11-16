@@ -217,29 +217,31 @@ public sealed class StationSaveData
         public float BurnLeft { get; set; }
         public float Heat { get; set; }
         public float UnitProgress { get; set; }
-        public float UnitOverheat { get; set; }
 
         /// <summary>Finished blooms waiting to be collected.</summary>
         public int Blooms { get; set; }
-
-        /// <summary>Slag waiting to be collected.</summary>
-        public int Slag { get; set; }
     }
 
-    /// <summary>One anvil with a piece on it.</summary>
+    /// <summary>One anvil with a stack of forge metal on it.</summary>
     public sealed class AnvilData
     {
         public int[]? Cell { get; set; }
         public string? Block { get; set; }
-        public int Hits { get; set; }
-        public float Cooldown { get; set; }
 
-        /// <summary>The forge metal stacked on the anvil by content name; absent for an anvil holding a piece (a bloom),
-        /// whose <see cref="Hits"/> and <see cref="Cooldown"/> are then what counts.</summary>
+        /// <summary>The forge metal stacked on the anvil, by content name.</summary>
         public string? Metal { get; set; }
 
         /// <summary>How many of <see cref="Metal"/> are stacked.</summary>
         public int Count { get; set; }
+
+        /// <summary>The result of the forge recipe picked for the stack, by content name; absent when none is.</summary>
+        public string? Selected { get; set; }
+
+        /// <summary>Hammer hits the picked recipe has taken.</summary>
+        public int Hits { get; set; }
+
+        /// <summary>Seconds until the next hit counts.</summary>
+        public float Cooldown { get; set; }
     }
 
     /// <summary>One mold cell holding a pour, its recipe named by mold block and material.</summary>

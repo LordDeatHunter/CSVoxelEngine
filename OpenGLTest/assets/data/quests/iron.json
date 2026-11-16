@@ -1,10 +1,10 @@
 {
   "title": "Iron Will",
-  "description": "Smelt iron ore in a bloomery and work the bloom into wrought iron.",
-  "icon": "item/wrought_iron",
+  "description": "Smelt crushed iron in a bloomery, its bellows blowing, and pull out an iron bloom.",
+  "icon": "item/bloom",
   "pos": [-3, 5],
   "parents": ["bronze"],
   "requirements": [
-    { "type": "obtain", "item": "item/wrought_iron" }
+    { "type": "obtain", "item": "item/bloom" }
   ]
 }

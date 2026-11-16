@@ -163,10 +163,10 @@ the other while still being faster together.
   Crusher, sawmill, smeltery, assembler; multi-step recipes with byproducts. The quern is step
   zero; `P-3` is step one.
 - [ ] **`P-59` · Bloomery automation** — P3, M. *(after the bloomery lands; not in its scope)*
-  The bloomery's bellows is worked by the player jumping near it. Replace that with a mechanical
+  The bloomery's bellows block is worked by a body landing on it at a tuyere. Add a mechanical
   bellows (water wheel or an automated pump, see `P-19`) and automated ore/fuel feeding (`P-20`), so
-  a smelt can run unattended. Hook: the `BloomeryManager` pump input, which should take any
-  source of pumps, not only the jump count.
+  a smelt can run unattended. Hook: `BloomeryManager.PressBellows(cell, fall)`, which takes a press
+  from any source.
 - [ ] **`P-22` · Electronics / logic (redstone-ish)** — P2, L.
   Scheduled-tick logic on top of the `FluidManager` pattern: sensors, gates, moving collision
   (pistons).

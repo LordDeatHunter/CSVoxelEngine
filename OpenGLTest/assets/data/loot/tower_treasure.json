@@ -1,9 +1,9 @@
 {
-  // The battle tower's roof chest beside the altar, reachable only once every floor is cleared: wrought iron, two or
+  // The battle tower's roof chest beside the altar, reachable only once every floor is cleared: iron blooms, two or
   // three legendary trinkets, mana draughts and often a modifier scroll.
   "pools": [
     { "rolls": 1, "entries": [ { "table": "tower_supplies" } ] },
-    { "rolls": 1, "entries": [ { "item": "item/wrought_iron", "count": { "min": 3, "max": 6 } } ] },
+    { "rolls": 1, "entries": [ { "item": "item/bloom", "count": { "min": 3, "max": 6 } } ] },
     {
       "rolls": { "min": 2, "max": 3 },
       "entries": [

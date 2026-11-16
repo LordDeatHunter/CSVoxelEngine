@@ -228,7 +228,8 @@ internal sealed class IntentReplay
     /// <summary>
     /// One hammer hit on the anvil the intent names: a smithing hammer in hand, the player's own ray landing on
     /// the anvil's cell, and the anvil's own hit gap run down (the hammer's pace, less jitter slack). The anvil
-    /// manager counts the hit and, on the last, drops the result and slag; the station broadcast carries the rest.
+    /// manager counts the hit and, on the last, drops the picked recipe's result and byproduct; the station broadcast
+    /// carries the rest.
     /// </summary>
     private bool HammerFor(ServerPlayer player, in WorldIntent intent)
     {
@@ -245,14 +246,14 @@ internal sealed class IntentReplay
 
     /// <summary>
     /// A pick from the anvil's recipe list: a smithing hammer in hand, the player's own ray landing on the anvil's cell,
-    /// then the forge itself (<see cref="SmithingStations.Forge"/>), which needs the recipe offered for the stack on the
-    /// anvil and room for its result. The inventory snapshot and the station broadcast carry the outcome.
+    /// then the pick itself (<see cref="SmithingStations.Select"/>), which needs the recipe offered for the stack on the
+    /// anvil. The hammer's hits forge it; the station broadcast carries the outcome.
     /// </summary>
     private bool ForgeFor(ServerPlayer player, in WorldIntent intent)
     {
         if (!Mining.IsHammer(player.Inventory.HeldItem) || !AimsAt(player, intent, out _))
             return false;
-        return _state.World.Smithing.Forge(intent.Cell, intent.Recipe, player.Inventory);
+        return _state.World.Smithing.Select(intent.Cell, intent.Recipe);
     }
 
     private bool PlaceFor(ServerPlayer player, in WorldIntent intent)

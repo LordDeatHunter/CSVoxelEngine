@@ -1,20 +1,18 @@
 using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Recipes;
-using VoxelEngine.Content.Stations;
 using VoxelEngine.Networking;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Smithing;
-using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
 namespace VoxelEngine.Tests.Simulation.Smithing;
 
 /// <summary>
-/// The anvil's rules: it takes only its own input, one piece at a time; a hit needs the gap since the last one to
-/// have run down, the last hit finishes the piece into its result and slag, and a gone block hands the piece back.
-/// It holds either that piece or a stack of one forge metal, which grows one at a time up to the metal's largest recipe,
-/// comes back one at a time or whole, and is forged only into the recipes of that metal the stack covers.
+/// The anvil's rules: it holds a stack of one forge metal, which grows one at a time up to the metal's largest recipe and
+/// comes back one at a time or whole. A recipe the stack covers is picked first (which costs nothing), then hammered: a
+/// hit needs a pick and the gap since the last one to have run down, and the hit that reaches the recipe's hits takes
+/// its metal off the stack and hands out its result and byproduct. A gone block hands the stack back.
 /// </summary>
 public sealed class AnvilManagerTests
 {
@@ -24,7 +22,12 @@ public sealed class AnvilManagerTests
     private const float Gap = 2.5f;
 
     private static BlockType Anvil => ContentRegistry.RequireBlock("anvil");
-    private static AnvilProfile Profile => Anvil.Anvil!;
+
+    // The bloomery's output is what the iron forge recipes take
+    private static ushort Metal => ContentRegistry.RequireBlock("bloomery").Bloomery!.BloomId;
+
+    private static ForgeRecipe[] RecipesOf(ushort metal) =>
+        ContentRegistry.ForgeRecipes.Where(r => r.MetalId == metal).ToArray();
 
     private static AnvilManager Ready()
     {
@@ -32,129 +35,6 @@ public sealed class AnvilManagerTests
         anvils.Ensure(Cell, Anvil.Id);
         return anvils;
     }
-
-    [Fact]
-    public void ItTakesOnlyItsInputAndOnlyOnePiece()
-    {
-        var anvils = Ready();
-        Assert.False(anvils.TryPlace(Cell, ContentRegistry.RequireItem("coal").Id));
-        Assert.True(anvils.TryPlace(Cell, Profile.InputId));
-        Assert.False(anvils.TryPlace(Cell, Profile.InputId));
-    }
-
-    [Fact]
-    public void AHitWithNothingOnTheAnvilDoesNothing()
-    {
-        Assert.Equal(AnvilHitKind.Refused, Ready().TryHit(Cell, Gap, 0f).Kind);
-    }
-
-    [Fact]
-    public void HitsAreGatedByTheHammersGapAndTheLastOneFinishesThePiece()
-    {
-        var anvils = Ready();
-        Assert.True(anvils.TryPlace(Cell, Profile.InputId));
-        var state = anvils.StateAt(4, 2, 4)!;
-
-        for (var hit = 1; hit < Profile.Hits; hit++)
-        {
-            Assert.Equal(AnvilHitKind.Struck, anvils.TryHit(Cell, Gap, 0f).Kind);
-            // Right away again: refused, nothing counted
-            Assert.Equal(AnvilHitKind.Refused, anvils.TryHit(Cell, Gap, 0f).Kind);
-            Assert.Equal(hit, state.Hits);
-            state.CooldownLeft = 0f;
-        }
-
-        var done = anvils.TryHit(Cell, Gap, 0f);
-        Assert.Equal(AnvilHitKind.Finished, done.Kind);
-        Assert.Equal(Profile.ResultId, done.ResultId);
-        Assert.True(done.ResultCount > 0);
-        Assert.Equal(Profile.SlagId, done.SlagId);
-        Assert.False(state.HasPiece);
-        Assert.Equal(0, state.Hits);
-    }
-
-    [Fact]
-    public void TheGapRunsDownWithTimeAndSlackLetsAHitThroughEarly()
-    {
-        var anvils = Ready();
-        Assert.True(anvils.TryPlace(Cell, Profile.InputId));
-        Assert.Equal(AnvilHitKind.Struck, anvils.TryHit(Cell, Gap, 0f).Kind);
-
-        // Half the gap passes, with the anvil block standing in its cell
-        var (manager, _) = MeshTestWorld.WalledArea();
-        var (lx, ly, lz) = VoxelCoords.LocalOf((int)Cell.X, (int)Cell.Y, (int)Cell.Z);
-        manager.ChunkAt((int)Cell.X, (int)Cell.Y, (int)Cell.Z)!.SetBlockRaw(lx, ly, lz, Anvil.Id, 0);
-        anvils.Update(Gap * 0.5f, manager, new DropManager());
-
-        Assert.Equal(AnvilHitKind.Refused, anvils.TryHit(Cell, Gap, 0f).Kind);
-        // Within the slack of the end of the gap a late packet still counts
-        Assert.Equal(AnvilHitKind.Struck, anvils.TryHit(Cell, Gap, Gap * 0.5f + 0.01f).Kind);
-    }
-
-    [Fact]
-    public void ThePieceCanBeTakenBackAndHitsAreLost()
-    {
-        var anvils = Ready();
-        Assert.True(anvils.TryPlace(Cell, Profile.InputId));
-        anvils.TryHit(Cell, Gap, 0f);
-
-        Assert.True(anvils.TryTake(Cell, all: false, out var item, out var count));
-        Assert.Equal(Profile.InputId, item);
-        Assert.Equal(1, count);
-        Assert.False(anvils.TryTake(Cell, all: false, out _, out _));
-        Assert.True(anvils.TryPlace(Cell, Profile.InputId));
-        Assert.Equal(0, anvils.StateAt(4, 2, 4)!.Hits);
-    }
-
-    [Fact]
-    public void AnAnvilWhoseBlockIsGoneDropsItsPiece()
-    {
-        var (manager, _) = MeshTestWorld.WalledArea();
-        var drops = new DropManager();
-        var anvils = Ready();
-        Assert.True(anvils.TryPlace(Cell, Profile.InputId));
-
-        // The cell holds air, not the anvil
-        anvils.Update(0.1f, manager, drops);
-
-        Assert.Null(anvils.StateAt(4, 2, 4));
-        Assert.Single(drops.Drops);
-        Assert.Equal(Profile.InputId, drops.Drops[0].BlockId);
-    }
-
-    [Fact]
-    public void APieceAndItsHitsSurviveASaveAndTheWire()
-    {
-        var anvils = Ready();
-        Assert.True(anvils.TryPlace(Cell, Profile.InputId));
-        anvils.TryHit(Cell, Gap, 0f);
-
-        var saved = new AnvilManager();
-        Assert.Equal(0, saved.Restore(anvils.Capture()));
-        Assert.True(saved.StateAt(4, 2, 4)!.HasPiece);
-        Assert.Equal(1, saved.StateAt(4, 2, 4)!.Hits);
-
-        using var writer = new PacketWriter(NetMessage.StationState);
-        anvils.WriteNet(writer);
-        using var reader = new PacketReader(writer.ToArray());
-        Assert.Equal(NetMessage.StationState, reader.Message);
-        var mirror = new AnvilManager();
-        mirror.ReadNet(reader);
-        Assert.True(mirror.StateAt(4, 2, 4)!.HasPiece);
-        Assert.Equal(1, mirror.StateAt(4, 2, 4)!.Hits);
-    }
-
-    [Fact]
-    public void AnEmptyAnvilIsNotSaved()
-    {
-        Assert.Empty(Ready().Capture());
-    }
-
-    // The metal the anvil's own work makes is what its forge recipes take (the iron chain)
-    private static ushort Metal => Profile.ResultId;
-
-    private static ForgeRecipe[] RecipesOf(ushort metal) =>
-        ContentRegistry.ForgeRecipes.Where(r => r.MetalId == metal).ToArray();
 
     private static AnvilManager Stacked(int count)
     {
@@ -164,20 +44,39 @@ public sealed class AnvilManagerTests
         return anvils;
     }
 
+    // Lands hits until one finishes, clearing the gap between them; returns the finishing hit and how many it took
+    private static (AnvilHit Hit, int Hits) HammerOut(AnvilManager anvils)
+    {
+        var state = anvils.StateAt(4, 2, 4)!;
+        for (var hits = 1; ; hits++)
+        {
+            var hit = anvils.TryHit(Cell, Gap, 0f);
+            Assert.NotEqual(AnvilHitKind.Refused, hit.Kind);
+            if (hit.Kind == AnvilHitKind.Finished) return (hit, hits);
+            state.CooldownLeft = 0f;
+        }
+    }
+
     [Fact]
-    public void AStackTakesOnlyAForgeMetalAndNeverLiesBesideABloom()
+    public void AHitWithNoRecipePickedDoesNothing()
+    {
+        Assert.Equal(AnvilHitKind.Refused, Ready().TryHit(Cell, Gap, 0f).Kind);
+        // A stack alone is not enough either: the hammer forges only a picked recipe
+        var anvils = Stacked(RecipesOf(Metal).Min(r => r.MetalCount));
+        Assert.Equal(AnvilHitKind.Refused, anvils.TryHit(Cell, Gap, 0f).Kind);
+        Assert.Equal(0, anvils.StateAt(4, 2, 4)!.Hits);
+    }
+
+    [Fact]
+    public void AStackTakesOnlyAForgeMetal()
     {
         Assert.True(ContentRegistry.IsForgeMetal(Metal));
         var anvils = Ready();
         Assert.False(anvils.TryStack(Cell, ContentRegistry.RequireItem("coal").Id));
-        Assert.False(anvils.TryStack(Cell, Profile.InputId));
-
-        // A bloom on the anvil keeps the metal off, and a stack keeps the bloom off
-        Assert.True(anvils.TryPlace(Cell, Profile.InputId));
-        Assert.False(anvils.TryStack(Cell, Metal));
-        Assert.True(anvils.TryTake(Cell, all: true, out _, out _));
         Assert.True(anvils.TryStack(Cell, Metal));
-        Assert.False(anvils.TryPlace(Cell, Profile.InputId));
+        // Another forge metal never joins the stack
+        var other = ContentRegistry.ForgeRecipes.First(r => r.MetalId != Metal).MetalId;
+        Assert.False(anvils.TryStack(Cell, other));
     }
 
     [Fact]
@@ -221,12 +120,12 @@ public sealed class AnvilManagerTests
             Assert.Equal(recipes.Count(r => r.MetalCount <= count), offered.Count);
         }
 
-        // Another item never forges into this metal's recipes, however many lie there
-        Assert.Empty(AnvilManager.Offered(Profile.InputId, 64));
+        // An item no recipe takes is offered nothing, however many lie there
+        Assert.Empty(AnvilManager.Offered(ContentRegistry.RequireItem("coal").Id, 64));
     }
 
     [Fact]
-    public void ForgingTakesTheRecipesMetalAndRefusesWhatTheStackDoesNotCover()
+    public void APickNeedsTheRecipeOfferedAndCostsNothing()
     {
         var recipes = RecipesOf(Metal);
         var cheapest = recipes.MinBy(r => r.MetalCount)!;
@@ -234,41 +133,129 @@ public sealed class AnvilManagerTests
         Assert.True(costliest.MetalCount > cheapest.MetalCount, "the iron recipes should differ in cost");
 
         var anvils = Stacked(cheapest.MetalCount);
-        Assert.False(anvils.TryForge(Cell, costliest.ResultId, out _));
-        Assert.Equal(cheapest.MetalCount, anvils.StateAt(4, 2, 4)!.MetalCount);
-        Assert.False(anvils.TryForge(Cell, Metal, out _));
+        Assert.False(anvils.TrySelect(Cell, costliest.ResultId));
+        Assert.False(anvils.TrySelect(Cell, Metal));
+        Assert.True(anvils.TrySelect(Cell, cheapest.ResultId));
 
-        Assert.True(anvils.TryForge(Cell, cheapest.ResultId, out var made));
-        Assert.Same(cheapest, made);
-        Assert.True(anvils.StateAt(4, 2, 4)!.IsEmpty);
+        var state = anvils.StateAt(4, 2, 4)!;
+        Assert.Same(cheapest, state.Selected);
+        Assert.Equal(cheapest.MetalCount, state.MetalCount);
     }
 
     [Fact]
-    public void TheStationsForgeHandsTheResultToTheInventory()
+    public void HitsAreGatedByTheHammersGapAndTheRecipesHitsFinishIt()
+    {
+        // One with room for a spare unit on the stack, so the test sees exactly its own metal leave
+        var recipe = RecipesOf(Metal).Where(r => r.MetalCount < AnvilManager.StackCap(Metal)).MaxBy(r => r.Hits)!;
+        var anvils = Stacked(recipe.MetalCount + 1);
+        Assert.True(anvils.TrySelect(Cell, recipe.ResultId));
+        var state = anvils.StateAt(4, 2, 4)!;
+
+        for (var hit = 1; hit < recipe.Hits; hit++)
+        {
+            Assert.Equal(AnvilHitKind.Struck, anvils.TryHit(Cell, Gap, 0f).Kind);
+            // Right away again: refused, nothing counted
+            Assert.Equal(AnvilHitKind.Refused, anvils.TryHit(Cell, Gap, 0f).Kind);
+            Assert.Equal(hit, state.Hits);
+            // Nothing leaves the stack before the last hit
+            Assert.Equal(recipe.MetalCount + 1, state.MetalCount);
+            state.CooldownLeft = 0f;
+        }
+
+        var done = anvils.TryHit(Cell, Gap, 0f);
+        Assert.Equal(AnvilHitKind.Finished, done.Kind);
+        Assert.Equal((recipe.ResultId, recipe.ResultCount), (done.ResultId, done.ResultCount));
+        Assert.Equal((recipe.ByproductId, recipe.ByproductCount), (done.ByproductId, done.ByproductCount));
+        // Exactly the recipe's metal is spent, and the pick is used up
+        Assert.Equal(1, state.MetalCount);
+        Assert.Null(state.Selected);
+        Assert.Equal(0, state.Hits);
+    }
+
+    [Fact]
+    public void EveryForgeRecipeFinishesOnExactlyItsOwnHitCount()
+    {
+        foreach (var recipe in ContentRegistry.ForgeRecipes)
+        {
+            var anvils = Ready();
+            for (var i = 0; i < recipe.MetalCount; i++)
+                Assert.True(anvils.TryStack(Cell, recipe.MetalId));
+            Assert.True(anvils.TrySelect(Cell, recipe.ResultId));
+            Assert.Equal(recipe.Hits, HammerOut(anvils).Hits);
+            Assert.True(anvils.StateAt(4, 2, 4)!.IsEmpty);
+        }
+    }
+
+    [Fact]
+    public void RePickingTheSameRecipeKeepsItsHitsAndAnotherStartsOver()
+    {
+        var recipes = AnvilManager.Offered(Metal, RecipesOf(Metal).Max(r => r.MetalCount));
+        var first = recipes.First(r => r.Hits > 1);
+        var other = recipes.First(r => r.ResultId != first.ResultId);
+        var anvils = Stacked(RecipesOf(Metal).Max(r => r.MetalCount));
+        Assert.True(anvils.TrySelect(Cell, first.ResultId));
+        anvils.TryHit(Cell, Gap, 0f);
+
+        Assert.True(anvils.TrySelect(Cell, first.ResultId));
+        Assert.Equal(1, anvils.StateAt(4, 2, 4)!.Hits);
+        Assert.True(anvils.TrySelect(Cell, other.ResultId));
+        Assert.Equal(0, anvils.StateAt(4, 2, 4)!.Hits);
+    }
+
+    [Fact]
+    public void TakingTheStackBelowThePicksCostForgetsThePick()
     {
         var cheapest = RecipesOf(Metal).MinBy(r => r.MetalCount)!;
-        var smithing = new SmithingStations();
-        smithing.Anvils.Ensure(Cell, Anvil.Id);
-        for (var i = 0; i < cheapest.MetalCount; i++)
-            Assert.True(smithing.Anvils.TryStack(Cell, Metal));
-        var inventory = Inventory.Empty();
+        var anvils = Stacked(cheapest.MetalCount);
+        Assert.True(anvils.TrySelect(Cell, cheapest.ResultId));
+        anvils.TryHit(Cell, Gap, 0f);
 
-        Assert.True(smithing.Forge(Cell, cheapest.ResultId, inventory));
-        Assert.Equal(cheapest.ResultCount, inventory.CountFor(cheapest.ResultId));
-        // The stack is spent, so a second pick is refused and gives nothing
-        Assert.False(smithing.Forge(Cell, cheapest.ResultId, inventory));
-        Assert.Equal(cheapest.ResultCount, inventory.CountFor(cheapest.ResultId));
+        Assert.True(anvils.TryTake(Cell, all: false, out _, out _));
+        var state = anvils.StateAt(4, 2, 4)!;
+        Assert.Null(state.Selected);
+        Assert.Equal(0, state.Hits);
+        state.CooldownLeft = 0f;
+        Assert.Equal(AnvilHitKind.Refused, anvils.TryHit(Cell, Gap, 0f).Kind);
     }
 
     [Fact]
-    public void AStackSurvivesASaveAndTheWireAndDropsWhenItsBlockIsGone()
+    public void TheGapRunsDownWithTimeAndSlackLetsAHitThroughEarly()
     {
-        var anvils = Stacked(3);
+        var recipe = RecipesOf(Metal).First(r => r.Hits > 2);
+        var anvils = Stacked(recipe.MetalCount);
+        Assert.True(anvils.TrySelect(Cell, recipe.ResultId));
+        Assert.Equal(AnvilHitKind.Struck, anvils.TryHit(Cell, Gap, 0f).Kind);
+
+        // Half the gap passes, with the anvil block standing in its cell
+        var (manager, _) = MeshTestWorld.WalledArea();
+        var (lx, ly, lz) = VoxelCoords.LocalOf((int)Cell.X, (int)Cell.Y, (int)Cell.Z);
+        manager.ChunkAt((int)Cell.X, (int)Cell.Y, (int)Cell.Z)!.SetBlockRaw(lx, ly, lz, Anvil.Id, 0);
+        anvils.Update(Gap * 0.5f, manager, new DropManager());
+
+        Assert.Equal(AnvilHitKind.Refused, anvils.TryHit(Cell, Gap, 0f).Kind);
+        // Within the slack of the end of the gap a late packet still counts
+        Assert.Equal(AnvilHitKind.Struck, anvils.TryHit(Cell, Gap, Gap * 0.5f + 0.01f).Kind);
+    }
+
+    [Fact]
+    public void AnEmptyAnvilIsNotSaved()
+    {
+        Assert.Empty(Ready().Capture());
+    }
+
+    [Fact]
+    public void AStackAndItsPickSurviveASaveAndTheWireAndTheStackDropsWhenItsBlockIsGone()
+    {
+        var recipe = RecipesOf(Metal).First(r => r.Hits > 1);
+        var anvils = Stacked(recipe.MetalCount);
+        Assert.True(anvils.TrySelect(Cell, recipe.ResultId));
+        anvils.TryHit(Cell, Gap, 0f);
 
         var saved = new AnvilManager();
         Assert.Equal(0, saved.Restore(anvils.Capture()));
-        Assert.Equal((Metal, 3), (saved.StateAt(4, 2, 4)!.MetalId, saved.StateAt(4, 2, 4)!.MetalCount));
-        Assert.False(saved.StateAt(4, 2, 4)!.HasPiece);
+        var restored = saved.StateAt(4, 2, 4)!;
+        Assert.Equal((Metal, recipe.MetalCount), (restored.MetalId, restored.MetalCount));
+        Assert.Equal((recipe.ResultId, 1), (restored.SelectedResultId, restored.Hits));
 
         using var writer = new PacketWriter(NetMessage.StationState);
         anvils.WriteNet(writer);
@@ -276,11 +263,13 @@ public sealed class AnvilManagerTests
         Assert.Equal(NetMessage.StationState, reader.Message);
         var mirror = new AnvilManager();
         mirror.ReadNet(reader);
-        Assert.Equal((Metal, 3), (mirror.StateAt(4, 2, 4)!.MetalId, mirror.StateAt(4, 2, 4)!.MetalCount));
+        var mirrored = mirror.StateAt(4, 2, 4)!;
+        Assert.Equal((Metal, recipe.MetalCount), (mirrored.MetalId, mirrored.MetalCount));
+        Assert.Equal((recipe.ResultId, 1), (mirrored.SelectedResultId, mirrored.Hits));
 
         var (manager, _) = MeshTestWorld.WalledArea();
         var drops = new DropManager();
         anvils.Update(0.1f, manager, drops);
-        Assert.Equal(3, drops.Drops.Count(d => d.BlockId == Metal));
+        Assert.Equal(recipe.MetalCount, drops.Drops.Count(d => d.BlockId == Metal));
     }
 }

@@ -578,7 +578,7 @@ corrected never refills it), a teleport resets it (`MovementState.Reset`). The n
 jump, a sprint auto-step of a whole block inside one state, swimming up and out of water, a mob's
 knockback lift, a fall and standing idle never trip them (`MovementRulesTests` asserts the
 relations against `PlayerPhysics`' own constants, and that a wearer's one air hop is taken and a second rejected, a bunny hop,
-a queued lift and a slime-block bounce are legal; `ServerPlayerJumpTests` that an air hop is never a bellows jump;
+a queued lift and a slime-block bounce are legal; `ServerPlayerLandingTests` that only a landing reports its drop (which works a bellows), never a take-off, a teleport or flight;
 `GameServerTests.AWearersDoubleJumpIsNeverCorrectedButASecondAirHopIs` over loopback, with immediate and delayed delivery).
 The loopback jump fixture advances the world and server clock once per analytic trajectory sample; extra transport pumps
 use zero elapsed time and assert that the processed state gap equals the sample interval. Advancing the clock again while

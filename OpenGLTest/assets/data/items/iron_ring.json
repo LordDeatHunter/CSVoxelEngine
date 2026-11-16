@@ -1,6 +1,6 @@
 {
   // Iron Ring: placeholder gear. A full-metal ring, armor only:
-  // worn in an accessory slot, forged on the anvil from two wrought iron
+  // worn in an accessory slot, forged on the anvil from two iron blooms
   // (recipes/forge/iron_ring.json), never looted.
   "name": "Iron Ring",
   "texture": "assets/textures/items/iron_ring.png",

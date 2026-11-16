@@ -110,12 +110,18 @@ public sealed class VisualStep
     /// <summary>The heat (0..1) a lit <c>bloomery</c> step holds the fire at.</summary>
     public float Heat { get; init; }
 
-    /// <summary>Hammer hits an <c>anvil</c> step has already put in the bloom it lays down.</summary>
+    /// <summary>Whether a <c>bloomery</c> step also sets a bellows against each of its tuyeres.</summary>
+    public bool Bellows { get; init; }
+
+    /// <summary>Hammer hits an <c>anvil</c> step has already put in the recipe it picks (<see cref="Select"/>).</summary>
     public int Hits { get; init; }
 
-    /// <summary>The forge metal an <c>anvil</c> step stacks (<see cref="Count"/> of it) instead of laying a bloom;
-    /// null for a bloom.</summary>
+    /// <summary>The forge metal an <c>anvil</c> step stacks (<see cref="Count"/> of it); null for a bare anvil.</summary>
     public string? Metal { get; init; }
+
+    /// <summary>The result (an item name) of the forge recipe an <c>anvil</c> step picks for its stack; null picks
+    /// none.</summary>
+    public string? Select { get; init; }
 
     /// <summary>The tower floor (0 = the ground floor) a <c>towerclear</c> step clears; 0 by default.</summary>
     public int Floor { get; init; }
@@ -308,15 +314,16 @@ public sealed class VisualScenario
                 Fuel = ReadInt(element, "fuel"),
                 On = element.TryGetProperty("lit", out var lit) && lit.ValueKind == JsonValueKind.True,
                 Heat = element.TryGetProperty("heat", out var heat) && heat.TryGetSingle(out var h) ? h : 0.5f,
+                Bellows = element.TryGetProperty("bellows", out var bellows) && bellows.ValueKind == JsonValueKind.True,
             },
             "anvil" => new VisualStep
             {
                 Op = "anvil",
                 Pos = ReadPos(element, index, "anvil"),
-                On = !element.TryGetProperty("piece", out var piece) || piece.ValueKind != JsonValueKind.False,
                 Hits = ReadInt(element, "hits"),
                 Metal = element.TryGetProperty("metal", out var metal) ? metal.GetString() : null,
                 Count = element.TryGetProperty("count", out var stack) && stack.TryGetInt32(out var units) ? units : 1,
+                Select = element.TryGetProperty("select", out var select) ? select.GetString() : null,
             },
             "hammer" => new VisualStep { Op = "hammer", Pos = ReadPos(element, index, "hammer") },
             "chest" => ReadChest(element, index),

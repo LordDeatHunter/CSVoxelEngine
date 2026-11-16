@@ -53,7 +53,7 @@ public sealed class IngotPileTests
     [Fact]
     public void EveryIngotItemNamesACubeToDrawAndTheFullPileFitsItsCell()
     {
-        var ingots = new[] { "copper_ingot", "tin_ingot", "bronze_ingot", "wrought_iron", "refined_vulcanite" }.Select(Ingot).ToArray();
+        var ingots = new[] { "copper_ingot", "tin_ingot", "bronze_ingot", "refined_vulcanite" }.Select(Ingot).ToArray();
         Assert.All(ingots, item => Assert.True(IngotPileManager.IsIngot(item.Id) && item.IngotBlockId != 0));
         var pile = BlockType.ById[Pile]!;
         Assert.True(IngotPileConfig.FullHeight <= pile.Hitboxes.Max(h => h.Max.Y) + 1e-4f);

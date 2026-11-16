@@ -324,14 +324,13 @@ public sealed class ServerPlayer : IMobTarget
     /// (<see cref="NetValidation.AllowedDistance"/>), so nothing an accepted state can do is ever
     /// mistaken for a teleport; only the server's own teleports reset the fall. A dead player, or
     /// one whose surroundings are not loaded (<see cref="PlayerBodyProbe.IsKnown"/>), is not judged.
+    /// Returns the drop in blocks the state landed (0 when it landed nothing, or in water), which works a
+    /// bellows the body came down on.
     /// </summary>
-    public bool ObserveAcceptedState(ChunkManager chunks, double stateGapSeconds)
+    public float ObserveAcceptedState(ChunkManager chunks, double stateGapSeconds)
     {
         if (IsDead || !PlayerBodyProbe.IsKnown(Position, chunks))
-        {
-            _jumpTracked = false;
-            return false;
-        }
+            return 0f;
         var feet = Position.Y - Camera.EyeHeight;
         var grounded = PlayerBodyProbe.Grounded(Position, chunks);
         var inWater = PlayerBodyProbe.InWater(Position, chunks);
@@ -346,20 +345,9 @@ public sealed class ServerPlayer : IMobTarget
             StatusDirty = true;
         }
 
-        // A jump is the step off the ground that rises: grounded last state, airborne and higher now (an
-        // auto-step stays grounded, a drop off a ledge does not rise, and an airborne rise such as the cloud
-        // boots' air jump starts from no ground). It is what works a bloomery's bellows.
-        var jumped = _jumpTracked && _wasGrounded && !grounded && !Flying && !inWater
-                     && feet - _lastFeet > NetworkConfig.NetJumpRiseBlocks;
-        _jumpTracked = true;
-        _wasGrounded = grounded;
-        _lastFeet = feet;
-        return jumped;
+        // The landing's drop (in water none counts) is what works a bellows the body came down on
+        return inWater ? 0f : _fall.LandedDrop;
     }
-
-    private bool _jumpTracked;
-    private bool _wasGrounded;
-    private float _lastFeet;
 
     /// <summary>
     /// The per-tick half of the status: lava burns a body standing in it, an empty lung drowns one
@@ -461,7 +449,6 @@ public sealed class ServerPlayer : IMobTarget
         Aim(eye, Forward);
         _fall.Reset(eye.Y - Camera.EyeHeight, grounded: false);
         Movement.Reset();
-        _jumpTracked = false;
     }
 
     /// <summary>
@@ -469,11 +456,7 @@ public sealed class ServerPlayer : IMobTarget
     /// memory is kept on purpose: a correction never refills the airtime rise budget, so being
     /// corrected again and again cannot climb.
     /// </summary>
-    public void ResetFall()
-    {
-        _fall.Reset(Position.Y - Camera.EyeHeight, grounded: false);
-        _jumpTracked = false;
-    }
+    public void ResetFall() => _fall.Reset(Position.Y - Camera.EyeHeight, grounded: false);
 
     /// <summary>
     /// Brings a dead player back: full health, at its <see cref="RespawnEye"/> or else

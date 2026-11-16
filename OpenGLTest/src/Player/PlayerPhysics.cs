@@ -72,12 +72,12 @@ internal sealed class PlayerPhysics
     /// <summary>Counts strokes started, so the body can start its stroke animation on the same frame.</summary>
     public int SwimStrokeCount { get; private set; }
 
-    /// <summary>Counts jumps taken (a land jump, or one off the bottom of a shallow puddle): the bellows of a
-    /// bloomery beside the player reads it (<see cref="Camera.JumpCount"/>).</summary>
+    /// <summary>Counts jumps taken (a land jump, or one off the bottom of a shallow puddle; see
+    /// <see cref="Camera.JumpCount"/>).</summary>
     public int JumpCount { get; private set; }
 
     /// <summary>Counts air jumps taken (the cloud boots' one free jump per airtime). Kept apart from
-    /// <see cref="JumpCount"/> on purpose: an air jump starts from no ground, so it never works a bellows.</summary>
+    /// <see cref="JumpCount"/>: an air jump starts from no ground.</summary>
     public int AirJumpCount { get; private set; }
 
     // Space as it was last frame: the air jump needs a fresh press, so a Space held through a ground
@@ -383,8 +383,7 @@ internal sealed class PlayerPhysics
                      && !camera.IsInWater)
             {
                 // The cloud boots' air jump, a fresh Space press while airborne: as high as a ground jump,
-                // the horizontal speed (sprint momentum) kept, and JumpCount, which works a bloomery's
-                // bellows, never moved
+                // the horizontal speed (sprint momentum) kept, and JumpCount never moved
                 _verticalVelocity = JumpSpeed;
                 _airJumpReady = false;
                 AirJumpCount++;

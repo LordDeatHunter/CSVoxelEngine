@@ -19,11 +19,12 @@ namespace VoxelEngine.Simulation.Smithing;
 /// Block-entity registry for bloomeries, keyed by the structure's anchor cell (the volume's minimum corner): a
 /// solid-state iron smelter. Crushed ore (the profile's <see cref="BloomeryProfile.OreId"/>) and fuel are loaded by
 /// right-click; a firestarter lights it once it holds both. A lit bloomery cools every second
-/// (<see cref="BloomeryRules.Decay"/>) and only the player's bellows keeps it hot: each jump within
-/// <see cref="BloomeryConfig.PumpRangeBlocks"/> of it (<see cref="Pump"/>) adds heat. Ore smelts while the heat is
-/// at or over <see cref="BloomeryConfig.BandMin"/>; a unit that spent too long over <see cref="BloomeryConfig.BandMax"/>
-/// burns to slag, a clean one becomes a bloom. Blooms and slag wait in the shaft until an empty hand collects them,
-/// and no new ore goes in before then. Iron never melts here, so none of this touches the crucible pipeline.
+/// (<see cref="BloomeryRules.Decay"/>) and only its bellows keeps it hot: a body landing on a bellows block set
+/// against one of its tuyeres (<see cref="PressBellows"/>) adds heat, more the farther it fell. Ore smelts while the
+/// heat is at or over <see cref="BloomeryConfig.BandMin"/> (however hot) and every finished unit is a bloom; under the
+/// band the unit's progress runs back, faster the colder the fire (<see cref="BloomeryRules.ProgressRate"/>). Blooms
+/// wait in the shaft until an empty hand collects them, and no new ore goes in before then. Iron never melts here, so
+/// none of this touches the crucible pipeline.
 ///
 /// <para>
 /// Like <see cref="KilnManager"/>, <see cref="Update"/> doubles as the structure's integrity sweep (a blast that takes
@@ -68,19 +69,15 @@ public sealed class BloomeryManager
         /// <summary>The fire's heat, 0..1 (0 while unlit).</summary>
         public float Heat;
 
-        /// <summary>Seconds the unit smelting now has progressed, 0..<see cref="BloomeryConfig.SecondsPerOre"/>.</summary>
+        /// <summary>Seconds the unit smelting now has progressed, 0..<see cref="BloomeryConfig.SecondsPerOre"/>; runs
+        /// back while the fire is too cold.</summary>
         public float UnitProgress;
-
-        /// <summary>Seconds the unit smelting now spent over the band.</summary>
-        public float UnitOverheat;
 
         /// <summary>Finished blooms waiting to be collected.</summary>
         public int Blooms;
 
-        /// <summary>Slag waiting to be collected.</summary>
-        public int Slag;
-
-        /// <summary>Seconds until the next pump counts (server and singleplayer only; not saved or sent).</summary>
+        /// <summary>Seconds until the next bellows landing counts (server and singleplayer only; not saved or
+        /// sent).</summary>
         public float PumpCooldown;
     }
 
@@ -131,7 +128,7 @@ public sealed class BloomeryManager
     {
         if (!_bloomeries.TryGetValue(KeyOf(anchor), out var state)) return false;
         if (item == 0 || item != state.Profile.OreId) return false;
-        if (state.Ore >= state.Profile.OreCap || state.Blooms + state.Slag > 0) return false;
+        if (state.Ore >= state.Profile.OreCap || state.Blooms > 0) return false;
         state.Ore++;
         return true;
     }
@@ -171,38 +168,37 @@ public sealed class BloomeryManager
     }
 
     /// <summary>
-    /// Hands over what a finished run left (blooms, then slag) and empties the shaft of it. The ids are the
-    /// profile's; the caller puts them in the player's inventory or on the ground. False when nothing is waiting.
+    /// Hands over what a finished run left (its blooms) and empties the shaft of it. The id is the profile's; the
+    /// caller puts them in the player's inventory or on the ground. False when nothing is waiting.
     /// </summary>
     public bool TryCollect(Vector3 anchor, List<ushort> output)
     {
-        if (!_bloomeries.TryGetValue(KeyOf(anchor), out var state) || state.Blooms + state.Slag == 0) return false;
+        if (!_bloomeries.TryGetValue(KeyOf(anchor), out var state) || state.Blooms == 0) return false;
         for (var i = 0; i < state.Blooms; i++)
             output.Add(state.Profile.BloomId);
-        for (var i = 0; i < state.Slag; i++)
-            output.Add(state.Profile.SlagId);
         state.Blooms = 0;
-        state.Slag = 0;
         return true;
     }
 
     /// <summary>
-    /// One bellows pump from a body at <paramref name="position"/> (a jump): every lit bloomery whose center lies
-    /// within <see cref="BloomeryConfig.PumpRangeBlocks"/> and whose pump cooldown has run out gains a pump of
-    /// heat. Authoritative simulation only (singleplayer, and the server for each player's jump). Returns whether
-    /// any bloomery took it.
+    /// A body landed on the bellows block at <paramref name="bellows"/> after a fall of <paramref name="fallBlocks"/>:
+    /// every lit bloomery with a tuyere against that cell (<see cref="BloomeryProfile.IsTuyere"/>, turned with the
+    /// structure) whose landing cooldown has run out gains <see cref="BloomeryRules.LandingHeat"/>. The caller has
+    /// checked the cell holds a bellows. Authoritative simulation only (singleplayer, and the server for its players
+    /// and mobs). Returns whether any bloomery took it.
     /// </summary>
-    public bool Pump(Vector3 position)
+    public bool PressBellows((int X, int Y, int Z) bellows, float fallBlocks)
     {
+        var heat = BloomeryRules.LandingHeat(fallBlocks);
+        if (heat <= 0f) return false;
         var pumped = false;
         foreach (var (key, state) in _bloomeries)
         {
             if (!state.Lit || state.PumpCooldown > 0f) continue;
-            var half = (BlockType.ById[state.AnchorId]?.MultiblockSize ?? 2) * 0.5f;
-            var center = new Vector3(key.X + half, key.Y + half, key.Z + half);
-            if (Vector3.DistanceSquared(position, center) > BloomeryConfig.PumpRangeBlocks * BloomeryConfig.PumpRangeBlocks)
+            var size = BlockType.ById[state.AnchorId]?.MultiblockSize ?? 2;
+            if (!state.Profile.IsTuyere((bellows.X - key.X, bellows.Y - key.Y, bellows.Z - key.Z), state.Facing, size))
                 continue;
-            state.Heat = BloomeryRules.Pump(state.Heat);
+            state.Heat = BloomeryRules.Pump(state.Heat, heat);
             state.PumpCooldown = BloomeryConfig.PumpCooldownSeconds;
             pumped = true;
         }
@@ -272,9 +268,9 @@ public sealed class BloomeryManager
     }
 
     /// <summary>
-    /// One bloomery's fire and smelt for <paramref name="dt"/> seconds. Heat falls, the fuel burns (faster while
-    /// overheated), and while the heat is at or over the band the unit in the shaft progresses; a finished unit
-    /// becomes a bloom, or slag if it overheated long enough. Returns whether the lit flag changed.
+    /// One bloomery's fire and smelt for <paramref name="dt"/> seconds. Heat falls, the fuel burns, and the unit in the
+    /// shaft progresses at <see cref="BloomeryRules.ProgressRate"/>: on while the heat is at or over the band, back
+    /// (never under 0) while it is under; a finished unit becomes a bloom. Returns whether the lit flag changed.
     /// </summary>
     internal static bool Tick(BloomeryState state, float dt)
     {
@@ -282,31 +278,21 @@ public sealed class BloomeryManager
         if (!state.Lit) return false;
 
         state.Heat = BloomeryRules.Decay(state.Heat, dt);
-        var zone = BloomeryRules.ZoneOf(state.Heat);
 
-        if (state.Ore > 0 && BloomeryRules.Smelts(state.Heat))
+        if (state.Ore > 0)
         {
-            state.UnitProgress += dt;
-            if (zone == HeatZone.Hot)
-                state.UnitOverheat += dt;
+            state.UnitProgress = MathF.Max(0f, state.UnitProgress + dt * BloomeryRules.ProgressRate(state.Heat));
             while (state.UnitProgress >= BloomeryConfig.SecondsPerOre && state.Ore > 0)
             {
                 state.Ore--;
-                if (BloomeryRules.Burns(state.UnitOverheat))
-                    state.Slag += BloomeryConfig.SlagPerBurntUnit;
-                else
-                    state.Blooms++;
+                state.Blooms++;
                 state.UnitProgress -= BloomeryConfig.SecondsPerOre;
-                state.UnitOverheat = 0f;
             }
             if (state.Ore == 0)
-            {
                 state.UnitProgress = 0f;
-                state.UnitOverheat = 0f;
-            }
         }
 
-        state.BurnLeft -= dt * BloomeryRules.FuelBurnFactor(state.Heat);
+        state.BurnLeft -= dt;
         while (state.BurnLeft <= 0f)
         {
             if (state.Fuel > 0)
@@ -355,12 +341,9 @@ public sealed class BloomeryManager
                 drops.Spawn(state.FuelItemId, cell);
         for (var i = 0; i < state.Blooms; i++)
             drops.Spawn(state.Profile.BloomId, cell);
-        for (var i = 0; i < state.Slag; i++)
-            drops.Spawn(state.Profile.SlagId, cell);
         state.Ore = 0;
         state.Fuel = 0;
         state.Blooms = 0;
-        state.Slag = 0;
     }
 
     private void RefreshCells()
@@ -398,9 +381,7 @@ public sealed class BloomeryManager
                 BurnLeft = state.BurnLeft,
                 Heat = state.Heat,
                 UnitProgress = state.UnitProgress,
-                UnitOverheat = state.UnitOverheat,
                 Blooms = state.Blooms,
-                Slag = state.Slag,
             });
         }
         return result;
@@ -420,10 +401,9 @@ public sealed class BloomeryManager
                 || data.Facing is < 0 or > 3
                 || data.Ore < 0 || data.Ore > ProfileOf(anchor).OreCap
                 || data.Fuel < 0 || data.Fuel > ProfileOf(anchor).FuelCap
-                || data.Blooms < 0 || data.Slag < 0
-                || data.Blooms > BloomeryConfig.MaxStoredOutput || data.Slag > BloomeryConfig.MaxStoredOutput
+                || data.Blooms < 0 || data.Blooms > BloomeryConfig.MaxStoredOutput
                 || !float.IsFinite(data.FuelSeconds) || !float.IsFinite(data.BurnLeft) || !float.IsFinite(data.Heat)
-                || !float.IsFinite(data.UnitProgress) || !float.IsFinite(data.UnitOverheat))
+                || !float.IsFinite(data.UnitProgress))
             {
                 skipped++;
                 continue;
@@ -440,9 +420,7 @@ public sealed class BloomeryManager
                 BurnLeft = data.BurnLeft,
                 Heat = Math.Clamp(data.Heat, 0f, 1f),
                 UnitProgress = Math.Clamp(data.UnitProgress, 0f, BloomeryConfig.SecondsPerOre),
-                UnitOverheat = Math.Max(0f, data.UnitOverheat),
                 Blooms = data.Blooms,
-                Slag = data.Slag,
             };
             if (data.Fuel > 0 || data.FuelItem != null)
             {
@@ -479,9 +457,7 @@ public sealed class BloomeryManager
             writer.Write(state.BurnLeft);
             writer.Write(state.Heat);
             writer.Write(state.UnitProgress);
-            writer.Write(state.UnitOverheat);
             writer.Write((byte)state.Blooms);
-            writer.Write((byte)state.Slag);
         }
     }
 
@@ -506,9 +482,7 @@ public sealed class BloomeryManager
                 BurnLeft = StationNetCodec.ReadFinite(reader),
                 Heat = StationNetCodec.ReadFinite(reader),
                 UnitProgress = StationNetCodec.ReadFinite(reader),
-                UnitOverheat = StationNetCodec.ReadFinite(reader),
                 Blooms = reader.ReadByte(),
-                Slag = reader.ReadByte(),
             };
             state.Profile = ProfileOf(state.AnchorId);
             if (state.Facing > 3 || state.Ore > state.Profile.OreCap || state.Fuel > state.Profile.FuelCap)

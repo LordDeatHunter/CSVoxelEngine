@@ -4,5 +4,6 @@
   "metal": "item/vulcanite_shard",
   "metalCount": 3,
   "result": "item/refined_vulcanite",
-  "count": 1
+  "count": 1,
+  "hits": 5
 }

@@ -7,10 +7,11 @@ using Xunit;
 namespace VoxelEngine.Tests.Content;
 
 /// <summary>
-/// The iron chain as relations, so retuning a recipe can never strand the player: ore is smelted by the bloomery into
-/// what the anvil takes, the anvil makes the iron its forge recipes take (and no crafting recipe does), and the anvil
-/// and its hammer can be had without any iron (the bootstrap), so every piece of iron gear is reachable from the raw
-/// world. The same anvil works vulcanite: its ore drops shards the anvil refines before it forges anything of them.
+/// The iron chain as relations, so retuning a recipe can never strand the player: ore from the quern is smelted by the
+/// bloomery into the bloom, the bloom is the metal the anvil's forge recipes take (and no crafting recipe does), and the
+/// anvil, its hammer and the bellows can be had without any iron (the bootstrap), so every piece of iron gear is
+/// reachable from the raw world. The same anvil works vulcanite: its ore drops shards the anvil refines before it forges
+/// anything of them.
 /// </summary>
 public sealed class IronChainTests
 {
@@ -18,14 +19,17 @@ public sealed class IronChainTests
 
     private static BlockType Bloomery => ContentRegistry.RequireBlock("bloomery");
 
-    private static BlockType AnvilBlock =>
-        BlockType.Types.Values.First(b => b.Anvil != null);
+    private static BlockType AnvilBlock => BlockType.Types.Values.First(b => b.IsAnvil);
+
+    private static BlockType BellowsBlock => BlockType.Types.Values.First(b => b.IsBellows);
+
+    private static ushort Bloom => Bloomery.Bloomery!.BloomId;
 
     [Fact]
-    public void WhatTheBloomeryMakesIsWhatTheAnvilTakesAndTheOreComesFromTheQuern()
+    public void WhatTheBloomeryMakesIsWhatTheAnvilForgesAndTheOreComesFromTheQuern()
     {
         var bloomery = Bloomery.Bloomery!;
-        Assert.Equal(bloomery.BloomId, AnvilBlock.Anvil!.InputId);
+        Assert.True(ContentRegistry.IsForgeMetal(bloomery.BloomId));
         Assert.NotEqual(bloomery.BloomId, bloomery.OreId);
         Assert.True(Enumerable.Range(1, BlockType.ById.Length - 1).Any(i => ContentRegistry.CrushRecipeForInput((ushort)i)?.ResultId == bloomery.OreId),
             "the ore the bloomery smelts has to be something the quern makes");
@@ -35,7 +39,7 @@ public sealed class IronChainTests
     public void TheBloomeryNeverMeltsIronSoNoCrucibleMetalExists()
     {
         Assert.Null(ContentRegistry.MeltRecipeForInput(Bloomery.Bloomery!.OreId));
-        Assert.Null(ContentRegistry.MeltRecipeForInput(AnvilBlock.Anvil!.ResultId));
+        Assert.Null(ContentRegistry.MeltRecipeForInput(Bloom));
     }
 
     /// <summary>The crafting recipes minus the cinder sword's, the one recipe that takes a refined metal bar directly
@@ -44,11 +48,9 @@ public sealed class IronChainTests
         ContentRegistry.CraftingRecipes.Where(r => r.ResultId != ContentRegistry.ItemIds["cinder_sword"]);
 
     [Fact]
-    public void NoCraftingRecipeTakesWroughtIronItIsForgedOnTheAnvil()
+    public void NoCraftingRecipeTakesABloomItIsForgedOnTheAnvil()
     {
-        var wrought = AnvilBlock.Anvil!.ResultId;
-        Assert.True(ContentRegistry.IsForgeMetal(wrought));
-        Assert.DoesNotContain(ExceptCinderSword, r => r.Ingredients.Any(i => i.Accepts(wrought)));
+        Assert.DoesNotContain(ExceptCinderSword, r => r.Ingredients.Any(i => i.Accepts(Bloom)));
         // No other forge metal is crafted with either: a solid metal is worked only on the anvil (bar the cinder sword)
         Assert.DoesNotContain(ExceptCinderSword,
             r => r.Ingredients.Any(i => i.AcceptedIds.Any(ContentRegistry.IsForgeMetal)));
@@ -58,8 +60,9 @@ public sealed class IronChainTests
     public void EveryForgeRecipeIsReachableFromTheRawWorld()
     {
         var anvil = AnvilBlock;
-        var wrought = anvil.Anvil!.ResultId;
-        var stationMade = new HashSet<ushort> { wrought, anvil.Anvil.InputId, anvil.Anvil.SlagId, Bloomery.Bloomery!.SlagId };
+        // What the iron works themselves make: the bloom, and every forge recipe's byproduct
+        var stationMade = new HashSet<ushort>(ContentRegistry.ForgeRecipes.Where(r => r.ByproductId != 0)
+            .Select(r => r.ByproductId)) { Bloom };
 
         // Raw: every item with no crafting or forge recipe, except what the iron works themselves make
         var obtainable = new HashSet<ushort>(ItemRegistry.All
@@ -77,28 +80,26 @@ public sealed class IronChainTests
                 if (!obtainable.Contains(recipe.ResultId) && recipe.Ingredients.All(Have))
                     grew |= obtainable.Add(recipe.ResultId);
 
-            // The bloomery, built from its source block and fed ore and fuel, makes the bloom; the anvil, with a
-            // hammer in hand, turns the bloom into iron
-            var bloom = Bloomery.Bloomery.BloomId;
-            if (obtainable.Contains(Bloomery.Bloomery.OreId) && obtainable.Contains(Bloomery.MultiblockSourceId)
+            // The bloomery, built from its source block, fed ore and fuel and heated by its bellows, makes the bloom
+            if (obtainable.Contains(Bloomery.Bloomery!.OreId) && obtainable.Contains(Bloomery.MultiblockSourceId)
+                && obtainable.Contains(BellowsBlock.Id)
                 && ItemRegistry.All.Any(i => i.FuelSeconds > 0f && obtainable.Contains(i.Id)))
-                grew |= obtainable.Add(bloom);
-            if (obtainable.Contains(bloom) && obtainable.Contains(anvil.Id)
-                && ItemRegistry.All.Any(i => obtainable.Contains(i.Id) && ContentRegistry.IsInTag("hammer", i.Id)))
-            {
-                grew |= obtainable.Add(wrought);
-                grew |= obtainable.Add(anvil.Anvil.SlagId);
-            }
+                grew |= obtainable.Add(Bloom);
 
-            // The anvil and the hammer forge a stack of the metal into its recipes
+            // The anvil and the hammer forge a stack of the metal into its recipes, and squeeze out their byproducts
+            var hammer = ItemRegistry.All.Any(i => obtainable.Contains(i.Id) && ContentRegistry.IsInTag("hammer", i.Id));
             foreach (var recipe in ContentRegistry.ForgeRecipes)
-                if (obtainable.Contains(recipe.MetalId) && obtainable.Contains(anvil.Id))
+                if (hammer && obtainable.Contains(recipe.MetalId) && obtainable.Contains(anvil.Id))
+                {
                     grew |= obtainable.Add(recipe.ResultId);
+                    if (recipe.ByproductId != 0)
+                        grew |= obtainable.Add(recipe.ByproductId);
+                }
         }
 
-        Assert.Contains(wrought, obtainable);
-        Assert.Contains(ContentRegistry.ForgeRecipes, r => r.MetalId == wrought);
-        // Every metal's recipes, wrought iron's and the vulcanite chain's alike
+        Assert.Contains(Bloom, obtainable);
+        Assert.Contains(ContentRegistry.ForgeRecipes, r => r.MetalId == Bloom);
+        // Every metal's recipes, the bloom's and the vulcanite chain's alike
         var forged = ContentRegistry.ForgeRecipes;
         Assert.All(forged, r => Assert.True(obtainable.Contains(r.ResultId),
             $"{r.Name} is a forge recipe but cannot be reached"));
@@ -139,17 +140,16 @@ public sealed class IronChainTests
     }
 
     [Fact]
-    public void ThePieceOfIronGearTheGameShipsAreAllForgedFromWroughtIron()
+    public void ThePiecesOfIronGearTheGameShipsAreAllForgedFromBlooms()
     {
-        // Every gear piece of the iron set is forged on the anvil from the iron the anvil's own work makes
+        // Every gear piece of the iron set is forged on the anvil straight from the bloomery's blooms
         var iron = ItemRegistry.All.OfType<GearItem>().Where(i => i.Info.SetName == "iron").ToList();
         Assert.NotEmpty(iron);
-        var wrought = AnvilBlock.Anvil!.ResultId;
         foreach (var piece in iron)
         {
             var recipe = ContentRegistry.ForgeRecipeForResult(piece.Id);
             Assert.NotNull(recipe);
-            Assert.Equal(wrought, recipe!.MetalId);
+            Assert.Equal(Bloom, recipe!.MetalId);
         }
     }
 }

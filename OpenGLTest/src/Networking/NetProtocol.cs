@@ -302,8 +302,12 @@ public static class NetFraming
     /// 59: each floor of a battle tower in the station snapshot ends with the spots of its bone piles (a count byte, then
     /// three floats each); an older peer would misread the frame.
     /// 60: <see cref="NetInventoryAction.CreativeQuest"/> (a creative player's quest earn or unearn, the quest id then an
-    /// earn byte); an older peer would refuse it as malformed.</summary>
-    public const int ProtocolVersion = 60;
+    /// earn byte); an older peer would refuse it as malformed.
+    /// 61: the iron works rework. A bloomery in <see cref="NetMessage.StationState"/> no longer carries its overheat or
+    /// slag, and an anvil is a metal stack with a picked recipe and its hits (metal id and count, picked result id, hits,
+    /// cooldown) instead of a bloom piece; <see cref="NetIntentKind.Forge"/> now only picks the recipe the hammer's hits
+    /// forge. An older peer would misread the station frames.</summary>
+    public const int ProtocolVersion = 61;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

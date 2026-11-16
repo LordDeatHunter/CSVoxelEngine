@@ -173,7 +173,7 @@ of each set is drawn once, shaded by a shared bevel and recolored per material, 
 leather, rivets on metal), and the rings, charms and belt are drawn the same way. **Cloud boots** (`cloud_boots`, feet, from iron boots and cloud shards) carry `air_jump`: one free air jump per airtime
 (`PlayerPhysics`), on a fresh Space press while airborne, never in water or flight nor on the frame a creative double tap toggles
 flight; it rises as high as a ground jump, keeps the horizontal speed (sprint momentum), refills on the ground, in water and in
-flight, and has its own `AirJumpCount`, never moving `JumpCount`, so it never works a bloomery's bellows. `LocalPlayer.ApplyGear`
+flight, and has its own `AirJumpCount`, never moving `JumpCount`. `LocalPlayer.ApplyGear`
 feeds the flag into `Camera.GearAirJump` every frame (singleplayer and a client's mirrored equipment), and the server judges the
 hop by `ServerPlayer.AirJumps`: the server's airtime rise budget (`MovementRules.AirRiseBudget`: one jump apex per jump the
 player has plus `NetAirRiseSlackBlocks`, reset by support or a descent-then-rise near ground, widened by a bounce block and a
@@ -181,7 +181,7 @@ queued knockback lift) is what accepts the legal hop and corrects a second (see 
 protocol 24. `AirJumpTests`. **Accessories**: the stat accessories are the Ring of Focus (`focus_ring`, mana regen) and the
 Charm of Reserves (`reserve_charm`, max mana), both crafted and looted, plus `amulet_of_vigor`, `miners_belt` and
 `ember_charm`; the **metal ring ladder** is `tin_ring` and `copper_ring` (+1 armor) and `bronze_ring` and `iron_ring` (+2),
-armor only (no mana, no set), never looted, the tin, copper and bronze ones cast in the ring mold (200 ml, see "Cast molds") and the iron one forged on the anvil from two `wrought_iron` (`recipes/forge/iron_ring.json`, see "The bloomery and the anvil"), their armor adding to the
+armor only (no mana, no set), never looted, the tin, copper and bronze ones cast in the ring mold (200 ml, see "Cast molds") and the iron one forged on the anvil from two blooms (`recipes/forge/iron_ring.json`, see "The bloomery and the anvil"), their armor adding to the
 body armor's in `GearStatsCalculator`; the ability charms are under "Armor, modifiers and sets". Its instances live in the same `Inventory.Tools` list as tool
 instances (so every instance lookup, the save and the wire carry them) but count against their own pool
 (`InventoryCategory.Gear`, `GearConfig.GearCapacity`), never take a hotbar slot and come off when removed from the

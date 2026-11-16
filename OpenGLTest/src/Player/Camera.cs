@@ -50,7 +50,7 @@ public class Camera : IMobTarget
     /// <summary>Jumps the body has taken so far; moves on each one (<c>PlayerPhysics.JumpCount</c>).</summary>
     public int JumpCount => _physics.JumpCount;
     /// <summary>Air jumps the body has taken so far (<c>PlayerPhysics.AirJumpCount</c>); never counted in
-    /// <see cref="JumpCount"/>, so a bloomery's bellows never sees them.</summary>
+    /// <see cref="JumpCount"/>.</summary>
     public int AirJumpCount => _physics.AirJumpCount;
     /// <summary>Current vertical FOV in degrees: the base FOV plus the eased sprint widening plus the punch
     /// pinch plus the throw charge zoom.</summary>

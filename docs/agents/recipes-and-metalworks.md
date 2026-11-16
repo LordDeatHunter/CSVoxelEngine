@@ -10,8 +10,8 @@ Crafting recipes live in `assets/data/recipes/<name>.json` as `{ "result", "coun
 `recipes/cook/<name>.json` as `{ "input", "result", "count", "cookSeconds" }`
 (`CookRecipeDefinition.cs` -> `CookRecipe`, one recipe per input, enforced) and quern recipes in
 `recipes/crush/<name>.json` (`CrushRecipe`, likewise one per input) and anvil recipes in `recipes/forge/<result>.json` as
-`{ "metal", "metalCount", "result", "count" }` (`ForgeRecipeDefinition.cs` -> `ForgeRecipe`, one per result, `metalCount`
-1..64; see "The bloomery and the anvil"). Every name resolves
+`{ "metal", "metalCount", "result", "count", "hits", "byproduct": { "item", "count" } }` (`ForgeRecipeDefinition.cs` ->
+`ForgeRecipe`, one per result, `metalCount` and `hits` 1..64, `byproduct` optional; see "The bloomery and the anvil"). Every name resolves
 like a loot entry, with `block/` and `item/` prefixes pinning the namespace (`ContentFiles.TryResolve`), so
 blocks and items are interchangeable as ingredients, results, inputs and outputs. Craft files are
 named by their result, cook files by their input, and a reverse recipe by
@@ -98,9 +98,10 @@ crucible holds 800 ml: one vessel takes exactly one set (`AlloyKilnTests.OneCruc
 tier-2 (copper) pickaxe (`tools: {"pickaxe": 2}`, so the primitive and tin pickaxes whiff and copper and bronze mine it)
 and drops a hematite chunk (the `hematite_ore` item), which the quern crushes into `crushed_iron`
 (`recipes/crush/hematite_ore.json`). There is no melt recipe and no molten iron, so a kiln refuses every iron form
-(`MetalworksRecipeTests.IronCrushesInTheQuernButNeverMelts`); the bloomery turns crushed iron into a `bloom` and the
-anvil hammers that into `wrought_iron`, which no crafting recipe takes (`IronChainTests.NoCraftingRecipeTakesWroughtIronItIsForgedOnTheAnvil`):
-it is stacked on the anvil and forged there (`recipes/forge/`) into the heads (`iron_pickaxe_head` 3, `iron_axe_head` 3,
+(`MetalworksRecipeTests.IronCrushesInTheQuernButNeverMelts`); the bloomery turns crushed iron into a `bloom`, which no
+crafting recipe takes (`IronChainTests.NoCraftingRecipeTakesABloomItIsForgedOnTheAnvil`; there is no wrought iron): blooms
+are stacked on the anvil and forged there (`recipes/forge/`, each recipe hammered out in its own `hits`, every bloom leaving
+one `slag`) into the heads (`iron_pickaxe_head` 3, `iron_axe_head` 3,
 `iron_sword_head` 4), the five-piece iron armor set (`iron_cap` 5, `iron_tunic` 8, `iron_pants` 7, `iron_boots` 4, `iron_gloves`
 4, `sets/iron.json`; bronze's ring counts and one more armor point each) and `iron_ring` (2). The tools are still crafted
 from a forged head (`iron_pickaxe`, `iron_axe`, `iron_sword`, each head + branch + 2 vine). The `iron_pickaxe` (power 3, above bronze's 2.5; in the
@@ -267,83 +268,97 @@ inside is lost.
 
 **The bloomery and the anvil** (`Simulation/Smithing/`, namespace `VoxelEngine.Simulation.Smithing`, tuning in
 `BloomeryConfig`) make iron. `SmithingStations` owns both registries as one unit (`World.Smithing`), so the frame, the
-save and the station broadcast each plumb one object. The flow is crushed iron + fuel -> **bloomery** (the player jumps
-beside it to keep its bellows going) -> `bloom` -> **anvil** + smithing hammer -> `wrought_iron` + `slag` -> wrought iron
-stacked back on the **anvil** + smithing hammer -> forged parts and armor (**the forge**, below).
+save and the station broadcast each plumb one object. The flow is crushed iron + fuel -> **bloomery** (kept hot by
+landing on a **bellows** at one of its tuyeres) -> `bloom` -> blooms stacked on the **anvil**, a recipe picked with the
+smithing hammer's right-click and hammered out with its left (**the forge**, below) -> the part or armor + `slag`. There
+is no wrought iron: the bloom is the forge metal.
 - **The bloomery** (`bloomery` / `bloomery_part`, a 2x2x2 `multiblock` pressed from `bloomery_bricks` by the same
-  bare-hand conversion; it wears the mud brick kiln's model, so its fire burns where `KilnLayout.Kiln` says) is declared by a
-  `bloomery` object on the anchor block: `{"oreCap", "fuelCap", "ore", "bloom", "slag"}` (`BloomeryProfile`, parsed by
-  `BlockSchemaParser.ParseBloomery`, `BlockType.Bloomery`; the three names resolve to ids at load and a missing or unknown
-  one throws naming the file, and it is only legal on a multiblock anchor and never with `kiln`). It does **not** reuse
-  `KilnProfile`/`KilnLayout`, which carry crucible semantics. `BloomeryManager` (keyed by anchor, main thread only) copies
-  the kiln's pattern: `Ensure`, `Update` as the integrity sweep (a blast reverts the structure and drops what it held),
-  `Capture`/`Restore` (`StationSaveData.Bloomeries`), `WriteNet`/`ReadNet`, `NotifyBlockRemoved`.
-  Right-click (`BlockInteractions.TryBloomeryInteract`, in the chain after the kiln) loads the profile's ore and any fuel
-  one unit at a time, a firestarter lights it (`IItemUseWorld.CanIgniteKiln`/`IgniteKiln` cover both structures, so a
-  fire spell does too) once it holds ore and fuel, an empty hand collects the finished blooms and slag, and no new ore
-  goes in before that. **Heat model** (`BloomeryRules`, GL-free): a lit bloomery loses `HeatDecayPerSecond` of its 0..1
-  heat a second, each pump adds `PumpHeat`; below `BandMin` the ore stalls, in or above the band the unit progresses
-  (`SecondsPerOre`), above `BandMax` it also accumulates overheat and burns fuel `OverheatFuelFactor` times faster, and a
-  unit that overheated `BurnSeconds` becomes slag instead of a bloom. One pump per `PumpCooldownSeconds` beats the decay
-  (`BloomeryRulesTests` asserts the relation), so a jump every couple of seconds holds the band.
-- **The bellows is a jump.** `PlayerPhysics.JumpCount` (also `Camera.JumpCount`) moves on each jump; `World.Update` pumps
-  `Bloomeries.Pump(camera position)` on every new one (singleplayer; never on a client). A server cannot see jumps, so
-  `ServerPlayer.ObserveAcceptedState` now returns whether the accepted state was a **jump** (grounded last state,
-  airborne and `NetworkConfig.NetJumpRiseBlocks` higher now; never flying, in water, on the first state or after a
-  teleport), and `PlayerSessions.PumpOnJump` calls `World.PumpBellows(player position)`. `Pump` only heats a lit bloomery
-  whose center is within `PumpRangeBlocks`, and each has its own pump cooldown. `ServerPlayerJumpTests`. A later
-  automation (a mechanical bellows, automated feeding) is `P-59` in plans/TODO.md; `Pump` takes any source of pumps.
-- **The anvil** (`anvil`, a plain model block made of cobblestone so the chain can bootstrap) carries an `anvil` object
-  `{"hits", "input", "result", "slag"}` (`AnvilProfile`, `BlockType.Anvil`). An anvil holds **either one bloom or a stack
-  of one forge metal, never both** (`AnvilManager.State`: `HasPiece`, or `MetalId`/`MetalCount`), so a bloom is laid only
-  on a bare anvil and metal is stacked only where no bloom lies. Right-click (`BlockInteractions.TryAnvilInteract`): a
-  forge metal in hand (any item a forge recipe takes, `ContentRegistry.IsForgeMetal`: wrought iron, vulcanite shards and refined vulcanite) stacks one more
-  (`TryStack`, refused for another metal or at `AnvilManager.StackCap`, the largest recipe of that metal, so a stack never
-  holds metal no recipe could use), the profile's input is laid on a bare anvil (`TryPlace`), and anything else, an empty
-  hand included, takes one back (the bloom, or one of the stack; the whole stack while sneaking, `PlayerContext.IsSneaking`,
-  `TryTake`); a hammer never claims this click and a bare anvil none at all, so a block still places against it. The
-  manager counts hammer hits on a bloom: `TryHit`
-  is refused until the gap since the last hit has run down (`State.CooldownLeft`, ticked in `Update`, so the pace is the
-  simulation's and not a client's clock, with `BloomeryConfig.HammerSlackSeconds` of jitter allowed on a server), the hit
-  that reaches `hits` replaces the piece with `IronPerBloom` result and `SlagPerBloom` slag dropped on top of the anvil
-  (`BlockInteractions.HammerAnvil`). An anvil whose block is gone is swept and its piece or stack drops. The hammer is any item in
-  the `hammer` tag (`Mining.IsHammer`; the `smithing_hammer`, stone-headed, `tool.hitDelayMs` 2500, so there is no
-  spamming): `LeftClickAction.UpdateAnvilHammer` fires the first hit on press and the next after the hammer's own gap
-  (`Mining.HitGapSeconds`), with the usual swing, sound and chips, and never mines the anvil. A connected client only predicts
-  that (from the mirrored anvil) and raises the new `NetIntentKind.Hammer(cell)` (rate-limited, edits no cell); the server
-  (`IntentReplay.HammerFor`) needs the hammer in hand, its own ray on the cell and the anvil's gap run down, and the result
-  rides the drops and the station broadcast.
+  bare-hand conversion; it wears the mud brick kiln's shape, so its fire burns where `KilnLayout.Kiln` says) is declared by a
+  `bloomery` object on the anchor block: `{"oreCap", "fuelCap", "ore", "bloom", "tuyeres"}` (`BloomeryProfile`, parsed by
+  `BlockSchemaParser.ParseBloomery`, `BlockType.Bloomery`; the two names resolve to ids at load and a missing or unknown
+  one throws naming the file; `tuyeres` is at least one `[x, y, z]` cell in the authored, north-facing local space, each
+  just outside a side face of the volume, refused otherwise; it is only legal on a multiblock anchor and never with
+  `kiln`). It does **not** reuse `KilnProfile`/`KilnLayout`, which carry crucible semantics. `BloomeryManager` (keyed by
+  anchor, main thread only) copies the kiln's pattern: `Ensure`, `Update` as the integrity sweep (a blast reverts the
+  structure and drops what it held), `Capture`/`Restore` (`StationSaveData.Bloomeries`), `WriteNet`/`ReadNet`,
+  `NotifyBlockRemoved`. Right-click (`BlockInteractions.TryBloomeryInteract`, in the chain after the kiln) loads the
+  profile's ore and any fuel one unit at a time, a firestarter lights it (`IItemUseWorld.CanIgniteKiln`/`IgniteKiln` cover
+  both structures, so a fire spell does too) once it holds ore and fuel, an empty hand collects the finished blooms, and
+  no new ore goes in before that. **Heat model** (`BloomeryRules`, GL-free): a lit bloomery loses `HeatDecayPerSecond` of
+  its 0..1 heat a second; at or over `BandMin` the unit progresses one second a second (`ProgressRate`, the same at full
+  heat: **nothing is too hot**, every finished unit of `SecondsPerOre` is a bloom and the fuel burns at one rate), and
+  under it the unit's progress **runs back**, linearly faster the colder the fire, up to `ColdReverseRate` for a dead one,
+  never under 0 and never losing the ore. A jump on the spot onto the bellows once per `PumpCooldownSeconds` (or a
+  second) beats the decay (`BloomeryRulesTests` asserts the relation).
+- **The bellows** (`bellows`, a plain cube for now with placeholder tiles, crafted from oak planks and hide) carries the
+  `"bellows": true` flag (`BlockType.IsBellows`). It works only from a **tuyere**: the cells the profile names, turned with
+  the structure's facing (`BloomeryProfile.IsTuyere`, through `MultiblockShape.RotatePoint`); the shipped bloomery's two
+  sit beside the back lower cell of each side wall, where `models/block/bloomery.json` sinks a hole one unit into the wall
+  (a core one unit in from each side, four brick strips per side around the hole, its floor the `bloomery_tuyere` tile; a
+  multiblock model may not leave its volume, so the hole goes in rather than standing out). Heat comes only from a body
+  **landing** on it: `World.PressBellows(feet, halfWidth, fall)` finds the bellows a hair under the feet
+  (`BellowsProbe`: the middle, then the footprint's corners) and calls `BloomeryManager.PressBellows(cell, fall)`, which
+  adds `BloomeryRules.LandingHeat(fall)` (nothing under `BellowsMinFallBlocks`, so a settle or an auto-step never pumps;
+  `BellowsBaseHeat` plus `BellowsHeatPerBlock` a block fallen, capped at `BellowsMaxHeat`) to every lit bloomery with a
+  tuyere at that cell whose own `PumpCooldownSeconds` has run out. The callers are the authoritative simulation only, never
+  a client: the local player's `FallTracker` landing (`LocalPlayer`, beside the fall damage; not in water), a server
+  player's accepted state (`ServerPlayer.ObserveAcceptedState` returns the landing's drop, `PlayerSessions.PressOnLanding`;
+  `ServerPlayerLandingTests`), and every non-flying mob's dry landing (`Mob.NoteLanding` keeps the fall for
+  `Mob.TryTakeBellowsLanding`, taken in `World.Update` apart from the cosmetic landing dust). Item drops never press. A later
+  automation (a mechanical bellows, automated feeding) is `P-59` in plans/TODO.md; `PressBellows` takes any source.
+- **The anvil** (`anvil`, a plain model block made of cobblestone so the chain can bootstrap) carries the
+  `"anvil": true` flag (`BlockType.IsAnvil`, only legal on a plain model block). An anvil holds a **stack of one forge
+  metal** (`AnvilManager.State`: `MetalId`/`MetalCount`) and the recipe picked for it with its hits
+  (`SelectedResultId`, `Hits`, `CooldownLeft`). Right-click (`BlockInteractions.TryAnvilInteract`): a forge metal in hand
+  (any item a forge recipe takes, `ContentRegistry.IsForgeMetal`: blooms, vulcanite shards and refined vulcanite) stacks
+  one more (`TryStack`, refused for another metal or at `AnvilManager.StackCap`, the largest recipe of that metal, so a
+  stack never holds metal no recipe could use), and anything else, an empty hand included, takes one back (the whole stack
+  while sneaking, `PlayerContext.IsSneaking`, `TryTake`; a pick the smaller stack no longer covers is forgotten with its
+  hits); a hammer never claims this click and a bare anvil none at all, so a block still places against it. An anvil whose
+  block is gone is swept and its stack drops.
 - **The forge.** A right-click with the smithing hammer on an anvil holding a stack (`BlockInteractions.TryOpenForge`,
-  `RightClickOutcome.Forge`; a bloom-holding or bare anvil is not claimed, the bloom is hammered with the left button)
-  opens the anvil's recipe list (`App/ForgeInput`, `UI/Forge/ForgeView` + `ForgeLayout`, drawn by `ForgeRenderer` in the
-  craft card's dress: one card per recipe with the result's icon, rarity-colored name and metal cost, clickable, and CLOSE).
-  It lists **only** the recipes `AnvilManager.Offered` gives for the stack: that metal's, taking no more than the stack
-  holds. A click forges (`SmithingStations.Forge`: refused unless the recipe is offered and its result fits the inventory,
-  then `AnvilManager.TryForge` takes the recipe's metal off the stack and the result goes into the inventory) and the list
-  stays up for the next pick; it closes on CLOSE, E, Escape, the pause menu, the death screen, a non-hammer in hand,
-  leaving reach or the stack running out. Recipes are data (`recipes/forge/<result>.json`, see the top of this file), so
-  another solid metal plugs in with its own files. Connected, the pick is predicted on the mirror and sent as
-  `NetIntentKind.Forge(cell, result id)`; `IntentReplay.ForgeFor` needs the hammer in hand and the player's own ray on
-  the anvil, and the inventory snapshot and the station broadcast bring the truth back. Stacking and taking back ride the
-  right-click's `Use` intent like every station.
-- **Persistence and the wire.** Both registries save into `stations.json` (`Bloomeries`, `Anvils`, only an anvil holding
-  something: a piece with its `Hits`/`Cooldown`, or a stack as `Metal` (content name) and `Count`, clamped to the cap on
-  load) and ride the **end** of the `StationState` frame, after the cast molds (`World.WriteStations`,
-  `ClientMirror.ApplyNetworkStations`); each anvil ends with its metal id and count: protocol **32**. A client's copies
-  are display-only mirrors that never tick.
+  `RightClickOutcome.Forge`; a bare anvil is not claimed) opens the anvil's recipe list (`App/ForgeInput`,
+  `UI/Forge/ForgeView` + `ForgeLayout`, drawn by `ForgeRenderer` in the craft card's dress: one card per recipe with the
+  result's icon, rarity-colored name, its hits and metal cost, the picked one framed in gold, and CLOSE). It lists **only**
+  the recipes `AnvilManager.Offered` gives for the stack: that metal's, taking no more than the stack holds. A click
+  **picks** (`SmithingStations.Select` -> `AnvilManager.TrySelect`: refused unless offered; a new pick starts from 0 hits,
+  re-picking the same keeps them; nothing leaves the stack yet), toasts the hit count and closes the list; it also closes
+  on CLOSE, E, Escape, the pause menu, the death screen, a non-hammer in hand, leaving reach or the stack running out. Then
+  the hammer works it: `TryHit` is refused without a pick or until the gap since the last hit has run down
+  (`State.CooldownLeft`, ticked in `Update`, so the pace is the simulation's and not a client's clock, with
+  `BloomeryConfig.HammerSlackSeconds` of jitter allowed on a server), and the hit that reaches the recipe's `hits` takes its
+  `metalCount` off the stack, clears the pick and drops its result and `byproduct` (a bloom's slag, one per bloom) on top
+  of the anvil (`BlockInteractions.HammerAnvil`). The hammer is any item in the `hammer` tag (`Mining.IsHammer`; the
+  `smithing_hammer`, stone-headed, `tool.hitDelayMs` 2500, so there is no spamming): `LeftClickAction.UpdateAnvilHammer`
+  fires the first hit on press and the next after the hammer's own gap (`Mining.HitGapSeconds`), with the usual swing,
+  sound and chips, and never mines the anvil. Recipes are data (`recipes/forge/<result>.json`, see the top of this file),
+  so another solid metal plugs in with its own files. Connected, a pick is predicted on the mirror and sent as
+  `NetIntentKind.Forge(cell, result id)` (`IntentReplay.ForgeFor`: the hammer in hand and the player's own ray on the
+  anvil), and a hit only predicted (from the mirrored pick) and sent as `NetIntentKind.Hammer(cell)` (rate-limited, edits
+  no cell; `IntentReplay.HammerFor` also needs the anvil's gap run down); the drops and the station broadcast bring the
+  truth back. Stacking and taking back ride the right-click's `Use` intent like every station.
+- **Persistence and the wire.** Both registries save into `stations.json` (`Bloomeries`; `Anvils`, only an anvil holding a
+  stack: `Metal` (content name) and `Count`, clamped to the cap on load, and the pick as `Selected` (content name) with its
+  `Hits`/`Cooldown`, forgotten on load when it no longer resolves or is not offered) and ride the **end** of the
+  `StationState` frame, after the cast molds (`World.WriteStations`, `ClientMirror.ApplyNetworkStations`); an anvil is its
+  metal id and count, picked result id, hits and cooldown, a bloomery carries no overheat or slag: protocol **61**. A
+  client's copies are display-only mirrors that never tick.
 - **Look and feel.** `RenderManager.Stations.RenderSmithing` draws the loaded ore and fuel in two rows on the hearth, the
-  finished blooms and slag where the ore stood, the bloom lying on each anvil, shrinking with every hit, and a metal
-  stack as one face-up piece per unit, each resting on the one below and turned a little against it. A lit
-  bloomery joins `AmbientEffects.FireCells`, so it throws embers and a point light. The look-at label shows a status line
-  (`LookLabelState.Detail`, `SmithingReadout`): a lit bloomery's heat with `too cold` / `good` / `too hot`, its ore and
-  smelt percentage, a done run's output, or an anvil's `Hammered n/m` or its stack (`Wrought Iron x3`).
-- **Slag** (`slag`, from burnt ore and from every hammered bloom) crafts into `slag_bricks`, a plain building block.
-- `IronChainTests` (the chain's relations, including that the anvil and hammer need no iron, that no crafting recipe takes
-  wrought iron and that every forge recipe is reachable), `BloomeryRulesTests`, `BloomeryManagerTests`, `AnvilManagerTests`
-  (the stack, take-back, offer and forge rules), `IronWorksWorldTests` (the right-clicks in a live world, sneaking
-  included); `visual-examples/anvil-forge.json` (`VOXEL_TIME=147`, the `anvil` op's `metal`/`count` and the `forge` op)
-  films two stacks, the recipe list on each and a pick; `visual-examples/bloomery.json` (`VOXEL_TIME=147`, with its `bloomery`,
-  `anvil` and `hammer` ops) films it.
+  finished blooms where the ore stood, and an anvil's stack as one face-up piece per unit, each resting on the one below
+  and turned a little against it. A lit bloomery joins `AmbientEffects.FireCells`, so it throws embers and a point light.
+  The look-at label shows a status line (`LookLabelState.Detail`, `SmithingReadout`): a lit bloomery's heat with
+  `too cold` / `good`, its ore and smelt percentage, a done run's blooms, or an anvil's `Forging <result> n/m` or its stack
+  (`Iron Bloom x3`); the station bar (`StationBars.Anvil`) fills with the picked recipe's hits.
+- **Slag** (`slag`, the byproduct of every bloom hammered into a part) crafts into `slag_bricks`, a plain building block.
+- `IronChainTests` (the chain's relations, including that the anvil, hammer and bellows need no iron, that no crafting
+  recipe takes a bloom and that every forge recipe is reachable), `BloomeryRulesTests`, `BloomeryManagerTests` (no
+  too-hot, the cold run-back, the tuyeres and their facing), `AnvilManagerTests` (the stack, take-back, offer, pick and
+  hit rules, every recipe finishing on its own hits), `IronWorksWorldTests` (a bellows landing, the last hit's drops and
+  the right-clicks in a live world, sneaking included), `GameServerTests.APlayerLandingOnABellowsAtATuyereWorksItOnTheServer`;
+  `visual-examples/bloomery.json` (`VOXEL_TIME=147`, the `bloomery` op's `bellows`, the `anvil` op's `select`/`hits`
+  and the `hammer` op) films the tuyere hole, two landings blowing a cold fire good and a head hammered out;
+  `visual-examples/anvil-forge.json` (`VOXEL_TIME=147`, the `anvil` op's `metal`/`count` and the `forge` op) films two
+  bloom stacks, the recipe list on each, a pick and the hits that forge it.
 
 **The alloy furnace** (`alloy_furnace` / `alloy_furnace_part`, `multiblock.size` 3) is the second
 kiln: a 3x3x3 hollow shell of `alloy_bricks` (one mud brick block, a copper and a tin ring each,

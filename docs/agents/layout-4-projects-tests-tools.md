@@ -222,6 +222,8 @@ tools/                                # asset generators: models, animation clip
                                       #   cut from the same faces; stdlib PNG writer; listed in USER_TODO.md; --check
   generate-tower-lock-textures.py     # deterministic placeholder tower_door (portcullis cutout), skeleton_pile and
                                       #   tower_altar_top tiles, stdlib PNG writer, small palettes; listed in USER_TODO.md; --check
+  generate-bellows-textures.py        # deterministic placeholder bellows_side/bellows_top and bloomery_tuyere tiles, read off
+                                      #   the committed planks, bricks and fired mud; stdlib PNG; listed in USER_TODO.md; --check
   generate-critter-models.py          # deterministic dragonfly, crow and deer .bbmodels (their own bone sets around the
                                       #   humanoid six, clips) and skins with cutout texels, on the hell script's machinery;
                                       #   models only, no mob class yet; --check

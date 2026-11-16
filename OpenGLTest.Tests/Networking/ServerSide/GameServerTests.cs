@@ -28,6 +28,7 @@ using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Status;
 using VoxelEngine.Tests.Magic;
@@ -1142,7 +1143,10 @@ public sealed class GameServerTests : IDisposable
         var cell = arena.Front;
         SetCell(cell, anvil.Id);
         Assert.True(_world.Interactions.TryTrackAnvilAt(cell));
-        Assert.True(_world.Smithing.Anvils.TryPlace(cell, anvil.Anvil!.InputId));
+        var recipe = ContentRegistry.ForgeRecipes.First(r => r.Hits > 2);
+        for (var i = 0; i < recipe.MetalCount; i++)
+            Assert.True(_world.Smithing.Anvils.TryStack(cell, recipe.MetalId));
+        Assert.True(_world.Smithing.Select(cell, recipe.ResultId));
         var state = _world.Smithing.Anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!;
 
         // Bare-handed, the hit is refused and counts for nothing
@@ -1233,13 +1237,20 @@ public sealed class GameServerTests : IDisposable
     }
 
     [Fact]
-    public void AJumpBesideALitBloomeryWorksItsBellowsForThatPlayer()
+    public void APlayerLandingOnABellowsAtATuyereWorksItOnTheServer()
     {
         using var client = Connect("Smith");
         var arena = PrepareArena(client.Server!.Value.Spawn);
         var bloomery = ContentRegistry.RequireBlock("bloomery");
-        var anchor = arena.Front;
+        // The player's own floor cell becomes the bellows; the bloomery stands where one of its tuyeres meets it
+        var bellows = arena.FloorBelow;
+        var size = bloomery.MultiblockSize;
+        var tuyere = Enumerable.Range(-1, size + 2)
+            .SelectMany(dx => Enumerable.Range(-1, size + 2).Select(dz => (dx, 0, dz)))
+            .First(d => bloomery.Bloomery!.IsTuyere(d, 0, size));
+        var anchor = bellows - new Vector3(tuyere.dx, 0, tuyere.dz);
         Multiblock.Convert(_world.GetChunkManager(), anchor, 0, bloomery, new HashSet<Vector3>());
+        SetCell(bellows, BlockType.Types.Values.First(b => b.IsBellows).Id);
         var bloomeries = _world.Smithing.Bloomeries;
         bloomeries.Ensure(anchor, 0, bloomery.Id);
         Assert.True(bloomeries.TryAddOre(anchor, bloomery.Bloomery!.OreId));
@@ -1248,16 +1259,24 @@ public sealed class GameServerTests : IDisposable
         var fire = bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z)!;
         fire.Heat = 0.3f;
 
-        // Standing, then rising off the ground: one jump
-        SendState(client, arena.Eye, NetPlayerFlags.None);
-        Tick(0.06);
-        Tick(0.06);
-        Assert.Equal(0.3f, fire.Heat, 0.02f);
+        void Hold(Vector3 eye, NetPlayerFlags flags)
+        {
+            SendState(client, eye, flags);
+            Tick(0.06);
+            Tick(0.06);
+        }
 
-        SendState(client, arena.Eye + new Vector3(0f, 0.6f, 0f), NetPlayerFlags.Airborne);
-        Tick(0.06);
-        Tick(0.06);
-        Assert.True(fire.Heat > 0.3f + BloomeryConfig.PumpHeat * 0.5f, $"heat {fire.Heat}");
+        // Standing, then rising off the bellows: no landing yet, the fire only cools
+        Hold(arena.Eye, NetPlayerFlags.None);
+        Hold(arena.Eye + new Vector3(0f, 0.6f, 0f), NetPlayerFlags.Airborne);
+        Hold(arena.Eye + new Vector3(0f, 1.0f, 0f), NetPlayerFlags.Airborne);
+        Hold(arena.Eye + new Vector3(0f, 0.6f, 0f), NetPlayerFlags.Airborne);
+        Assert.True(fire.Heat <= 0.3f, $"heat {fire.Heat}");
+
+        // Coming back down on it: the landing blows the fire
+        var before = fire.Heat;
+        Hold(arena.Eye, NetPlayerFlags.None);
+        Assert.True(fire.Heat > before + BloomeryRules.LandingHeat(1f) * 0.5f, $"heat {fire.Heat}");
     }
 
     [Fact]

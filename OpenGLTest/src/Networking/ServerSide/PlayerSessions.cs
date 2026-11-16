@@ -111,10 +111,10 @@ internal sealed class PlayerSessions
                         break;
                     case MoveVerdict.Clamped:
                         Log.Warn($"net: clamped a move from {client.Name} (#{client.Id})");
-                        PumpOnJump(current, current.ObserveAcceptedState(chunks, gap));
+                        PressOnLanding(current, current.ObserveAcceptedState(chunks, gap));
                         break;
                     default:
-                        PumpOnJump(current, current.ObserveAcceptedState(chunks, gap));
+                        PressOnLanding(current, current.ObserveAcceptedState(chunks, gap));
                         break;
                 }
             }
@@ -129,19 +129,21 @@ internal sealed class PlayerSessions
         }
     }
 
+    /// <summary>A landing of <paramref name="player"/> after a drop of <paramref name="landedDrop"/> blocks (see
+    /// <see cref="ServerPlayer.ObserveAcceptedState"/>; 0 when the state landed nothing) works a bellows it came down
+    /// on.</summary>
+    private void PressOnLanding(ServerPlayer player, float landedDrop)
+    {
+        if (landedDrop > 0f)
+            _state.World.PressBellows(player.Position with { Y = player.Position.Y - Camera.EyeHeight },
+                PlayerPhysics.PlayerRadius, landedDrop);
+    }
+
     /// <summary>
     /// Tells <paramref name="player"/> its server-owned status: the granted modes, the
     /// health, whether it is dead, the knockback queued since the last status (handed over and
     /// cleared here, zero when none), the air and the mana. Clears <see cref="ServerPlayer.StatusDirty"/>.
     /// </summary>
-    /// <summary>A jump of <paramref name="player"/> (see <see cref="ServerPlayer.ObserveAcceptedState"/>) works the
-    /// bellows of every lit bloomery within reach of it.</summary>
-    private void PumpOnJump(ServerPlayer player, bool jumped)
-    {
-        if (jumped)
-            _state.World.PumpBellows(player.Position);
-    }
-
     internal static void SendPlayerStatus(ClientConnection client, ServerPlayer player)
     {
         player.TakePendingKnockback(out var knockback, out var lift);

@@ -104,12 +104,14 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible
                                #   slot and its melt loop, plus the multiblock integrity sweep
       Smithing/                # the iron works, namespace VoxelEngine.Simulation.Smithing (see "The bloomery and the anvil")
-        AnvilManager.cs        # anvils keyed by cell: one piece (hammer hits gated by the hammer's gap, result and slag) or a
-                               #   stack of one forge metal (stack, take back, the recipes Offered, TryForge), save and wire
-        BloomeryManager.cs     # bloomeries keyed by anchor: ore, fuel, heat, smelting, the integrity sweep, save and wire
-        BloomeryRules.cs       # GL-free heat model: zones, decay, pump, fuel factor, burning
+        AnvilManager.cs        # anvils keyed by cell: a stack of one forge metal (stack, take back, the recipes Offered), the
+                               #   picked recipe (TrySelect) and its hammer hits (gated by the hammer's gap), save and wire
+        BellowsProbe.cs        # GL-free: the bellows cell a landing body came down on (its middle, then its footprint corners)
+        BloomeryManager.cs     # bloomeries keyed by anchor: ore, fuel, heat, smelting, bellows presses at the tuyeres, the
+                               #   integrity sweep, save and wire
+        BloomeryRules.cs       # GL-free heat model: the band, decay, progress rate (backward when cold), landing heat
         SmithingReadout.cs     # GL-free look-at status lines of a bloomery and an anvil
-        SmithingStations.cs    # both registries as one unit (World.Smithing): update, save, wire, and Forge (a pick into an inventory)
+        SmithingStations.cs    # both registries as one unit (World.Smithing): update, save, wire, and Select (a recipe pick)
       LeafDecay/               # leaf decay and the orphaned-wood crumble, namespace VoxelEngine.Simulation.LeafDecay
         LeafDecayManager.cs    # the composition root and facade: the scheduled cells, the tick and its slicing,
                                #   ScheduleAround/ScheduleBox from every edit path, TickLeaf/TickWood and the removal

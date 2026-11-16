@@ -44,9 +44,9 @@ public enum NetIntentKind : byte
     /// player there once the destination has loaded. Edits no cell.</summary>
     Waystone = 10,
 
-    /// <summary>A pick from an anvil's recipe list: forge the recipe making <see cref="WorldIntent.Recipe"/> from the
-    /// metal stacked on the anvil cell the intent names. The server judges the hammer in hand, its own ray on the cell
-    /// and the stack; the result lands in the inventory. Edits no cell.</summary>
+    /// <summary>A pick from an anvil's recipe list: the recipe making <see cref="WorldIntent.Recipe"/> is to be hammered
+    /// out of the metal stacked on the anvil cell the intent names (the <see cref="Hammer"/> hits forge it). The server
+    /// judges the hammer in hand, its own ray on the cell and the stack. Edits no cell.</summary>
     Forge = 11,
 
     /// <summary>A left-click blow on the tree stump cell the intent names: the server judges reach and the stump's log and

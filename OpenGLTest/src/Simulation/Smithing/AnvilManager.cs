@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
-using VoxelEngine.Config;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Recipes;
-using VoxelEngine.Content.Stations;
 using VoxelEngine.Networking;
 using VoxelEngine.Saves;
 
@@ -16,31 +14,31 @@ namespace VoxelEngine.Simulation.Smithing;
 /// <summary>What one hammer hit on an anvil did.</summary>
 public enum AnvilHitKind
 {
-    /// <summary>Nothing happened: no anvil, nothing on it, or the last hit was too recent.</summary>
+    /// <summary>Nothing happened: no anvil, no recipe picked on it, or the last hit was too recent.</summary>
     Refused,
 
     /// <summary>The hit landed and the work is not done yet.</summary>
     Struck,
 
-    /// <summary>The last hit landed: the piece became its result and its slag.</summary>
+    /// <summary>The last hit landed: the recipe's metal left the stack as its result and its byproduct.</summary>
     Finished,
 }
 
 /// <summary>The outcome of <see cref="AnvilManager.TryHit"/>; the ids and counts are only meaningful for
 /// <see cref="AnvilHitKind.Finished"/>.</summary>
-public readonly record struct AnvilHit(AnvilHitKind Kind, ushort ResultId = 0, int ResultCount = 0, ushort SlagId = 0,
-    int SlagCount = 0);
+public readonly record struct AnvilHit(AnvilHitKind Kind, ushort ResultId = 0, int ResultCount = 0,
+    ushort ByproductId = 0, int ByproductCount = 0);
 
 /// <summary>
-/// Block-entity registry for anvils, keyed by the anvil's cell. An anvil holds <b>either</b> one piece of its profile's
-/// input (a bloom, laid on with right-click) <b>or</b> a stack of one forge metal (wrought iron: any item a
-/// <see cref="ForgeRecipe"/> takes, stacked one per right-click up to its largest recipe, <see cref="StackCap"/>), never
-/// both. The hammer works a piece: every <see cref="TryHit"/> counts, with a gap the hammer sets between two hits
-/// (<see cref="State.CooldownLeft"/> runs down in <see cref="Update"/>, so the pace is judged by the simulation and not
-/// by a client's clock), and the hit that reaches <see cref="AnvilProfile.Hits"/> turns the piece into its result and
-/// its slag. A stack is forged instead: the recipes <see cref="Offered"/> for its metal and its size are picked from a
-/// list and <see cref="TryForge"/> takes their metal off the stack. Main thread only; saved with the world and mirrored
-/// to clients like the other stations. An entry whose block is gone is swept and what lies on it handed back as drops.
+/// Block-entity registry for anvils, keyed by the anvil's cell. An anvil holds a stack of one forge metal (blooms, or
+/// vulcanite: any item a <see cref="ForgeRecipe"/> takes), stacked one per right-click up to its largest recipe
+/// (<see cref="StackCap"/>). A recipe <see cref="Offered"/> for the stack is picked from the anvil's list
+/// (<see cref="TrySelect"/>, which costs nothing yet) and then hammered: every <see cref="TryHit"/> counts, with a gap
+/// the hammer sets between two hits (<see cref="State.CooldownLeft"/> runs down in <see cref="Update"/>, so the pace is
+/// judged by the simulation and not by a client's clock), and the hit that reaches the recipe's
+/// <see cref="ForgeRecipe.Hits"/> takes its metal off the stack and hands out its result and byproduct. Main thread
+/// only; saved with the world and mirrored to clients like the other stations. An entry whose block is gone is swept
+/// and its stack handed back as drops.
 /// </summary>
 public sealed class AnvilManager
 {
@@ -50,26 +48,39 @@ public sealed class AnvilManager
         /// <summary>Block id of the anvil this entry was registered with.</summary>
         public ushort BlockId;
 
-        /// <summary>How this anvil behaves, from <see cref="BlockId"/>; never saved or sent.</summary>
-        public AnvilProfile Profile = AnvilProfile.Default;
-
-        /// <summary>Whether a piece (a bloom) lies on the anvil; never with a metal stack.</summary>
-        public bool HasPiece;
-
-        /// <summary>Hits the piece has taken.</summary>
-        public int Hits;
-
-        /// <summary>Seconds until the next hit counts.</summary>
-        public float CooldownLeft;
-
         /// <summary>The forge metal stacked on the anvil, 0 when there is no stack.</summary>
         public ushort MetalId;
 
         /// <summary>How many of <see cref="MetalId"/> are stacked; 0 when there is no stack.</summary>
         public int MetalCount;
 
-        /// <summary>Whether nothing lies on the anvil: no piece and no stack.</summary>
-        public bool IsEmpty => !HasPiece && MetalCount == 0;
+        /// <summary>The result of the forge recipe picked for the stack, 0 when none is.</summary>
+        public ushort SelectedResultId;
+
+        /// <summary>Hits the picked recipe has taken.</summary>
+        public int Hits;
+
+        /// <summary>Seconds until the next hit counts.</summary>
+        public float CooldownLeft;
+
+        /// <summary>Whether nothing lies on the anvil.</summary>
+        public bool IsEmpty => MetalCount == 0;
+
+        /// <summary>The picked recipe, or null when none is.</summary>
+        public ForgeRecipe? Selected =>
+            SelectedResultId == 0 ? null : ContentRegistry.ForgeRecipeForResult(SelectedResultId);
+
+        /// <summary>The recipe making <paramref name="resultId"/> when it is <see cref="Offered"/> for this stack, or
+        /// null.</summary>
+        public ForgeRecipe? Offers(ushort resultId) =>
+            Offered(MetalId, MetalCount).FirstOrDefault(r => r.ResultId == resultId);
+
+        // Forgets the pick and its hits
+        internal void ClearSelection()
+        {
+            SelectedResultId = 0;
+            Hits = 0;
+        }
     }
 
     private readonly Dictionary<(int X, int Y, int Z), State> _anvils = new();
@@ -88,12 +99,7 @@ public sealed class AnvilManager
             _anvils[key] = state;
         }
         state.BlockId = blockId;
-        state.Profile = ProfileOf(blockId);
     }
-
-    /// <summary>The anvil profile of block <paramref name="blockId"/>, or <see cref="AnvilProfile.Default"/> when it
-    /// is not (or no longer) an anvil.</summary>
-    public static AnvilProfile ProfileOf(ushort blockId) => BlockType.ById[blockId]?.Anvil ?? AnvilProfile.Default;
 
     /// <summary>The most of <paramref name="metalId"/> an anvil stacks: the most any of its forge recipes takes, so a
     /// stack never holds metal no recipe could use. 0 for an id that is no forge metal.</summary>
@@ -123,23 +129,11 @@ public sealed class AnvilManager
             yield return (new Vector3(key.X, key.Y, key.Z), state);
     }
 
-    /// <summary>Lays one <paramref name="item"/> on an empty anvil. Refuses anything but the profile's input and an
-    /// anvil that already holds a piece or a stack.</summary>
-    public bool TryPlace(Vector3 cell, ushort item)
-    {
-        if (!_anvils.TryGetValue(KeyOf(cell), out var state) || !state.IsEmpty) return false;
-        if (item == 0 || item != state.Profile.InputId) return false;
-        state.HasPiece = true;
-        state.Hits = 0;
-        state.CooldownLeft = 0f;
-        return true;
-    }
-
-    /// <summary>Stacks one <paramref name="metal"/> on the anvil. Refuses an id no forge recipe takes, an anvil holding
-    /// a piece or a stack of another metal, and a stack already at its <see cref="StackCap"/>.</summary>
+    /// <summary>Stacks one <paramref name="metal"/> on the anvil. Refuses an id no forge recipe takes, a stack of
+    /// another metal, and a stack already at its <see cref="StackCap"/>. The pick, if any, stands.</summary>
     public bool TryStack(Vector3 cell, ushort metal)
     {
-        if (!_anvils.TryGetValue(KeyOf(cell), out var state) || state.HasPiece) return false;
+        if (!_anvils.TryGetValue(KeyOf(cell), out var state)) return false;
         if (state.MetalCount > 0 && state.MetalId != metal) return false;
         if (state.MetalCount >= StackCap(metal)) return false;
         state.MetalId = metal;
@@ -148,23 +142,14 @@ public sealed class AnvilManager
     }
 
     /// <summary>
-    /// Takes back what lies on the anvil: the piece (however many hits it took; they are lost), or one of the stack,
-    /// or the whole stack when <paramref name="all"/>. False on an empty anvil.
+    /// Takes back one of the stack, or the whole stack when <paramref name="all"/>. A pick the smaller stack can no
+    /// longer pay for is forgotten with its hits. False on an empty anvil.
     /// </summary>
     public bool TryTake(Vector3 cell, bool all, out ushort item, out int count)
     {
         item = 0;
         count = 0;
         if (!_anvils.TryGetValue(KeyOf(cell), out var state) || state.IsEmpty) return false;
-        if (state.HasPiece)
-        {
-            item = state.Profile.InputId;
-            count = 1;
-            state.HasPiece = false;
-            state.Hits = 0;
-            return true;
-        }
-
         item = state.MetalId;
         count = all ? state.MetalCount : 1;
         TakeMetal(state, count);
@@ -172,16 +157,17 @@ public sealed class AnvilManager
     }
 
     /// <summary>
-    /// Forges the recipe making <paramref name="resultId"/> from the anvil's stack: refused unless such a recipe exists
-    /// and the stack is of its metal and holds at least its count (<see cref="Offered"/>), which then leaves the stack.
-    /// The caller hands out <paramref name="recipe"/>'s result.
+    /// Picks the recipe making <paramref name="resultId"/> for the anvil's stack, to be hammered out next: refused
+    /// unless it is <see cref="Offered"/> for the stack. A new pick starts its hits from 0; picking the one already
+    /// picked keeps them. Nothing leaves the stack until the last hit.
     /// </summary>
-    public bool TryForge(Vector3 cell, ushort resultId, out ForgeRecipe? recipe)
+    public bool TrySelect(Vector3 cell, ushort resultId)
     {
-        recipe = ContentRegistry.ForgeRecipeForResult(resultId);
-        if (recipe == null || !_anvils.TryGetValue(KeyOf(cell), out var state)) return false;
-        if (state.MetalId != recipe.MetalId || state.MetalCount < recipe.MetalCount) return false;
-        TakeMetal(state, recipe.MetalCount);
+        if (!_anvils.TryGetValue(KeyOf(cell), out var state)) return false;
+        if (state.Offers(resultId) == null) return false;
+        if (state.SelectedResultId == resultId) return true;
+        state.SelectedResultId = resultId;
+        state.Hits = 0;
         return true;
     }
 
@@ -193,33 +179,35 @@ public sealed class AnvilManager
             state.MetalCount = 0;
             state.MetalId = 0;
         }
+        if (state.Selected is not { } picked || picked.MetalCount > state.MetalCount)
+            state.ClearSelection();
     }
 
     /// <summary>
-    /// One hammer hit. Refused unless a piece lies on the anvil and the gap since the last hit has run down to within
+    /// One hammer hit. Refused unless a recipe is picked and the gap since the last hit has run down to within
     /// <paramref name="slackSeconds"/> (network jitter on a server; 0 in singleplayer). A hit that lands starts a new
-    /// gap of <paramref name="gapSeconds"/> (the hammer's own pace); the one that reaches the profile's hit count
-    /// finishes the piece, clears the anvil and reports the result and slag to hand out.
+    /// gap of <paramref name="gapSeconds"/> (the hammer's own pace); the one that reaches the recipe's hit count takes
+    /// its metal off the stack, clears the pick and reports the result and byproduct to hand out.
     /// </summary>
     public AnvilHit TryHit(Vector3 cell, float gapSeconds, float slackSeconds)
     {
-        if (!_anvils.TryGetValue(KeyOf(cell), out var state) || !state.HasPiece) return default;
+        if (!_anvils.TryGetValue(KeyOf(cell), out var state) || state.Selected is not { } recipe) return default;
         if (state.CooldownLeft > slackSeconds) return default;
 
         state.CooldownLeft = gapSeconds;
         state.Hits++;
-        if (state.Hits < state.Profile.Hits)
+        if (state.Hits < recipe.Hits)
             return new AnvilHit(AnvilHitKind.Struck);
 
-        state.HasPiece = false;
-        state.Hits = 0;
-        return new AnvilHit(AnvilHitKind.Finished, state.Profile.ResultId, BloomeryConfig.IronPerBloom,
-            state.Profile.SlagId, BloomeryConfig.SlagPerBloom);
+        TakeMetal(state, recipe.MetalCount);
+        state.ClearSelection();
+        return new AnvilHit(AnvilHitKind.Finished, recipe.ResultId, recipe.ResultCount, recipe.ByproductId,
+            recipe.ByproductCount);
     }
 
     /// <summary>
-    /// Runs the hit gaps down and sweeps anvils whose block is gone (broken, blasted or replaced): the piece or the
-    /// stack lying on one drops where it stood. An anvil in an unloaded chunk is left alone.
+    /// Runs the hit gaps down and sweeps anvils whose block is gone (broken, blasted or replaced): the stack lying on
+    /// one drops where it stood. An anvil in an unloaded chunk is left alone.
     /// </summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops)
     {
@@ -237,8 +225,6 @@ public sealed class AnvilManager
         {
             if (!_anvils.Remove(key, out var state)) continue;
             var at = new Vector3(key.X, key.Y, key.Z);
-            if (state.HasPiece)
-                drops.Spawn(state.Profile.InputId, at);
             for (var i = 0; i < state.MetalCount; i++)
                 drops.Spawn(state.MetalId, at);
         }
@@ -246,34 +232,34 @@ public sealed class AnvilManager
 
     private static (int X, int Y, int Z) KeyOf(Vector3 cell) => VoxelCoords.BlockCellOf(cell);
 
-    /// <summary>Every tracked anvil that holds something, by content name, for <c>stations.json</c>.</summary>
+    /// <summary>Every tracked anvil that holds a stack, by content name, for <c>stations.json</c>.</summary>
     internal List<StationSaveData.AnvilData> Capture()
     {
         var result = new List<StationSaveData.AnvilData>();
         foreach (var ((x, y, z), state) in _anvils)
         {
             if (result.Count >= StationNetCodec.MaxEntries) break;
-            if (state.IsEmpty || SaveNames.NameOf(state.BlockId) is not { } block) continue;
-            var data = new StationSaveData.AnvilData { Cell = [x, y, z], Block = block };
-            if (state.HasPiece)
+            if (state.IsEmpty || SaveNames.NameOf(state.BlockId) is not { } block
+                || SaveNames.NameOf(state.MetalId) is not { } metal)
+                continue;
+            result.Add(new StationSaveData.AnvilData
             {
-                data.Hits = state.Hits;
-                data.Cooldown = state.CooldownLeft;
-            }
-            else if (SaveNames.NameOf(state.MetalId) is { } metal)
-            {
-                data.Metal = metal;
-                data.Count = state.MetalCount;
-            }
-            else continue;
-            result.Add(data);
+                Cell = [x, y, z],
+                Block = block,
+                Metal = metal,
+                Count = state.MetalCount,
+                Selected = state.SelectedResultId == 0 ? null : SaveNames.NameOf(state.SelectedResultId),
+                Hits = state.Hits,
+                Cooldown = state.CooldownLeft,
+            });
         }
         return result;
     }
 
-    /// <summary>Adds the anvils saved by <see cref="Capture"/>: one with a <see cref="StationSaveData.AnvilData.Metal"/>
-    /// holds that stack (clamped to the metal's <see cref="StackCap"/>), any other a piece. An entry whose block or metal
-    /// no longer resolves or whose numbers are out of range is dropped. Returns how many were dropped.</summary>
+    /// <summary>Adds the anvils saved by <see cref="Capture"/>, each stack clamped to its metal's
+    /// <see cref="StackCap"/>. An entry whose block or metal no longer resolves or whose numbers are out of range is
+    /// dropped; a pick that no longer resolves or is not offered for the stack is forgotten. Returns how many entries
+    /// were dropped.</summary>
     internal int Restore(IReadOnlyList<StationSaveData.AnvilData>? saved)
     {
         var skipped = 0;
@@ -291,22 +277,25 @@ public sealed class AnvilManager
         return skipped;
     }
 
-    // The state one saved entry restores to, or null when its piece or stack is out of range
+    // The state one saved entry restores to, or null when its stack is out of range
     private static State? RestoredState(StationSaveData.AnvilData data, ushort block)
     {
-        var state = new State { BlockId = block, Profile = ProfileOf(block) };
-        if (data.Metal != null)
+        if (!SaveNames.TryResolve(data.Metal, out var metal) || StackCap(metal) == 0 || data.Count < 1
+            || !float.IsFinite(data.Cooldown))
+            return null;
+        var state = new State
         {
-            if (!SaveNames.TryResolve(data.Metal, out var metal) || StackCap(metal) == 0 || data.Count < 1) return null;
-            state.MetalId = metal;
-            state.MetalCount = Math.Min(data.Count, StackCap(metal));
-            return state;
+            BlockId = block,
+            MetalId = metal,
+            MetalCount = Math.Min(data.Count, StackCap(metal)),
+            CooldownLeft = Math.Clamp(data.Cooldown, 0f, 60f),
+        };
+        if (data.Selected != null && SaveNames.TryResolve(data.Selected, out var selected)
+            && state.Offers(selected) is { } recipe && data.Hits >= 0 && data.Hits < recipe.Hits)
+        {
+            state.SelectedResultId = selected;
+            state.Hits = data.Hits;
         }
-
-        if (data.Hits < 0 || data.Hits >= state.Profile.Hits || !float.IsFinite(data.Cooldown)) return null;
-        state.HasPiece = true;
-        state.Hits = data.Hits;
-        state.CooldownLeft = Math.Clamp(data.Cooldown, 0f, 60f);
         return state;
     }
 
@@ -320,11 +309,11 @@ public sealed class AnvilManager
             if (left-- == 0) break;
             StationNetCodec.WriteCell(writer, x, y, z);
             writer.WriteId(state.BlockId);
-            writer.Write(state.HasPiece);
-            writer.Write((byte)state.Hits);
-            writer.Write(state.CooldownLeft);
             writer.WriteId(state.MetalId);
             writer.Write((byte)state.MetalCount);
+            writer.WriteId(state.SelectedResultId);
+            writer.Write((byte)state.Hits);
+            writer.Write(state.CooldownLeft);
         }
     }
 
@@ -339,15 +328,16 @@ public sealed class AnvilManager
             var state = new State
             {
                 BlockId = BlockTables.RequireAssigned(reader.ReadId()),
-                HasPiece = reader.ReadBool(),
-                Hits = reader.ReadByte(),
-                CooldownLeft = StationNetCodec.ReadFinite(reader),
                 MetalId = BlockTables.RequireAssigned(reader.ReadId()),
                 MetalCount = reader.ReadByte(),
+                SelectedResultId = BlockTables.RequireAssigned(reader.ReadId()),
+                Hits = reader.ReadByte(),
+                CooldownLeft = StationNetCodec.ReadFinite(reader),
             };
-            state.Profile = ProfileOf(state.BlockId);
-            if (state.Hits > AnvilProfile.MaxHits || (state.MetalId == 0) != (state.MetalCount == 0)
-                || (state.HasPiece && state.MetalCount > 0))
+            if ((state.MetalId == 0) != (state.MetalCount == 0)
+                || (state.SelectedResultId != 0 && (state.Offers(state.SelectedResultId) is not { } recipe
+                                                    || state.Hits >= recipe.Hits))
+                || (state.SelectedResultId == 0 && state.Hits != 0))
                 throw new System.IO.InvalidDataException("anvil snapshot out of range");
             _anvils[key] = state;
         }

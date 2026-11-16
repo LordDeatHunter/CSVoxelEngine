@@ -200,7 +200,7 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
   `TowerSite.TreasureTier`, one above any floor) into its state as `ChestProfile.TierState`, so the point query equals the
   stamp. Its `chest.tiers` maps the tiers onto `tower_floor_low`/`_mid`/`_high`/`_top` (two floors each) and
   `tower_treasure`, all nesting `tower_supplies`, richer going up (a gear rarity band one step rarer a table, more gear,
-  the ingot ladder tin..wrought iron, scrolls and mana draughts). Like any ruin chest it holds no state until first opened
+  the ingot ladder tin..bronze, then iron blooms, scrolls and mana draughts). Like any ruin chest it holds no state until first opened
   or broken. Hooks: `TowerGenerator.ChestCells(s, k)`/`AltarChestCells(s)`. Tests: `TowerChestTests` and the chest cases
   of `TowerPlacementTests`. Known gap: towers in chunks saved before BT-5 have no chests. The collapse (BT-8) keeps floor 0's
   chests and spills every higher one's contents (an unopened chest rolls its loot first), so nothing is lost.
@@ -247,7 +247,7 @@ altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collaps
   `TowerRecord.BossDefeated` reads true from then on, which BT-8's collapse reads (polled, not through the event).
 - **The Skeleton King** (`skeleton_king.json`, hp 600, not difficulty-scaled, `"boss": true`; its boss table
   `loot/skeleton_king.json` (BT-7) rolls exactly one unique first, the bone-breaker blade, the bone charm or the crystal
-  staff, then bones, wrought iron, bronze ingots and, half the time, a modifier scroll or mana draughts;
+  staff, then bones, iron blooms, bronze ingots and, half the time, a modifier scroll or mana draughts;
   `SkeletonKingLootTests`) is a `SkeletonKing`
   (`Entities/TowerMobs/`), a `RealmMob` with `IsBoss` and `IsUndead` true (the `undeadDamage` stat applies) and no floating
   healthbar. Its model and skin come from `tools/generate-skeleton-king-model.py` (deterministic, `--check`, on the hell and

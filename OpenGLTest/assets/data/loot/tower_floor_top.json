@@ -1,5 +1,5 @@
 {
-  // A battle tower chest on floors 6-7: wrought iron, one or two epic to legendary trinkets,
+  // A battle tower chest on floors 6-7: iron blooms, one or two epic to legendary trinkets,
   // and often a scroll or a mana draught.
   "pools": [
     { "rolls": 1, "entries": [ { "table": "tower_supplies" } ] },
@@ -7,7 +7,7 @@
       "chance": 0.9,
       "rolls": 1,
       "entries": [
-        { "item": "item/wrought_iron", "weight": 3, "count": { "min": 2, "max": 4 } },
+        { "item": "item/bloom", "weight": 3, "count": { "min": 2, "max": 4 } },
         { "item": "item/bronze_ingot", "weight": 1, "count": { "min": 2, "max": 4 } }
       ]
     },

@@ -15,7 +15,7 @@
     { "op": "wait", "seconds": 14 },
     { "op": "give", "block": "item/copper_ingot", "count": 5 },
     { "op": "give", "block": "item/tin_ingot", "count": 2 },
-    { "op": "give", "block": "item/wrought_iron", "count": 2 },
+    { "op": "give", "block": "item/bronze_ingot", "count": 2 },
     { "op": "teleport", "pos": [157.5, 14.5, 279.5], "yaw": -90, "pitch": -89 },
     { "op": "wait", "seconds": 0.3 },
     { "op": "select", "slot": 1 },

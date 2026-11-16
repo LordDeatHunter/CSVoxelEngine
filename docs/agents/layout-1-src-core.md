@@ -196,7 +196,7 @@ OpenGLTest/
                                #   readonly, read concurrently by every thread; namespace VoxelEngine.Config)
       FootprintConfig.cs       # footprints: default visibility and persistence, fade share, cap, print size and tint
       AudioConfig.cs           # ambience bed paths, volumes and fades; the sfx volume
-      BloomeryConfig.cs        # iron smelting: the bloomery's heat band, bellows pump, smelt and burn times, the anvil's slack
+      BloomeryConfig.cs        # iron smelting: the bloomery's heat band, cold reverse rate, bellows landing heat, smelt time, the anvil's slack
       HudConfig.cs             # selection outline and pulse, hotbar name fade, pop and flash, the loading screen
       RarityStyleConfig.cs     # the rarity chrome's per-rarity layer strengths (opacity, wash, glow, sheen, sparkle,
                                #   pulse depth) and its shape and motion knobs; Common all zero
@@ -388,7 +388,7 @@ OpenGLTest/
                                #   authored model (the crucible bowl, fuel lump and
                                #   pending-charge sizes every kiln shares; the mold
                                #   pocket levels and the cooling dissolve curves)
-        BloomeryProfile.cs     # a bloomery anchor's compiled `bloomery` object (caps and item ids) and an anvil's `anvil` object
+        BloomeryProfile.cs     # a bloomery anchor's compiled `bloomery` object (caps, item ids, tuyere cells and IsTuyere)
         KilnLayout.cs          # one kiln model's opening and its bowl, fire, fuel and mouth spots, per structure
                                #   size (Kiln 2, Furnace 3, ForSize), and ToWorld onto a facing
         KilnProfile.cs         # a kiln anchor's compiled `kiln` object: fuel cap, melt speed (MeltSeconds), can-alloy,

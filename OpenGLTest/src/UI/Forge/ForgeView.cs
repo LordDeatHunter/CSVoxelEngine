@@ -29,6 +29,9 @@ public sealed class ForgeView
     /// <summary>How many of <see cref="MetalId"/> are stacked.</summary>
     public int MetalCount { get; private set; }
 
+    /// <summary>The result of the recipe already picked on the anvil, 0 for none; its card is marked.</summary>
+    public ushort SelectedResultId { get; private set; }
+
     /// <summary>The recipes the stack can make, in the order the cards show them.</summary>
     public IReadOnlyList<ForgeRecipe> Recipes { get; private set; } = [];
 
@@ -45,13 +48,15 @@ public sealed class ForgeView
         Cell = cell;
         MetalId = 0;
         MetalCount = 0;
+        SelectedResultId = 0;
         Recipes = [];
         _shown = false;
     }
 
-    /// <summary>Shows the anvil's current stack; the cards are rebuilt only when it changed.</summary>
-    public void Show(ushort metalId, int count)
+    /// <summary>Shows the anvil's current stack and pick; the cards are rebuilt only when the stack changed.</summary>
+    public void Show(ushort metalId, int count, ushort selectedResultId)
     {
+        SelectedResultId = selectedResultId;
         if (_shown && metalId == MetalId && count == MetalCount) return;
         _shown = true;
         MetalId = metalId;

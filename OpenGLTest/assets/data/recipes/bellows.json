@@ -1,0 +1,9 @@
+{
+  // A bloomery's bellows: a leather bag between two boards.
+  "result": "block/bellows",
+  "count": 1,
+  "ingredients": [
+    { "item": "block/oak_planks", "count": 2 },
+    { "item": "item/hide", "count": 2 }
+  ]
+}

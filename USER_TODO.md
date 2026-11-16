@@ -65,7 +65,7 @@ body wears.
 
 ### Ingot piles
 
-- [ ] **Ingot cube tiles** — `blocks/<metal>_ingot_block.png` (copper, tin, bronze, wrought iron, vulcanite) are flat generated 32x32 tiles squashed onto the ingots of a pile; replace with hand-drawn metal faces.
+- [ ] **Ingot cube tiles** — `blocks/<metal>_ingot_block.png` (copper, tin, bronze, vulcanite) are flat generated 32x32 tiles squashed onto the ingots of a pile; replace with hand-drawn metal faces.
 
 ### Drops
 
@@ -124,6 +124,10 @@ fully opaque and tileable on both axes.
   `oak_trapdoor.json`); the models crop it with default UVs.
 - [ ] **Anvil** — `anvil.png`. The model crops it with default UVs across the base, waist, top and
   horn, so every part must read on its own. Keep it symmetric.
+- [ ] **Bellows** — `bellows_side.png`, `bellows_top.png` on a plain cube (`blocks/bellows.json`); the block wants a
+  real model (boards and a pleated bag) later. Made by `tools/generate-bellows-textures.py`.
+- [ ] **Bloomery tuyere** — `bloomery_tuyere.png`, the floor of the hole sunk into each side wall of the bloomery
+  (`models/block/bloomery.json`), drawn as a full tile on an 8x8-unit quad. Made by `tools/generate-bellows-textures.py`.
 - [ ] **Cloud block** — `cloud_block.png`. A soft white mottle whose alpha is about 0.7; keep the
   alpha, since it is drawn in the translucent pass.
 - [ ] **Slime block** — `slime_block.png`. Opaque, green gel in 4x4-texel cells with rims and

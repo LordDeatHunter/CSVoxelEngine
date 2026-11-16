@@ -10,9 +10,9 @@ namespace VoxelEngine.Tests.Interaction;
 
 /// <summary>
 /// The iron works in a live world: a cube of bloomery bricks converts into a tracked bloomery through the world's own
-/// convert path, mining it hands back what it held, a bloomery and an anvil survive the world's save snapshot, a
-/// hammer hit that finishes a bloom drops the iron and the slag on top of the anvil, and right-clicks stack that iron on
-/// the anvil and take it back.
+/// convert path, mining it hands back what it held, a landing on a bellows at its tuyere heats it, a bloomery survives
+/// the world's save snapshot, the hammer hit that finishes a picked recipe drops its result and byproduct on top of the
+/// anvil, and right-clicks stack blooms on the anvil and take them back.
 /// </summary>
 [Collection("Worldgen seed")]
 public sealed class IronWorksWorldTests : IDisposable
@@ -66,33 +66,67 @@ public sealed class IronWorksWorldTests : IDisposable
     }
 
     [Fact]
-    public void AHammerHitThatFinishesABloomDropsTheIronAndTheSlagOnTheAnvil()
+    public void ALandingOnABellowsAtATuyereHeatsTheLitBloomeryAndALandingBesideItDoesNot()
+    {
+        var anchor = BuildBloomery();
+        var bloomeries = _world!.World.Smithing.Bloomeries;
+        var state = bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z)!;
+        Assert.True(bloomeries.TryAddOre(anchor, Bloomery.Bloomery!.OreId));
+        Assert.True(bloomeries.TryAddFuel(anchor, ContentRegistry.RequireItem("coal")));
+        Assert.True(bloomeries.Ignite(anchor));
+
+        // A bellows on the first tuyere cell of the structure as it was built
+        var size = Bloomery.MultiblockSize;
+        var tuyere = Enumerable.Range(-1, size + 2)
+            .SelectMany(dx => Enumerable.Range(-1, size + 2).Select(dz => (dx, dz)))
+            .Select(d => (d.dx, 0, d.dz))
+            .First(d => Bloomery.Bloomery.IsTuyere(d, state.Facing, size));
+        var bellows = new Vector3(anchor.X + tuyere.dx, anchor.Y, anchor.Z + tuyere.dz);
+        _world.Set((int)bellows.X, (int)bellows.Y, (int)bellows.Z, BlockType.Types.Values.First(b => b.IsBellows).Id);
+        var feetOnTop = bellows + new Vector3(0.5f, 1f, 0.5f);
+
+        state.Heat = 0.2f;
+        // Landing on the ground beside it (two cells off the bellows, away from the structure) heats nothing
+        var away = Vector3.Normalize(new Vector3(tuyere.dx - (size - 1) * 0.5f, 0f, tuyere.dz - (size - 1) * 0.5f));
+        Assert.False(_world.World.PressBellows(feetOnTop + away * 2f, 0.3f, 1.2f));
+        Assert.Equal(0.2f, state.Heat);
+
+        Assert.True(_world.World.PressBellows(feetOnTop, 0.3f, 1.2f));
+        Assert.True(state.Heat > 0.2f);
+    }
+
+    [Fact]
+    public void ThePickedRecipesLastHammerHitDropsItsResultAndByproductOnTheAnvil()
     {
         _world = new SupportTestWorld();
-        var anvilBlock = BlockType.Types.Values.First(b => b.Anvil != null);
+        var anvilBlock = BlockType.Types.Values.First(b => b.IsAnvil);
         var cell = new Vector3(2, _world.Top + 1, 2);
         _world.Load(3, _world.Top + 2, 3);
         _world.Set((int)cell.X, (int)cell.Y, (int)cell.Z, anvilBlock.Id);
 
-        var profile = anvilBlock.Anvil!;
+        var recipe = ContentRegistry.ForgeRecipes.First(r => r.MetalId == Bloomery.Bloomery!.BloomId && r.ByproductId != 0);
+        var anvils = _world.World.Smithing.Anvils;
         Assert.True(_world.World.Interactions.TryTrackAnvilAt(cell));
-        Assert.True(_world.World.Smithing.Anvils.TryPlace(cell, profile.InputId));
+        for (var i = 0; i < recipe.MetalCount; i++)
+            Assert.True(anvils.TryStack(cell, recipe.MetalId));
+        Assert.True(_world.World.Smithing.Select(cell, recipe.ResultId));
 
-        for (var hit = 1; hit < profile.Hits; hit++)
+        for (var hit = 1; hit < recipe.Hits; hit++)
             Assert.Equal(AnvilHitKind.Struck, _world.World.HammerFor(cell, 0f, 0f).Kind);
         Assert.Empty(_world.World.Drops);
 
         Assert.Equal(AnvilHitKind.Finished, _world.World.HammerFor(cell, 0f, 0f).Kind);
-        Assert.Equal(BloomeryConfig.IronPerBloom, _world.World.Drops.Count(d => d.BlockId == profile.ResultId));
-        Assert.Equal(BloomeryConfig.SlagPerBloom, _world.World.Drops.Count(d => d.BlockId == profile.SlagId));
+        Assert.Equal(recipe.ResultCount, _world.World.Drops.Count(d => d.BlockId == recipe.ResultId));
+        Assert.Equal(recipe.ByproductCount, _world.World.Drops.Count(d => d.BlockId == recipe.ByproductId));
         Assert.All(_world.World.Drops, d => Assert.True(d.Position.Y > cell.Y + 0.5f));
+        Assert.True(anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!.IsEmpty);
     }
 
     [Fact]
     public void RightClicksStackTheMetalTakeOneBackOrAllWhileSneakingAndAHammerOpensTheRecipes()
     {
         _world = new SupportTestWorld();
-        var anvilBlock = BlockType.Types.Values.First(b => b.Anvil != null);
+        var anvilBlock = BlockType.Types.Values.First(b => b.IsAnvil);
         var (x, y, z) = (8, _world.Top + 1, 6);
         _world.Load(x, y, z);
         _world.Set(x, y, z, anvilBlock.Id);
@@ -100,7 +134,7 @@ public sealed class IronWorksWorldTests : IDisposable
 
         var player = _world.Player;
         var inventory = player.Inventory;
-        var metal = anvilBlock.Anvil!.ResultId;
+        var metal = Bloomery.Bloomery!.BloomId;
         var coal = ContentRegistry.RequireItem("coal").Id;
         var hammer = ContentRegistry.RequireItem("smithing_hammer").Id;
         Assert.True(inventory.Add(coal));
@@ -144,7 +178,7 @@ public sealed class IronWorksWorldTests : IDisposable
     }
 
     [Fact]
-    public void ABloomeryAndAnAnvilWithAPieceSurviveTheWorldsSaveSnapshot()
+    public void ABloomerySurvivesTheWorldsSaveSnapshot()
     {
         var anchor = BuildBloomery();
         var smithing = _world!.World.Smithing;

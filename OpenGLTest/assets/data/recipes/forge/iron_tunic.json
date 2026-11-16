@@ -1,8 +1,10 @@
 {
-  // The iron tunic: bronze's ring count in wrought iron.
-  // Forged with a smithing hammer from wrought iron stacked on an anvil (see AnvilManager).
-  "metal": "item/wrought_iron",
+  // The iron tunic: bronze's ring count in blooms.
+  // Picked on an anvil holding blooms, then hammered out with a smithing hammer (see AnvilManager).
+  "metal": "item/bloom",
   "metalCount": 8,
   "result": "item/iron_tunic",
-  "count": 1
+  "count": 1,
+  "hits": 10,
+  "byproduct": { "item": "item/slag", "count": 8 }
 }

@@ -1,0 +1,14 @@
+{
+  // A bloomery's bellows (recipes/bellows.json): set it against one of a bloomery's tuyeres (the holes low in its
+  // side walls, the bloomery object's "tuyeres") and land on it to blow the fire hotter; the farther the body fell, the
+  // more heat (BloomeryRules.LandingHeat). A player or any walking mob works it, an item drop never does. A plain cube
+  // for now: the tiles are placeholders (USER_TODO.md) until it gets a real model.
+  "name": "Bellows",
+  "model": {
+    "parent": "block/cube_bottom_top",
+    "textures": { "side": "bellows_side", "top": "bellows_top", "bottom": "bellows_side" }
+  },
+  "bellows": true,
+  "hardness": 6,
+  "sfx": "hit_wood"
+}

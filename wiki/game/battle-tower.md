@@ -44,7 +44,7 @@ phases and a temper that gets worse as it weakens; it slams the roof, fires voll
 not stray far from its altar, and if everyone leaves it alone for a while it heals.
 
 The king always drops one unique: the [Bone-breaker Blade](/game/items/bone_breaker_blade), the
-[Bone Charm](/game/items/bone_charm) or the [Crystal Staff](/game/items/crystal_staff), together with bones, wrought iron,
+[Bone Charm](/game/items/bone_charm) or the [Crystal Staff](/game/items/crystal_staff), together with bones, iron blooms,
 bronze ingots and sometimes a scroll or a mana draught.
 
 ## The ruin

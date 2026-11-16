@@ -69,8 +69,9 @@ internal static class RecipeLoader
 
     /// <summary>
     /// Compiles one anvil recipe: a registered metal taken 1..<see cref="MaxForgeMetalCount"/> at a time, a registered
-    /// result other than the metal, made 1 or more at a time, and one recipe per result (a pick on the anvil names its
-    /// recipe by the result). Every error names <paramref name="path"/>.
+    /// result other than the metal, made 1 or more at a time in 1..<see cref="MaxForgeHits"/> hammer hits, an optional
+    /// registered byproduct, and one recipe per result (a pick on the anvil names its recipe by the result). Every
+    /// error names <paramref name="path"/>.
     /// </summary>
     private static ForgeRecipe CompileForgeRecipe(string name, ForgeRecipeDefinition definition, string path)
     {
@@ -92,12 +93,31 @@ internal static class RecipeLoader
         if (ContentRegistry.ForgeRecipeForResult(resultId) is { } other)
             throw new InvalidOperationException(
                 $"Forge recipe '{path}' duplicates the result of '{other.Name}': one forge recipe per result.");
-        return new ForgeRecipe(name, metalId, metalCount, resultId, resultCount);
+        var hits = definition.Hits ?? 0;
+        if (hits is < 1 or > MaxForgeHits)
+            throw new InvalidOperationException(
+                $"Forge recipe '{path}' has hits {definition.Hits}; expected 1..{MaxForgeHits}.");
+        ushort byproductId = 0;
+        var byproductCount = 0;
+        if (definition.Byproduct is { } byproduct)
+        {
+            if (byproduct.Item == null || !ContentFiles.TryResolve(byproduct.Item, out byproductId))
+                throw new InvalidOperationException(
+                    $"Forge recipe '{path}' names byproduct '{byproduct.Item}', which is not a registered block or item.");
+            byproductCount = byproduct.Count ?? 1;
+            if (byproductCount <= 0)
+                throw new InvalidOperationException(
+                    $"Forge recipe '{path}' has byproduct count {byproductCount}; expected 1 or more.");
+        }
+        return new ForgeRecipe(name, metalId, metalCount, resultId, resultCount, hits, byproductId, byproductCount);
     }
 
     /// <summary>The most metal one forge recipe may take: an anvil's stack is capped by its metal's largest recipe,
     /// and the stack rides the wire in a byte.</summary>
     internal const int MaxForgeMetalCount = 64;
+
+    /// <summary>The most hammer hits one forge recipe may take: an anvil's hit count rides the wire in a byte.</summary>
+    internal const int MaxForgeHits = 64;
 
     /// <summary>
     /// Compiles one alloy recipe: a molten result and at least two parts, each a distinct molten

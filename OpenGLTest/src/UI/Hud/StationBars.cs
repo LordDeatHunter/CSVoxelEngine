@@ -96,10 +96,10 @@ public static class StationBars
         return bars;
     }
 
-    /// <summary>The bar of an anvil with a piece on it: how far it has been hammered.</summary>
+    /// <summary>The bar of an anvil with a recipe picked: how far it has been hammered.</summary>
     public static List<StationBar>? Anvil(AnvilManager.State? state) =>
-        state is { HasPiece: true }
-            ? [new StationBar($"Hammered {state.Hits}/{state.Profile.Hits}", state.Hits / (float)Math.Max(1, state.Profile.Hits), StationBarKind.Progress)]
+        state?.Selected is { } recipe
+            ? [new StationBar($"Hammered {state.Hits}/{recipe.Hits}", state.Hits / (float)Math.Max(1, recipe.Hits), StationBarKind.Progress)]
             : null;
 
     /// <summary>The bar of a quern whose plate is turning: how far through its rotation it is. Null at rest.</summary>

@@ -1,19 +1,23 @@
 using System;
+using System.Numerics;
+using VoxelEngine.Content.Shapes;
 
 namespace VoxelEngine.Content.Stations;
 
 /// <summary>
 /// How one kind of bloomery behaves, compiled from its anchor block's <c>bloomery</c> object
-/// (<see cref="BlockType.Bloomery"/>): how many units of ore and of fuel its shaft holds. The heat model every
-/// bloomery shares lives in <see cref="Config.BloomeryConfig"/>. A bloomery's model is the mud brick kiln's, so
-/// where its fire burns is <see cref="KilnLayout.Kiln"/>'s.
+/// (<see cref="BlockType.Bloomery"/>): how many units of ore and of fuel its shaft holds and where its bellows go. The
+/// heat model every bloomery shares lives in <see cref="Config.BloomeryConfig"/>. A bloomery's model is the mud brick
+/// kiln's, so where its fire burns is <see cref="KilnLayout.Kiln"/>'s.
 /// </summary>
 /// <param name="OreCap">Units of crushed ore the shaft holds at once.</param>
 /// <param name="FuelCap">Units of fuel the shaft holds at once.</param>
 /// <param name="OreId">The one item the shaft smelts (the <c>ore</c> field).</param>
-/// <param name="BloomId">The item a well-smelted unit becomes (<c>bloom</c>).</param>
-/// <param name="SlagId">The item a burnt unit leaves (<c>slag</c>).</param>
-public sealed record BloomeryProfile(int OreCap, int FuelCap, ushort OreId, ushort BloomId, ushort SlagId)
+/// <param name="BloomId">The item a smelted unit becomes (<c>bloom</c>).</param>
+/// <param name="Tuyeres">The cells just outside the volume, in its authored (north-facing) local space, where a bellows
+/// works the bloomery (<c>tuyeres</c>).</param>
+public sealed record BloomeryProfile(int OreCap, int FuelCap, ushort OreId, ushort BloomId,
+    (int X, int Y, int Z)[] Tuyeres)
 {
     /// <summary>Ore cap of a bloomery object that names none.</summary>
     public const int DefaultOreCap = 4;
@@ -25,46 +29,50 @@ public sealed record BloomeryProfile(int OreCap, int FuelCap, ushort OreId, usho
     public const int MaxCap = 64;
 
     /// <summary>A profile that smelts nothing, for a block id that is not (or no longer) a bloomery.</summary>
-    public static readonly BloomeryProfile Default = new(DefaultOreCap, DefaultFuelCap, 0, 0, 0);
+    public static readonly BloomeryProfile Default = new(DefaultOreCap, DefaultFuelCap, 0, 0, []);
 
-    /// <summary>A validated profile: both caps in 1..<see cref="MaxCap"/>, anything else throws an
+    /// <summary>A validated profile: both caps in 1..<see cref="MaxCap"/> and at least one tuyere, each of which
+    /// must lie outside a <paramref name="size"/>-cell volume but touch one of its side faces; anything else throws an
     /// <see cref="ArgumentException"/> saying which.</summary>
-    public static BloomeryProfile Create(int oreCap, int fuelCap, ushort oreId, ushort bloomId, ushort slagId)
+    public static BloomeryProfile Create(int oreCap, int fuelCap, ushort oreId, ushort bloomId,
+        (int X, int Y, int Z)[] tuyeres, int size)
     {
         if (oreCap is < 1 or > MaxCap)
             throw new ArgumentException($"oreCap {oreCap}; a bloomery holds 1..{MaxCap} ore units.");
         if (fuelCap is < 1 or > MaxCap)
             throw new ArgumentException($"fuelCap {fuelCap}; a bloomery holds 1..{MaxCap} fuel units.");
-        return new BloomeryProfile(oreCap, fuelCap, oreId, bloomId, slagId);
+        if (tuyeres.Length == 0)
+            throw new ArgumentException("no tuyeres; a bloomery needs at least one cell where a bellows works it.");
+        foreach (var t in tuyeres)
+            if (!TouchesSide(t, size))
+                throw new ArgumentException(
+                    $"tuyere [{t.X}, {t.Y}, {t.Z}], which is not a cell against a side face of the {size}-cell volume.");
+        return new BloomeryProfile(oreCap, fuelCap, oreId, bloomId, tuyeres);
     }
-}
 
-/// <summary>
-/// How one kind of anvil behaves, compiled from its block's <c>anvil</c> object (<see cref="BlockType.Anvil"/>):
-/// how many hammer hits turn the bloom lying on it into wrought iron. The pace of the hits is the hammer's own
-/// <c>tool.hitDelayMs</c>.
-/// </summary>
-/// <param name="Hits">Hits a bloom takes.</param>
-/// <param name="InputId">The one item laid on the anvil (<c>input</c>).</param>
-/// <param name="ResultId">What the hits make of it (<c>result</c>).</param>
-/// <param name="SlagId">What the hits squeeze out (<c>slag</c>).</param>
-public sealed record AnvilProfile(int Hits, ushort InputId, ushort ResultId, ushort SlagId)
-{
-    /// <summary>Hits of an anvil object that names none.</summary>
-    public const int DefaultHits = 3;
-
-    /// <summary>Largest legal hit count.</summary>
-    public const int MaxHits = 32;
-
-    /// <summary>A profile that works nothing, for a block id that is not (or no longer) an anvil.</summary>
-    public static readonly AnvilProfile Default = new(DefaultHits, 0, 0, 0);
-
-    /// <summary>A validated profile: <paramref name="hits"/> in 1..<see cref="MaxHits"/>, anything else throws an
-    /// <see cref="ArgumentException"/>.</summary>
-    public static AnvilProfile Create(int hits, ushort inputId, ushort resultId, ushort slagId)
+    /// <summary>
+    /// Whether a bellows at <paramref name="offset"/> from the anchor works a bloomery of this profile turned to
+    /// <paramref name="facing"/>: the offset is one of the tuyeres turned the way the structure is
+    /// (<see cref="MultiblockShape.RotatePoint"/>, through the cell's center so it lands on a whole cell again).
+    /// </summary>
+    public bool IsTuyere((int X, int Y, int Z) offset, int facing, int size)
     {
-        if (hits is < 1 or > MaxHits)
-            throw new ArgumentException($"hits {hits}; a bloom takes 1..{MaxHits} hits.");
-        return new AnvilProfile(hits, inputId, resultId, slagId);
+        foreach (var t in Tuyeres)
+        {
+            var turned = MultiblockShape.RotatePoint(new Vector3(t.X + 0.5f, t.Y + 0.5f, t.Z + 0.5f), facing, size);
+            if (MathUtils.FloorToInt(turned.X) == offset.X && MathUtils.FloorToInt(turned.Y) == offset.Y
+                && MathUtils.FloorToInt(turned.Z) == offset.Z)
+                return true;
+        }
+        return false;
+    }
+
+    // A cell just outside one side face of the volume: one step past it on exactly one horizontal axis, within it on
+    // the other two
+    private static bool TouchesSide((int X, int Y, int Z) t, int size)
+    {
+        bool Inside(int v) => v >= 0 && v < size;
+        bool Beside(int v) => v == -1 || v == size;
+        return Inside(t.Y) && ((Beside(t.X) && Inside(t.Z)) || (Inside(t.X) && Beside(t.Z)));
     }
 }

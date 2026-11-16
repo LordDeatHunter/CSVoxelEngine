@@ -267,16 +267,20 @@ internal static class BlockSchemaParser
     /// <summary>Reads a bloomery anchor's <c>bloomery</c> object into its <see cref="BloomeryProfile"/>: omitted fields
     /// take the defaults and a cap <see cref="BloomeryProfile.Create"/> refuses throws naming the file. Null for a
     /// block that is not a bloomery.</summary>
-    internal static BloomeryProfile? ParseBloomery(BlockDefinition.BloomeryDefinition? definition, string path)
+    internal static BloomeryProfile? ParseBloomery(BlockDefinition.BloomeryDefinition? definition, int multiblockSize,
+        string path)
     {
         if (definition == null) return null;
+        var tuyeres = (definition.Tuyeres ?? []).Select(t => t is { Length: 3 }
+            ? (t[0], t[1], t[2])
+            : throw new InvalidOperationException($"Block '{path}' has a bloomery.tuyeres entry that is not [x, y, z].")).ToArray();
         try
         {
             return BloomeryProfile.Create(definition.OreCap ?? BloomeryProfile.DefaultOreCap,
                 definition.FuelCap ?? BloomeryProfile.DefaultFuelCap,
                 ResolveItemName(definition.Ore, "bloomery.ore", path),
                 ResolveItemName(definition.Bloom, "bloomery.bloom", path),
-                ResolveItemName(definition.Slag, "bloomery.slag", path));
+                tuyeres, multiblockSize);
         }
         catch (ArgumentException e)
         {
@@ -294,8 +298,6 @@ internal static class BlockSchemaParser
         throw new InvalidOperationException($"Block '{path}' names '{name}' in {field}, which is not a registered block or item.");
     }
 
-    /// <summary>Reads a block's <c>anvil</c> object into its <see cref="AnvilProfile"/>. An anvil is a plain model
-    /// block; a multiblock is refused. Null for a block that is not an anvil.</summary>
     /// <summary>Validates a block's <c>spritesheet</c> object into its <see cref="TextureSheet"/>.</summary>
     internal static TextureSheet ParseSpritesheet(BlockDefinition.SpritesheetDefinition definition, string path)
     {
@@ -316,24 +318,14 @@ internal static class BlockSchemaParser
         return new TextureSheet(texture, cols, rows, frames, fps);
     }
 
-    internal static AnvilProfile? ParseAnvil(BlockDefinition.AnvilDefinition? definition, BlockRenderer renderer,
-        string path)
+    /// <summary>Reads a block's <c>anvil</c> flag. An anvil is a plain model block; any other renderer is refused.</summary>
+    internal static bool ParseAnvil(bool? anvil, BlockRenderer renderer, string path)
     {
-        if (definition == null) return null;
+        if (anvil != true) return false;
         if (renderer is not BlockRenderer.Model)
             throw new InvalidOperationException(
-                $"Block '{path}' declares an anvil object with renderer \"{renderer}\"; an anvil is a plain model block.");
-        try
-        {
-            return AnvilProfile.Create(definition.Hits ?? AnvilProfile.DefaultHits,
-                ResolveItemName(definition.Input, "anvil.input", path),
-                ResolveItemName(definition.Result, "anvil.result", path),
-                ResolveItemName(definition.Slag, "anvil.slag", path));
-        }
-        catch (ArgumentException e)
-        {
-            throw new InvalidOperationException($"Block '{path}' has an anvil object with {e.Message}", e);
-        }
+                $"Block '{path}' declares an anvil with renderer \"{renderer}\"; an anvil is a plain model block.");
+        return true;
     }
 
     /// <summary>

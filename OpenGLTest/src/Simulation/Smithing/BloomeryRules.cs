@@ -3,48 +3,43 @@ using VoxelEngine.Config;
 
 namespace VoxelEngine.Simulation.Smithing;
 
-/// <summary>Where a bloomery's heat sits relative to the smelting band.</summary>
-public enum HeatZone
-{
-    /// <summary>Under <see cref="BloomeryConfig.BandMin"/>: the ore does not smelt, progress stalls.</summary>
-    Cold,
-
-    /// <summary>Inside the band: the ore smelts cleanly.</summary>
-    Band,
-
-    /// <summary>Over <see cref="BloomeryConfig.BandMax"/>: the ore still smelts, but it overheats and burns, and the
-    /// fuel burns faster.</summary>
-    Hot,
-}
-
 /// <summary>
 /// The bloomery's heat model as pure functions, so the manager, the tests and the look-at readout agree: the fire
-/// loses heat every second, each bellows pump (a jump beside the bloomery) adds some, and what the heat is relative
-/// to the band decides whether the ore smelts, stalls or burns. GL-free.
+/// loses heat every second, each landing on its bellows adds some (more the farther the body fell), and whether the
+/// heat reaches the band decides whether the ore smelts on or its progress runs back. There is no too hot: a fire at
+/// full heat smelts like one just inside the band. GL-free.
 /// </summary>
 public static class BloomeryRules
 {
-    /// <summary>The zone a heat value (0..1) falls in.</summary>
-    public static HeatZone ZoneOf(float heat) =>
-        heat < BloomeryConfig.BandMin ? HeatZone.Cold
-        : heat > BloomeryConfig.BandMax ? HeatZone.Hot
-        : HeatZone.Band;
+    /// <summary>Whether the ore smelts at this heat (at or over <see cref="BloomeryConfig.BandMin"/>); under it the
+    /// fire is too cold and the unit's progress runs back.</summary>
+    public static bool Smelts(float heat) => heat >= BloomeryConfig.BandMin;
 
-    /// <summary>The heat after <paramref name="dt"/> seconds without a pump, never under 0.</summary>
+    /// <summary>The heat after <paramref name="dt"/> seconds without a landing, never under 0.</summary>
     public static float Decay(float heat, float dt) => MathF.Max(0f, heat - BloomeryConfig.HeatDecayPerSecond * dt);
 
-    /// <summary>The heat after one bellows pump, never over 1.</summary>
-    public static float Pump(float heat) => MathF.Min(1f, heat + BloomeryConfig.PumpHeat);
+    /// <summary>
+    /// Seconds of smelt progress one second at <paramref name="heat"/> makes: 1 at or over the band, and under it a
+    /// negative rate that grows linearly from 0 at the band's edge to <see cref="BloomeryConfig.ColdReverseRate"/>
+    /// for a fire with no heat at all.
+    /// </summary>
+    public static float ProgressRate(float heat)
+    {
+        if (Smelts(heat)) return 1f;
+        var deficit = (BloomeryConfig.BandMin - MathF.Max(0f, heat)) / BloomeryConfig.BandMin;
+        return -BloomeryConfig.ColdReverseRate * deficit;
+    }
 
-    /// <summary>How fast the fuel burns at this heat, relative to a calm fire: an overheated one eats it faster.</summary>
-    public static float FuelBurnFactor(float heat) =>
-        ZoneOf(heat) == HeatZone.Hot ? BloomeryConfig.OverheatFuelFactor : 1f;
+    /// <summary>The heat one landing on the bellows after a fall of <paramref name="fallBlocks"/> adds: nothing under
+    /// <see cref="BloomeryConfig.BellowsMinFallBlocks"/>, otherwise a base plus a share per block fallen, capped at
+    /// <see cref="BloomeryConfig.BellowsMaxHeat"/>.</summary>
+    public static float LandingHeat(float fallBlocks)
+    {
+        if (!(fallBlocks >= BloomeryConfig.BellowsMinFallBlocks)) return 0f;
+        return MathF.Min(BloomeryConfig.BellowsMaxHeat,
+            BloomeryConfig.BellowsBaseHeat + fallBlocks * BloomeryConfig.BellowsHeatPerBlock);
+    }
 
-    /// <summary>Whether the ore smelts at this heat: inside the band or above it (an overheated unit still
-    /// progresses, it just burns).</summary>
-    public static bool Smelts(float heat) => ZoneOf(heat) != HeatZone.Cold;
-
-    /// <summary>Whether a unit that overheated for <paramref name="overheatSeconds"/> burns to slag instead of
-    /// becoming a bloom.</summary>
-    public static bool Burns(float overheatSeconds) => overheatSeconds >= BloomeryConfig.BurnSeconds;
+    /// <summary>The heat after a landing that adds <paramref name="added"/>, never over 1.</summary>
+    public static float Pump(float heat, float added) => MathF.Min(1f, heat + added);
 }

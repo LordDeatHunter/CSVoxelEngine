@@ -1,9 +1,12 @@
 {
-  // The bloomery and the anvil: run with VOXEL_SCRIPT=visual-examples/bloomery.json VOXEL_TIME=147 from OpenGLTest/.
-  // Shots land in visual/bloomery/. Builds two bloomeries in the forest clearing (one loaded and cold, one lit with its
-  // fire in the band), then an anvil with a bloom on it, and hammers the bloom twice (the last hit drops the iron and
-  // the slag on top). The look-at label under the crosshair carries the heat and ore readout, so the shots aim at the
-  // structures. Facing 1 opens the bloomery toward the player (+Z).
+  // The bloomery, its bellows and the anvil: run with VOXEL_SCRIPT=visual-examples/bloomery.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/bloomery/. Builds two bloomeries in the forest clearing (one loaded and cold, one
+  // lit too cold, with a bellows against each of its tuyeres), shows the tuyere hole in the bare one's side wall, then
+  // drops the (creative, so unhurt) player six blocks onto a bellows twice: the landings blow the fire from "too cold"
+  // to "good". Then an anvil with three blooms and
+  // the pickaxe head picked is hammered out (the last hit drops the head and its slag on top). The look-at label under
+  // the crosshair carries the heat, ore and forging readout, so the shots aim at the structures. Facing 1 opens the
+  // bloomery toward the player (+Z); its tuyeres then sit at x -45 and -42, z 57.
   "steps": [
     { "op": "wait", "seconds": 12 },
     { "op": "fly", "on": true },
@@ -11,23 +14,38 @@
     { "op": "wait", "seconds": 2 },
 
     { "op": "bloomery", "pos": [-48, 10, 57], "state": 1, "ore": 3, "fuel": 2 },
-    { "op": "bloomery", "pos": [-44, 10, 57], "state": 1, "ore": 4, "fuel": 3, "lit": true, "heat": 0.55 },
+    { "op": "bloomery", "pos": [-44, 10, 57], "state": 1, "ore": 4, "fuel": 3, "lit": true, "heat": 0.3, "bellows": true },
     { "op": "wait", "seconds": 1.5 },
     { "op": "screenshot", "name": "bloomeries" },
 
+    { "op": "teleport", "pos": [-45.5, 11.0, 59.5], "yaw": -104, "pitch": -16 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "tuyere", "hideHud": true },
+
     { "op": "teleport", "pos": [-43, 11.2, 60.2], "yaw": -90, "pitch": -4 },
     { "op": "wait", "seconds": 0.8 },
-    { "op": "screenshot", "name": "lit-readout" },
+    { "op": "screenshot", "name": "too-cold" },
 
-    { "op": "anvil", "pos": [-40, 10, 58], "piece": true, "hits": 1 },
-    { "op": "teleport", "pos": [-39.5, 12, 61], "yaw": -90, "pitch": -35 },
-    { "op": "wait", "seconds": 0.8 },
-    { "op": "screenshot", "name": "anvil-bloom" },
-
-    { "op": "hammer", "pos": [-40, 10, 58] },
+    { "op": "creative" },
+    { "op": "fly", "on": false },
+    { "op": "teleport", "pos": [-41.5, 18.8, 57.5], "yaw": 180, "pitch": -40 },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "screenshot", "name": "on-the-bellows", "hideHud": true },
+    { "op": "teleport", "pos": [-41.5, 18.8, 57.5], "yaw": 180, "pitch": -40 },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-43, 11.2, 60.2], "yaw": -90, "pitch": -4 },
     { "op": "wait", "seconds": 0.3 },
-    { "op": "screenshot", "name": "anvil-smaller" },
-    { "op": "hammer", "pos": [-40, 10, 58] },
+    { "op": "screenshot", "name": "blown-good" },
+
+    { "op": "anvil", "pos": [-40, 10, 60], "metal": "bloom", "count": 3, "select": "iron_pickaxe_head", "hits": 3 },
+    { "op": "teleport", "pos": [-39.5, 12, 63], "yaw": -90, "pitch": -35 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "anvil-forging" },
+
+    { "op": "hammer", "pos": [-40, 10, 60] },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "hammer", "pos": [-40, 10, 60] },
     { "op": "wait", "seconds": 1 },
     { "op": "screenshot", "name": "anvil-done" }
   ]

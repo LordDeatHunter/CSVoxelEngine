@@ -1,8 +1,10 @@
 {
-  // The iron gloves: bronze's ring count in wrought iron.
-  // Forged with a smithing hammer from wrought iron stacked on an anvil (see AnvilManager).
-  "metal": "item/wrought_iron",
+  // The iron gloves: bronze's ring count in blooms.
+  // Picked on an anvil holding blooms, then hammered out with a smithing hammer (see AnvilManager).
+  "metal": "item/bloom",
   "metalCount": 4,
   "result": "item/iron_gloves",
-  "count": 1
+  "count": 1,
+  "hits": 6,
+  "byproduct": { "item": "item/slag", "count": 4 }
 }

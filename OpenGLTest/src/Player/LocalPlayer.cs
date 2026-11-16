@@ -531,6 +531,9 @@ internal sealed class LocalPlayer
         // Worn no_fall_damage gear negates the blow inside PlayerHealth.TakeDamage; the landing still counts
         if (damage > 0)
             _health.TakeDamage(damage, DamageSource.Fall);
+        // A landing on a bellows works the bloomery beside it, more the farther the body fell
+        if (_fall.LandedDrop > 0f && !Camera.IsInWater)
+            _world.PressBellows(Camera.Position with { Y = feet }, PlayerPhysics.PlayerRadius, _fall.LandedDrop);
 
         _health.UpdateLava(deltaTime, Camera.IsInLava, Camera.IsCreative || Camera.IsFlying);
         _health.UpdateCampfire(PlayerBodyProbe.OnLitCampfire(Camera.Position, _world.Campfires),

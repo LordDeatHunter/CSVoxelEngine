@@ -201,7 +201,7 @@ internal sealed class LeftClickAction
         if (type.CrucibleStand) return StationBars.StandingCrucible(_world.StandingCrucibles.Peek((x, y, z)));
         if (type.Kiln != null) return StationBars.Kiln(_world.Kilns.StateAt(ax, ay, az));
         if (type.Bloomery != null) return StationBars.Bloomery(_world.Smithing.Bloomeries.StateAt(ax, ay, az));
-        if (type.Anvil != null) return StationBars.Anvil(_world.Smithing.Anvils.StateAt(x, y, z));
+        if (type.IsAnvil) return StationBars.Anvil(_world.Smithing.Anvils.StateAt(x, y, z));
         return StationBars.Mold(blockId, _world.Casting.StateAt(x, y, z));
     }
 
@@ -211,7 +211,7 @@ internal sealed class LeftClickAction
         var type = BlockType.ById[blockId];
         if (type?.Bloomery != null && _world.Smithing.Bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z) is { } bloomery)
             return SmithingReadout.Bloomery(bloomery);
-        if (type?.Anvil != null && _world.Smithing.Anvils.StateAt(x, y, z) is { } anvil)
+        if (type is { IsAnvil: true } && _world.Smithing.Anvils.StateAt(x, y, z) is { } anvil)
             return SmithingReadout.Anvil(anvil);
         return null;
     }
@@ -363,8 +363,8 @@ internal sealed class LeftClickAction
             return;
         }
 
-        // A smithing hammer on an anvil works what lies on it instead of mining the anvil
-        if (Mining.IsHammer(held) && BlockType.ById[Edits.BlockIdAt(_selectedBlockPosition)]?.Anvil != null)
+        // A smithing hammer on an anvil forges the recipe picked on it instead of mining the anvil
+        if (Mining.IsHammer(held) && BlockType.ById[Edits.BlockIdAt(_selectedBlockPosition)] is { IsAnvil: true })
         {
             StopBreaking();
             UpdateAnvilHammer(held!);
@@ -513,7 +513,7 @@ internal sealed class LeftClickAction
     /// <summary>
     /// One hammer hit on the aimed anvil, while the button is held: the first lands at once, the next after the
     /// hammer's own gap (<see cref="Mining.HitGapSeconds(Item, float)"/>, a smithing hammer's is a couple of seconds, so
-    /// there is no spamming). A hit with nothing on the anvil does nothing. A connected client only predicts it
+    /// there is no spamming). A hit with no recipe picked on the anvil does nothing. A connected client only predicts it
     /// (the swing, sound and chips, from the anvil it mirrors) and raises <see cref="NetIntentKind.Hammer"/>; the
     /// server judges the gap itself and its snapshot carries the result.
     /// </summary>
@@ -527,7 +527,7 @@ internal sealed class LeftClickAction
         if (_clientMode)
         {
             _world.Interactions.TryTrackAnvilAt(cell);
-            if (_world.Smithing.Anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z) is not { HasPiece: true })
+            if (_world.Smithing.Anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z) is not { SelectedResultId: not 0 })
                 return;
         }
         else if (_world.HammerFor(cell, gap, 0f).Kind == AnvilHitKind.Refused)

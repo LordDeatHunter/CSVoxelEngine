@@ -18,7 +18,7 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   (`SkyConfig.SkyCloudSeaHeight`, `SkyCloudSeaThickness`: 290..301); the sky islands
   `SkyIslandBottomY..SkyIslandTopY` (320..420), tuned in `SkyIslandConfig`.
 - **Getting there**: dig down or build up. The barrier and hell's slabs (`basalt`, `hellrock`) need the
-  `iron_pickaxe` (power 3, made from wrought iron smelted in the bloomery, see "The bloomery and the anvil"), see "The barrier". The sky has no gate: the
+  `iron_pickaxe` (power 3, forged from blooms smelted in the bloomery, see "The bloomery and the anvil"), see "The barrier". The sky has no gate: the
   solid clouds and the cloud sea catch a fall (`softLanding`, and `sink` holds the player half a block deep,
   "Sink and soft-landing flags"); hell has no bottom and its falls hurt as usual.
 - **Worldgen**, a pure function of position like the rest (each chunk alone, the point query equal to the

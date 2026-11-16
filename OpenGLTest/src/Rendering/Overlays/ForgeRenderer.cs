@@ -13,8 +13,8 @@ namespace VoxelEngine.Rendering.Overlays;
 
 /// <summary>
 /// The anvil's recipe list, in the crafting card's dress: the panel frame with its gold accent, the title, a line naming
-/// the metal stacked on the anvil, a grid of recipe cards (the result's icon and rarity-colored name, the metal it takes)
-/// with a hover look, and CLOSE. Every rectangle comes from <see cref="ForgeLayout"/>, which the clicks read too. Draws
+/// the metal stacked on the anvil, a grid of recipe cards (the result's icon and rarity-colored name, the metal and hits
+/// it takes) with a hover look and the picked one framed, and CLOSE. Every rectangle comes from <see cref="ForgeLayout"/>, which the clicks read too. Draws
 /// through the <see cref="UIRenderer"/> primitives. Render thread only.
 /// </summary>
 internal sealed class ForgeRenderer
@@ -54,14 +54,15 @@ internal sealed class ForgeRenderer
             _ui.EnsureDepthCleared();
             var shown = Math.Min(recipes.Count, ForgeLayout.Capacity(canvas));
             for (var i = 0; i < shown; i++)
-                DrawCard(ForgeLayout.Card(i, canvas), i, recipes[i], metal, view.Hover, time, headingDegrees);
+                DrawCard(ForgeLayout.Card(i, canvas), i, recipes[i], metal, recipes[i].ResultId == view.SelectedResultId,
+                    view.Hover, time, headingDegrees);
         }
 
         DrawCloseButton(ForgeLayout.CloseButton(canvas), view.Hover);
     }
 
-    private void DrawCard(UiRect card, int index, ForgeRecipe recipe, string metal, Vector2? hover, float time,
-        float headingDegrees)
+    private void DrawCard(UiRect card, int index, ForgeRecipe recipe, string metal, bool picked, Vector2? hover,
+        float time, float headingDegrees)
     {
         var hovered = hover is { } p && card.Contains(p);
         _ui.DrawRect(card.Center, card.Size, hovered ? HoverBackground : SlotBackground);
@@ -69,7 +70,10 @@ internal sealed class ForgeRenderer
         var style = RarityStyle.Of(Rarities.Of(recipe.ResultId, null));
         _ui.Chrome.DrawRow(card.Center, card.Size, style, time, index);
         _ui.DrawRect(new Vector2(card.Left + 2f, card.Center.Y), new Vector2(4f, card.Size.Y), style.AccentOr(SlotBorderColor));
-        if (hovered)
+        // The recipe already picked on the anvil keeps a heavy gold frame; hovering any other card a thin one
+        if (picked)
+            _ui.DrawBorder(card.Center, card.Size, Border.Standard, AccentGold);
+        else if (hovered)
             _ui.DrawBorder(card.Center, card.Size, Border.Thin, AccentGold);
 
         var iconCenter = new Vector2(card.Left + Margin + CardIcon * 0.5f, card.Center.Y);
@@ -81,7 +85,7 @@ internal sealed class ForgeRenderer
         if (recipe.ResultCount > 1) name += $" x{recipe.ResultCount}";
         _ui.DrawTextCenteredY(_ui.FittedText(name, _ui.CountScale, textWidth), textLeft, card.Center.Y - 11f,
             _ui.CountScale, style.Color);
-        _ui.DrawTextCenteredY(_ui.FittedText($"{recipe.MetalCount} {metal}", _ui.CountScale, textWidth), textLeft,
+        _ui.DrawTextCenteredY(_ui.FittedText($"{recipe.Hits} hits, {recipe.MetalCount} {metal}", _ui.CountScale, textWidth), textLeft,
             card.Center.Y + 11f, _ui.CountScale, TextDim);
     }
 

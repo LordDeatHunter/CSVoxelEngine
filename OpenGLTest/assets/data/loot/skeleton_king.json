@@ -19,7 +19,7 @@
     {
       "rolls": 1,
       "entries": [
-        { "item": "item/wrought_iron", "weight": 1, "count": { "min": 2, "max": 4 } }
+        { "item": "item/bloom", "weight": 1, "count": { "min": 2, "max": 4 } }
       ]
     },
     {
