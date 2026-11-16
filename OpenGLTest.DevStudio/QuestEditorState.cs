@@ -13,9 +13,9 @@ using VoxelEngine.Items;
 namespace VoxelEngine.DevStudio;
 
 /// <summary>
-/// The QUESTS tab's rules, GL-free: one document per quest file (<see cref="QuestDocument"/>), the selection, every
-/// edit (add, delete, move, link, rename, the fields and the requirements), saving and reverting every quest or one,
-/// and undo. Every edit recompiles, which also works out what differs from disk (<see cref="QuestDocument.Dirty"/>,
+/// The QUESTS tab's rules, GL-free: one document per quest file (<see cref="QuestDocument"/>) and per book label file
+/// (<see cref="QuestLabelDocument"/>), the selection, every edit (add, delete, move, link, rename, the fields and the
+/// requirements; a label's text, size and color), saving and reverting everything or one quest or label, and undo. Every edit recompiles, which also works out what differs from disk (<see cref="QuestDocument.Dirty"/>,
 /// <see cref="IsQuestDirty"/>): <see cref="Preview"/> is a lenient book that always draws (unknown icons and parents
 /// are skipped), and <see cref="Error"/> is what the real <see cref="QuestLoader.Compile"/> refuses, which blocks
 /// <see cref="Save"/>. A deleted quest's file, and a renamed quest's old file, stay on disk until the save deletes them.
@@ -42,20 +42,29 @@ public sealed class QuestEditorState
     // Every selected quest, in the order they were selected
     private readonly List<string> _selection = [];
     private (string Child, string Parent)? _selectedLink;
+    private string? _selectedLabel;
 
-    public QuestEditorState(string folder, IEnumerable<QuestDocument> documents)
+    public QuestEditorState(string folder, IEnumerable<QuestDocument> documents, IEnumerable<QuestLabelDocument>? labels = null)
     {
         Folder = folder;
         Documents = [.. documents];
+        Labels = [.. labels ?? []];
         Recompile();
     }
 
-    /// <summary>Every quest file in <paramref name="folder"/>, in the loader's (file name) order.</summary>
-    public static QuestEditorState Load(string folder) => new(folder, ReadFolder(folder));
+    /// <summary>Every quest file in <paramref name="folder"/>, in the loader's (file name) order, and every label file
+    /// in its <c>labels</c> subfolder.</summary>
+    public static QuestEditorState Load(string folder) => new(folder, ReadFolder(folder), ReadLabels(folder));
 
     private static IEnumerable<QuestDocument> ReadFolder(string folder) => Directory.Exists(folder)
         ? ContentFiles.JsonFilesIn(folder).Select(file => QuestDocument.Load(file.Path))
         : [];
+
+    private static IEnumerable<QuestLabelDocument> ReadLabels(string folder)
+    {
+        var labels = Path.Combine(folder, QuestLoader.LabelFolder);
+        return Directory.Exists(labels) ? ContentFiles.JsonFilesIn(labels).Select(file => QuestLabelDocument.Load(file.Path)) : [];
+    }
 
     public string Folder { get; }
 
@@ -63,6 +72,18 @@ public sealed class QuestEditorState
     public List<QuestDocument> Documents { get; }
 
     private IEnumerable<QuestDocument> Live => Documents.Where(d => !d.Deleted);
+
+    /// <summary>Every label document, deleted ones (whose file the next save deletes) included.</summary>
+    public List<QuestLabelDocument> Labels { get; }
+
+    /// <summary>The selected label's name, or null; a label is never selected together with a quest or a link.</summary>
+    public string? SelectedLabel => _selectedLabel != null && FindLabel(_selectedLabel) != null ? _selectedLabel : null;
+
+    /// <summary>The document of the (not deleted) label with that name, or null.</summary>
+    public QuestLabelDocument? FindLabel(string name) => Labels.FirstOrDefault(d => !d.Deleted && d.Id == name);
+
+    /// <summary>Whether the label differs from its file, or has none.</summary>
+    public bool IsLabelDirty(string name) => FindLabel(name)?.Dirty == true;
 
     /// <summary>The key of the gesture in progress (one typed field, one drag), whose changes undo as one step; the
     /// page sets it when the gesture starts and clears it when it ends.</summary>
@@ -99,7 +120,7 @@ public sealed class QuestEditorState
     public string? ErrorQuestId { get; private set; }
 
     /// <summary>Whether anything differs from the files on disk.</summary>
-    public bool Dirty => Documents.Any(d => d.Dirty);
+    public bool Dirty => Documents.Any(d => d.Dirty) || Labels.Any(d => d.Dirty);
 
     /// <summary>Whether the quest differs from its file, or has none.</summary>
     public bool IsQuestDirty(string id) => Find(id)?.Dirty == true;
@@ -114,6 +135,7 @@ public sealed class QuestEditorState
         _selection.Clear();
         if (id != null) _selection.Add(id);
         _selectedLink = null;
+        _selectedLabel = null;
         PickRequirement = -1;
         Touch();
     }
@@ -124,6 +146,7 @@ public sealed class QuestEditorState
         if (Find(id) == null) return;
         if (!_selection.Remove(id)) _selection.Add(id);
         _selectedLink = null;
+        _selectedLabel = null;
         PickRequirement = -1;
         Touch();
     }
@@ -136,6 +159,7 @@ public sealed class QuestEditorState
             if (!_selection.Contains(id) && Find(id) != null)
                 _selection.Add(id);
         _selectedLink = null;
+        _selectedLabel = null;
         PickRequirement = -1;
         Touch();
     }
@@ -145,6 +169,13 @@ public sealed class QuestEditorState
         Select(null);
         _selectedLink = (child, parent);
         Touch();
+    }
+
+    /// <summary>Selects one label alone (no quest, no link).</summary>
+    public void SelectLabel(string? name)
+    {
+        Select(null);
+        _selectedLabel = name;
     }
 
     private void Touch() => _history.Touch([.. _selection], _selectedLink);
@@ -163,22 +194,12 @@ public sealed class QuestEditorState
     private bool Restore(QuestEditSnapshot? snapshot)
     {
         if (snapshot == null) return false;
-        var disk = Documents.Where(d => d.SavedId != null).ToDictionary(d => d.SavedId!, d => d.Saved!);
-        var claimed = new HashSet<string>(StringComparer.Ordinal);
+        var quests = Restored(snapshot.Quests, Documents, (quest, saved, id) => new QuestDocument(quest, saved, id));
+        var labels = Restored(snapshot.Labels, Labels, (label, saved, id) => new QuestLabelDocument(label, saved, id));
         Documents.Clear();
-        foreach (var entry in snapshot.Quests)
-        {
-            var quest = QuestDocument.Clone(entry.Quest);
-            var savedId = Claim(entry.SavedId) ?? (entry.Deleted ? null : Claim(quest.Id));
-            if (entry.Deleted && savedId == null) continue;
-            Documents.Add(new QuestDocument(quest, savedId != null ? QuestDocument.Clone(disk[savedId]) : null, savedId)
-            {
-                Deleted = entry.Deleted,
-            });
-        }
-        foreach (var (id, saved) in disk)
-            if (!claimed.Contains(id))
-                Documents.Add(new QuestDocument(QuestDocument.Clone(saved), QuestDocument.Clone(saved), id) { Deleted = true });
+        Documents.AddRange(quests);
+        Labels.Clear();
+        Labels.AddRange(labels);
 
         SelectMany(snapshot.SelectedQuests);
         if (snapshot.SelectedLink is { } link) _selectedLink = link;
@@ -186,13 +207,42 @@ public sealed class QuestEditorState
         Recompile();
         _restoring = false;
         return true;
+    }
+
+    // The disk does not undo: each restored document takes the file it recorded while that file is still there, else the
+    // file of its own id, else none; a file no restored document takes is a deletion for the next save
+    private static List<TDoc> Restored<T, TDoc>(IReadOnlyList<QuestEditSnapshot.Entry<T>> entries, IEnumerable<TDoc> current,
+        Func<T, T?, string?, TDoc> make) where T : class, IFileNamedDefinition where TDoc : EditorDocument<T>
+    {
+        var disk = current.Where(d => d.SavedId != null).ToDictionary(d => d.SavedId!, d => d.Saved!);
+        var claimed = new HashSet<string>(StringComparer.Ordinal);
+        var restored = new List<TDoc>();
+        foreach (var entry in entries)
+        {
+            var value = EditorDocument<T>.Clone(entry.Value);
+            var savedId = Claim(entry.SavedId) ?? (entry.Deleted ? null : Claim(value.Id));
+            if (entry.Deleted && savedId == null) continue;
+            var document = make(value, savedId != null ? EditorDocument<T>.Clone(disk[savedId]) : null, savedId);
+            document.Deleted = entry.Deleted;
+            restored.Add(document);
+        }
+        foreach (var (id, saved) in disk)
+        {
+            if (claimed.Contains(id)) continue;
+            var document = make(EditorDocument<T>.Clone(saved), EditorDocument<T>.Clone(saved), id);
+            document.Deleted = true;
+            restored.Add(document);
+        }
+        return restored;
 
         string? Claim(string? id) => id != null && disk.ContainsKey(id) && claimed.Add(id) ? id : null;
     }
 
-    private QuestEditSnapshot Capture(string text) => new(text,
-        [.. Documents.Select(d => new QuestEditSnapshot.Entry(QuestDocument.Clone(d.Quest), d.SavedId, d.Deleted))],
-        [.. _selection], _selectedLink);
+    private QuestEditSnapshot Capture(string text) => new(text, Entries(Documents), Entries(Labels), [.. _selection], _selectedLink);
+
+    private static List<QuestEditSnapshot.Entry<T>> Entries<T>(IEnumerable<EditorDocument<T>> documents)
+        where T : class, IFileNamedDefinition =>
+        [.. documents.Select(d => new QuestEditSnapshot.Entry<T>(EditorDocument<T>.Clone(d.Value), d.SavedId, d.Deleted))];
 
     // ---- edits
 
@@ -414,6 +464,102 @@ public sealed class QuestEditorState
             r.Count = count == 1 ? null : count;
         });
 
+    // ---- labels
+
+    /// <summary>Adds a label at the absolute grid point and selects it.</summary>
+    public string AddLabel(Vector2 grid, string text = "Label")
+    {
+        var n = 1;
+        while (Labels.Any(d => d.Id == $"label_{n}" || d.SavedId == $"label_{n}")) n++;
+        var name = $"label_{n}";
+        var position = Snap(grid, true);
+        Labels.Add(new QuestLabelDocument(new QuestLabelDefinition { Id = name, Text = text, Pos = [position.X, position.Y] },
+            null, null));
+        Recompile();
+        SelectLabel(name);
+        return name;
+    }
+
+    /// <summary>Moves the label so its text is centered on the absolute grid point.</summary>
+    public void MoveLabel(string name, Vector2 grid, bool snap) => EditLabel(name, l =>
+    {
+        var position = Snap(grid, snap);
+        l.Pos = [position.X, position.Y];
+    });
+
+    /// <summary>Sets the label's text (line breaks start new lines).</summary>
+    public void SetLabelText(string name, string text) => EditLabel(name, l => l.Text = text);
+
+    /// <summary>Sets the label's size: <paramref name="size"/> indexes <see cref="QuestLoader.LabelSizeNames"/>, and the
+    /// default (medium) clears the field.</summary>
+    public void SetLabelSize(string name, int size) => EditLabel(name, l => l.Size =
+        size < 0 || size >= QuestLoader.LabelSizeNames.Count || size == (int)QuestLabelSize.Medium ? null : QuestLoader.LabelSizeNames[size]);
+
+    /// <summary>Sets the label's color: <paramref name="color"/> indexes <see cref="QuestLoader.LabelColorNames"/>, and the
+    /// default (gray) clears the field.</summary>
+    public void SetLabelColor(string name, int color) => EditLabel(name, l => l.Color =
+        color <= 0 || color >= QuestLoader.LabelColorNames.Count ? null : QuestLoader.LabelColorNames[color]);
+
+    /// <summary>The index of the label's size in <see cref="QuestLoader.LabelSizeNames"/> (medium when unset or unknown).</summary>
+    public static int SizeOf(QuestLabelDefinition label) => IndexOf(QuestLoader.LabelSizeNames, label.Size, (int)QuestLabelSize.Medium);
+
+    /// <summary>The index of the label's color in <see cref="QuestLoader.LabelColorNames"/> (gray when unset or unknown).</summary>
+    public static int ColorOf(QuestLabelDefinition label) => IndexOf(QuestLoader.LabelColorNames, label.Color, (int)QuestLabelColor.Gray);
+
+    private static int IndexOf(IReadOnlyList<string> names, string? value, int fallback) =>
+        value == null ? fallback : names.ToList().FindIndex(n => string.Equals(n, value, StringComparison.OrdinalIgnoreCase)) is var i and >= 0 ? i : fallback;
+
+    /// <summary>Removes the label (its file goes on the next save) as one change.</summary>
+    public void DeleteLabel(string name)
+    {
+        if (FindLabel(name) is not { } document) return;
+        if (document.SavedId == null) Labels.Remove(document);
+        else document.Deleted = true;
+        Recompile();
+        if (_selectedLabel == name) _selectedLabel = null;
+    }
+
+    /// <summary>Writes only this label's file, unless it does not compile. Returns the status line.</summary>
+    public string SaveLabel(string name)
+    {
+        if (FindLabel(name) is not { } document) return "No such label.";
+        if (!document.Dirty) return $"{name} has no unsaved edits";
+        var path = QuestLabelDocument.PathOf(Folder, name);
+        try
+        {
+            QuestLoader.CompileLabel(document.Label, path);
+        }
+        catch (InvalidOperationException e)
+        {
+            return "Not saved: " + e.Message;
+        }
+        QuestWriter.SaveLabel(path, document.Label);
+        document.MarkSaved();
+        Recompile();
+        return $"Saved {QuestLoader.LabelFolder}/{name}.json";
+    }
+
+    /// <summary>Puts the label back as its file holds it, or removes a label that has no file. Returns the status line.</summary>
+    public string RevertLabel(string name)
+    {
+        if (FindLabel(name) is not { } document) return "No such label.";
+        if (document.Saved == null)
+        {
+            DeleteLabel(name);
+            return $"Removed {name}, which was never saved";
+        }
+        document.Revert();
+        Recompile();
+        return $"Reverted {name}";
+    }
+
+    private void EditLabel(string name, Action<QuestLabelDefinition> edit)
+    {
+        if (FindLabel(name) is not { } document) return;
+        edit(document.Label);
+        Recompile();
+    }
+
     /// <summary>The text a requirement's target field shows: its item, <c>#tag</c>, block or entity.</summary>
     public static string TargetOf(QuestRequirementDefinition requirement) =>
         requirement.Tag is { } tag ? TagPrefix + tag
@@ -431,22 +577,32 @@ public sealed class QuestEditorState
     {
         Recompile();
         if (Error != null) return "Not saved: " + Error;
-        var stale = Documents.Where(d => d.SavedId != null && (d.Deleted || d.SavedId != d.Id))
-            .Select(d => d.SavedId!).Distinct().ToList();
-        var dirty = Live.Where(d => d.Dirty).ToList();
-        if (stale.Count == 0 && dirty.Count == 0) return "Nothing to save";
+        if (!Dirty) return "Nothing to save";
         Directory.CreateDirectory(Folder);
-        // Deletions first: a quest may have been renamed to a name another quest just gave up
-        foreach (var id in stale) File.Delete(QuestDocument.PathOf(Folder, id));
+        var (quests, removedQuests) = SaveAll<QuestDefinition, QuestDocument>(Documents, id => QuestDocument.PathOf(Folder, id), QuestWriter.Save);
+        var (labels, removedLabels) = SaveAll<QuestLabelDefinition, QuestLabelDocument>(Labels, name => QuestLabelDocument.PathOf(Folder, name), QuestWriter.SaveLabel);
+        Recompile();
+        var removed = removedQuests + removedLabels;
+        var written = $"{quests} quest(s) and {labels} label(s)";
+        return removed == 0 ? $"Saved {written}" : $"Saved {written}, removed {removed} old file(s)";
+    }
+
+    // Deletes the files of deleted and renamed documents, then writes every changed one; returns how many of each.
+    // Deletions go first: a document may have been renamed to a name another one just gave up.
+    private static (int Written, int Removed) SaveAll<T, TDoc>(List<TDoc> documents, Func<string, string> pathOf,
+        Action<string, T> write) where T : class, IFileNamedDefinition where TDoc : EditorDocument<T>
+    {
+        var stale = documents.Where(d => d.SavedId != null && (d.Deleted || d.SavedId != d.Id))
+            .Select(d => d.SavedId!).Distinct().ToList();
+        foreach (var id in stale) File.Delete(pathOf(id));
+        var dirty = documents.Where(d => !d.Deleted && d.Dirty).ToList();
         foreach (var document in dirty)
         {
-            QuestWriter.Save(QuestDocument.PathOf(Folder, document.Id), document.Quest);
+            write(pathOf(document.Id), document.Value);
             document.MarkSaved();
         }
-        Documents.RemoveAll(d => d.Deleted);
-        Recompile();
-        var written = dirty.Count == 1 ? $"{dirty[0].Id}.json" : $"{dirty.Count} quests";
-        return stale.Count == 0 ? $"Saved {written}" : $"Saved {written}, removed {stale.Count} old file(s)";
+        documents.RemoveAll(d => d.Deleted);
+        return (dirty.Count, stale.Count);
     }
 
     /// <summary>Writes only this quest's file (and removes its old file after a rename). Refused when the files on disk
@@ -507,10 +663,12 @@ public sealed class QuestEditorState
     {
         Documents.Clear();
         Documents.AddRange(ReadFolder(Folder));
+        Labels.Clear();
+        Labels.AddRange(ReadLabels(Folder));
         PickRequirement = -1;
         _selection.RemoveAll(id => Find(id) == null);
         Recompile();
-        return "Reverted every quest to the files on disk";
+        return "Reverted every quest and label to the files on disk";
     }
 
     /// <summary>The content name a quest icon or target uses for a block or item id: a block's bare name, an
@@ -529,19 +687,16 @@ public sealed class QuestEditorState
     public void Recompile()
     {
         var live = Live.ToList();
-        Preview = BuildPreview(live);
+        var liveLabels = Labels.Where(d => !d.Deleted).ToList();
+        Preview = BuildPreview(live, liveLabels);
         var text = new StringBuilder();
-        foreach (var document in Documents)
-        {
-            var formatted = QuestWriter.Format(document.Quest);
-            if (!document.Deleted) text.Append(document.Id).Append('\n').Append(formatted).Append('\0');
-            document.Dirty = document.Deleted
-                ? document.SavedId != null
-                : document.Saved is not { } saved || document.SavedId != document.Id || formatted != QuestWriter.Format(saved);
-        }
+        MarkDirty(Documents, QuestWriter.Format, text);
+        text.Append("labels\0");
+        MarkDirty(Labels, QuestWriter.FormatLabel, text);
         try
         {
-            QuestLoader.Compile([.. live.Select(d => (d.Quest, QuestDocument.PathOf(Folder, d.Id)))]);
+            QuestLoader.Compile([.. live.Select(d => (d.Quest, QuestDocument.PathOf(Folder, d.Id)))],
+                [.. liveLabels.Select(d => (d.Label, QuestLabelDocument.PathOf(Folder, d.Id)))]);
             Error = null;
             ErrorQuestId = null;
         }
@@ -553,6 +708,21 @@ public sealed class QuestEditorState
         if (_restoring) return;
         var all = text.ToString();
         _history.Observe(all, () => Capture(all), Gesture, [.. _selection], _selectedLink);
+    }
+
+    // Works out each document's dirty flag (deleted with a file, never saved, renamed, or differing from its file) and
+    // appends the live ones to the history text
+    private static void MarkDirty<T>(IEnumerable<EditorDocument<T>> documents, Func<T, string> format, StringBuilder text)
+        where T : class, IFileNamedDefinition
+    {
+        foreach (var document in documents)
+        {
+            var formatted = format(document.Value);
+            if (!document.Deleted) text.Append(document.Id).Append('\n').Append(formatted).Append('\0');
+            document.Dirty = document.Deleted
+                ? document.SavedId != null
+                : document.Saved is not { } saved || document.SavedId != document.Id || formatted != format(saved);
+        }
     }
 
     private void Edit(string id, Action<QuestDefinition> edit)
@@ -627,7 +797,7 @@ public sealed class QuestEditorState
 
     // Every quest as it would draw, however broken: duplicate ids after the first, unknown parents and unresolved icons
     // are skipped rather than refused, so the canvas never goes blank mid-edit
-    private static QuestBook BuildPreview(IReadOnlyList<QuestDocument> live)
+    private static QuestBook BuildPreview(IReadOnlyList<QuestDocument> live, IReadOnlyList<QuestLabelDocument> labels)
     {
         var entries = new List<QuestDefinition>();
         var indexById = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -668,6 +838,11 @@ public sealed class QuestEditorState
                 Requirements = [],
             };
         }
-        return new QuestBook(quests);
+        // Labels draw leniently too: a blank text shows its name, a missing position the origin, an unknown size or color the default
+        var previewLabels = labels.Select(d => new QuestLabel(d.Id,
+            string.IsNullOrWhiteSpace(d.Label.Text) ? d.Id : d.Label.Text,
+            d.Label.Pos is { Length: 2 } at ? new Vector2(at[0], at[1]) : Vector2.Zero,
+            (QuestLabelSize)SizeOf(d.Label), (QuestLabelColor)ColorOf(d.Label)));
+        return new QuestBook(quests, [.. previewLabels]);
     }
 }

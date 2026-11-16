@@ -71,6 +71,55 @@ public class QuestLoaderTests
         Assert.Equal([book.Of("child").Index], book.Of("root").Children.ToArray());
     }
 
+    private static QuestLabelDefinition Label(string? size = null, string? color = null, string? text = "Hello") =>
+        new() { Id = "note", Text = text, Pos = [2, -1], Size = size, Color = color };
+
+    [Fact]
+    public void ALabelDefaultsToMediumGrayAndKeepsItsLineBreaks()
+    {
+        var label = QuestLoader.CompileLabel(Label(text: "Two\nlines"), "note.json");
+
+        Assert.Equal(QuestLabelSize.Medium, label.Size);
+        Assert.Equal(QuestLabelColor.Gray, label.Color);
+        Assert.Equal(2, label.Text.Split('\n').Length);
+        Assert.Equal(QuestLabelSize.Large, QuestLoader.CompileLabel(Label(size: "LARGE"), "note.json").Size);
+    }
+
+    [Theory]
+    [InlineData("huge", null, "Hello")]
+    [InlineData(null, "purple", "Hello")]
+    [InlineData(null, null, " ")]
+    public void ABrokenLabelIsRefusedNamingItsFile(string? size, string? color, string text)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => QuestLoader.CompileLabel(Label(size, color, text), "note.json"));
+        Assert.Contains("note.json", error.Message);
+    }
+
+    [Fact]
+    public void LabelsInTheLabelsFolderAreNotQuests()
+    {
+        TestContent.EnsureLoaded();
+        var folder = System.IO.Directory.CreateTempSubdirectory("quest-labels").FullName;
+        try
+        {
+            System.IO.File.WriteAllText(System.IO.Path.Combine(folder, "only.json"),
+                """{ "icon": "stone", "pos": [0, 0], "requirements": [{ "type": "break", "block": "stone" }] }""");
+            System.IO.Directory.CreateDirectory(System.IO.Path.Combine(folder, QuestLoader.LabelFolder));
+            System.IO.File.WriteAllText(System.IO.Path.Combine(folder, QuestLoader.LabelFolder, "title.json"),
+                """{ "text": "Survival", "pos": [0, -1], "color": "gold" }""");
+
+            var book = QuestLoader.ReadQuests(folder);
+
+            Assert.Equal(["only"], book.Quests.Select(q => q.Id));
+            Assert.Equal(["title"], book.Labels.Select(l => l.Id));
+            Assert.Equal(QuestLabelColor.Gold, book.Labels[0].Color);
+        }
+        finally
+        {
+            System.IO.Directory.Delete(folder, true);
+        }
+    }
+
     [Fact]
     public void AQuestFileIsNamedByItsIdWhateverItsJsonSays()
     {

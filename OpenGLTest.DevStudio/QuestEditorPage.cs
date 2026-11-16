@@ -31,16 +31,17 @@ namespace VoxelEngine.DevStudio;
 /// quest there that depends on the first), a double-click on empty canvas adds a quest
 /// there, dragging empty canvas pans and the wheel zooms. A grid click picks the quest's icon, or the target of a
 /// requirement whose PICK is armed; dragging a grid slot onto the canvas adds a quest there with that icon, named
-/// after it. With several quests selected, the right panel lists them instead (icon and title, scrolled by the wheel
+/// after it. Free text labels (ADD LABEL, or a shift-double-click on empty canvas) are clicked to select, dragged to
+/// move and edited in the right panel (text with \n for a line break, SIZE, COLOR). With several quests selected, the right panel lists them instead (icon and title, scrolled by the wheel
 /// when too long; a click on a row opens that quest alone) over a DELETE button. A requirement's type and the quest's reveal mode (SHOW) are <see cref="DropdownState"/>s. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
 /// </summary>
 internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys)
 {
-    private enum Field { Id, Title, Description, Target, Label }
+    private enum Field { Id, Title, Description, Target, Label, LabelText }
 
     private enum Action
     {
-        AddQuest, Save, RevertAll, Undo, Redo,
+        AddQuest, AddLabel, Save, RevertAll, Undo, Redo, SaveLabel, RevertLabel, DeleteLabel,
         Shape, Readable, AnyOf, PickIcon, AddRequirement, DeleteQuest, SaveQuest, RevertQuest, SwapLink, DeleteLink,
         DeleteSelected,
         // The Arg of these is the requirement index.
@@ -72,11 +73,18 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private static readonly string[] RevealLabels =
         ["WHEN UNLOCKED", "ALWAYS", "A PARENT SHOWN", "ALL PARENTS SHOWN", "A PARENT DONE", "A DONE + ALL SHOWN"];
     private readonly DropdownState _revealDropdown = new(RevealLabels);
+    // The selected label's SIZE and COLOR, in QuestLoader.LabelSizeNames / LabelColorNames order
+    private readonly DropdownState _labelSize = new([.. QuestLoader.LabelSizeNames.Select(n => n.ToUpperInvariant())]);
+    private readonly DropdownState _labelColor = new([.. QuestLoader.LabelColorNames.Select(n => n.ToUpperInvariant())]);
+    private string? _dropdownLabel;
     // Every dropdown the last layout placed: its state, the option it shows, and what picking an option does
     private readonly List<(DropdownState Dropdown, int Selected, Action<int> Choose)> _dropdowns = [];
     private string? _focusQuest;
+    private string? _focusLabel;
 
-    private enum Drag { None, Pan, Node, Link, Marquee }
+    private enum Drag { None, Pan, Node, Link, Marquee, Label }
+    // The label being dragged
+    private string? _dragLabel;
     private Drag _drag;
     // A middle-button pan, which never clears the selection the way an unmoved left click on empty canvas does
     private bool _panOnly;
@@ -190,6 +198,13 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
                 ui.Quests.DrawLine(start + rim, end - rim, QuestConfig.EdgeThickness * Camera.Zoom * 1.5f, DevStudioUi.Accent);
         }
 
+        // The selected label, outlined in gold
+        if (State.SelectedLabel is { } name && book.Labels.FirstOrDefault(l => l.Id == name) is { } selectedLabel)
+        {
+            var bounds = ui.Quests.LabelBounds(selectedLabel, Camera, _screen);
+            ui.DrawBorder(bounds.Center, bounds.Size, 1.5f, DevStudioUi.Accent);
+        }
+
         if (State.ErrorQuestId is { } bad && book.TryGet(bad, out var broken))
         {
             var size = QuestBookLayout.NodeSize(Camera) * 1.3f;
@@ -253,6 +268,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         const float wide = 100f;
         const float narrow = 64f;
         x = AddButtonAt(x, y, wide, Action.AddQuest, "ADD QUEST", true);
+        x = AddButtonAt(x, y, wide, Action.AddLabel, "ADD LABEL", true);
         x = AddButtonAt(x + Gap * 2f, y, narrow, Action.Undo, "UNDO", State.CanUndo);
         x = AddButtonAt(x, y, narrow, Action.Redo, "REDO", State.CanRedo);
         x = AddButtonAt(x + Gap * 2f, y, wide, Action.Save, State.Dirty ? "SAVE ALL *" : "SAVE ALL", State.Dirty);
@@ -271,6 +287,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         if (State.SelectedLink != null)
         {
             BuildLinkPanel();
+            return;
+        }
+        if (State.SelectedLabel is { } label)
+        {
+            BuildLabelPanel(label);
             return;
         }
         if (State.SelectedQuestIds.Count > 1)
@@ -400,6 +421,47 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             DevStudioUi.Accent);
     }
 
+    // A selected label: its TEXT field, SIZE and COLOR, and SAVE / REVERT / DELETE LABEL at the bottom
+    private void BuildLabelPanel(string name)
+    {
+        if (State.FindLabel(name) is not { } document) return;
+        if (name != _dropdownLabel)
+        {
+            _labelSize.Close();
+            _labelColor.Close();
+            _dropdownLabel = name;
+        }
+        var left = PanelLeft;
+        var width = PanelRight - left;
+        var y = AddField(Field.LabelText, 0, "text (\\n: new line)", left, Pad + 40f, width);
+        const float labelWidth = 86f;
+        _labelSize.Box = Rect(left + labelWidth, y, width - labelWidth, FieldH);
+        _dropdowns.Add((_labelSize, QuestEditorState.SizeOf(document.Label), size => State.SetLabelSize(name, size)));
+        y += FieldH + Gap;
+        _labelColor.Box = Rect(left + labelWidth, y, width - labelWidth, FieldH);
+        _dropdowns.Add((_labelColor, QuestEditorState.ColorOf(document.Label), color => State.SetLabelColor(name, color)));
+
+        var bottom = _screen.Y - Pad * 2f - ButtonH;
+        var half = (width - Gap) * 0.5f;
+        AddButton(Rect(left, bottom - ButtonH - Gap, half, ButtonH), Action.SaveLabel, "SAVE LABEL", document.Dirty, false);
+        AddButton(Rect(left + half + Gap, bottom - ButtonH - Gap, half, ButtonH), Action.RevertLabel, "REVERT LABEL",
+            document.Dirty, false);
+        AddButton(Rect(left, bottom, width, ButtonH), Action.DeleteLabel, "DELETE LABEL  [DEL]", true, false);
+    }
+
+    private void DrawLabelText(UIRenderer ui, string name)
+    {
+        var scale = ui.CapHeightScale(DevStudioUi.TextCap);
+        var heading = "Label " + name + (State.IsLabelDirty(name) ? " *" : "");
+        ui.DrawText(heading, new Vector2(PanelLeft, Pad + 8f), DevStudioUi.FitText(ui, heading, 18f, PanelRight - PanelLeft).Scale,
+            Rgba.White);
+        foreach (var (rect, field, _, placeholder) in _fields)
+            if (field == Field.LabelText)
+                ui.DrawText("TEXT", new Vector2(rect.Left, rect.Top - LabelH + 2f), scale, DevStudioUi.TextDim);
+        ui.DrawText("SIZE", new Vector2(PanelLeft, _labelSize.Box.Center.Y - DevStudioUi.TextCap * 0.5f), scale, DevStudioUi.TextDim);
+        ui.DrawText("COLOR", new Vector2(PanelLeft, _labelColor.Box.Center.Y - DevStudioUi.TextCap * 0.5f), scale, DevStudioUi.TextDim);
+    }
+
     // A selected link: which quest depends on which (drawn in DrawLinkText), SWAP and DELETE LINK
     private void BuildLinkPanel()
     {
@@ -438,6 +500,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         if (State.SelectedLink is { } selectedLink)
         {
             DrawLinkText(ui, selectedLink);
+            return;
+        }
+        if (State.SelectedLabel is { } selectedLabel)
+        {
+            DrawLabelText(ui, selectedLabel);
             return;
         }
         if (State.SelectedQuestIds.Count > 1)
@@ -556,6 +623,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
     private string ValueOf(Field field, int arg)
     {
+        // A label's line breaks show as \n, so the one-line field can hold them
+        if (field == Field.LabelText)
+            return State.SelectedLabel is { } name ? (State.FindLabel(name)?.Label.Text ?? "").Replace("\n", "\\n") : "";
         if (State.SelectedQuest is not { } quest) return "";
         return field switch
         {
@@ -617,9 +687,27 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         var node = QuestBookLayout.NodeAt(State.Preview.Quests, _ => true, Camera, _screen, point);
         if (node == null && shift)
         {
+            // A shift-double-click adds a label; a shift-press starts the selection box
+            if (time - _lastClickTime < DoubleClickSeconds && Vector2.Distance(point, _lastClickAt) < 8f)
+            {
+                _lastClickTime = double.NegativeInfinity;
+                Status = $"Added {State.AddLabel(QuestBookLayout.ToGrid(point, Camera, _screen))}";
+                return true;
+            }
+            _lastClickTime = time;
+            _lastClickAt = point;
             _drag = Drag.Marquee;
             _marqueeTo = point;
             State.Select(null);
+            return true;
+        }
+        if (node == null && LabelAt(point) is { } label)
+        {
+            State.SelectLabel(label.Id);
+            State.Gesture = $"drag {++_gestureSerial}";
+            _drag = Drag.Label;
+            _dragLabel = label.Id;
+            _grabbed = label.Position;
             return true;
         }
         if (node == null
@@ -711,6 +799,18 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             Status = $"Added {added}, which depends on {parent}";
     }
 
+    // The topmost label whose text is under the point (labels draw in order, so the last drawn wins)
+    private QuestLabel? LabelAt(Vector2 point)
+    {
+        if (_ui == null) return null;
+        for (var i = State.Preview.Labels.Count - 1; i >= 0; i--)
+        {
+            var label = State.Preview.Labels[i];
+            if (_ui.Quests.LabelBounds(label, Camera, _screen).Contains(point)) return label;
+        }
+        return null;
+    }
+
     // The selection box: the rectangle between the shift-press and the pointer, whichever way it was dragged
     private UiRect MarqueeBox()
     {
@@ -751,6 +851,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
                 Camera.PanX = pan.X;
                 Camera.PanY = pan.Y;
                 break;
+            case Drag.Label when travel.Length() >= QuestConfig.DragThreshold && _dragLabel != null:
+                State.MoveLabel(_dragLabel, _grabbed + GridTravel(travel), !alt);
+                break;
             case Drag.Node when travel.Length() >= QuestConfig.DragThreshold && _dragQuest != null:
                 State.MoveQuests(_dragQuest, _grabbed + GridTravel(travel), _grabbedMany, !alt);
                 break;
@@ -770,6 +873,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             State.Select(_dragQuest);
         _drag = Drag.None;
         _dragQuest = null;
+        _dragLabel = null;
         if (_focus == null) State.Gesture = null;
     }
 
@@ -817,6 +921,10 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         }
         switch (key)
         {
+            case Key.Delete when State.SelectedLabel is { } label:
+                State.DeleteLabel(label);
+                Status = $"Deleted {label}";
+                return true;
             case Key.Delete when State.SelectedLink is { } link:
                 Status = State.RemoveLink(link.Child, link.Parent) ?? $"{link.Child} no longer depends on {link.Parent}";
                 return true;
@@ -890,6 +998,19 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         var id = State.SelectedQuestId;
         switch (action)
         {
+            case Action.AddLabel:
+                Status = $"Added {State.AddLabel(new Vector2(Camera.PanX, Camera.PanY))}";
+                break;
+            case Action.SaveLabel when State.SelectedLabel is { } label:
+                Status = State.SaveLabel(label);
+                break;
+            case Action.RevertLabel when State.SelectedLabel is { } label:
+                Status = State.RevertLabel(label);
+                break;
+            case Action.DeleteLabel when State.SelectedLabel is { } label:
+                State.DeleteLabel(label);
+                Status = $"Deleted {label}";
+                break;
             case Action.AddQuest:
                 State.AddQuest(new Vector2(Camera.PanX, Camera.PanY), Selected()?.Icon);
                 Status = $"Added {State.SelectedQuestId}";
@@ -985,6 +1106,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         Blur();
         _focus = (field, arg);
         _focusQuest = State.SelectedQuestId;
+        _focusLabel = State.SelectedLabel;
         State.Gesture = $"field {++_gestureSerial}";
         _field.Set(ValueOf(field, arg));
         _field.ViewStart = 0;
@@ -1002,6 +1124,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private void Commit((Field Field, int Arg) focus, bool final)
     {
         var text = _field.Text;
+        if (focus.Field == Field.LabelText)
+        {
+            if (_focusLabel is { } label) State.SetLabelText(label, text.Replace("\\n", "\n"));
+            return;
+        }
         if (_focusQuest is not { } id || State.Find(id) == null) return;
         switch (focus.Field)
         {

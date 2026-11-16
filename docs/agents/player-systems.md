@@ -420,7 +420,12 @@ quest once any one requirement is met instead of all) and `requirements`, each `
 `data/tags` file, optional `label` for its display name) instead of an `item`: any member counts and an obtain sums the held
 counts across them (`copper_tin_casts` for the first-pour quest). The loader refuses, naming the file, a duplicate or blank id, an unknown or repeated parent, a parent cycle, an unknown
 icon, item, block or entity, a count below 1, a bad shape, type or position, and a quest with no requirements
-(`QuestLoaderTests`, which also proves every shipped quest can unlock). DevStudio's QUESTS tab edits and saves these files
+(`QuestLoaderTests`, which also proves every shipped quest can unlock). There are no sections: the book's headings are
+**labels**, free text placed anywhere, one per file in `assets/data/quests/labels/<name>.json` (`QuestLabelDefinition`:
+`text`, which may hold line breaks, `pos`, `size` small/medium/large, default medium, and `color`
+gray/white/gold/green/red/blue, default gray; the loader refuses blank text or an unknown size or color, naming the file).
+`QuestBookRenderer.DrawGraph` draws them under the edges and nodes, each line centered, scaled with the zoom
+(`QuestLabelStyle`). DevStudio's QUESTS tab edits and saves these files
 visually (see "DevStudio" in `dev-tools.md`).
 
 The rules are `QuestLog`'s (GL-free, one per player; `QuestLogTests`):

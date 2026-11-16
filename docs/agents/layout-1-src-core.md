@@ -302,7 +302,9 @@ OpenGLTest/
         RecipeDefinition.cs    # JSON shape of assets/data/recipes/<name>.json
         SpellPartDefinition.cs # JSON shape of assets/data/spell/<kind>/<name>.json
         StatusEffectDefinition.cs # JSON shape of assets/data/effects/<name>.json
+        IFileNamedDefinition.cs # a definition whose id is its file name (a quest, a quest book label)
         QuestDefinition.cs     # JSON shape of assets/data/quests/<id>.json, one quest (its id is the file name)
+        QuestLabelDefinition.cs # JSON shape of assets/data/quests/labels/<name>.json, one free text in the quest book
         QuestRequirementDefinition.cs # JSON shape of one quest requirement
         TagDefinition.cs       # JSON shape of assets/data/tags/<name>.json
         TreeSpeciesDefinition.cs # JSON DTO of assets/data/trees/<species>.json
@@ -363,6 +365,8 @@ OpenGLTest/
         QuestType.cs           # one compiled quest: id, text, icon, grid position, shape, parents, children, requirements
         QuestRequirement.cs, QuestRequirementKind.cs  # obtain/craft/break/place/kill with its target and count
         QuestShape.cs          # Hex / Circle node frame
+        QuestLabel.cs          # one compiled quest book label: text, position, size, color
+        QuestLabelSize.cs, QuestLabelColor.cs # a label's size (small/medium/large) and color names
         QuestReveal.cs         # when a quest shows as a locked preview before it unlocks (unlocked, always, a parent or
                                #   all parents shown, a parent done, a parent done with all shown)
       StatusEffects/           # status effects (MG-4b): the compiled effect, its block actions, loader and registry

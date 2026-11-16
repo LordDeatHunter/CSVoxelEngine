@@ -13,7 +13,8 @@ namespace VoxelEngine.DevStudio;
 /// Writes a quest to its <c>&lt;id&gt;.json</c> in the shipped files' hand-written layout: two-space indent, the fields in
 /// schema order (<c>title, description, icon, pos, shape, parents, reveal, readable, anyOf, requirements</c>), <c>pos</c>
 /// and <c>parents</c> as inline arrays and each requirement as one line. A field at its loader default (no shape, readable
-/// true, anyOf false, count 1) is left out, and so is the id, which is the file name. CRLF line endings, UTF-8 without a BOM.
+/// true, anyOf false, count 1) is left out, and so is the id, which is the file name. A label file is written the same way
+/// (<c>text, pos, size, color</c>, the default size and color left out). CRLF line endings, UTF-8 without a BOM.
 /// </summary>
 public static class QuestWriter
 {
@@ -61,6 +62,23 @@ public static class QuestWriter
             if (i < fields.Count - 1) result.Append(',');
         }
         return result.Append(NewLine).Append('}').Append(NewLine).ToString();
+    }
+
+    /// <summary>Writes <paramref name="label"/> to <paramref name="path"/>, creating its folder.</summary>
+    public static void SaveLabel(string path, QuestLabelDefinition label)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, FormatLabel(label), new UTF8Encoding(false));
+    }
+
+    /// <summary>The label file's text; two labels format the same exactly when they save the same.</summary>
+    public static string FormatLabel(QuestLabelDefinition label)
+    {
+        var fields = new List<string> { $"\"text\": {Text(label.Text ?? "")}" };
+        if (label.Pos is { } pos) fields.Add($"\"pos\": {Numbers(pos)}");
+        if (label.Size != null) fields.Add($"\"size\": {Text(label.Size)}");
+        if (label.Color != null) fields.Add($"\"color\": {Text(label.Color)}");
+        return "{" + NewLine + string.Join("," + NewLine, fields.ConvertAll(f => "  " + f)) + NewLine + "}" + NewLine;
     }
 
     private static string FormatRequirement(QuestRequirementDefinition requirement)

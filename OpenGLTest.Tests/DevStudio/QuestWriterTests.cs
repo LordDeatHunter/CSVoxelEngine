@@ -42,6 +42,19 @@ public sealed class QuestWriterTests : IDisposable
     }
 
     [Fact]
+    public void AWrittenLabelReadsBackTheSameUnderItsFileName()
+    {
+        var label = new QuestLabelDefinition { Id = "title", Text = "Line \"one\"\nline two", Pos = [1.5f, -2], Size = "small", Color = "blue" };
+        var path = QuestLabelDocument.PathOf(_folder, "title");
+        QuestWriter.SaveLabel(path, label);
+
+        var read = QuestLabelDocument.Load(path).Label;
+
+        Assert.Equal("title", read.Id);
+        Assert.Equal(JsonSerializer.Serialize(label), JsonSerializer.Serialize(read));
+    }
+
+    [Fact]
     public void AnUneditedShippedQuestSavesBackToItsOwnText()
     {
         TestContent.EnsureLoaded();
@@ -53,6 +66,10 @@ public sealed class QuestWriterTests : IDisposable
         foreach (var document in editor.Documents)
             Assert.Equal(Normalize(File.ReadAllText(QuestDocument.PathOf(folder, document.Id))),
                 Normalize(QuestWriter.Format(document.Quest)));
+        Assert.NotEmpty(editor.Labels);
+        foreach (var document in editor.Labels)
+            Assert.Equal(Normalize(File.ReadAllText(QuestLabelDocument.PathOf(folder, document.Id))),
+                Normalize(QuestWriter.FormatLabel(document.Label)));
     }
 
     [Fact]

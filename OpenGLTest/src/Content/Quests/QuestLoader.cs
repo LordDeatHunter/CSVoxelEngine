@@ -11,7 +11,8 @@ namespace VoxelEngine.Content.Quests;
 
 /// <summary>
 /// Loads <c>data/quests/&lt;id&gt;.json</c>, one quest per file named by its id, into <see cref="QuestRegistry"/>. A
-/// missing folder is no quests. Every error names its file: a duplicate or blank id, an unknown parent, a parent cycle, an unknown
+/// missing folder is no quests. The book's free text labels are <c>data/quests/labels/&lt;name&gt;.json</c>, one per file.
+/// Every error names its file: a duplicate or blank id, an unknown parent, a parent cycle, an unknown
 /// icon, block, item or entity, a bad shape, position or count. <see cref="ReadQuests"/> and
 /// <see cref="Compile"/> touch no static state but the content tables, so tests call them directly.
 /// Runs last in <see cref="ContentRegistry.Load"/>, once blocks, items and entities are registered.
@@ -25,7 +26,52 @@ internal static class QuestLoader
     internal static QuestBook ReadQuests(string folder)
     {
         if (!Directory.Exists(folder)) return QuestBook.Empty;
-        return Compile([.. ContentFiles.JsonFilesIn(folder).Select(file => (ReadQuest(file.Path), file.Path))]);
+        var labels = Path.Combine(folder, LabelFolder);
+        return Compile([.. ContentFiles.JsonFilesIn(folder).Select(file => (ReadQuest(file.Path), file.Path))],
+            Directory.Exists(labels)
+                ? [.. ContentFiles.JsonFilesIn(labels).Select(file => (ReadLabel(file.Path), file.Path))]
+                : null);
+    }
+
+    /// <summary>The subfolder of the quest folder that holds the book's labels.</summary>
+    internal const string LabelFolder = "labels";
+
+    /// <summary>One label file, its <see cref="QuestLabelDefinition.Id"/> set from the file name.</summary>
+    internal static QuestLabelDefinition ReadLabel(string path)
+    {
+        var label = ContentFiles.ReadJson<QuestLabelDefinition>(path);
+        label.Id = Path.GetFileNameWithoutExtension(path);
+        return label;
+    }
+
+    /// <summary>The JSON names of every label size and color, in declaration order.</summary>
+    internal static IReadOnlyList<string> LabelSizeNames { get; } = [.. Enum.GetNames<QuestLabelSize>().Select(n => n.ToLowerInvariant())];
+
+    internal static IReadOnlyList<string> LabelColorNames { get; } = [.. Enum.GetNames<QuestLabelColor>().Select(n => n.ToLowerInvariant())];
+
+    /// <summary>Compiles one label, throwing an error that names its file: blank text, no position, an unknown size or
+    /// color.</summary>
+    internal static QuestLabel CompileLabel(QuestLabelDefinition label, string path)
+    {
+        if (string.IsNullOrWhiteSpace(label.Text))
+            throw new InvalidOperationException($"Quest label '{label.Id}' in '{path}' has no text.");
+        var position = ReadVector(label.Pos, "pos", path)
+                       ?? throw new InvalidOperationException($"Quest label '{label.Id}' in '{path}' has no pos.");
+        return new QuestLabel(label.Id!, label.Text, position,
+            ReadName(label.Size, QuestLabelSize.Medium, LabelSizeNames, "size", label.Id!, path),
+            ReadName(label.Color, QuestLabelColor.Gray, LabelColorNames, "color", label.Id!, path));
+    }
+
+    // A lowercase enum name (any case) to its member; null is the default
+    private static T ReadName<T>(string? value, T fallback, IReadOnlyList<string> names, string field, string label, string path)
+        where T : struct, Enum
+    {
+        if (value == null) return fallback;
+        var index = names.ToList().FindIndex(n => string.Equals(n, value, StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+            throw new InvalidOperationException(
+                $"Quest label '{label}' in '{path}' has {field} '{value}'; expected {string.Join(", ", names)}.");
+        return Enum.GetValues<T>()[index];
     }
 
     /// <summary>One quest file, its <see cref="QuestDefinition.Id"/> set from the file name.</summary>
@@ -38,7 +84,8 @@ internal static class QuestLoader
 
     /// <summary>Compiles the quests (each with its id set, and the file it came from) into one book, throwing an error
     /// that names the offending file.</summary>
-    internal static QuestBook Compile(IReadOnlyList<(QuestDefinition Quest, string Path)> quests)
+    internal static QuestBook Compile(IReadOnlyList<(QuestDefinition Quest, string Path)> quests,
+        IReadOnlyList<(QuestLabelDefinition Label, string Path)>? labels = null)
     {
         // Pass 1: ids, so a parent may name any quest
         var entries = new List<(QuestDefinition Quest, string Path)>();
@@ -104,7 +151,7 @@ internal static class QuestLoader
                 Requirements = [.. requirements.Select(r => CompileRequirement(r, quest.Id!, path))]
             };
         }
-        return new QuestBook(compiled);
+        return new QuestBook(compiled, [.. (labels ?? []).Select(l => CompileLabel(l.Label, l.Path))]);
     }
 
     private static QuestRequirement CompileRequirement(QuestRequirementDefinition definition, string quest, string path)

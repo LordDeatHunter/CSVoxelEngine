@@ -7,7 +7,7 @@ namespace VoxelEngine.Content.Definitions;
 /// JSON shape of <c>assets/data/quests/&lt;id&gt;.json</c>: one quest, whose id is its file name. Compiled by
 /// <see cref="VoxelEngine.Content.Quests.QuestLoader"/>.
 /// </summary>
-public sealed class QuestDefinition
+public sealed class QuestDefinition : IFileNamedDefinition
 {
     /// <summary>The quest's id: its file name, unique across the folder. Set by whoever reads or makes the quest, never
     /// read from or written to the file.</summary>

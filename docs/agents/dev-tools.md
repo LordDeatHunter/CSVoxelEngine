@@ -92,7 +92,11 @@ drag narrows the selection to that quest) (snapped to `QuestEditorState.SnapStep
 (`QuestEditorState.ComponentOf`: its parent links followed both ways, so an unlinked quest stays put), right-drag from one node to another to make the second depend on the first (dropped on empty canvas, it adds a
 quest there that depends on the first, a self link, a duplicate or a cycle is refused), click a line to select that link (the panel names which quest depends on which, SWAP DIRECTION turns it around unless
 that would close a cycle, DELETE LINK or Delete removes it), double-click empty canvas to add a quest there, drag empty canvas (or middle-drag anywhere) to pan, wheel to zoom. The
-top bar adds a quest at the view center (a new file once saved), undoes, redoes, saves and reverts. With several quests selected the right panel lists them instead (icon and title, the wheel
+top bar adds a quest or a label at the view center (a new file once saved), undoes, redoes, saves and reverts. A label
+(see "Quests (U-15)") is also added by a shift-double-click on empty canvas, selected by a click on its text (gold
+outline), dragged to move it, and edited in the right panel: TEXT (`\n` types a line break), SIZE and COLOR dropdowns,
+SAVE / REVERT / DELETE LABEL (Delete too); labels save, revert and undo like quests (`QuestLabelDocument`, both on the
+generic `EditorDocument`), and the selection box and group drags stay quest-only. With several quests selected the right panel lists them instead (icon and title, the wheel
 scrolls a long list, a click on a row opens that quest alone) over DELETE N QUESTS; Delete removes every selected quest
 as one undo step. The right panel edits the selected quest's id (committed on Enter or leaving the field; a rename
 follows every parent link), title, description, shape (AUTO/HEX/CIRCLE), readable, any-of, SHOW (the `reveal` mode, a

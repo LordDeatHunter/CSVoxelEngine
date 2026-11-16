@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Quests;
 using VoxelEngine.DevStudio;
 using Xunit;
 using static VoxelEngine.Tests.Support.QuestFixtures;
@@ -518,6 +519,99 @@ public sealed class QuestEditorStateTests : IDisposable
         editor.RenameQuest("root", "start");
 
         Assert.Equal(["start", "a"], editor.SelectedQuestIds);
+    }
+
+    private string LabelPath(string name) => QuestLabelDocument.PathOf(_folder, name);
+
+    [Fact]
+    public void ALabelIsAddedEditedAndSavedToItsOwnFileWithItsLineBreaks()
+    {
+        var editor = Editor(Quest("root", null, Break("stone")));
+
+        var name = editor.AddLabel(new Vector2(3.2f, -1.1f));
+        Assert.Equal(name, editor.SelectedLabel);
+        Assert.Null(editor.SelectedQuestId);
+        editor.SetLabelText(name, "Two\nlines");
+        editor.SetLabelSize(name, (int)QuestLabelSize.Large);
+        editor.SetLabelColor(name, (int)QuestLabelColor.Gold);
+        editor.MoveLabel(name, new Vector2(5.1f, 0.2f), snap: true);
+        Assert.True(editor.IsLabelDirty(name));
+
+        editor.Save();
+
+        var saved = QuestLabelDocument.Load(LabelPath(name)).Label;
+        Assert.Equal("Two\nlines", saved.Text);
+        Assert.Equal(("large", "gold"), (saved.Size, saved.Color));
+        Assert.Equal(new[] { 5f, 0f }, saved.Pos);
+        Assert.False(editor.Dirty);
+    }
+
+    [Fact]
+    public void ADefaultLabelSizeOrColorIsLeftOutOfItsFile()
+    {
+        var editor = Editor(Quest("root", null, Break("stone")));
+        var name = editor.AddLabel(Vector2.Zero);
+        editor.SetLabelColor(name, (int)QuestLabelColor.Red);
+        editor.SetLabelColor(name, (int)QuestLabelColor.Gray);
+        editor.SetLabelSize(name, (int)QuestLabelSize.Medium);
+
+        editor.Save();
+
+        var text = File.ReadAllText(LabelPath(name));
+        Assert.DoesNotContain("\"size\"", text);
+        Assert.DoesNotContain("\"color\"", text);
+    }
+
+    [Fact]
+    public void ADeletedLabelLeavesItsFileUntilSaveAndUndoBringsItBack()
+    {
+        var editor = Editor(Quest("root", null, Break("stone")));
+        var name = editor.AddLabel(Vector2.Zero);
+        editor.Save();
+
+        editor.DeleteLabel(name);
+        Assert.Null(editor.FindLabel(name));
+        Assert.True(File.Exists(LabelPath(name)));
+        Assert.True(editor.Dirty);
+
+        Assert.True(editor.Undo());
+        Assert.NotNull(editor.FindLabel(name));
+        Assert.False(editor.Dirty);
+
+        editor.DeleteLabel(name);
+        editor.Save();
+        Assert.False(File.Exists(LabelPath(name)));
+    }
+
+    [Fact]
+    public void RevertingALabelPutsBackItsFileOrRemovesAnUnsavedOne()
+    {
+        var editor = Editor(Quest("root", null, Break("stone")));
+        var saved = editor.AddLabel(Vector2.Zero, "Kept");
+        editor.Save();
+        editor.SetLabelText(saved, "Changed");
+        var unsaved = editor.AddLabel(Vector2.One);
+
+        editor.RevertLabel(saved);
+        editor.RevertLabel(unsaved);
+
+        Assert.Equal("Kept", editor.FindLabel(saved)!.Label.Text);
+        Assert.Null(editor.FindLabel(unsaved));
+        Assert.False(editor.Dirty);
+    }
+
+    [Fact]
+    public void SelectingAQuestOrALabelClearsTheOther()
+    {
+        var editor = Editor(Quest("root", null, Break("stone")));
+        var name = editor.AddLabel(Vector2.Zero);
+
+        editor.Select("root");
+        Assert.Null(editor.SelectedLabel);
+
+        editor.SelectLabel(name);
+        Assert.Empty(editor.SelectedQuestIds);
+        Assert.Equal(name, editor.SelectedLabel);
     }
 
     [Fact]

@@ -84,7 +84,7 @@ internal sealed class QuestBookRenderer : IDisposable
             DrawDetails(selected, log, view.Camera, canvas, time);
     }
 
-    /// <summary>The book's backdrop, grid, parent edges and nodes over the whole canvas: what the quest
+    /// <summary>The book's backdrop, grid, labels, parent edges and nodes over the whole canvas: what the quest
     /// book and the DevStudio quest editor both draw. A quest <paramref name="visible"/> refuses is skipped (and so is
     /// every edge to it), one <paramref name="complete"/> accepts draws done (a lit node, a green edge in, a check
     /// badge), one <paramref name="preview"/> accepts draws locked (a dark frame, its icon shaded, a "?"), and every one
@@ -96,6 +96,7 @@ internal sealed class QuestBookRenderer : IDisposable
         var canvas = _ui.ScreenSize;
         _ui.DrawRect(canvas * 0.5f, canvas, Backdrop);
         DrawGrid(canvas, camera);
+        foreach (var label in book.Labels) DrawLabel(label, camera, canvas);
 
         var edge = QuestConfig.EdgeThickness * camera.Zoom;
         foreach (var quest in book.Quests)
@@ -120,6 +121,30 @@ internal sealed class QuestBookRenderer : IDisposable
                 preview?.Invoke(quest) == true, selected(quest), quest == hovered, camera.Zoom, time);
         }
 
+    }
+
+    // A label's lines, each centered on the label's x, the block centered on its position, scaled with the zoom
+    private void DrawLabel(QuestLabel label, VoxelEngine.Saves.QuestViewData camera, Vector2 canvas)
+    {
+        var cap = QuestLabelStyle.CapHeight(label.Size) * camera.Zoom;
+        var step = QuestLabelStyle.LineStep(cap);
+        var lines = label.Text.Split('\n');
+        var center = QuestBookLayout.ToCanvas(label.Position, camera, canvas);
+        var scale = _ui.CapHeightScale(cap);
+        var color = QuestLabelStyle.ColorOf(label.Color);
+        for (var i = 0; i < lines.Length; i++)
+            _ui.DrawTextMiddle(lines[i], center + new Vector2(0f, (i - (lines.Length - 1) * 0.5f) * step), scale, color);
+    }
+
+    /// <summary>The canvas rectangle a label's text covers, for the editor's hit test and selection outline.</summary>
+    internal UiRect LabelBounds(QuestLabel label, VoxelEngine.Saves.QuestViewData camera, Vector2 canvas)
+    {
+        var cap = QuestLabelStyle.CapHeight(label.Size) * camera.Zoom;
+        var lines = label.Text.Split('\n');
+        var scale = _ui.CapHeightScale(cap);
+        var width = lines.Max(line => _ui.TextWidth(line, scale));
+        var height = (lines.Length - 1) * QuestLabelStyle.LineStep(cap) + cap * 1.6f;
+        return new UiRect(QuestBookLayout.ToCanvas(label.Position, camera, canvas), new Vector2(width + 8f, height));
     }
 
     // A faint grid that pans and zooms with the book; dropped once its lines would crowd together

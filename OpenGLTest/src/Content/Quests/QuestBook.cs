@@ -12,12 +12,16 @@ public sealed class QuestBook
 {
     private readonly Dictionary<string, QuestType> _byId;
 
-    public QuestBook(IReadOnlyList<QuestType> quests)
+    public QuestBook(IReadOnlyList<QuestType> quests, IReadOnlyList<QuestLabel>? labels = null)
     {
         Quests = quests;
+        Labels = labels ?? [];
         _byId = new Dictionary<string, QuestType>(StringComparer.Ordinal);
         foreach (var quest in quests) _byId[quest.Id] = quest;
     }
+
+    /// <summary>Every free text label drawn in the book.</summary>
+    public IReadOnlyList<QuestLabel> Labels { get; }
 
     /// <summary>A book with no quests.</summary>
     public static QuestBook Empty { get; } = new([]);

@@ -16,7 +16,7 @@ OpenGLTest.DevStudio/                 # the preview and authoring tool (ITEMS, E
   ItemDisplayEditor.cs                # editable copy of the selected item's display block plus the preview-only renderer tweaks
   ItemJsonDisplayWriter.cs            # writes an item's display block back into its JSON file
   PlayerPreviewState.cs               # GL-free state behind DevStudio's player animations (the ITEMS tab)
-  QuestEditHistory.cs                 # the quest editor's undo and redo stacks: records a step when the graphs' text changes,
+  QuestEditHistory.cs                 # the quest editor's undo and redo stacks: records a step when the quests' text changes,
                                       #   one gesture (a typed field, a drag) as one step, a new edit clears redo
   QuestEditSnapshot.cs                # one history step: every graph copied, each quest's on-disk id, the selection
   QuestEditorPage.cs                  # the QUESTS tab: the graph canvas (QuestBookRenderer.DrawGraph), top bar,
@@ -24,6 +24,9 @@ OpenGLTest.DevStudio/                 # the preview and authoring tool (ITEMS, E
   QuestEditorState.cs                 # GL-free quest editing rules: add, delete, move, link (cycle-safe), rename,
                                       #   fields, requirements, the lenient preview book, compile errors, dirty
                                       #   tracking, save and revert (all, or one quest)
+  EditorDocument.cs                   # one content file being edited (generic): the definition, the copy and id its
+                                      #   file holds, deleted and dirty; the save, revert and undo rules use it
+  QuestLabelDocument.cs               # one quest book label file being edited (labels/<name>.json)
   QuestDocument.cs                    # one quest file being edited: the quest, the copy and id its file holds, and
                                       #   whether it was deleted (the file goes on the next save)
   QuestWriter.cs                      # writes a quest file back in the shipped files' hand-written JSON layout

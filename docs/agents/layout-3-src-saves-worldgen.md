@@ -333,6 +333,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         QuestTracker.cs        # the equipped quest: one at a time, open and readable only, unequipped on completion
         QuestBookView.cs       # open flag, transition, the bound pan/zoom, the selection, the press and drag
         QuestText.cs           # the fixed strings and the requirement lines
+        QuestLabelStyle.cs     # a book label's cap height per size, line step and color
       Waystone/                # the waystone screen, GL-free (WaystoneRenderer draws it, WaystoneInput drives it)
         WaystonePage.cs        # Closed / Discovered (the popup) / Rename (the dialog) / List
         WaystoneView.cs        # the page, the waystone, its name and rename right, the rename field, search, scroll, the cached
