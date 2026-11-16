@@ -99,8 +99,8 @@ SAVE / REVERT / DELETE LABEL (Delete too); labels save, revert and undo like que
 generic `EditorDocument`), and the selection box and group drags stay quest-only. With several quests selected the right panel lists them instead (icon and title, the wheel
 scrolls a long list, a click on a row opens that quest alone) over DELETE N QUESTS; Delete removes every selected quest
 as one undo step. The right panel edits the selected quest's id (committed on Enter or leaving the field; a rename
-follows every parent link), title, description, shape (AUTO/HEX/CIRCLE), readable, any-of, SHOW (the `reveal` mode, a
-dropdown), UNLOCK (the `unlock` mode, a dropdown), icon and requirements: a type
+follows every parent link), title, description, shape (AUTO/HEX/CIRCLE), readable, any-of, UNLOCK (the `unlock` mode, a
+dropdown), SHOW (the `reveal` mode, a dropdown), icon and requirements: a type
 dropdown (the reusable `UI/Widgets/DropdownState`, drawn by `DropdownRenderer`) picks obtain/craft/break/place/kill, the target field takes an item (or `#tag`, which adds a label field), a block
 or an entity, `-`/`+` set the count, PICK arms the left grid for the target (NEXT MOB steps a kill through the registered
 entities), and a plain grid click sets the icon. The QUESTS tab's left grid has a search field (matching a display name or a quest name, ignoring case) and ITEMS / BLOCKS / ENTITIES toggles over it (`QuestIconPicker`); entities show as name slots and can name a kill requirement but not an icon. A grid entry dragged onto the panel lands on what is under it, outlined gold where it fits and red where it does not (`QuestEditorState.Accepts`: obtain and craft take an item or a block, break and place a block, kill an entity): a requirement row names it, the rest of the requirements area adds a fitting requirement (obtain an item, break a block, kill an entity, as one undo step), and the icon row sets the icon; dropped on the canvas an entity adds a quest that asks to kill it. Dragging a grid slot onto the canvas adds a quest where it is dropped,

@@ -375,16 +375,16 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             quest.AnyOf == true ? "ANY OF" : "ALL OF", true, quest.AnyOf == true);
         y += ButtonH + Gap;
 
-        // SHOW: when the quest appears as a locked preview (its label is drawn in DrawDetailsText)
+        // UNLOCK: when the quest shows its details and can be earned (the captions are drawn in DrawDetailsText)
         var questId = quest.Id!;
         const float showLabel = 86f;
-        _revealDropdown.Box = Rect(left + showLabel, y, width - showLabel, FieldH);
-        _dropdowns.Add((_revealDropdown, QuestEditorState.RevealOf(quest), mode => State.SetReveal(questId, mode)));
-        y += FieldH + Gap;
-
-        // UNLOCK: when the quest shows its details and can be earned
         _unlockDropdown.Box = Rect(left + showLabel, y, width - showLabel, FieldH);
         _dropdowns.Add((_unlockDropdown, QuestEditorState.UnlockOf(quest), mode => State.SetUnlock(questId, mode)));
+        y += FieldH + Gap;
+
+        // SHOW: when the quest appears as a locked preview before it unlocks
+        _revealDropdown.Box = Rect(left + showLabel, y, width - showLabel, FieldH);
+        _dropdowns.Add((_revealDropdown, QuestEditorState.RevealOf(quest), mode => State.SetReveal(questId, mode)));
         y += FieldH + Gap + LabelH;
 
         // The icon row: the icon is drawn in DrawDetailsText, the button arms the grid for it
