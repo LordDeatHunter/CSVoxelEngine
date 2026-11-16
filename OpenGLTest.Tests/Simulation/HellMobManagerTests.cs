@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.HellMobs;
@@ -23,13 +24,14 @@ public sealed class HellMobManagerTests
     private const int OverworldFloor = -25;
 
     // Solid stone chunks over x and z -48..47 and the chunk layer holding the floor, with a pocket three
-    // cells tall carved across all of it; every cell publishes the given block light (no skylight)
-    private static ChunkManager Pocket(int floor, int block = 0)
+    // cells tall carved across all of it, its floor layer made of floorId (stone by default); every cell publishes
+    // darkness (no skylight)
+    private static ChunkManager Pocket(int floor, ushort floorId = 0)
     {
         var chunks = new ChunkManager(null!);
         var stone = ContentRegistry.RequireBlock("stone").Id;
+        if (floorId == 0) floorId = stone;
         var light = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
-        Array.Fill(light, (byte)block);
         for (var cy = floor >> Chunk.SizeShift; cy <= (floor + 3) >> Chunk.SizeShift; cy++)
         for (var cx = -3; cx <= 2; cx++)
         for (var cz = -3; cz <= 2; cz++)
@@ -41,7 +43,8 @@ public sealed class HellMobManagerTests
             for (var z = 0; z < Chunk.Size; z++)
             {
                 var worldY = cy * Chunk.Size + y;
-                chunk.SetBlockRaw(x, y, z, worldY > floor && worldY <= floor + 3 ? BlockType.Air : stone, 0);
+                chunk.SetBlockRaw(x, y, z, worldY > floor && worldY <= floor + 3 ? BlockType.Air
+                    : worldY == floor ? floorId : stone, 0);
             }
             chunk.PublishLight(light);
             chunks.Chunks[pos] = chunk;
@@ -71,16 +74,26 @@ public sealed class HellMobManagerTests
     }
 
     [Fact]
-    public void APocketWhoseHeadroomLeavesHellOrALitFloorTakesNone()
+    public void APocketWhoseHeadroomLeavesHellOrAFloorOfManMadeLightTakesNone()
     {
         // The floor is hell's top cell, so the cells a mob would stand in are the barrier band's
         const int edge = WorldGenerationConfig.HellTopY;
+        var lamp = BrightEmitter(natural: false);
         for (var i = 0; i < 20; i++)
         {
             Assert.False(Search(Pocket(edge), edge, out _));
-            Assert.False(Search(Pocket(HellFloor, block: MobConfig.HellSpawnMaxBlockLight + 1), HellFloor, out _));
+            Assert.False(Search(Pocket(HellFloor, lamp), HellFloor, out _));
         }
     }
+
+    [Fact]
+    public void AFloorOfNaturalLightStillTakesASpawn() =>
+        Assert.True(Search(Pocket(HellFloor, BrightEmitter(natural: true)), HellFloor, out _));
+
+    // A solid emitter whose light alone is over the hell spawn's limit, man-made or natural as asked
+    private static ushort BrightEmitter(bool natural) =>
+        BlockType.Types.Values.First(b => b.Solid && b.NaturalLight == natural
+            && b.LightEmission > MobConfig.HellSpawnMaxBlockLight).Id;
 
     [Fact]
     public void TheRingSpawnerFillsHellUpToTheNaturalCapAndNoFurther()

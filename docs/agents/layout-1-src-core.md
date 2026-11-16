@@ -113,6 +113,8 @@ OpenGLTest/
       ColumnTerrain.cs         # one chunk column's terrain: heights, water levels, corner climate (warmth, wetness)
       EntityLight.cs           # GL-free world light query for entity draws (drops, pops, debris, the player, ...)
       EntityLightSample.cs     # sun and block light (each 0..1) one entity draw is lit with
+      IManMadePointLights.cs   # the man-made point lights (lanterns, lit stations) a world registers on ChunkManager
+                               #   for the mob spawn searches' torch-safe ground
       IColumnSource.cs         # the seam a mesh build, the fluid-surface query and the pop/debris tint read
                                #   chunk-column terrain through (ChunkManager.ColumnSource): IsReady + TryGet
       PlayerPlacedIndex.cs     # the player-placed cells bucketed by chunk, the restored-placement queue and its adoption, the unload snapshot's placed indices
@@ -427,6 +429,7 @@ OpenGLTest/
         BlockLightPalette.cs   # GL-free 8-slot block-light color palette (slot 0 = the default warm torch color)
         LightFlicker.cs        # GL-free per-cell flicker phase + curve for the campfire point lights
         FireLight.cs           # one dynamic point light: cell, linear color, strength (a held block uses its own light.color and emission)
+        StationPointLights.cs  # the world's IManMadePointLights: fueled lanterns and lit campfires, kilns, bloomeries
         LightTint.cs           # GL-free 10-bit two-slot tint code: FromSamples/FromWeights/Decode, the C# twin of the shader decode
       Post/                    # the post pass and screen-space effects: tonemap, eye
                                #   adaptation, biome grade, contact AO, godrays, sun dazzle, lens flare, underwater wobble

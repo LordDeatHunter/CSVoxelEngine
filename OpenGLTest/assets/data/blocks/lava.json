@@ -8,7 +8,7 @@
   "solid": false,
   "occludes": false,
   "castsAO": false,
-  "light": { "emission": 15, "passes": true },
+  "light": { "emission": 15, "passes": true, "natural": true },
   "hasItem": false,
   "loot": "none",
   "freezesTo": "cobblestone",

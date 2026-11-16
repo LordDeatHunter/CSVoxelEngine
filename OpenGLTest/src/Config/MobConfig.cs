@@ -95,9 +95,10 @@ public static class MobConfig
     public const float MobIdleDespawnSeconds = 30f;
     public const float MobIdleDespawnMinDistanceBlocks = 24f;
 
-    // --- Torch-safe ground (MobSpawner.IsLitByBlocks) ---
-    // A ring spawn is refused where the cell a mob would stand in holds this much block light
-    // (0..15) or more, so torches and lamps keep a base clear of new mobs.
+    // --- Torch-safe ground (MobSpawner.IsLitByManMadeLight) ---
+    // A ring spawn is refused where the cell a mob would stand in holds this much man-made light
+    // (0..15) or more, so torches, lamps, lanterns and lit stations keep a base clear of new mobs;
+    // natural light (light.natural: glowing plants, crystals, lava) never counts.
     public const int MobSpawnBlockLightLimit = 8;
 
     // --- Ledge caution (LedgeProbe, Mob.IsLedgeAhead) ---
@@ -305,8 +306,8 @@ public static class MobConfig
     // --- Hell mobs (HellMobManager, Hellbrute, Cinderwitch) ---
     // Both live only in hell's cavern pockets (MobSpawner.TryFindHellSpawn): a ring like the goblin's
     // around a player standing in hell, each try scanning a column down from near the player's feet for
-    // an open floor (solid ground, two clear dry cells, block light at most HellSpawnMaxBlockLight, so a
-    // lava-lit pool edge or a torched base stays clear). The layer index scales each spawn's health,
+    // an open floor (solid ground, two clear dry cells, man-made light at most HellSpawnMaxBlockLight, so a
+    // torched base stays clear; a lava-lit pool edge does not, lava's light being natural). The layer index scales each spawn's health,
     // damage and the caster's fire rate (LayerDifficulty) and the pack size: one more mob every
     // HellPackLayersPerExtra layers, up to HellPackMaxSize. HellCasterShare of the spawns are casters.
     public const float HellSpawnIntervalSeconds = 5f;

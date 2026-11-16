@@ -24,7 +24,7 @@ public sealed class GoblinCaveSpawnTests
     [Fact]
     public void AGoblinNeverSpawnsInTheMagmaDeep()
     {
-        var chunks = CaveTestWorld.Cave(sun: 0, block: 0);
+        var chunks = CaveTestWorld.Cave(sun: 0);
         for (var call = 0; call < Calls; call++)
             Assert.False(GoblinManager.TryFindCaveSpawn(chunks, CaveTestWorld.EyeOnFloor(), roll: 0f,
                 Always(CaveBiome.MagmaDeep), out _, out _));
@@ -34,7 +34,7 @@ public sealed class GoblinCaveSpawnTests
     public void AFavouredCaveTakesARollAPlainCaveRefuses()
     {
         var roll = (CaveSpawnRules.GoblinWeight(CaveBiome.Fungal) + CaveSpawnRules.GoblinWeight(CaveBiome.Plain)) * 0.5f;
-        var chunks = CaveTestWorld.Cave(sun: 0, block: 0);
+        var chunks = CaveTestWorld.Cave(sun: 0);
 
         var fungal = 0;
         for (var call = 0; call < Calls; call++)
@@ -54,7 +54,7 @@ public sealed class GoblinCaveSpawnTests
     [Fact]
     public void TheBodyStandsOnTheFoundFloor()
     {
-        var chunks = CaveTestWorld.Cave(sun: 0, block: 0);
+        var chunks = CaveTestWorld.Cave(sun: 0);
         var found = 0;
         for (var call = 0; call < Calls; call++)
         {
@@ -71,7 +71,7 @@ public sealed class GoblinCaveSpawnTests
     [Fact]
     public void APackMateLandsOnAFloorNearTheLeaderInTheLeadersBiome()
     {
-        var chunks = CaveTestWorld.Cave(sun: 0, block: 0);
+        var chunks = CaveTestWorld.Cave(sun: 0);
         const int leaderX = 2;
         const int leaderZ = -3;
         // The leader's side of x is fungal, the far side crystal: no mate may land over there

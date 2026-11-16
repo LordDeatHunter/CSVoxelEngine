@@ -68,6 +68,7 @@ internal static class BlockTables
         BlockType.ById = new BlockType?[idCount];
         BlockType.Emission = new byte[idCount];
         BlockType.LightSlot = new byte[idCount];
+        BlockType.ManMadeEmission = new byte[idCount];
         BlockType.PassesLightById = new bool[idCount];
         BlockType.SolidById = new bool[idCount];
         BlockType.CollidesByHitboxById = new bool[idCount];

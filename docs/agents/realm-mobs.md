@@ -38,7 +38,8 @@ torso) checked at startup (`Hellbrute.ValidateContent`, `Cinderwitch.ValidateCon
   joined to the world's `MobCaps`): every
   `HellSpawnIntervalSeconds`, under the natural cap, around a target standing in hell only,
   `MobSpawner.TryFindHellSpawn` scans ring columns for an open cavern floor whose two standing cells are in
-  hell and whose block light is at most `HellSpawnMaxBlockLight` (no skylight reaches hell); the overworld
+  hell and whose man-made light (`MobSpawner.IsLitByManMadeLight`, see "Torch-safe ground") is at most
+  `HellSpawnMaxBlockLight` (lava's natural light never counts; no skylight reaches hell); the overworld
   cave slimes stop above `HellTopY`. `HellCasterShare` of the spawns are casters. Despawn and the shared
   hazards work as for the goblin.
 - **Plumbing**: `World.HellMobs`, `MobDirector` (update, damage billing, `RefreshMobs`, the `spawn` op names),

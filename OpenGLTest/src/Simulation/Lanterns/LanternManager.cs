@@ -92,10 +92,21 @@ public sealed class LanternManager
     public void AppendLights(ChunkManager chunks, List<Effects.Lighting.FireLight> lights)
     {
         foreach (var (cell, stack) in _placed)
-            if (LanternState.Of(stack)!.HasFuel && chunks.TryGetCell(cell.X, cell.Y, cell.Z, out var id, out _)
-                && LanternState.IsLantern(id))
+            if (IsLit(chunks, cell, stack))
                 lights.Add(Effects.Lighting.FireLight.Warm(new Vector3(cell.X, cell.Y - .5f, cell.Z)));
     }
+
+    /// <summary>Adds the cell of every placed lantern that burns (fueled and still standing) to <paramref name="cells"/>.</summary>
+    public void AppendLitCells(ChunkManager chunks, List<(int X, int Y, int Z)> cells)
+    {
+        foreach (var (cell, stack) in _placed)
+            if (IsLit(chunks, cell, stack))
+                cells.Add(cell);
+    }
+
+    private static bool IsLit(ChunkManager chunks, (int X, int Y, int Z) cell, ItemStack stack) =>
+        LanternState.Of(stack)!.HasFuel && chunks.TryGetCell(cell.X, cell.Y, cell.Z, out var id, out _)
+        && LanternState.IsLantern(id);
 
     /// <summary>Whether the item in either hand emits, derived solely from owned state.</summary>
     public static bool Emits(Inventory inventory) => EmitsFrom(inventory, offhand: false) || EmitsFrom(inventory, offhand: true);

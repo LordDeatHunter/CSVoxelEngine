@@ -9,6 +9,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Chunks.Streaming;
 using VoxelEngine.Content.Models;
+using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.CaveMobs;
@@ -489,6 +490,9 @@ public class World
             // A server never draws: finished meshes are marked and their light published, but the
             // geometry is discarded instead of uploaded to pools it does not have.
             _chunkManager.Headless = serverMode;
+            // The burning stations keep mob spawns off the ground they light (MobSpawner.IsLitByManMadeLight)
+            _chunkManager.ManMadePointLights = new StationPointLights(_chunkManager, Lanterns, _campfires, _kilns,
+                _smithing.Bloomeries);
             if (serverMode)
             {
                 // No local player on a server: hover the camera (creative and flying, so mobs

@@ -180,6 +180,7 @@ internal static class BlockLoader
             Material = material,
             LightEmission = emission,
             LightColorSlot = lightColorSlot,
+            NaturalLight = definition.Light?.Natural ?? false,
             FlamePoints = flamePoints,
             Renderer = renderer,
             Pane = paneProfile,
@@ -248,6 +249,7 @@ internal static class BlockLoader
         BlockType.ById[id] = type;
         BlockType.Emission[id] = type.LightEmission;
         BlockType.LightSlot[id] = type.LightColorSlot;
+        BlockType.ManMadeEmission[id] = type.NaturalLight ? (byte)0 : type.LightEmission;
         BlockType.SolidById[id] = type.Solid;
         BlockType.CollidesByHitboxById[id] = type.CollidesByHitbox;
         BlockType.StackSolidStateById[id] = (byte)stackSolidAt;

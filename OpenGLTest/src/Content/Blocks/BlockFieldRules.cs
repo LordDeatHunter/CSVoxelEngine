@@ -200,6 +200,9 @@ internal static class BlockFieldRules
         var emission = definition.Light?.Emission ?? 0;
         if (emission > 15)
             throw new InvalidOperationException($"Block '{path}' has light.emission {emission}; expected 0..15.");
+        if (definition.Light?.Natural == true && emission == 0)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets light.natural but emits no light; light.natural needs light.emission > 0.");
         return emission;
     }
 

@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Data;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation.Caves;
@@ -16,8 +18,8 @@ namespace VoxelEngine.Simulation;
 /// The surface spawn search shared by every mob manager: samples a ring around the player (leaning toward
 /// where a moving one is heading, <see cref="RingColumn"/>) and
 /// returns the first dry, loaded column of a mob-spawning biome (<see cref="SpawnsMobs"/>: any land
-/// biome) with two clear cells above its ground that no torch
-/// lights (<see cref="IsLitByBlocks"/>) and that lies outside every battle tower's footprint (whose dark ground floor
+/// biome) with two clear cells above its ground that no man-made light
+/// lights (<see cref="IsLitByManMadeLight(ChunkManager, int, int, int)"/>) and that lies outside every battle tower's footprint (whose dark ground floor
 /// is the tower skeletons' own). Main thread only (it reads the live chunk map).
 /// </summary>
 public static class MobSpawner
@@ -71,8 +73,9 @@ public static class MobSpawner
             // Never inside a battle tower: its dark ground floor passes every check above. A column a world source
             // supplies holds no generated tower.
             if (!source.Supplies(chunkX, chunkZ) && blockedColumn(x, z)) continue;
-            // Torch-safe ground: never where a lamp or torch lights the cell a mob would stand in
-            if (IsLitByBlocks(chunks, x, height + 1, z)) continue;
+            // Torch-safe ground: never where man-made light (a torch, a lamp, a lit station) lights the cell a mob
+            // would stand in
+            if (IsLitByManMadeLight(chunks, x, height + 1, z)) continue;
 
             groundY = height;
             return true;
@@ -146,7 +149,7 @@ public static class MobSpawner
     /// The floor must lie at least <see cref="MobConfig.SlimeUndergroundDepthBlocks"/> under its column's terrain
     /// height (<see cref="SlimeSize.IsUnderground"/>), the cell above it must be dark (sky light at most
     /// <see cref="CaveSpawnSearch.MaxSkyLight"/>; a cell without a published light snapshot reads as full sun, so it is
-    /// refused) and not torch-lit (<see cref="IsLitByBlocks(ChunkManager, int, int, int, int)"/> at
+    /// refused) and not lit by man-made light (<see cref="IsLitByManMadeLight(ChunkManager, int, int, int, int)"/> at
     /// <see cref="CaveSpawnSearch.BlockLightLimit"/>), and every cell read must be loaded. Never in hell
     /// (<see cref="HellGenerator.InHell"/>), which is the hell mobs' own ground. Last of all, only on a floor that
     /// passed every other check (so it costs nothing per frame), the standing cell's cave biome is read through
@@ -169,7 +172,7 @@ public static class MobSpawner
             // The first floor under two clear cells decides this try
             if (!TryScanFloor(chunks, x, top, z, search.ScanDepth, out var y)) continue;
             if (HellGenerator.InHell(y) || !SlimeSize.IsUnderground(y, surface)) continue;
-            if (IsLitByBlocks(chunks, x, y + 1, z, search.BlockLightLimit)) continue;
+            if (IsLitByManMadeLight(chunks, x, y + 1, z, search.BlockLightLimit)) continue;
             if ((int)MathF.Round(EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 1.5f, z + 0.5f)).Sun * 15f)
                 > search.MaxSkyLight) continue;
             // The cave biome last: three noise blends, paid only by an otherwise accepted floor
@@ -214,9 +217,9 @@ public static class MobSpawner
     /// player's feet for at most <paramref name="scanDepth"/> cells, taking the first open cavern floor
     /// (solid ground under two clear, dry cells, every cell loaded). The floor and both cells above it
     /// must lie in hell (<see cref="HellGenerator.InHell"/>), so nothing is ever found in the overworld or
-    /// the barrier band, and the standing cell's block light must stay at or under
-    /// <see cref="MobConfig.HellSpawnMaxBlockLight"/> (a lava-lit pool edge or a torched base stays
-    /// clear; hell has no skylight). On success <paramref name="groundY"/> is the floor cell's Y.
+    /// the barrier band, and the standing cell's man-made light must stay at or under
+    /// <see cref="MobConfig.HellSpawnMaxBlockLight"/> (<see cref="IsLitByManMadeLight(ChunkManager, int, int, int, int)"/>:
+    /// a torched base stays clear, a lava-lit pool edge does not; hell has no skylight). On success <paramref name="groundY"/> is the floor cell's Y.
     /// </summary>
     public static bool TryFindHellSpawn(ChunkManager chunks, SpawnOrigin origin, float minRadius,
         float maxRadius, int tries, int searchHalfHeight, int scanDepth, out int x, out int groundY, out int z)
@@ -228,8 +231,7 @@ public static class MobSpawner
             var top = feetY + Random.Shared.Next(-searchHalfHeight, searchHalfHeight + 1);
             if (!TryScanFloor(chunks, x, top, z, scanDepth, out var y)) continue;
             if (!HellGenerator.InHell(y + 2)) continue;
-            var light = EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 1.5f, z + 0.5f));
-            if ((int)MathF.Round(light.Block * 15f) > MobConfig.HellSpawnMaxBlockLight) continue;
+            if (IsLitByManMadeLight(chunks, x, y + 1, z, MobConfig.HellSpawnMaxBlockLight + 1)) continue;
 
             groundY = y;
             return true;
@@ -251,8 +253,8 @@ public static class MobSpawner
     /// most <paramref name="scanDepth"/> cells, taking the first open floor (solid ground under two clear, dry
     /// cells, every cell loaded). The floor and both cells above it must lie in the sky band
     /// (<see cref="InSkyBand"/>), so neither the cloud sea under the islands nor the overworld or hell is ever
-    /// found, the column must lie inside an island zone (<see cref="SkyIslands.ZoneAt"/>), and no torch may
-    /// light the standing cell (<see cref="IsLitByBlocks"/>). On success <paramref name="groundY"/> is the
+    /// found, the column must lie inside an island zone (<see cref="SkyIslands.ZoneAt"/>), and no man-made light may
+    /// light the standing cell (<see cref="IsLitByManMadeLight(ChunkManager, int, int, int)"/>). On success <paramref name="groundY"/> is the
     /// island top's Y.
     /// </summary>
     public static bool TryFindSkySpawn(ChunkManager chunks, SpawnOrigin origin, float minRadius,
@@ -265,7 +267,7 @@ public static class MobSpawner
             var top = feetY + Random.Shared.Next(-searchHalfHeight, searchHalfHeight + 1);
             if (!TryScanFloor(chunks, x, top, z, scanDepth, out var y)) continue;
             if (!InSkyBand(y) || !InSkyBand(y + 2)) continue;
-            if (!SkyIslands.ZoneAt(x + 0.5f, z + 0.5f).InZone || IsLitByBlocks(chunks, x, y + 1, z)) continue;
+            if (!SkyIslands.ZoneAt(x + 0.5f, z + 0.5f).InZone || IsLitByManMadeLight(chunks, x, y + 1, z)) continue;
 
             groundY = y;
             return true;
@@ -331,20 +333,64 @@ public static class MobSpawner
     }
 
     /// <summary>
-    /// Whether the block light (torches, lamps, lava) in cell (<paramref name="x"/>, <paramref name="y"/>,
-    /// <paramref name="z"/>) reaches <see cref="MobConfig.MobSpawnBlockLightLimit"/>, which
-    /// keeps every ring spawn off it, so a few torches keep a base clear. Read through
-    /// <see cref="EntityLight.Sample"/> from the light each chunk publishes with its mesh (a headless
-    /// server publishes it too); a cell without one reads as unlit.
+    /// Whether man-made light in cell (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>) reaches
+    /// <see cref="MobConfig.MobSpawnBlockLightLimit"/>, which keeps every ring spawn off it, so a few torches keep a
+    /// base clear. See <see cref="IsLitByManMadeLight(ChunkManager, int, int, int, int)"/>.
     /// </summary>
-    public static bool IsLitByBlocks(ChunkManager chunks, int x, int y, int z) =>
-        IsLitByBlocks(chunks, x, y, z, MobConfig.MobSpawnBlockLightLimit);
+    public static bool IsLitByManMadeLight(ChunkManager chunks, int x, int y, int z) =>
+        IsLitByManMadeLight(chunks, x, y, z, MobConfig.MobSpawnBlockLightLimit);
 
-    /// <summary><see cref="IsLitByBlocks(ChunkManager, int, int, int)"/> against <paramref name="limit"/> (0..15)
-    /// instead of the shared torch-safe limit.</summary>
-    public static bool IsLitByBlocks(ChunkManager chunks, int x, int y, int z, int limit)
+    /// <summary>
+    /// Whether man-made light reaches level <paramref name="limit"/> (1..15) in cell (<paramref name="x"/>,
+    /// <paramref name="y"/>, <paramref name="z"/>): a block whose emission is man-made
+    /// (<see cref="BlockType.ManMadeEmission"/>: a torch, a lamp; never <c>light.natural</c> glowing plants, crystals
+    /// or lava) or a burning station's point light (<see cref="ChunkManager.ManMadePointLights"/>, as bright as a
+    /// torch: <see cref="StationLightEmission"/>). Light falls off by one per step through light-passing cells,
+    /// exactly as the voxel block light spreads, so a flood out from the cell to the depth such light could still
+    /// reach it finds every source that lights it at the limit or brighter and none behind a wall. The
+    /// natural light around the cell never counts, however bright, and an unloaded cell stops the flood.
+    /// </summary>
+    public static bool IsLitByManMadeLight(ChunkManager chunks, int x, int y, int z, int limit)
     {
-        var light = EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
-        return (int)MathF.Round(light.Block * 15f) >= limit;
+        var reach = Math.Max(MaxEmission, StationLightEmission) - limit;
+        if (reach < 0) return false;
+
+        // Only the burning stations close enough to matter are looked up per flooded cell
+        var stations = _stations ??= [];
+        stations.Clear();
+        chunks.ManMadePointLights?.AppendLitCells(stations);
+        var stationReach = StationLightEmission - limit;
+        stations.RemoveAll(c => Math.Abs(c.X - x) + Math.Abs(c.Y - y) + Math.Abs(c.Z - z) > stationReach);
+
+        var visited = _visited ??= [];
+        var queue = _queue ??= new Queue<(int X, int Y, int Z, int Depth)>();
+        visited.Clear();
+        queue.Clear();
+        visited.Add((x, y, z));
+        queue.Enqueue((x, y, z, 0));
+        while (queue.TryDequeue(out var cell))
+        {
+            if (!chunks.TryGetCell(cell.X, cell.Y, cell.Z, out var id, out _)) continue;
+            if (BlockType.ManMadeEmission[id] - cell.Depth >= limit) return true;
+            if (StationLightEmission - cell.Depth >= limit && stations.Contains((cell.X, cell.Y, cell.Z))) return true;
+            // An opaque emitter (a lamp) lights its neighbors but passes nothing on; the starting cell always floods
+            if (cell.Depth == reach || (cell.Depth > 0 && !BlockType.PassesLightById[id])) continue;
+            foreach (var (dx, dy, dz) in Vector3Directions.CardinalOffsets)
+            {
+                var next = (cell.X + dx, cell.Y + dy, cell.Z + dz);
+                if (visited.Add(next)) queue.Enqueue((next.Item1, next.Item2, next.Item3, cell.Depth + 1));
+            }
+        }
+        return false;
     }
+
+    // The brightest block emission, and the man-made point lights' level: a torch's (FireLight strength 1)
+    private const int MaxEmission = 15;
+    internal const int StationLightEmission = 14;
+
+    // Flood scratch, per thread: the spawn searches run on an authoritative world's main thread, and the tests
+    // run several worlds side by side
+    [ThreadStatic] private static List<(int X, int Y, int Z)>? _stations;
+    [ThreadStatic] private static HashSet<(int X, int Y, int Z)>? _visited;
+    [ThreadStatic] private static Queue<(int X, int Y, int Z, int Depth)>? _queue;
 }

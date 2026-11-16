@@ -38,7 +38,7 @@ public sealed class CaveMobManagerTests
     private static CaveMobManager SpawnRun(CaveBiome biome, int floor = CaveTestWorld.Floor, int updates = 600,
         MobCaps? caps = null)
     {
-        var chunks = CaveTestWorld.Cave(sun: 0, block: 0, floor);
+        var chunks = CaveTestWorld.Cave(sun: 0, floor);
         var manager = NewManager(caps);
         manager.Biomes = Always(biome);
         var drops = new DropManager();
@@ -94,7 +94,7 @@ public sealed class CaveMobManagerTests
     [Fact]
     public void ATargetOnTheSurfaceSpawnsNothing()
     {
-        var chunks = CaveTestWorld.Cave(sun: 0, block: 0);
+        var chunks = CaveTestWorld.Cave(sun: 0);
         var manager = NewManager();
         manager.Biomes = Always(CaveBiome.Crystal);
         var surface = ColumnCache.GetHeights(0, 0)[VoxelCoords.ColumnIndex(0, 0)];

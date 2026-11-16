@@ -54,6 +54,11 @@ public sealed record BlockType
     /// warm color), indexed like <see cref="ById"/>; see <see cref="BlockLightPalette"/>.</summary>
     public static byte[] LightSlot { get; internal set; } = new byte[256];
 
+    /// <summary>Light emitted by each block id when it is man-made (a torch, a lamp), 0 for natural light
+    /// (<c>light.natural</c>: glowing plants, crystals, lava) and for no light; the light that keeps hostile
+    /// mobs from spawning (<c>PlacedLight</c>). Indexed like <see cref="ById"/>.</summary>
+    public static byte[] ManMadeEmission { get; internal set; } = new byte[256];
+
     /// <summary>Whether voxel light travels through each block id; see Chunk's light passes.</summary>
     public static bool[] PassesLightById { get; internal set; } = new bool[256];
 
@@ -335,6 +340,9 @@ public sealed record BlockType
 
     /// <summary><see cref="BlockLightPalette"/> slot of the emitted light's color; 0 is the default.</summary>
     public byte LightColorSlot { get; init; }
+
+    /// <summary>Whether the emitted light is natural (<c>light.natural</c>), which never keeps mobs from spawning.</summary>
+    public bool NaturalLight { get; init; }
 
     /// <summary>Where the block's flame burns (its JSON <c>flame</c>), cell-local 0..1, one point per
     /// horizontal facing for a <see cref="HasHorizontalFacing"/> block (indexed by the state byte's low

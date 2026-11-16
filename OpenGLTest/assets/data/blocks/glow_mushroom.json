@@ -11,7 +11,7 @@
   "castsAO": false,
   "cutout": true,
   "sway": true,
-  "light": { "emission": 7, "color": [110, 220, 250], "passes": true },
+  "light": { "emission": 7, "color": [110, 220, 250], "passes": true, "natural": true },
   "needsSupport": true,
   "blocksSight": false,
   "replaceableByPlacement": true,

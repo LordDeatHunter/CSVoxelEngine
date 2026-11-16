@@ -4,5 +4,5 @@
   "name": "Fungal Glow",
   "model": { "parent": "block/cube_all", "textures": { "all": "fungal_glow" } },
   "hardness": 2,
-  "light": { "emission": 14, "color": [70, 240, 190] }
+  "light": { "emission": 14, "color": [70, 240, 190], "natural": true }
 }

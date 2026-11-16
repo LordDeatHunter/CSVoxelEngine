@@ -13,8 +13,8 @@ namespace VoxelEngine.Simulation.Caves;
 /// target's feet.</param>
 /// <param name="ScanDepth">How many cells a column is scanned down for a floor under two clear cells.</param>
 /// <param name="MaxSkyLight">The most sky light (0..15) the standing cell may hold.</param>
-/// <param name="BlockLightLimit">The block light (0..15) at or above which the standing cell counts as torch-lit
-/// and is refused (<see cref="MobSpawner.IsLitByBlocks(VoxelEngine.Chunks.ChunkManager, int, int, int, int)"/>).</param>
+/// <param name="BlockLightLimit">The man-made light (0..15) at or above which the standing cell counts as torch-lit
+/// and is refused (<see cref="MobSpawner.IsLitByManMadeLight(VoxelEngine.Chunks.ChunkManager, int, int, int, int)"/>).</param>
 /// <param name="AllowedBiomes">The cave biomes that may take the spawn, as a mask of
 /// <see cref="CaveSpawnRules.Bit(CaveBiome)"/> bits.</param>
 public readonly record struct CaveSpawnSearch(

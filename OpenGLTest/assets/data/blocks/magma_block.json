@@ -7,5 +7,5 @@
   "hardness": 8,
   "requiresTool": true,
   "tools": { "pickaxe": 1 },
-  "light": { "emission": 9, "color": [255, 90, 40] }
+  "light": { "emission": 9, "color": [255, 90, 40], "natural": true }
 }

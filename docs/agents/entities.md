@@ -107,10 +107,18 @@ goblin strolls to at `MobWanderSpeedFactor` of its walk (`Goblin.Update`'s `wand
 play at all it stands still as before. Idle for `MobIdleDespawnSeconds` and farther than
 `MobIdleDespawnMinDistanceBlocks` from every target, it despawns through the same fade
 (`Mob.ShouldIdleDespawn`; `MobInterestTests`). **Torch-safe ground**: the ring spawn search refuses a
-column whose standing cell holds `MobSpawnBlockLightLimit` or more block light
-(`MobSpawner.IsLitByBlocks`, read through `EntityLight.Sample` from the light each chunk publishes
-with its mesh; a headless server publishes it too, and a cell without a snapshot reads as unlit), so
-torches and lamps keep a base clear of new mobs (`TorchSafeSpawnTests`). **Ledge caution**: a mob
+column whose standing cell holds `MobSpawnBlockLightLimit` or more **man-made** light
+(`MobSpawner.IsLitByManMadeLight`), so torches, lamps, fueled lanterns and lit campfires, kilns and
+bloomeries keep a base clear of new mobs, while natural light (a block whose JSON sets `light.natural`:
+glowing plants and mushrooms, crystals, magma, lava) never does, however bright. It does not read the
+published light snapshot (which merges both): it floods out from the cell through light-passing cells to
+the depth man-made light could still reach it, one level lost per step exactly as block light spreads (so
+a wall still shields the ground behind it, an unloaded cell stops the flood), and refuses the cell on
+finding a block whose `BlockType.ManMadeEmission` (its emission, 0 when natural) minus the steps reaches
+the limit, or one of the world's burning stations (`ChunkManager.ManMadePointLights`, the point lights
+that are not voxel light: `StationPointLights` over the lanterns, campfires, kilns and bloomeries, set
+by `World`; null on a test world) treated as a torch (`MobSpawner.StationLightEmission`). The cave,
+sky and hell searches use the same rule (`TorchSafeSpawnTests`). **Ledge caution**: a mob
 will not step (a goblin's next step, `MobLedgeProbeBlocks` past its body, zeroing its move in
 `Goblin.Update`) or hop (where a slime's flat-ground hop would land, sitting that hop out) onto ground
 more than `MobLedgeMaxDropBlocks` under its feet unless its target stands lower than that

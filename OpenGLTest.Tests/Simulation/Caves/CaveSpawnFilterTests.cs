@@ -26,7 +26,7 @@ public sealed class CaveSpawnFilterTests
     [Fact]
     public void AMaskWithoutTheResolvedBiomeRefusesEveryTry()
     {
-        var chunks = CaveTestWorld.Cave(sun: 0, block: 0);
+        var chunks = CaveTestWorld.Cave(sun: 0);
         var search = SearchFor(CaveSpawnRules.AllBiomes & ~CaveSpawnRules.Bit(CaveBiome.Fungal));
         for (var attempt = 0; attempt < 30; attempt++)
         {
@@ -39,7 +39,7 @@ public sealed class CaveSpawnFilterTests
     [Fact]
     public void TheSearchReportsTheResolvedBiomeAndFindsTheFloorWhenAllowed()
     {
-        var chunks = CaveTestWorld.Cave(sun: 0, block: 0);
+        var chunks = CaveTestWorld.Cave(sun: 0);
         var search = SearchFor(CaveSpawnRules.Bit(CaveBiome.Fungal));
         var found = 0;
         for (var attempt = 0; attempt < 30; attempt++)
@@ -64,7 +64,7 @@ public sealed class CaveSpawnFilterTests
         };
         var search = SearchFor(CaveSpawnRules.AllBiomes);
 
-        var dark = CaveTestWorld.Cave(sun: 0, block: 0);
+        var dark = CaveTestWorld.Cave(sun: 0);
         for (var attempt = 0; attempt < 30; attempt++)
         {
             if (!MobSpawner.TryFindCaveSpawn(dark, CaveTestWorld.EyeOnFloor(), search, recording,
@@ -74,7 +74,7 @@ public sealed class CaveSpawnFilterTests
         Assert.NotEmpty(asked);
 
         asked.Clear();
-        var sunlit = CaveTestWorld.Cave(sun: 15, block: 0);
+        var sunlit = CaveTestWorld.Cave(sun: 15);
         for (var attempt = 0; attempt < 30; attempt++)
             Assert.False(MobSpawner.TryFindCaveSpawn(sunlit, CaveTestWorld.EyeOnFloor(), search, recording,
                 out _, out _, out _, out _));

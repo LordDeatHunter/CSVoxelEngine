@@ -10,7 +10,7 @@
   "castsAO": false,
   "cutout": true,
   "sway": true,
-  "light": { "emission": 5, "color": [255, 90, 40], "passes": true },
+  "light": { "emission": 5, "color": [255, 90, 40], "passes": true, "natural": true },
   "hasItem": false,
   "needsSupport": true,
   "blocksSight": false,

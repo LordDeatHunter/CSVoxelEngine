@@ -115,7 +115,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   never a mob), an immune target spared, the hits of the frame for the owning manager to bill
       SpawnOrigin.cs           # where a ring search is centered and how that center moves (a target's eye and velocity)
       MobSpawner.cs            # the ring spawn searches, leaning toward a running target's heading: dry land surface (never in a tower footprint), dark caves,
-                               #   hell floors, sky island tops
+                               #   hell floors, sky island tops; none where man-made light reaches (IsLitByManMadeLight)
       RealmMobManager.cs       # the realm mob managers' shared frame: the capped list, forced spawn, mirrors, the update
                                #   loop (target, hazards, loot, attack, shove, despawn), Hit and the spawn turn
       QuernManager.cs          # block-entity registry for querns: one crushable unit per cell plus a one-rotation spin timer

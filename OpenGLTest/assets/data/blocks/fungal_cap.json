@@ -8,6 +8,6 @@
   "hardness": 1,
   "occludes": false,
   "castsAO": false,
-  "light": { "emission": 9, "color": [70, 240, 190], "passes": true },
+  "light": { "emission": 9, "color": [70, 240, 190], "passes": true, "natural": true },
   "loot": "none"
 }

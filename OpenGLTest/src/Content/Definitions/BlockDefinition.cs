@@ -642,6 +642,11 @@ public sealed class BlockDefinition
         /// torch color (<see cref="BlockLightPalette.DefaultSrgb"/>). Only legal with emission &gt; 0.</summary>
         public float[]? Color { get; set; }
 
+        /// <summary>Whether the emitted light is natural (a glowing mushroom, a crystal, lava): it does not keep
+        /// hostile mobs from spawning, the way man-made light (a torch, a lamp) does. Default false; only legal
+        /// with emission &gt; 0.</summary>
+        public bool? Natural { get; set; }
+
         /// <summary>Whether voxel light travels through it; defaults to "not a full cube".</summary>
         public bool? Passes { get; set; }
     }

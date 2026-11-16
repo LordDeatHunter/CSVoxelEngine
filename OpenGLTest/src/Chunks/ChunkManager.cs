@@ -167,6 +167,13 @@ public class ChunkManager
     /// </summary>
     public IWorldSource WorldSource { get; set; } = GeneratedWorldSource.Instance;
 
+    /// <summary>
+    /// The man-made point lights (fueled lanterns, lit campfires, kilns, bloomeries) the mob spawn searches keep
+    /// clear of beside the man-made block light; null (a client mirror, a bare test world) means none. Set by
+    /// the authoritative world that owns those stations; read on the main thread only.
+    /// </summary>
+    public IManMadePointLights? ManMadePointLights { get; set; }
+
     /// <inheritdoc cref="ChunkMeshScheduler.DirtyStartBudget"/>
     public int DirtyStartBudget { get => _meshScheduler.DirtyStartBudget; set => _meshScheduler.DirtyStartBudget = value; }
 
