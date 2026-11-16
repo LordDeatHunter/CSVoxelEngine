@@ -64,6 +64,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
     private enum Drag { None, Pan, Node, Graph }
     private Drag _drag;
+    // A middle-button pan, which never clears the selection the way an unmoved left click on empty canvas does
+    private bool _panOnly;
     private Vector2 _pressAt;
     private Vector2 _pressPan;
     private Vector2 _grabbed;
@@ -304,7 +306,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
                 "Drag a node to move it (Alt: no snap); shift-drag moves its graph.",
                 "Ctrl+click a node to toggle it as a parent of the selected quest.",
                 "Double-click empty canvas, or drag an icon from the grid onto it, to add a quest.",
-                "Drag empty canvas to pan; the wheel zooms.",
+                "Drag empty canvas or middle-drag anywhere to pan; the wheel zooms.",
                 "Delete deletes the selected quest; Ctrl+S saves.",
             ];
             var y = Pad + 44f;
@@ -463,8 +465,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
                 Status = $"Added {State.SelectedQuestId}";
                 return true;
             }
-            _drag = Drag.Pan;
-            _pressPan = new Vector2(Camera.PanX, Camera.PanY);
+            StartPan(point, panOnly: false);
             return true;
         }
 
@@ -512,6 +513,20 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         return false;
     }
 
+    /// <summary>A middle press: pans from anywhere over the canvas, nodes included.</summary>
+    public void PanDown(Vector2 point)
+    {
+        if (OverCanvas(point)) StartPan(point, panOnly: true);
+    }
+
+    private void StartPan(Vector2 point, bool panOnly)
+    {
+        _pressAt = point;
+        _drag = Drag.Pan;
+        _panOnly = panOnly;
+        _pressPan = new Vector2(Camera.PanX, Camera.PanY);
+    }
+
     /// <summary>Follows a held press: pans, or moves the grabbed node or graph once past the drag threshold.</summary>
     public void MouseMove(Vector2 point, bool alt)
     {
@@ -537,7 +552,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     {
         if (_iconDrag is { } icon) DropIcon(icon, point);
         _iconDrag = null;
-        if (_drag == Drag.Pan && Vector2.Distance(point, _pressAt) < QuestConfig.DragThreshold)
+        if (_drag == Drag.Pan && !_panOnly && Vector2.Distance(point, _pressAt) < QuestConfig.DragThreshold)
             State.Select(null);
         _drag = Drag.None;
         _dragQuest = null;

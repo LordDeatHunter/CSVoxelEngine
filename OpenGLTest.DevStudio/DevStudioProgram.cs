@@ -609,6 +609,11 @@ public static class DevStudioProgram
             return;
         }
 
+        if (_tab == StudioTab.Quests)
+        {
+            if (button == MouseButton.Middle) _quests.PanDown(position);
+            return;
+        }
         if (button == MouseButton.Right) _rightDrag = true;
         else if (button == MouseButton.Middle) _middleDrag = true;
     }
@@ -623,7 +628,11 @@ public static class DevStudioProgram
             SetCursorCaptured(false);
         }
         else if (button == MouseButton.Right) _rightDrag = false;
-        else if (button == MouseButton.Middle) _middleDrag = false;
+        else if (button == MouseButton.Middle)
+        {
+            _quests.MouseUp(new Vector2(mouse.Position.X, mouse.Position.Y));
+            _middleDrag = false;
+        }
     }
 
     private static void OnMouseMove(IMouse mouse, Vector2 position)
