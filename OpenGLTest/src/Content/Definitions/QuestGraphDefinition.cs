@@ -44,6 +44,11 @@ public sealed class QuestGraphDefinition
         /// <summary>The quest ids that must all be complete before this one shows and makes progress; default none (a root).</summary>
         public string[]? Parents { get; set; }
 
+        /// <summary>When the quest shows as a locked preview before it unlocks: <c>unlocked</c> (not before; the default),
+        /// <c>always</c>, <c>anyParentShown</c>, <c>allParentsShown</c>, <c>anyParentDone</c> or <c>anyParentDoneAllShown</c>
+        /// (see <see cref="VoxelEngine.Content.Quests.QuestReveal"/>).</summary>
+        public string? Reveal { get; set; }
+
         /// <summary>Whether the details panel lists the requirements before the quest is complete; default true.</summary>
         public bool? Readable { get; set; }
 

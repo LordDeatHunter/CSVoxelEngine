@@ -28,10 +28,8 @@ internal static class DropdownRenderer
         var label = selected >= 0 && selected < dropdown.Options.Count ? dropdown.Options[selected] : "";
         var arrowWidth = ui.TextWidth("v", scale);
         // A label wider than the room left of the marker shrinks to fit rather than running into it
-        var room = box.Size.X - TextPad * 3f - arrowWidth;
-        var width = ui.TextWidth(label, scale);
-        var labelScale = width > room && width > 0f ? scale * room / width : scale;
-        ui.DrawTextCenteredY(label, box.Left + TextPad, box.Center.Y, labelScale, enabled ? Rgba.White : TextDim);
+        ui.DrawTextCenteredY(label, box.Left + TextPad, box.Center.Y,
+            Fitted(ui, label, scale, box.Size.X - TextPad * 3f - arrowWidth), enabled ? Rgba.White : TextDim);
         ui.DrawTextCenteredY("v", box.Right - TextPad - arrowWidth, box.Center.Y, scale, TextDim);
         if (!dropdown.IsOpen) return;
 
@@ -41,9 +39,16 @@ internal static class DropdownRenderer
         {
             var row = dropdown.OptionRect(i);
             if (pointer is { } q && row.Contains(q)) ui.DrawRect(row.Center, row.Size, ButtonHover);
-            ui.DrawTextCenteredY(dropdown.Options[i], row.Left + TextPad, row.Center.Y, scale,
-                i == selected ? AccentGold : Rgba.White);
+            ui.DrawTextCenteredY(dropdown.Options[i], row.Left + TextPad, row.Center.Y,
+                Fitted(ui, dropdown.Options[i], scale, row.Size.X - TextPad * 2f), i == selected ? AccentGold : Rgba.White);
         }
         ui.DrawBorder(list.Center, list.Size, Border.Standard, SelectedBorderColor);
+    }
+
+    // The scale that fits text into room: the given one, or smaller for a label too wide
+    private static float Fitted(UIRenderer ui, string text, float scale, float room)
+    {
+        var width = ui.TextWidth(text, scale);
+        return width > room && width > 0f ? scale * room / width : scale;
     }
 }

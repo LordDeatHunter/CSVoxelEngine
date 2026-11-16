@@ -11,9 +11,10 @@ namespace VoxelEngine.UI.Quests;
 /// </summary>
 internal static class QuestTracker
 {
-    /// <summary>Whether <paramref name="quest"/> may be equipped: shown in the book, not complete, requirements readable.</summary>
+    /// <summary>Whether <paramref name="quest"/> may be equipped: unlocked (not a locked preview), not complete,
+    /// requirements readable.</summary>
     public static bool CanEquip(QuestLog log, QuestType quest) =>
-        log.IsVisible(quest) && !log.IsComplete(quest) && quest.Readable;
+        log.IsUnlocked(quest) && !log.IsComplete(quest) && quest.Readable;
 
     /// <summary>Whether <paramref name="quest"/> is the equipped one.</summary>
     public static bool IsEquipped(QuestViewData view, QuestType quest) => view.Equipped == quest.Id;

@@ -28,6 +28,9 @@ public sealed class QuestType
 
     public required QuestShape Shape { get; init; }
 
+    /// <summary>When the quest shows as a locked preview before it unlocks.</summary>
+    public QuestReveal Reveal { get; init; }
+
     /// <summary>Whether the details panel lists the requirements before the quest is complete.</summary>
     public required bool Readable { get; init; }
 

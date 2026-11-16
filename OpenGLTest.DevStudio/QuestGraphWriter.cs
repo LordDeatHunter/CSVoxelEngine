@@ -12,7 +12,7 @@ namespace VoxelEngine.DevStudio;
 /// <summary>
 /// Writes a <see cref="QuestGraphDocument"/> back to its JSON file in the shipped files' hand-written layout:
 /// two-space indent, the header comment kept under the opening brace, each quest's fields in schema order
-/// (<c>id, title, description, icon, pos, shape, parents, readable, anyOf, requirements</c>), <c>pos</c>,
+/// (<c>id, title, description, icon, pos, shape, parents, reveal, readable, anyOf, requirements</c>), <c>pos</c>,
 /// <c>origin</c> and <c>parents</c> as inline arrays and each requirement as one line. A field at its loader
 /// default (no shape, readable true, anyOf false, count 1) is left out. CRLF line endings, UTF-8 without a BOM.
 /// </summary>
@@ -69,6 +69,7 @@ public static class QuestGraphWriter
         if (quest.Shape != null) fields.Add($"\"shape\": {Text(quest.Shape)}");
         if (quest.Parents is { Length: > 0 } parents)
             fields.Add($"\"parents\": [{string.Join(", ", Array.ConvertAll(parents, Text))}]");
+        if (quest.Reveal != null) fields.Add($"\"reveal\": {Text(quest.Reveal)}");
         if (quest.Readable == false) fields.Add("\"readable\": false");
         if (quest.AnyOf == true) fields.Add("\"anyOf\": true");
 

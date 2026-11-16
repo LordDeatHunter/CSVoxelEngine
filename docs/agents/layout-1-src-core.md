@@ -362,6 +362,8 @@ OpenGLTest/
         QuestType.cs           # one compiled quest: id, text, icon, grid position, shape, parents, children, requirements
         QuestRequirement.cs, QuestRequirementKind.cs  # obtain/craft/break/place/kill with its target and count
         QuestShape.cs          # Hex / Circle node frame
+        QuestReveal.cs         # when a quest shows as a locked preview before it unlocks (unlocked, always, a parent or
+                               #   all parents shown, a parent done, a parent done with all shown)
       StatusEffects/           # status effects (MG-4b): the compiled effect, its block actions, loader and registry
         StatusEffect.cs        # one compiled effect: duration, tick, damage share, factors, block actions, visuals; Bit
         StatusEffectBlockAction.cs # [Flags] Ignite / Freeze / Thaw, what an effect's tick does to the cells around

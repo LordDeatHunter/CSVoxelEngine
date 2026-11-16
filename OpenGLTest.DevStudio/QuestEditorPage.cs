@@ -30,7 +30,7 @@ namespace VoxelEngine.DevStudio;
 /// quest there that depends on the first), Ctrl+click toggles the clicked node as a parent of the selected one, a double-click on empty canvas adds a quest
 /// there, dragging empty canvas pans and the wheel zooms. A grid click picks the quest's icon, or the target of a
 /// requirement whose PICK is armed; dragging a grid slot onto the canvas adds a quest there with that icon, named
-/// after it. A requirement's type is a <see cref="DropdownState"/>. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
+/// after it. A requirement's type and the quest's reveal mode (SHOW) are <see cref="DropdownState"/>s. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
 /// </summary>
 internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys)
 {
@@ -65,6 +65,12 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private static readonly string[] TypeLabels = [.. QuestEditorState.RequirementTypes.Select(t => t.ToUpperInvariant())];
     private readonly List<DropdownState> _typeDropdowns = [];
     private string? _dropdownQuest;
+    // When the selected quest shows as a locked preview, in QuestLoader.RevealNames order
+    private static readonly string[] RevealLabels =
+        ["WHEN UNLOCKED", "ALWAYS", "A PARENT SHOWN", "ALL PARENTS SHOWN", "A PARENT DONE", "A DONE + ALL SHOWN"];
+    private readonly DropdownState _revealDropdown = new(RevealLabels);
+    // Every dropdown the last layout placed: its state, the option it shows, and what picking an option does
+    private readonly List<(DropdownState Dropdown, int Selected, Action<int> Choose)> _dropdowns = [];
     private string? _focusQuest;
 
     private enum Drag { None, Pan, Node, Graph, Link }
@@ -182,6 +188,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         _now = time;
         _buttons.Clear();
         _fields.Clear();
+        _dropdowns.Clear();
         BuildTopBar();
         BuildDetails();
 
@@ -197,7 +204,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             DevStudioUi.DrawButton(ui, rect.Center, rect.Size, label, enabled, active);
         DrawDetailsText(ui);
         DrawStatus(ui);
-        DrawTypeDropdowns(ui, pointer);
+        DrawDropdowns(ui, pointer);
         DrawDraggedIcon(ui, pointer, time);
     }
 
@@ -212,17 +219,13 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private bool IconDragging(Vector2 point) => Vector2.Distance(point, _iconPressAt) >= QuestConfig.DragThreshold;
 
     // The closed boxes first, then the open list over everything it covers
-    private void DrawTypeDropdowns(UIRenderer ui, Vector2? pointer)
+    private void DrawDropdowns(UIRenderer ui, Vector2? pointer)
     {
-        if (State.SelectedQuest?.Requirements is not { } requirements) return;
         var scale = ui.CapHeightScale(DevStudioUi.TextCap);
         foreach (var open in new[] { false, true })
-            for (var i = 0; i < _typeDropdowns.Count && i < requirements.Count; i++)
-            {
-                if (_typeDropdowns[i].IsOpen != open) continue;
-                var type = Array.IndexOf(QuestEditorState.RequirementTypes, requirements[i].Type?.ToLowerInvariant());
-                DropdownRenderer.Draw(ui, _typeDropdowns[i], type, pointer, scale);
-            }
+            foreach (var (dropdown, selected, _) in _dropdowns)
+                if (dropdown.IsOpen == open)
+                    DropdownRenderer.Draw(ui, dropdown, selected, pointer, scale);
     }
 
     private void BuildTopBar()
@@ -251,6 +254,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         if (State.SelectedQuestId != _dropdownQuest)
         {
             _typeDropdowns.Clear();
+            _revealDropdown.Close();
             _dropdownQuest = State.SelectedQuestId;
         }
         if (State.SelectedLink != null)
@@ -274,7 +278,14 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             quest.Readable == false ? "HIDDEN REQS" : "READABLE", true, quest.Readable == false);
         AddButton(Rect(left + (third + Gap) * 2f, y, third, ButtonH), Action.AnyOf,
             quest.AnyOf == true ? "ANY OF" : "ALL OF", true, quest.AnyOf == true);
-        y += ButtonH + Gap + LabelH;
+        y += ButtonH + Gap;
+
+        // SHOW: when the quest appears as a locked preview (its label is drawn in DrawDetailsText)
+        var questId = quest.Id!;
+        const float showLabel = 70f;
+        _revealDropdown.Box = Rect(left + showLabel, y, width - showLabel, FieldH);
+        _dropdowns.Add((_revealDropdown, QuestEditorState.RevealOf(quest), mode => State.SetReveal(questId, mode)));
+        y += FieldH + Gap + LabelH;
 
         // The icon row: the icon is drawn in DrawDetailsText, the button arms the grid for it
         AddButton(Rect(PanelRight - 110f, y, 110f, ButtonH), Action.PickIcon, "PICK ICON", true, State.PickRequirement < 0);
@@ -288,6 +299,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         {
             var requirement = requirements[i];
             _typeDropdowns[i].Box = Rect(left, y, typeWidth, FieldH);
+            var row = i;
+            _dropdowns.Add((_typeDropdowns[i], Array.IndexOf(QuestEditorState.RequirementTypes, requirement.Type?.ToLowerInvariant()),
+                type => State.SetRequirementType(questId, row, QuestEditorState.RequirementTypes[type])));
             // A row near the bottom opens its list upward, so it stays on screen
             _typeDropdowns[i].OpensUp = y + FieldH * (TypeLabels.Length + 1) > _screen.Y - Pad;
             _fields.Add((Rect(left + typeWidth + Gap, y, width - typeWidth - Gap, FieldH), Field.Target, i,
@@ -404,6 +418,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         ui.DrawText(quest.Icon ?? "", new Vector2(left + 34f, pick.Center.Y - DevStudioUi.TextCap * 0.5f),
             DevStudioUi.FitText(ui, quest.Icon ?? "", DevStudioUi.TextCap, pick.Left - left - 40f).Scale, Rgba.White);
         ui.DrawText("REQUIREMENTS", new Vector2(left, pick.Bottom + Gap + 2f), scale, DevStudioUi.TextDim);
+        ui.DrawText("SHOW", new Vector2(left, _revealDropdown.Box.Center.Y - DevStudioUi.TextCap * 0.5f), scale,
+            DevStudioUi.TextDim);
 
         foreach (var (rect, action, arg, _, _, _) in _buttons)
         {
@@ -499,7 +515,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     public bool MouseDown(Vector2 point, double time, bool ctrl, bool shift)
     {
         _now = time;
-        if (TypeDropdownClick(point)) return true;
+        if (ClickDropdowns(point)) return true;
         foreach (var (rect, action, arg, _, enabled, _) in _buttons)
         {
             if (!enabled || !rect.Contains(point)) continue;
@@ -566,17 +582,15 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     }
 
     // An open type list takes the click first (a pick, or dismissing it); then a click on a closed box opens it
-    private bool TypeDropdownClick(Vector2 point)
+    private bool ClickDropdowns(Vector2 point)
     {
-        if (State.SelectedQuestId is not { } id) return false;
-        for (var i = 0; i < _typeDropdowns.Count; i++)
+        foreach (var (dropdown, _, choose) in _dropdowns)
         {
-            if (!_typeDropdowns[i].IsOpen) continue;
-            if (_typeDropdowns[i].Click(point, out var chosen) == DropdownClick.Chosen)
-                State.SetRequirementType(id, i, QuestEditorState.RequirementTypes[chosen]);
+            if (!dropdown.IsOpen) continue;
+            if (dropdown.Click(point, out var chosen) == DropdownClick.Chosen) choose(chosen);
             return true;
         }
-        foreach (var dropdown in _typeDropdowns)
+        foreach (var (dropdown, _, _) in _dropdowns)
         {
             if (dropdown.Click(point, out _) != DropdownClick.Toggled) continue;
             Blur();

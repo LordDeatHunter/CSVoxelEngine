@@ -307,6 +307,16 @@ public sealed class QuestEditorState
         _ => null,
     });
 
+    /// <summary>Sets when the quest shows as a locked preview: <paramref name="mode"/> indexes
+    /// <see cref="QuestLoader.RevealNames"/>, and the first (the default) clears the field.</summary>
+    public void SetReveal(string id, int mode) =>
+        Edit(id, q => q.Reveal = mode <= 0 || mode >= QuestLoader.RevealNames.Count ? null : QuestLoader.RevealNames[mode]);
+
+    /// <summary>The index in <see cref="QuestLoader.RevealNames"/> of the quest's reveal mode (0, the default, for an
+    /// unknown one, which <see cref="Error"/> reports).</summary>
+    public static int RevealOf(QuestGraphDefinition.QuestDefinition quest) => quest.Reveal == null ? 0
+        : Math.Max(0, QuestLoader.RevealNames.ToList().FindIndex(n => string.Equals(n, quest.Reveal, StringComparison.OrdinalIgnoreCase)));
+
     public void ToggleReadable(string id) => Edit(id, q => q.Readable = q.Readable == false ? null : false);
 
     public void ToggleAnyOf(string id) => Edit(id, q => q.AnyOf = q.AnyOf == true ? null : true);
@@ -615,6 +625,7 @@ public sealed class QuestEditorState
                     "circle" => QuestShape.Circle,
                     _ => parents[i].Length == 0 ? QuestShape.Hex : QuestShape.Circle,
                 },
+                Reveal = (QuestReveal)RevealOf(quest),
                 Readable = quest.Readable ?? true,
                 AnyOf = quest.AnyOf ?? false,
                 Graph = graph,

@@ -29,7 +29,7 @@ public sealed class QuestGraphWriterTests : IDisposable
                 new()
                 {
                     Id = "root", Title = "It's here", Description = "Line with a \\ and \"quotes\".", Icon = "item/spear",
-                    Pos = [0, 0], Shape = "circle", Readable = false, AnyOf = true,
+                    Pos = [0, 0], Shape = "circle", Reveal = "anyParentDone", Readable = false, AnyOf = true,
                     Requirements =
                     [
                         new() { Type = "obtain", Tag = "logs", Label = "Any Log", Count = 4 },

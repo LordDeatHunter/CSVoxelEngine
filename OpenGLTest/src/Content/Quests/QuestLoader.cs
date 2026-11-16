@@ -98,6 +98,7 @@ internal static class QuestLoader
                 IconId = icon,
                 Position = origin + position,
                 Shape = ReadShape(quest.Shape, parents[i].Length == 0, quest.Id!, path),
+                Reveal = ReadReveal(quest.Reveal, quest.Id!, path),
                 Readable = quest.Readable ?? true,
                 AnyOf = quest.AnyOf ?? false,
                 Graph = graph,
@@ -166,6 +167,20 @@ internal static class QuestLoader
         "circle" => QuestShape.Circle,
         _ => throw new InvalidOperationException($"Quest '{quest}' in '{path}' has shape '{shape}'; expected hex or circle.")
     };
+
+    /// <summary>A reveal name (the camelCase <see cref="QuestReveal"/> member, any case) to the mode; null is the default.</summary>
+    internal static QuestReveal ReadReveal(string? reveal, string quest, string path)
+    {
+        if (reveal == null) return QuestReveal.Unlocked;
+        if (Enum.TryParse<QuestReveal>(reveal, true, out var mode) && Enum.IsDefined(mode) && !int.TryParse(reveal, out _))
+            return mode;
+        throw new InvalidOperationException(
+            $"Quest '{quest}' in '{path}' has reveal '{reveal}'; expected {string.Join(", ", RevealNames)}.");
+    }
+
+    /// <summary>The JSON names of every reveal mode, in declaration order.</summary>
+    internal static IReadOnlyList<string> RevealNames { get; } =
+        [.. Enum.GetNames<QuestReveal>().Select(n => char.ToLowerInvariant(n[0]) + n[1..])];
 
     private static Vector2? ReadVector(float[]? values, string field, string path)
     {

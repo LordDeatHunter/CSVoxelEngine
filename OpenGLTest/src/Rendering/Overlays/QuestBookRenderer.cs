@@ -34,6 +34,8 @@ internal sealed class QuestBookRenderer : IDisposable
     private static readonly Rgba NodeOpen = Rgba.Gray(0.62f);
     private static readonly Rgba NodeDone = Rgba.Gray(0.95f);
     private static readonly Rgba NodeHover = Rgba.White;
+    private static readonly Rgba NodeLocked = Rgba.Gray(0.3f);
+    private static readonly Rgba LockedShade = new(8, 10, 14, 175);
     private const float PanelPad = 18f;
     private const float RowHeight = 34f;
     private const float RowIcon = 26f;
@@ -68,7 +70,7 @@ internal sealed class QuestBookRenderer : IDisposable
         var hovered = view.Hover is { } pointer && !view.Dragging
             ? QuestBookLayout.NodeAt(log, view.Camera, canvas, pointer)
             : null;
-        DrawGraph(book, view.Camera, log.IsVisible, log.IsComplete, view.Selected, hovered, time);
+        DrawGraph(book, view.Camera, log.IsVisible, log.IsComplete, view.Selected, hovered, time, log.IsPreview);
         var complete = book.Quests.Count(log.IsComplete);
 
         var header = QuestBookLayout.Header;
@@ -83,10 +85,12 @@ internal sealed class QuestBookRenderer : IDisposable
     }
 
     /// <summary>The book's backdrop, grid, parent edges, nodes and graph titles over the whole canvas: what the quest
-    /// book and the DevStudio quest editor both draw. A quest <paramref name="visible"/> refuses is skipped, and one
-    /// <paramref name="complete"/> accepts draws done (a lit node, a green edge in, a check badge).</summary>
+    /// book and the DevStudio quest editor both draw. A quest <paramref name="visible"/> refuses is skipped (and so is
+    /// every edge to it), one <paramref name="complete"/> accepts draws done (a lit node, a green edge in, a check
+    /// badge), and one <paramref name="preview"/> accepts draws locked (a dark frame, its icon shaded, a "?").</summary>
     internal void DrawGraph(QuestBook book, VoxelEngine.Saves.QuestViewData camera, Func<QuestType, bool> visible,
-        Func<QuestType, bool> complete, QuestType? selected, QuestType? hovered, float time)
+        Func<QuestType, bool> complete, QuestType? selected, QuestType? hovered, float time,
+        Func<QuestType, bool>? preview = null)
     {
         var canvas = _ui.ScreenSize;
         _ui.DrawRect(canvas * 0.5f, canvas, Backdrop);
@@ -99,6 +103,7 @@ internal sealed class QuestBookRenderer : IDisposable
             var to = QuestBookLayout.ToCanvas(quest.Position, camera, canvas);
             foreach (var parent in quest.Parents)
             {
+                if (!visible(book.Quests[parent])) continue;
                 var from = QuestBookLayout.ToCanvas(book.Quests[parent].Position, camera, canvas);
                 DrawLine(from, to, edge, complete(quest) ? EdgeDone : EdgeOpen);
             }
@@ -111,7 +116,7 @@ internal sealed class QuestBookRenderer : IDisposable
         {
             if (!visible(quest)) continue;
             DrawNode(quest, QuestBookLayout.ToCanvas(quest.Position, camera, canvas), size, complete(quest),
-                quest == selected, quest == hovered, camera.Zoom, time);
+                preview?.Invoke(quest) == true, quest == selected, quest == hovered, camera.Zoom, time);
         }
 
         // Each graph's title rides above its root
@@ -149,14 +154,23 @@ internal sealed class QuestBookRenderer : IDisposable
         _ui.DrawMesh(_ui.UnitSquare, model, color);
     }
 
-    private void DrawNode(QuestType quest, Vector2 center, float size, bool done, bool selected, bool hovered,
-        float zoom, float time)
+    private void DrawNode(QuestType quest, Vector2 center, float size, bool done, bool locked, bool selected,
+        bool hovered, float zoom, float time)
     {
         var frame = quest.Shape == QuestShape.Hex ? _hexTexture : _circleTexture;
         if (selected)
             _ui.DrawTexture(center, new Vector2(size * 1.18f), frame, AccentGold);
-        _ui.DrawTexture(center, new Vector2(size), frame, hovered ? NodeHover : done ? NodeDone : NodeOpen);
-        _ui.DrawIdIcon(center, QuestConfig.NodeIconSize * zoom, quest.IconId, 0f, time);
+        _ui.DrawTexture(center, new Vector2(size), frame,
+            hovered ? NodeHover : done ? NodeDone : locked ? NodeLocked : NodeOpen);
+        var icon = QuestConfig.NodeIconSize * zoom;
+        _ui.DrawIdIcon(center, icon, quest.IconId, 0f, time);
+        if (locked)
+        {
+            // A locked preview: the icon shaded over and a "?" on top; 3D icons wrote depth, so clear it for the shade
+            _ui.ClearDepthForOverlay();
+            _ui.DrawRect(center, new Vector2(icon), LockedShade);
+            _ui.DrawTextMiddle("?", center, _ui.HeadScale * zoom, Rgba.White);
+        }
         if (done)
         {
             var badge = size * 0.38f;
@@ -177,6 +191,11 @@ internal sealed class QuestBookRenderer : IDisposable
         _ui.DrawIdIcon(new Vector2(left + 20f, y + 4f), 40f, quest.IconId, 0f, time);
         _ui.DrawTextCenteredY(_ui.FittedText(quest.Title, _ui.HeadScale, width - 56f), left + 52f, y, _ui.HeadScale, AccentGold);
         var done = log.IsComplete(quest);
+        if (log.IsPreview(quest))
+        {
+            DrawLockedDetails(quest, log, left, y, width);
+            return;
+        }
         _ui.DrawTextCenteredY(done ? QuestText.Complete : QuestText.InProgress, left + 52f, y + 26f, _ui.CountScale,
             done ? ReadyGreen : TextDim);
         y += 64f;
@@ -207,6 +226,24 @@ internal sealed class QuestBookRenderer : IDisposable
             y += RowHeight;
         }
         DrawEquipButton(quest, log, camera, canvas);
+    }
+
+    // A locked preview's panel: "Locked" and the parents still to finish (a parent not shown yet reads "???"); the
+    // description and the requirements stay hidden until it unlocks
+    private void DrawLockedDetails(QuestType quest, QuestLog log, float left, float y, float width)
+    {
+        _ui.DrawTextCenteredY(QuestText.Locked, left + 52f, y + 26f, _ui.CountScale, TextDim);
+        y += 64f;
+        _ui.DrawTextCenteredY(QuestText.FinishFirst, left, y, _ui.CountScale, AccentGold);
+        y += 28f;
+        foreach (var index in quest.Parents)
+        {
+            var parent = log.Book.Quests[index];
+            if (log.IsComplete(parent)) continue;
+            var name = log.IsVisible(parent) ? parent.Title : QuestText.Unknown;
+            _ui.DrawTextCenteredY(_ui.FittedText(name, _ui.CountScale, width), left, y, _ui.CountScale, Rgba.White);
+            y += RowHeight;
+        }
     }
 
     private void DrawEquipButton(QuestType quest, QuestLog log, VoxelEngine.Saves.QuestViewData camera, Vector2 canvas)

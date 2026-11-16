@@ -92,7 +92,8 @@ that would close a cycle, DELETE LINK or Delete removes it), Ctrl+click another 
 refused in the status line), double-click empty canvas to add a quest there, drag empty canvas (or middle-drag anywhere) to pan, wheel to zoom. The
 top bar picks the graph (`<`/`>`), edits its title, adds a graph file (`NEW GRAPH`, `graph_N.json`) or a quest at the
 view center, and saves. The right panel edits the selected quest's id (committed on Enter or leaving the field; a rename
-follows every parent link), title, description, shape (AUTO/HEX/CIRCLE), readable, any-of, icon and requirements: a type
+follows every parent link), title, description, shape (AUTO/HEX/CIRCLE), readable, any-of, SHOW (the `reveal` mode, a
+dropdown), icon and requirements: a type
 dropdown (the reusable `UI/Widgets/DropdownState`, drawn by `DropdownRenderer`) picks obtain/craft/break/place/kill, the target field takes an item (or `#tag`, which adds a label field), a block
 or an entity, `-`/`+` set the count, PICK arms the left grid for the target (NEXT MOB steps a kill through the registered
 entities), and a plain grid click sets the icon. Dragging a grid slot onto the canvas adds a quest where it is dropped,

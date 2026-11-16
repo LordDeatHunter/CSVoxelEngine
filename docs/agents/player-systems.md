@@ -411,7 +411,11 @@ book; `survival`, `metalworks`, `adventure` ship), loaded last in `ContentRegist
 offset added to every node, so a graph moves as a unit) and its `quests`. A quest has an `id` (unique across every file;
 saves and the wire name a quest by it), `title`, `description`, `icon` (a block or item, `item/`/`block/` prefix allowed),
 `pos` (`[x, y]` grid steps), `parents` (quest ids, any file), `shape` (`hex` or `circle`; default hex for a quest with no
-parents, circle otherwise), `readable` (default true; false hides the requirement list until it is complete), `anyOf` (default false; true completes the
+parents, circle otherwise), `reveal` (when the quest shows in the book as a locked preview before it unlocks:
+`unlocked`, the default, not before; `always`; `anyParentShown` or `allParentsShown`, while one or every parent shows, done
+or not; `anyParentDone`, once one parent is done; `anyParentDoneAllShown`, once one is done and every other shows;
+`QuestReveal`, worked out by `QuestLog.IsVisible` from the parents' state and memoized until a completion changes,
+`QuestRevealTests`; a preview still unlocks, and makes progress, only once every parent is done), `readable` (default true; false hides the requirement list until it is complete), `anyOf` (default false; true completes the
 quest once any one requirement is met instead of all) and `requirements`, each `{ "type": obtain|craft|break|place|kill,
 "item"|"block"|"entity": name, "count": n }` (count default 1). An obtain or craft requirement may name a `tag` (a
 `data/tags` file, optional `label` for its display name) instead of an `item`: any member counts and an obtain sums the held
@@ -450,8 +454,10 @@ that never traveled selects the quest under the pointer (or clears the selection
 panel keeps it), and the wheel zooms about the pointer (`QuestBookLayout.ZoomAbout`, clamped to
 `QuestConfig.MinZoom..MaxZoom`; `QuestBookLayoutTests`). The pan and zoom are the local player's `QuestViewData`, so they are
 where they were on the next open, and singleplayer saves them in `QuestSaveData.View`. `QuestBookRenderer` (in
-`UiPasses.RenderQuests`, after the HUD pass) draws an opaque grid backdrop, the edges (green into a complete quest), the hex or
-circle node frames (tinted by state, a check badge when complete, a gold ring when selected) with the icon inside, the header
+`UiPasses.RenderQuests`, after the HUD pass) draws an opaque grid backdrop, the edges between shown quests (green into a
+complete quest), the hex or circle node frames (tinted by state, a check badge when complete, a gold ring when selected;
+a locked preview, `QuestLog.IsPreview`, gets a dark frame, its icon shaded over and a "?", and its details panel shows only
+"Locked" and the parents left to finish, "???" for one not shown yet, with no EQUIP) with the icon inside, the header
 tally, the controls hint and, for the selected quest, the details panel: title, state, wrapped description and one row per
 requirement (`QuestText.Line`, `have/count`, green when met). An open, readable quest shows an EQUIP button at the foot of the
 panel (UNEQUIP when it is the equipped one). **The equipped quest** is `QuestViewData.Equipped` (one id, so one at a time,

@@ -38,7 +38,15 @@ public class QuestLoaderTests
         { "zero count", [Quest("a", null, Break("stone", 0))] },
         { "no requirements", [Quest("a", null)] },
         { "bad type", [Quest("a", null, new QuestGraphDefinition.RequirementDefinition { Type = "dance", Item = "stone" })] },
+        { "bad reveal", [Revealing(Quest("a", null, Break("stone")), "sometimes")] },
+        { "numeric reveal", [Revealing(Quest("a", null, Break("stone")), "1")] },
     };
+
+    private static QuestGraphDefinition.QuestDefinition Revealing(QuestGraphDefinition.QuestDefinition quest, string reveal)
+    {
+        quest.Reveal = reveal;
+        return quest;
+    }
 
     [Theory]
     [MemberData(nameof(BrokenGraphs))]

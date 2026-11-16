@@ -15,6 +15,9 @@ internal static class QuestText
     public const string Equip = "EQUIP";
     public const string Unequip = "UNEQUIP";
     public const string Hidden = "The requirements are a secret until you complete it.";
+    public const string Locked = "Locked";
+    public const string FinishFirst = "Finish first";
+    public const string Unknown = "???";
 
     /// <summary>"12 / 30 complete" for the header.</summary>
     public static string Tally(int complete, int total) => $"{complete} / {total} complete";

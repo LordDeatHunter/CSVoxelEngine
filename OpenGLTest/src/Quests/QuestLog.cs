@@ -13,6 +13,8 @@ namespace VoxelEngine.Quests;
 /// <list type="bullet">
 /// <item>a quest is unlocked once every parent is complete (a root always is), and only an unlocked quest
 /// makes progress or completes;</item>
+/// <item>a quest shows in the book once complete or unlocked, or earlier as a locked preview when its
+/// <see cref="QuestType.Reveal"/> mode says so (worked out from what its parents show and have done);</item>
 /// <item>an <c>obtain</c> requirement reads the inventory only when an item is gained
 /// (<see cref="Inventory.Gained"/>, through <see cref="Bind"/>) and once when its quest unlocks, never per tick;</item>
 /// <item>a quest completes when every requirement has reached its count, raising <see cref="Completed"/>
@@ -26,6 +28,8 @@ public sealed class QuestLog
 {
     private readonly bool[] _complete;
     private readonly int[][] _progress;
+    // Whether each quest shows (1), does not (-1) or is not worked out yet (0); dropped whenever a completion changes
+    private sbyte[]? _shown;
     private Func<ushort, int>? _held;
 
     public QuestLog(QuestBook book)
@@ -53,8 +57,32 @@ public sealed class QuestLog
         return true;
     }
 
-    /// <summary>Whether the quest book draws the quest: complete, or unlocked and still open.</summary>
-    public bool IsVisible(QuestType quest) => _complete[quest.Index] || IsUnlocked(quest);
+    /// <summary>Whether the quest book draws the quest: complete, unlocked, or revealed early as a locked preview.</summary>
+    public bool IsVisible(QuestType quest) => Shown(quest.Index);
+
+    /// <summary>Whether the quest shows only as a locked preview: visible, but not unlocked yet.</summary>
+    public bool IsPreview(QuestType quest) => !_complete[quest.Index] && !IsUnlocked(quest) && IsVisible(quest);
+
+    private bool Shown(int index)
+    {
+        _shown ??= new sbyte[_complete.Length];
+        if (_shown[index] != 0) return _shown[index] > 0;
+        var quest = Book.Quests[index];
+        var shown = _complete[index] || IsUnlocked(quest) || Revealed(quest);
+        _shown[index] = shown ? (sbyte)1 : (sbyte)-1;
+        return shown;
+    }
+
+    // The parent graph is acyclic (the loader refuses cycles), so asking the parents always ends
+    private bool Revealed(QuestType quest) => quest.Reveal switch
+    {
+        QuestReveal.Always => true,
+        QuestReveal.AnyParentShown => quest.Parents.Any(Shown),
+        QuestReveal.AllParentsShown => quest.Parents.All(Shown),
+        QuestReveal.AnyParentDone => quest.Parents.Any(p => _complete[p]),
+        QuestReveal.AnyParentDoneAllShown => quest.Parents.Any(p => _complete[p]) && quest.Parents.All(Shown),
+        _ => false,
+    };
 
     /// <summary>How far requirement <paramref name="requirement"/> of the quest has come, capped at its count
     /// (the full count once the quest is complete).</summary>
@@ -127,6 +155,7 @@ public sealed class QuestLog
         if (met == 0 || (!quest.AnyOf && met < quest.Requirements.Count)) return;
 
         _complete[quest.Index] = true;
+        _shown = null;
         Changed = true;
         Completed?.Invoke(quest);
         foreach (var child in quest.Children)
@@ -190,6 +219,7 @@ public sealed class QuestLog
     public void Import(QuestSaveData data)
     {
         Array.Clear(_complete);
+        _shown = null;
         foreach (var progress in _progress) Array.Clear(progress);
 
         foreach (var id in data.Completed ?? [])
