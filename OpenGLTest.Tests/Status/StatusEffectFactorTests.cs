@@ -37,14 +37,15 @@ public sealed class StatusEffectFactorTests
         var held = ItemRegistry.All.Select(i => (Item?)i).Append(null);
         foreach (var item in held)
         {
-            var plain = Mining.HitGapSeconds(item);
-            Assert.Equal(plain, Mining.HitGapSeconds(item, 1f));
-            var slowed = Mining.HitGapSeconds(item, 0.6f);
+            var plain = Mining.PunchGapSeconds(item, 1f);
+            var serverMinimum = AttackPacing.MinGapSeconds(NetAttackKind.Punch, NetAttackKind.Punch, item);
+            Assert.Equal(plain, serverMinimum);
+            var slowed = Mining.PunchGapSeconds(item, 0.6f);
             Assert.True(slowed > plain, $"{item?.Name ?? "bare hand"}: slowed gap {slowed} not above {plain}");
-            Assert.True(slowed >= AttackPacing.MinGapSeconds(NetAttackKind.Punch, NetAttackKind.Punch, item),
+            Assert.True(slowed >= serverMinimum,
                 $"{item?.Name ?? "bare hand"}: a slowed punch would be refused by the server");
             // A stronger slow is a longer gap
-            Assert.True(Mining.HitGapSeconds(item, 0.3f) > slowed);
+            Assert.True(Mining.PunchGapSeconds(item, 0.3f) > slowed);
         }
     }
 
