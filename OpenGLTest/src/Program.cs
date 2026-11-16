@@ -584,7 +584,7 @@ public static class Program
         renderManager.Ui.Pointer = panelInput.UiPointerCanvas();
         if (!hideHud)
             world.Renderer.RenderUI(renderManager, inventoryView,
-                (float)world.LightingTime, diagnostics.ShownFps, diagnostics.DebugEnabled,
+                (float)windowManager.Window.Time, diagnostics.ShownFps, diagnostics.DebugEnabled,
                 showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView, builder: spellBuilderView, waystone: waystoneView, forge: gameplay.Forge.View,
                 mapScreen: gameplay.Map.View);
         // The quest book covers the world and the HUD; its toast card rides the HUD's corner
@@ -602,7 +602,7 @@ public static class Program
             renderManager.UiPasses.RenderPlayerList(windowManager.Window, chatInput.PlayerListNames());
         // A hover tooltip over the [E] panel's rows and the hotbar slots
         if (!hideHud && !pauseMenuView.IsOpen)
-            renderManager.UiPasses.RenderTooltip(windowManager.Window, panelInput.HoveredTooltip(), (float)world.LightingTime);
+            renderManager.UiPasses.RenderTooltip(windowManager.Window, panelInput.HoveredTooltip(), (float)windowManager.Window.Time);
         // The death screen covers the HUD and the world until the player asks to respawn; a
         // client has no death line (the server's chat carries it)
         if (!hideHud && gameplay.DeathScreenUp(world))
