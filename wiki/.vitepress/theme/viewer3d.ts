@@ -60,7 +60,9 @@ export async function loadTexture(T: THREE, url: string) {
   return tex
 }
 
-export function lit(T: THREE, tex: InstanceType<THREE['Texture']>) {
+/** An element with "shade": false (torch, lantern) is drawn flat like the game does, so its glow never darkens with the face. */
+export function lit(T: THREE, tex: InstanceType<THREE['Texture']>, shade = true) {
+  if (!shade) return new T.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.5, side: T.DoubleSide })
   return new T.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.5, side: T.DoubleSide })
 }
 
@@ -155,14 +157,19 @@ export async function blockGroup(T: THREE, block: any, base: string, size = 1): 
   const tiles = new Set<string>()
   for (const el of elements) for (const f of Object.values<any>(el.faces)) tiles.add(f.tile)
   const mats = new Map<string, InstanceType<THREE['MeshLambertMaterial']>>()
+  const flatMats = new Map<string, InstanceType<THREE['MeshBasicMaterial']>>()
   await Promise.all([...tiles].map(async (t) => {
-    try { mats.set(t, lit(T, await loadTexture(T, `${base}/textures/blocks/${t}.png`))) } catch { /* missing tile: face skipped */ }
+    try {
+      const tex = await loadTexture(T, `${base}/textures/blocks/${t}.png`)
+      mats.set(t, lit(T, tex))
+      flatMats.set(t, lit(T, tex, false) as any)
+    } catch { /* missing tile: face skipped */ }
   }))
 
   const group = new T.Group()
   for (const el of elements) {
     for (const [face, f] of Object.entries<any>(el.faces)) {
-      const mat = mats.get(f.tile)
+      const mat = (el.shade === false ? flatMats : mats).get(f.tile)
       if (!mat) continue
       const pos: number[] = []
       const uvs: number[] = []

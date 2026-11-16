@@ -51,7 +51,7 @@ export function resolveModel(model, loadModel) {
       if (!tile) continue
       faces[f] = { tile, uv: face.uv ?? defaultUv(f, el.from, el.to), rotation: face.rotation ?? 0 }
     }
-    return { from: el.from, to: el.to, rotation: el.rotation ?? null, faces }
+    return { from: el.from, to: el.to, rotation: el.rotation ?? null, shade: el.shade !== false, faces }
   })
   const resolved = {}
   for (const k of Object.keys(textures)) {
