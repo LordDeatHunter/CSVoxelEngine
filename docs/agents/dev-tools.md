@@ -85,7 +85,7 @@ the wheel off the grid zooms that framing. The GL-free, tested state is
 
 **QUESTS** edits `assets/data/quests/*.json` (see "Quests (U-15)"). The canvas between the panels is the in-game book's
 own drawing (`QuestBookRenderer.DrawGraph`, every quest shown, none complete) over the quests as edited: click a node to
-select it, drag it to move it (snapped to `QuestEditorState.SnapStep`, Alt for none), shift-drag to move its whole graph's
+select it (a click on empty canvas that does not pan clears the selection), drag it to move it (snapped to `QuestEditorState.SnapStep`, Alt for none), shift-drag to move its whole graph's
 `origin`, Ctrl+click another node to toggle it as a parent of the selected one (a self link or one closing a cycle is
 refused in the status line), double-click empty canvas to add a quest there, drag empty canvas to pan, wheel to zoom. The
 top bar picks the graph (`<`/`>`), edits its title, adds a graph file (`NEW GRAPH`, `graph_N.json`) or a quest at the

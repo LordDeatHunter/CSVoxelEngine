@@ -617,7 +617,7 @@ public static class DevStudioProgram
     {
         if (button == MouseButton.Left)
         {
-            _quests.MouseUp();
+            _quests.MouseUp(new Vector2(mouse.Position.X, mouse.Position.Y));
             _leftDrag = false;
             _dragSlider = null;
             SetCursorCaptured(false);

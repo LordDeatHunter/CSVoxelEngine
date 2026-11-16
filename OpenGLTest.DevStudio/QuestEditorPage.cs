@@ -231,7 +231,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             ui.DrawText("No quest selected", new Vector2(left, Pad + 8f), ui.CapHeightScale(18f), Rgba.White);
             string[] hints =
             [
-                "Click a node to select it.",
+                "Click a node to select it, empty",
+                "  canvas to clear the selection.",
                 "Drag a node to move it (Alt: no snap).",
                 "Shift+drag a node: move its graph.",
                 "Ctrl+click a node: toggle it as a",
@@ -432,8 +433,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         }
     }
 
-    public void MouseUp()
+    /// <summary>Ends a press. A press on empty canvas that never traveled far enough to pan clears the selection.</summary>
+    public void MouseUp(Vector2 point)
     {
+        if (_drag == Drag.Pan && Vector2.Distance(point, _pressAt) < QuestConfig.DragThreshold)
+            State.Select(null);
         _drag = Drag.None;
         _dragQuest = null;
         _dragGraph = null;
