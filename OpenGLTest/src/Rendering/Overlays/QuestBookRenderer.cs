@@ -70,7 +70,7 @@ internal sealed class QuestBookRenderer : IDisposable
         var hovered = view.Hover is { } pointer && !view.Dragging
             ? QuestBookLayout.NodeAt(log, view.Camera, canvas, pointer)
             : null;
-        DrawGraph(book, view.Camera, log.IsVisible, log.IsComplete, view.Selected, hovered, time, log.IsPreview);
+        DrawGraph(book, view.Camera, log.IsVisible, log.IsComplete, q => q == view.Selected, hovered, time, log.IsPreview);
         var complete = book.Quests.Count(log.IsComplete);
 
         var header = QuestBookLayout.Header;
@@ -87,9 +87,10 @@ internal sealed class QuestBookRenderer : IDisposable
     /// <summary>The book's backdrop, grid, parent edges, nodes and graph titles over the whole canvas: what the quest
     /// book and the DevStudio quest editor both draw. A quest <paramref name="visible"/> refuses is skipped (and so is
     /// every edge to it), one <paramref name="complete"/> accepts draws done (a lit node, a green edge in, a check
-    /// badge), and one <paramref name="preview"/> accepts draws locked (a dark frame, its icon shaded, a "?").</summary>
+    /// badge), one <paramref name="preview"/> accepts draws locked (a dark frame, its icon shaded, a "?"), and every one
+    /// <paramref name="selected"/> accepts gets the gold ring.</summary>
     internal void DrawGraph(QuestBook book, VoxelEngine.Saves.QuestViewData camera, Func<QuestType, bool> visible,
-        Func<QuestType, bool> complete, QuestType? selected, QuestType? hovered, float time,
+        Func<QuestType, bool> complete, Func<QuestType, bool> selected, QuestType? hovered, float time,
         Func<QuestType, bool>? preview = null)
     {
         var canvas = _ui.ScreenSize;
@@ -116,7 +117,7 @@ internal sealed class QuestBookRenderer : IDisposable
         {
             if (!visible(quest)) continue;
             DrawNode(quest, QuestBookLayout.ToCanvas(quest.Position, camera, canvas), size, complete(quest),
-                preview?.Invoke(quest) == true, quest == selected, quest == hovered, camera.Zoom, time);
+                preview?.Invoke(quest) == true, selected(quest), quest == hovered, camera.Zoom, time);
         }
 
         // Each graph's title rides above its root

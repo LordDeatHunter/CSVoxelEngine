@@ -58,23 +58,23 @@ public sealed class QuestEditorStateTests : IDisposable
         var editor = Editor(Graph("g", null,
             Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone")), Quest("b", ["a"], Break("stone"))));
 
-        Assert.NotNull(editor.ToggleParent("a", "a"));
-        Assert.NotNull(editor.ToggleParent("root", "b"));
+        Assert.NotNull(editor.AddParent("a", "a"));
+        Assert.NotNull(editor.AddParent("root", "b"));
         Assert.Null(editor.Find("root")!.Value.Quest.Parents);
         Assert.False(editor.Dirty);
         Assert.Null(editor.Error);
     }
 
     [Fact]
-    public void TogglingAParentLinksItThenUnlinksIt()
+    public void ALinkAddedThenRemovedComesAndGoesFromThePreview()
     {
         var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", null, Break("stone"))));
 
-        Assert.Null(editor.ToggleParent("a", "root"));
+        Assert.Null(editor.AddParent("a", "root"));
         Assert.Equal(["root"], editor.Find("a")!.Value.Quest.Parents);
         Assert.Contains(editor.Preview.Of("root").Index, editor.Preview.Of("a").Parents);
 
-        Assert.Null(editor.ToggleParent("a", "root"));
+        Assert.Null(editor.RemoveLink("a", "root"));
         Assert.Empty(editor.Preview.Of("a").Parents);
     }
 
@@ -275,7 +275,7 @@ public sealed class QuestEditorStateTests : IDisposable
     {
         var editor = Editor(Graph("g", null, Quest("root", null, Break("stone"))));
         var added = editor.AddQuest(new Vector2(2f, 0f))!;
-        editor.ToggleParent(added, "root");
+        editor.AddParent(added, "root");
 
         editor.RevertQuest(added);
 

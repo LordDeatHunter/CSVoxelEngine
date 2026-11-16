@@ -25,9 +25,10 @@ namespace VoxelEngine.DevStudio;
 /// one typed field or one drag is one step (the page names the gesture in <see cref="QuestEditorState.Gesture"/>).
 /// SAVE ALL / REVERT ALL (a second click within <see cref="ConfirmSeconds"/> confirms) act on every graph,
 /// SAVE QUEST / REVERT QUEST on the selected quest alone; a quest with unsaved edits carries a gold corner mark.
-/// Clicking a node selects it, dragging moves it (shift-drag moves its whole graph, Alt turns snapping off),
+/// Clicking a node selects it, Ctrl+click adds it to the selection (or takes it out), dragging moves it (shift-drag
+/// moves its whole graph, Alt turns snapping off), shift-drag on empty canvas draws a box that selects every quest in it,
 /// clicking a line selects that link (its panel turns it around or deletes it), a right-drag from one node to another makes the second depend on the first (dropped on empty canvas, it adds a
-/// quest there that depends on the first), Ctrl+click toggles the clicked node as a parent of the selected one, a double-click on empty canvas adds a quest
+/// quest there that depends on the first), a double-click on empty canvas adds a quest
 /// there, dragging empty canvas pans and the wheel zooms. A grid click picks the quest's icon, or the target of a
 /// requirement whose PICK is armed; dragging a grid slot onto the canvas adds a quest there with that icon, named
 /// after it. A requirement's type and the quest's reveal mode (SHOW) are <see cref="DropdownState"/>s. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
@@ -73,10 +74,12 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private readonly List<(DropdownState Dropdown, int Selected, Action<int> Choose)> _dropdowns = [];
     private string? _focusQuest;
 
-    private enum Drag { None, Pan, Node, Graph, Link }
+    private enum Drag { None, Pan, Node, Graph, Link, Marquee }
     private Drag _drag;
     // A middle-button pan, which never clears the selection the way an unmoved left click on empty canvas does
     private bool _panOnly;
+    // The far corner of the selection box being shift-dragged from _pressAt
+    private Vector2 _marqueeTo;
     private Vector2 _pressAt;
     private Vector2 _pressPan;
     private Vector2 _grabbed;
@@ -145,8 +148,14 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         var hovered = pointer is { } p && _drag is Drag.None or Drag.Link && OverCanvas(p)
             ? QuestBookLayout.NodeAt(book.Quests, _ => true, Camera, _screen, p)
             : null;
-        QuestType? selected = State.SelectedQuestId is { } id && book.TryGet(id, out var q) ? q : null;
-        ui.Quests.DrawGraph(book, Camera, _ => true, _ => false, selected, hovered, time);
+        ui.Quests.DrawGraph(book, Camera, _ => true, _ => false, q => State.IsSelected(q.Id), hovered, time);
+
+        if (_drag == Drag.Marquee)
+        {
+            var box = MarqueeBox();
+            ui.DrawRect(box.Center, box.Size, DevStudioUi.Accent.WithAlpha((byte)40));
+            ui.DrawBorder(box.Center, box.Size, 1.5f, DevStudioUi.Accent);
+        }
 
         // The link being right-dragged: a gold line from its parent to the pointer
         if (_drag == Drag.Link && _dragQuest != null && book.TryGet(_dragQuest, out var from) && pointer is { } tip)
@@ -382,19 +391,22 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
                 "Click a node to select it; click empty canvas to clear the selection.",
                 "Drag a node to move it (Alt: no snap); shift-drag moves its graph.",
                 "Right-drag from a quest to another to make the second depend on the first; drop on empty canvas to add a quest that depends on it.",
-                "Ctrl+click a node to toggle it as a parent of the selected quest.",
+                "Ctrl+click a node to add it to the selection; shift-drag on empty canvas selects every quest in the box.",
                 "Click a line to select that link: swap its direction or delete it.",
                 "Double-click empty canvas, or drag an icon from the grid onto it, to add a quest.",
                 "Drag empty canvas or middle-drag anywhere to pan; the wheel zooms.",
                 "Delete deletes the selected quest or link; Ctrl+S saves; Ctrl+Z undoes, Ctrl+Y or Ctrl+Shift+Z redoes.",
             ];
+            // Smaller than the panel's text, so every hint fits the panel's height
+            const float hintCap = 9f;
+            var hintScale = ui.CapHeightScale(hintCap);
             var y = Pad + 44f;
             foreach (var hint in hints)
             {
-                foreach (var line in Wrap(ui, hint, scale, PanelRight - left))
+                foreach (var line in Wrap(ui, hint, hintScale, PanelRight - left))
                 {
-                    ui.DrawText(line, new Vector2(left, y), scale, DevStudioUi.TextDim);
-                    y += 18f;
+                    ui.DrawText(line, new Vector2(left, y), hintScale, DevStudioUi.TextDim);
+                    y += hintCap + 6f;
                 }
                 y += 6f;
             }
@@ -535,6 +547,13 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
         _pressAt = point;
         var node = QuestBookLayout.NodeAt(State.Preview.Quests, _ => true, Camera, _screen, point);
+        if (node == null && shift)
+        {
+            _drag = Drag.Marquee;
+            _marqueeTo = point;
+            State.Select(null);
+            return true;
+        }
         if (node == null
             && QuestBookLayout.LinkAt(State.Preview.Quests, _ => true, Camera, _screen, point, LinkTolerance) is { } hit)
         {
@@ -556,11 +575,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             return true;
         }
 
-        if (ctrl && State.SelectedQuestId is { } child && child != node.Id)
+        if (ctrl)
         {
-            var wasParent = State.SelectedQuest?.Parents?.Contains(node.Id) == true;
-            var refused = State.ToggleParent(child, node.Id);
-            Status = refused ?? (wasParent ? $"Unlinked {node.Id} from {child}" : $"{node.Id} is now a parent of {child}");
+            State.ToggleSelected(node.Id);
             return true;
         }
 
@@ -629,6 +646,13 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             Status = $"Added {added}, which depends on {parent}";
     }
 
+    // The selection box: the rectangle between the shift-press and the pointer, whichever way it was dragged
+    private UiRect MarqueeBox()
+    {
+        var min = Vector2.Min(_pressAt, _marqueeTo);
+        return UiRect.FromTopLeft(min, Vector2.Max(_pressAt, _marqueeTo) - min);
+    }
+
     /// <summary>A middle press: pans from anywhere over the canvas, nodes included.</summary>
     public void PanDown(Vector2 point)
     {
@@ -649,6 +673,13 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         var travel = point - _pressAt;
         switch (_drag)
         {
+            case Drag.Marquee:
+                _marqueeTo = point;
+                var box = MarqueeBox();
+                State.SelectMany(State.Preview.Quests
+                    .Where(q => box.Contains(QuestBookLayout.ToCanvas(q.Position, Camera, _screen)))
+                    .Select(q => q.Id));
+                break;
             case Drag.Pan:
                 var pan = QuestBookLayout.PannedBy(_pressPan, travel, Camera.Zoom);
                 Camera.PanX = pan.X;

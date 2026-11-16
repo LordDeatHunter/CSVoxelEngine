@@ -263,15 +263,6 @@ public sealed class QuestEditorState
         Recompile();
     }
 
-    /// <summary>Links <paramref name="parent"/> as a parent of <paramref name="child"/>, or unlinks it when it already
-    /// is one. Returns why a link is refused (itself, an unknown quest, or a cycle), else null.</summary>
-    public string? ToggleParent(string child, string parent)
-    {
-        if (child == parent) return "A quest cannot be its own parent.";
-        if (Find(child) is not { } found || Find(parent) == null) return "No such quest.";
-        return found.Quest.Parents?.Contains(parent) == true ? RemoveLink(child, parent) : AddParent(child, parent);
-    }
-
     /// <summary>Removes the link that makes <paramref name="child"/> depend on <paramref name="parent"/>. Returns why
     /// nothing was removed, else null.</summary>
     public string? RemoveLink(string child, string parent)
