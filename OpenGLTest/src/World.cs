@@ -478,7 +478,7 @@ public class World
             if (saveStore != null)
             {
                 // Held until the Loading -> Playing flip, then spawned as their chunks load
-                savedEntities = EntitySaveCodec.TryParse(saveStore.ReadFile(EntitySaveCodec.FileName));
+                savedEntities = EntitySaveReader.Read(saveStore);
                 savedStations = StationSaveCodec.TryParse(saveStore.ReadFile(StationSaveCodec.FileName));
             }
             LocalPlayer.RecordSpawn();

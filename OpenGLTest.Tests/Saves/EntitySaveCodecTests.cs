@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Linq;
 using System.Text;
 using VoxelEngine.Saves;
@@ -93,5 +95,50 @@ public sealed class EntitySaveCodecTests
         Assert.Null(EntitySaveCodec.TryParse(Encoding.UTF8.GetBytes("not json at all")));
         Assert.Null(EntitySaveCodec.TryParse(valid.Take(valid.Length / 2).ToArray()));
         Assert.Null(EntitySaveCodec.TryParse("null"u8.ToArray()));
+    }
+
+    [Fact]
+    public void TryParseReportsOnlyJsonRejection()
+    {
+        Assert.Null(EntitySaveCodec.TryParse(null, out var missingRejected));
+        Assert.False(missingRejected);
+        Assert.Null(EntitySaveCodec.TryParse("null"u8.ToArray(), out var nullRejected));
+        Assert.False(nullRejected);
+        Assert.NotNull(EntitySaveCodec.TryParse("{}"u8.ToArray(), out var partialRejected));
+        Assert.False(partialRejected);
+        Assert.Null(EntitySaveCodec.TryParse("{\"Mobs\":["u8.ToArray(), out var malformedRejected));
+        Assert.True(malformedRejected);
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("null", false)]
+    [InlineData("{}", true)]
+    [InlineData("{\"Mobs\":[{\"Type\":\"retired-mob\"}],\"Drops\":[{\"Item\":\"item/retired\"}]}", true)]
+    public void MissingNullPartialAndUnresolvedEntityFilesAreNotArchived(string? json, bool hasData)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, EntitySaveCodec.FileName);
+        if (json != null)
+            File.WriteAllBytes(path, Encoding.UTF8.GetBytes(json));
+
+        var store = new ChunkSaveStore(directory);
+        try
+        {
+            var loaded = EntitySaveReader.Read(store);
+            Assert.Equal(hasData, loaded != null);
+            store.EnqueueFile(EntitySaveCodec.FileName,
+                EntitySaveCodec.ToBytes(new EntitySaveData { Mobs = [], Drops = [] }));
+            Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+            Assert.False(File.Exists(path + ".bad"));
+            Assert.NotNull(EntitySaveCodec.TryParse(File.ReadAllBytes(path)));
+        }
+        finally
+        {
+            store.Shutdown(TimeSpan.FromSeconds(10));
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
     }
 }

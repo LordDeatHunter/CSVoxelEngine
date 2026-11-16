@@ -20,8 +20,15 @@ public static class EntitySaveCodec
 
     /// <summary>The parsed file, or null for no file, the JSON <c>null</c> literal or anything
     /// that is not valid JSON of this shape (logged as a warning).</summary>
-    public static EntitySaveData? TryParse(byte[]? bytes)
+    public static EntitySaveData? TryParse(byte[]? bytes) => TryParse(bytes, out _);
+
+    /// <summary>
+    /// Parses entity bytes and reports only a <see cref="JsonException"/> rejection. Missing bytes
+    /// and a valid JSON <c>null</c> still return null without setting <paramref name="rejectedJson"/>.
+    /// </summary>
+    public static EntitySaveData? TryParse(byte[]? bytes, out bool rejectedJson)
     {
+        rejectedJson = false;
         if (bytes == null)
             return null;
         try
@@ -30,6 +37,7 @@ public static class EntitySaveCodec
         }
         catch (JsonException e)
         {
+            rejectedJson = true;
             Log.Warn($"Entity save: ignoring {FileName}: {e.Message}");
             return null;
         }
