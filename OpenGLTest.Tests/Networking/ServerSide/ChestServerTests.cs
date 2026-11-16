@@ -328,9 +328,14 @@ public sealed class ChestServerTests : IDisposable
         Assert.Equal(remaining, fuel.Remaining);
         Assert.Equal(1, fuel.Storage.CountOf(coal));
         Assert.False(LanternManager.Emits(player.Inventory));
-        TickUntil(() => _inboxes[b].Held.TryGetValue("Alice", out var held) && held.Id == 0 && !held.Lit,
+        // The drag swaps: the Flint that stood at the destination is now in the selected slot, so the other client
+        // sees Alice hold Flint, unlit, and never the lantern she moved away
+        TickUntil(() => _inboxes[b].Held.TryGetValue("Alice", out var held) && held.Id == Flint && !held.Lit,
             "switching away left a remote held light behind");
-        Assert.Equal(0, player.Inventory.IdAt(source));
+        Assert.Equal(Flint, player.Inventory.IdAt(source));
+        Assert.Equal(source, player.Inventory.SelectedIndex);
+        Assert.Equal(0, player.Inventory.ToolInstanceAt(source));
+        Assert.Equal(instance, player.Inventory.ToolInstanceAt(destination));
         Assert.Equal(2, player.Inventory.CountFor(Flint));
         TickUntil(() => _inboxes[a].Inventory?.Hotbar?[destination].ToolInstance == instance,
             "moved lantern never reached the inventory mirror");
