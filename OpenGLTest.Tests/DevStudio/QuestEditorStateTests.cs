@@ -299,6 +299,108 @@ public sealed class QuestEditorStateTests : IDisposable
         Assert.NotEqual("Edited", editor.Find("root")!.Value.Quest.Title);
     }
 
+    private static string? TitleOf(QuestEditorState editor, string id) => editor.Find(id)?.Quest.Title;
+
+    [Fact]
+    public void UndoStepsBackThroughEditsAndRedoStepsForwardAgain()
+    {
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone"))));
+        var original = (TitleOf(editor, "root"), TitleOf(editor, "a"));
+        editor.SetTitle("root", "First");
+        editor.SetTitle("a", "Second");
+
+        Assert.True(editor.Undo());
+        Assert.Equal(("First", original.Item2), (TitleOf(editor, "root"), TitleOf(editor, "a")));
+        Assert.True(editor.Undo());
+        Assert.Equal(original, (TitleOf(editor, "root"), TitleOf(editor, "a")));
+        Assert.False(editor.Undo());
+        Assert.False(editor.Dirty);
+
+        Assert.True(editor.Redo());
+        Assert.True(editor.Redo());
+        Assert.Equal(("First", "Second"), (TitleOf(editor, "root"), TitleOf(editor, "a")));
+        Assert.False(editor.Redo());
+    }
+
+    [Fact]
+    public void AnEditAfterAnUndoDropsEverythingUndone()
+    {
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone"))));
+        editor.SetTitle("root", "First");
+        editor.SetTitle("root", "Second");
+        editor.Undo();
+
+        editor.SetTitle("root", "Third");
+
+        Assert.False(editor.CanRedo);
+        Assert.False(editor.Redo());
+        Assert.Equal("Third", TitleOf(editor, "root"));
+    }
+
+    [Fact]
+    public void AGestureIsOneStepAndARefusedEditIsNone()
+    {
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone"))));
+        var original = TitleOf(editor, "root");
+
+        Assert.NotNull(editor.AddParent("a", "root"));
+        Assert.False(editor.CanUndo);
+
+        editor.Gesture = "typing";
+        foreach (var title in new[] { "T", "Ti", "Tit" }) editor.SetTitle("root", title);
+        editor.Gesture = null;
+
+        Assert.True(editor.Undo());
+        Assert.Equal(original, TitleOf(editor, "root"));
+        Assert.False(editor.CanUndo);
+    }
+
+    [Fact]
+    public void UndoBringsBackDeletedQuestsAndLinksAndRevertAllIsAStepToo()
+    {
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone"))));
+        editor.DeleteQuest("root");
+        Assert.True(editor.Undo());
+        Assert.Equal(["root"], editor.Find("a")!.Value.Quest.Parents);
+
+        editor.SetTitle("a", "Edited");
+        editor.RevertAll();
+        Assert.True(editor.Undo());
+        Assert.Equal("Edited", TitleOf(editor, "a"));
+    }
+
+    [Fact]
+    public void UndoingAnEditThatWasSavedLeavesTheFileAndMarksTheQuestUnsaved()
+    {
+        var path = Graph("g", null, Quest("root", null, Break("stone")));
+        var editor = Editor(path);
+        editor.SetTitle("root", "Saved title");
+        editor.SaveQuest("root");
+
+        Assert.True(editor.Undo());
+
+        Assert.Equal("Saved title", TitleOnDisk(path, "root"));
+        Assert.True(editor.IsQuestDirty("root"));
+        Assert.True(editor.Redo());
+        Assert.False(editor.IsQuestDirty("root"));
+    }
+
+    [Fact]
+    public void UndoRestoresTheSelectionTheChangeWasMadeUnder()
+    {
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone"))));
+        editor.Select("a");
+        editor.SetTitle("a", "Edited");
+        editor.Select("root");
+        editor.SetTitle("root", "Edited too");
+
+        editor.Undo();
+
+        Assert.Equal("root", editor.SelectedQuestId);
+        editor.Undo();
+        Assert.Equal("a", editor.SelectedQuestId);
+    }
+
     [Fact]
     public void AnAddedQuestOrGraphCompilesAsItIsWithAFreshId()
     {

@@ -16,6 +16,9 @@ OpenGLTest.DevStudio/                 # the preview and authoring tool (ITEMS, E
   ItemDisplayEditor.cs                # editable copy of the selected item's display block plus the preview-only renderer tweaks
   ItemJsonDisplayWriter.cs            # writes an item's display block back into its JSON file
   PlayerPreviewState.cs               # GL-free state behind DevStudio's player animations (the ITEMS tab)
+  QuestEditHistory.cs                 # the quest editor's undo and redo stacks: records a step when the graphs' text changes,
+                                      #   one gesture (a typed field, a drag) as one step, a new edit clears redo
+  QuestEditSnapshot.cs                # one history step: every graph copied, each quest's on-disk id, the selection
   QuestEditorPage.cs                  # the QUESTS tab: the graph canvas (QuestBookRenderer.DrawGraph), top bar,
                                       #   quest fields and requirement rows, and their mouse and keyboard handling
   QuestEditorState.cs                 # GL-free quest editing rules: add, delete, move, link (cycle-safe), rename,

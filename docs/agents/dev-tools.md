@@ -96,7 +96,10 @@ follows every parent link), title, description, shape (AUTO/HEX/CIRCLE), readabl
 dropdown (the reusable `UI/Widgets/DropdownState`, drawn by `DropdownRenderer`) picks obtain/craft/break/place/kill, the target field takes an item (or `#tag`, which adds a label field), a block
 or an entity, `-`/`+` set the count, PICK arms the left grid for the target (NEXT MOB steps a kill through the registered
 entities), and a plain grid click sets the icon. Dragging a grid slot onto the canvas adds a quest where it is dropped,
-with that icon, titled after it and asking to obtain it. Delete removes the selected quest and every link to it, Ctrl+S saves,
+with that icon, titled after it and asking to obtain it. UNDO and REDO (Ctrl+Z, and Ctrl+Y or Ctrl+Shift+Z) step through `QuestEditHistory`: every change that alters the
+graphs is a step (one typed field or one drag is one step, a refused edit or a save none; REVERT ALL is a step too), and a
+new change after an undo drops what was undone; an undo never touches the files, so a quest saved since reads as unsaved
+again. Delete removes the selected quest and every link to it, Ctrl+S saves,
 Escape clears the selection. Every edit recompiles through `QuestLoader.Compile`: an error is listed in red under the
 canvas and its quest ringed, and SAVE ALL refuses until it compiles. SAVE ALL writes only the changed files through
 `QuestGraphWriter`, in the shipped files' layout with their header comment kept, so an unedited graph writes back

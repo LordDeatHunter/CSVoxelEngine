@@ -266,7 +266,7 @@ public static class DevStudioProgram
     {
         if (_tab == StudioTab.Quests)
         {
-            _quests.KeyDown(key, Held(Key.ControlLeft, Key.ControlRight));
+            _quests.KeyDown(key, Held(Key.ControlLeft, Key.ControlRight), Held(Key.ShiftLeft, Key.ShiftRight));
             return;
         }
         if (key != Key.Space || _tab == StudioTab.Trees) return;

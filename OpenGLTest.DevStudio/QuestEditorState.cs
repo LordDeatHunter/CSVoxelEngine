@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 using System.Text.RegularExpressions;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Definitions;
@@ -39,6 +40,53 @@ public sealed class QuestEditorState
         Recompile();
     }
 
+    private readonly QuestEditHistory _history = new();
+    // Set while an undo or redo rebuilds the documents, so the rebuild is not recorded as a new step
+    private bool _restoring;
+
+    /// <summary>The key of the gesture in progress (one typed field, one drag), whose changes undo as one step; the
+    /// page sets it when the gesture starts and clears it when it ends.</summary>
+    public string? Gesture { get; set; }
+
+    public bool CanUndo => _history.CanUndo;
+
+    public bool CanRedo => _history.CanRedo;
+
+    /// <summary>Puts the graphs and the selection back as they were before the last recorded change. False when there
+    /// is nothing to undo. Saving is not undone: a quest saved since reads as unsaved again.</summary>
+    public bool Undo() => Restore(_history.Undo());
+
+    /// <summary>Re-applies the last undone change. False when there is nothing to redo.</summary>
+    public bool Redo() => Restore(_history.Redo());
+
+    private bool Restore(QuestEditSnapshot? snapshot)
+    {
+        if (snapshot == null) return false;
+        var current = Documents.ToDictionary(d => d.Path);
+        Documents.Clear();
+        foreach (var graph in snapshot.Graphs)
+        {
+            var saved = current.TryGetValue(graph.Path, out var document) ? document.Saved
+                : File.Exists(graph.Path) ? QuestGraphDocument.Load(graph.Path).Saved
+                : null;
+            Documents.Add(QuestGraphDocument.Restore(graph, saved));
+        }
+        SelectedGraph = Math.Clamp(snapshot.SelectedGraph, 0, Math.Max(0, Documents.Count - 1));
+        Select(snapshot.SelectedQuest is { } id && Find(id) != null ? id : null);
+        if (snapshot.SelectedLink is { } link) _selectedLink = link;
+        _restoring = true;
+        Recompile();
+        _restoring = false;
+        return true;
+    }
+
+    private QuestEditSnapshot Capture(string text) => new(text,
+        [
+            .. Documents.Select(d => new QuestEditSnapshot.Graph(d.Path, d.Header, QuestGraphDocument.Clone(d.Definition),
+                [.. d.Quests.Select(d.OriginalId)]))
+        ],
+        SelectedQuestId, _selectedLink, SelectedGraph);
+
     /// <summary>Every graph file under <paramref name="folder"/>, in the loader's (file name) order.</summary>
     public static QuestEditorState Load(string folder) => new(folder, ReadFolder(folder));
 
@@ -69,6 +117,7 @@ public sealed class QuestEditorState
     {
         Select(null);
         _selectedLink = (child, parent);
+        _history.Touch(SelectedQuestId, _selectedLink, SelectedGraph);
     }
 
     /// <summary>The selected quest's requirement a grid click or a PICK fills, or -1 for the quest's icon.</summary>
@@ -108,6 +157,7 @@ public sealed class QuestEditorState
         _selectedLink = null;
         PickRequirement = -1;
         if (id != null && Find(id) is { } found) SelectedGraph = Documents.IndexOf(found.Document);
+        _history.Touch(SelectedQuestId, _selectedLink, SelectedGraph);
     }
 
     /// <summary>Adds a quest at the absolute grid point to the selected graph and selects it. Its icon and its one
@@ -402,7 +452,8 @@ public sealed class QuestEditorState
         return $"Reverted {original}";
     }
 
-    /// <summary>Drops every unsaved edit: the graphs are read from disk again, and a graph never saved is gone.</summary>
+    /// <summary>Drops every unsaved edit: the graphs are read from disk again, and a graph never saved is gone. It is
+    /// a recorded change, so <see cref="Undo"/> brings the edits back.</summary>
     public string RevertAll()
     {
         Documents.Clear();
@@ -430,10 +481,12 @@ public sealed class QuestEditorState
     {
         Preview = BuildPreview();
         _dirtyQuests.Clear();
+        var text = new StringBuilder();
         foreach (var document in Documents)
         {
-            document.Dirty = document.Saved is not { } saved
-                             || QuestGraphWriter.Format(document) != QuestGraphWriter.Format(saved, document.Header);
+            var formatted = QuestGraphWriter.Format(document);
+            text.Append(document.Path).Append('\n').Append(formatted).Append('\0');
+            document.Dirty = document.Saved is not { } saved || formatted != QuestGraphWriter.Format(saved, document.Header);
             foreach (var quest in document.Quests)
                 if (quest.Id != null && (document.SavedQuest(quest) is not { } savedQuest
                                          || QuestGraphWriter.FormatQuest(quest) != QuestGraphWriter.FormatQuest(savedQuest)))
@@ -450,6 +503,9 @@ public sealed class QuestEditorState
             Error = e.Message;
             ErrorQuestId = QuestNamed.Match(e.Message) is { Success: true } match ? match.Groups[1].Value : null;
         }
+        if (_restoring) return;
+        var all = text.ToString();
+        _history.Observe(all, () => Capture(all), Gesture, SelectedQuestId, _selectedLink, SelectedGraph);
     }
 
     private void Edit(string id, Action<QuestGraphDefinition.QuestDefinition> edit)

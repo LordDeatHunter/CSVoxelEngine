@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using VoxelEngine.Content;
@@ -52,6 +53,25 @@ public sealed class QuestGraphDocument
 
     public static QuestGraphDocument Load(string path) =>
         new(path, ContentFiles.ReadJson<QuestGraphDefinition>(path), ReadHeader(File.ReadAllText(path)), true);
+
+    /// <summary>A document rebuilt from an undo or redo step: a fresh copy of the step's definition, against
+    /// <paramref name="saved"/>, the file as it is now (the disk does not undo). Each quest keeps the on-disk id the step
+    /// recorded while the file still has it, else claims its own id if the file has that, else counts as never saved.</summary>
+    internal static QuestGraphDocument Restore(QuestEditSnapshot.Graph graph, QuestGraphDefinition? saved)
+    {
+        var document = new QuestGraphDocument(graph.Path, Clone(graph.Definition), graph.Header, false) { Saved = saved };
+        var onDisk = saved?.Quests?.Select(q => q.Id).ToHashSet() ?? [];
+        for (var i = 0; i < document.Quests.Count; i++)
+        {
+            var quest = document.Quests[i];
+            var recorded = i < graph.OriginalIds.Count ? graph.OriginalIds[i] : null;
+            var id = recorded != null && onDisk.Contains(recorded) ? recorded
+                : quest.Id != null && onDisk.Contains(quest.Id) ? quest.Id
+                : null;
+            if (id != null) document._originalIds[quest] = id;
+        }
+        return document;
+    }
 
     /// <summary>The id <paramref name="quest"/> has on disk, or null for a quest never saved.</summary>
     public string? OriginalId(QuestGraphDefinition.QuestDefinition quest) => _originalIds.GetValueOrDefault(quest);

@@ -21,7 +21,9 @@ namespace VoxelEngine.DevStudio;
 /// DevStudio's QUESTS tab over a <see cref="QuestEditorState"/>: the quest graphs drawn exactly as the in-game book
 /// draws them (<see cref="QuestBookRenderer.DrawGraph"/>) on the canvas between the side panels, a top bar (graph
 /// selector, graph title, NEW GRAPH, ADD QUEST, SAVE), and the selected quest's fields and requirements in the right
-/// panel. SAVE ALL / REVERT ALL (a second click within <see cref="ConfirmSeconds"/> confirms) act on every graph,
+/// panel. UNDO / REDO (Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z) step through <see cref="QuestEditorState"/>'s history, where
+/// one typed field or one drag is one step (the page names the gesture in <see cref="QuestEditorState.Gesture"/>).
+/// SAVE ALL / REVERT ALL (a second click within <see cref="ConfirmSeconds"/> confirms) act on every graph,
 /// SAVE QUEST / REVERT QUEST on the selected quest alone; a quest with unsaved edits carries a gold corner mark.
 /// Clicking a node selects it, dragging moves it (shift-drag moves its whole graph, Alt turns snapping off),
 /// clicking a line selects that link (its panel turns it around or deletes it), a right-drag from one node to another makes the second depend on the first (dropped on empty canvas, it adds a
@@ -36,7 +38,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
     private enum Action
     {
-        PrevGraph, NextGraph, NewGraph, AddQuest, Save, RevertAll,
+        PrevGraph, NextGraph, NewGraph, AddQuest, Save, RevertAll, Undo, Redo,
         Shape, Readable, AnyOf, PickIcon, AddRequirement, DeleteQuest, SaveQuest, RevertQuest, SwapLink, DeleteLink,
         // The Arg of these is the requirement index.
         CountDown, CountUp, Pick, Remove,
@@ -79,6 +81,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private const double ConfirmSeconds = 3.0;
     private double _revertArmedUntil = double.NegativeInfinity;
     private double _now;
+    // Numbers each typing or drag gesture, so a later gesture on the same field or node is a step of its own
+    private int _gestureSerial;
     private Vector2 _lastClickAt;
     private Vector2 _screen = new(1600f, 900f);
     // A grid slot pressed in the left panel: a click picks it, a drag onto the canvas adds a quest with it
@@ -226,14 +230,20 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         var y = Pad + TopBarH * 0.5f;
         var x = CanvasLeft;
         var hasGraph = State.Graph != null;
+        const float titleWidth = 180f;
+        const float wide = 100f;
+        const float narrow = 64f;
         x = AddButtonAt(x, y, 34f, Action.PrevGraph, "<", State.SelectedGraph > 0);
-        _fields.Add((new UiRect(new Vector2(x + 110f, y), new Vector2(220f, FieldH)), Field.GraphTitle, 0, "graph title"));
-        x += 220f + Gap;
+        _fields.Add((new UiRect(new Vector2(x + titleWidth * 0.5f, y), new Vector2(titleWidth, FieldH)), Field.GraphTitle, 0,
+            "graph title"));
+        x += titleWidth + Gap;
         x = AddButtonAt(x, y, 34f, Action.NextGraph, ">", State.SelectedGraph < State.Documents.Count - 1);
-        x = AddButtonAt(x + Gap * 2f, y, 110f, Action.NewGraph, "NEW GRAPH", true);
-        x = AddButtonAt(x, y, 110f, Action.AddQuest, "ADD QUEST", hasGraph);
-        x = AddButtonAt(x, y, 110f, Action.Save, State.Dirty ? "SAVE ALL *" : "SAVE ALL", State.Dirty);
-        AddButtonAt(x, y, 110f, Action.RevertAll, _now < _revertArmedUntil ? "CONFIRM?" : "REVERT ALL", State.Dirty);
+        x = AddButtonAt(x + Gap * 2f, y, wide, Action.NewGraph, "NEW GRAPH", true);
+        x = AddButtonAt(x, y, wide, Action.AddQuest, "ADD QUEST", hasGraph);
+        x = AddButtonAt(x + Gap * 2f, y, narrow, Action.Undo, "UNDO", State.CanUndo);
+        x = AddButtonAt(x, y, narrow, Action.Redo, "REDO", State.CanRedo);
+        x = AddButtonAt(x + Gap * 2f, y, wide, Action.Save, State.Dirty ? "SAVE ALL *" : "SAVE ALL", State.Dirty);
+        AddButtonAt(x, y, wide, Action.RevertAll, _now < _revertArmedUntil ? "CONFIRM?" : "REVERT ALL", State.Dirty);
     }
 
     private void BuildDetails()
@@ -362,7 +372,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
                 "Click a line to select that link: swap its direction or delete it.",
                 "Double-click empty canvas, or drag an icon from the grid onto it, to add a quest.",
                 "Drag empty canvas or middle-drag anywhere to pan; the wheel zooms.",
-                "Delete deletes the selected quest; Ctrl+S saves.",
+                "Delete deletes the selected quest or link; Ctrl+S saves; Ctrl+Z undoes, Ctrl+Y or Ctrl+Shift+Z redoes.",
             ];
             var y = Pad + 44f;
             foreach (var hint in hints)
@@ -539,6 +549,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         }
 
         State.Select(node.Id);
+        State.Gesture = $"drag {++_gestureSerial}";
         if (shift && State.Find(node.Id) is { } found)
         {
             _drag = Drag.Graph;
@@ -648,6 +659,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         _drag = Drag.None;
         _dragQuest = null;
         _dragGraph = null;
+        if (_focus == null) State.Gesture = null;
     }
 
     /// <summary>The wheel over the canvas zooms about the pointer; elsewhere it is not the page's.</summary>
@@ -659,12 +671,17 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     }
 
     /// <summary>A pressed key. True when the page used it (typing in a field, or one of its commands).</summary>
-    public bool KeyDown(Key key, bool ctrl)
+    public bool KeyDown(Key key, bool ctrl, bool shift)
     {
         if (ctrl && key == Key.S)
         {
             Blur();
             Status = State.Save();
+            return true;
+        }
+        if (ctrl && key is Key.Z or Key.Y)
+        {
+            Run(key == Key.Y || shift ? Action.Redo : Action.Undo, 0);
             return true;
         }
         if (_focus is { } focus)
@@ -676,6 +693,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
                     return true;
                 case Key.Escape:
                     _focus = null;
+                    State.Gesture = null;
                     return true;
             }
             if (keys.TryHandle(_field, key, true, out var changed) && changed) Commit(focus, false);
@@ -774,6 +792,14 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             case Action.Save:
                 Status = State.Save();
                 break;
+            case Action.Undo:
+                Blur();
+                Status = State.Undo() ? "Undone" : "Nothing to undo";
+                break;
+            case Action.Redo:
+                Blur();
+                Status = State.Redo() ? "Redone" : "Nothing to redo";
+                break;
             case Action.RevertAll when _now < _revertArmedUntil:
                 _revertArmedUntil = double.NegativeInfinity;
                 Status = State.RevertAll();
@@ -861,6 +887,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         Blur();
         _focus = (field, arg);
         _focusQuest = State.SelectedQuestId;
+        State.Gesture = $"field {++_gestureSerial}";
         _field.Set(ValueOf(field, arg));
         _field.ViewStart = 0;
     }
@@ -871,6 +898,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         if (_focus is not { } focus) return;
         Commit(focus, true);
         _focus = null;
+        State.Gesture = null;
     }
 
     private void Commit((Field Field, int Arg) focus, bool final)
