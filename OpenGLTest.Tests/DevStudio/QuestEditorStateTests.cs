@@ -442,6 +442,35 @@ public sealed class QuestEditorStateTests : IDisposable
     }
 
     [Fact]
+    public void AGroupMoveKeepsTheLayoutAndLandsTheDraggedQuestOnTheGrid()
+    {
+        var a = Quest("a", null, Break("stone"));
+        a.Pos = [0.25f, 0];
+        var b = Quest("b", null, Break("stone"));
+        b.Pos = [3, 1.75f];
+        Graph("other", [10, 10], Quest("c", null, Break("stone")));
+        var editor = Editor(Graph("g", [1, -2], Quest("root", null, Break("stone")), a, b));
+        var grabbed = new[] { "a", "b", "c" }.ToDictionary(id => id, id => editor.Preview.Of(id).Position);
+        var offsets = grabbed.ToDictionary(kv => kv.Key, kv => kv.Value - grabbed["a"]);
+        var rootBefore = editor.Preview.Of("root").Position;
+
+        editor.Gesture = "drag";
+        editor.MoveQuests("a", grabbed["a"] + new Vector2(1.1f, 0.4f), grabbed, snap: true);
+        editor.MoveQuests("a", grabbed["a"] + new Vector2(2.3f, 1.2f), grabbed, snap: true);
+        editor.Gesture = null;
+
+        var lead = editor.Preview.Of("a").Position - new Vector2(1, -2);
+        Assert.Equal(Vector2.Zero, lead / QuestEditorState.SnapStep - Vector2.Round(lead / QuestEditorState.SnapStep));
+        foreach (var (id, offset) in offsets)
+            Assert.True(Vector2.Distance(offset, editor.Preview.Of(id).Position - editor.Preview.Of("a").Position) < 1e-4f, id);
+        Assert.Equal(rootBefore, editor.Preview.Of("root").Position);
+
+        Assert.True(editor.Undo());
+        Assert.All(grabbed, kv => Assert.Equal(kv.Value, editor.Preview.Of(kv.Key).Position));
+        Assert.False(editor.CanUndo);
+    }
+
+    [Fact]
     public void ARenamedQuestStaysSelected()
     {
         var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone"))));

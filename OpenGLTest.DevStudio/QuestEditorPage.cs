@@ -26,7 +26,7 @@ namespace VoxelEngine.DevStudio;
 /// SAVE ALL / REVERT ALL (a second click within <see cref="ConfirmSeconds"/> confirms) act on every graph,
 /// SAVE QUEST / REVERT QUEST on the selected quest alone; a quest with unsaved edits carries a gold corner mark.
 /// Clicking a node selects it, Ctrl+click adds it to the selection (or takes it out), dragging moves it (shift-drag
-/// moves its whole graph, Alt turns snapping off), shift-drag on empty canvas draws a box that selects every quest in it,
+/// moves its whole graph, Alt turns snapping off; dragging any quest of a multi-selection moves them all), shift-drag on empty canvas draws a box that selects every quest in it,
 /// clicking a line selects that link (its panel turns it around or deletes it), a right-drag from one node to another makes the second depend on the first (dropped on empty canvas, it adds a
 /// quest there that depends on the first), a double-click on empty canvas adds a quest
 /// there, dragging empty canvas pans and the wheel zooms. A grid click picks the quest's icon, or the target of a
@@ -83,6 +83,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private Vector2 _pressAt;
     private Vector2 _pressPan;
     private Vector2 _grabbed;
+    // Where every selected quest sat when a node drag began, so the whole selection moves with the dragged one
+    private readonly Dictionary<string, Vector2> _grabbedMany = new(StringComparer.Ordinal);
     private string? _dragQuest;
     private QuestGraphDocument? _dragGraph;
     private double _lastClickTime = double.NegativeInfinity;
@@ -581,20 +583,23 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             return true;
         }
 
-        State.Select(node.Id);
+        // A press on a quest of a multi-selection keeps the selection, so dragging it moves them all
+        if (shift || !State.IsSelected(node.Id)) State.Select(node.Id);
         State.Gesture = $"drag {++_gestureSerial}";
         if (shift && State.Find(node.Id) is { } found)
         {
             _drag = Drag.Graph;
             _dragGraph = found.Document;
             _grabbed = found.Document.Origin;
+            return true;
         }
-        else
-        {
-            _drag = Drag.Node;
-            _dragQuest = node.Id;
-            _grabbed = node.Position;
-        }
+        _drag = Drag.Node;
+        _dragQuest = node.Id;
+        _grabbed = node.Position;
+        _grabbedMany.Clear();
+        foreach (var id in State.SelectedQuestIds)
+            if (State.Preview.TryGet(id, out var quest))
+                _grabbedMany[id] = quest.Position;
         return true;
     }
 
@@ -686,7 +691,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
                 Camera.PanY = pan.Y;
                 break;
             case Drag.Node when travel.Length() >= QuestConfig.DragThreshold && _dragQuest != null:
-                State.MoveQuest(_dragQuest, _grabbed + GridTravel(travel), !alt);
+                State.MoveQuests(_dragQuest, _grabbed + GridTravel(travel), _grabbedMany, !alt);
                 break;
             case Drag.Graph when travel.Length() >= QuestConfig.DragThreshold && _dragGraph != null:
                 State.MoveGraph(_dragGraph, _grabbed + GridTravel(travel), !alt);
@@ -699,8 +704,12 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     {
         if (_iconDrag is { } icon) DropIcon(icon, point);
         _iconDrag = null;
-        if (_drag == Drag.Pan && !_panOnly && Vector2.Distance(point, _pressAt) < QuestConfig.DragThreshold)
+        var clicked = Vector2.Distance(point, _pressAt) < QuestConfig.DragThreshold;
+        if (_drag == Drag.Pan && !_panOnly && clicked)
             State.Select(null);
+        // A click (no drag) on one quest of a multi-selection narrows the selection to it
+        if (_drag == Drag.Node && clicked && _dragQuest != null && State.SelectedQuestIds.Count > 1)
+            State.Select(_dragQuest);
         _drag = Drag.None;
         _dragQuest = null;
         _dragGraph = null;

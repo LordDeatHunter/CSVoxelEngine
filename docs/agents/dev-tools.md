@@ -87,7 +87,8 @@ the wheel off the grid zooms that framing. The GL-free, tested state is
 own drawing (`QuestBookRenderer.DrawGraph`, every quest shown, none complete) over the quests as edited: click a node to
 select it (a click on empty canvas that does not pan clears the selection; Ctrl+click adds a node to the selection or
 takes it out; shift-drag on empty canvas draws a box that selects every quest whose node center is inside it), drag it
-to move it (snapped to `QuestEditorState.SnapStep`, Alt for none), shift-drag to move its whole graph's
+to move it (dragging any quest of a multi-selection moves the whole selection, keeping its layout; a click without a
+drag narrows the selection to that quest) (snapped to `QuestEditorState.SnapStep`, Alt for none), shift-drag to move its whole graph's
 `origin`, right-drag from one node to another to make the second depend on the first (dropped on empty canvas, it adds a
 quest there that depends on the first, a self link, a duplicate or a cycle is refused), click a line to select that link (the panel names which quest depends on which, SWAP DIRECTION turns it around unless
 that would close a cycle, DELETE LINK or Delete removes it), double-click empty canvas to add a quest there, drag empty canvas (or middle-drag anywhere) to pan, wheel to zoom. The

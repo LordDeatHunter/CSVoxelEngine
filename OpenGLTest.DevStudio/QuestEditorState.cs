@@ -247,11 +247,23 @@ public sealed class QuestEditorState
     }
 
     /// <summary>Moves the quest so its node sits at the absolute grid point; stored relative to its graph's origin.</summary>
-    public void MoveQuest(string id, Vector2 grid, bool snap)
+    public void MoveQuest(string id, Vector2 grid, bool snap) =>
+        MoveQuests(id, grid, new Dictionary<string, Vector2> { [id] = grid }, snap);
+
+    /// <summary>Moves a group of quests as one change: the <paramref name="lead"/> (the dragged one) lands at
+    /// <paramref name="leadTarget"/>, snapped like a single move, and every quest in <paramref name="grabbed"/> moves by
+    /// the same amount from the absolute position it was grabbed at, so the group keeps its layout exactly.</summary>
+    public void MoveQuests(string lead, Vector2 leadTarget, IReadOnlyDictionary<string, Vector2> grabbed, bool snap)
     {
-        if (Find(id) is not { } found) return;
-        var position = Snap(grid - found.Document.Origin, snap);
-        found.Quest.Pos = [position.X, position.Y];
+        if (Find(lead) is not { } leader || !grabbed.TryGetValue(lead, out var leadFrom)) return;
+        var landed = leader.Document.Origin + Snap(leadTarget - leader.Document.Origin, snap);
+        var delta = landed - leadFrom;
+        foreach (var (id, from) in grabbed)
+        {
+            if (Find(id) is not { } found) continue;
+            var position = from + delta - found.Document.Origin;
+            found.Quest.Pos = [position.X, position.Y];
+        }
         Recompile();
     }
 
