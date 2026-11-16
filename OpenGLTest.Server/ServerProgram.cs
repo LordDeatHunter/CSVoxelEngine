@@ -170,17 +170,25 @@ public static class ServerProgram
     }
 
     private static WorldInfo? PromptWorld(WorldStore store)
+        => PromptWorld(store, Console.In, Console.Out);
+
+    internal static WorldInfo? PromptWorld(WorldStore store, TextReader input, TextWriter output)
     {
         while (true)
         {
-            var worlds = store.List();
-            Console.WriteLine(worlds.Count == 0 ? "No saved worlds yet." : "Saved worlds:");
-            for (var i = 0; i < worlds.Count; i++)
-                Console.WriteLine($"  {i + 1}. {worlds[i].Name} (seed {worlds[i].Seed})"
-                    + (ServerLaunch.IsHostable(worlds[i]) ? "" : " (old format, cannot be hosted)"));
-            Console.Write("Choose a world number, or N for a new world: ");
+            if (!store.TryList(out var worlds))
+            {
+                output.WriteLine("Could not list saved worlds; check the saves folder.");
+                return null;
+            }
 
-            var line = Console.ReadLine();
+            output.WriteLine(worlds.Count == 0 ? "No saved worlds yet." : "Saved worlds:");
+            for (var i = 0; i < worlds.Count; i++)
+                output.WriteLine($"  {i + 1}. {worlds[i].Name} (seed {worlds[i].Seed})"
+                    + (ServerLaunch.IsHostable(worlds[i]) ? "" : " (old format, cannot be hosted)"));
+            output.Write("Choose a world number, or N for a new world: ");
+
+            var line = input.ReadLine();
             if (line == null)
                 return null;
             line = line.Trim();
@@ -194,16 +202,16 @@ public static class ServerProgram
                     return chosen;
                 // The same refusal the main menu makes: a world in another save format would be
                 // half-loaded and its chunks regenerated over, so it is never opened.
-                Console.WriteLine($"'{chosen.Name}' was saved by an older version (format {chosen.Version}, " +
+                output.WriteLine($"'{chosen.Name}' was saved by an older version (format {chosen.Version}, " +
                                   $"this build reads {WorldStore.CurrentVersion}); it cannot be hosted.");
-                Console.WriteLine();
+                output.WriteLine();
                 continue;
             }
             if (line.Length == 0 && worlds.Count == 0)
                 return CreateWorld(store);
 
-            Console.WriteLine("Enter a listed number or N.");
-            Console.WriteLine();
+            output.WriteLine("Enter a listed number or N.");
+            output.WriteLine();
         }
     }
 

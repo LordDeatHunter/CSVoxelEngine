@@ -6,9 +6,12 @@ The main menu / loading / playing flow, the save folder layout, and the persiste
 explicit `AppScreen` of Menu / Loading / Playing / Saving; every page rule, key rule and store
 call lives in the GL-free, tested `MainMenuController`, drawn by `MenuRenderer.DrawMainMenu`
 through `UiPasses.RenderMenuFrame`, which writes framebuffer 0 directly with no HDR pass,
-lighting or GPU timer). START opens the worlds page, a scrollable list of `WorldStore.List()`
+lighting or GPU timer). START opens the worlds page, a scrollable list from `WorldStore.TryList()`
 (most recently played first) with PLAY / EDIT (rename) / DELETE (a confirm popup, DELETE /
-CANCEL) on every row, plus CREATE and BACK; an empty list says so. CREATE opens a name field
+CANCEL) on every row, plus CREATE and BACK; an empty list says so, while the Worlds and Host pages
+report failed root listings with the saves-folder notice instead of presenting them as empty. The
+dedicated-server prompt also reports a failed listing without offering to create a world from that
+empty result. CREATE opens a name field
 (placeholder `Unnamed World`, which is what an empty field becomes; the store makes a taken name
 unique with the smallest free numeric suffix, `WorldNames.Unique`) and a seed field (empty =
 random, an integer is used verbatim, any other text is FNV-1a-hashed by `WorldSeedParser`).
