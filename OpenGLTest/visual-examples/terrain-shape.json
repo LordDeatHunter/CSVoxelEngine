@@ -5,6 +5,9 @@
   //   VOXEL_TIME=1090 VOXEL_SCRIPT=visual-examples/terrain-shape.json
   // Shots land in visual/terrain-shape/. The whole run takes about eight minutes of clock, far
   // longer than the afternoon after noon (147) lasts, so it starts at 1090, which is -110 one
+  // NOTE: the day is now SkyConfig.DayLengthSeconds = 2400 s (noon ~294, sunset ~894, midnight ~1494).
+  // The times and sun arithmetic in this header were measured on the former 1200 s day and are kept as
+  // the historical record; re-derive them (or use 1494 for night) before relying on them.
   // 1200 s day later, 43 s after sunrise (about 1047): the first shot lands near 1108, with the
   // sun up, the middle ones around noon (1347), and the last near 1609, before sunset (about
   // 1647). The scene is only brightly lit from about 1080 to 1610, so the run has to fit in about

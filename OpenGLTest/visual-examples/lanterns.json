@@ -1,5 +1,5 @@
 {
-  // Hanging lantern check: run with VOXEL_TIME=700 (night) and VOXEL_SCRIPT=visual-examples/lanterns.json.
+  // Hanging lantern check: run with VOXEL_TIME=1494 (night) and VOXEL_SCRIPT=visual-examples/lanterns.json.
   // Shots land in visual/lanterns/.
   //
   // The flat desert patch of torches.json: the player hovers over (157, 283) (sand at y 11) and

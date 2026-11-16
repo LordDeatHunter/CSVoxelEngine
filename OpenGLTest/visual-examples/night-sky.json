@@ -3,6 +3,9 @@
 // between runs since each run overwrites it:
 //   $env:VOXEL_SCRIPT='visual-examples/night-sky.json'; $env:VOXEL_TIME='<t>'
 //   bin/Release/net9.0/VoxelEngine.exe
+// NOTE: the day is now SkyConfig.DayLengthSeconds = 2400 s (noon ~294, sunset ~894, midnight ~1494).
+// The times and sun arithmetic in this header were measured on the former 1200 s day and are kept as
+// the historical record; re-derive them (or use 1494 for night) before relying on them.
 // Times (DayLengthSeconds 1200, RenderManager.SetLighting: the sun at normalize(cos a, sin a, 0.35) with
 // a = t / 1200 * tau + 0.8): 700 night (full stars), 450 dusk (the run moves the sun ~0.3 degrees
 // a second, so the dome shots ~15 s in catch it ~6 degrees down with the stars a third faded in),
