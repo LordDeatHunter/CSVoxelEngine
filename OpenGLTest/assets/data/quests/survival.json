@@ -31,7 +31,7 @@
       "title": "Timber!",
       "description": "Chop into an oak.",
       "icon": "oak_log",
-      "pos": [4, -1.5],
+      "pos": [3, -2.5],
       "parents": ["primitive_tools"],
       "requirements": [
         { "type": "break", "block": "oak_log", "count": 4 }
@@ -42,7 +42,7 @@
       "title": "Cut to Size",
       "description": "Saw logs into planks.",
       "icon": "oak_planks",
-      "pos": [6, -2.5],
+      "pos": [3, -5],
       "parents": ["timber"],
       "requirements": [
         { "type": "craft", "item": "oak_planks", "count": 8 }
@@ -53,7 +53,7 @@
       "title": "A Roof Overhead",
       "description": "Put the planks to use and build something.",
       "icon": "oak_planks_stairs",
-      "pos": [8, -2.5],
+      "pos": [5, -5],
       "parents": ["planks"],
       "requirements": [
         { "type": "place", "block": "oak_planks", "count": 32 }
@@ -64,7 +64,7 @@
       "title": "Pack Rat",
       "description": "Build a chest to keep what your pockets cannot.",
       "icon": "wooden_chest",
-      "pos": [6, -0.5],
+      "pos": [5, -2.5],
       "parents": ["timber"],
       "requirements": [
         { "type": "craft", "item": "wooden_chest" }
@@ -75,7 +75,7 @@
       "title": "Stone Age",
       "description": "Dig into the rock under the soil.",
       "icon": "stone",
-      "pos": [4, 1.5],
+      "pos": [4, 0],
       "parents": ["primitive_tools"],
       "requirements": [
         { "type": "break", "block": "stone", "count": 16 }
@@ -86,7 +86,7 @@
       "title": "Black Gold",
       "description": "Find coal in the stone.",
       "icon": "item/coal",
-      "pos": [6, 1.5],
+      "pos": [6, -1],
       "parents": ["stone_age"],
       "requirements": [
         { "type": "obtain", "item": "item/coal", "count": 4 }
@@ -97,7 +97,7 @@
       "title": "Light the Way",
       "description": "Coal on a branch burns for a long time. Light up the dark.",
       "icon": "torch",
-      "pos": [8, 1.5],
+      "pos": [8, -1],
       "parents": ["coal"],
       "requirements": [
         { "type": "craft", "item": "torch", "count": 8 },
@@ -109,7 +109,7 @@
       "title": "Masonry",
       "description": "Dress stone into bricks.",
       "icon": "stone_bricks",
-      "pos": [6, 3],
+      "pos": [6, 1],
       "parents": ["stone_age"],
       "requirements": [
         { "type": "craft", "item": "stone_bricks", "count": 8 }

@@ -8,7 +8,7 @@
       "title": "Mud and Fire",
       "description": "Shape and fire mud into bricks: the start of every furnace.",
       "icon": "item/mud_brick",
-      "pos": [0, 0],
+      "pos": [-2, -1],
       "requirements": [
         { "type": "obtain", "item": "item/mud_brick", "count": 8 }
       ]
@@ -18,7 +18,7 @@
       "title": "Brickwork",
       "description": "Bind mud bricks into blocks for a kiln.",
       "icon": "mud_bricks",
-      "pos": [2, -1],
+      "pos": [0, -3],
       "parents": ["mud_bricks"],
       "requirements": [
         { "type": "craft", "item": "mud_bricks", "count": 8 }
@@ -29,7 +29,7 @@
       "title": "Into the Mold",
       "description": "Shape an ingot mold to pour metal into, then fire it in the kiln.",
       "icon": "mold_ingot",
-      "pos": [2, 1],
+      "pos": [0, 1],
       "parents": ["mud_bricks"],
       "requirements": [
         { "type": "craft", "item": "mold_ingot" },
@@ -41,7 +41,8 @@
       "title": "Grind Stone",
       "description": "Build a quern to crush ore before it goes in the kiln.",
       "icon": "quern",
-      "pos": [2, 3],
+      "pos": [4, -5.5],
+      "parents": ["stone_age"],
       "requirements": [
         { "type": "craft", "item": "quern" }
       ]
@@ -51,7 +52,8 @@
       "title": "Raw Ore",
       "description": "Mine a chunk of copper or tin ore.",
       "icon": "item/malachite_ore",
-      "pos": [2, 5],
+      "pos": [2, -5.5],
+      "parents": ["primitive_tools"],
       "anyOf": true,
       "requirements": [
         { "type": "obtain", "item": "item/malachite_ore" },
@@ -63,7 +65,7 @@
       "title": "Crushed Hopes",
       "description": "Grind a copper or tin chunk to powder in the quern.",
       "icon": "item/crushed_copper",
-      "pos": [4, 4],
+      "pos": [2, -3],
       "parents": ["quern", "ore_chunk"],
       "anyOf": true,
       "requirements": [
@@ -76,8 +78,8 @@
       "title": "Hot Pot",
       "description": "A crucible carries molten metal from the kiln to the mold.",
       "icon": "item/crucible",
-      "pos": [4, -1],
-      "parents": ["brickwork"],
+      "pos": [0, -1],
+      "parents": ["mud_bricks"],
       "requirements": [
         { "type": "craft", "item": "item/crucible" }
       ]
@@ -87,8 +89,8 @@
       "title": "First Pour",
       "description": "Melt crushed copper or tin in the kiln and cast anything from it: an ingot, a tool head, a ring.",
       "icon": "item/copper_ingot",
-      "pos": [6, 1],
-      "parents": ["crucible", "mold", "crushed_ore"],
+      "pos": [2, -1],
+      "parents": ["crucible", "mold", "crushed_ore", "brickwork"],
       "requirements": [
         { "type": "obtain", "tag": "copper_tin_casts", "label": "Any Copper or Tin Cast" }
       ]
@@ -98,7 +100,7 @@
       "title": "Shiny Tools",
       "description": "Trade the flint for copper.",
       "icon": "item/copper_pickaxe",
-      "pos": [8, -0.5],
+      "pos": [4, -1],
       "parents": ["copper"],
       "requirements": [
         { "type": "craft", "item": "item/copper_pickaxe" },
@@ -110,7 +112,7 @@
       "title": "Bronze Age",
       "description": "Alloy copper and tin into bronze.",
       "icon": "item/bronze_ingot",
-      "pos": [10, 1],
+      "pos": [6, -1],
       "parents": ["copper_tools"],
       "requirements": [
         { "type": "obtain", "item": "item/bronze_ingot", "count": 2 }
@@ -121,7 +123,7 @@
       "title": "Bronze Kit",
       "description": "A bronze pickaxe and a bronze sword.",
       "icon": "item/bronze_sword",
-      "pos": [12, -1.5],
+      "pos": [8, -1],
       "parents": ["bronze"],
       "requirements": [
         { "type": "craft", "item": "item/bronze_pickaxe" },
@@ -133,7 +135,7 @@
       "title": "Iron Will",
       "description": "Smelt iron ore in a bloomery and work the bloom into wrought iron.",
       "icon": "item/wrought_iron",
-      "pos": [12, 1.5],
+      "pos": [6, 1],
       "parents": ["bronze"],
       "requirements": [
         { "type": "obtain", "item": "item/wrought_iron" }
@@ -144,7 +146,7 @@
       "title": "Hammer Time",
       "description": "Build an anvil and a smithing hammer.",
       "icon": "anvil",
-      "pos": [14, 0],
+      "pos": [8, 1],
       "parents": ["iron"],
       "requirements": [
         { "type": "craft", "item": "anvil" },
@@ -156,7 +158,7 @@
       "title": "Forged in Fire",
       "description": "Forge an iron sword head on the anvil.",
       "icon": "item/iron_sword_head",
-      "pos": [16, 1.5],
+      "pos": [10, 1],
       "parents": ["anvil"],
       "requirements": [
         { "type": "craft", "item": "item/iron_sword_head" }

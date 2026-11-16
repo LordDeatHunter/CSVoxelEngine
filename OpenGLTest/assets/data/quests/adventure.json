@@ -8,7 +8,7 @@
       "title": "Sticky Situation",
       "description": "Defeat a slime.",
       "icon": "item/slimeball",
-      "pos": [0, 0],
+      "pos": [0, -3],
       "requirements": [
         { "type": "kill", "entity": "slime" }
       ]
@@ -18,8 +18,7 @@
       "title": "Goblin Trouble",
       "description": "Goblins camp in the woods at night. Drive them off.",
       "icon": "item/spear",
-      "pos": [2, -1.5],
-      "parents": ["slime"],
+      "pos": [0, -1],
       "requirements": [
         { "type": "kill", "entity": "goblin", "count": 3 }
       ]
@@ -30,7 +29,6 @@
       "description": "Something huge moves under the desert sand.",
       "icon": "item/sandworm_fang",
       "pos": [4, -3],
-      "parents": ["goblins"],
       "requirements": [
         { "type": "kill", "entity": "sandworm" }
       ]
@@ -40,8 +38,7 @@
       "title": "Above the Clouds",
       "description": "Reach the sky islands and bring back a cloud shard.",
       "icon": "item/cloud_shard",
-      "pos": [4, -1.5],
-      "parents": ["goblins"],
+      "pos": [2, -1],
       "requirements": [
         { "type": "obtain", "item": "item/cloud_shard" }
       ]
@@ -51,8 +48,7 @@
       "title": "Down Below",
       "description": "Get past the barrier and take an ember shard from hell.",
       "icon": "item/ember_shard",
-      "pos": [6, -1.5],
-      "parents": ["sky"],
+      "pos": [4, -1],
       "requirements": [
         { "type": "obtain", "item": "item/ember_shard" }
       ]
@@ -62,8 +58,7 @@
       "title": "Bone Collector",
       "description": "Put two skeletons back to rest.",
       "icon": "item/bone",
-      "pos": [2, 1.5],
-      "parents": ["slime"],
+      "pos": [0, 1],
       "requirements": [
         { "type": "kill", "entity": "skeleton", "count": 2 }
       ]
@@ -73,8 +68,7 @@
       "title": "Arachnophobia",
       "description": "Kill a giant spider in the caves.",
       "icon": "item/spider_silk",
-      "pos": [4, 1.5],
-      "parents": ["skeletons"],
+      "pos": [2, -3],
       "requirements": [
         { "type": "kill", "entity": "spider" }
       ]
@@ -84,8 +78,9 @@
       "title": "Regicide",
       "description": "Something waits at the top of the battle tower.",
       "icon": "item/bone_charm",
-      "pos": [6, 1.5],
-      "parents": ["spider"],
+      "pos": [2, 1],
+      "parents": ["skeletons"],
+      "reveal": "anyParentShown",
       "readable": false,
       "requirements": [
         { "type": "kill", "entity": "skeleton_king" }
