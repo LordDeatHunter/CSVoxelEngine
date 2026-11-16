@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Effects.Climate;
+using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Networking;
 using VoxelEngine.Particles;
@@ -50,6 +53,22 @@ public sealed class MobHitSparkTests : IDisposable
             world.Player.Update(Dt, 0f);
     }
 
+    // A connecting hit throws the pale spark chips and, beside them, the mob's own blood. Each population is checked
+    // on its own look, color and count, and together they are every chip the hit made.
+    private static void AssertSparksAndGore(IReadOnlyList<BlockDebris> debris, EntityType mob)
+    {
+        var sparkTint = BiomeTint.VertexTint(JuiceConfig.HitSparkColor);
+        var goreTint = BiomeTint.VertexTint(mob.BloodColor!.Value);
+        Assert.NotEqual(sparkTint, goreTint);
+
+        var sparks = debris.Where(chip => chip.Tint == sparkTint).ToList();
+        var gore = debris.Where(chip => chip.Tint == goreTint).ToList();
+        Assert.Equal(JuiceConfig.HitSparkCount, sparks.Count);
+        Assert.Equal(JuiceConfig.GoreHitCount, gore.Count);
+        Assert.Equal(debris.Count, sparks.Count + gore.Count);
+        Assert.All(debris, chip => Assert.Equal(DebrisLook.Color, chip.Look));
+    }
+
     [Fact]
     public void APunchThatConnectsSparksOffTheMob()
     {
@@ -59,12 +78,7 @@ public sealed class MobHitSparkTests : IDisposable
 
         Punch(world);
 
-        Assert.Equal(JuiceConfig.HitSparkCount, world.GetDebrisSystem().Debris.Count);
-        foreach (var chip in world.GetDebrisSystem().Debris)
-        {
-            Assert.Equal(DebrisLook.Color, chip.Look);
-            Assert.Equal(BiomeTint.VertexTint(JuiceConfig.HitSparkColor), chip.Tint);
-        }
+        AssertSparksAndGore(world.GetDebrisSystem().Debris, EntityRegistry.Require("goblin"));
     }
 
     [Fact]
@@ -80,7 +94,7 @@ public sealed class MobHitSparkTests : IDisposable
 
         Punch(_world);
 
-        Assert.Equal(JuiceConfig.HitSparkCount, _world.GetDebrisSystem().Debris.Count);
+        AssertSparksAndGore(_world.GetDebrisSystem().Debris, _world.Slimes[0].Type);
         // The prediction is cosmetic: the mirrored mob took no damage.
         Assert.Equal(3, _world.Slimes[0].Health);
     }
