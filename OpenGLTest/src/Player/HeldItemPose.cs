@@ -43,33 +43,56 @@ public static class HeldItemPose
         var hand = offhand ? player.GetOffhandAnchorMatrix(eye, yawDeg, backOffset, pitchDeg)
             : player.GetHandAnchorMatrix(eye, yawDeg, backOffset, pitchDeg);
         var held = Pose(hand, type.DisplayMatrix(player.HeldItemRotationOffset), HeldItemScale, HeldItemGrip);
-        return type.ThrowAligned
-            ? Aimed(held, hand, player.ThrowAimWeight(offhand), Vector3Utils.FromYawPitch(yawDeg, pitchDeg),
-                HeldItemScale * type.DisplayScale, HeldItemGrip)
-            : held;
+        if (!type.ThrowAligned) return held;
+
+        var aim = Vector3Utils.FromYawPitch(yawDeg, pitchDeg);
+        return Aimed(held, hand, player.ThrowAimWeight(offhand), aim, HeldItemScale * type.DisplayScale, HeldItemGrip,
+            FirstPersonAimShift(Vector3.Transform(HeldItemGrip, hand) - eye, aim, backOffset));
     }
 
-    /// <summary>How far ahead of the palm, along the aim, an aimed item's center rides: it is held just behind its middle.</summary>
-    internal const float AimedGripForward = 0.06f;
+    /// <summary>
+    /// Where a wound-up item is moved to in first person, for a palm at <paramref name="palmFromEye"/> and the unit
+    /// <paramref name="aim"/>: the cocked hand is beside and behind the eye, where a level javelin would sit wholly out
+    /// of view, so it is slid <see cref="AimedFirstPersonReach"/> along the aim and pulled
+    /// <see cref="AimedFirstPersonPull"/> of the way onto the line of sight, bringing its front half into the frame.
+    /// Scaled by the first-person body's back shift (<paramref name="backOffset"/>), so it is zero from the shoulder
+    /// camera and for a remote player, and fades with the glide between the two views.
+    /// </summary>
+    internal static Vector3 FirstPersonAimShift(Vector3 palmFromEye, Vector3 aim, float backOffset)
+    {
+        var firstPerson = MathUtils.Clamp01(backOffset / PlayerModel.FirstPersonBodyBack);
+        var offAxis = palmFromEye - aim * Vector3.Dot(palmFromEye, aim);
+        return (aim * AimedFirstPersonReach - offAxis * AimedFirstPersonPull) * firstPerson;
+    }
+
+    /// <summary>Blocks a wound-up item is slid along the aim in first person (<see cref="FirstPersonAimShift"/>).</summary>
+    internal const float AimedFirstPersonReach = 0.45f;
+
+    /// <summary>The share of its distance from the line of sight a wound-up item is pulled in by in first person.</summary>
+    internal const float AimedFirstPersonPull = 0.45f;
 
     /// <summary>
     /// A point-first throwable (<see cref="Item.ThrowAligned"/>) wound up for a throw: <paramref name="held"/>,
     /// its resting matrix, turned by <paramref name="weight"/> (0 at rest, 1 fully cocked) to lie along
     /// <paramref name="aim"/>, the thrower's view, tip first, exactly as it will fly
-    /// (<see cref="ThrownProjectile.AlignedRotation"/>), with its middle in the palm of <paramref name="hand"/>.
+    /// (<see cref="ThrownProjectile.AlignedRotation"/>), turning about the palm of <paramref name="hand"/>: the
+    /// spot of the item the hand grips at rest (where its <c>display</c> puts the palm) stays in the palm.
     /// So a javelin is carried level over the shoulder and leaves the hand already pointing where it goes,
-    /// whatever the arm is doing. <paramref name="scale"/> is the item's drawn size in the hand.
+    /// whatever the arm is doing. <paramref name="scale"/> is the item's drawn size in the hand, and
+    /// <paramref name="shift"/> moves it that far at full weight (<see cref="FirstPersonAimShift"/>).
     /// </summary>
     internal static Matrix4x4 Aimed(in Matrix4x4 held, in Matrix4x4 hand, float weight, Vector3 aim, float scale,
-        Vector3 grip)
+        Vector3 grip, Vector3 shift = default)
     {
-        if (weight <= 0f || !Matrix4x4.Decompose(held, out _, out var rest, out var restAt)) return held;
+        if (weight <= 0f || !Matrix4x4.Decompose(held, out _, out var rest, out _)
+                         || !Matrix4x4.Invert(held, out var toItem)) return held;
 
+        var palm = Vector3.Transform(grip, hand);
+        var gripped = Vector3.Transform(palm, toItem);
         var aimed = Quaternion.CreateFromRotationMatrix(ThrownProjectile.AlignedRotation(aim));
-        var palm = Vector3.Transform(grip, hand) + aim * AimedGripForward;
-        return Matrix4x4.CreateScale(scale)
-               * Matrix4x4.CreateFromQuaternion(Quaternion.Slerp(rest, aimed, weight))
-               * Matrix4x4.CreateTranslation(Vector3.Lerp(restAt, palm, weight));
+        var turned = Matrix4x4.CreateScale(scale)
+                     * Matrix4x4.CreateFromQuaternion(Quaternion.Slerp(rest, aimed, weight));
+        return turned * Matrix4x4.CreateTranslation(palm - Vector3.Transform(gripped, turned) + shift * weight);
     }
 
     /// <summary>A lantern hangs upright below the hand's grip, regardless of the wrist's rotation. The left hand

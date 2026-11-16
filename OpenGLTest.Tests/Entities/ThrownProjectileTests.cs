@@ -139,10 +139,38 @@ public sealed class ThrownProjectileTests
         var cocked = HeldItemPose.Aimed(held, hand, 1f, aim, 0.65f, HeldItemPose.HeldItemGrip);
         var tip = Vector3.Normalize(Vector3.TransformNormal(new Vector3(1f, 1f, 0f), cocked));
         Assert.True(Vector3.Dot(tip, aim) > 0.999f);
-        // Its size in the hand is kept, and its middle stays within reach of the palm
+        // Its size in the hand is kept, and the spot the hand grips never leaves the palm on the way there
         Assert.Equal(0.65f, Vector3.TransformNormal(Vector3.UnitZ, cocked).Length(), 3);
         var palm = Vector3.Transform(HeldItemPose.HeldItemGrip, hand);
-        Assert.True(Vector3.Distance(cocked.Translation, palm) < 0.2f);
+        Assert.True(Matrix4x4.Invert(held, out var toItem));
+        var gripped = Vector3.Transform(palm, toItem);
+        foreach (var weight in new[] { 0.3f, 0.7f, 1f })
+        {
+            var turning = HeldItemPose.Aimed(held, hand, weight, aim, 0.65f, HeldItemPose.HeldItemGrip);
+            Assert.True(Vector3.Distance(Vector3.Transform(gripped, turning), palm) < 1e-3f);
+        }
+    }
+
+    [Fact]
+    public void OnlyTheFirstPersonViewBringsAWoundUpItemTowardTheLineOfSight()
+    {
+        var aim = Vector3.Normalize(new Vector3(1f, 0.2f, 0.4f));
+        // A cocked hand beside and behind the eye
+        var palm = new Vector3(-0.3f, 0.1f, 0.5f);
+        static float OffAxis(Vector3 point, Vector3 axis) => (point - axis * Vector3.Dot(point, axis)).Length();
+
+        // The shoulder camera and a remote player (no first-person back shift) see the item where the hand has it
+        Assert.Equal(Vector3.Zero, HeldItemPose.FirstPersonAimShift(palm, aim, 0f));
+
+        var shifted = palm + HeldItemPose.FirstPersonAimShift(palm, aim, PlayerModel.FirstPersonBodyBack);
+        Assert.True(Vector3.Dot(shifted, aim) > Vector3.Dot(palm, aim));
+        Assert.True(OffAxis(shifted, aim) < OffAxis(palm, aim));
+        // It stays on the hand's side of the view rather than crossing it
+        Assert.True(Vector3.Dot(shifted - aim * Vector3.Dot(shifted, aim), palm - aim * Vector3.Dot(palm, aim)) > 0f);
+
+        // Half way through the glide to the shoulder camera, half the move
+        var half = HeldItemPose.FirstPersonAimShift(palm, aim, PlayerModel.FirstPersonBodyBack * 0.5f);
+        Assert.Equal((shifted - palm).Length() * 0.5f, half.Length(), 4);
     }
 
     [Fact]
