@@ -276,6 +276,34 @@ public sealed class DoorTests : IDisposable
     }
 
     [Fact]
+    public void ALooseBodyIsStoppedByTheShutPanelAndPassesTheOpenDoorway()
+    {
+        _world = new SupportTestWorld();
+        var door = Door();
+        _world.Load(8, _world.Top, 8);
+        var (x, y, z) = PlaceDoor(door.Id, 4, 8, 0);
+        var half = new Vector3(0.2f);
+        var start = new Vector3(x + 0.5f, y + 0.5f, z - 0.5f);
+        var through = new Vector3(0f, 0f, 2f);
+
+        // Shut: the body crosses the free part of the door's cell and stops against the panel
+        var panel = Bounds(BlockShape.BoxesAt(door.Id, _world.Manager, x, y, z));
+        var stopped = BoxSweep.MoveOnAxis(start, through.Z, 2, half, _world.Manager, out var hitShut);
+        Assert.True(hitShut);
+        Assert.InRange(stopped.Z + half.Z, z, z + panel.Min.Z);
+        // A body that must rest on whole cells never enters the door's cell at all
+        var outside = BoxSweep.MoveOnAxis(start, through.Z, 2, half, _world.Manager, out var hitCell, wholeCells: true);
+        Assert.True(hitCell);
+        Assert.True(outside.Z + half.Z <= z);
+
+        // Open: the same walk goes straight through the doorway
+        ClickBoxes(x, y, z);
+        var passed = BoxSweep.MoveOnAxis(start, through.Z, 2, half, _world.Manager, out var hitOpen);
+        Assert.False(hitOpen);
+        Assert.Equal(start.Z + through.Z, passed.Z, 3);
+    }
+
+    [Fact]
     public void ARightHingedDoorIsTheLeftHingedOneMirroredAcrossItsCell()
     {
         var hinged = BlockType.Types.Values.Where(t => t.SideHinged).ToArray();

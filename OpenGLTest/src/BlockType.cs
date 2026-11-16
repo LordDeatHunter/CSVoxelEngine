@@ -69,6 +69,9 @@ public sealed record BlockType
     // Flat mirrors of the per-block flags the mesher asks about by neighbor id
     internal static bool[] SolidById = new bool[256];
     internal static bool[] CollidesByHitboxById = new bool[256];
+
+    /// <summary>Per id, <see cref="Openable"/>: the loose-body sweep (<c>BoxSweep</c>) collides such a cell by its panel boxes.</summary>
+    internal static bool[] OpenableById = new bool[256];
     internal static bool[] OccludesById = new bool[256];
     internal static bool[] CastsAoById = new bool[256];
 

@@ -231,6 +231,7 @@ stones never pile up as pickups. The rules:
   `visual-examples/goblins.json` film them from a hovering camera.
 - **Movement.** Goblins auto-jump a one-block step they walked into, float and paddle in water like
   the slime, and are shoved away when they overlap the player on the ground.
+  `BoxSweep` collides a solid cell whole, except an openable block's (`BlockType.OpenableById`: a door, a trapdoor), which is only its current panel boxes (`TreeWoodShape.OverlapsShape`), so mobs, drops, projectiles and debris pass an open door and stop at a shut one; a falling cube sweeps with `wholeCells` (it turns back into a block where it rests). The cell probes (`LedgeProbe`, the crawler pathfinder, the spawner) still read a door cell as solid, so nothing plans a path through a door; a body only walks through one that is in its way and open.
   Every ground mob (`RiggedMob.SweepBody`, `Slime`) moves through `BoxSweep.MoveBody`: while rising it sweeps Y
   first and keeps its sideways speed through a wall hit (`RiggedMob.Walk` also keeps driving the move while
   rising), so a mob flush against a one-block step climbs it instead of bouncing in place (`StepUpTests`).

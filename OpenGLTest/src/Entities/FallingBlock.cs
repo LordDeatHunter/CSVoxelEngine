@@ -144,9 +144,11 @@ public class FallingBlock
         var movement = _velocity * deltaTime;
         var half = new Vector3(HalfExtent);
 
-        Position = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);
-        Position = BoxSweep.MoveOnAxis(Position, movement.Z, 2, half, chunks, out var hitZ);
-        Position = BoxSweep.MoveOnAxis(Position, movement.Y, 1, half, chunks, out var hitY);
+        // Whole cells: the cube turns back into a block where it comes to rest, so it may never settle inside
+        // the cell of an open door
+        Position = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX, wholeCells: true);
+        Position = BoxSweep.MoveOnAxis(Position, movement.Z, 2, half, chunks, out var hitZ, wholeCells: true);
+        Position = BoxSweep.MoveOnAxis(Position, movement.Y, 1, half, chunks, out var hitY, wholeCells: true);
 
         // Walls just stop that axis; a downward impact rolls the sand-sim slide below
         if (hitX) _velocity.X = 0f;

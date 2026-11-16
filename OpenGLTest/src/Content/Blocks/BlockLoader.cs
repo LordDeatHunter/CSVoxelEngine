@@ -261,6 +261,7 @@ internal static class BlockLoader
         BlockType.ManMadeEmission[id] = type.NaturalLight ? (byte)0 : type.LightEmission;
         BlockType.SolidById[id] = type.Solid;
         BlockType.CollidesByHitboxById[id] = type.CollidesByHitbox;
+        BlockType.OpenableById[id] = type.Openable;
         BlockType.StackSolidStateById[id] = (byte)stackSolidAt;
         BlockType.MovementSpeedById[id] = type.MovementSpeed;
         BlockType.FrictionById[id] = type.Friction;

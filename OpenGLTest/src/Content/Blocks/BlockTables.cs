@@ -72,6 +72,7 @@ internal static class BlockTables
         BlockType.PassesLightById = new bool[idCount];
         BlockType.SolidById = new bool[idCount];
         BlockType.CollidesByHitboxById = new bool[idCount];
+        BlockType.OpenableById = new bool[idCount];
         BlockType.OccludesById = new bool[idCount];
         BlockType.CastsAoById = new bool[idCount];
         BlockType.StackSolidStateById = new byte[idCount];
