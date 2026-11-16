@@ -163,6 +163,16 @@ for (const { id, file } of listJson(path.join(rdir, 'alloy'))) {
   const d = readJson(file)
   recipes.push({ kind: 'alloy', id, parts: d.parts, outputs: ['fluid/' + d.result], inputs: d.parts.map((p) => 'fluid/' + p.fluid) })
 }
+// Anvil recipes: the metal stacked on the anvil, picked with a smithing hammer and hammered out in `hits` blows. The
+// byproduct (a bloom's slag) is a second output, so its page lists the forge recipes that leave it.
+for (const { id, file } of listJson(path.join(rdir, 'forge'))) {
+  const d = readJson(file)
+  const byproduct = d.byproduct ? { ref: R(d.byproduct.item), count: d.byproduct.count ?? 1 } : null
+  recipes.push({
+    kind: 'forge', id, count: d.count ?? 1, metalCount: d.metalCount, hits: d.hits, byproduct,
+    outputs: [R(d.result), ...(byproduct ? [byproduct.ref] : [])], inputs: [R(d.metal)]
+  })
+}
 const recipeIndex = buildRecipeIndex(recipes)
 
 // ---- output ----
@@ -317,8 +327,19 @@ const table = (head, rows) => `| ${head.join(' | ')} |\n|${head.map(() => '---')
 const pct = (x) => `${Math.round(x * 100)}%`
 const title = (s) => s.charAt(0).toUpperCase() + s.slice(1)
 
+// How a structure is worked once built, for those whose use the recipe cards do not tell, as [heading, text]
+const structureUse = {
+  bloomery: ['Smelting', `Load crushed iron and fuel through the opening and light it with a firestarter. The fire cools on its own; to keep it
+hot, set a [Bellows](/game/blocks/bellows) against one of the two holes low in the side walls (the tuyeres) and land on
+it: every landing blows the fire, the more the farther you fell, and any walking mob works it too. A fire too cold to
+smelt slowly loses the progress of the ore it is working (the colder, the faster); there is no such thing as too hot.
+Collect the blooms with an empty hand and forge them on an [anvil](/game/blocks/anvil): stack them, pick a recipe with a
+smithing hammer, then hammer it out (see the [anvil recipes](/game/reference/crafting#anvil)).`]
+}
+
 for (const st of Object.values(structures)) {
   const rows = [['Size', `${st.size}×${st.size}×${st.size}`], ...st.notes]
+  const use = structureUse[st.id]
   writePage(`game/structures/${st.id}.md`,
     `---
 title: ${JSON.stringify(st.name)}
@@ -336,7 +357,7 @@ ${table(['Property', 'Value'], rows)}
 
 ` +
     `Craft the bricks, stack them into a ${st.size}×${st.size}×${st.size} cube and right-click a front face with a bare hand. The opening ends up facing you.
-`)
+` + (use ? `\n## ${use[0]}\n\n${use[1]}\n` : ''))
 }
 writePage('game/structures/index.md', `# Structures
 
@@ -388,7 +409,8 @@ const kindText = {
   crush: ['Quern', 'Crushing in a quern.'],
   melt: ['Melting', 'Put the item in a crucible inside a lit kiln.'],
   cast: ['Casting', 'Pour molten metal from a crucible into a fired mold.'],
-  alloy: ['Alloys', 'Only made in the alloy furnace: a full set of the parts becomes the same total amount of the result.']
+  alloy: ['Alloys', 'Only made in the alloy furnace: a full set of the parts becomes the same total amount of the result.'],
+  forge: ['Anvil', 'Stack the metal on an [anvil](/game/blocks/anvil), pick the recipe with a smithing hammer (right-click), then hammer it out (left-click) in the given number of hits. Iron is forged straight from blooms, each leaving a slag.']
 }
 writePage('game/reference/crafting.md',
   `# Recipes\n\n` + Object.keys(kindText).map((k) => {

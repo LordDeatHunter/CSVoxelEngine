@@ -7,7 +7,7 @@ import RecipeCard from './RecipeCard.vue'
 const props = defineProps<{ recipes: string | { kind: string; id: string }[] }>()
 
 const LABELS: Record<string, string> = {
-  craft: 'Crafting', cook: 'Campfire', crush: 'Quern', melt: 'Kiln', cast: 'Casting', alloy: 'Alloy furnace'
+  craft: 'Crafting', cook: 'Campfire', crush: 'Quern', melt: 'Kiln', cast: 'Casting', alloy: 'Alloy furnace', forge: 'Anvil'
 }
 // Groups at most this big start open; a longer one starts collapsed.
 const OPEN_UP_TO = 3

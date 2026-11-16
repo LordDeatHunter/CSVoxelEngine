@@ -17,7 +17,8 @@ const STATIONS: Record<string, { label: string; block?: string }> = {
   crush: { label: 'Quern', block: 'quern' },
   melt: { label: 'Kiln', block: 'mud_brick_kiln' },
   cast: { label: 'Casting', block: 'casting_basin' },
-  alloy: { label: 'Alloy furnace', block: 'alloy_furnace' }
+  alloy: { label: 'Alloy furnace', block: 'alloy_furnace' },
+  forge: { label: 'Anvil', block: 'anvil' }
 }
 const station = computed(() => STATIONS[props.kind] ?? { label: props.kind })
 
@@ -28,6 +29,7 @@ const inputs = computed<Slot[]>(() => {
     case 'craft': return r.ingredients.map((i: any) => ({ target: i.ref, count: i.count }))
     case 'cast': return [{ target: r.inputs[0] }, { target: r.inputs[1], ml: r.ml }]
     case 'alloy': return r.parts.map((p: any) => ({ target: `fluid/${p.fluid}`, ml: p.ml }))
+    case 'forge': return [{ target: r.inputs[0], count: r.metalCount }]
     default: return [{ target: r.inputs[0] }]
   }
 })
@@ -46,7 +48,14 @@ const detail = computed(() => {
   if (props.kind === 'cook') return `${r.seconds} s`
   if (props.kind === 'cast') return `${r.seconds} s cooling`
   if (props.kind === 'alloy') return 'full set'
+  if (props.kind === 'forge') return `${r.hits} hits`
   return ''
+})
+
+// What the work leaves besides the result (an anvil recipe's slag), drawn beside the output
+const byproduct = computed<Slot | null>(() => {
+  const b = recipe.value?.byproduct
+  return b ? { target: b.ref, count: b.count } : null
 })
 
 onMounted(async () => {
@@ -78,6 +87,10 @@ onMounted(async () => {
         </svg>
       </div>
       <RecipeSlot :target="output.target" :count="output.count" :ml="output.ml" big class="rc-out" />
+      <template v-if="byproduct">
+        <span class="rc-plus">+</span>
+        <RecipeSlot :target="byproduct.target" :count="byproduct.count" />
+      </template>
     </div>
   </div>
 </template>
@@ -92,6 +105,7 @@ onMounted(async () => {
 .rc[data-kind='melt'] { --accent: #e0483a; }
 .rc[data-kind='cast'] { --accent: #4f8fe0; }
 .rc[data-kind='alloy'] { --accent: #a65fd6; }
+.rc[data-kind='forge'] { --accent: #7a8ea3; }
 .rc-head {
   display: flex; justify-content: space-between; align-items: center; padding: 5px 12px;
   font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
