@@ -218,7 +218,7 @@ public sealed class DebugSceneRenderer : IDisposable
         }
 
         // The item the kind's entity file holds (the skeleton warrior's dagger), as the game's MobPasses draws it
-        if (type.HeldItemId != 0 && _itemMeshes.TryGet(type.HeldItemId, out var held, out var heldTex))
+        if (type.HeldItemId != 0 && _itemMeshes.TryGetShape(type.HeldItemId, out var held, out var heldTex))
         {
             BindArray(0, heldTex);
             Draw(held, type.HeldMatrix(animator, preview.Rig, feet, state.FacingYaw) * effect, viewProj);
@@ -347,7 +347,7 @@ public sealed class DebugSceneRenderer : IDisposable
         if (editor.IsPureItem && ItemRegistry.TryGet(editor.SelectedId) is { } type)
         {
             var frame = type.FrameAt(time, Compass.HeadingFromYaw(bodyYaw));
-            if (!_itemMeshes.TryGetFrame(editor.SelectedId, frame, out var mesh, out var texture)) return;
+            if (!_itemMeshes.TryGetShape(editor.SelectedId, out var mesh, out var texture, frame)) return;
 
             BindArray(0, texture);
             var model = RenderManager.PoseHeldItem(hand, editor.DisplayMatrix(player.HeldItemRotationOffset),

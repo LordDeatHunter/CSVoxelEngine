@@ -88,6 +88,12 @@ public abstract class Item
     /// </summary>
     public BakedModel? BakedModel { get; internal set; }
 
+    /// <summary>
+    /// The 3D shape this item is drawn as in the world (held, thrown, dropped) in place of its extruded
+    /// sprite, from its JSON <c>heldModel</c>; null for a sprite item. The sprite stays the icon either way.
+    /// </summary>
+    public HeldModel? HeldModel { get; internal init; }
+
     /// <summary>Whether the item declares a <c>tool</c> block and therefore mines as a tool
     /// rather than at the bare-hand baseline. Membership in tool tags comes from the tag
     /// files, not from this flag.</summary>
@@ -133,7 +139,7 @@ public abstract class Item
     /// <summary>Whether right-click in the air can charge and release this item as a projectile.</summary>
     public bool IsThrowable => ThrowDamage.HasValue;
 
-    /// <summary>Whether a thrown copy flies point first along its velocity (a spear) rather than tumbling.</summary>
+    /// <summary>Whether a thrown copy flies point first along its velocity (a javelin) rather than tumbling.</summary>
     public bool ThrowAligned { get; internal init; }
 
     /// <summary>The block whose cube a thrown copy is drawn as instead of this item's sprite, or 0 for the sprite.</summary>
@@ -297,6 +303,7 @@ public abstract class Item
         ThrowAligned = spec.ThrowAligned;
         ThrowBlockId = spec.ThrowBlockId;
         IngotBlockId = spec.IngotBlockId;
+        HeldModel = spec.HeldModel;
         Rarity = spec.Rarity;
     }
 

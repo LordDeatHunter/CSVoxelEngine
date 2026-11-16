@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Data;
@@ -113,6 +114,8 @@ internal static class ItemLoader
                 }
             }
 
+            var heldModel = LoadHeldModel(definition.HeldModel, path);
+
             var sheet = ParseSpritesheet(definition.Spritesheet, path);
             var display = ParseDisplay(definition.Display, path);
 
@@ -191,7 +194,8 @@ internal static class ItemLoader
                 Rarity: rarity,
                 Equip: equip,
                 Shrapnel: shrapnel,
-                OnHit: onHit));
+                OnHit: onHit,
+                HeldModel: heldModel));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, ushort>(ContentRegistry.ItemIds, StringComparer.Ordinal));
@@ -521,6 +525,20 @@ internal static class ItemLoader
     /// Reads a held-in-hand transform (an item's <c>display</c>, or an entity's <c>held.display</c>),
     /// defaulting to the upright side-facing tool pose when the file says nothing.
     /// </summary>
+    // The Blockbench project an item's heldModel names, or null when it names none; a failure names the item
+    private static HeldModel? LoadHeldModel(string? modelPath, string path)
+    {
+        if (string.IsNullOrWhiteSpace(modelPath)) return null;
+        try
+        {
+            return HeldModel.Load(modelPath);
+        }
+        catch (Exception e)
+        {
+            throw new InvalidOperationException($"Item '{path}' heldModel: {e.Message}", e);
+        }
+    }
+
     internal static ParsedDisplay ParseDisplay(ItemDefinition.DisplayDefinition? display, string path)
     {
         if (display == null)

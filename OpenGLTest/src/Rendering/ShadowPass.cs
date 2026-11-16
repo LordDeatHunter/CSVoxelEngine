@@ -363,7 +363,7 @@ internal sealed class ShadowPass
         }
 
         var type = mob.Type;
-        if (type.HeldItemId == 0 || !_owner.ItemMeshes.TryGet(type.HeldItemId, out var held, out var texture)) return;
+        if (type.HeldItemId == 0 || !_owner.ItemMeshes.TryGetShape(type.HeldItemId, out var held, out var texture)) return;
         Units.BindUnit(0, TextureTarget.Texture2DArray, texture);
         var heldModel = type.HeldMatrix(mob.Animation, rig.Rig, mob.Feet, mob.Facing);
         _owner.ShadowShader.SetUniform("uModel", heldModel);

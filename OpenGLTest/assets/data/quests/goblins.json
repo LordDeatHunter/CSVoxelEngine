@@ -1,7 +1,7 @@
 {
   "title": "Goblin Trouble",
   "description": "Goblins camp in the woods at night. Drive them off.",
-  "icon": "item/spear",
+  "icon": "item/javelin",
   "pos": [5, -6.5],
   "requirements": [
     { "type": "kill", "entity": "goblin", "count": 3 }

@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Items;
@@ -110,13 +111,26 @@ public sealed class ThrownProjectileTests
         Assert.Equal(1f, Vector3.TransformNormal(Vector3.UnitX, rotation).Length(), 3);
     }
 
-    [Fact]
-    public void OnlyTheSpearFliesPointFirst()
+    [Theory]
+    [MemberData(nameof(Headings))]
+    public void AHeldModelAuthoredTipUpFliesTipFirstLikeASprite(float x, float y, float z)
     {
-        var spear = ContentRegistry.RequireItem("spear");
-        Assert.True(spear.IsThrowable && spear.ThrowAligned);
+        // The model stands in for the sprite in the sprite's space, so the one aligned rotation serves both
+        var velocity = new Vector3(x, y, z) * 13f;
+        var drawn = HeldModel.ToSpriteSpace * ThrownProjectile.AlignedRotation(velocity);
+
+        var tip = Vector3.TransformNormal(Vector3.UnitY, drawn);
+        Assert.True(Vector3.Dot(tip, Vector3.Normalize(velocity)) > 0.9999f);
+        Assert.Equal(1f, drawn.GetDeterminant(), 3);
+    }
+
+    [Fact]
+    public void OnlyTheJavelinFliesPointFirst()
+    {
+        var javelin = ContentRegistry.RequireItem("javelin");
+        Assert.True(javelin.IsThrowable && javelin.ThrowAligned);
         Assert.False(ContentRegistry.RequireItem("flint").ThrowAligned);
-        Assert.True(new ThrownProjectile(spear.Id, Vector3.Zero, Vector3.UnitX, 1f, 1f).Aligned);
+        Assert.True(new ThrownProjectile(javelin.Id, Vector3.Zero, Vector3.UnitX, 1f, 1f).Aligned);
         Assert.False(new ThrownProjectile(ContentRegistry.RequireItem("flint").Id, Vector3.Zero, Vector3.UnitX, 1f, 1f).Aligned);
     }
 }

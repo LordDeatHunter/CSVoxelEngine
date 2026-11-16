@@ -7,7 +7,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   the block/item mesh caches, cutout mips, tile materials
       BlockCubeCache.cs        # lazily built cube meshes, one per block type, always the whole object (`WholeModel`, GL-free: a two-cell block's halves stacked, a multiblock's volume, fitted to one cell; `GetLookAt` spins it about its visual center)
       CutoutMipmap.cs          # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
-      ItemMeshCache.cs         # lazily built extruded-sprite meshes plus their GL textures, one per Item
+      ItemMeshCache.cs         # lazily built extruded-sprite meshes plus their GL textures, one per Item, and the held-model mesh of a 3D item (TryGetShape)
       Mesh.cs                  # an indexed triangle mesh in the shared Vertex layout
       Shader.cs                # a compiled GL program from vertex/fragment sources, with
                                #   an optional defines prefix (the CHUNK_DRAW variants); CreateCompute builds a

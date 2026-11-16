@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using Silk.NET.OpenGL;
 using StbImageSharp;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Items;
+using VoxelEngine.Player;
 using VoxelEngine.UI;
 
 namespace VoxelEngine.Graphics;
@@ -18,6 +20,7 @@ public class ItemMeshCache : IDisposable
 {
     private readonly GL _gl;
     private readonly Dictionary<ushort, (Mesh Mesh, Dictionary<int, uint> Textures)> _entries = new();
+    private readonly Dictionary<ushort, (Mesh Mesh, uint Texture)> _models = new();
 
     /// <param name="gl">The GL context the meshes and textures are created on.</param>
     /// <param name="srgb">Upload every texture this cache builds as <c>SRGB8_ALPHA8</c>, for
@@ -46,6 +49,28 @@ public class ItemMeshCache : IDisposable
     /// <summary>The mesh and texture for an item id, or false for non-item ids.</summary>
     public bool TryGet(ushort itemId, out Mesh mesh, out uint texture) =>
         TryGetFrame(itemId, 0, out mesh, out texture);
+
+    /// <summary>
+    /// What an item is drawn as in the world (held, thrown, dropped): its <see cref="Item.HeldModel"/> with
+    /// that model's skin when it has one, otherwise the sprite of <see cref="TryGetFrame"/>. Icons and the
+    /// flat sprites lying in stations keep asking for the sprite.
+    /// </summary>
+    public bool TryGetShape(ushort itemId, out Mesh mesh, out uint texture, int frame = 0)
+    {
+        if (ItemRegistry.TryGet(itemId)?.HeldModel is not { } model)
+            return TryGetFrame(itemId, frame, out mesh, out texture);
+
+        if (!_models.TryGetValue(itemId, out var entry))
+        {
+            entry = (PlayerRig.BuildTransformedMesh(_gl, model.Part, HeldModel.ToSpriteSpace),
+                TextureLoader.Upload(_gl, model.TexturePixels, model.TextureWidth, model.TextureHeight, IsSrgb));
+            GlStateChanged?.Invoke();
+            _models[itemId] = entry;
+        }
+
+        (mesh, texture) = entry;
+        return true;
+    }
 
     /// <summary>
     /// The extruded mesh plus the texture of one spritesheet frame, for items whose look
@@ -119,6 +144,12 @@ public class ItemMeshCache : IDisposable
                 _gl.DeleteTexture(texture);
         }
         _entries.Clear();
+        foreach (var (mesh, texture) in _models.Values)
+        {
+            mesh.Dispose();
+            _gl.DeleteTexture(texture);
+        }
+        _models.Clear();
 
         GC.SuppressFinalize(this);
     }

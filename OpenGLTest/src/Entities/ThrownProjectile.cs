@@ -28,7 +28,7 @@ public sealed class ThrownProjectile
     /// <summary>The projectile's velocity in blocks per second.</summary>
     public Vector3 Velocity => _velocity;
 
-    /// <summary>Whether it flies point first along its velocity (a spear) instead of tumbling.</summary>
+    /// <summary>Whether it flies point first along its velocity (a javelin) instead of tumbling.</summary>
     public bool Aligned => ItemRegistry.TryGet(ItemId)?.ThrowAligned == true;
 
     /// <summary>

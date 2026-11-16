@@ -613,6 +613,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                       #   cube, cube_all, cube_column, cube_bottom_top
   assets/models/entity/<name>.bbmodel # Blockbench entity projects (slime, goblin with its four
                                       #   clips) + <name>.png skins
+  assets/models/item/<name>.bbmodel   # 3D items (an item's `heldModel`), skin embedded: javelin
   assets/models/player/               # the player rig (player.bbmodel) and its skin
   visual-examples/                    # the VOXEL_SCRIPT scenario JSONs (see `VOXEL_SCRIPT`)
 ```

@@ -314,6 +314,7 @@ OpenGLTest/
         WoodLootBand.cs        # one thickness band of a tree_wood block's loot (self or a table)
       Models/                  # Minecraft model format and Blockbench projects: parents, baking, quads
         ModelBaker.cs, BakedModel.cs, BakedQuad.cs  # elements -> atlas-ready quads + full-cube flags
+        HeldModel.cs           # GL-free: a 3D item's shape (item JSON `heldModel`), its cubes flattened and turned into the sprite's space
         BbmodelLoader.cs       # Blockbench .bbmodel: groups (nested, with Parent),
                                #   cubes, per-face UVs, the skin texture and the
                                #   keyframe `animations`; rest rotations rejected

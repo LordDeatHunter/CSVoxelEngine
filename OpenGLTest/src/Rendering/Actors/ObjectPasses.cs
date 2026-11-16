@@ -59,7 +59,7 @@ internal sealed class ObjectPasses
             Mesh? mesh;
             if (ItemRegistry.IsItem(drop.BlockId))
             {
-                if (!_owner.ItemMeshes.TryGet(drop.BlockId, out mesh, out var itemTexture)) continue;
+                if (!_owner.ItemMeshes.TryGetShape(drop.BlockId, out mesh, out var itemTexture)) continue;
                 Units.BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
                 atlasBound = false;
             }
@@ -104,7 +104,7 @@ internal sealed class ObjectPasses
             var renderId = projectile.RenderId;
             if (ItemRegistry.IsItem(renderId))
             {
-                if (!_owner.ItemMeshes.TryGet(renderId, out mesh, out var itemTexture)) continue;
+                if (!_owner.ItemMeshes.TryGetShape(renderId, out mesh, out var itemTexture)) continue;
                 Units.BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
                 atlasBound = false;
             }

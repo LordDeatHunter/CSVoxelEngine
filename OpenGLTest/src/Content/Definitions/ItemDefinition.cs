@@ -39,7 +39,7 @@ public sealed class ItemDefinition
     public float? ThrowDamage { get; set; }
 
     /// <summary>
-    /// A throwable that flies point first along its velocity (a spear) instead of tumbling about the
+    /// A throwable that flies point first along its velocity (a javelin) instead of tumbling about the
     /// vertical like a thrown stone. Needs <see cref="ThrowDamage"/>; the sprite's tip is on its (1, 1)
     /// diagonal, as a held blade's is.
     /// </summary>
@@ -234,6 +234,15 @@ public sealed class ItemDefinition
     /// inventory icon; this only adds a mesh.
     /// </summary>
     public string? Model { get; set; }
+
+    /// <summary>
+    /// Optional Blockbench project (a path like <see cref="Texture"/>, e.g.
+    /// <c>assets/models/item/javelin.bbmodel</c>) the item is drawn as in the world: in a hand, thrown and
+    /// dropped. The sprite stays the inventory icon, and the model takes the sprite's place in its own
+    /// space, so <see cref="Display"/> and <see cref="ThrowAligned"/> pose it the same way (see
+    /// <see cref="VoxelEngine.Content.Models.HeldModel"/> for how to author one).
+    /// </summary>
+    public string? HeldModel { get; set; }
 
     /// <summary>Seconds between uses of this item; omitted for the global click rate.</summary>
     public float? UseDelay { get; set; }
