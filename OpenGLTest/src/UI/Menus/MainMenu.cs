@@ -120,6 +120,9 @@ public sealed class MainMenuView
     /// <summary>The worlds page's rows, as <see cref="WorldStore.List"/> returned them.</summary>
     public List<WorldInfo> Worlds { get; } = [];
 
+    /// <summary>Whether the latest world-list read failed, so an empty failure is not shown as no worlds.</summary>
+    internal bool WorldListFailed { get; set; }
+
     /// <summary>
     /// Raw scroll of the worlds list in canvas units; draw and hit-test clamp it on read with
     /// that frame's row count (<see cref="MainMenuLayout.ClampedOffset"/>), as the inventory does.
@@ -134,6 +137,9 @@ public sealed class MainMenuView
 
     /// <summary>The multiplayer page's rows, as <see cref="ServerStore.List"/> returned them.</summary>
     public List<ServerInfo> Servers { get; } = [];
+
+    /// <summary>Whether the latest multiplayer list could not be read.</summary>
+    public bool ServerListFailed { get; set; }
 
     /// <summary>Raw scroll of the server list in canvas units, clamped like the worlds list.</summary>
     public float ServerScrollOffset { get; set; }

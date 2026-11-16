@@ -305,6 +305,68 @@ public sealed class MainMenuControllerTests : IDisposable
         Assert.Single(_store.List());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FailedWorldEnumerationIsShownOnWorldAndHostPages(bool host)
+    {
+        _store.Create("One", 1);
+        _store.EnumerateDirectories = _ => throw new IOException("injected enumeration failure");
+        var controller = NewController();
+
+        if (host)
+            controller.OpenHost();
+        else
+            controller.OpenWorlds();
+
+        Assert.Empty(controller.View.Worlds);
+        Assert.True(controller.View.WorldListFailed);
+        Assert.Equal(MainMenuController.StoreErrorNotice, controller.View.Notice);
+    }
+
+    [Fact]
+    public void MissingWorldRootIsShownAsAnOrdinaryEmptyList()
+    {
+        var controller = NewController();
+
+        controller.OpenWorlds();
+
+        Assert.Empty(controller.View.Worlds);
+        Assert.False(controller.View.WorldListFailed);
+        Assert.Null(controller.View.Notice);
+    }
+
+    [Fact]
+    public void WorldListingFailureClearsAfterTheNextSuccessfulOpen()
+    {
+        _store.Create("One", 1);
+        _store.EnumerateDirectories = _ => throw new IOException("injected enumeration failure");
+        var controller = NewController();
+        controller.OpenWorlds();
+        Assert.True(controller.View.WorldListFailed);
+
+        _store.EnumerateDirectories = Directory.GetDirectories;
+        controller.OpenWorlds();
+
+        Assert.False(controller.View.WorldListFailed);
+        Assert.Null(controller.View.Notice);
+        Assert.Equal("One", Assert.Single(controller.View.Worlds).Name);
+    }
+
+    [Fact]
+    public void WorldListingFailureDoesNotReplaceTheWorldsLockedNotice()
+    {
+        _store.EnumerateDirectories = _ => throw new IOException("injected enumeration failure");
+        var controller = NewController();
+        controller.View.WorldsLocked = true;
+        controller.View.Notice = "Worlds are locked";
+
+        controller.OpenWorlds();
+
+        Assert.True(controller.View.WorldListFailed);
+        Assert.Equal("Worlds are locked", controller.View.Notice);
+    }
+
     [Fact]
     public void ScrollClampsToTheListAndOnlyOnTheWorldsPage()
     {
@@ -406,6 +468,72 @@ public sealed class MainMenuControllerTests : IDisposable
         Assert.True(target.HasValue);
         Assert.Equal("10.0.0.1", target!.Value.Address.Host);
         Assert.Equal(25566, target.Value.Address.Port);
+    }
+
+    [Fact]
+    public void FailedTouchReadDoesNotBlockConnectOrReplaceSavedBytes()
+    {
+        _servers.Add("Alpha", "10.0.0.1", 25566);
+        var controller = NewController();
+        controller.OpenMultiplayer();
+        var server = Assert.Single(controller.View.Servers);
+        var original = File.ReadAllBytes(_serverPath);
+        var originalLastPlayed = server.LastPlayedUnixMs;
+        _servers.ReadAllText = _ => throw new IOException("injected server-list read failure");
+
+        var action = controller.Click(Hit(MainMenuHitKind.Connect, 0));
+        var request = controller.TakeConnectRequest();
+        var after = File.ReadAllBytes(_serverPath);
+        var bytesUnchanged = original.SequenceEqual(after);
+        var timestampUnchanged = server.LastPlayedUnixMs == originalLastPlayed;
+        Assert.True(action == MainMenuAction.Connect && request is { Address.Host: "10.0.0.1" }
+                    && bytesUnchanged && timestampUnchanged,
+            $"action={action}; connectRequest={request.HasValue}; bytesUnchanged={bytesUnchanged}; " +
+            $"timestampUnchanged={timestampUnchanged}; beforeLength={original.Length}; afterLength={after.Length}");
+    }
+
+    [Fact]
+    public void FailedServerListReadShowsTheStoreErrorNotice()
+    {
+        _servers.Add("Alpha", "10.0.0.1", 25566);
+        var controller = NewController();
+        _servers.ReadAllText = _ => throw new IOException("injected server-list read failure");
+
+        controller.OpenMultiplayer();
+
+        Assert.True(controller.View.ServerListFailed);
+        Assert.Empty(controller.View.Servers);
+        Assert.Equal(MainMenuController.StoreErrorNotice, controller.View.Notice);
+    }
+
+    [Fact]
+    public void ReopeningServerListAfterReadRecoveryRestoresRowsAndClearsFailure()
+    {
+        _servers.Add("Alpha", "10.0.0.1", 25566);
+        var controller = NewController();
+        _servers.ReadAllText = _ => throw new IOException("injected server-list read failure");
+        controller.OpenMultiplayer();
+        Assert.True(controller.View.ServerListFailed);
+
+        _servers.ReadAllText = File.ReadAllText;
+        controller.OpenMultiplayer();
+
+        Assert.False(controller.View.ServerListFailed);
+        Assert.Null(controller.View.Notice);
+        Assert.Equal("Alpha", Assert.Single(controller.View.Servers).Name);
+    }
+
+    [Fact]
+    public void FailedServerListReadPreservesWorldsLockedNotice()
+    {
+        var controller = NewController();
+        controller.LockWorlds("worlds are locked");
+        _servers.ReadAllText = _ => throw new IOException("injected server-list read failure");
+
+        controller.OpenMultiplayer();
+
+        Assert.True(controller.View.ServerListFailed);
+        Assert.Equal("worlds are locked", controller.View.Notice);
     }
 
     [Fact]

@@ -153,7 +153,12 @@ page up with `MainMenuController.BadAddressNotice`. Servers live in one JSON fil
 `%APPDATA%/CSVoxelEngine/servers.json`, owned by `ServerStore` (unique case-insensitive names via
 `WorldNames.Unique`, most-recently-connected first, a temp-file write); a row CONNECT touches it
 and returns a `ConnectTarget` through `MainMenuAction.Connect`, which Program turns into a real
-session.
+session. An unreadable list shows the store-error notice and an unavailable empty state rather than
+the normal empty-list prompt. Add, delete and touch refuse to write when the list cannot be read;
+the legacy `ServerStore.List()` remains best-effort for callers that only need rows. A malformed
+file is treated as empty only after it has been moved aside to `servers.json.bak`; if that recovery
+move fails, the list is unavailable and mutations are refused. Missing files and invalid individual
+entries remain tolerated, and a failed last-played touch does not prevent a row connection attempt.
 
 The multiplayer page's bottom row is four slots spanning the panel (`MainMenuLayout.QuadButtonCenter`): ADD SERVER /
 DIRECT CONNECT / **HOST** / BACK. HOST opens `MainMenuPage.Host`, the saved worlds again (re-read like the worlds
@@ -777,7 +782,8 @@ continuing into its next token), ranked by `SuggestionRanking` (with something t
 before a match inside, then letter-pair similarity), plus the command's usage; `/help` and every usage line are
 generated from the trees, filtered to what the source may run. The commands: `/help [command]`, `/tp <x y z> |
 <target> [<x y z> | <destination>]` (alias `/teleport`; coordinates are where the feet land), `/give <item> [count
-[target]]`, `/summon <entity> [x y z]`, `/time dawn|sunrise|morning|noon|day|dusk|sunset|night|midnight | set <s> | add <s>` (dawn and dusk name sunrise
+[target]]` (reports the amount accepted; a partial inventory grant reports that smaller amount, and a full pool
+returns a no-room error), `/summon <entity> [x y z]`, `/time dawn|sunrise|morning|noon|day|dusk|sunset|night|midnight | set <s> | add <s>` (dawn and dusk name sunrise
 and sunset, morning sits halfway between sunrise and noon),
 `/gamemode survival|creative [target]`, `/fly [on|off [target]]`, `/kill [target]`, `/locate tower` and `/op <name>`
 / `/deop <name>` (any name, online or not, `Arg.PlayerName`), all but `/help` and `/locate` operator-only. A root marked

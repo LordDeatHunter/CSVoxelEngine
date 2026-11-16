@@ -14,6 +14,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="VoxelEngine.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
         <!-- Reuses the engine headlessly: worldgen, saves, the content registry and the game
              simulation. The World runs with no GL context and no window. -->
         <ProjectReference Include="..\OpenGLTest\VoxelEngine.csproj" />

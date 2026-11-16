@@ -280,6 +280,39 @@ public sealed class CommandDispatcherTests
         Assert.Equal(DayCycle.NoonTime, _host.LightingTime);
     }
 
+    [Theory]
+    [InlineData("1.7e308", "1.7e308")]
+    [InlineData("-1.7e308", "-1.7e308")]
+    public void TimeAddOverflowIsRejectedWithoutChangingTheClockOrAnnouncing(string initial, string addition)
+    {
+        Run($"/time set {initial}");
+        var previousTime = _host.LightingTime;
+        var announcementsBeforeAdd = _host.Announced.Count;
+        var repliesBeforeAdd = _host.Replies.Count;
+
+        Run($"/time add {addition}");
+
+        var stateIsPreserved = double.IsFinite(_host.LightingTime)
+            && _host.LightingTime == previousTime
+            && _host.Announced.Count == announcementsBeforeAdd
+            && _host.Replies.Count == repliesBeforeAdd + 1
+            && _host.LastReply == "The resulting time must be finite";
+        Assert.True(stateIsPreserved,
+            $"clock={_host.LightingTime}, previous={previousTime}, announcements={_host.Announced.Count} (before {announcementsBeforeAdd}), replies={_host.Replies.Count} (before {repliesBeforeAdd}), last reply='{_host.LastReply}'");
+    }
+
+    [Fact]
+    public void TimeAddKeepsLargeFiniteSums()
+    {
+        Run("/time set 1.2e308");
+        var announcementsBeforeAdd = _host.Announced.Count;
+        Run("/time add 5e307");
+
+        Assert.Equal(1.7e308, _host.LightingTime);
+        Assert.Equal(announcementsBeforeAdd + 1, _host.Announced.Count);
+        Assert.Empty(_host.Replies);
+    }
+
     [Fact]
     public void TheNamedTimesKeepTheirOrderThroughTheDay()
     {

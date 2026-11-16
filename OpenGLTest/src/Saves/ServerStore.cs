@@ -14,8 +14,8 @@ namespace VoxelEngine.Saves;
 /// name and an address.
 /// <para>
 /// Every operation works against the file given to the constructor, so tests use a temp path and
-/// only the game uses <see cref="DefaultPath"/>. A missing or broken file lists empty with a
-/// warning rather than failing.
+/// only the game uses <see cref="DefaultPath"/>. <see cref="List"/> keeps a best-effort empty
+/// result on read failures; <see cref="TryList"/> distinguishes failures so callers can report them.
 /// </para>
 /// </summary>
 public sealed class ServerStore(string path)
@@ -37,35 +37,50 @@ public sealed class ServerStore(string path)
     /// <summary>Replaceable clock (Unix milliseconds) so tests can order servers deterministically.</summary>
     internal Func<long> Clock { get; set; } = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
+    internal Func<string, string> ReadAllText { get; set; } = File.ReadAllText;
+
     /// <summary>Every readable server, most recently connected first, ties broken by name.</summary>
     public IReadOnlyList<ServerInfo> List()
     {
-        if (!File.Exists(Path))
-            return [];
+        TryList(out var servers);
+        return servers;
+    }
 
+    /// <summary>Reads the server list, distinguishing an empty list from a root read/archive failure.</summary>
+    internal bool TryList(out IReadOnlyList<ServerInfo> servers)
+    {
         ServerDto[]? dtos;
         try
         {
-            dtos = JsonSerializer.Deserialize<ServerDto[]>(File.ReadAllText(Path), JsonOptions);
+            dtos = JsonSerializer.Deserialize<ServerDto[]>(ReadAllText(Path), JsonOptions);
+        }
+        catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
+        {
+            servers = [];
+            return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             Log.Warn($"Could not read saved servers '{Path}': {e.Message}");
-            return [];
+            servers = [];
+            return false;
         }
         catch (JsonException e)
         {
-            // The next Add/Delete writes the list back, which would turn one bad field into an
+            // The next mutation writes the list back, which would turn one bad field into an
             // empty file: set the broken file aside instead so the entries can be recovered by hand.
             Log.Warn($"Could not parse saved servers '{Path}': {e.Message}");
-            SetAsideBrokenFile();
-            return [];
+            servers = [];
+            return SetAsideBrokenFile();
         }
 
         if (dtos == null)
-            return [];
+        {
+            servers = [];
+            return true;
+        }
 
-        var servers = new List<ServerInfo>(dtos.Length);
+        var readableServers = new List<ServerInfo>(dtos.Length);
         foreach (var dto in dtos)
         {
             if (dto == null || string.IsNullOrWhiteSpace(dto.Host)
@@ -79,35 +94,37 @@ public sealed class ServerStore(string path)
             // An entry written without an id gets one derived from its address, so Delete and
             // TouchLastPlayed can match it on every List() rather than a fresh random id each time.
             var id = string.IsNullOrWhiteSpace(dto.Id) ? $"{dto.Host}:{dto.Port}" : dto.Id;
-            servers.Add(new ServerInfo(id, name, dto.Host, dto.Port, dto.LastPlayed ?? 0));
+            readableServers.Add(new ServerInfo(id, name, dto.Host, dto.Port, dto.LastPlayed ?? 0));
         }
 
-        return servers
+        servers = readableServers
             .OrderByDescending(s => s.LastPlayedUnixMs)
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+        return true;
     }
 
     /// <summary>Appends a server, its name made unique against the existing ones, and saves.</summary>
     public ServerInfo Add(string? requestedName, string host, int port)
     {
-        var name = WorldNames.Unique(requestedName, List().Select(s => s.Name));
+        var servers = ReadForMutation();
+        var name = WorldNames.Unique(requestedName, servers.Select(s => s.Name));
         var server = new ServerInfo(Guid.NewGuid().ToString("N"), name, host, port, Clock());
-        Write([.. List(), server]);
+        Write(servers.Append(server));
         return server;
     }
 
     /// <summary>Removes a server by <see cref="ServerInfo.Id"/> and saves; a missing id is a no-op.</summary>
     public void Delete(ServerInfo server)
     {
-        Write(List().Where(s => s.Id != server.Id));
+        Write(ReadForMutation().Where(s => s.Id != server.Id));
     }
 
     /// <summary>Stamps a server as connected now and saves.</summary>
     public void TouchLastPlayed(ServerInfo server)
     {
+        var servers = ReadForMutation();
         server.LastPlayedUnixMs = Clock();
-        var servers = List();
         for (var i = 0; i < servers.Count; i++)
         {
             if (servers[i].Id == server.Id)
@@ -119,16 +136,25 @@ public sealed class ServerStore(string path)
         Write(servers);
     }
 
-    private void SetAsideBrokenFile()
+    private IReadOnlyList<ServerInfo> ReadForMutation()
+    {
+        if (TryList(out var servers))
+            return servers;
+        throw new IOException($"Could not read saved servers '{Path}'.");
+    }
+
+    private bool SetAsideBrokenFile()
     {
         try
         {
             File.Move(Path, Path + ".bak", overwrite: true);
             Log.Warn($"Moved the broken servers file to '{Path}.bak'");
+            return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             Log.Warn($"Could not set aside '{Path}': {e.Message}");
+            return false;
         }
     }
 

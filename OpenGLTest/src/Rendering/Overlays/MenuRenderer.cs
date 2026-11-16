@@ -320,7 +320,7 @@ internal sealed class MenuRenderer
     private void DrawWorldsPage(MainMenuView view, Vector2 screen)
     {
         DrawListPage(view, screen, "WORLDS", MainMenuPage.Worlds, view.Worlds.Count, view.ScrollOffset,
-            "No worlds yet - create one", WorldRow);
+            view.WorldListFailed ? "World list could not be read" : "No worlds yet - create one", WorldRow);
 
         DrawBottomPair(screen, "CREATE");
     }
@@ -329,7 +329,9 @@ internal sealed class MenuRenderer
     private void DrawMultiplayerPage(MainMenuView view, Vector2 screen)
     {
         DrawListPage(view, screen, "MULTIPLAYER", MainMenuPage.Multiplayer, view.Servers.Count,
-            view.ServerScrollOffset, "No servers yet - add one", ServerRow);
+            view.ServerScrollOffset,
+            view.ServerListFailed ? "Server list unavailable" : "No servers yet - add one",
+            ServerRow);
         DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 0), MainMenuLayout.QuadButtonSize, "ADD SERVER");
         DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 1), MainMenuLayout.QuadButtonSize, "DIRECT CONNECT");
         DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 2), MainMenuLayout.QuadButtonSize, "HOST");
@@ -341,7 +343,7 @@ internal sealed class MenuRenderer
     private void DrawHostPage(MainMenuView view, Vector2 screen, float time)
     {
         DrawListPage(view, screen, "HOST A WORLD", MainMenuPage.Host, view.Worlds.Count, view.ScrollOffset,
-            "No worlds yet - make a new one", HostRow);
+            view.WorldListFailed ? "World list could not be read" : "No worlds yet - make a new one", HostRow);
 
         var portCenter = MainMenuLayout.PortFieldCenter(screen);
         _ui.DrawTextCenteredY("PORT", MainMenuLayout.PortLabelLeft(screen), portCenter.Y, _ui.CountScale, TextDim);

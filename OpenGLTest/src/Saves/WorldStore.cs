@@ -51,35 +51,49 @@ public sealed class WorldStore(string root)
     /// <summary>Replaceable clock (Unix milliseconds) so tests can order worlds deterministically.</summary>
     internal Func<long> Clock { get; set; } = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-    /// <summary>Every readable world, most recently played first, ties broken by name.
-    /// An absent root lists empty.</summary>
+    internal Func<string, string[]> EnumerateDirectories { get; set; } = Directory.GetDirectories;
+
+    /// <summary>Every readable world, most recently played first, ties broken by name. An absent or
+    /// unreadable root lists empty; use <see cref="TryList"/> to distinguish those results.</summary>
     public IReadOnlyList<WorldInfo> List()
     {
-        if (!Directory.Exists(Root))
-            return [];
+        TryList(out var worlds);
+        return worlds;
+    }
 
+    /// <summary>Lists readable worlds and reports root enumeration failures separately from an empty or absent root.
+    /// Broken individual world folders remain skipped.</summary>
+    public bool TryList(out IReadOnlyList<WorldInfo> worlds)
+    {
         string[] folders;
         try
         {
-            folders = Directory.GetDirectories(Root);
+            folders = EnumerateDirectories(Root);
+        }
+        catch (DirectoryNotFoundException)
+        {
+            worlds = [];
+            return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             Log.Warn($"Could not list saved worlds in '{Root}': {e.Message}");
-            return [];
+            worlds = [];
+            return false;
         }
 
-        var worlds = new List<WorldInfo>(folders.Length);
+        var readableWorlds = new List<WorldInfo>(folders.Length);
         foreach (var folder in folders)
         {
             if (TryRead(folder) is { } world)
-                worlds.Add(world);
+                readableWorlds.Add(world);
         }
 
-        return worlds
+        worlds = readableWorlds
             .OrderByDescending(w => w.LastPlayedUnixMs)
             .ThenBy(w => w.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+        return true;
     }
 
     /// <summary>Creates a new world folder with its chunks subfolder and metadata. The name is

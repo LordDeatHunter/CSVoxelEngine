@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using VoxelEngine.UI.InventoryPanel;
 using Xunit;
@@ -8,6 +9,66 @@ namespace VoxelEngine.Tests.UI.InventoryPanel;
 public sealed class InventoryTests
 {
     public InventoryTests() => TestContent.EnsureLoaded();
+
+    [Theory]
+    [InlineData(true, "stone", "dirt")]
+    [InlineData(false, "flint", "vine")]
+    [InlineData(false, "bucket", "water_bucket")]
+    [InlineData(false, "leather_cap", "leather_tunic")]
+    public void ARefusedFreshItemIsNotMarkedObtained(bool isBlock, string fullItem, string refusedItem)
+    {
+        var inventory = Inventory.Empty();
+        var fullId = Collectable(isBlock, fullItem);
+        var refusedId = Collectable(isBlock, refusedItem);
+        var category = Inventory.CategoryOf(fullId);
+        Assert.NotNull(category);
+        Assert.Equal(category, Inventory.CategoryOf(refusedId));
+        Assert.NotEqual(fullId, refusedId);
+        Assert.True(inventory.Add(fullId, Inventory.CapacityOf(category.Value)));
+        Assert.Equal(Inventory.CapacityOf(category.Value), inventory.UsedOf(category.Value));
+
+        var gained = new List<ushort>();
+        inventory.Gained += gained.Add;
+        Assert.False(inventory.Knows(refusedId));
+        Assert.Equal(0, inventory.CountFor(refusedId));
+
+        Assert.False(inventory.Add(refusedId));
+
+        Assert.False(inventory.Knows(refusedId));
+        Assert.Equal(0, inventory.CountFor(refusedId));
+        Assert.Equal(Inventory.CapacityOf(category.Value), inventory.UsedOf(category.Value));
+        Assert.DoesNotContain(refusedId, gained);
+        Assert.DoesNotContain(Enumerable.Range(0, Inventory.SlotCount), slot => inventory.IdAt(slot) == refusedId);
+    }
+
+    [Fact]
+    public void APartialAcquisitionIsKnownBeforeItsGainEventAndRemainsKnownAfterSpending()
+    {
+        var inventory = Inventory.Empty();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var dirt = ContentRegistry.RequireBlock("dirt").Id;
+        Assert.True(inventory.Add(stone, Inventory.BlockCapacity - 1));
+        var knownWhenGained = false;
+        var countWhenGained = 0;
+        inventory.Gained += id =>
+        {
+            if (id != dirt) return;
+            knownWhenGained = inventory.Knows(id);
+            countWhenGained = inventory.CountFor(id);
+        };
+
+        Assert.True(inventory.Add(dirt, 5));
+
+        Assert.Equal(1, inventory.CountFor(dirt));
+        Assert.True(knownWhenGained);
+        Assert.Equal(1, countWhenGained);
+        Assert.True(inventory.RemoveAll(dirt));
+        Assert.Equal(0, inventory.CountFor(dirt));
+        Assert.True(inventory.Knows(dirt));
+    }
+
+    private static ushort Collectable(bool isBlock, string name) =>
+        isBlock ? ContentRegistry.RequireBlock(name).Id : ContentRegistry.RequireItem(name).Id;
 
     [Fact]
     public void BlocksShareOnePoolAcrossIds()

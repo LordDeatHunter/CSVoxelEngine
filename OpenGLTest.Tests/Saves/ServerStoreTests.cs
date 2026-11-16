@@ -19,14 +19,37 @@ public sealed class ServerStoreTests : IDisposable
 
     public void Dispose()
     {
+        if (File.Exists(_path + ".tmp"))
+            File.Delete(_path + ".tmp");
         if (File.Exists(_path))
             File.Delete(_path);
+        if (Directory.Exists(_path + ".bak"))
+            Directory.Delete(_path + ".bak", recursive: true);
+        else if (File.Exists(_path + ".bak"))
+            File.Delete(_path + ".bak");
     }
 
     [Fact]
     public void AbsentFileListsEmpty()
     {
         Assert.Empty(new ServerStore(_path).List());
+    }
+
+    [Fact]
+    public void MissingFileIsASuccessfulEmptyRead()
+    {
+        Assert.True(_store.TryList(out var servers));
+        Assert.Empty(servers);
+    }
+
+    [Fact]
+    public void ListKeepsItsBestEffortEmptyResultOnReadFailure()
+    {
+        _store.ReadAllText = _ => throw new IOException("injected server-list read failure");
+
+        Assert.False(_store.TryList(out var statusServers));
+        Assert.Empty(statusServers);
+        Assert.Empty(_store.List());
     }
 
     [Fact]
@@ -131,6 +154,71 @@ public sealed class ServerStoreTests : IDisposable
         Assert.Equal("New", only.Name);
     }
 
+    [Theory]
+    [InlineData("add", false)]
+    [InlineData("delete", false)]
+    [InlineData("touch", false)]
+    [InlineData("add", true)]
+    [InlineData("delete", true)]
+    [InlineData("touch", true)]
+    public void ReadFailureDoesNotReplaceSavedBytes(string mutation, bool unauthorized)
+    {
+        var server = _store.Add("Keep", "10.0.0.1", 25566);
+        var original = File.ReadAllBytes(_path);
+        var originalLastPlayed = server.LastPlayedUnixMs;
+        _store.ReadAllText = _ =>
+        {
+            if (unauthorized)
+                throw new UnauthorizedAccessException("injected server-list read failure");
+            throw new IOException("injected server-list read failure");
+        };
+
+        Exception? failure = null;
+        try
+        {
+            Mutate(mutation, server);
+        }
+        catch (Exception e)
+        {
+            failure = e;
+        }
+
+        var after = File.ReadAllBytes(_path);
+        var bytesUnchanged = original.SequenceEqual(after);
+        var timestampUnchanged = mutation != "touch" || server.LastPlayedUnixMs == originalLastPlayed;
+        Assert.True(failure is IOException && bytesUnchanged && timestampUnchanged,
+            $"exception={failure?.GetType().Name ?? "none"}; bytesUnchanged={bytesUnchanged}; " +
+            $"beforeLength={original.Length}; afterLength={after.Length}; timestampUnchanged={timestampUnchanged}");
+    }
+
+    [Theory]
+    [InlineData("add")]
+    [InlineData("delete")]
+    [InlineData("touch")]
+    public void FailedBrokenFileArchiveDoesNotReplaceSavedBytes(string mutation)
+    {
+        var server = _store.Add("Keep", "10.0.0.1", 25566);
+        var original = System.Text.Encoding.UTF8.GetBytes("[{ broken server list bytes");
+        File.WriteAllBytes(_path, original);
+        Directory.CreateDirectory(_path + ".bak");
+
+        Exception? failure = null;
+        try
+        {
+            Mutate(mutation, server);
+        }
+        catch (Exception e)
+        {
+            failure = e;
+        }
+
+        var after = File.ReadAllBytes(_path);
+        var bytesUnchanged = original.SequenceEqual(after);
+        Assert.True(failure is IOException && bytesUnchanged,
+            $"exception={failure?.GetType().Name ?? "none"}; bytesUnchanged={bytesUnchanged}; " +
+            $"beforeLength={original.Length}; afterLength={after.Length}");
+    }
+
     [Fact]
     public void OddEntriesNeverThrowAndAnIdlessEntryStaysDeletable()
     {
@@ -140,5 +228,23 @@ public sealed class ServerStoreTests : IDisposable
 
         _store.Delete(old);
         Assert.Empty(_store.List());
+    }
+
+    private void Mutate(string mutation, ServerInfo server)
+    {
+        switch (mutation)
+        {
+            case "add":
+                _store.Add("New", "10.0.0.2", 25567);
+                break;
+            case "delete":
+                _store.Delete(server);
+                break;
+            case "touch":
+                _store.TouchLastPlayed(server);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mutation), mutation, "Unknown mutation.");
+        }
     }
 }
