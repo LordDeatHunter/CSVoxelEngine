@@ -32,15 +32,20 @@ public sealed class MeshingTests
     [Fact]
     public void SharedFaceIsCulledBetweenCubes()
     {
-        // High above the terrain so sunlight is uniform: the two cubes' shared face is culled
+        // Under a complete roof so light is uniform: the two cubes' shared face is culled
         // and the greedy pass merges the remaining coplanar pairs (+-Y, +-Z) into six quads
-        var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
+        var (manager, center) = MeshTestWorld.DarkRoofArea(MeshTestWorld.HighAbove);
         var stone = ContentRegistry.RequireBlock("stone").Id;
         center.SetBlockRaw(8, 8, 8, stone, 0);
         center.SetBlockRaw(9, 8, 8, stone, 0);
 
         var mesh = center.GenerateMeshData(manager);
         Assert.NotNull(mesh);
+        Assert.All(mesh.Vertices, vertex =>
+        {
+            Assert.Equal((byte)0, vertex.Sun);
+            Assert.Equal((byte)0, vertex.Block);
+        });
         Assert.Equal(24, mesh.Vertices.Count);
         Assert.Equal(36, mesh.Indices.Count);
 
