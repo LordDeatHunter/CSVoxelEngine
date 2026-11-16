@@ -185,6 +185,13 @@ public sealed record BlockType
     /// <see cref="SfxLibrary.DefaultGroup"/>.</summary>
     public string Sfx { get; init; } = SfxLibrary.DefaultGroup;
 
+    /// <summary>Sound group of the footstep an entity walking over this block makes, null for silence
+    /// (see <see cref="Footsteps"/>).</summary>
+    public string? StepSfx { get; init; }
+
+    /// <summary>The footstep group of a block id, null for air, an unknown id or a silent block.</summary>
+    public static string? StepSfxOf(ushort blockId) => ById[blockId]?.StepSfx;
+
     /// <summary>Damage this block takes before breaking; one hit deals the held tool's power.</summary>
     public float Hardness { get; init; } = DefaultHardness;
 

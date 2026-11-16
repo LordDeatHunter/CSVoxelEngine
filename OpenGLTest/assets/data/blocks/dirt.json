@@ -1,5 +1,6 @@
 {
   "sfx": "hit_grass",
+  "stepSfx": "step_grass",
   "name": "Dirt",
   "model": { "parent": "block/cube_all", "textures": { "all": "dirt" } },
   "footstepDust": true

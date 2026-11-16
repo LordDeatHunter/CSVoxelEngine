@@ -1,5 +1,6 @@
 {
   "sfx": "hit_grass",
+  "stepSfx": "step_grass",
   // Hell ash (plans/LAYERS.md L-8): the Ashlands floor surface and the top of its dry pools.
   // Plain solid (not a falls block), loose underfoot. Tile is committed art.
   "name": "Ash",

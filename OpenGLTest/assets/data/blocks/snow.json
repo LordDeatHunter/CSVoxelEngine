@@ -1,5 +1,6 @@
 {
   "sfx": "hit_snow",
+  "stepSfx": "step_snow",
   "name": "Snow",
   "model": { "parent": "block/cube_all", "textures": { "all": "snow" } },
   "hardness": 1,

@@ -298,6 +298,8 @@ public abstract class RiggedMob : Mob
         }
 
         ApplyPhysics(deltaTime, chunks);
+        if (IsGrounded && !_inWater)
+            NoteWalked(MathF.Sqrt(_velocity.X * _velocity.X + _velocity.Z * _velocity.Z) * deltaTime);
 
         Animation.Update(deltaTime, LocomotionSpeed);
 

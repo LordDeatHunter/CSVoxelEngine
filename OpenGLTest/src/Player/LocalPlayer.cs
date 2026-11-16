@@ -349,7 +349,10 @@ internal sealed class LocalPlayer
         Camera.ThrowCharge = Player.ThrowCharge ?? Player.BowCharge;
         // The dust a landing or a sprinting footfall kicks up: cosmetic, so a headless server spawns none
         if (!_serverMode)
+        {
             _dust.UpdatePlayer(Camera, Player.WalkPhase, horizontalSpeed, chunkManager, _debris);
+            _world.Footsteps.UpdatePlayer(Camera, Player.WalkPhase, horizontalSpeed, chunkManager, _world.Sounds);
+        }
     }
 
     private int _lastSwimStrokes;

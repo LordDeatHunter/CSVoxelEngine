@@ -308,6 +308,8 @@ overshoot or jiggle.
   with `BiomeTint.VertexTint` of the mean opaque skin color (`LandingDust.SkinColor`). Sprinting
   on foot over a `footstepDust` block (grounded, not sneaking, not in water, really moving) puffs once
   per foot strike of the gait: `PlayerModel.WalkPhase` crossing π/2 + kπ (`FootstepDust.FootfallsBetween`).
+  The same footfalls (and a walking mob's every `AudioConfig.MobStrideBlocks`) play a quiet step sound of the
+  block's `stepSfx` group (`Footsteps`).
 - **World-event effects** (cosmetic: singleplayer and a client, never a headless server). A TNT blast
   shakes the local camera (`AmbientEffects.ShakeForBlast`): `ShakeFalloff.Trauma` is `BlastShakeStrength` inside
   `TntManager.BlastRadius`, falls off as radius / distance and eases to zero at `BlastShakeRangeBlocks`,

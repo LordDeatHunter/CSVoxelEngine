@@ -22,6 +22,12 @@ public static class AudioConfig
     // Peak volume of one-shot gameplay sfx (block hits, pickups) mixed by SfxManager
     public const float SfxVolume = 0.7f;
 
+    // Footsteps (Footsteps, FootstepSfx): the distance a walking mob covers per footfall, the speed
+    // below which a body is not walking, and how far from the listener a mob's step is still sounded
+    public const float MobStrideBlocks = 1.1f;
+    public const float FootstepMinSpeed = 1f;
+    public const float MobFootstepRangeBlocks = 14f;
+
     // --- Positional sfx (SpatialVoices, SoundFalloff) ---
     // A sound in the world plays at full volume within this many blocks of the listener's eye...
     public const float SfxFullVolumeBlocks = 3f;

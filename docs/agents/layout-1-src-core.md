@@ -67,6 +67,9 @@ OpenGLTest/
       SfxMixer.cs              # mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline
       SoundFalloff.cs          # GL-free: a positional sound's distance gain and the earshot a server sends within
       SpatialVoices.cs         # the pool of OpenAL 3D sources positional one-shots play on (oldest taken when full)
+      FootstepSfx.cs           # GL-free footstep rules: when a footfall is audible, the mob stride accumulator
+      Footsteps.cs             # plays the block-underfoot step group at the player's gait footfalls and each walking
+                               #   mob's (Mob.TryTakeFootfall); raises FootfallTaken for anything following the steps
       WorldSounds.cs           # where a World's components send sounds (SoundEvent): played here, or on a server
                                #   queued for the players in earshot (see "World sounds")
     Chunks/                    # chunk storage and lifecycle, the column cache and column terrain, the light

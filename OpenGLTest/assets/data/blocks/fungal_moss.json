@@ -1,5 +1,6 @@
 {
   "sfx": "hit_grass",
+  "stepSfx": "step_grass",
   // The Fungal Grove floor surface and the top of its dry pools. Tile from
   // committed art.
   "name": "Fungal Moss",

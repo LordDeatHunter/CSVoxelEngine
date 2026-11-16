@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Particles;
 using VoxelEngine.Status;
@@ -163,6 +164,28 @@ public abstract class Mob
         fallBlocks = LandingDust.FallFromImpactSpeed(_landingSpeed, _landingGravity);
         _landingSpeed = 0f;
         return impactSpeed > 0f;
+    }
+
+    private float _strideWalked;
+    private bool _footfall;
+
+    /// <summary>
+    /// Records that the body just walked <paramref name="walked"/> blocks on the ground; a whole stride
+    /// (<see cref="FootstepSfx.Stride"/>) notes a footfall for the owner's step sound to take
+    /// (<see cref="TryTakeFootfall"/>). Cosmetic only.
+    /// </summary>
+    protected void NoteWalked(float walked)
+    {
+        if (FootstepSfx.Stride(ref _strideWalked, walked)) _footfall = true;
+    }
+
+    /// <summary>True once per footfall noted since the last take. A world that sounds no steps never
+    /// takes, which leaves one flag standing.</summary>
+    public bool TryTakeFootfall()
+    {
+        var taken = _footfall;
+        _footfall = false;
+        return taken;
     }
 
     private readonly MobInterest _interest = new();

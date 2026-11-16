@@ -1,5 +1,6 @@
 {
   "sfx": "hit_grass",
+  "stepSfx": "step_grass",
   // The frosted turf topping the frost highland's sky islands (SkyBiomes): rimed grass over
   // permafrost. Tiles are committed art; the bottom is the permafrost tile.
   "name": "Frosted Turf",

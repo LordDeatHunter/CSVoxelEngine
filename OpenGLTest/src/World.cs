@@ -98,6 +98,9 @@ public class World
     private readonly LeafParticleSystem _leaves = new();
     private readonly BlockDebrisSystem _debris = new();
     private readonly GroundDust _dust = new();
+
+    /// <summary>The subtle footsteps of the player and the walking mobs.</summary>
+    internal Footsteps Footsteps { get; } = new();
     private readonly CampfireManager _campfires = new();
     private readonly QuernManager _querns = new();
     private readonly ChestManager _chests = new();
@@ -1308,6 +1311,8 @@ public class World
         // this frame is never hit by a projectile or drawn a healthbar.
         Director.RefreshMobs();
         MobSeparation.Separate(_mobs, _chunkManager);
+        // A walking mob's footfall sounds on the block under it (a server queues it for the players near)
+        Footsteps.TakeMobFootfalls(_mobs, _chunkManager, Sounds, _serverMode ? null : Camera.Position);
         // A mob that landed this frame kicks up its dust and an affected mob sheds its effects'
         // particles; a server spawns no particles
         if (!_serverMode)

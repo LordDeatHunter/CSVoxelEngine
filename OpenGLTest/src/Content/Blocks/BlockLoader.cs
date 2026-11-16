@@ -154,6 +154,7 @@ internal static class BlockLoader
             DisplayName = definition.Name ?? name,
             Id = id,
             Sfx = ResolveSfx(path, definition.Sfx),
+            StepSfx = ResolveStepSfx(path, definition.StepSfx),
             Hardness = hardness,
             RequiresTool = requiresTool,
             Tools = tools,
@@ -303,6 +304,16 @@ internal static class BlockLoader
 
         Log.Warn($"Block '{path}' names sfx group '{name}', which has no .wav files under assets/sfx; using '{SfxLibrary.DefaultGroup}'.");
         return SfxLibrary.DefaultGroup;
+    }
+
+    // A step sound is optional and non-fatal like the hit one: unset or unknown is silence
+    internal static string? ResolveStepSfx(string path, string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        if (ContentRegistry.SfxGroups.ContainsKey(name)) return name;
+
+        Log.Warn($"Block '{path}' names step sfx group '{name}', which has no .wav files under assets/sfx; it stays silent.");
+        return null;
     }
 
     private static BlockModel ResolveModel(JsonElement model, string path)

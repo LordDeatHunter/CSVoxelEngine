@@ -454,6 +454,13 @@ public sealed class BlockDefinition
     public string? Sfx { get; set; }
 
     /// <summary>
+    /// Sound group of the subtle footstep an entity walking on top of this block makes (see
+    /// <see cref="Footsteps"/>), e.g. <c>step_grass</c>. Null or unset is silent; an unknown group
+    /// warns and is silent.
+    /// </summary>
+    public string? StepSfx { get; set; }
+
+    /// <summary>
     /// How reflective the block's surface is. Omitting the whole object (every block but the
     /// ores) leaves it perfectly diffuse and costs nothing at render time: the fragment shader
     /// branches on metallic being positive, and that branch is uniform across a quad.

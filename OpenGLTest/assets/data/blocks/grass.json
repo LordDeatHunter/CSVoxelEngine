@@ -1,5 +1,6 @@
 {
   "sfx": "hit_grass",
+  "stepSfx": "step_grass",
   "name": "Grass",
   "model": {
     "parent": "block/cube_bottom_top",
