@@ -30,8 +30,15 @@ public static class PlayerSaveCodec
 
     /// <summary>The parsed file, or null for no file, the JSON <c>null</c> literal or anything
     /// that is not valid JSON of this shape (logged as a warning).</summary>
-    public static PlayerSaveData? TryParse(byte[]? bytes)
+    public static PlayerSaveData? TryParse(byte[]? bytes) => TryParse(bytes, out _);
+
+    /// <summary>
+    /// Parses player bytes and reports only a <see cref="JsonException"/> rejection. Missing bytes
+    /// and a valid JSON <c>null</c> still return null without setting <paramref name="rejectedJson"/>.
+    /// </summary>
+    public static PlayerSaveData? TryParse(byte[]? bytes, out bool rejectedJson)
     {
+        rejectedJson = false;
         if (bytes == null)
             return null;
         try
@@ -40,6 +47,7 @@ public static class PlayerSaveCodec
         }
         catch (JsonException e)
         {
+            rejectedJson = true;
             Log.Warn($"Player save: ignoring {FileName}: {e.Message}");
             return null;
         }

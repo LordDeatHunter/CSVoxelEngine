@@ -165,7 +165,9 @@ pure function of the seed: only **deltas** and the seed are written.
 - **Autosave** (`WorldPersistence.Autosave`) runs every `AutosaveIntervalSeconds` (at most `MaxAutosaveSnapshotsPerCall`
   snapshots a call, the rest on following frames) after the fluid tick, under the one `save`
   profiler row, which is entered nowhere else.
-- **Player and entities.** `player.json` never stores a position before the spawn settled, so a
+- **Player and entities.** A malformed `player.json` or hosted `players/<slug>.json` is marked for
+  `.bad` preservation before a later fallback save replaces it; a missing file, JSON `null`, or a
+  valid partial object is not treated as malformed. The player file never stores a position before the spawn settled, so a
   world closed mid-load searches the surface again next time. Saved mobs and drops are spawned
   once loading finishes, each only when its chunk is loaded; a restore is a forced spawn, so it
   may pass the natural mob cap but a mob waits while the hard cap (`MobHardCap`, which sizes the

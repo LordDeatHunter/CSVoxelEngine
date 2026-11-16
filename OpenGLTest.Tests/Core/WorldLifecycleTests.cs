@@ -875,6 +875,24 @@ public sealed class WorldLifecycleTests : IDisposable
     }
 
     [Fact]
+    public void ACorruptPlayerFileIsPreservedWhenTheWorldWritesItsFallback()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        Directory.CreateDirectory(_dir);
+        var file = Path.Combine(_dir, PlayerSaveCodec.FileName);
+        byte[] original = "{\"Position\":["u8.ToArray();
+        File.WriteAllBytes(file, original);
+
+        var world = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(world.SaveAndDispose());
+
+        var backup = file + ".bad";
+        Assert.True(File.Exists(backup), "a rejected player file should be archived before the fallback save");
+        Assert.Equal(original, File.ReadAllBytes(backup));
+        Assert.NotNull(PlayerSaveCodec.TryParse(File.ReadAllBytes(file)));
+    }
+
+    [Fact]
     public void UnknownEntityNamesAreDroppedWithoutFailingTheLoad()
     {
         WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
