@@ -205,6 +205,16 @@ internal static class BlockSchemaParser
                ?? throw new InvalidOperationException($"Block '{path}' declares an open object without a hitbox.");
     }
 
+    /// <summary>Reads <c>open.hinge</c>: whether the block is side-hinged (<c>"side"</c>, a door). Anything else
+    /// but an omitted field throws naming the file.</summary>
+    internal static bool ParseSideHinged(BlockDefinition definition, string path) => definition.Open?.Hinge switch
+    {
+        null => false,
+        "side" => true,
+        var other => throw new InvalidOperationException(
+            $"Block '{path}' has open.hinge \"{other}\"; the only hinge is \"side\"."),
+    };
+
     /// <summary>
     /// Reads a multiblock anchor's <c>multiblock.size</c>, the edge length of its cubic volume in
     /// cells: <see cref="MultiblockShape.DefaultSize"/> when omitted, and anything outside

@@ -31,7 +31,9 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       Combat.cs                # GL-free punch rules: the forward cone (3 blocks, 30° half-angle)
                                #   and entity damage, shared by the punch loop and the tests
       DoorState.cs             # GL-free state byte of an openable block: facing in bits 0-1, the
-                               #   open bit 2, the index into its eight pre-turned shapes
+                               #   open bit 2, a side-hinged block's hinge bit 3, the shape counts
+      DoubleDoor.cs            # GL-free double-door rules: a door's latch side, its partner (same facing,
+                               #   opposite hinge, read off the state bytes) and the state a placed door starts with
       LeftClickAction.cs       # World component: the crosshair target, mining (UpdateBlockBreaking), punch and
                                #   slice, the look-at label and crosshair state
       Mining.cs                # GL-free mining rules: the tools/requiresTool gate, block damage per

@@ -50,9 +50,9 @@ public sealed class OpenableTests : IDisposable
         {
             var state = DoorState.Encode(facing, open);
             Assert.Equal((facing, open), (DoorState.Facing(state), DoorState.IsOpen(state)));
-            var toggled = DoorState.Toggle(state);
+            var toggled = DoorState.WithOpen(state, !open);
             Assert.Equal((facing, !open), (DoorState.Facing(toggled), DoorState.IsOpen(toggled)));
-            Assert.Equal(state, DoorState.Toggle(toggled));
+            Assert.Equal(state, DoorState.WithOpen(toggled, open));
 
             // Eight shapes: the facing, plus four when open; a four-shape block reads the facing only
             Assert.Equal(facing + (open ? 4 : 0), BlockType.ShapeIndex(state, DoorState.ShapeCount));
@@ -67,8 +67,10 @@ public sealed class OpenableTests : IDisposable
         Assert.NotEmpty(openable);
         foreach (var type in openable)
         {
-            Assert.Equal(DoorState.ShapeCount, type.RotatedModels!.Length);
-            Assert.Equal(DoorState.ShapeCount, type.RotatedHitboxes!.Length);
+            // A side-hinged block holds the same eight again, mirrored for a right-hand hinge
+            var shapes = type.SideHinged ? DoorState.HingedShapeCount : DoorState.ShapeCount;
+            Assert.Equal(shapes, type.RotatedModels!.Length);
+            Assert.Equal(shapes, type.RotatedHitboxes!.Length);
             for (var facing = 0; facing < 4; facing++)
             {
                 var closed = Bounds(type.RotatedHitboxes[BlockType.ShapeIndex(DoorState.Encode(facing, false), 8)]);

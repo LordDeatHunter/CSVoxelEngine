@@ -278,6 +278,10 @@ internal sealed class BlockPlacer
         // A placed leaf is decoration, not canopy: persistent, so no missing tip ever decays it
         if (TreeGenerator.IsLeaf(blockId) && state == 0) state = LeafState.Encode(0, persistent: true);
 
+        // A door set beside a single door's free edge hangs mirrored, so the two make a double door
+        if (BlockType.ById[blockId] is { SideHinged: true })
+            state = DoubleDoor.PlacedState(_chunkManager, placePos, DoorState.Facing(state));
+
         // A door needs the cell above free for its upper half too, or nothing is placed or spent
         var upperId = BlockType.ById[blockId]?.UpperHalfId ?? 0;
         if (upperId != 0 && !CanPlaceUpperHalf(placePos + Vector3.UnitY, upperId)) return false;

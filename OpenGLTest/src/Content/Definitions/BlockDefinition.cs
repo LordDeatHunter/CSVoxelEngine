@@ -514,9 +514,14 @@ public sealed class BlockDefinition
     }
 
     /// <summary>The <c>"open"</c> object: what an openable block looks like and is hit as while
-    /// open. Both fields are required.</summary>
+    /// open. The model and the hitbox are required.</summary>
     public sealed class OpenDefinition
     {
+        /// <summary><c>"side"</c> for a block that swings about a vertical hinge on its left-hand edge (a door): it
+        /// may hang mirrored on its right-hand edge instead, pairs with a mirrored neighbor into a double door and
+        /// swings smoothly (<see cref="BlockType.SideHinged"/>). Omitted for a block that only flips (a trapdoor).</summary>
+        public string? Hinge { get; set; }
+
         /// <summary>The open model: a model file name or an inline model object, facing north.</summary>
         public JsonElement Model { get; set; }
 

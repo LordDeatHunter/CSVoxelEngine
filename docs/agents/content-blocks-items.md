@@ -294,10 +294,20 @@ the upper half with the same state (`PlaceUpperHalf`, with the fluid, leaf-decay
 `BlockEdited` hooks); `BlockEditor.RemoveBlock` hands either half to `RemoveTallBlock`, which drops the
 lower half once and clears the partner through the hooks mining runs (fluid, leaf decay, far LOD,
 `PopUnsupportedAround`, a falls block above it, `BlockEdited`), the multiblock revert in
-miniature; `BlockInteractions.TryToggleOpenable` writes the clicked half's new state to its partner too. A blast
+miniature; `BlockInteractions.TryToggleOpenable` writes the clicked half's new state to its partner too. Both
+halves set `"hinge": "side"` in their `open` object (`BlockType.SideHinged`): the state byte's bit 3
+(`DoorState.HingeRightBit`) hangs the door on its right-hand edge, drawn and hit with the X-mirrored models and boxes
+that follow the plain eight (`HorizontalFacing.MirrorModel`/`MirrorBoxes`, sixteen shapes). `DoubleDoor` (GL-free)
+owns the **double door**: a door's latch side is the cell beside its free edge, and two doors are a pair when each
+stands on the other's latch side with the same facing and opposite hinges; nothing is stored, the pair is read off
+the state bytes, so breaking one leaves a working single door. `BlockPlacer.PlaceBlockAtFace` asks
+`DoubleDoor.PlacedState`: a door placed on a single same-facing door's latch side takes the opposite hinge and that
+door's open bit; beside its hinge, beside a door facing another way or beside an already paired door it is a plain
+left-hinged door. The toggle writes the new open bit to all four cells of a pair, each keeping its own hinge. A blast
 clears cells without these hooks, so it can leave one half standing (like a multiblock without
 a sweep); breaking that orphan drops the door as usual. The door's pull sits on the center line because of the mirrored uv.
-`DoorTests` covers placement, the two-cell refusal, breaking either half and the shared toggle;
+`DoorTests` covers placement, the two-cell refusal, breaking either half, the shared toggle and the double door (the
+mirrored second door, the placements that stay plain, the four-cell toggle, the mirrored shapes);
 `doors.json` shoots two doors, one clicked open.
 
 **Stone bricks** (`stone_bricks`, four from four stone) are a plain `cube_all` building block on

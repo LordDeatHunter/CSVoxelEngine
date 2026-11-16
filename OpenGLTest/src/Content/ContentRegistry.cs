@@ -280,19 +280,21 @@ public static class ContentRegistry
                     type.RotatedModels = HorizontalFacing.WithUpright(type.RotatedModels);
 
                 // An openable block's open model follows its four closed ones, indexed by the
-                // state byte's open bit beside the facing (DoorState.ShapeIndex)
+                // state byte's open bit beside the facing (DoorState.OpenBit)
                 if (type.Openable)
                 {
                     var open = ModelBakeSteps.BakeOpenModel(type, OpenModels[id]);
                     ModelBakeSteps.ValidateFacingBake(type, open);
-                    type.RotatedModels =
-                    [
-                        .. type.RotatedModels,
-                        open,
-                        HorizontalFacing.RotateModel(open, 1, 1f),
-                        HorizontalFacing.RotateModel(open, 2, 1f),
-                        HorizontalFacing.RotateModel(open, 3, 1f),
-                    ];
+                    type.RotatedModels = [.. type.RotatedModels, .. HorizontalFacing.RotateModels(open)];
+                    // A side-hinged block's mirrored closed and open models follow those, picked by
+                    // the hinge bit (DoorState.HingeRightBit)
+                    if (type.SideHinged)
+                        type.RotatedModels =
+                        [
+                            .. type.RotatedModels,
+                            .. HorizontalFacing.RotateModels(HorizontalFacing.MirrorModel(baked)),
+                            .. HorizontalFacing.RotateModels(HorizontalFacing.MirrorModel(open)),
+                        ];
                 }
             }
 

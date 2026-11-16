@@ -81,6 +81,48 @@ public static class HorizontalFacing
         return model with { Quads = quads };
     }
 
+    /// <summary>A single-cell model turned to each of the four facings, indexed by facing (<c>[0]</c> is the
+    /// authored model itself).</summary>
+    public static BakedModel[] RotateModels(BakedModel model) =>
+        [model, RotateModel(model, 1, 1f), RotateModel(model, 2, 1f), RotateModel(model, 3, 1f)];
+
+    /// <summary>
+    /// A single-cell model authored facing north, mirrored left to right (x to 1 - x): the shape of a side-hinged
+    /// block hung on its other edge (<see cref="Interaction.DoorState.HingeRightBit"/>). The corners are listed in
+    /// reverse so the quad still winds outward, each keeping its uv, so the texture mirrors with the shape; like
+    /// <see cref="RotateModel"/>, every output quad shades flat.
+    /// </summary>
+    public static BakedModel MirrorModel(BakedModel model)
+    {
+        var quads = new BakedQuad[model.Quads.Length];
+        for (var i = 0; i < quads.Length; i++)
+        {
+            var quad = model.Quads[i];
+            var normal = quad.Normal with { X = -quad.Normal.X };
+            quads[i] = quad with
+            {
+                Positions = [.. Enumerable.Reverse(quad.Positions).Select(p => p with { X = 1f - p.X })],
+                Uvs = [.. Enumerable.Reverse(quad.Uvs)],
+                Normal = normal,
+                Face = ModelBaker.DominantFace(normal),
+                CullFace = MirrorFace(quad.CullFace),
+                IsFullFace = false,
+            };
+        }
+
+        return model with { Quads = quads };
+    }
+
+    // West and east (engine faces 2 and 3) trade places under the mirror; every other side stays
+    private static int MirrorFace(int face) => face is 2 or 3 ? face ^ 1 : face;
+
+    /// <summary>Cell-local boxes mirrored left to right like <see cref="MirrorModel"/>.</summary>
+    public static BlockHitbox[] MirrorBoxes(BlockHitbox[] boxes) =>
+    [
+        .. boxes.Select(box => new BlockHitbox(
+            box.Min with { X = 1f - box.Max.X }, box.Max with { X = 1f - box.Min.X })),
+    ];
+
     /// <summary>A cell-local box (size 1) turned to <paramref name="facing"/>: both corners turn,
     /// and the result is re-sorted into a min and a max corner.</summary>
     public static BlockHitbox RotateBox(BlockHitbox box, int facing)

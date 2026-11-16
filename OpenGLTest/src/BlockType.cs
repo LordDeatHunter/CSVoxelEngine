@@ -498,8 +498,14 @@ public sealed record BlockType
     /// <summary>Whether right-click opens and closes this block (a trapdoor, a door half): its
     /// state byte carries <see cref="DoorState.OpenBit"/> beside the facing, and
     /// <see cref="RotatedModels"/> / <see cref="RotatedHitboxes"/> hold eight shapes, indexed by
-    /// <see cref="DoorState.ShapeIndex"/>.</summary>
+    /// <see cref="ShapeIndex"/>.</summary>
     public bool Openable { get; init; }
+
+    /// <summary>Whether this <see cref="Openable"/> block swings about a vertical hinge on one side (a door half,
+    /// <c>open.hinge: "side"</c>): its state byte also carries <see cref="DoorState.HingeRightBit"/>, it holds
+    /// sixteen shapes (the eight mirrored after the plain ones) and it pairs into a double door
+    /// (<see cref="DoubleDoor"/>).</summary>
+    public bool SideHinged { get; init; }
 
     /// <summary>Whether a placement faces this <see cref="HasHorizontalFacing"/> block along the
     /// placing player's horizontal look (stairs); see <see cref="Placement.LookFacing"/>.</summary>
@@ -525,7 +531,8 @@ public sealed record BlockType
     /// The index into <see cref="RotatedModels"/> / <see cref="RotatedHitboxes"/> a cell with
     /// state byte <paramref name="state"/> draws and is hit with, for a block of
     /// <paramref name="shapeCount"/> shapes: the facing for four (the facing blocks, a multiblock
-    /// anchor), and the facing plus the open bit for an openable block's eight.
+    /// anchor), the facing plus the open bit for an openable block's eight, and the hinge bit over those for a
+    /// side-hinged block's sixteen.
     /// </summary>
     public static int ShapeIndex(byte state, int shapeCount) => state & (shapeCount - 1);
 

@@ -11,6 +11,7 @@
   "facing": "horizontal",
   "facingFromLook": true,
   "open": {
+    "hinge": "side",
     "model": { "parent": "block/door_open", "textures": { "texture": "oak_door_bottom" } },
     "hitbox": { "min": [0, 0, 0], "max": [0.1875, 1, 1] }
   },

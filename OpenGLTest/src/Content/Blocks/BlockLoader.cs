@@ -212,6 +212,7 @@ internal static class BlockLoader
             FacesViewer = facesViewer,
             AxisFromFace = axisFromFace,
             Openable = openHitboxes != null,
+            SideHinged = BlockSchemaParser.ParseSideHinged(definition, path),
             ReplaceableByPlacement = replaceableByPlacement,
             Falls = falls,
             Fluid = fluid,
@@ -233,10 +234,18 @@ internal static class BlockLoader
             type.RotatedHitboxes = axisFromFace
                 ? HorizontalFacing.WithUpright(HorizontalFacing.RotateBoxes(type.Hitboxes))
                 : HorizontalFacing.RotateBoxes(type.Hitboxes);
-        // ...and an openable block's open boxes follow the closed ones (DoorState.ShapeIndex)
+        // ...and an openable block's open boxes follow the closed ones (DoorState.OpenBit)
         if (openHitboxes != null)
         {
             type.RotatedHitboxes = [.. type.RotatedHitboxes!, .. HorizontalFacing.RotateBoxes(openHitboxes)];
+            // ...and a side-hinged block's mirrored sets follow those (DoorState.HingeRightBit)
+            if (type.SideHinged)
+                type.RotatedHitboxes =
+                [
+                    .. type.RotatedHitboxes,
+                    .. HorizontalFacing.RotateBoxes(HorizontalFacing.MirrorBoxes(type.Hitboxes)),
+                    .. HorizontalFacing.RotateBoxes(HorizontalFacing.MirrorBoxes(openHitboxes)),
+                ];
             ContentRegistry.OpenModels[id] = ResolveModel(definition.Open!.Model, path);
         }
         return type;

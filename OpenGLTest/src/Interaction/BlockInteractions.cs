@@ -460,7 +460,7 @@ internal sealed class BlockInteractions
     /// <summary>
     /// Right-click on an openable block (a trapdoor, either half of a door;
     /// <see cref="BlockType.Openable"/>): flips its open bit (<see cref="DoorState"/>), and a
-    /// door's other half with it, whatever is in hand, so a held block never places against it. The flip is a state write through <see cref="Chunk.SetStateAt"/> (saved,
+    /// door's other half and the other door of a double door (<see cref="DoubleDoor"/>) with it, whatever is in hand, so a held block never places against it. The flip is a state write through <see cref="Chunk.SetStateAt"/> (saved,
     /// journaled to clients and remeshed at once) with the edit-path hooks, and a client reports
     /// it as part of its prediction. Returns whether the click belonged to an openable block.
     /// </summary>
@@ -469,14 +469,25 @@ internal sealed class BlockInteractions
         if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
         if (!_chunkManager.TryGetCell((int)hit.X, (int)hit.Y, (int)hit.Z, out var id, out var state)) return false;
         if (BlockType.ById[id] is not { Openable: true }) return false;
-        var toggled = DoorState.Toggle(state);
-        ToggleOpenCell(hit, toggled);
-        // Both halves of a door share one state: the other half swings with the clicked one
-        if (TallBlock.TryGetPartner(id, hit, out var partner, out var partnerId)
+        var open = !DoorState.IsOpen(state);
+        SetOpenWithOtherHalf(hit, id, state, open);
+        // The other door of a double door swings with the clicked one
+        if (DoubleDoor.TryGetPartner(_chunkManager, hit, id, state, out var other)
+            && _chunkManager.TryGetCell((int)other.X, (int)other.Y, (int)other.Z, out var otherId, out var otherState))
+            SetOpenWithOtherHalf(other, otherId, otherState, open);
+        return true;
+    }
+
+    /// <summary>Opens or shuts the openable cell <paramref name="cell"/> and, both halves of a door sharing one
+    /// state, its other half with it.</summary>
+    private void SetOpenWithOtherHalf(Vector3 cell, ushort id, byte state, bool open)
+    {
+        var target = DoorState.WithOpen(state, open);
+        ToggleOpenCell(cell, target);
+        if (TallBlock.TryGetPartner(id, cell, out var partner, out var partnerId)
             && _chunkManager.TryGetCell((int)partner.X, (int)partner.Y, (int)partner.Z, out var held, out _)
             && held == partnerId)
-            ToggleOpenCell(partner, toggled);
-        return true;
+            ToggleOpenCell(partner, target);
     }
 
     /// <summary>

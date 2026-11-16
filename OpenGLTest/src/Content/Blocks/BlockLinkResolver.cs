@@ -250,9 +250,10 @@ internal sealed class BlockLinkResolver
         if (upper.UpperHalfId != 0 || upper.LowerHalfId != 0 || upper.ItemBlockId != 0 || lower.LowerHalfId != 0)
             throw new InvalidOperationException(
                 $"Block '{path}' names '{name}' in upperHalf, but one of the two already belongs to another block; a half belongs to one pair.");
-        if (lower.HasHorizontalFacing != upper.HasHorizontalFacing || lower.Openable != upper.Openable)
+        if (lower.HasHorizontalFacing != upper.HasHorizontalFacing || lower.Openable != upper.Openable
+            || lower.SideHinged != upper.SideHinged)
             throw new InvalidOperationException(
-                $"Block '{path}' and its upperHalf '{name}' disagree on facing or open; the halves share one state byte.");
+                $"Block '{path}' and its upperHalf '{name}' disagree on facing, open or hinge; the halves share one state byte.");
         foreach (var half in new[] { lower, upper })
             if (half.Fluid || half.Falls || half.NeedsSupport || half.StackMax >= 2)
                 throw new InvalidOperationException(
