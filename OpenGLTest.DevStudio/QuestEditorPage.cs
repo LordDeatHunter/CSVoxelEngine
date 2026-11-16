@@ -31,7 +31,8 @@ namespace VoxelEngine.DevStudio;
 /// quest there that depends on the first), a double-click on empty canvas adds a quest
 /// there, dragging empty canvas pans and the wheel zooms. A grid click picks the quest's icon, or the target of a
 /// requirement whose PICK is armed; dragging a grid slot onto the canvas adds a quest there with that icon, named
-/// after it. A requirement's type and the quest's reveal mode (SHOW) are <see cref="DropdownState"/>s. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
+/// after it. With several quests selected, the right panel lists them instead (icon and title, scrolled by the wheel
+/// when too long; a click on a row opens that quest alone) over a DELETE button. A requirement's type and the quest's reveal mode (SHOW) are <see cref="DropdownState"/>s. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
 /// </summary>
 internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys)
 {
@@ -41,6 +42,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     {
         PrevGraph, NextGraph, NewGraph, AddQuest, Save, RevertAll, Undo, Redo,
         Shape, Readable, AnyOf, PickIcon, AddRequirement, DeleteQuest, SaveQuest, RevertQuest, SwapLink, DeleteLink,
+        DeleteSelected,
         // The Arg of these is the requirement index.
         CountDown, CountUp, Pick, Remove,
     }
@@ -80,6 +82,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private bool _panOnly;
     // The far corner of the selection box being shift-dragged from _pressAt
     private Vector2 _marqueeTo;
+    // The multi-selection list: its rows as the last layout placed them, and how far it is scrolled
+    private const float ListRowHeight = 34f;
+    private ScrollViewLayout? _list;
+    private float _listOffset;
+    private Vector2? _pointer;
     private Vector2 _pressAt;
     private Vector2 _pressPan;
     private Vector2 _grabbed;
@@ -213,6 +220,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         }
         foreach (var (rect, _, _, label, enabled, active) in _buttons)
             DevStudioUi.DrawButton(ui, rect.Center, rect.Size, label, enabled, active);
+        _pointer = pointer;
         DrawDetailsText(ui);
         DrawStatus(ui);
         DrawDropdowns(ui, pointer);
@@ -268,9 +276,15 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             _revealDropdown.Close();
             _dropdownQuest = State.SelectedQuestId;
         }
+        _list = null;
         if (State.SelectedLink != null)
         {
             BuildLinkPanel();
+            return;
+        }
+        if (State.SelectedQuestIds.Count > 1)
+        {
+            BuildSelectionList();
             return;
         }
         if (State.SelectedQuest is not { } quest) return;
@@ -344,6 +358,57 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         AddButton(Rect(left, bottom, width, ButtonH), Action.DeleteQuest, "DELETE QUEST", true, false);
     }
 
+    // Several selected quests: a scrolled list from under the heading down to the DELETE button
+    private void BuildSelectionList()
+    {
+        var width = PanelRight - PanelLeft;
+        var bottom = _screen.Y - Pad * 2f - ButtonH;
+        var view = UiRect.FromTopLeft(new Vector2(PanelLeft, Pad + 44f), new Vector2(width, bottom - Gap - (Pad + 44f)));
+        var list = new ScrollViewLayout(view, ListRowHeight, State.SelectedQuestIds.Count);
+        _listOffset = list.Clamp(_listOffset);
+        _list = list;
+        AddButton(Rect(PanelLeft, bottom, width, ButtonH), Action.DeleteSelected,
+            $"DELETE {State.SelectedQuestIds.Count} QUESTS  [DEL]", true, false);
+    }
+
+    // Every row that sits whole inside the viewport: its icon, its title and, under the pointer, a lit background;
+    // a scrollbar along the right edge when the list is longer than the view
+    private void DrawSelectionList(UIRenderer ui)
+    {
+        if (_list is not { } list) return;
+        var ids = State.SelectedQuestIds;
+        var heading = $"{ids.Count} quests selected";
+        ui.DrawText(heading, new Vector2(PanelLeft, Pad + 8f), DevStudioUi.FitText(ui, heading, 18f, list.View.Size.X).Scale,
+            Rgba.White);
+        ui.ClearDepthForOverlay();
+        var scrollbar = list.Overflows ? 6f : 0f;
+        var (first, end) = list.VisibleRows(_listOffset);
+        for (var row = first; row < end && row < ids.Count; row++)
+        {
+            var rect = list.RowRect(row, _listOffset);
+            if (rect.Top < list.View.Top - 0.5f || rect.Bottom > list.View.Bottom + 0.5f) continue;
+            var inner = rect with { Size = rect.Size - new Vector2(scrollbar + 4f, 4f) };
+            inner = inner with { Center = new Vector2(rect.Left + inner.Size.X * 0.5f, rect.Center.Y) };
+            var hovered = _pointer is { } p && inner.Contains(p);
+            ui.DrawRect(inner.Center, inner.Size, hovered ? Rgba.Gray(0.24f, 0.9f) : Rgba.Gray(0.1f, 0.85f));
+            if (!State.Preview.TryGet(ids[row], out var quest)) continue;
+            ui.DrawIdIcon(new Vector2(inner.Left + 16f, inner.Center.Y), 24f, quest.IconId, 0f, 0f);
+            var title = quest.Title == quest.Id ? quest.Id : $"{quest.Title} ({quest.Id})";
+            // One smaller size for every row, shrunk further only for a title that still does not fit
+            const float rowCap = 10f;
+            ui.DrawText(title, new Vector2(inner.Left + 34f, inner.Center.Y - rowCap * 0.5f),
+                DevStudioUi.FitText(ui, title, rowCap, inner.Size.X - 40f).Scale, Rgba.White);
+        }
+        if (!list.Overflows) return;
+        var track = UiRect.FromTopLeft(new Vector2(list.View.Right - scrollbar, list.View.Top), new Vector2(scrollbar, list.View.Size.Y));
+        ui.DrawRect(track.Center, track.Size, Rgba.Gray(0.12f, 0.9f));
+        var thumbHeight = track.Size.Y * list.View.Size.Y / list.ContentHeight;
+        var travel = list.ContentHeight - list.View.Size.Y;
+        var thumbTop = track.Top + (track.Size.Y - thumbHeight) * (travel > 0f ? _listOffset / travel : 0f);
+        ui.DrawRect(new Vector2(track.Center.X, thumbTop + thumbHeight * 0.5f), new Vector2(scrollbar, thumbHeight),
+            DevStudioUi.Accent);
+    }
+
     // A selected link: which quest depends on which (drawn in DrawLinkText), SWAP and DELETE LINK
     private void BuildLinkPanel()
     {
@@ -382,6 +447,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         if (State.SelectedLink is { } selectedLink)
         {
             DrawLinkText(ui, selectedLink);
+            return;
+        }
+        if (State.SelectedQuestIds.Count > 1)
+        {
+            DrawSelectionList(ui);
             return;
         }
         if (State.SelectedQuest is not { } quest)
@@ -535,6 +605,12 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             if (!enabled || !rect.Contains(point)) continue;
             Blur();
             Run(action, arg);
+            return true;
+        }
+        if (_list is { } list && list.RowAt(point, _listOffset) is { } row && row < State.SelectedQuestIds.Count)
+        {
+            Blur();
+            State.Select(State.SelectedQuestIds[row]);
             return true;
         }
         foreach (var (rect, field, arg, _) in _fields)
@@ -719,6 +795,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     /// <summary>The wheel over the canvas zooms about the pointer; elsewhere it is not the page's.</summary>
     public bool Scroll(Vector2 point, float wheel)
     {
+        if (_list is { } list && list.View.Contains(point))
+        {
+            _listOffset = list.Clamp(_listOffset - MathF.Sign(wheel) * ListRowHeight);
+            return true;
+        }
         if (!OverCanvas(point)) return false;
         QuestBookLayout.ZoomAbout(Camera, point, _screen, wheel > 0 ? QuestConfig.ZoomStep : 1f / QuestConfig.ZoomStep);
         return true;
@@ -890,6 +971,10 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
                 break;
             case Action.DeleteLink when State.SelectedLink is { } link:
                 Status = State.RemoveLink(link.Child, link.Parent) ?? $"{link.Child} no longer depends on {link.Parent}";
+                break;
+            case Action.DeleteSelected:
+                var deleting = State.SelectedQuestIds.ToList();
+                Status = $"Deleted {State.DeleteQuests(deleting)} quests";
                 break;
             case Action.DeleteQuest when id != null:
                 State.DeleteQuest(id);

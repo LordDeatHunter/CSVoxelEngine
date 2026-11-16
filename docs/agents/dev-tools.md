@@ -93,7 +93,9 @@ drag narrows the selection to that quest) (snapped to `QuestEditorState.SnapStep
 quest there that depends on the first, a self link, a duplicate or a cycle is refused), click a line to select that link (the panel names which quest depends on which, SWAP DIRECTION turns it around unless
 that would close a cycle, DELETE LINK or Delete removes it), double-click empty canvas to add a quest there, drag empty canvas (or middle-drag anywhere) to pan, wheel to zoom. The
 top bar picks the graph (`<`/`>`), edits its title, adds a graph file (`NEW GRAPH`, `graph_N.json`) or a quest at the
-view center, and saves. The right panel edits the selected quest's id (committed on Enter or leaving the field; a rename
+view center, and saves. With several quests selected the right panel lists them instead (icon and title, the wheel
+scrolls a long list, a click on a row opens that quest alone) over DELETE N QUESTS; Delete removes every selected quest
+as one undo step. The right panel edits the selected quest's id (committed on Enter or leaving the field; a rename
 follows every parent link), title, description, shape (AUTO/HEX/CIRCLE), readable, any-of, SHOW (the `reveal` mode, a
 dropdown), icon and requirements: a type
 dropdown (the reusable `UI/Widgets/DropdownState`, drawn by `DropdownRenderer`) picks obtain/craft/break/place/kill, the target field takes an item (or `#tag`, which adds a label field), a block
