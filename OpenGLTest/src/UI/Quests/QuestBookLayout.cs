@@ -63,6 +63,33 @@ internal static class QuestBookLayout
         return null;
     }
 
+    /// <summary>The parent link (child, parent) whose drawn line passes within <paramref name="tolerance"/> canvas units of
+    /// <paramref name="point"/>, between both quests <paramref name="visible"/> accepts, or null. Only the stretch of the
+    /// line outside the two nodes counts, so a press on a node is never a press on its links.</summary>
+    public static (QuestType Child, QuestType Parent)? LinkAt(IReadOnlyList<QuestType> quests, Func<QuestType, bool> visible,
+        QuestViewData camera, Vector2 canvas, Vector2 point, float tolerance)
+    {
+        var radius = NodeSize(camera) * 0.5f;
+        foreach (var child in quests)
+        {
+            if (!visible(child)) continue;
+            var to = ToCanvas(child.Position, camera, canvas);
+            foreach (var p in child.Parents)
+            {
+                var parent = quests[p];
+                if (!visible(parent)) continue;
+                var from = ToCanvas(parent.Position, camera, canvas);
+                if (Vector2.Distance(point, from) <= radius || Vector2.Distance(point, to) <= radius) continue;
+                var segment = to - from;
+                var length = segment.LengthSquared();
+                if (length <= 0f) continue;
+                var t = Math.Clamp(Vector2.Dot(point - from, segment) / length, 0f, 1f);
+                if (Vector2.Distance(point, from + segment * t) <= tolerance) return (child, parent);
+            }
+        }
+        return null;
+    }
+
     /// <summary>The details panel along the right edge.</summary>
     public static UiRect Details(Vector2 canvas)
     {

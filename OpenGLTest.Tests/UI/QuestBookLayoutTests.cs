@@ -1,4 +1,5 @@
 using System.Numerics;
+using VoxelEngine.Content.Quests;
 using VoxelEngine.Quests;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.Quests;
@@ -70,5 +71,28 @@ public class QuestBookLayoutTests
         Assert.Null(QuestBookLayout.NodeAt(log, camera, Canvas, childPoint));
         log.OnBroke(Id("dirt"));
         Assert.Same(book.Of("child"), QuestBookLayout.NodeAt(log, camera, Canvas, childPoint));
+    }
+
+    [Fact]
+    public void ALinkIsHitAlongItsLineBetweenTheNodesOnly()
+    {
+        var root = Quest("root", null, Break("stone"));
+        var child = Quest("child", ["root"], Break("stone"));
+        child.Pos = [4, 0];
+        var book = Book(root, child);
+        var camera = new QuestViewData();
+        var from = QuestBookLayout.ToCanvas(book.Of("root").Position, camera, Canvas);
+        var to = QuestBookLayout.ToCanvas(book.Of("child").Position, camera, Canvas);
+        const float tolerance = 6f;
+        (QuestType, QuestType)? At(Vector2 point) => QuestBookLayout.LinkAt(book.Quests, _ => true, camera, Canvas, point, tolerance) is { } hit
+            ? (hit.Child, hit.Parent)
+            : null;
+
+        var middle = (from + to) * 0.5f;
+        Assert.Equal((book.Of("child"), book.Of("root")), At(middle + new Vector2(0f, tolerance * 0.5f)));
+        Assert.Null(At(middle + new Vector2(0f, tolerance * 3f)));
+        Assert.Null(At(to + (to - from) * 0.5f));
+        Assert.Null(At(to));
+        Assert.Null(QuestBookLayout.LinkAt(book.Quests, q => q.Id != "child", camera, Canvas, middle, tolerance));
     }
 }

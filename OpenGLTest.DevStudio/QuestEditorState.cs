@@ -58,6 +58,19 @@ public sealed class QuestEditorState
 
     public string? SelectedQuestId { get; set; }
 
+    private (string Child, string Parent)? _selectedLink;
+
+    /// <summary>The selected parent link (the child depends on the parent), or null; it reads null once the link is
+    /// gone. A quest and a link are never selected together.</summary>
+    public (string Child, string Parent)? SelectedLink =>
+        _selectedLink is { } link && Find(link.Child)?.Quest.Parents?.Contains(link.Parent) == true ? link : null;
+
+    public void SelectLink(string child, string parent)
+    {
+        Select(null);
+        _selectedLink = (child, parent);
+    }
+
     /// <summary>The selected quest's requirement a grid click or a PICK fills, or -1 for the quest's icon.</summary>
     public int PickRequirement { get; set; } = -1;
 
@@ -92,6 +105,7 @@ public sealed class QuestEditorState
     public void Select(string? id)
     {
         SelectedQuestId = id;
+        _selectedLink = null;
         PickRequirement = -1;
         if (id != null && Find(id) is { } found) SelectedGraph = Documents.IndexOf(found.Document);
     }
@@ -159,8 +173,35 @@ public sealed class QuestEditorState
     {
         if (child == parent) return "A quest cannot be its own parent.";
         if (Find(child) is not { } found || Find(parent) == null) return "No such quest.";
-        if (found.Quest.Parents?.Contains(parent) != true) return AddParent(child, parent);
+        return found.Quest.Parents?.Contains(parent) == true ? RemoveLink(child, parent) : AddParent(child, parent);
+    }
+
+    /// <summary>Removes the link that makes <paramref name="child"/> depend on <paramref name="parent"/>. Returns why
+    /// nothing was removed, else null.</summary>
+    public string? RemoveLink(string child, string parent)
+    {
+        if (Find(child) is not { } found || found.Quest.Parents?.Contains(parent) != true) return "No such link.";
         found.Quest.Parents = Shrink(found.Quest.Parents.Where(p => p != parent));
+        Recompile();
+        return null;
+    }
+
+    /// <summary>Turns the link around: <paramref name="parent"/> depends on <paramref name="child"/> instead, and the
+    /// turned link is selected. Refused (changing nothing) when another path already makes the parent a prerequisite
+    /// of the child, since the turned link would close a cycle. Returns why, else null.</summary>
+    public string? SwapLink(string child, string parent)
+    {
+        if (Find(child) is not { } dependent || dependent.Quest.Parents?.Contains(parent) != true) return "No such link.";
+        if (Find(parent) is not { } prerequisite) return "No such quest.";
+        var before = dependent.Quest.Parents;
+        dependent.Quest.Parents = Shrink(before.Where(p => p != parent));
+        if (IsAncestor(parent, child))
+        {
+            dependent.Quest.Parents = before;
+            return $"'{child}' also depends on '{parent}' through other quests: swapping would make a cycle.";
+        }
+        prerequisite.Quest.Parents = [.. prerequisite.Quest.Parents ?? [], child];
+        SelectLink(parent, child);
         Recompile();
         return null;
     }
@@ -195,6 +236,8 @@ public sealed class QuestEditorState
             quest.Parents = [.. parents.Select(p => p == id ? newId : p)];
         }
         if (SelectedQuestId == id) SelectedQuestId = newId;
+        if (_selectedLink is { } link)
+            _selectedLink = (link.Child == id ? newId : link.Child, link.Parent == id ? newId : link.Parent);
         Recompile();
         return null;
     }

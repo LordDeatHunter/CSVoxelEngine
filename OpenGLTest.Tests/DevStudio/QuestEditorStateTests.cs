@@ -93,6 +93,37 @@ public sealed class QuestEditorStateTests : IDisposable
     }
 
     [Fact]
+    public void SwappingALinkTurnsItAroundUnlessAnotherPathWouldMakeACycle()
+    {
+        var editor = Editor(Graph("g", null,
+            Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone")), Quest("b", ["a", "root"], Break("stone"))));
+
+        Assert.NotNull(editor.SwapLink("b", "root"));
+        Assert.Equal(["a", "root"], editor.Find("b")!.Value.Quest.Parents);
+        Assert.False(editor.Dirty);
+
+        Assert.Null(editor.SwapLink("b", "a"));
+        Assert.Equal(["root"], editor.Find("b")!.Value.Quest.Parents);
+        Assert.Contains("b", editor.Find("a")!.Value.Quest.Parents!);
+        Assert.Equal(("a", "b"), editor.SelectedLink);
+        Assert.Null(editor.Error);
+    }
+
+    [Fact]
+    public void ARemovedOrRenamedLinkKeepsTheLinkSelectionTruthful()
+    {
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone"))));
+        editor.SelectLink("a", "root");
+
+        editor.RenameQuest("root", "start");
+        Assert.Equal(("a", "start"), editor.SelectedLink);
+
+        Assert.Null(editor.RemoveLink("a", "start"));
+        Assert.Null(editor.SelectedLink);
+        Assert.NotNull(editor.RemoveLink("a", "start"));
+    }
+
+    [Fact]
     public void AQuestAddedFromAParentJoinsItsGraphDependingOnIt()
     {
         Graph("first", null, Quest("root", null, Break("stone")));

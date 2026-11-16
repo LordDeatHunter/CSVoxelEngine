@@ -24,7 +24,7 @@ namespace VoxelEngine.DevStudio;
 /// panel. SAVE ALL / REVERT ALL (a second click within <see cref="ConfirmSeconds"/> confirms) act on every graph,
 /// SAVE QUEST / REVERT QUEST on the selected quest alone; a quest with unsaved edits carries a gold corner mark.
 /// Clicking a node selects it, dragging moves it (shift-drag moves its whole graph, Alt turns snapping off),
-/// a right-drag from one node to another makes the second depend on the first (dropped on empty canvas, it adds a
+/// clicking a line selects that link (its panel turns it around or deletes it), a right-drag from one node to another makes the second depend on the first (dropped on empty canvas, it adds a
 /// quest there that depends on the first), Ctrl+click toggles the clicked node as a parent of the selected one, a double-click on empty canvas adds a quest
 /// there, dragging empty canvas pans and the wheel zooms. A grid click picks the quest's icon, or the target of a
 /// requirement whose PICK is armed; dragging a grid slot onto the canvas adds a quest there with that icon, named
@@ -37,7 +37,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private enum Action
     {
         PrevGraph, NextGraph, NewGraph, AddQuest, Save, RevertAll,
-        Shape, Readable, AnyOf, PickIcon, AddRequirement, DeleteQuest, SaveQuest, RevertQuest,
+        Shape, Readable, AnyOf, PickIcon, AddRequirement, DeleteQuest, SaveQuest, RevertQuest, SwapLink, DeleteLink,
         // The Arg of these is the requirement index.
         CountDown, CountUp, Pick, Remove,
     }
@@ -50,6 +50,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private const float LabelH = 18f;
     private const float TopBarH = DevStudioUi.ButtonH;
     private const double DoubleClickSeconds = 0.35;
+    // How near a line a click has to land to select that link, in canvas units
+    private const float LinkTolerance = 6f;
     private static readonly Rgba ErrorColor = new(230, 110, 110);
 
     private readonly TextFieldState _field = new(400);
@@ -151,6 +153,16 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             ui.DrawRect(corner, new Vector2(mark), DevStudioUi.Accent);
         }
 
+        // The selected link, drawn again in gold over the graph, between the node rims so it never covers an icon
+        if (State.SelectedLink is { } link && book.TryGet(link.Child, out var child) && book.TryGet(link.Parent, out var parent))
+        {
+            var start = QuestBookLayout.ToCanvas(parent.Position, Camera, _screen);
+            var end = QuestBookLayout.ToCanvas(child.Position, Camera, _screen);
+            var rim = Vector2.Normalize(end - start) * QuestBookLayout.NodeSize(Camera) * 0.5f;
+            if (Vector2.Distance(start, end) > rim.Length() * 2f)
+                ui.Quests.DrawLine(start + rim, end - rim, QuestConfig.EdgeThickness * Camera.Zoom * 1.5f, DevStudioUi.Accent);
+        }
+
         if (State.ErrorQuestId is { } bad && book.TryGet(bad, out var broken))
         {
             var size = QuestBookLayout.NodeSize(Camera) * 1.3f;
@@ -231,6 +243,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             _typeDropdowns.Clear();
             _dropdownQuest = State.SelectedQuestId;
         }
+        if (State.SelectedLink != null)
+        {
+            BuildLinkPanel();
+            return;
+        }
         if (State.SelectedQuest is not { } quest) return;
         var left = PanelLeft;
         var width = PanelRight - left;
@@ -292,6 +309,31 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         AddButton(Rect(left, bottom, width, ButtonH), Action.DeleteQuest, "DELETE QUEST", true, false);
     }
 
+    // A selected link: which quest depends on which (drawn in DrawLinkText), SWAP and DELETE LINK
+    private void BuildLinkPanel()
+    {
+        var width = PanelRight - PanelLeft;
+        AddButton(Rect(PanelLeft, Pad + 150f, width, ButtonH), Action.SwapLink, "SWAP DIRECTION", true, false);
+        AddButton(Rect(PanelLeft, Pad + 150f + ButtonH + Gap, width, ButtonH), Action.DeleteLink, "DELETE LINK  [DEL]", true, false);
+    }
+
+    private void DrawLinkText(UIRenderer ui, (string Child, string Parent) link)
+    {
+        var left = PanelLeft;
+        var width = PanelRight - left;
+        var scale = ui.CapHeightScale(DevStudioUi.TextCap);
+        ui.DrawText("Link", new Vector2(left, Pad + 8f), ui.CapHeightScale(18f), Rgba.White);
+        var y = Pad + 44f;
+        foreach (var (label, id) in new[] { ("QUEST", link.Child), ("DEPENDS ON", link.Parent) })
+        {
+            ui.DrawText(label, new Vector2(left, y), scale, DevStudioUi.TextDim);
+            var title = State.Find(id)?.Quest.Title is { Length: > 0 } t ? $"{t} ({id})" : id;
+            ui.DrawText(title, new Vector2(left, y + 18f), DevStudioUi.FitText(ui, title, DevStudioUi.TextCap, width).Scale,
+                Rgba.White);
+            y += 46f;
+        }
+    }
+
     private float AddField(Field field, int arg, string label, float left, float y, float width)
     {
         _fields.Add((Rect(left, y + LabelH, width, FieldH), field, arg, label));
@@ -302,6 +344,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     {
         var scale = ui.CapHeightScale(DevStudioUi.TextCap);
         var left = PanelLeft;
+        if (State.SelectedLink is { } selectedLink)
+        {
+            DrawLinkText(ui, selectedLink);
+            return;
+        }
         if (State.SelectedQuest is not { } quest)
         {
             const string none = "No quest selected";
@@ -312,6 +359,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
                 "Drag a node to move it (Alt: no snap); shift-drag moves its graph.",
                 "Right-drag from a quest to another to make the second depend on the first; drop on empty canvas to add a quest that depends on it.",
                 "Ctrl+click a node to toggle it as a parent of the selected quest.",
+                "Click a line to select that link: swap its direction or delete it.",
                 "Double-click empty canvas, or drag an icon from the grid onto it, to add a quest.",
                 "Drag empty canvas or middle-drag anywhere to pan; the wheel zooms.",
                 "Delete deletes the selected quest; Ctrl+S saves.",
@@ -461,6 +509,12 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
         _pressAt = point;
         var node = QuestBookLayout.NodeAt(State.Preview.Quests, _ => true, Camera, _screen, point);
+        if (node == null
+            && QuestBookLayout.LinkAt(State.Preview.Quests, _ => true, Camera, _screen, point, LinkTolerance) is { } hit)
+        {
+            State.SelectLink(hit.Child.Id, hit.Parent.Id);
+            return true;
+        }
         if (node == null)
         {
             var doubleClick = time - _lastClickTime < DoubleClickSeconds && Vector2.Distance(point, _lastClickAt) < 8f;
@@ -629,6 +683,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         }
         switch (key)
         {
+            case Key.Delete when State.SelectedLink is { } link:
+                Status = State.RemoveLink(link.Child, link.Parent) ?? $"{link.Child} no longer depends on {link.Parent}";
+                return true;
             case Key.Delete when State.SelectedQuestId is { } id:
                 State.DeleteQuest(id);
                 Status = $"Deleted {id}";
@@ -746,6 +803,12 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
                 break;
             case Action.AddRequirement when id != null:
                 State.AddRequirement(id);
+                break;
+            case Action.SwapLink when State.SelectedLink is { } link:
+                Status = State.SwapLink(link.Child, link.Parent) ?? $"{link.Parent} now depends on {link.Child}";
+                break;
+            case Action.DeleteLink when State.SelectedLink is { } link:
+                Status = State.RemoveLink(link.Child, link.Parent) ?? $"{link.Child} no longer depends on {link.Parent}";
                 break;
             case Action.DeleteQuest when id != null:
                 State.DeleteQuest(id);
