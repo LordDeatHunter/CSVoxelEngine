@@ -178,6 +178,7 @@ OpenGLTest/
                                #   LocateCommand (Tower: the linked /locate answer)
     Config/                    # every tuning constant, one static class per domain (all const or static
                                #   readonly, read concurrently by every thread; namespace VoxelEngine.Config)
+      FootprintConfig.cs       # footprints: default visibility and persistence, fade share, cap, print size and tint
       AudioConfig.cs           # ambience bed paths, volumes and fades; the sfx volume
       BloomeryConfig.cs        # iron smelting: the bloomery's heat band, bellows pump, smelt and burn times, the anvil's slack
       HudConfig.cs             # selection outline and pulse, hotbar name fade, pop and flash, the loading screen

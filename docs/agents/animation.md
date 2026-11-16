@@ -309,7 +309,12 @@ overshoot or jiggle.
   on foot over a `footstepDust` block (grounded, not sneaking, not in water, really moving) puffs once
   per foot strike of the gait: `PlayerModel.WalkPhase` crossing π/2 + kπ (`FootstepDust.FootfallsBetween`).
   The same footfalls (and a walking mob's every `AudioConfig.MobStrideBlocks`) play a quiet step sound of the
-  block's `stepSfx` group (`Footsteps`).
+  block's `stepSfx` group (`Footsteps`). Each of those footfalls also leaves a **footprint** (`FootprintSystem`,
+  `Footsteps.FootfallTaken`; client-side only, never saved or sent): a flat dark quad on the ground
+  (`FootprintRenderer`, drawn with the depthless particles, polygon-offset, tint linearized because the scene target
+  is linear light) whose opacity holds then fades (`FootprintRules.Alpha`) per the block's `footprintVisibility` and
+  `footprintPersistence`; alternating feet mirror the sprite, the oldest print goes past `FootprintConfig.Max`, and a
+  print is dropped when its supporting block changes. `visual-examples/footprints.json` films a trail.
 - **World-event effects** (cosmetic: singleplayer and a client, never a headless server). A TNT blast
   shakes the local camera (`AmbientEffects.ShakeForBlast`): `ShakeFalloff.Trauma` is `BlastShakeStrength` inside
   `TntManager.BlastRadius`, falls off as radius / distance and eases to zero at `BlastShakeRangeBlocks`,

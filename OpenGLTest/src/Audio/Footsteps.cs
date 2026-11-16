@@ -7,6 +7,10 @@ using VoxelEngine.Player;
 
 namespace VoxelEngine.Audio;
 
+/// <summary>One footfall that found a block underfoot: where the foot lands, the heading (a unit XZ vector, or
+/// zero), the supporting cell and block id, and which foot (-1 left, 1 right).</summary>
+public readonly record struct FootfallEvent(Vector3 Feet, Vector2 Heading, Vector3 Cell, ushort BlockId, int Side);
+
 /// <summary>
 /// The subtle footsteps: every footfall of the local player's gait
 /// (<see cref="FootstepDust.FootfallsBetween"/> on <see cref="PlayerModel.WalkPhase"/>) and of each
@@ -22,9 +26,10 @@ public sealed class Footsteps
     private Vector2 _runDirection;
     private Vector3 _lastFeet;
 
-    /// <summary>Raised for every footfall that found a block underfoot: where the foot lands, the
-    /// heading (a unit XZ vector, or zero), the supporting cell and block id.</summary>
-    public event System.Action<Vector3, Vector2, Vector3, ushort>? FootfallTaken;
+    private int _playerFoot;
+
+    /// <summary>Raised for every footfall that found a block underfoot, silent block or not.</summary>
+    public event System.Action<FootfallEvent>? FootfallTaken;
 
     /// <summary>One frame of the local player: sounds each footfall the gait crossed since the last call
     /// (at most two, so a hitch never bursts).</summary>
@@ -47,7 +52,7 @@ public sealed class Footsteps
             return;
 
         if (BlockType.StepSfxOf(blockId) is { } group) sounds.Play(group);
-        FootfallTaken?.Invoke(feet, _runDirection, cell, blockId);
+        FootfallTaken?.Invoke(new FootfallEvent(feet, _runDirection, cell, blockId, (_playerFoot++ & 1) == 0 ? -1 : 1));
     }
 
     /// <summary>Takes every footfall the <paramref name="mobs"/> noted this frame and sounds it at the
@@ -67,7 +72,7 @@ public sealed class Footsteps
 
             if (BlockType.StepSfxOf(blockId) is { } group) sounds.PlayAt(group, feet);
             var heading = new Vector2(-System.MathF.Sin(mob.Facing), -System.MathF.Cos(mob.Facing));
-            FootfallTaken?.Invoke(feet, heading, cell, blockId);
+            FootfallTaken?.Invoke(new FootfallEvent(feet, heading, cell, blockId, (mob.FootfallCount & 1) == 0 ? -1 : 1));
         }
     }
 }

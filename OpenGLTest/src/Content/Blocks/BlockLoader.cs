@@ -155,6 +155,8 @@ internal static class BlockLoader
             Id = id,
             Sfx = ResolveSfx(path, definition.Sfx),
             StepSfx = ResolveStepSfx(path, definition.StepSfx),
+            FootprintVisibility = Math.Clamp(definition.FootprintVisibility ?? FootprintConfig.DefaultVisibility, 0f, 1f),
+            FootprintPersistence = Math.Max(definition.FootprintPersistence ?? FootprintConfig.DefaultPersistenceSeconds, 0f),
             Hardness = hardness,
             RequiresTool = requiresTool,
             Tools = tools,

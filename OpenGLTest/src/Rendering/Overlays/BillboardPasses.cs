@@ -3,6 +3,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Graphics;
 using VoxelEngine.Particles;
+using VoxelEngine.Particles.Footprints;
 using VoxelEngine.Player;
 
 namespace VoxelEngine.Rendering.Overlays;
@@ -100,6 +101,16 @@ internal sealed class BillboardPasses
 
         _owner.Fire.Render(fire, camera.GetViewProjection(), camera.RenderEye, camera.ViewDirection,
             Lighting.FogColor, Lighting.FogNear, Lighting.FogFar);
+    }
+
+    internal void RenderFootprints(Camera camera, IReadOnlyList<Footprint> prints)
+    {
+        if (camera == null || prints.Count == 0 || _owner.Footprints == null) return;
+
+        _owner.Footprints.Render(prints, camera.GetViewProjection(), camera.RenderEye, Lighting.FogColor,
+            Lighting.FogNear, Lighting.FogFar);
+        // FootprintRenderer binds its own sprite to unit 0.
+        Units.InvalidateTextureUnits();
     }
 
     internal void RenderBubbleParticles(Camera camera, IReadOnlyList<BubbleParticle> bubbles)

@@ -1,6 +1,8 @@
 {
   "sfx": "hit_grass",
   "stepSfx": "step_grass",
+  "footprintVisibility": 0.3,
+  "footprintPersistence": 15,
   "name": "Mud",
   "model": { "parent": "block/cube_all", "textures": { "all": "mud" } },
   "loot": "mud"

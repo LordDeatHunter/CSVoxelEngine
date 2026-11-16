@@ -192,6 +192,20 @@ public sealed record BlockType
     /// <summary>The footstep group of a block id, null for air, an unknown id or a silent block.</summary>
     public static string? StepSfxOf(ushort blockId) => ById[blockId]?.StepSfx;
 
+    /// <summary>How clearly a footprint shows on this block (0..1).</summary>
+    public float FootprintVisibility { get; init; } = FootprintConfig.DefaultVisibility;
+
+    /// <summary>Seconds a footprint on this block lasts.</summary>
+    public float FootprintPersistence { get; init; } = FootprintConfig.DefaultPersistenceSeconds;
+
+    /// <summary>The footprint tier of a block id; the faint default for air or an unknown id.</summary>
+    public static void FootprintOf(ushort blockId, out float visibility, out float persistence)
+    {
+        var type = ById[blockId];
+        visibility = type?.FootprintVisibility ?? FootprintConfig.DefaultVisibility;
+        persistence = type?.FootprintPersistence ?? FootprintConfig.DefaultPersistenceSeconds;
+    }
+
     /// <summary>Damage this block takes before breaking; one hit deals the held tool's power.</summary>
     public float Hardness { get; init; } = DefaultHardness;
 

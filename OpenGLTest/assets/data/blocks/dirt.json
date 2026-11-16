@@ -1,6 +1,8 @@
 {
   "sfx": "hit_grass",
   "stepSfx": "step_grass",
+  "footprintVisibility": 0.3,
+  "footprintPersistence": 15,
   "name": "Dirt",
   "model": { "parent": "block/cube_all", "textures": { "all": "dirt" } },
   "footstepDust": true

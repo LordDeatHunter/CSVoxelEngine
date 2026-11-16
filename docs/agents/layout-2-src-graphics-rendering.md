@@ -255,6 +255,10 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   on every mining hit plus a bigger burst when the block breaks
       BubbleParticle.cs        # one exhaled bubble: a small billboard that rises off the player's mouth while the eye is submerged
       BubbleParticleRenderer.cs # draws every live BubbleParticle as a camera-facing billboard in one dynamic draw
+      Footprints/              # the footprints walkers leave on soft ground
+        FootprintRules.cs      # GL-free: a print's alpha over its life (hold, then fade) and its quad's corners
+        FootprintSystem.cs     # the live prints (one per Footsteps footfall, capped, aged, dropped with their block)
+        FootprintRenderer.cs   # draws them as flat dark quads on the ground (footprint-*.glsl, footprint.png)
       BubbleParticleSystem.cs  # live exhaled bubbles: spawns them at the player's mouth while the eye is submerged
       DebrisLook.cs            # what a BlockDebris chip looks like, i.e. which cached cube BlockCubeCache draws it with
       FireParticle.cs          # one fire particle: an ember, a smoke puff, a steam puff or a floor-conquered pulse mote

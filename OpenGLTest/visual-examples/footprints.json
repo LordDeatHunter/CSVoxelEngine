@@ -1,0 +1,16 @@
+{
+  // Footprints: walk a straight line on the surface, then look back down the trail.
+  // Run with VOXEL_SCRIPT=visual-examples/footprints.json VOXEL_TIME=147 (working directory OpenGLTest/).
+  // Shots land in visual/footprints/: fresh prints behind the walker, then the same trail after it has faded.
+  "steps": [
+    { "op": "creative" },
+    { "op": "wait", "seconds": 5 },
+    { "op": "look", "yaw": -90, "pitch": 0 },
+    { "op": "walk", "keys": ["W"], "seconds": 4 },
+    { "op": "look", "yaw": 90, "pitch": -14 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "fresh", "hideHud": true },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "later", "hideHud": true }
+  ]
+}

@@ -318,6 +318,7 @@ internal sealed class WorldRenderer
         renderManager.Billboards.RenderDamageNumbers(Camera, DamageNumbers);
         if (_goblins != null)
             renderManager.Billboards.RenderNoticePips(Camera, _goblins.Goblins);
+        renderManager.Billboards.RenderFootprints(Camera, _world.Footprints.Prints);
         renderManager.Billboards.RenderLeafParticles(Camera, _leaves.Particles);
         renderManager.Billboards.RenderFireParticles(Camera, _fire.Particles);
         // Lava embers are a second batch; the renderer re-uploads with BufferSubData, so two

@@ -10,6 +10,7 @@ using VoxelEngine.Effects.Sky;
 using VoxelEngine.Effects.Water;
 using VoxelEngine.Graphics;
 using VoxelEngine.Particles;
+using VoxelEngine.Particles.Footprints;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering.Actors;
 using VoxelEngine.Rendering.Atmosphere;
@@ -165,6 +166,7 @@ public class RenderManager : IDisposable
     private LeafParticleRenderer? _leaves;
     private FireParticleRenderer? _fire;
     private BubbleParticleRenderer? _bubbles;
+    private FootprintRenderer? _footprints;
     private SliceTrailRenderer? _sliceTrails;
 
     // Entity healthbars: one five-heart billboard row above every live slime.
@@ -376,6 +378,8 @@ public class RenderManager : IDisposable
     internal LeafParticleRenderer? Leaves => _leaves;
     internal FireParticleRenderer? Fire => _fire;
     internal BubbleParticleRenderer? Bubbles => _bubbles;
+
+    internal FootprintRenderer? Footprints => _footprints;
     /// <summary>This frame's splash ripples for the water shader; packed before <see cref="BeginFrame"/>.</summary>
     internal RippleField WaterRipples { get; } = new();
     internal SliceTrailRenderer? SliceTrails => _sliceTrails;
@@ -570,6 +574,7 @@ public class RenderManager : IDisposable
         _leaves = new LeafParticleRenderer(gl);
         _fire = new FireParticleRenderer(gl);
         _bubbles = new BubbleParticleRenderer(gl);
+        _footprints = new FootprintRenderer(gl);
         _sliceTrails = new SliceTrailRenderer(gl, linearOutput: true);
         _healthbars = new EntityHealthbarRenderer(gl);
 
@@ -1073,6 +1078,7 @@ public class RenderManager : IDisposable
         _leaves?.Dispose();
         _fire?.Dispose();
         _bubbles?.Dispose();
+        _footprints?.Dispose();
         _sliceTrails?.Dispose();
         _healthbars?.Dispose();
         _damageNumbers?.Dispose();

@@ -1,6 +1,8 @@
 {
   "sfx": "hit_grass",
   "stepSfx": "step_grass",
+  "footprintVisibility": 0.3,
+  "footprintPersistence": 15,
   // The Fungal Grove floor surface and the top of its dry pools. Tile from
   // committed art.
   "name": "Fungal Moss",

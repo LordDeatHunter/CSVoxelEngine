@@ -3,6 +3,8 @@
   "model": { "parent": "block/cube_all", "textures": { "all": "gravel" } },
   "sfx": "hit_gravel",
   "stepSfx": "step_gravel",
+  "footprintVisibility": 0.3,
+  "footprintPersistence": 15,
   "pebbleWeight": 1,
   "hardness": 3,
   "falls": true,

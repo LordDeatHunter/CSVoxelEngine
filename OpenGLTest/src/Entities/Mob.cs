@@ -176,8 +176,13 @@ public abstract class Mob
     /// </summary>
     protected void NoteWalked(float walked)
     {
-        if (FootstepSfx.Stride(ref _strideWalked, walked)) _footfall = true;
+        if (!FootstepSfx.Stride(ref _strideWalked, walked)) return;
+        _footfall = true;
+        FootfallCount++;
     }
+
+    /// <summary>How many footfalls the body has made; its parity says which foot lands next.</summary>
+    public int FootfallCount { get; private set; }
 
     /// <summary>True once per footfall noted since the last take. A world that sounds no steps never
     /// takes, which leaves one flag standing.</summary>

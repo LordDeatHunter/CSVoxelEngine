@@ -312,3 +312,8 @@ placeholders back (`--check` compares).
   `tools/generate-map-icons.py`. Keep the arrow pointing straight up and near white, and every icon centered.
 - [ ] **Quest check badge** — `quest_check.png`, 64x64, a green disc with a white check, drawn untinted at the top-right
   of a complete quest's node.
+
+## Particles
+
+- [ ] **Footprint** - `OpenGLTest/assets/textures/particles/footprint.png`, 16x16, a placeholder boot print (white shape
+  on transparent, toe at the top, drawn left-footed and mirrored for the right); `FootprintRenderer` tints it dark.

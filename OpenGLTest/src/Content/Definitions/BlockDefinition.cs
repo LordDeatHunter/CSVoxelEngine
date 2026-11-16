@@ -461,6 +461,16 @@ public sealed class BlockDefinition
     public string? StepSfx { get; set; }
 
     /// <summary>
+    /// How clearly a footprint left on this block shows, 0 (none) to 1. Unset is the faint
+    /// <see cref="FootprintConfig.DefaultVisibility"/>; soft ground (dirt, mud) sets more, sand and snow most.
+    /// </summary>
+    public float? FootprintVisibility { get; set; }
+
+    /// <summary>Seconds a footprint left on this block lasts. Unset is the short
+    /// <see cref="FootprintConfig.DefaultPersistenceSeconds"/>; softer ground keeps its prints longer.</summary>
+    public float? FootprintPersistence { get; set; }
+
+    /// <summary>
     /// How reflective the block's surface is. Omitting the whole object (every block but the
     /// ores) leaves it perfectly diffuse and costs nothing at render time: the fragment shader
     /// branches on metallic being positive, and that branch is uniform across a quad.

@@ -29,6 +29,7 @@ using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Particles.Collapse;
+using VoxelEngine.Particles.Footprints;
 using VoxelEngine.Player;
 using VoxelEngine.Quests;
 using VoxelEngine.Rendering;
@@ -101,6 +102,9 @@ public class World
 
     /// <summary>The subtle footsteps of the player and the walking mobs.</summary>
     internal Footsteps Footsteps { get; } = new();
+
+    /// <summary>The footprints those steps leave on the ground (cosmetic; none on a headless server).</summary>
+    internal FootprintSystem Footprints { get; } = new();
     private readonly CampfireManager _campfires = new();
     private readonly QuernManager _querns = new();
     private readonly ChestManager _chests = new();
@@ -455,6 +459,7 @@ public class World
                 Camera.Effects = _health.Effects;
                 Camera.Healer = amount => _health.Heal(amount);
             LocalPlayer = new LocalPlayer(this, _health, _dust, _debris, _mobs, serverMode, clientMode);
+            if (!serverMode) Footsteps.FootfallTaken += Footprints.Spawn;
             var savedPlayer = PlayerSaveCodec.TryParse(saveStore?.ReadFile(PlayerSaveCodec.FileName));
             if (savedPlayer != null)
                 LocalPlayer.ApplySavedPlayer(savedPlayer);
@@ -1148,6 +1153,7 @@ public class World
         _fire.Update((float)deltaTime, Ambient.FireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
         Ambient.UpdateTorchFlames((float)deltaTime, Wind.Direction(LightingTime));
         Ambient.UpdateBubbles((float)deltaTime);
+        Footprints.Update((float)deltaTime, _chunkManager);
         Throws.UpdateThrown((float)deltaTime);
         Throws.RefreshProjectiles();
         Ambient.UpdateSplashes((float)deltaTime);
@@ -1294,6 +1300,7 @@ public class World
             Ambient.UpdateSpringSteam((float)deltaTime, Camera.RenderEye);
         Ambient.UpdateTorchFlames((float)deltaTime, wind);
         Ambient.UpdateBubbles((float)deltaTime);
+        Footprints.Update((float)deltaTime, _chunkManager);
 
         // Falling cubes shove the player aside instead of landing inside them; strictly
         // one-way, the player never deflects a cube
