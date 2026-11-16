@@ -492,6 +492,120 @@ public sealed class ChunkSaveStoreTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ManualRetryAfterAdmissionClosesPreservesFailedWriteForShutdown(bool wholeFile)
+    {
+        var failedKey = ChunkKey.Pack(4, 1, 2);
+        var blockerKey = ChunkKey.Pack(5, 1, 2);
+        var acceptedSnapshot = Snapshot("stone", seed: 41);
+        var blockerSnapshot = Snapshot("dirt", seed: 42);
+        var acceptedBytes = Enumerable.Range(1, 64).Select(i => (byte)i).ToArray();
+        var blockerBytes = Enumerable.Range(65, 64).Select(i => (byte)i).ToArray();
+        var failedFile = "lod-edits.bin";
+        var blockerFile = Path.Combine(WorldStore.PlayersDirectoryName, "retry-blocker.bin");
+        var failedPath = Path.GetFullPath(wholeFile
+            ? Path.Combine(_world, failedFile)
+            : Path.Combine(ChunksDir, WorldStore.ChunkFileName(4, 1, 2)));
+        var blockerPath = Path.GetFullPath(wholeFile
+            ? Path.Combine(_world, blockerFile)
+            : Path.Combine(ChunksDir, WorldStore.ChunkFileName(5, 1, 2)));
+        var initialMoveAttempts = SaveConfig.SaveMoveRetries + 1;
+        using var blockerEntered = new ManualResetEventSlim(false);
+        using var releaseBlocker = new ManualResetEventSlim(false);
+        var failedAttempts = 0;
+        var blockerAttempts = 0;
+        var store = new ChunkSaveStore(_world);
+        Thread? shutdown = null;
+        var shutdownResult = false;
+        var retryCount = -1;
+        var failedCountAfterRetry = -1;
+
+        store.MoveFile = (tmp, final) =>
+        {
+            var path = Path.GetFullPath(final);
+            if (path == failedPath)
+            {
+                if (Interlocked.Increment(ref failedAttempts) <= initialMoveAttempts)
+                    throw new IOException("the accepted artifact fails its initial write cycle");
+                File.Move(tmp, final, overwrite: true);
+                return;
+            }
+
+            if (path == blockerPath)
+            {
+                Interlocked.Increment(ref blockerAttempts);
+                blockerEntered.Set();
+                Assert.True(releaseBlocker.Wait(ShutdownTimeout), "the test did not release the in-flight blocker write");
+            }
+
+            File.Move(tmp, final, overwrite: true);
+        };
+
+        try
+        {
+            if (wholeFile)
+            {
+                store.EnqueueFile(failedFile, acceptedBytes);
+                store.EnqueueFile(blockerFile, blockerBytes);
+            }
+            else
+            {
+                store.Enqueue(failedKey, acceptedSnapshot);
+                store.Enqueue(blockerKey, blockerSnapshot);
+            }
+
+            Assert.True(blockerEntered.Wait(ShutdownTimeout), "the writer did not reach the accepted blocker job");
+            Assert.Equal(initialMoveAttempts, Volatile.Read(ref failedAttempts));
+            Assert.Equal(1, store.FailedCount);
+
+            shutdown = new Thread(() => shutdownResult = store.Shutdown(ShutdownTimeout));
+            shutdown.Start();
+            Assert.True(SpinWait.SpinUntil(() => store.IsAddingCompletedForTests, ShutdownTimeout),
+                "shutdown did not close admission while the blocker write was in flight");
+
+            retryCount = store.RetryFailed();
+            failedCountAfterRetry = store.FailedCount;
+        }
+        finally
+        {
+            releaseBlocker.Set();
+            if (shutdown == null)
+                ShutdownOrFail(store);
+            else
+                Assert.True(shutdown.Join(ShutdownTimeout), "shutdown did not return after the blocker was released");
+        }
+
+        Assert.True(shutdownResult, "the writer did not finish after the blocker was released");
+        var reopened = new ChunkSaveStore(_world);
+        try
+        {
+            if (wholeFile)
+            {
+                Assert.Equal(acceptedBytes, reopened.ReadFile(failedFile));
+                Assert.Equal(blockerBytes, reopened.ReadFile(blockerFile));
+            }
+            else
+            {
+                Assert.True(reopened.TryLoad(failedKey, out var acceptedOnDisk));
+                AssertSameData(acceptedSnapshot, acceptedOnDisk);
+                Assert.True(reopened.TryLoad(blockerKey, out var blockerOnDisk));
+                AssertSameData(blockerSnapshot, blockerOnDisk);
+            }
+        }
+        finally
+        {
+            ShutdownOrFail(reopened);
+        }
+
+        Assert.Equal(0, retryCount);
+        Assert.Equal(1, failedCountAfterRetry);
+        Assert.Equal(0, store.FailedCount);
+        Assert.Equal(initialMoveAttempts + 1, Volatile.Read(ref failedAttempts));
+        Assert.Equal(1, Volatile.Read(ref blockerAttempts));
+    }
+
     [Fact]
     public void AFolderWithALiveWriterCannotBeOpenedAgain()
     {

@@ -74,6 +74,9 @@ public sealed class ChunkSaveStore
     // may replace the readable pending value, but must not turn into a disk write at shutdown.
     private readonly ConcurrentDictionary<long, ChunkSnapshot> _failedChunks = new();
     private readonly ConcurrentDictionary<string, byte[]> _failedFiles = new(StringComparer.Ordinal);
+    // Serializes manual retries with the writer's shutdown scan so a rejected queue add cannot
+    // remove an artifact before that final scan sees it.
+    private readonly object _failedRetryGate = new();
     // Files a read gave up on: set aside as .bad before the writer first replaces them
     private readonly ConcurrentDictionary<long, byte> _unreadableChunks = new();
     private readonly ConcurrentDictionary<string, byte> _unreadableFiles = new(StringComparer.Ordinal);
@@ -258,28 +261,42 @@ public sealed class ChunkSaveStore
     /// <summary>
     /// Re-queues every write whose last attempt failed (its newest pending snapshot or bytes), so a
     /// file that was briefly locked gets another try without the chunk having to be edited again.
-    /// Returns how many were re-queued. Shutdown uses its own writer-side final pass after drain.
+    /// Returns how many retry jobs were newly accepted by the writer. Shutdown uses its own
+    /// writer-side final pass after drain.
     /// </summary>
     public int RetryFailed()
     {
-        var retried = 0;
-        foreach (var key in _failedChunks.Keys)
+        lock (_failedRetryGate)
         {
-            if (_failedChunks.TryRemove(key, out _) && _pending.ContainsKey(key))
+            var retried = 0;
+            foreach (var key in _failedChunks.Keys)
             {
-                QueueChunk(key);
-                retried++;
+                if (!_failedChunks.TryRemove(key, out var failedSnapshot))
+                    continue;
+                if (!_pending.ContainsKey(key))
+                {
+                    _failedChunks.TryAdd(key, failedSnapshot);
+                    continue;
+                }
+                if (QueueChunk(key))
+                    retried++;
+                else
+                    _failedChunks.TryAdd(key, failedSnapshot);
             }
-        }
-        foreach (var fileName in _failedFiles.Keys)
-        {
-            if (_failedFiles.TryRemove(fileName, out _) && _pendingFiles.TryGetValue(fileName, out var bytes))
+
+            foreach (var fileName in _failedFiles.Keys)
             {
-                TryAdd(new SaveJob(0, fileName, bytes));
-                retried++;
+                if (!_failedFiles.TryRemove(fileName, out var failedBytes))
+                    continue;
+                var bytes = _pendingFiles.TryGetValue(fileName, out var pendingBytes) ? pendingBytes : failedBytes;
+                if (TryAdd(new SaveJob(0, fileName, bytes)))
+                    retried++;
+                else
+                    _failedFiles.TryAdd(fileName, failedBytes);
             }
+
+            return retried;
         }
-        return retried;
     }
 
     /// <summary>
@@ -303,30 +320,34 @@ public sealed class ChunkSaveStore
         return false;
     }
 
-    private void TryAdd(SaveJob job)
+    private bool TryAdd(SaveJob job)
     {
         try
         {
             _jobs.Add(job);
+            return true;
         }
         catch (InvalidOperationException)
         {
             Log.Warn($"Chunk save store for '{WorldDirectory}' is shut down; a write was dropped.");
+            return false;
         }
     }
 
-    private void QueueChunk(long key)
+    private bool QueueChunk(long key)
     {
         if (!_queuedChunks.TryAdd(key, 0))
-            return;
+            return false;
         try
         {
             _jobs.Add(new SaveJob(key, null, null));
+            return true;
         }
         catch (InvalidOperationException)
         {
             _queuedChunks.TryRemove(key, out _);
             Log.Warn($"Chunk save store for '{WorldDirectory}' is shut down; a write was dropped.");
+            return false;
         }
     }
 
@@ -367,36 +388,45 @@ public sealed class ChunkSaveStore
     // the final attempts stay pending/diagnosed but never schedule another shutdown cycle.
     private void RetryFailedAfterDrain()
     {
-        var chunks = new List<long>(_failedChunks.Keys);
-        var files = new List<string>(_failedFiles.Keys);
+        var chunks = new List<KeyValuePair<long, ChunkSnapshot>>();
+        var files = new List<KeyValuePair<string, byte[]>>();
+        lock (_failedRetryGate)
+        {
+            foreach (var key in _failedChunks.Keys)
+                if (_failedChunks.TryRemove(key, out var snapshot))
+                    chunks.Add(new KeyValuePair<long, ChunkSnapshot>(key, snapshot));
+            foreach (var fileName in _failedFiles.Keys)
+                if (_failedFiles.TryRemove(fileName, out var bytes))
+                    files.Add(new KeyValuePair<string, byte[]>(fileName, bytes));
+        }
+
         if (chunks.Count + files.Count > 0)
             Log.Warn($"Chunk save store for '{WorldDirectory}': retrying {chunks.Count + files.Count} failed write(s) at shutdown.");
 
-        foreach (var key in chunks)
+        foreach (var (key, snapshot) in chunks)
         {
-            if (!_failedChunks.TryRemove(key, out var snapshot))
-                continue;
             try
             {
                 WriteChunk(key, snapshot);
             }
             catch (Exception e)
             {
-                _failedChunks[key] = snapshot;
+                lock (_failedRetryGate)
+                    _failedChunks.TryAdd(key, snapshot);
                 Log.Warn($"Chunk save writer: unexpected {e.GetType().Name}: {e.Message}");
             }
         }
-        foreach (var fileName in files)
+
+        foreach (var (fileName, bytes) in files)
         {
-            if (!_failedFiles.TryRemove(fileName, out var bytes))
-                continue;
             try
             {
                 WriteWholeFile(fileName, bytes);
             }
             catch (Exception e)
             {
-                _failedFiles[fileName] = bytes;
+                lock (_failedRetryGate)
+                    _failedFiles.TryAdd(fileName, bytes);
                 Log.Warn($"Chunk save writer: unexpected {e.GetType().Name}: {e.Message}");
             }
         }
@@ -413,11 +443,13 @@ public sealed class ChunkSaveStore
         if (!TryWriteAndMove(final, encoded.GetBuffer().AsSpan(0, (int)encoded.Length)))
         {
             // Keep the pending entry: still readable; a later enqueue or shutdown retries it.
-            _failedChunks[key] = snapshot;
+            lock (_failedRetryGate)
+                _failedChunks[key] = snapshot;
             return;
         }
 
-        _failedChunks.TryRemove(key, out _);
+        lock (_failedRetryGate)
+            _failedChunks.TryRemove(key, out _);
         _index.TryAdd(key, 0);
         // Only if it is still THIS snapshot: a newer enqueue for the key must survive
         _pending.TryRemove(new KeyValuePair<long, ChunkSnapshot>(key, snapshot));
@@ -439,10 +471,12 @@ public sealed class ChunkSaveStore
         }
         if (!TryWriteAndMove(final, bytes))
         {
-            _failedFiles[fileName] = bytes;
+            lock (_failedRetryGate)
+                _failedFiles[fileName] = bytes;
             return;
         }
-        _failedFiles.TryRemove(fileName, out _);
+        lock (_failedRetryGate)
+            _failedFiles.TryRemove(fileName, out _);
         _pendingFiles.TryRemove(new KeyValuePair<string, byte[]>(fileName, bytes));
     }
 
