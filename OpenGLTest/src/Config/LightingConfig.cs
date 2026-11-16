@@ -15,6 +15,12 @@ public static class LightingConfig
     // (TextureLoader.UploadArray's sampleMips). Clamped to the driver's maximum at upload.
     public const float AtlasAnisotropy = 8f;
 
+    // Brightness of a vertex at the darkest baked AO level (both sides of the corner occluded).
+    // The shade multiplies all of a face's light, so 0 would render every face whose four
+    // corners are enclosed (the floor of a 1x1 shaft) pitch black however lit its cell is.
+    // Levels 1..3 ramp linearly from here to 1.
+    public const float VertexAoFloor = 0.25f;
+
     // Directional shadow map resolution (depth texture is Size x Size)
     public const int ShadowMapSize = 2048;
 

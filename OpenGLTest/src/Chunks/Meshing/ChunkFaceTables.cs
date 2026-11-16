@@ -68,9 +68,14 @@ internal static class ChunkFaceTables
             AODeltas[i] = deltas;
 
             for (var ao = 0; ao <= 3; ao++)
-                ShadeLut[(i << 2) | ao] = (byte)(FaceBrightness[i] * ao * MathUtils.ONE_THIRD * 255);
+                ShadeLut[(i << 2) | ao] = (byte)(FaceBrightness[i] * AoBrightness(ao) * 255);
         }
     }
+
+    /// <summary>Brightness of baked AO level <paramref name="ao"/> (0 = darkest, 3 = open):
+    /// a linear ramp from <see cref="LightingConfig.VertexAoFloor"/> to 1, never 0.</summary>
+    internal static float AoBrightness(int ao) =>
+        LightingConfig.VertexAoFloor + (1f - LightingConfig.VertexAoFloor) * ao * MathUtils.ONE_THIRD;
 
     private static int PaddedDelta(Vector3 offset) =>
         (int)offset.X * PaddedSq + (int)offset.Y * Padded + (int)offset.Z;

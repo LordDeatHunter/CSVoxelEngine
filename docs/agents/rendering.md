@@ -394,6 +394,12 @@ the crease is exactly the plain midpoint crease. The cost is that a corner seen 
 keeps a band about that reach wide in the world rather than a tap radius wide on screen.
 `ContactAoEnabled = false` skips the pass entirely.
 
+**Baked vertex AO floor.** The mesher's per-corner AO level (`ChunkFaceTables.VertexAO`, 0..3) becomes the
+vertex shade through `ChunkFaceTables.AoBrightness`, a linear ramp from `LightingConfig.VertexAoFloor` to 1.
+The shade multiplies all of the face's light (sun, sky and torch), so the darkest level must never be 0: before the
+floor, a face with all four corners enclosed (the floor of a 1x1 shaft dug straight down) rendered pitch black
+however much light reached its cell. `ShadeLutTests` locks the rule.
+
 **Rarity chrome.** An item's rarity dresses its [E] list rows, its chest card rows and its hover
 tooltip. `ui-fragment.glsl` has a `uChrome` mode with five vec4 uniforms (`uChromeBox`, `uChromeColor`,
 `uChromeLayers`, `uChromeShape`, `uChromeMotion`). With `uChrome` 1 the quad is a row or the tooltip box:
