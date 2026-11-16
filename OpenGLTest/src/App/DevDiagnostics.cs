@@ -61,14 +61,15 @@ internal sealed class DevDiagnostics
     /// dusk or night can be photographed straight away instead of after minutes of orbit.
     /// Parsed once here; an unparseable value is ignored with a warning, like VOXEL_SPAWN.
     /// </summary>
-    internal static double ReadTimeOffset()
+    internal static double ReadTimeOffset() => ParseTimeOffset(Environment.GetEnvironmentVariable(TimeOffsetVariable));
+
+    internal static double ParseTimeOffset(string? timeOverride)
     {
-        var timeOverride = Environment.GetEnvironmentVariable(TimeOffsetVariable);
         if (string.IsNullOrWhiteSpace(timeOverride))
             return 0.0;
 
         if (double.TryParse(timeOverride.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture,
-                out var offset))
+                out var offset) && double.IsFinite(offset))
             return offset;
 
         Log.WriteLine(
