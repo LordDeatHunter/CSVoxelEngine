@@ -321,7 +321,14 @@ after the panel arrives the cells go back to the chunk with one remesh; on that 
 cleared and a pinned player is squeezed out of the boxes (`BodyCollision.PushOutOfBox`), so a door never traps
 anyone. A door broken or unloaded mid-swing ends its swing at once. Trapdoors still flip. A blast
 clears cells without these hooks, so it can leave one half standing (like a multiblock without
-a sweep); breaking that orphan drops the door as usual. The door's pull sits on the center line because of the mirrored uv.
+a sweep); breaking that orphan drops the door as usual. **Standalone renders** of any multi-cell block come from one
+place, `BlockCubeCache.WholeModel` (GL-free): `Get` (icons, held item, drops, every floating copy) and `GetLookAt` (the
+look-at label) both draw a two-cell block as both halves stacked and a multiblock anchor as its whole volume, fitted to
+one cell, so no consumer can show one cell of an object; a two-cell block is centered sideways on what is drawn, and the
+look-at label does the same for every block, so a thin door or a wall torch spins about itself, not its cell. The
+label's id comes from `WholeBlock.IdAt` (any cell of a multiblock or of a two-cell block names the one object). The
+wiki's block view matches: `viewer3d.ts` stacks `upperModel` and frames it through `pivot.ts` (`pivotBox`), which
+slides the orbit center onto the drawn shape. `WholeModelTests` and `wiki/scripts/pivot.test.mjs` cover both. The door's pull sits on the center line because of the mirrored uv.
 `DoorTests` covers placement, the two-cell refusal, breaking either half, the shared toggle and the double door (the
 mirrored second door, the placements that stay plain, the four-cell toggle, the mirrored shapes), the loose-body
 collision and the swing (the panel matrix against the boxes, the lifecycle and reversal, a body swept out);

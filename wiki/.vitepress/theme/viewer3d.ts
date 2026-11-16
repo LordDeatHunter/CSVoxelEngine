@@ -1,5 +1,6 @@
 // three.js scene builders for the wiki's ModelViewer: blocks (resolved model elements), items (extruded
 // sprite) and entities (.bbmodel with animation clips). three is imported lazily so SSR never loads it.
+import { pivotBox } from './pivot.ts'
 import { clipTime, keyValue, positionToBlocks, rotationToEuler, sample, sheetFrame, storesPreviewSigns, type Key, type Sheet, type Vec3 } from './animation.ts'
 
 type THREE = typeof import('three')
@@ -199,7 +200,11 @@ export async function buildBlock(host: HTMLElement, block: any, base: string): P
   scene.add(group)
   const h = size / 2
   const hy = block.upperModel ? 1 : h
-  stage.frame(new T.Box3(new T.Vector3(-h, -hy, -h), new T.Vector3(h, hy, h)))
+  // The view turns about the middle of what is drawn, like the game's look-at label, so a door's panel at the
+  // edge of its cell spins in place
+  const drawn = new T.Box3().setFromObject(group)
+  const box = pivotBox({ min: [-h, -hy, -h], max: [h, hy, h] }, { min: drawn.min.toArray() as Vec3, max: drawn.max.toArray() as Vec3 })
+  stage.frame(new T.Box3(new T.Vector3(...box.min), new T.Vector3(...box.max)))
   const note = block.renderer !== 'model' ? 'Representative shape; the in-game form depends on placement.' : ''
   return { dispose: stage.dispose, note }
 }

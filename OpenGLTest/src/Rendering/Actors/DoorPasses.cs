@@ -68,7 +68,7 @@ internal sealed class DoorPasses(GL gl, RenderManager owner) : IDisposable
             var quads = new List<BakedQuad>(lower[shape].Quads);
             foreach (var quad in upper[shape].Quads)
                 quads.Add(quad with { Positions = [.. Array.ConvertAll(quad.Positions, p => p + Vector3.UnitY)] });
-            mesh = Primitives.CreateBlockModel(gl, quads, center: 0f);
+            mesh = Primitives.CreateBlockModel(gl, quads, center: Vector3.Zero);
         }
 
         _meshes[key] = mesh;

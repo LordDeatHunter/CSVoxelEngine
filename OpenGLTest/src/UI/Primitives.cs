@@ -155,8 +155,9 @@ public static class Primitives
     /// handle quads above its model's air gap, rotating about the cell center.
     /// </summary>
     public static Mesh CreateBlockModel(GL gl, IReadOnlyList<BakedQuad> quads, float size = 1f,
-        float center = 0.5f)
+        Vector3? center = null)
     {
+        var origin = center ?? new Vector3(0.5f);
         var vertices = new Vertex[quads.Count * CornersPerFace];
         var indices = new ushort[quads.Count * 6];
 
@@ -172,7 +173,7 @@ public static class Primitives
             {
                 // Baked positions span the 0..1 cell (a multiblock's 0..2 volume, centered on
                 // `center`), so recenter before scaling
-                var position = (quad.Positions[corner] - new Vector3(center)) * size;
+                var position = (quad.Positions[corner] - origin) * size;
                 vertices[q * CornersPerFace + corner] =
                     Vert(position, tint, quad.Uvs[corner], quad.Tile, quad.Normal);
             }

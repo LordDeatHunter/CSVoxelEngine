@@ -89,6 +89,9 @@ public sealed class DoorTests : IDisposable
             var (x, y, z) = PlaceDoor(door.Id, 2 + 3 * facing, 4, facing);
             Assert.Equal(held, _world.Player.Inventory.CountFor(door.Id));
             Assert.Equal((door.Id, door.UpperHalfId), (_world.IdAt(x, y, z), _world.IdAt(x, y + 1, z)));
+            // Either cell is the one door to whatever names the block under the crosshair
+            Assert.Equal(door.Id, WholeBlock.IdAt(_world.Manager, x, y, z, out _));
+            Assert.Equal(door.Id, WholeBlock.IdAt(_world.Manager, x, y + 1, z, out _));
             var state = _world.StateAt(x, y, z);
             Assert.Equal(state, _world.StateAt(x, y + 1, z));
             Assert.Equal((facing, false), (DoorState.Facing(state), DoorState.IsOpen(state)));

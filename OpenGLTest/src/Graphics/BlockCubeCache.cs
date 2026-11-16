@@ -19,6 +19,8 @@ namespace VoxelEngine.Graphics;
 /// <summary>
 /// Lazily built cube meshes, one per block type. Item drops, held items and inventory
 /// icons all draw the same geometry, so they share one cache instead of each keeping a copy.
+/// Every one of them is the whole object (<see cref="WholeModel"/>): a block two cells tall shows both halves and
+/// a multiblock anchor its whole volume, fitted to one cell, so no consumer can show a single cell of one.
 /// (The mining pop used to share it too; it now draws the hitboxes as tile-cropped boxes
 /// via PopBoxEmitter so partial blocks keep their texel density.) The break debris asks for
 /// <see cref="GetTinted"/> instead, which for a biome-tinted block is a second cube wearing
@@ -31,13 +33,14 @@ public class BlockCubeCache : IDisposable
     private readonly Dictionary<ushort, Mesh> _meshes = new();
     private readonly Dictionary<ushort, Mesh> _tintedMeshes = new();
     private readonly Dictionary<ushort, Mesh> _surfaceMeshes = new();
-    private readonly Dictionary<ushort, Mesh> _tallMeshes = new();
+    private readonly Dictionary<ushort, Mesh> _lookMeshes = new();
     private readonly Dictionary<(ushort, int), Mesh> _pileMeshes = new();
     private Mesh? _colorChip;
 
     public BlockCubeCache(GL gl) => _gl = gl;
 
-    /// <summary>The cube for a block type, or null for air and unknown ids.</summary>
+    /// <summary>The cube for a block type, the whole object for a multi-cell one (<see cref="WholeModel"/>), or
+    /// null for air and unknown ids.</summary>
     public Mesh? Get(ushort blockId)
     {
         if (_meshes.TryGetValue(blockId, out var mesh))
@@ -48,49 +51,68 @@ public class BlockCubeCache : IDisposable
 
         // Every registered block is baked at startup; the plain cube is only a safety net so a
         // half-initialized registry still draws something instead of throwing
-        // A multiblock anchor's model spans the whole volume: center it on the volume and
-        // shrink it to the one-cell footprint every other block's cube has
-        mesh = type.BakedModel == null ? CreateFallbackCube(type)
-            : type.Renderer == BlockRenderer.Multiblock
-                ? Primitives.CreateBlockModel(_gl, type.BakedModel.Quads,
-                    1f / type.MultiblockSize, type.MultiblockSize / 2f)
-                : Primitives.CreateBlockModel(_gl, type.BakedModel);
+        if (type.BakedModel == null)
+        {
+            mesh = CreateFallbackCube(type);
+        }
+        else
+        {
+            var whole = WholeModel(type);
+            mesh = Primitives.CreateBlockModel(_gl, whole.Quads, whole.Size, whole.Center);
+        }
         _meshes[blockId] = mesh;
         return mesh;
     }
 
     /// <summary>
-    /// The mesh the look-at label spins for a block: <see cref="Get"/>, except a lower half of a two-cell block
-    /// (a waystone, a door) shows both halves stacked, shrunk to the one-cell footprint like a multiblock anchor's
-    /// volume. Null for air and unknown ids.
+    /// The quads of the whole object a block stands for, in the block's own cell space, with the scale and the
+    /// center that fit it to the one-cell footprint every plain block's cube has. A multiblock anchor's model spans
+    /// its whole volume, centered on the volume. The lower half of a two-cell block (a door, a waystone) is both
+    /// halves stacked, centered where they meet and, sideways, on the middle of what is drawn, so a thin door spins
+    /// about its own panel. Every other block is its model about its cell's vertical center;
+    /// <paramref name="visualCenter"/> also centers it sideways on what is drawn (the look-at label, whose shape
+    /// spins in place). GL-free.
     /// </summary>
-    public Mesh? GetWhole(ushort blockId)
+    public static (IReadOnlyList<BakedQuad> Quads, float Size, Vector3 Center) WholeModel(BlockType type,
+        bool visualCenter = false)
     {
-        if (BlockType.ById[blockId] is not { UpperHalfId: not 0 } lower
-            || lower.BakedModel is not { } lowerModel
-            || BlockType.ById[lower.UpperHalfId]?.BakedModel is not { } upperModel)
-            return Get(blockId);
-        if (_tallMeshes.TryGetValue(blockId, out var mesh))
-            return mesh;
+        var model = type.BakedModel!;
+        if (type.Renderer == BlockRenderer.Multiblock)
+            return (model.Quads, 1f / type.MultiblockSize, new Vector3(type.MultiblockSize / 2f));
 
-        // Each half moves half a cell toward its own end, so the stack is centered on the cell center
-        var quads = new List<BakedQuad>(lowerModel.Quads.Length + upperModel.Quads.Length);
-        quads.AddRange(lowerModel.Quads.Select(q => Shifted(q, -0.5f)));
-        quads.AddRange(upperModel.Quads.Select(q => Shifted(q, 0.5f)));
-        mesh = Primitives.CreateBlockModel(_gl, quads, 0.5f);
-        _tallMeshes[blockId] = mesh;
-        return mesh;
+        if (type.UpperHalfId != 0 && BlockType.ById[type.UpperHalfId]?.BakedModel is { } upper)
+        {
+            BakedQuad[] quads = [.. model.Quads, .. upper.Quads.Select(q => Shifted(q, 1f))];
+            return (quads, 0.5f, SidewaysMiddle(quads) with { Y = 1f });
+        }
+
+        return (model.Quads, 1f, visualCenter ? SidewaysMiddle(model.Quads) with { Y = 0.5f } : new Vector3(0.5f));
+    }
+
+    // The middle of the quads' bounds on X and Z (Y is the caller's)
+    private static Vector3 SidewaysMiddle(IReadOnlyList<BakedQuad> quads)
+    {
+        var min = new Vector3(float.MaxValue);
+        var max = new Vector3(float.MinValue);
+        foreach (var quad in quads)
+        foreach (var position in quad.Positions)
+        {
+            min = Vector3.Min(min, position);
+            max = Vector3.Max(max, position);
+        }
+        return quads.Count == 0 ? new Vector3(0.5f) : (min + max) * 0.5f;
     }
 
     /// <summary>
     /// The mesh the look-at label spins for a block in a given state: a branch pile is its
     /// <see cref="BuildBranchPile"/> sticks (one per state-byte count, so the label shows how many the cell
-    /// holds), anything else is <see cref="GetWhole"/>.
+    /// holds), anything else is <see cref="WholeModel"/> about its visual center, so a shape that does not fill
+    /// its cell (a wall torch, a door) still spins in place.
     /// </summary>
     public Mesh? GetLookAt(ushort blockId, byte state)
     {
         if (BlockType.ById[blockId] is not { Renderer: BlockRenderer.BranchPile } type)
-            return GetWhole(blockId);
+            return GetCentered(blockId);
 
         var count = BranchPileGenerator.CountWithState(state, type.StackMax >= 2 ? type.StackMax : 4);
         var key = (blockId, count);
@@ -132,6 +154,20 @@ public class BlockCubeCache : IDisposable
             }
         }
         return (vertices.ToArray(), indices.ToArray());
+    }
+
+    // Get's mesh when the block already sits in the middle of its cell, else its own about the visual center
+    private Mesh? GetCentered(ushort blockId)
+    {
+        if (BlockType.ById[blockId] is not { BakedModel: not null } type) return Get(blockId);
+        var whole = WholeModel(type, visualCenter: true);
+        if (whole.Center == WholeModel(type).Center) return Get(blockId);
+        if (_lookMeshes.TryGetValue(blockId, out var mesh))
+            return mesh;
+
+        mesh = Primitives.CreateBlockModel(_gl, whole.Quads, whole.Size, whole.Center);
+        _lookMeshes[blockId] = mesh;
+        return mesh;
     }
 
     private static BakedQuad Shifted(BakedQuad quad, float dy) =>
@@ -277,9 +313,9 @@ public class BlockCubeCache : IDisposable
         foreach (var mesh in _tintedMeshes.Values)
             mesh.Dispose();
         _tintedMeshes.Clear();
-        foreach (var mesh in _tallMeshes.Values)
+        foreach (var mesh in _lookMeshes.Values)
             mesh.Dispose();
-        _tallMeshes.Clear();
+        _lookMeshes.Clear();
         foreach (var mesh in _pileMeshes.Values)
             mesh.Dispose();
         _pileMeshes.Clear();

@@ -5,7 +5,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
 ```
     Graphics/                  # GL resource wrappers: Mesh, Shader, textures and the atlases,
                                #   the block/item mesh caches, cutout mips, tile materials
-      BlockCubeCache.cs        # lazily built cube meshes, one per block type (`GetWhole`: the look-at label's mesh, a two-cell block's halves stacked)
+      BlockCubeCache.cs        # lazily built cube meshes, one per block type, always the whole object (`WholeModel`, GL-free: a two-cell block's halves stacked, a multiblock's volume, fitted to one cell; `GetLookAt` spins it about its visual center)
       CutoutMipmap.cs          # GL-free coverage-preserving mip chain for cutout tiles (alpha rescaled per level)
       ItemMeshCache.cs         # lazily built extruded-sprite meshes plus their GL textures, one per Item
       Mesh.cs                  # an indexed triangle mesh in the shared Vertex layout
@@ -61,6 +61,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       SwordSwing.cs            # the three sword swings, in chain order
       SwordSwings.cs           # GL-free per-swing rules: the chain's successor, power, targets, cone vs
                                #   hemisphere, shove and hit-stop weight
+      WholeBlock.cs            # GL-free: the object a world cell belongs to (multiblock anchor, a two-cell block's lower half), for whatever names the block under the crosshair
       TallBlock.cs             # GL-free two-cell block rules (a door, a waystone): each half's partner cell
                                #   and block, and the lower half every half drops and picks as
       ThrowAction.cs           # World component: Q drops, the throw charge and release, the projectiles in flight
