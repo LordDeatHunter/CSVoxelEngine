@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using VoxelEngine.Audio;
 using VoxelEngine.Content.Blocks;
 using Xunit;
@@ -46,6 +47,15 @@ public sealed class SfxTests
             Assert.True(SfxManager.TryLoad(path, out var samples), path);
             Assert.NotEmpty(samples);
         });
+    }
+
+    // A clip the mixer cannot decode (it takes 16-bit stereo 44.1 kHz PCM only) is skipped at startup, so its
+    // group would be silent in game: every clip of every group must load
+    [Fact]
+    public void EveryShippedClipLoads()
+    {
+        var groups = SfxLibrary.Scan(Path.Combine(TestContent.FindAssetsRoot(), "sfx"));
+        Assert.All(groups.Values.SelectMany(clips => clips), path => Assert.True(SfxManager.TryLoad(path, out _), path));
     }
 
     [Fact]
