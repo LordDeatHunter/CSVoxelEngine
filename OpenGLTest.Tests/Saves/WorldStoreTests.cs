@@ -113,6 +113,48 @@ public sealed class WorldStoreTests : IDisposable
     }
 
     [Fact]
+    public void LegacyListKeepsItsEmptyResultWhenRootEnumerationFails()
+    {
+        Directory.CreateDirectory(_root);
+        var store = new WorldStore(_root)
+        {
+            EnumerateDirectories = _ => throw new IOException("injected enumeration failure"),
+        };
+
+        Assert.Empty(store.List());
+    }
+
+    [Fact]
+    public void TryListTreatsAnAbsentRootAsAReadableEmptyList()
+    {
+        var store = new WorldStore(_root);
+
+        Assert.True(store.TryList(out var worlds));
+        Assert.Empty(worlds);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TryListReportsRootEnumerationFailures(bool unauthorized)
+    {
+        Directory.CreateDirectory(_root);
+        var store = new WorldStore(_root)
+        {
+            EnumerateDirectories = _ =>
+            {
+                if (unauthorized)
+                    throw new UnauthorizedAccessException("injected enumeration failure");
+                throw new IOException("injected enumeration failure");
+            },
+        };
+
+        Assert.False(store.TryList(out var worlds));
+        Assert.Empty(worlds);
+        Assert.Empty(store.List());
+    }
+
+    [Fact]
     public void TouchLastPlayedReordersTheList()
     {
         long now = 1_000;

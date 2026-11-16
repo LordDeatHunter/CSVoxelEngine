@@ -305,6 +305,68 @@ public sealed class MainMenuControllerTests : IDisposable
         Assert.Single(_store.List());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FailedWorldEnumerationIsShownOnWorldAndHostPages(bool host)
+    {
+        _store.Create("One", 1);
+        _store.EnumerateDirectories = _ => throw new IOException("injected enumeration failure");
+        var controller = NewController();
+
+        if (host)
+            controller.OpenHost();
+        else
+            controller.OpenWorlds();
+
+        Assert.Empty(controller.View.Worlds);
+        Assert.True(controller.View.WorldListFailed);
+        Assert.Equal(MainMenuController.StoreErrorNotice, controller.View.Notice);
+    }
+
+    [Fact]
+    public void MissingWorldRootIsShownAsAnOrdinaryEmptyList()
+    {
+        var controller = NewController();
+
+        controller.OpenWorlds();
+
+        Assert.Empty(controller.View.Worlds);
+        Assert.False(controller.View.WorldListFailed);
+        Assert.Null(controller.View.Notice);
+    }
+
+    [Fact]
+    public void WorldListingFailureClearsAfterTheNextSuccessfulOpen()
+    {
+        _store.Create("One", 1);
+        _store.EnumerateDirectories = _ => throw new IOException("injected enumeration failure");
+        var controller = NewController();
+        controller.OpenWorlds();
+        Assert.True(controller.View.WorldListFailed);
+
+        _store.EnumerateDirectories = Directory.GetDirectories;
+        controller.OpenWorlds();
+
+        Assert.False(controller.View.WorldListFailed);
+        Assert.Null(controller.View.Notice);
+        Assert.Equal("One", Assert.Single(controller.View.Worlds).Name);
+    }
+
+    [Fact]
+    public void WorldListingFailureDoesNotReplaceTheWorldsLockedNotice()
+    {
+        _store.EnumerateDirectories = _ => throw new IOException("injected enumeration failure");
+        var controller = NewController();
+        controller.View.WorldsLocked = true;
+        controller.View.Notice = "Worlds are locked";
+
+        controller.OpenWorlds();
+
+        Assert.True(controller.View.WorldListFailed);
+        Assert.Equal("Worlds are locked", controller.View.Notice);
+    }
+
     [Fact]
     public void ScrollClampsToTheListAndOnlyOnTheWorldsPage()
     {

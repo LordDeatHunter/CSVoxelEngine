@@ -120,6 +120,9 @@ public sealed class MainMenuView
     /// <summary>The worlds page's rows, as <see cref="WorldStore.List"/> returned them.</summary>
     public List<WorldInfo> Worlds { get; } = [];
 
+    /// <summary>Whether the latest world-list read failed, so an empty failure is not shown as no worlds.</summary>
+    internal bool WorldListFailed { get; set; }
+
     /// <summary>
     /// Raw scroll of the worlds list in canvas units; draw and hit-test clamp it on read with
     /// that frame's row count (<see cref="MainMenuLayout.ClampedOffset"/>), as the inventory does.

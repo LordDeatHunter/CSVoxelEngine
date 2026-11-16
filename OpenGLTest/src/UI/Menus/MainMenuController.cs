@@ -85,8 +85,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
     {
         if (!View.WorldsLocked)
             View.Notice = null;
-        View.Worlds.Clear();
-        Guarded(() => View.Worlds.AddRange(store.List()));
+        ReadWorlds();
         View.ScrollOffset = 0f;
         View.SelectedRow = -1;
         View.Focus = MenuField.None;
@@ -114,8 +113,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
     {
         if (!View.WorldsLocked)
             View.Notice = null;
-        View.Worlds.Clear();
-        Guarded(() => View.Worlds.AddRange(store.List()));
+        ReadWorlds();
         View.ScrollOffset = 0f;
         View.SelectedRow = -1;
         View.Focus = MenuField.None;
@@ -602,6 +600,24 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
     {
         if (!View.WorldsLocked)
             View.Notice = StoreErrorNotice;
+    }
+
+    private void ReadWorlds()
+    {
+        View.Worlds.Clear();
+        View.WorldListFailed = false;
+        if (!Guarded(() =>
+        {
+            if (!store.TryList(out var worlds))
+            {
+                View.WorldListFailed = true;
+                SetErrorNotice();
+                return;
+            }
+
+            View.Worlds.AddRange(worlds);
+        }))
+            View.WorldListFailed = true;
     }
 
     private bool Guarded(Action call)
