@@ -32,6 +32,9 @@ public static class TimeCommand
 
     private static void Set(CommandContext context, double seconds)
     {
+        if (!double.IsFinite(seconds))
+            throw new CommandException("The resulting time must be finite");
+
         context.Source.Host.SetLightingTime(seconds);
         context.Source.Host.Announce(string.Create(CultureInfo.InvariantCulture,
             $"{context.Source.Name} set the time to {Math.Round(seconds, 1)} s"));
