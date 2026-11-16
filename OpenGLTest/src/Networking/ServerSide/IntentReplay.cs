@@ -64,6 +64,9 @@ internal sealed class IntentReplay
                     accepted = _state.World.ThrowSelected(intent.Action == NetInventoryAction.DropAllSelected,
                         player.Position, player.Forward, player.Inventory);
                     break;
+                case NetInventoryAction.CreativeQuest:
+                    accepted = InventoryIntentRules.ApplyQuest(player.Quests, intent, player.Creative);
+                    break;
                 default:
                     accepted = InventoryIntentRules.Apply(player.Inventory, intent, player.Creative);
                     break;

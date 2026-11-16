@@ -69,7 +69,7 @@ internal sealed class GameplayInput
         this.session = session;
         this.diagnostics = diagnostics;
         Forge = new ForgeInput(inputManager, renderManager, session);
-        QuestBook = new QuestBookInput(inputManager, renderManager);
+        QuestBook = new QuestBookInput(inputManager, renderManager, session);
         Map = new MapInput(inputManager, renderManager);
     }
 

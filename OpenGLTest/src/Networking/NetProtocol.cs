@@ -138,6 +138,9 @@ public enum NetInventoryAction : byte
     /// <summary>Swaps the selected hotbar slot with the offhand. The offhand is named by slot index
     /// <c>Inventory.OffhandIndex</c> in <c>Equip</c>, <c>MoveSlot</c> and <c>ClearSlot</c>.</summary>
     SwapHands = 15,
+    /// <summary>A creative player's quest edit: <c>Recipe</c> is the quest id, <c>Count</c> 1 earns it (and every
+    /// quest it depends on), 0 unearns it (and every quest that depends on it).</summary>
+    CreativeQuest = 16,
 }
 
 /// <summary>
@@ -297,8 +300,10 @@ public static class NetFraming
     /// equip, move and clear intents may name it, and each <see cref="NetMessage.PlayerList"/> entry ends with the offhand's
     /// held item and lit flag; an older peer would misread the frame.
     /// 59: each floor of a battle tower in the station snapshot ends with the spots of its bone piles (a count byte, then
-    /// three floats each); an older peer would misread the frame.</summary>
-    public const int ProtocolVersion = 59;
+    /// three floats each); an older peer would misread the frame.
+    /// 60: <see cref="NetInventoryAction.CreativeQuest"/> (a creative player's quest earn or unearn, the quest id then an
+    /// earn byte); an older peer would refuse it as malformed.</summary>
+    public const int ProtocolVersion = 60;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

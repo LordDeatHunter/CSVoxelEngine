@@ -17,6 +17,8 @@ namespace VoxelEngine.Networking;
 /// in ingredient order).</item>
 /// <item><see cref="NetInventoryAction.CreativeGrant"/>: <see cref="Id"/> and <see cref="Count"/>.</item>
 /// <item><see cref="NetInventoryAction.CreativeClear"/> / <see cref="NetInventoryAction.PickBlock"/>: <see cref="Id"/>.</item>
+/// <item><see cref="NetInventoryAction.CreativeQuest"/>: <see cref="Recipe"/> (the quest id) and <see cref="Count"/>
+/// (1 earn, 0 unearn).</item>
 /// <item><see cref="NetInventoryAction.SelectStaffSlot"/>: <see cref="Slot"/>, the held staff's spell
 /// slot to select.</item>
 /// <item><see cref="NetInventoryAction.BindStaffSlot"/>: <see cref="Slot"/> and <see cref="Parts"/>, the
@@ -57,6 +59,10 @@ public readonly record struct InventoryIntent(
 
     public static InventoryIntent CreativeGrant(ushort id, int count) =>
         new(NetInventoryAction.CreativeGrant, Id: id, Count: count);
+
+    /// <summary>A creative player earns (<paramref name="earn"/>) or unearns the quest <paramref name="questId"/>.</summary>
+    public static InventoryIntent CreativeQuest(string questId, bool earn) =>
+        new(NetInventoryAction.CreativeQuest, Count: earn ? 1 : 0, Recipe: questId);
 
     public static InventoryIntent CreativeClear(ushort id) => new(NetInventoryAction.CreativeClear, Id: id);
 

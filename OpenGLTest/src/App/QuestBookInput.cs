@@ -1,7 +1,11 @@
 using System;
 using System.Numerics;
 using Silk.NET.Input;
+using VoxelEngine.Content.Quests;
+using VoxelEngine.Networking;
+using VoxelEngine.Networking.Client;
 using VoxelEngine.Platform;
+using VoxelEngine.Quests;
 using VoxelEngine.Rendering;
 using VoxelEngine.UI.Quests;
 
@@ -15,7 +19,10 @@ namespace VoxelEngine.App;
 /// <item>a release that never traveled selects the quest under the pointer, or clears the selection on empty
 /// space (a click inside the details panel keeps it);</item>
 /// <item>the wheel zooms about the pointer;</item>
-/// <item>the details panel's EQUIP button equips the selected quest (<see cref="QuestTracker"/>).</item>
+/// <item>the details panel's EQUIP button equips the selected quest (<see cref="QuestTracker"/>);</item>
+/// <item>in creative, Shift+left-click on a quest earns it and every quest it depends on, and Shift+right-click
+/// unearns it and every quest that depends on it (<see cref="QuestLog.ForceEarn"/>, <see cref="QuestLog.ForceUnearn"/>);
+/// on a client the server applies it to the player's own log and sends the log back.</item>
 /// </list>
 /// P, E and Escape close it. The pan and zoom live in the local player's <see cref="Saves.QuestViewData"/>, so
 /// they are where they were on the next open. Owned by <see cref="GameplayInput"/>; main thread only.
@@ -24,12 +31,14 @@ internal sealed class QuestBookInput
 {
     private readonly InputManager inputManager;
     private readonly RenderManager renderManager;
+    private readonly ClientSession session;
     private bool pWasPressed;
 
-    internal QuestBookInput(InputManager inputManager, RenderManager renderManager)
+    internal QuestBookInput(InputManager inputManager, RenderManager renderManager, ClientSession session)
     {
         this.inputManager = inputManager;
         this.renderManager = renderManager;
+        this.session = session;
     }
 
     /// <summary>The book's state, which the UI pass draws.</summary>
@@ -88,6 +97,35 @@ internal sealed class QuestBookInput
             return;
         }
         View.Selected = QuestBookLayout.NodeAt(w.LocalPlayer.Quests, View.Camera, canvas, point);
+        if (View.Selected is { } clicked && CreativeShift(w)) Force(w, clicked, earn: true);
+    }
+
+    /// <summary>A right release: in creative with Shift held, unearns the quest under the pointer and everything after it.</summary>
+    internal void HandleRightRelease(Vector2 windowPoint, World w)
+    {
+        if (!CreativeShift(w)) return;
+        var canvas = renderManager.Ui.ScreenSize;
+        var point = renderManager.Ui.ToCanvas(windowPoint);
+        if (View.Selected != null && QuestBookLayout.Details(canvas).Contains(point)) return;
+        if (QuestBookLayout.NodeAt(w.LocalPlayer.Quests, View.Camera, canvas, point) is { } quest)
+            Force(w, quest, earn: false);
+    }
+
+    private bool CreativeShift(World w) =>
+        w.Camera.IsCreative && inputManager.Keyboard is { } keyboard
+                            && (keyboard.IsKeyPressed(Key.ShiftLeft) || keyboard.IsKeyPressed(Key.ShiftRight));
+
+    // Singleplayer edits its own log; a client asks the server, which owns its progress and sends the log back
+    private void Force(World w, QuestType quest, bool earn)
+    {
+        if (w.IsClientMode)
+        {
+            session.SendInventoryIntent(InventoryIntent.CreativeQuest(quest.Id, earn));
+            return;
+        }
+        var log = w.LocalPlayer.Quests;
+        if (earn) log.ForceEarn(quest);
+        else log.ForceUnearn(quest);
     }
 
     /// <summary>The wheel zooms about the pointer; <paramref name="wheelY"/> above 0 (toward the top) zooms in.</summary>

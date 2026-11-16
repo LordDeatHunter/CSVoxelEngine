@@ -100,6 +100,9 @@ internal sealed class InputEvents
         }
         switch (button)
         {
+            case MouseButton.Right when gameplay.QuestBook.IsOpen && inputManager.Mouse != null:
+                gameplay.QuestBook.HandleRightRelease(inputManager.Mouse.Position, ActiveWorld!);
+                break;
             case MouseButton.Right:
                 gameplay.ResetPlaceTimer();
                 // A right-click on an [E] panel row equips it; the world's use and place stand aside while it is open.

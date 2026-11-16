@@ -3,6 +3,7 @@ using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Magic;
+using VoxelEngine.Quests;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Networking.ServerSide;
@@ -22,6 +23,8 @@ namespace VoxelEngine.Networking.ServerSide;
 /// with exactly the fed members, so it consumes from this inventory only and nothing when it fails.</item>
 /// <item>Creative grants and clears need the player's server-owned creative flag; a grant never lands on the hotbar
 /// by itself, as on the client (<see cref="Inventory.Add"/>).</item>
+/// <item>A creative quest edit needs the same flag and a quest the book knows, and changes the player's own quest log
+/// (<see cref="ApplyQuest"/>, which the server calls in place of <see cref="Apply"/>).</item>
 /// <item>Pick-block only selects or equips what the player owns, or any block for a creative player (<see cref="Inventory.PickBlock"/>).</item>
 /// <item>A staff slot selection needs a staff in hand and a slot it has (<see cref="HeldStaff.TrySelect"/>).</item>
 /// <item>A staff bind needs a staff in hand, keys that resolve, parts the player knows
@@ -43,6 +46,7 @@ public static class InventoryIntentRules
     /// </summary>
     public static bool Apply(Inventory inventory, in InventoryIntent intent, bool creative)
     {
+        // A creative quest edit is the quest log's, not the inventory's (ApplyQuest)
         switch (intent.Action)
         {
             case NetInventoryAction.SelectSlot:
@@ -96,6 +100,20 @@ public static class InventoryIntentRules
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// Applies a <see cref="NetInventoryAction.CreativeQuest"/> intent to the player's <paramref name="quests"/>:
+    /// refused unless <paramref name="creative"/> and the quest exists, and when it changes nothing. An earn completes the
+    /// quest and its ancestors (<see cref="QuestLog.ForceEarn"/>), an unearn clears it and its descendants
+    /// (<see cref="QuestLog.ForceUnearn"/>); the changed log goes back to the player as its <c>QuestState</c>.
+    /// </summary>
+    public static bool ApplyQuest(QuestLog quests, in InventoryIntent intent, bool creative)
+    {
+        if (!creative || intent.Action != NetInventoryAction.CreativeQuest || intent.Recipe is not { } id
+            || !quests.Book.TryGet(id, out var quest))
+            return false;
+        return (intent.Count != 0 ? quests.ForceEarn(quest) : quests.ForceUnearn(quest)) > 0;
     }
 
     /// <summary>The crafting recipe with this file name, or null.</summary>

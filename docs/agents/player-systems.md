@@ -459,7 +459,7 @@ death screen or other panel); P, E and Escape close it, and it counts as a panel
 frozen, the hotbar and the world's clicks stand aside. A left press that travels `QuestConfig.DragThreshold` pans, a release
 that never traveled selects the quest under the pointer (or clears the selection on empty space; a click in the details
 panel keeps it), and the wheel zooms about the pointer (`QuestBookLayout.ZoomAbout`, clamped to
-`QuestConfig.MinZoom..MaxZoom`; `QuestBookLayoutTests`). The pan and zoom are the local player's `QuestViewData`, so they are
+`QuestConfig.MinZoom..MaxZoom`; `QuestBookLayoutTests`). In creative, Shift+left-click on a quest earns it and every quest it depends on (`QuestLog.ForceEarn`, each a real completion with its toast and unlock cascade) and Shift+right-click unearns it and every quest that depends on it (`QuestLog.ForceUnearn`); on a client the edit goes to the server as the `CreativeQuest` inventory intent, applied to that player's own log only when the server lets it be creative, and the log comes back as its `QuestState` (`QuestForceTests`). The pan and zoom are the local player's `QuestViewData`, so they are
 where they were on the next open, and singleplayer saves them in `QuestSaveData.View`. `QuestBookRenderer` (in
 `UiPasses.RenderQuests`, after the HUD pass) draws an opaque grid backdrop, the edges between shown quests (green into a
 complete quest), the hex or circle node frames (tinted by state, a check badge when complete, a gold ring when selected;

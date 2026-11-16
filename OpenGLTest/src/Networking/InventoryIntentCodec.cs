@@ -87,6 +87,10 @@ public static class InventoryIntentCodec
                 writer.WriteId((ushort)intent.Id);
                 writer.Write(intent.Count);
                 break;
+            case NetInventoryAction.CreativeQuest:
+                writer.Write(intent.Recipe ?? "");
+                writer.Write((byte)(intent.Count != 0 ? 1 : 0));
+                break;
             case NetInventoryAction.CreativeClear:
             case NetInventoryAction.PickBlock:
                 writer.WriteId((ushort)intent.Id);
@@ -136,6 +140,13 @@ public static class InventoryIntentCodec
             }
             case NetInventoryAction.CreativeClear:
                 return InventoryIntent.CreativeClear(reader.ReadId());
+            case NetInventoryAction.CreativeQuest:
+            {
+                var quest = reader.ReadString();
+                if (quest.Length > MaxRecipeNameLength)
+                    throw new InvalidDataException($"creative quest intent id of {quest.Length} chars");
+                return InventoryIntent.CreativeQuest(quest, reader.ReadByte() != 0);
+            }
             case NetInventoryAction.PickBlock:
                 return InventoryIntent.PickBlock(reader.ReadId());
             case NetInventoryAction.SelectStaffSlot:

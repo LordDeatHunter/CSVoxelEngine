@@ -42,6 +42,8 @@ public sealed class InventoryIntentTests
         Assert.Equal(InventoryIntent.ClearSlot(4), RoundTrip(InventoryIntent.ClearSlot(4)));
         Assert.Equal(InventoryIntent.CreativeGrant(17, 100), RoundTrip(InventoryIntent.CreativeGrant(17, 100)));
         Assert.Equal(InventoryIntent.CreativeClear(17), RoundTrip(InventoryIntent.CreativeClear(17)));
+        Assert.Equal(InventoryIntent.CreativeQuest("some_quest", true), RoundTrip(InventoryIntent.CreativeQuest("some_quest", true)));
+        Assert.Equal(InventoryIntent.CreativeQuest("some_quest", false), RoundTrip(InventoryIntent.CreativeQuest("some_quest", false)));
         Assert.Equal(InventoryIntent.PickBlock(42), RoundTrip(InventoryIntent.PickBlock(42)));
         Assert.Equal(InventoryIntent.SelectStaffSlot(3), RoundTrip(InventoryIntent.SelectStaffSlot(3)));
 

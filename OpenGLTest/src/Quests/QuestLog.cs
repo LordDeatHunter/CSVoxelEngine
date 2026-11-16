@@ -202,6 +202,59 @@ public sealed class QuestLog
         return true;
     }
 
+    /// <summary>
+    /// The creative earn: completes the quest and every incomplete quest it depends on (parents before children, each
+    /// raising <see cref="Completed"/> and its unlock cascade as a real completion would), so nothing complete sits under
+    /// an open parent. Returns how many it completed (0 when the quest already was).
+    /// </summary>
+    public int ForceEarn(QuestType quest)
+    {
+        var order = new List<int>();
+        var seen = new HashSet<int>();
+        AncestorsFirst(quest.Index);
+        var earned = 0;
+        foreach (var index in order)
+        {
+            if (_complete[index]) continue;
+            var ancestor = Book.Quests[index];
+            for (var r = 0; r < ancestor.Requirements.Count; r++)
+                _progress[index][r] = ancestor.Requirements[r].Count;
+            TryComplete(ancestor);
+            earned++;
+        }
+        return earned;
+
+        void AncestorsFirst(int index)
+        {
+            if (!seen.Add(index)) return;
+            foreach (var parent in Book.Quests[index].Parents) AncestorsFirst(parent);
+            order.Add(index);
+        }
+    }
+
+    /// <summary>
+    /// The creative unearn: clears the quest and every quest that depends on it, however far down, back to no progress
+    /// at all. Returns how many quests it changed (0 when none was complete or had progress).
+    /// </summary>
+    public int ForceUnearn(QuestType quest)
+    {
+        var changed = 0;
+        var seen = new HashSet<int> { quest.Index };
+        var queue = new Queue<int>([quest.Index]);
+        while (queue.TryDequeue(out var index))
+        {
+            if (_complete[index] || _progress[index].Any(v => v > 0)) changed++;
+            _complete[index] = false;
+            Array.Clear(_progress[index]);
+            foreach (var child in Book.Quests[index].Children)
+                if (seen.Add(child)) queue.Enqueue(child);
+        }
+        if (changed == 0) return 0;
+        _shown = null;
+        Changed = true;
+        return changed;
+    }
+
     /// <summary>The progress by quest id (completed ids, and the counts of every open quest that has any).</summary>
     public QuestSaveData Export()
     {
