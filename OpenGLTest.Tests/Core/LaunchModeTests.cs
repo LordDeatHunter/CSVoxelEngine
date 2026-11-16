@@ -26,4 +26,11 @@ public sealed class LaunchModeTests
 
         Assert.False(LaunchMode.BypassesMenu(Env(new())));
     }
+
+    [Fact]
+    public void NonFiniteButNonblankPoseOverridesStillBypassTheMenu()
+    {
+        Assert.True(LaunchMode.BypassesMenu(Env(new() { [LaunchMode.SpawnVariable] = "NaN,1,2" })));
+        Assert.True(LaunchMode.BypassesMenu(Env(new() { [LaunchMode.LookVariable] = "1,Infinity" })));
+    }
 }
