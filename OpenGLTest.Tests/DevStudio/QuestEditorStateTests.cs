@@ -471,6 +471,17 @@ public sealed class QuestEditorStateTests : IDisposable
     }
 
     [Fact]
+    public void AComponentFollowsLinksBothWaysAcrossFilesAndLeavesOrphansOut()
+    {
+        Graph("other", null, Quest("far", ["b"], Break("stone")));
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone")),
+            Quest("b", ["root"], Break("stone")), Quest("orphan", null, Break("stone"))));
+
+        Assert.Equal(new[] { "a", "b", "far", "root" }, editor.ComponentOf("a").Order());
+        Assert.Equal(["orphan"], editor.ComponentOf("orphan"));
+    }
+
+    [Fact]
     public void ARenamedQuestStaysSelected()
     {
         var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone"))));

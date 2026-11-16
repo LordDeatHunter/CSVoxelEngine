@@ -267,12 +267,21 @@ public sealed class QuestEditorState
         Recompile();
     }
 
-    /// <summary>Moves a whole graph by setting its origin.</summary>
-    public void MoveGraph(QuestGraphDocument document, Vector2 origin, bool snap)
+    /// <summary>Every quest linked to <paramref name="id"/> through parent links followed either way, the quest itself
+    /// included: the quests a shift-drag moves together. A quest with no link to it is not part of it, whatever file it
+    /// shares.</summary>
+    public IReadOnlyList<string> ComponentOf(string id)
     {
-        var snapped = Snap(origin, snap);
-        document.Definition.Origin = [snapped.X, snapped.Y];
-        Recompile();
+        if (!Preview.TryGet(id, out var start)) return [];
+        var seen = new HashSet<int> { start.Index };
+        var queue = new Queue<int>([start.Index]);
+        while (queue.TryDequeue(out var index))
+        {
+            var quest = Preview.Quests[index];
+            foreach (var next in quest.Parents.Concat(quest.Children))
+                if (seen.Add(next)) queue.Enqueue(next);
+        }
+        return [.. seen.Select(i => Preview.Quests[i].Id)];
     }
 
     /// <summary>Removes the link that makes <paramref name="child"/> depend on <paramref name="parent"/>. Returns why

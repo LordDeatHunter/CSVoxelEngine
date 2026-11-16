@@ -26,7 +26,7 @@ namespace VoxelEngine.DevStudio;
 /// SAVE ALL / REVERT ALL (a second click within <see cref="ConfirmSeconds"/> confirms) act on every graph,
 /// SAVE QUEST / REVERT QUEST on the selected quest alone; a quest with unsaved edits carries a gold corner mark.
 /// Clicking a node selects it, Ctrl+click adds it to the selection (or takes it out), dragging moves it (shift-drag
-/// moves its whole graph, Alt turns snapping off; dragging any quest of a multi-selection moves them all), shift-drag on empty canvas draws a box that selects every quest in it,
+/// moves every quest linked to it, Alt turns snapping off; dragging any quest of a multi-selection moves them all), shift-drag on empty canvas draws a box that selects every quest in it,
 /// clicking a line selects that link (its panel turns it around or deletes it), a right-drag from one node to another makes the second depend on the first (dropped on empty canvas, it adds a
 /// quest there that depends on the first), a double-click on empty canvas adds a quest
 /// there, dragging empty canvas pans and the wheel zooms. A grid click picks the quest's icon, or the target of a
@@ -76,7 +76,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private readonly List<(DropdownState Dropdown, int Selected, Action<int> Choose)> _dropdowns = [];
     private string? _focusQuest;
 
-    private enum Drag { None, Pan, Node, Graph, Link, Marquee }
+    private enum Drag { None, Pan, Node, Link, Marquee }
     private Drag _drag;
     // A middle-button pan, which never clears the selection the way an unmoved left click on empty canvas does
     private bool _panOnly;
@@ -93,7 +93,6 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     // Where every selected quest sat when a node drag began, so the whole selection moves with the dragged one
     private readonly Dictionary<string, Vector2> _grabbedMany = new(StringComparer.Ordinal);
     private string? _dragQuest;
-    private QuestGraphDocument? _dragGraph;
     private double _lastClickTime = double.NegativeInfinity;
     // REVERT ALL drops every unsaved edit, so it asks for a second click within this many seconds
     private const double ConfirmSeconds = 3.0;
@@ -461,7 +460,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             string[] hints =
             [
                 "Click a node to select it; click empty canvas to clear the selection.",
-                "Drag a node to move it (Alt: no snap); shift-drag moves its graph.",
+                "Drag a node to move it (Alt: no snap); shift-drag moves every quest linked to it.",
                 "Right-drag from a quest to another to make the second depend on the first; drop on empty canvas to add a quest that depends on it.",
                 "Ctrl+click a node to add it to the selection; shift-drag on empty canvas selects every quest in the box.",
                 "Click a line to select that link: swap its direction or delete it.",
@@ -662,18 +661,12 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         // A press on a quest of a multi-selection keeps the selection, so dragging it moves them all
         if (shift || !State.IsSelected(node.Id)) State.Select(node.Id);
         State.Gesture = $"drag {++_gestureSerial}";
-        if (shift && State.Find(node.Id) is { } found)
-        {
-            _drag = Drag.Graph;
-            _dragGraph = found.Document;
-            _grabbed = found.Document.Origin;
-            return true;
-        }
         _drag = Drag.Node;
         _dragQuest = node.Id;
         _grabbed = node.Position;
         _grabbedMany.Clear();
-        foreach (var id in State.SelectedQuestIds)
+        // A shift-drag takes every quest linked to this one; a plain drag takes the selection
+        foreach (var id in shift ? State.ComponentOf(node.Id) : State.SelectedQuestIds)
             if (State.Preview.TryGet(id, out var quest))
                 _grabbedMany[id] = quest.Position;
         return true;
@@ -769,9 +762,6 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             case Drag.Node when travel.Length() >= QuestConfig.DragThreshold && _dragQuest != null:
                 State.MoveQuests(_dragQuest, _grabbed + GridTravel(travel), _grabbedMany, !alt);
                 break;
-            case Drag.Graph when travel.Length() >= QuestConfig.DragThreshold && _dragGraph != null:
-                State.MoveGraph(_dragGraph, _grabbed + GridTravel(travel), !alt);
-                break;
         }
     }
 
@@ -788,7 +778,6 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             State.Select(_dragQuest);
         _drag = Drag.None;
         _dragQuest = null;
-        _dragGraph = null;
         if (_focus == null) State.Gesture = null;
     }
 
