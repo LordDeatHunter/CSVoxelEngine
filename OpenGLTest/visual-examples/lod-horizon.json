@@ -29,6 +29,9 @@
 // Pitch -10 centers the band: from summit A the terrain 256 blocks out sits ~18 deg below the
 // eye and 2048 blocks out ~2 deg below, so that span brackets the middle of the frame.
 //
+// NOTE: the day is now SkyConfig.DayLengthSeconds = 2400 s (noon ~294, sunset ~894, midnight ~1494).
+// The times and sun arithmetic in this header were measured on the former 1200 s day and are kept as
+// the historical record; re-derive them (or use 1494 for night) before relying on them.
 // Timing is part of the framing. RenderManager.cs:639 drives the sun from wall-clock elapsed
 // time plus VOXEL_TIME over a 1200 s cycle (angle = t/1200*tau + 0.8), so sunset falls at clock
 // t = 447 s and a longer script simply walks off the end of the day - an earlier draft with

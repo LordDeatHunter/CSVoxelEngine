@@ -1,5 +1,5 @@
 {
-  // Block-light flicker check: run with VOXEL_TIME=700 (night) and
+  // Block-light flicker check: run with VOXEL_TIME=1494 (night) and
   // VOXEL_SCRIPT=visual-examples/night-lights.json. Shots land in visual/night-lights/.
   //
   // Starts on the open dunes east of the taiga at (-62, 118) - spawn is wooded and a trunk

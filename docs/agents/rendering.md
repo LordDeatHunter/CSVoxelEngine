@@ -102,7 +102,7 @@ after it, straight into the gamma default framebuffer, so text and icons stay cr
 colors stay display-space; the two textures it shares with the world (the atlas and the item
 meshes) are re-encoded in `ui-fragment.glsl` behind `uSrgbTex` (`UIRenderer`'s `atlasIsSrgb`
 constructor flag, `ItemMeshCache.IsSrgb`), so icons write the same bytes as before.
-`visual-examples/linear-lighting.json` (run at `VOXEL_TIME` 147, 440 and 700) frames the surface,
+`visual-examples/linear-lighting.json` (run at `VOXEL_TIME` 147 day, 894 sunset and 1494 night) frames the surface,
 the Snell window, the lava cave with and without the HUD and a high LOD/fog vista for comparing a
 lighting change against earlier shots.
 
@@ -215,7 +215,7 @@ ramped over `AuroraColdStart..AuroraColdFull`, times `StarField.Visibility`. The
 eye's column, bilinear like the biome tint, read back through `EyeClimate.Coldness`), never from
 worldgen noise, so a client reads its server's climate; an unknown column eases it out. The mirror
 redraws the dome, so it reflects, and the Snell window shows it. `AuroraTests`;
-`visual-examples/aurora.json` (`VOXEL_TIME` 700) films it over a frozen plain and back at the
+`visual-examples/aurora.json` (`VOXEL_TIME` 1494) films it over a frozen plain and back at the
 temperate origin, where it has faded out.
 
 **Eye adaptation.** The post pass's exposure (`uExposure`, now set per frame by
@@ -274,7 +274,7 @@ weighting) and cool where it is cold enough for snow (`BiomeGradeColdStart..Cold
 moving at most `BiomeGradeStrength`; exactly neutral across the temperate band. `FrameLighting.Grade`
 eases toward it (`BiomeGradeEaseRate`) and back to neutral over an unknown column, so a client
 without its column yet never guesses. `BiomeGradeTests`; `visual-examples/biome-grade.json`
-(`VOXEL_TIME` 147) compares the noon sky over the origin, a deep desert and a frozen plain.
+(`VOXEL_TIME` 147) compares the daytime sky over the origin, a deep desert and a frozen plain.
 
 **Damage chromatic fringe.** For a moment after a hit the screen edges split red and blue:
 post-fragment.glsl reads red and blue from either side of each pixel along the line from the screen
@@ -363,7 +363,7 @@ same anywhere in the world — keep the two sway blocks byte-identical), fire sm
 along it (`FireParticle.Update`'s `wind`), falling leaves (ambient and burst) ease their sideways
 motion into it, pushed by the canopy's own gusts (`LeafParticleSystem.Update`'s `windTime`,
 `Wind.Gust`, the C# twin of the sway's `0.6 + 0.4 sin(phase)`; a landed leaf stays put;
-`visual-examples/leaf-wind.json` at `VOXEL_TIME` 147 and 1347), and the cloud layer and its shadows are carried by it
+`visual-examples/leaf-wind.json` at `VOXEL_TIME` 147 and 1347, 1200 s apart so the wind has turned 180 degrees; 1347 is night under the 2400 s day), and the cloud layer and its shadows are carried by it
 (`CloudCopies.Drift`, wrapped modulo the field on both axes; `uCloudDrift` is a `vec2`). `World`
 gets the same lighting clock through `World.TimeOffset`, which `Program` sets from `VOXEL_TIME`, so
 leaves, smoke and clouds agree; `FrameLighting.WindDirection` exposes the unit direction for future
@@ -522,7 +522,7 @@ flicker and band rates) are written in both the shader and `ForcefieldShimmer`, 
 (`ForcefieldShimmerTests`: faintest head-on, the background always dominates, the honeycomb repeats, the
 film moves, nothing but the film far away). `uForcefield` 0 (the ItemDebugger) leaves the plain
 placeholder tile. Like glass it writes depth, so particles behind the dome are hidden.
-`visual-examples/tower-dome.json` (`VOXEL_TIME=147`, and 700 for night) films it.
+`visual-examples/tower-dome.json` (`VOXEL_TIME=147`, and 1494 for night) films it.
 
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.
 
