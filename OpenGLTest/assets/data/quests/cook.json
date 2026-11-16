@@ -2,7 +2,7 @@
   "title": "Home Cooking",
   "description": "Cook the venison over a fire.",
   "icon": "item/cooked_venison",
-  "pos": [-4, -7.5],
+  "pos": [-4, -8],
   "parents": ["hunter", "quest_1"],
   "requirements": [
     { "type": "obtain", "item": "item/cooked_venison" }

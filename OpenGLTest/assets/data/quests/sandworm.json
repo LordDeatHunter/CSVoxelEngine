@@ -2,7 +2,7 @@
   "title": "Desert Terror",
   "description": "Something huge moves under the desert sand.",
   "icon": "item/sandworm_fang",
-  "pos": [10, -7],
+  "pos": [6, -7.5],
   "requirements": [
     { "type": "kill", "entity": "sandworm" }
   ]

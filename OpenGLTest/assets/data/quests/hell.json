@@ -2,7 +2,7 @@
   "title": "Down Below",
   "description": "Get past the barrier and take an ember shard from hell.",
   "icon": "item/ember_shard",
-  "pos": [9, -5],
+  "pos": [8, -5.5],
   "requirements": [
     { "type": "obtain", "item": "item/ember_shard" }
   ]

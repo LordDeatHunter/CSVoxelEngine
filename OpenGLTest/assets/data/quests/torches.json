@@ -2,7 +2,7 @@
   "title": "Light the Way",
   "description": "Coal on a branch burns for a long time. Light up the dark.",
   "icon": "torch",
-  "pos": [-2, -3],
+  "pos": [0, -3],
   "parents": ["coal", "slime"],
   "unlock": "anyParentDone",
   "requirements": [

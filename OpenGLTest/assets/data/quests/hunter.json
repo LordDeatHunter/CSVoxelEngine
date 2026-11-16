@@ -2,7 +2,7 @@
   "title": "Hunter",
   "description": "Bring down a deer.",
   "icon": "item/raw_venison",
-  "pos": [4, -7.5],
+  "pos": [4, -8],
   "anyOf": true,
   "requirements": [
     { "type": "kill", "entity": "deer" },
