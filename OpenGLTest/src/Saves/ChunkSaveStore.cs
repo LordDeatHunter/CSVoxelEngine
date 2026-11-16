@@ -38,9 +38,9 @@ namespace VoxelEngine.Saves;
 /// stays readable for the rest of the session, the next flush of that chunk retries it, and
 /// <see cref="Shutdown"/> re-queues every failed write once more before the writer stops, so an
 /// edit never silently misses the disk because of a moment's lock.</item>
-/// <item>A file that cannot be read (after a few retries, or because it is corrupt) is never
-/// overwritten in place: the writer moves it to <c>.bad</c> first, so what was there can still be
-/// recovered by hand instead of being replaced by a regenerated chunk or an empty player file.</item>
+/// <item>A chunk that cannot be read or decoded, or a whole file that cannot be read, is not
+/// overwritten in place: the writer moves it to <c>.bad</c> first. If that move fails, the original
+/// stays at its final path and the pending replacement is retained for retry.</item>
 /// </list>
 /// The index is built once at open from the files on disk, so a generation worker never probes the
 /// file system for a chunk that was never saved. Reads open with
@@ -370,8 +370,15 @@ public sealed class ChunkSaveStore
         ChunkSaveCodec.Write(encoded, snapshot, static id => BlockType.ById[id]?.Name);
 
         var final = ChunkPath(key);
-        if (_unreadableChunks.TryRemove(key, out _))
-            SetAsideUnreadable(final);
+        if (_unreadableChunks.ContainsKey(key))
+        {
+            if (!SetAsideUnreadable(final))
+            {
+                _failedChunks.TryAdd(key, 0);
+                return;
+            }
+            _unreadableChunks.TryRemove(key, out _);
+        }
         if (!TryWriteAndMove(final, encoded.GetBuffer().AsSpan(0, (int)encoded.Length)))
         {
             // Keep the pending entry: still readable, the next flush retries, and so does Shutdown
@@ -388,8 +395,15 @@ public sealed class ChunkSaveStore
     private void WriteWholeFile(string fileName, byte[] bytes)
     {
         var final = Path.Combine(WorldDirectory, fileName);
-        if (_unreadableFiles.TryRemove(fileName, out _))
-            SetAsideUnreadable(final);
+        if (_unreadableFiles.ContainsKey(fileName))
+        {
+            if (!SetAsideUnreadable(final))
+            {
+                _failedFiles.TryAdd(fileName, 0);
+                return;
+            }
+            _unreadableFiles.TryRemove(fileName, out _);
+        }
         try
         {
             // A players/ file lands in a subfolder that a new world does not have yet
@@ -410,18 +424,20 @@ public sealed class ChunkSaveStore
 
     // Keeps a file a read gave up on as <final>.bad (the previous .bad, if any, is replaced), so the
     // write about to replace it never destroys the only copy of what the player had.
-    private static void SetAsideUnreadable(string final)
+    private static bool SetAsideUnreadable(string final)
     {
         if (!File.Exists(final))
-            return;
+            return true;
         try
         {
             File.Move(final, final + UnreadableExtension, overwrite: true);
             Log.Warn($"Kept the unreadable save file as '{final}{UnreadableExtension}'");
+            return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             Log.Warn($"Could not set aside the unreadable save file '{final}': {e.Message}");
+            return false;
         }
     }
 

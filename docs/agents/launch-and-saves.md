@@ -74,10 +74,10 @@ pure function of the seed: only **deltas** and the seed are written.
   lookup therefore always finds the chunk in one of the two, and a move that finally fails keeps
   its pending entry and is remembered as failed, so the chunk stays readable for the session,
   the next flush of it retries, and `Shutdown` re-queues every failed write once more
-  (`ChunkSaveStore.RetryFailed`) before the writer stops. A file a read gave up on (an
-  `IOException` after a few retries, or a corrupt file) is moved to `.bad` before the writer
-  first replaces it, so what the player had is never overwritten by a regenerated chunk or an
-  empty player file, and the temp file is flushed to disk before the rename. The store holds
+  (`ChunkSaveStore.RetryFailed`) before the writer stops. A chunk the store cannot read or decode, or
+  a whole file the store cannot read after its I/O retries, is moved to `.bad` before replacement.
+  If that move fails, the original stays at its final path and the accepted replacement remains
+  pending and failed for a later retry. The temp file is flushed to disk before its rename. The store holds
   `session.lock` (`FileShare.None`) from construction until its writer thread exits, so a second
   store over the same folder — this process after a writer overran its shutdown timeout, or the
   dedicated server beside the game — throws `IOException` from the constructor: `Program` shows
