@@ -8,6 +8,7 @@ using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Quests;
 using VoxelEngine.Data;
 using VoxelEngine.Entities;
+using VoxelEngine.Items;
 using VoxelEngine.Rendering.Overlays;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.Menus;
@@ -23,7 +24,8 @@ namespace VoxelEngine.DevStudio;
 /// panel. Clicking a node selects it, dragging moves it (shift-drag moves its whole graph, Alt turns snapping off),
 /// Ctrl+click toggles the clicked node as a parent of the selected one, a double-click on empty canvas adds a quest
 /// there, dragging empty canvas pans and the wheel zooms. A grid click picks the quest's icon, or the target of a
-/// requirement whose PICK is armed. A requirement's type is a <see cref="DropdownState"/>. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
+/// requirement whose PICK is armed; dragging a grid slot onto the canvas adds a quest there with that icon, named
+/// after it. A requirement's type is a <see cref="DropdownState"/>. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
 /// </summary>
 internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys)
 {
@@ -68,6 +70,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private double _lastClickTime = double.NegativeInfinity;
     private Vector2 _lastClickAt;
     private Vector2 _screen = new(1600f, 900f);
+    // A grid slot pressed in the left panel: a click picks it, a drag onto the canvas adds a quest with it
+    private ushort? _iconDrag;
+    private Vector2 _iconPressAt;
     // The renderer of the last draw, for placing a clicked caret by the drawn text's widths
     private UIRenderer? _ui;
 
@@ -152,7 +157,18 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         DrawDetailsText(ui);
         DrawStatus(ui);
         DrawTypeDropdowns(ui, pointer);
+        DrawDraggedIcon(ui, pointer, time);
     }
+
+    // The slot being dragged rides the pointer once it has left the click radius
+    private void DrawDraggedIcon(UIRenderer ui, Vector2? pointer, float time)
+    {
+        if (_iconDrag is not { } id || pointer is not { } p || !IconDragging(p)) return;
+        ui.ClearDepthForOverlay();
+        ui.DrawIdIcon(p, QuestConfig.NodeIconSize, id, 0f, time);
+    }
+
+    private bool IconDragging(Vector2 point) => Vector2.Distance(point, _iconPressAt) >= QuestConfig.DragThreshold;
 
     // The closed boxes first, then the open list over everything it covers
     private void DrawTypeDropdowns(UIRenderer ui, Vector2? pointer)
@@ -257,21 +273,27 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         var left = PanelLeft;
         if (State.SelectedQuest is not { } quest)
         {
-            ui.DrawText("No quest selected", new Vector2(left, Pad + 8f), ui.CapHeightScale(18f), Rgba.White);
+            const string none = "No quest selected";
+            ui.DrawText(none, new Vector2(left, Pad + 8f), DevStudioUi.FitText(ui, none, 18f, PanelRight - left).Scale, Rgba.White);
             string[] hints =
             [
-                "Click a node to select it, empty",
-                "  canvas to clear the selection.",
-                "Drag a node to move it (Alt: no snap).",
-                "Shift+drag a node: move its graph.",
-                "Ctrl+click a node: toggle it as a",
-                "  parent of the selected quest.",
-                "Double-click empty canvas: add quest.",
-                "Drag empty canvas: pan. Wheel: zoom.",
-                "Delete: delete quest. Ctrl+S: save.",
+                "Click a node to select it; click empty canvas to clear the selection.",
+                "Drag a node to move it (Alt: no snap); shift-drag moves its graph.",
+                "Ctrl+click a node to toggle it as a parent of the selected quest.",
+                "Double-click empty canvas, or drag an icon from the grid onto it, to add a quest.",
+                "Drag empty canvas to pan; the wheel zooms.",
+                "Delete deletes the selected quest; Ctrl+S saves.",
             ];
-            for (var i = 0; i < hints.Length; i++)
-                ui.DrawText(hints[i], new Vector2(left, Pad + 44f + i * 20f), scale, DevStudioUi.TextDim);
+            var y = Pad + 44f;
+            foreach (var hint in hints)
+            {
+                foreach (var line in Wrap(ui, hint, scale, PanelRight - left))
+                {
+                    ui.DrawText(line, new Vector2(left, y), scale, DevStudioUi.TextDim);
+                    y += 18f;
+                }
+                y += 6f;
+            }
             return;
         }
 
@@ -486,6 +508,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     /// <summary>Ends a press. A press on empty canvas that never traveled far enough to pan clears the selection.</summary>
     public void MouseUp(Vector2 point)
     {
+        if (_iconDrag is { } icon) DropIcon(icon, point);
+        _iconDrag = null;
         if (_drag == Drag.Pan && Vector2.Distance(point, _pressAt) < QuestConfig.DragThreshold)
             State.Select(null);
         _drag = Drag.None;
@@ -547,8 +571,30 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         return true;
     }
 
+    /// <summary>A press on a left-grid slot: released in place it picks (<see cref="Pick"/>), dragged onto the canvas
+    /// it adds a quest.</summary>
+    public void BeginIconDrag(ushort id, Vector2 point)
+    {
+        Blur();
+        _iconDrag = id;
+        _iconPressAt = point;
+    }
+
+    private void DropIcon(ushort id, Vector2 point)
+    {
+        if (!IconDragging(point))
+        {
+            Pick(id);
+            return;
+        }
+        if (!OverCanvas(point)) return;
+        var name = QuestEditorState.ContentName(id);
+        if (State.AddQuest(QuestBookLayout.ToGrid(point, Camera, _screen), name, ItemRegistry.TryGet(id)?.Name) is { } added)
+            Status = $"Added {added} ({name})";
+    }
+
     /// <summary>A left-grid click: the selected quest's icon, or the armed requirement's target.</summary>
-    public void Pick(ushort id)
+    private void Pick(ushort id)
     {
         Blur();
         if (State.SelectedQuestId is not { } quest) return;

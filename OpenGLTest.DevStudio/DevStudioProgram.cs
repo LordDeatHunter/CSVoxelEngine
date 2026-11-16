@@ -589,7 +589,7 @@ public static class DevStudioProgram
                         _trees.Select(slot);
                         break;
                     case StudioTab.Quests:
-                        _quests.Pick(_ui.Entries[slot].Id);
+                        _quests.BeginIconDrag(_ui.Entries[slot].Id, position);
                         break;
                     default:
                         Editor.Select(_ui.Entries[slot].Id);

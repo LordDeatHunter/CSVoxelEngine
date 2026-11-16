@@ -88,8 +88,9 @@ public sealed class QuestEditorState
     }
 
     /// <summary>Adds a quest at the absolute grid point to the selected graph and selects it. Its icon and its one
-    /// obtain requirement name <paramref name="icon"/> (default stone), so it compiles as it is.</summary>
-    public string? AddQuest(Vector2 grid, string? icon = null)
+    /// obtain requirement name <paramref name="icon"/> (default stone), so it compiles as it is; its title is
+    /// <paramref name="title"/>, default "New Quest".</summary>
+    public string? AddQuest(Vector2 grid, string? icon = null, string? title = null)
     {
         if (Graph is not { } document) return null;
         var id = UniqueId("quest");
@@ -98,7 +99,7 @@ public sealed class QuestEditorState
         document.Quests.Add(new QuestGraphDefinition.QuestDefinition
         {
             Id = id,
-            Title = "New Quest",
+            Title = title ?? "New Quest",
             Icon = icon,
             Pos = [position.X, position.Y],
             Requirements = [new QuestGraphDefinition.RequirementDefinition { Type = "obtain", Item = icon }],

@@ -93,7 +93,8 @@ view center, and saves. The right panel edits the selected quest's id (committed
 follows every parent link), title, description, shape (AUTO/HEX/CIRCLE), readable, any-of, icon and requirements: a type
 dropdown (the reusable `UI/Widgets/DropdownState`, drawn by `DropdownRenderer`) picks obtain/craft/break/place/kill, the target field takes an item (or `#tag`, which adds a label field), a block
 or an entity, `-`/`+` set the count, PICK arms the left grid for the target (NEXT MOB steps a kill through the registered
-entities), and a plain grid click sets the icon. Delete removes the selected quest and every link to it, Ctrl+S saves,
+entities), and a plain grid click sets the icon. Dragging a grid slot onto the canvas adds a quest where it is dropped,
+with that icon, titled after it and asking to obtain it. Delete removes the selected quest and every link to it, Ctrl+S saves,
 Escape clears the selection. Every edit recompiles through `QuestLoader.Compile`: an error is listed in red under the
 canvas and its quest ringed, and SAVE refuses until it compiles. A save writes only the changed files through
 `QuestGraphWriter`, in the shipped files' layout with their header comment kept, so an unedited graph writes back
