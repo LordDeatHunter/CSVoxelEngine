@@ -402,6 +402,57 @@ public sealed class QuestEditorStateTests : IDisposable
     }
 
     [Fact]
+    public void DeletingSeveralQuestsIsOneStepThatUndoesWhole()
+    {
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone")),
+            Quest("b", ["a"], Break("stone")), Quest("c", ["a", "root"], Break("stone"))));
+        editor.SelectMany(["a", "b"]);
+
+        Assert.Equal(2, editor.DeleteQuests(editor.SelectedQuestIds.ToList()));
+
+        Assert.Null(editor.Find("a"));
+        Assert.Null(editor.Find("b"));
+        Assert.Equal(["root"], editor.Find("c")!.Value.Quest.Parents);
+        Assert.Empty(editor.SelectedQuestIds);
+        Assert.Null(editor.Error);
+
+        Assert.True(editor.Undo());
+        Assert.NotNull(editor.Find("a"));
+        Assert.NotNull(editor.Find("b"));
+        Assert.Equal(["a", "root"], editor.Find("c")!.Value.Quest.Parents);
+        Assert.Equal(["a", "b"], editor.SelectedQuestIds);
+        Assert.False(editor.CanUndo);
+    }
+
+    [Fact]
+    public void TogglingBuildsAndShrinksTheSelectionAndOnlyOneSelectedQuestIsEdited()
+    {
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone"))));
+        editor.Select("root");
+        Assert.Equal("root", editor.SelectedQuestId);
+
+        editor.ToggleSelected("a");
+        Assert.Equal(["root", "a"], editor.SelectedQuestIds);
+        Assert.Null(editor.SelectedQuestId);
+
+        editor.ToggleSelected("root");
+        Assert.Equal("a", editor.SelectedQuestId);
+        editor.ToggleSelected("nope");
+        Assert.Equal(["a"], editor.SelectedQuestIds);
+    }
+
+    [Fact]
+    public void ARenamedQuestStaysSelected()
+    {
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone"))));
+        editor.SelectMany(["root", "a"]);
+
+        editor.RenameQuest("root", "start");
+
+        Assert.Equal(["start", "a"], editor.SelectedQuestIds);
+    }
+
+    [Fact]
     public void AnAddedQuestOrGraphCompilesAsItIsWithAFreshId()
     {
         var editor = Editor(Graph("g", null, Quest("root", null, Break("stone"))));

@@ -72,7 +72,7 @@ public sealed class QuestEditorState
             Documents.Add(QuestGraphDocument.Restore(graph, saved));
         }
         SelectedGraph = Math.Clamp(snapshot.SelectedGraph, 0, Math.Max(0, Documents.Count - 1));
-        Select(snapshot.SelectedQuest is { } id && Find(id) != null ? id : null);
+        SelectMany(snapshot.SelectedQuests);
         if (snapshot.SelectedLink is { } link) _selectedLink = link;
         _restoring = true;
         Recompile();
@@ -85,7 +85,7 @@ public sealed class QuestEditorState
             .. Documents.Select(d => new QuestEditSnapshot.Graph(d.Path, d.Header, QuestGraphDocument.Clone(d.Definition),
                 [.. d.Quests.Select(d.OriginalId)]))
         ],
-        SelectedQuestId, _selectedLink, SelectedGraph);
+        [.. _selection], _selectedLink, SelectedGraph);
 
     /// <summary>Every graph file under <paramref name="folder"/>, in the loader's (file name) order.</summary>
     public static QuestEditorState Load(string folder) => new(folder, ReadFolder(folder));
@@ -104,7 +104,16 @@ public sealed class QuestEditorState
     /// <summary>The graph the graph selector shows, where ADD QUEST adds.</summary>
     public int SelectedGraph { get; set; }
 
-    public string? SelectedQuestId { get; set; }
+    // Every selected quest, in the order they were selected
+    private readonly List<string> _selection = [];
+
+    /// <summary>Every selected quest (none, one, or several).</summary>
+    public IReadOnlyList<string> SelectedQuestIds => _selection;
+
+    /// <summary>The selected quest when exactly one is selected, else null: the one the quest panel edits.</summary>
+    public string? SelectedQuestId => _selection.Count == 1 ? _selection[0] : null;
+
+    public bool IsSelected(string id) => _selection.Contains(id);
 
     private (string Child, string Parent)? _selectedLink;
 
@@ -117,7 +126,7 @@ public sealed class QuestEditorState
     {
         Select(null);
         _selectedLink = (child, parent);
-        _history.Touch(SelectedQuestId, _selectedLink, SelectedGraph);
+        Touch();
     }
 
     /// <summary>The selected quest's requirement a grid click or a PICK fills, or -1 for the quest's icon.</summary>
@@ -153,12 +162,37 @@ public sealed class QuestEditorState
 
     public void Select(string? id)
     {
-        SelectedQuestId = id;
+        _selection.Clear();
+        if (id != null) _selection.Add(id);
         _selectedLink = null;
         PickRequirement = -1;
         if (id != null && Find(id) is { } found) SelectedGraph = Documents.IndexOf(found.Document);
-        _history.Touch(SelectedQuestId, _selectedLink, SelectedGraph);
+        Touch();
     }
+
+    /// <summary>Adds the quest to the selection, or takes it out when it is already in.</summary>
+    public void ToggleSelected(string id)
+    {
+        if (Find(id) == null) return;
+        if (!_selection.Remove(id)) _selection.Add(id);
+        _selectedLink = null;
+        PickRequirement = -1;
+        Touch();
+    }
+
+    /// <summary>Replaces the selection with the given quests (those that exist, each once).</summary>
+    public void SelectMany(IEnumerable<string> ids)
+    {
+        _selection.Clear();
+        foreach (var id in ids)
+            if (!_selection.Contains(id) && Find(id) != null)
+                _selection.Add(id);
+        _selectedLink = null;
+        PickRequirement = -1;
+        Touch();
+    }
+
+    private void Touch() => _history.Touch([.. _selection], _selectedLink, SelectedGraph);
 
     /// <summary>Adds a quest at the absolute grid point to the selected graph and selects it. Its icon and its one
     /// obtain requirement name <paramref name="icon"/> (default stone), so it compiles as it is; its title is
@@ -180,24 +214,36 @@ public sealed class QuestEditorState
             Parents = parent != null && Find(parent) != null ? [parent] : null,
             Requirements = [new QuestGraphDefinition.RequirementDefinition { Type = "obtain", Item = icon }],
         });
-        Select(id);
+        // Recorded before the selection moves to the new quest, so an undo restores the selection it was added under
         Recompile();
+        Select(id);
         return id;
     }
 
     /// <summary>Removes the quest and every parent link to it, in every graph.</summary>
-    public void DeleteQuest(string id)
+    public void DeleteQuest(string id) => DeleteQuests([id]);
+
+    /// <summary>Removes the quests and every parent link to them, in every graph, as one change (one undo step).
+    /// Returns how many were removed.</summary>
+    public int DeleteQuests(IEnumerable<string> ids)
     {
-        if (Find(id) is not { } found) return;
-        found.Document.Quests.Remove(found.Quest);
+        var doomed = ids.Where(id => Find(id) != null).ToHashSet(StringComparer.Ordinal);
+        if (doomed.Count == 0) return 0;
+        foreach (var id in doomed)
+        {
+            var found = Find(id)!.Value;
+            found.Document.Quests.Remove(found.Quest);
+        }
         foreach (var document in Documents)
         foreach (var quest in document.Quests)
         {
-            if (quest.Parents is not { } parents || !parents.Contains(id)) continue;
-            quest.Parents = Shrink(parents.Where(p => p != id));
+            if (quest.Parents is not { } parents || !parents.Any(doomed.Contains)) continue;
+            quest.Parents = Shrink(parents.Where(p => !doomed.Contains(p)));
         }
-        if (SelectedQuestId == id) Select(null);
+        // Recorded before the selection follows, so an undo brings the deleted quests back selected
         Recompile();
+        if (_selection.RemoveAll(doomed.Contains) > 0) Touch();
+        return doomed.Count;
     }
 
     /// <summary>Moves the quest so its node sits at the absolute grid point; stored relative to its graph's origin.</summary>
@@ -285,7 +331,7 @@ public sealed class QuestEditorState
             if (quest.Parents is not { } parents || !parents.Contains(id)) continue;
             quest.Parents = [.. parents.Select(p => p == id ? newId : p)];
         }
-        if (SelectedQuestId == id) SelectedQuestId = newId;
+        if (_selection.IndexOf(id) is var at and >= 0) _selection[at] = newId;
         if (_selectedLink is { } link)
             _selectedLink = (link.Child == id ? newId : link.Child, link.Parent == id ? newId : link.Parent);
         Recompile();
@@ -470,7 +516,7 @@ public sealed class QuestEditorState
         Documents.AddRange(ReadFolder(Folder));
         SelectedGraph = Math.Clamp(SelectedGraph, 0, Math.Max(0, Documents.Count - 1));
         PickRequirement = -1;
-        if (SelectedQuestId != null && Find(SelectedQuestId) == null) SelectedQuestId = null;
+        _selection.RemoveAll(id => Find(id) == null);
         Recompile();
         return "Reverted every graph to the files on disk";
     }
@@ -515,7 +561,7 @@ public sealed class QuestEditorState
         }
         if (_restoring) return;
         var all = text.ToString();
-        _history.Observe(all, () => Capture(all), Gesture, SelectedQuestId, _selectedLink, SelectedGraph);
+        _history.Observe(all, () => Capture(all), Gesture, [.. _selection], _selectedLink, SelectedGraph);
     }
 
     private void Edit(string id, Action<QuestGraphDefinition.QuestDefinition> edit)

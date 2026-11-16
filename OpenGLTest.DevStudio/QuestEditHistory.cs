@@ -30,11 +30,11 @@ public sealed class QuestEditHistory
     /// <summary>Records the editor's state after a change. <paramref name="capture"/> builds the full snapshot and is
     /// called only when the text changed; <paramref name="gesture"/> is the key of the gesture in progress, or null.</summary>
     public void Observe(string text, Func<QuestEditSnapshot> capture, string? gesture,
-        string? selectedQuest, (string Child, string Parent)? selectedLink, int selectedGraph)
+        IReadOnlyList<string> selectedQuests, (string Child, string Parent)? selectedLink, int selectedGraph)
     {
         if (Current != null && Current.Text == text)
         {
-            Touch(selectedQuest, selectedLink, selectedGraph);
+            Touch(selectedQuests, selectedLink, selectedGraph);
             return;
         }
         var now = capture();
@@ -49,10 +49,10 @@ public sealed class QuestEditHistory
     }
 
     /// <summary>Keeps the current entry's selection up to date without recording a step.</summary>
-    public void Touch(string? selectedQuest, (string Child, string Parent)? selectedLink, int selectedGraph)
+    public void Touch(IReadOnlyList<string> selectedQuests, (string Child, string Parent)? selectedLink, int selectedGraph)
     {
         if (Current != null)
-            Current = Current with { SelectedQuest = selectedQuest, SelectedLink = selectedLink, SelectedGraph = selectedGraph };
+            Current = Current with { SelectedQuests = selectedQuests, SelectedLink = selectedLink, SelectedGraph = selectedGraph };
     }
 
     /// <summary>Steps back one entry and returns the state to restore, or null when there is none.</summary>

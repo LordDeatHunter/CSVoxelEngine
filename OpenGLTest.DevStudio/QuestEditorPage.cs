@@ -718,9 +718,10 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             case Key.Delete when State.SelectedLink is { } link:
                 Status = State.RemoveLink(link.Child, link.Parent) ?? $"{link.Child} no longer depends on {link.Parent}";
                 return true;
-            case Key.Delete when State.SelectedQuestId is { } id:
-                State.DeleteQuest(id);
-                Status = $"Deleted {id}";
+            case Key.Delete when State.SelectedQuestIds.Count > 0:
+                var deleting = State.SelectedQuestIds.ToList();
+                var deleted = State.DeleteQuests(deleting);
+                Status = deleted == 1 ? $"Deleted {deleting[0]}" : $"Deleted {deleted} quests";
                 return true;
             case Key.Escape:
                 if (State.PickRequirement >= 0) State.PickRequirement = -1;
