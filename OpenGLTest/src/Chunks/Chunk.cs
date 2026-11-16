@@ -89,11 +89,9 @@ public class Chunk : IDisposable
     private volatile bool _mayHaveSkyCover;
 
     /// <summary>
-    /// True once the chunk may hold a <c>coversSky</c> block (<see cref="BlockType.CoversSkyById"/>): set by
-    /// the worldgen fill after a tower stamp, by every restore from a snapshot and by <see cref="SetBlockRaw"/>
-    /// (the only writer of a non-air id). It is sticky: an edit never clears it, so a collapsed ruin only pays the
-    /// light flood's cover scan, which then finds nothing. Mesh builds read it after
-    /// <see cref="IsBlockDataReady"/> publishes it.
+    /// Legacy tower-brick marker (<see cref="BlockType.CoversSkyById"/>), retained for content
+    /// diagnostics and restore checks. It no longer gates the light flood: every opaque cell
+    /// in the light volume is scanned regardless of this sticky flag.
     /// </summary>
     internal bool MayHaveSkyCover { get => _mayHaveSkyCover; set => _mayHaveSkyCover = value; }
 

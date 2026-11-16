@@ -154,8 +154,7 @@ public sealed record BlockType
     // Blocks no gameplay path may remove (IsUnbreakable); only Chunk.CollapseWriteAt replaces one
     internal static bool[] UnbreakableById = new bool[256];
 
-    // Blocks that hide the sky from the cells under them in a light volume (coversSky: the battle
-    // tower's bricks); ChunkLighting reads it per cell while it scans a covered neighborhood
+    // Legacy authored marker on battle-tower bricks. Sky cover itself follows !PassesLightById.
     internal static bool[] CoversSkyById = new bool[256];
 
     /// <summary>The ids whose <see cref="CoversSkyById"/> is true, as a vectorized search set over a ushort
