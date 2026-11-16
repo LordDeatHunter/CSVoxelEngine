@@ -68,13 +68,15 @@ pure function of the seed: only **deltas** and the seed are written.
   thread (`ChunkSaveWriter`) builds the name palette, deflates and writes. `Enqueue` publishes the
   snapshot in the pending map **before** the job is queued, and `ChunkManager` enqueues
   **before** it forgets the unloading chunk, so a chunk that streams straight back in is
-  restored from memory. The writer writes `.bin.tmp`, moves it over the final file (retried
-  `SaveMoveRetries` times), adds the key to the on-disk index and only **then** removes the
+  restored from memory. The writer writes `.bin.tmp`, moves it over the final file (up to
+  `SaveMoveRetries` additional move attempts), adds the key to the on-disk index and only **then** removes the
   pending entry — and only if it is still the snapshot it wrote, so a newer enqueue survives. A
   lookup therefore always finds the chunk in one of the two, and a move that finally fails keeps
-  its pending entry and is remembered as failed, so the chunk stays readable for the session,
-  the next flush of it retries, and `Shutdown` re-queues every failed write once more
-  (`ChunkSaveStore.RetryFailed`) before the writer stops. A file a read gave up on (an
+  its pending entry and is remembered as failed, so the chunk stays readable for the session.
+  A later enqueue, explicit `RetryFailed`, or `Shutdown` retries it. Shutdown drains accepted
+  jobs, then its writer makes one final write cycle for each failed artifact, including failures first
+  reported while closing; its Boolean result says whether the writer joined, not whether every
+  write landed. A file a read gave up on (an
   `IOException` after a few retries, or a corrupt file) is moved to `.bad` before the writer
   first replaces it, so what the player had is never overwritten by a regenerated chunk or an
   empty player file, and the temp file is flushed to disk before the rename. The store holds

@@ -35,9 +35,9 @@ namespace VoxelEngine.Saves;
 /// removes the pending entry — and only if it is still the snapshot it wrote, so a newer enqueue
 /// for the same key survives. A lookup therefore always finds the chunk in one of the two.</item>
 /// <item>A write that finally fails keeps its pending entry and is remembered as failed: the chunk
-/// stays readable for the rest of the session, the next flush of that chunk retries it, and
-/// <see cref="Shutdown"/> re-queues every failed write once more before the writer stops, so an
-/// edit never silently misses the disk because of a moment's lock.</item>
+/// stays readable for the rest of the session. A later enqueue, an explicit
+/// <see cref="RetryFailed"/>, or <see cref="Shutdown"/> gives it another try. Shutdown's one
+/// final retry runs after queued writes drain, including failures first reported while closing.</item>
 /// <item>A file that cannot be read (after a few retries, or because it is corrupt) is never
 /// overwritten in place: the writer moves it to <c>.bad</c> first, so what was there can still be
 /// recovered by hand instead of being replaced by a regenerated chunk or an empty player file.</item>
@@ -70,9 +70,10 @@ public sealed class ChunkSaveStore
     private readonly ConcurrentDictionary<long, byte> _queuedChunks = new();
     private readonly ConcurrentDictionary<string, byte[]> _pendingFiles = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<long, byte> _index = new();
-    // Writes that could not land (kept pending), retried by RetryFailed and at Shutdown
-    private readonly ConcurrentDictionary<long, byte> _failedChunks = new();
-    private readonly ConcurrentDictionary<string, byte> _failedFiles = new(StringComparer.Ordinal);
+    // Retain the last accepted write for each failed artifact: an enqueue after admission closes
+    // may replace the readable pending value, but must not turn into a disk write at shutdown.
+    private readonly ConcurrentDictionary<long, ChunkSnapshot> _failedChunks = new();
+    private readonly ConcurrentDictionary<string, byte[]> _failedFiles = new(StringComparer.Ordinal);
     // Files a read gave up on: set aside as .bad before the writer first replaces them
     private readonly ConcurrentDictionary<long, byte> _unreadableChunks = new();
     private readonly ConcurrentDictionary<string, byte> _unreadableFiles = new(StringComparer.Ordinal);
@@ -132,6 +133,9 @@ public sealed class ChunkSaveStore
 
     /// <summary>Jobs waiting for the writer, excluding the one in flight.</summary>
     internal int QueuedCount => _jobs.Count;
+
+    /// <summary>Whether shutdown has closed admission; used to synchronize writer fault tests.</summary>
+    internal bool IsAddingCompletedForTests => _jobs.IsAddingCompleted;
 
     /// <summary>Writes (chunks and files) whose last attempt could not land on disk.</summary>
     public int FailedCount => _failedChunks.Count + _failedFiles.Count;
@@ -254,7 +258,7 @@ public sealed class ChunkSaveStore
     /// <summary>
     /// Re-queues every write whose last attempt failed (its newest pending snapshot or bytes), so a
     /// file that was briefly locked gets another try without the chunk having to be edited again.
-    /// Returns how many were re-queued. Shutdown calls it once before the writer stops.
+    /// Returns how many were re-queued. Shutdown uses its own writer-side final pass after drain.
     /// </summary>
     public int RetryFailed()
     {
@@ -280,8 +284,9 @@ public sealed class ChunkSaveStore
 
     /// <summary>
     /// Stops accepting jobs and waits up to <paramref name="timeout"/> for the writer to finish the
-    /// ones already queued. Returns false (warned) when it did not finish in time; the writer is a
-    /// background thread, so it never keeps the process alive. Reads keep working afterwards.
+    /// ones already queued and one final write cycle for failures. Returns false (warned) when
+    /// the writer did not finish in time; true means joined, not that every write landed. The
+    /// writer is a background thread, so it never keeps the process alive. Reads keep working.
     /// A store handed to a <see cref="World"/> is shut down by <see cref="World.SaveAndDispose"/>:
     /// the World owns it, so its caller must not shut it down again and gives the next World a
     /// new store over the same folder.
@@ -289,14 +294,7 @@ public sealed class ChunkSaveStore
     public bool Shutdown(TimeSpan timeout)
     {
         if (!_jobs.IsAddingCompleted)
-        {
-            // One more go at whatever could not land earlier in the session: the writer drains
-            // the queue in order, so these run after every flush already queued ahead of them.
-            var retried = RetryFailed();
-            if (retried > 0)
-                Log.Warn($"Chunk save store for '{WorldDirectory}': retrying {retried} failed write(s) at shutdown.");
             _jobs.CompleteAdding();
-        }
         if (_writer.Join(timeout))
             return true;
 
@@ -356,11 +354,51 @@ public sealed class ChunkSaveStore
                     Log.Warn($"Chunk save writer: unexpected {e.GetType().Name}: {e.Message}");
                 }
             }
+            RetryFailedAfterDrain();
         }
         finally
         {
             // The folder is free for the next session only once no write can still be in flight
             _lock.Dispose();
+        }
+    }
+
+    // Only the writer runs this pass. Capture both worksets before writing either, so failures of
+    // the final attempts stay pending/diagnosed but never schedule another shutdown cycle.
+    private void RetryFailedAfterDrain()
+    {
+        var chunks = new List<long>(_failedChunks.Keys);
+        var files = new List<string>(_failedFiles.Keys);
+        if (chunks.Count + files.Count > 0)
+            Log.Warn($"Chunk save store for '{WorldDirectory}': retrying {chunks.Count + files.Count} failed write(s) at shutdown.");
+
+        foreach (var key in chunks)
+        {
+            if (!_failedChunks.TryRemove(key, out var snapshot))
+                continue;
+            try
+            {
+                WriteChunk(key, snapshot);
+            }
+            catch (Exception e)
+            {
+                _failedChunks[key] = snapshot;
+                Log.Warn($"Chunk save writer: unexpected {e.GetType().Name}: {e.Message}");
+            }
+        }
+        foreach (var fileName in files)
+        {
+            if (!_failedFiles.TryRemove(fileName, out var bytes))
+                continue;
+            try
+            {
+                WriteWholeFile(fileName, bytes);
+            }
+            catch (Exception e)
+            {
+                _failedFiles[fileName] = bytes;
+                Log.Warn($"Chunk save writer: unexpected {e.GetType().Name}: {e.Message}");
+            }
         }
     }
 
@@ -374,8 +412,8 @@ public sealed class ChunkSaveStore
             SetAsideUnreadable(final);
         if (!TryWriteAndMove(final, encoded.GetBuffer().AsSpan(0, (int)encoded.Length)))
         {
-            // Keep the pending entry: still readable, the next flush retries, and so does Shutdown
-            _failedChunks.TryAdd(key, 0);
+            // Keep the pending entry: still readable; a later enqueue or shutdown retries it.
+            _failedChunks[key] = snapshot;
             return;
         }
 
@@ -401,7 +439,7 @@ public sealed class ChunkSaveStore
         }
         if (!TryWriteAndMove(final, bytes))
         {
-            _failedFiles.TryAdd(fileName, 0);
+            _failedFiles[fileName] = bytes;
             return;
         }
         _failedFiles.TryRemove(fileName, out _);

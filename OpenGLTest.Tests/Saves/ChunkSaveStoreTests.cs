@@ -251,20 +251,42 @@ public sealed class ChunkSaveStoreTests : IDisposable
     {
         var key = ChunkKey.Pack(7, -1, 7);
         var snapshot = Snapshot("stone", seed: 4);
-
-        var store = new ChunkSaveStore(_world)
+        using var entered = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
+        var attempts = 0;
+        var store = new ChunkSaveStore(_world);
+        Thread? shutdown = null;
+        var shutdownResult = false;
+        store.MoveFile = (_, _) =>
         {
-            MoveFile = (_, _) => throw new IOException("locked")
+            if (Interlocked.Increment(ref attempts) == 1)
+            {
+                entered.Set();
+                Assert.True(release.Wait(ShutdownTimeout), "the test did not release the in-flight write");
+            }
+            throw new IOException("locked");
         };
         try
         {
             store.Enqueue(key, snapshot);
+            Assert.True(entered.Wait(ShutdownTimeout), "the writer did not reach the first move");
+            shutdown = new Thread(() => shutdownResult = store.Shutdown(ShutdownTimeout));
+            shutdown.Start();
+            Assert.True(SpinWait.SpinUntil(() => store.IsAddingCompletedForTests, ShutdownTimeout),
+                "shutdown did not close admission while the write was in flight");
         }
         finally
         {
-            ShutdownOrFail(store);
+            release.Set();
+            if (shutdown == null)
+                ShutdownOrFail(store);
+            else
+                Assert.True(shutdown.Join(ShutdownTimeout), "shutdown did not return after the writer was released");
         }
 
+        Assert.True(shutdownResult, "shutdown should join even when storage stays unavailable");
+        Assert.Equal(2 * (SaveConfig.SaveMoveRetries + 1), Volatile.Read(ref attempts));
+        Assert.Equal(1, store.FailedCount);
         Assert.Equal(1, store.PendingCount);
         Assert.True(store.TryLoad(key, out var pending));
         AssertSameData(snapshot, pending);
@@ -376,6 +398,97 @@ public sealed class ChunkSaveStoreTests : IDisposable
         finally
         {
             ShutdownOrFail(reopened);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void AWriteFirstFailingAfterShutdownClosesAdmissionGetsOneFinalTry(bool wholeFile, bool enqueueAfterClose)
+    {
+        var key = ChunkKey.Pack(2, 1, 3);
+        var snapshot = Snapshot("stone", seed: 31);
+        var rejected = Snapshot("dirt", seed: 32);
+        var bytes = Enumerable.Range(0, 256).Select(i => (byte)i).ToArray();
+        var rejectedBytes = new byte[] { 7, 8, 9 };
+        var initialCycleAttempts = SaveConfig.SaveMoveRetries + 1;
+        using var entered = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
+        var attempts = 0;
+        var store = new ChunkSaveStore(_world);
+        Thread? shutdown = null;
+        var shutdownResult = false;
+        store.MoveFile = (tmp, final) =>
+        {
+            var attempt = Interlocked.Increment(ref attempts);
+            if (attempt == 1)
+            {
+                entered.Set();
+                Assert.True(release.Wait(ShutdownTimeout), "the test did not release the in-flight write");
+            }
+            if (attempt <= initialCycleAttempts)
+                throw new IOException("first write cycle locked");
+            File.Move(tmp, final, overwrite: true);
+        };
+
+        try
+        {
+            if (wholeFile)
+                store.EnqueueFile("lod-edits.bin", bytes);
+            else
+                store.Enqueue(key, snapshot);
+            Assert.True(entered.Wait(ShutdownTimeout), "the writer did not reach the first move");
+            shutdown = new Thread(() => shutdownResult = store.Shutdown(ShutdownTimeout));
+            shutdown.Start();
+            Assert.True(SpinWait.SpinUntil(() => store.IsAddingCompletedForTests, ShutdownTimeout),
+                "shutdown did not close admission while the first write was in flight");
+            if (enqueueAfterClose)
+            {
+                if (wholeFile)
+                    store.EnqueueFile("lod-edits.bin", rejectedBytes);
+                else
+                    store.Enqueue(key, rejected);
+            }
+        }
+        finally
+        {
+            release.Set();
+            if (shutdown == null)
+                ShutdownOrFail(store);
+            else
+                Assert.True(shutdown.Join(ShutdownTimeout), "shutdown did not return after the writer was released");
+        }
+
+        Assert.True(shutdownResult, "the writer did not finish after the first failure");
+        var reopened = new ChunkSaveStore(_world);
+        try
+        {
+            if (wholeFile)
+                Assert.Equal(bytes, reopened.ReadFile("lod-edits.bin"));
+            else
+            {
+                Assert.True(reopened.TryLoad(key, out var disk));
+                AssertSameData(snapshot, disk);
+            }
+        }
+        finally
+        {
+            ShutdownOrFail(reopened);
+        }
+        Assert.Equal(initialCycleAttempts + 1, Volatile.Read(ref attempts));
+        Assert.Equal(0, store.FailedCount);
+        if (wholeFile && enqueueAfterClose)
+            Assert.Equal(rejectedBytes, store.ReadFile("lod-edits.bin"));
+        if (!wholeFile)
+        {
+            Assert.Equal(enqueueAfterClose ? 1 : 0, store.PendingCount);
+            if (enqueueAfterClose)
+            {
+                Assert.True(store.TryLoad(key, out var pending));
+                AssertSameData(rejected, pending);
+            }
         }
     }
 
