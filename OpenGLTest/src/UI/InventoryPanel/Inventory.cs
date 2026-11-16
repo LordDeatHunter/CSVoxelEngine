@@ -182,6 +182,7 @@ public class Inventory
     public bool Add(ushort id, int amount = 1, bool autoEquip = true)
     {
         if (!AddToPool(id, amount, autoEquip)) return false;
+        _known.Add(id);
         Gained?.Invoke(id);
         return true;
     }
@@ -197,7 +198,6 @@ public class Inventory
     {
         var category = CategoryOf(id);
         if (!category.HasValue || amount <= 0) return false;
-        _known.Add(id);
 
         switch (category.Value)
         {
