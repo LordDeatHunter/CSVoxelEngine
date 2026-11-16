@@ -145,6 +145,24 @@ public class ChunkSaveCodecTests
     }
 
     [Fact]
+    public void SupplementaryScalarAcrossDecoderChunksPreservesTheCompletePaletteName()
+    {
+        var name = new string('a', 1021) + "\U0001F642" + new string('b', 2048);
+        var utf8 = System.Text.Encoding.UTF8.GetBytes(name);
+        using var fragmented = new FragmentedReadStream(ForgeOneNameChunk(utf8), maxRead: 7);
+        string? resolvedName = null;
+
+        var decoded = ChunkSaveCodec.Read(fragmented, candidate =>
+        {
+            resolvedName = candidate;
+            return candidate == name ? (ushort)7 : null;
+        });
+
+        Assert.Equal(name, resolvedName);
+        Assert.Equal((ushort)7, decoded.Storage.Get(1));
+    }
+
+    [Fact]
     public void BadMagicOrTruncatedBodyThrowsInvalidData()
     {
         var garbage = new byte[64];
