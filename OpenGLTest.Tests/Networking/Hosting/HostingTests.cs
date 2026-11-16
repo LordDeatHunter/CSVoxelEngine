@@ -140,6 +140,54 @@ public sealed class HostingTests : IDisposable
     }
 
     [Fact]
+    public void SequentialServerLaunchesKeepSavedOperatorsWithTheirWorld()
+    {
+        var worldA = _store.Create("Operators A", WorldSeed.Default);
+        var worldB = _store.Create("Operators B", WorldSeed.Default);
+        var savedOperators = new OperatorList();
+        savedOperators.Add("Alice");
+        File.WriteAllBytes(Path.Combine(worldA.Directory, OperatorList.FileName), savedOperators.ToJson());
+
+        var baseOperators = new OperatorList();
+        baseOperators.Add("BaseOp");
+        ServerLaunchResult? first = null;
+        ServerLaunchResult? second = null;
+        try
+        {
+            first = ServerLaunch.Start(worldA, 0, baseOperators);
+            Assert.True(first.Started, first.Message);
+            Assert.True(first.Server!.IsOperator("BaseOp"));
+            Assert.True(first.Server.IsOperator("Alice"));
+
+            first.Server.Dispose();
+            Assert.True(first.World!.SaveAndDispose());
+            Assert.False(WorldSeed.WorldIsLive);
+            var reopened = new ChunkSaveStore(worldA.Directory);
+            Assert.True(reopened.Shutdown(Budget));
+            first = null;
+
+            second = ServerLaunch.Start(worldB, 0, baseOperators);
+            Assert.True(second.Started, second.Message);
+            Assert.False(second.Server!.IsOperator("Alice"));
+            Assert.True(second.Server.IsOperator("BaseOp"));
+            Assert.Equal(new[] { "BaseOp" }, baseOperators.Names);
+        }
+        finally
+        {
+            if (second?.Server is { } secondServer)
+            {
+                secondServer.Dispose();
+                second.World!.SaveAndDispose();
+            }
+            if (first?.Server is { } firstServer)
+            {
+                firstServer.Dispose();
+                first.World!.SaveAndDispose();
+            }
+        }
+    }
+
+    [Fact]
     public void TheLanAddressIsAnUpIPv4OffLoopbackPreferringTheGatewayAdapter()
     {
         var gateway = IPAddress.Parse("192.168.1.20");
