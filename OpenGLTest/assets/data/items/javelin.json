@@ -5,4 +5,5 @@
   "throwDamage": 6,
   "throwAligned": true,
   "throwChargeNeeded": 0.5,
+  "throwSpeedScale": 2,
   "throwSticks": true }

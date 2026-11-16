@@ -133,11 +133,11 @@ public sealed class ThrownProjectile
 
     public int Damage => DamageFor(BaseDamage, Charge01);
 
-    public static Vector3 LaunchVelocity(Vector3 direction, float charge01)
+    public static Vector3 LaunchVelocity(Vector3 direction, float charge01, float speedScale = 1f)
     {
         if (direction.LengthSquared() < 1e-8f) direction = Vector3.UnitX;
         direction = Vector3.Normalize(direction);
-        return direction * (PlayerConfig.ThrowSpeed * ChargeFactor(charge01));
+        return direction * (PlayerConfig.ThrowSpeed * speedScale * ChargeFactor(charge01));
     }
 
     public bool Update(float deltaTime, ChunkManager chunks, IReadOnlyList<Mob>? mobs, out Mob? hit,

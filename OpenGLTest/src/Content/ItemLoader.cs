@@ -172,6 +172,13 @@ internal static class ItemLoader
                 throw new InvalidOperationException(
                     $"Item '{path}' has throwChargeNeeded {definition.ThrowChargeNeeded}; expected 0..1.");
 
+            var throwSpeedScale = definition.ThrowSpeedScale ?? 1f;
+            if (definition.ThrowSpeedScale.HasValue && throwDamage == null)
+                throw new InvalidOperationException($"Item '{path}' sets throwSpeedScale but has no throwDamage.");
+            if (!(throwSpeedScale > 0f))
+                throw new InvalidOperationException(
+                    $"Item '{path}' has throwSpeedScale {definition.ThrowSpeedScale}; expected above 0.");
+
             if (definition.ThrowBlock != null && throwDamage == null)
                 throw new InvalidOperationException($"Item '{path}' sets throwBlock but has no throwDamage.");
 
@@ -207,7 +214,8 @@ internal static class ItemLoader
                 OnHit: onHit,
                 HeldModel: heldModel,
                 ThrowChargeNeeded: throwChargeNeeded,
-                ThrowSticks: definition.ThrowSticks));
+                ThrowSticks: definition.ThrowSticks,
+                ThrowSpeedScale: throwSpeedScale));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, ushort>(ContentRegistry.ItemIds, StringComparer.Ordinal));

@@ -67,7 +67,8 @@ public static class ItemFactory
         GearPassive? OnHit = null,
         HeldModel? HeldModel = null,
         float ThrowChargeNeeded = 0f,
-        bool ThrowSticks = false);
+        bool ThrowSticks = false,
+        float ThrowSpeedScale = 1f);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,

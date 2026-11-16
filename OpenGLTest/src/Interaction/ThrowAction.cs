@@ -254,7 +254,7 @@ internal sealed class ThrowAction
         if (!creative && !inventory.ConsumeSelected())
             return false;
         var origin = eye + forward * 0.6f;
-        var velocity = ThrownProjectile.LaunchVelocity(forward, charge01);
+        var velocity = ThrownProjectile.LaunchVelocity(forward, charge01, ItemRegistry.TryGet(id)?.ThrowSpeedScale ?? 1f);
         _thrown.Add(new ThrownProjectile(id, origin, velocity, baseDamage, charge01));
         return true;
     }

@@ -52,6 +52,9 @@ public sealed class ItemDefinition
     /// </summary>
     public float? ThrowChargeNeeded { get; set; }
 
+    /// <summary>Multiplier on the launch speed of a thrown copy (omitted: 1, the shared throw speed). Needs <see cref="ThrowDamage"/>.</summary>
+    public float? ThrowSpeedScale { get; set; }
+
     /// <summary>
     /// A throw of this item stays where it lands instead of turning into a spinning drop: stuck in the
     /// terrain it hit, tip first, until someone walks up and takes it back, or stuck in the mob it hit,
