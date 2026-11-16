@@ -808,8 +808,9 @@ continues the word, and, with nothing to offer, the command's usage line instead
 walking off a ledge, a hop within one state step of the ground counts as a landing, a client that double jumps before the
 server applied its equip intent is corrected once; players are
 keyed by name with no authentication, so whoever joins first
-under a name gets that name's inventory, status and operator rights (`ops.json` is read once at
-start, and there is no in-game op command); a slice's return-swing flag and a throw's charge are
+under a name gets that name's inventory, status and operator rights (the world's `ops.json` is loaded
+at startup; operator-only multiplayer `/op` and `/deop` commands update and persist it); a slice's
+return-swing flag and a throw's charge are
 taken from the client (both are paced, neither verified); a timed use (`use.seconds`) is held
 locally and the completed `Use` intent is taken on trust, so a modified client can fire one
 instantly; a third-person placement may land on a
