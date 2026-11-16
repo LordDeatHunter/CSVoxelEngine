@@ -45,7 +45,7 @@ internal sealed class FieldPointer(InputManager inputManager, RenderManager rend
                 var hit = ui.Menu.MainMenuHitAt(position, menu.View);
                 if (menu.FocusFieldAt(hit) is not { } menuField) return;
                 Begin(menuField, MainMenuLayout.FieldCenter(menu.View.Page, hit.Kind, ui.ScreenSize),
-                    MainMenuLayout.FieldSize, position);
+                    MainMenuLayout.FieldSizeFor(hit.Kind), position);
                 return;
             }
             case AppScreen.Playing when chatView.IsOpen && !pauseMenuView.IsOpen:

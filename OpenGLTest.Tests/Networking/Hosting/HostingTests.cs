@@ -4,7 +4,6 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.Hosting;
 using VoxelEngine.Networking.ServerSide;
@@ -94,7 +93,7 @@ public sealed class HostingTests : IDisposable
         {
             var port = ((IPEndPoint)occupant.LocalEndpoint).Port;
 
-            var hosted = HostedServer.TryStart(world, port, "Host", out var error);
+            var hosted = HostedServer.TryStart(world, port, "Host", upnp: false, out var error);
 
             Assert.Null(hosted);
             Assert.Contains(port.ToString(), error);
@@ -113,7 +112,7 @@ public sealed class HostingTests : IDisposable
     public void AHostedWorldServesItsHostOverLoopbackAndReleasesTheWorldWhenStopped()
     {
         var world = _store.Create("Hosted", WorldSeed.Default);
-        var hosted = HostedServer.TryStart(world, 0, "Host", out var error);
+        var hosted = HostedServer.TryStart(world, 0, "Host", upnp: false, out var error);
         Assert.True(hosted != null, error);
         Assert.True(WorldSeed.WorldIsLive);
 

@@ -443,6 +443,119 @@ public sealed class MainMenuControllerTests : IDisposable
     }
 
     [Fact]
+    public void HostOnARowRequestsThatWorldWithThePortAndUpnpChoice()
+    {
+        _store.Create("Shared", 7);
+        var controller = NewController();
+        controller.OpenMultiplayer();
+
+        controller.Click(Hit(MainMenuHitKind.OpenHost));
+        Assert.Equal(MainMenuPage.Host, controller.View.Page);
+        Assert.Equal(_store.List().Select(w => w.Slug), controller.View.Worlds.Select(w => w.Slug));
+
+        // The port takes digits only
+        controller.Click(Hit(MainMenuHitKind.PortField));
+        TypeText(controller, "p3o0:00 0");
+        Assert.Equal("30000", controller.View.Port.Text);
+        controller.Click(Hit(MainMenuHitKind.ToggleUpnp));
+
+        Assert.Equal(MainMenuAction.Host, controller.Click(Hit(MainMenuHitKind.HostWorld, 0)));
+        var request = controller.TakeHostRequest()!.Value;
+        Assert.Equal("shared", request.World.Slug);
+        Assert.Equal(30000, request.Port);
+        Assert.True(request.Upnp);
+        Assert.Null(controller.TakeHostRequest());
+
+        // Back and ESC both step back to the server list
+        controller.Click(Hit(MainMenuHitKind.Back));
+        Assert.Equal(MainMenuPage.Multiplayer, controller.View.Page);
+        controller.Click(Hit(MainMenuHitKind.OpenHost));
+        controller.Key(MenuKey.Escape);
+        Assert.Equal(MainMenuPage.Multiplayer, controller.View.Page);
+    }
+
+    [Theory]
+    [InlineData("0", false, 0)]
+    [InlineData("65536", false, 0)]
+    [InlineData("", true, ServerAddress.DefaultPort)]
+    [InlineData("65535", true, 65535)]
+    public void AnOutOfRangePortKeepsTheHostPageUpWithANotice(string typed, bool hosts, int port)
+    {
+        _store.Create("World", 1);
+        var controller = NewController();
+        controller.OpenHost();
+        controller.View.Port.Set(typed);
+
+        var action = controller.Click(Hit(MainMenuHitKind.HostWorld, 0));
+
+        Assert.Equal(hosts ? MainMenuAction.Host : MainMenuAction.None, action);
+        Assert.Equal(MainMenuPage.Host, controller.View.Page);
+        if (hosts)
+            Assert.Equal(port, controller.TakeHostRequest()!.Value.Port);
+        else
+            Assert.Equal(MainMenuController.BadPortNotice, controller.View.Notice);
+    }
+
+    [Fact]
+    public void HostRefusesAWorldOfAnotherSaveFormatAndLockedWorlds()
+    {
+        var controller = NewController();
+        controller.OpenHost();
+        controller.View.Worlds.Add(new WorldInfo("old", "Old", 1, 0, 0, WorldStore.CurrentVersion - 1, "old"));
+        Assert.Equal(MainMenuAction.None, controller.Click(Hit(MainMenuHitKind.HostWorld, 0)));
+        Assert.Null(controller.HostRequest);
+        Assert.NotNull(controller.View.Notice);
+
+        _store.Create("Fine", 1);
+        var locked = NewController();
+        locked.LockWorlds("locked");
+        locked.OpenHost();
+        Assert.Equal(MainMenuAction.None, locked.Click(Hit(MainMenuHitKind.HostWorld, 0)));
+        locked.Click(Hit(MainMenuHitKind.Create));
+        Assert.Equal(MainMenuPage.Host, locked.View.Page);
+    }
+
+    [Fact]
+    public void ANewWorldFromTheHostPageIsCreatedAndHosted()
+    {
+        var controller = NewController(() => 99);
+        controller.OpenHost();
+        controller.Click(Hit(MainMenuHitKind.Create));
+        Assert.Equal(MainMenuPage.Create, controller.View.Page);
+
+        // BACK and ESC return to the page that opened the form
+        controller.Click(Hit(MainMenuHitKind.Back));
+        Assert.Equal(MainMenuPage.Host, controller.View.Page);
+        controller.Click(Hit(MainMenuHitKind.Create));
+        controller.Key(MenuKey.Escape);
+        Assert.Equal(MainMenuPage.Host, controller.View.Page);
+
+        // A bad port is caught before the world is made
+        controller.View.Port.Set("99999");
+        controller.Click(Hit(MainMenuHitKind.Create));
+        TypeText(controller, "Lan Party");
+        Assert.Equal(MainMenuAction.None, controller.Key(MenuKey.Enter));
+        Assert.Empty(_store.List());
+        Assert.Equal(MainMenuPage.Host, controller.View.Page);
+        Assert.Equal(MainMenuController.BadPortNotice, controller.View.Notice);
+
+        controller.View.Port.Set("");
+        controller.Click(Hit(MainMenuHitKind.Create));
+        TypeText(controller, "Lan Party");
+        Assert.Equal(MainMenuAction.Host, controller.Key(MenuKey.Enter));
+        var request = controller.TakeHostRequest()!.Value;
+        Assert.Equal("Lan Party", request.World.Name);
+        Assert.Equal(99, request.World.Seed);
+        Assert.Single(_store.List());
+        Assert.Null(controller.PlayRequest);
+
+        // CREATE from the worlds page still plays
+        controller.OpenWorlds();
+        controller.Click(Hit(MainMenuHitKind.Create));
+        Assert.Equal(MainMenuAction.Play, controller.Key(MenuKey.Enter));
+    }
+
+    [Fact]
     public void OpeningAServerFormDropsTheListsNoticeButNeverTheWorldsLock()
     {
         var controller = NewController();

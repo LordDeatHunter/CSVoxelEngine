@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using VoxelEngine.Networking;
 using VoxelEngine.UI.Menus;
 
 namespace VoxelEngine.UI;
@@ -57,6 +58,13 @@ public static class GameSettings
     // Map
     /// <summary>Whether the top-right minimap is round instead of square (the [M] map screen's toggle).</summary>
     public static bool MinimapRound { get; set; }
+
+    // Hosting (the HOST page remembers the last choice, like a saved server; not a setting, so a reset keeps it)
+    /// <summary>The port the last world was hosted on.</summary>
+    public static int HostPort { get; set; } = ServerAddress.DefaultPort;
+
+    /// <summary>Whether the last world was hosted with a UPnP port mapping.</summary>
+    public static bool HostUpnp { get; set; }
 
     /// <summary>Window sizes offered by the resolution option row.</summary>
     public static readonly (int W, int H)[] Resolutions =
@@ -149,6 +157,8 @@ public static class GameSettings
         if (dto.SprintToggle is { } sprintToggle) SprintToggle = sprintToggle;
         if (dto.PauseInPanels is { } pauseInPanels) PauseInPanels = pauseInPanels;
         if (dto.MinimapRound is { } minimapRound) MinimapRound = minimapRound;
+        if (dto.HostPort is { } hostPort) HostPort = Math.Clamp(hostPort, ServerAddress.MinPort, ServerAddress.MaxPort);
+        if (dto.HostUpnp is { } hostUpnp) HostUpnp = hostUpnp;
     }
 
     public static void Save(string? path = null)
@@ -179,6 +189,8 @@ public static class GameSettings
             SprintToggle = SprintToggle,
             PauseInPanels = PauseInPanels,
             MinimapRound = MinimapRound,
+            HostPort = HostPort,
+            HostUpnp = HostUpnp,
         };
         try
         {
@@ -218,5 +230,7 @@ public static class GameSettings
         public bool? SprintToggle { get; set; }
         public bool? PauseInPanels { get; set; }
         public bool? MinimapRound { get; set; }
+        public int? HostPort { get; set; }
+        public bool? HostUpnp { get; set; }
     }
 }

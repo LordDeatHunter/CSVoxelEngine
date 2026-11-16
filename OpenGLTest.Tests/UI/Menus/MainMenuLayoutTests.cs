@@ -106,6 +106,26 @@ public sealed class MainMenuLayoutTests
     }
 
     [Fact]
+    public void HostPageHitsItsRowButtonThePortTheToggleNewWorldAndBack()
+    {
+        var view = WorldsView(3, MainMenuPage.Host);
+
+        var row = MainMenuLayout.HostRowButtonCenter(Screen, 1, 0f);
+        Assert.Equal(new MainMenuHit(MainMenuHitKind.HostWorld, 1), MainMenuLayout.HitAt(row, Screen, view));
+        Assert.Equal(MainMenuHitKind.PortField, KindAt(MainMenuLayout.PortFieldCenter(Screen), view));
+        Assert.Equal(MainMenuHitKind.ToggleUpnp, KindAt(MainMenuLayout.QuadButtonCenter(Screen, 1), view));
+        Assert.Equal(MainMenuHitKind.Create, KindAt(MainMenuLayout.QuadButtonCenter(Screen, 2), view));
+        Assert.Equal(MainMenuHitKind.Back, KindAt(MainMenuLayout.QuadButtonCenter(Screen, 3), view));
+        // The PORT label beside the field is not a hit
+        Assert.Equal(MainMenuHitKind.None,
+            KindAt(new Vector2(MainMenuLayout.PortLabelLeft(Screen) + 4f, MainMenuLayout.PortFieldCenter(Screen).Y), view));
+
+        var multiplayer = new MainMenuView { Page = MainMenuPage.Multiplayer };
+        Assert.Equal(MainMenuHitKind.OpenHost, KindAt(MainMenuLayout.QuadButtonCenter(Screen, 2), multiplayer));
+        Assert.Equal(MainMenuHitKind.Back, KindAt(MainMenuLayout.QuadButtonCenter(Screen, 3), multiplayer));
+    }
+
+    [Fact]
     public void EmptyWorldsPageHasNoRowHitsButKeepsCreateAndBack()
     {
         var view = WorldsView(0);

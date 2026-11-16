@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Runtime;
 using Silk.NET.Input;
 using Silk.NET.Maths;
@@ -29,7 +28,7 @@ namespace VoxelEngine;
 public static class Program
 {
     /// <summary>Blocking work recorded by a click and run on the update after its screen was presented.</summary>
-    private enum PendingWork { None, OpenWorld, SaveAndQuit, Connect }
+    private enum PendingWork { None, OpenWorld, SaveAndQuit, Connect, Host }
 
     private static WindowManager windowManager;
     private static InputManager inputManager;
@@ -53,6 +52,8 @@ public static class Program
     private static VisualDirector? visualDirector;
     private static bool visualScriptFailed;
     private static ConnectTarget pendingConnect;
+    private static HostTarget pendingHost;
+    private static HostSession hosting = null!;
     private static readonly InventoryView inventoryView = new();
     private static readonly SpellBuilderView spellBuilderView = new();
     private static readonly WaystoneView waystoneView = new();
@@ -69,9 +70,6 @@ public static class Program
     private static GameplayInput gameplay = null!;
     private static InputEvents inputEvents = null!;
     private static FieldPointer fieldPointer = null!;
-    private static double fpsTimer;
-    private static int fpsFrames;
-    private static int shownFps;
 
     // LaunchMode.ScriptVariable (VOXEL_SCRIPT) names a scenario JSON to run a scripted visual test
     // instead of playing: teleport/walk/mine/screenshot steps drive the real update functions, then
@@ -129,6 +127,8 @@ public static class Program
         worldStore = new WorldStore(WorldStore.DefaultRoot);
         serverStore = new ServerStore(ServerStore.DefaultPath);
         menu = new MainMenuController(worldStore, serverStore, Random.Shared.Next);
+        HostSession.RestoreChoices(menu.View);
+        hosting = new HostSession(pauseMenuView);
 
         // The app's components, built once; they read the live world and screen through Program
         diagnostics = new DevDiagnostics();
@@ -223,6 +223,10 @@ public static class Program
                 if (target is { } connect)
                     RequestConnect(connect);
                 break;
+            case MainMenuAction.Host when menu.TakeHostRequest() is { } host:
+                pendingHost = host;
+                BeginPending(PendingWork.Host, AppScreen.Loading, LoadingScreenKind.Loading, host.World.Name, "Starting the server...");
+                break;
             case MainMenuAction.Exit:
                 windowManager.Window.Close();
                 break;
@@ -235,19 +239,34 @@ public static class Program
     /// </summary>
     private static void RequestConnect(ConnectTarget target)
     {
-        pending = PendingWork.Connect;
         pendingConnect = target;
-        pendingFramePresented = false;
-        loadingView.Begin(LoadingScreenKind.Loading, target.Name, "Connecting...");
-        screen = AppScreen.Loading;
+        BeginPending(PendingWork.Connect, AppScreen.Loading, LoadingScreenKind.Loading, target.Name, "Connecting...");
     }
 
+    // Records blocking work and shows the screen that announces it; the work runs once that screen was presented
+    private static void BeginPending(PendingWork work, AppScreen announcing, LoadingScreenKind kind, string title, string status)
+    {
+        pending = work;
+        pendingFramePresented = false;
+        loadingView.Begin(kind, title, status);
+        screen = announcing;
+    }
+
+    /// <summary>A failed or lost connection: back to the server list, or to the host page when this game was hosting
+    /// (which stops the server and saves its world), with <paramref name="notice"/> under the list.</summary>
     internal static void AbortConnect(string notice)
     {
         loadingView.Finish();
-        ShowMenu();
-        menu.OpenMultiplayer();
+        ShowSessionList(hosting.Stop());
         menu.ShowNotice(notice);
+    }
+
+    // The menu a multiplayer session returns to: the host page after hosting, else the server list
+    private static void ShowSessionList(bool wasHosting)
+    {
+        ShowMenu();
+        if (wasHosting) menu.OpenHost();
+        else menu.OpenMultiplayer();
     }
 
     /// <summary>
@@ -257,13 +276,10 @@ public static class Program
     /// </summary>
     private static void RequestOpenWorld(WorldInfo info, bool isNew)
     {
-        pending = PendingWork.OpenWorld;
         pendingWorld = info;
         pendingWorldIsNew = isNew;
-        pendingFramePresented = false;
-        loadingView.Begin(LoadingScreenKind.Loading, info.Name,
+        BeginPending(PendingWork.OpenWorld, AppScreen.Loading, LoadingScreenKind.Loading, info.Name,
             isNew ? "Generating terrain..." : "Loading world...");
-        screen = AppScreen.Loading;
     }
 
     /// <summary>
@@ -272,10 +288,8 @@ public static class Program
     /// </summary>
     internal static void RequestSaveAndQuit()
     {
-        pending = PendingWork.SaveAndQuit;
-        pendingFramePresented = false;
-        loadingView.Begin(LoadingScreenKind.Saving, currentWorld?.Name ?? "", "Saving...");
-        screen = AppScreen.Saving;
+        BeginPending(PendingWork.SaveAndQuit, AppScreen.Saving, LoadingScreenKind.Saving,
+            currentWorld?.Name ?? hosting.Server?.WorldName ?? "", "Saving...");
     }
 
     /// <summary>Runs the blocking work a click recorded, once its announcing frame is on screen.</summary>
@@ -293,6 +307,13 @@ public static class Program
                 break;
             case PendingWork.Connect:
                 session.BeginConnect(pendingConnect);
+                break;
+            case PendingWork.Host:
+                // The host joins its own server over loopback, like any player
+                if (hosting.TryStart(pendingHost, chatView.LocalName, out var error))
+                    session.BeginConnect(hosting.Connection);
+                else
+                    AbortConnect(error);
                 break;
         }
     }
@@ -343,7 +364,7 @@ public static class Program
         opened.Player.Rig = renderManager.Players.PlayerRig;
         renderManager.LightSource = opened.GetChunkManager();
         currentWorld = info;
-        TryTouch(info);
+        worldStore.TryTouchLastPlayed(info);
         ResetWorldViews();
         // The screen stays Loading until the world reports IsLoaded. The Camera constructor
         // already captured the cursor and the World holds SuppressLook until the flip.
@@ -365,8 +386,9 @@ public static class Program
 
     private static void SaveAndQuit()
     {
-        // A multiplayer client leaves the server and returns to the server list; a singleplayer
-        // world saves and returns to the worlds page.
+        // A multiplayer client leaves the server and returns to the server list (a host also stops
+        // its server, saving the world, and returns to the host page); a singleplayer world saves
+        // and returns to the worlds page.
         var wasMultiplayer = session.Client != null;
         session.DisconnectNetwork();
         var w = world;
@@ -374,19 +396,20 @@ public static class Program
         if (w != null)
         {
             if (currentWorld != null)
-                TryTouch(currentWorld);
+                worldStore.TryTouchLastPlayed(currentWorld);
             ok = w.SaveAndDispose(renderManager);
         }
         world = null;
         currentWorld = null;
+        var wasHosting = hosting.Stop();
         ResetWorldViews();
         loadingView.Finish();
-        ShowMenu();
-        if (wasMultiplayer)
+        if (wasHosting || wasMultiplayer)
         {
-            menu.OpenMultiplayer();
+            ShowSessionList(wasHosting);
             return;
         }
+        ShowMenu();
         menu.OpenWorlds();
         // The lock follows WorldSeed rather than the return value: a writer timeout also returns
         // false but frees the seed, and PLAY keeps working then.
@@ -394,19 +417,6 @@ public static class Program
             menu.LockWorlds(SeedLockedNotice);
         else if (!ok)
             menu.ShowNotice("The last save may be incomplete - see the console");
-    }
-
-    /// <summary>Stamps a world as played now; a disk error only warns.</summary>
-    private static void TryTouch(WorldInfo info)
-    {
-        try
-        {
-            worldStore.TouchLastPlayed(info);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            Log.Warn($"Could not update world '{info.Name}': {e.Message}");
-        }
     }
 
     /// <summary>
@@ -455,6 +465,8 @@ public static class Program
         }
 
         fieldPointer.Update();
+        // A hosted server's frame comes first, so the host's client reads what it just sent
+        hosting.Tick(deltaTime);
 
         switch (screen)
         {
@@ -482,7 +494,10 @@ public static class Program
                 loading.Update((float)deltaTime, inputManager.Keyboard);
                 loadingView.Update(loading.LoadProgress, loading.IsLoaded, (float)deltaTime);
                 if (loading.IsLoaded)
+                {
                     screen = AppScreen.Playing;
+                    hosting.AnnounceOnce(chatView);
+                }
                 FrameProfiler.Begin(ProfileSection.DebugLog);
                 diagnostics.LogDebugLine(deltaTime, world);
                 FrameProfiler.End(ProfileSection.DebugLog);
@@ -558,14 +573,7 @@ public static class Program
         world.Renderer.Render(renderManager);
 
         FrameProfiler.Begin(ProfileSection.RenderShell);
-        fpsTimer += deltaTime;
-        fpsFrames++;
-        if (fpsTimer >= 1.0)
-        {
-            shownFps = (int)(fpsFrames / fpsTimer);
-            fpsTimer = 0.0;
-            fpsFrames = 0;
-        }
+        diagnostics.CountFrame(deltaTime);
         FrameProfiler.End(ProfileSection.RenderShell);
 
         FrameProfiler.Begin(ProfileSection.UiPass);
@@ -576,7 +584,7 @@ public static class Program
         renderManager.Ui.Pointer = panelInput.UiPointerCanvas();
         if (!hideHud)
             world.Renderer.RenderUI(renderManager, inventoryView,
-                (float)world.LightingTime, shownFps, diagnostics.DebugEnabled,
+                (float)world.LightingTime, diagnostics.ShownFps, diagnostics.DebugEnabled,
                 showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView, builder: spellBuilderView, waystone: waystoneView, forge: gameplay.Forge.View,
                 mapScreen: gameplay.Map.View);
         // The quest book covers the world and the HUD; its toast card rides the HUD's corner
@@ -609,17 +617,7 @@ public static class Program
         // Timed even when no screenshot is due, so the pairing stays obvious; an empty span
         // costs one Stopwatch read.
         FrameProfiler.Begin(ProfileSection.Screenshot);
-        if (visualDirector?.TakeScreenshot == true || gameplay.ScreenshotRequested)
-        {
-            var scripted = visualDirector?.TakeScreenshot == true;
-            var path = scripted ? visualDirector!.ScreenshotPath : Path.Combine(ScreenshotPaths.Directory,
-                ScreenshotPaths.NameFor(DateTime.Now));
-            if (scripted) visualDirector!.TakeScreenshot = false;
-            else gameplay.ScreenshotRequested = false;
-            var size = windowManager.Window.FramebufferSize;
-            var pixels = VisualCapture.ReadPixels(renderManager.gl, size.X, size.Y);
-            VisualCapture.QueueSave(pixels, size.X, size.Y, path);
-        }
+        gameplay.CaptureScreenshotIfDue(visualDirector, windowManager.Window.FramebufferSize);
         FrameProfiler.End(ProfileSection.Screenshot);
 
         FrameProfiler.Begin(ProfileSection.RenderShell);
@@ -635,13 +633,15 @@ public static class Program
 
     private static void OnClosing()
     {
-        // A multiplayer client drops its connection; the server owns the save, not the client.
+        // A multiplayer client drops its connection; the server owns the save, not the client. A
+        // world this game hosts is that server: it saves here.
         session?.DisconnectNetwork();
+        hosting?.Stop();
         // A saved world is saved on close exactly like SAVE & QUIT (no frame to announce it;
         // GL is still current here). A storeless dev-override world is left to process exit.
         if (world != null && currentWorld != null)
         {
-            TryTouch(currentWorld);
+            worldStore.TryTouchLastPlayed(currentWorld);
             world.SaveAndDispose(renderManager);
             world = null;
             currentWorld = null;

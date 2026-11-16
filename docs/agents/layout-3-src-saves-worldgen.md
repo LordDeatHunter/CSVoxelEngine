@@ -37,7 +37,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   pending entity restore and the station restore (player.json, entities.json, stations.json, lod-edits.bin)
       WorldSeedParser.cs       # seed field -> seed: empty = random, integer verbatim, else FNV-1a hash
       WorldSources.cs          # the server's named world sources (generated, imported): Create(name, worldDir)
-      WorldStore.cs            # the saves root: list (most recent first), create, rename, delete, touch;
+      WorldStore.cs            # the saves root: list (most recent first), create, rename, delete, touch (TryTouchLastPlayed only warns);
                                #   writes `source` back only when set, so an unset one never appears
     Simulation/                # the main-thread simulations World owns: gravity, TNT, tree growth,
                                #   saplings, the stations (campfire, quern, kiln, casting), drops, the mob managers
@@ -214,7 +214,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       StatusEffectBlockWriter.cs # the authoritative block writes with every edit hook, capped per pulse and per frame
     UI/                        # UI state, layout and rules, mostly GL-free (UIRenderer's page renderers in Rendering/Overlays draw them): canvas, font, settings
       BitmapFont.cs            # TrueType font baked into a GL atlas; CPU glyph layout (printable ASCII, any run length, a cap-box-centered layout)
-      GameSettings.cs          # player settings with JSON persistence (settings.json)
+      GameSettings.cs          # player settings with JSON persistence (settings.json), plus the HOST page's last port and
+                               #   UPnP choice (HostPort, HostUpnp; not reset with the settings)
       Primitives.cs            # Vertex-layout mesh factories for simple shapes
       ScrollList.cs            # scrolled equal-height row math: clamp, visible range, row at a point
       TextFit.cs               # GL-free single-line fit: shrink to a floor, then an ellipsis, reporting whether it cut
@@ -293,13 +294,17 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         SearchScope.cs         # what the [E] search lists: items and recipes (default), items only, recipes only
       Menus/                   # main, pause and settings menus, the loading screen, text fields
         LoadingScreen.cs       # LoadingScreenView (eased monotone progress, fade-out) + LoadingScreenLayout (spinner)
-        MainMenu.cs            # main-menu pages, hit kinds, fields, keys, actions and MainMenuView
-        MainMenuController.cs  # every main-menu page transition, key rule and WorldStore call (tested)
-        MainMenuLayout.cs      # main-menu geometry + HitAt: buttons, scrolled world rows, fields, delete popup
-        PauseMenu.cs           # pause menu pages, hit kinds, view and PauseMenuLayout (RESUME/SETTINGS/SAVE & QUIT)
+        MainMenu.cs            # main-menu pages, hit kinds, fields, keys, actions (ConnectTarget, HostTarget) and MainMenuView
+        MainMenuController.cs  # every main-menu page transition, key rule and WorldStore call, the HOST page's port check
+                               #   (TryParsePort) and new-world-then-host (tested)
+        MainMenuLayout.cs      # main-menu geometry + HitAt: buttons, scrolled world rows, fields, delete popup, the four bottom
+                               #   slots (QuadButtonCenter) and the host page's port field
+        PauseMenu.cs           # pause menu pages, hit kinds, view (HostLines while hosting) and PauseMenuLayout
+                               #   (RESUME/SETTINGS/SAVE & QUIT, CLOSE SERVER while hosting; StatusTop)
         RespawnPrompt.cs       # GL-free death screen rule (shows after the death plays, one respawn request per death) + DeathScreenLayout
         SettingsMenu.cs        # settings page rows, tabs, sliders and SettingsLayout (shared by both menus)
-        TextFieldState.cs      # one single-line text field: printable-ASCII typing rules, length cap, caret and selection
+        TextFieldState.cs      # one single-line text field: printable-ASCII (or digits-only) typing rules, length cap, caret
+                               #   and selection
         TextFieldEditing.cs    # the editing keys every field shares (arrows, Home/End, Ctrl words, Shift select, Delete, Ctrl+A/C/X/V; Up/Down jump only where the owner asks), over an IClipboard
         WordBoundary.cs        # the word rule of Ctrl+arrows and Ctrl+Backspace/Delete
       SpellBuilder/            # the spell table's builder: GL-free state, catalog, layout and text (SpellBuilderRenderer draws it)

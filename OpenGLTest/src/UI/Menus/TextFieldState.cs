@@ -9,9 +9,10 @@ public enum CaretMove { Left, Right, WordLeft, WordRight, Start, End }
 /// GL-free contents of one single-line text field (a world name, a seed, the chat line, a search
 /// query): the text, a caret and an optional selection. It knows nothing about Silk input: the
 /// app feeds it the characters that arrive through the keyboard's character event and the
-/// editing keys, so the typing rules are covered by tests.
+/// editing keys, so the typing rules are covered by tests. A <paramref name="digitsOnly"/> field (a port) takes
+/// only 0-9, typed or pasted.
 /// </summary>
-public sealed class TextFieldState(int maxLength)
+public sealed class TextFieldState(int maxLength, bool digitsOnly = false)
 {
     /// <summary>The most characters the field holds; inserts past it are refused or truncated.</summary>
     public int MaxLength { get; } = maxLength;
@@ -37,8 +38,9 @@ public sealed class TextFieldState(int maxLength)
 
     public string SelectedText => Text[SelectionStart..SelectionEnd];
 
-    /// <summary>Whether the font can draw <paramref name="c"/>: printable ASCII (<see cref="BitmapFont.FirstChar"/> to <c>~</c>; 127 is DEL).</summary>
-    private static bool IsTypable(char c) => c >= (char)BitmapFont.FirstChar && c <= '~';
+    /// <summary>Whether the field takes <paramref name="c"/>: a digit in a digits-only field, otherwise anything the
+    /// font can draw, printable ASCII (<see cref="BitmapFont.FirstChar"/> to <c>~</c>; 127 is DEL).</summary>
+    private bool IsTypable(char c) => digitsOnly ? char.IsAsciiDigit(c) : c >= (char)BitmapFont.FirstChar && c <= '~';
 
     /// <summary>
     /// Inserts <paramref name="c"/> at the caret (replacing a selection) when it is a character the

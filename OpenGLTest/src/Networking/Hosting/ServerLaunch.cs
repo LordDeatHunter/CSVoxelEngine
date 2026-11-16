@@ -38,7 +38,7 @@ public sealed record ServerLaunchResult(
 /// <summary>
 /// Opens a saved world as a server: the one setup the dedicated server and a world hosted from the game share. In
 /// order: the save-format gate, the world source (built before the folder is locked, so a refused source leaves it
-/// untouched), the save store (which takes the folder's lock), the operators (<paramref name="operators"/> plus the
+/// untouched), the save store (which takes the folder's lock), the operators (the caller's plus the
 /// world's <see cref="OperatorList.FileName"/>), the seed, the headless server-mode <see cref="World"/>, and the
 /// listening <see cref="GameServer"/>. A failure after the world is built saves and closes it, so nothing is left
 /// live or locked. Main thread only, and only while no other world is live.

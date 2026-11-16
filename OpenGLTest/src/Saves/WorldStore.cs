@@ -126,6 +126,19 @@ public sealed class WorldStore(string root)
         Write(world);
     }
 
+    /// <summary><see cref="TouchLastPlayed"/> for a caller that must go on regardless: a disk error only warns.</summary>
+    public void TryTouchLastPlayed(WorldInfo world)
+    {
+        try
+        {
+            TouchLastPlayed(world);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Log.Warn($"Could not update world '{world.Name}': {e.Message}");
+        }
+    }
+
     /// <summary>The file name one chunk is saved under inside the chunks folder.</summary>
     public static string ChunkFileName(int cx, int cy, int cz) =>
         string.Create(CultureInfo.InvariantCulture, $"{cx}_{cy}_{cz}{ChunkFileExtension}");

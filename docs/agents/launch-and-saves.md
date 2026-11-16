@@ -30,7 +30,9 @@ starts at the mid-morning default (+ `VOXEL_TIME`) however long the menu stayed 
 clock overrides that. The pause menu's third button is SAVE & QUIT: it presents a `Saving...`
 frame, calls `World.SaveAndDispose(renderManager)` on the next update and returns to the worlds
 page, and a second PLAY with another seed works in the same process; closing the window while in
-a store-backed world saves it the same way (`OnClosing`). The dev overrides `VOXEL_SCRIPT`,
+a store-backed world saves it the same way (`OnClosing`). While this game hosts the world (see "Hosting from the
+game") the button reads CLOSE SERVER: it stops the server, which saves the world, and returns to the host page; the
+window closing stops it the same way. The dev overrides `VOXEL_SCRIPT`,
 `VOXEL_SPAWN` and `VOXEL_LOOK` (`LaunchMode.BypassesMenu`) skip the menu entirely and build a
 **storeless** World exactly as before — no persistence, no seed change, no loading phase — which
 is why a dev override can never reach a saved world; `VOXEL_TIME` alone does not bypass.

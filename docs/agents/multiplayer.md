@@ -155,6 +155,46 @@ page up with `MainMenuController.BadAddressNotice`. Servers live in one JSON fil
 and returns a `ConnectTarget` through `MainMenuAction.Connect`, which Program turns into a real
 session.
 
+The multiplayer page's bottom row is four slots spanning the panel (`MainMenuLayout.QuadButtonCenter`): ADD SERVER /
+DIRECT CONNECT / **HOST** / BACK. HOST opens `MainMenuPage.Host`, the saved worlds again (re-read like the worlds
+page, sharing its scroll) with one HOST button per row, and across the bottom a digits-only PORT field
+(`TextFieldState(digitsOnly: true)`; blank is `ServerAddress.DefaultPort`), a UPNP: ON/OFF toggle, NEW WORLD and BACK.
+HOST on a row is refused for an old save format (the PLAY gate, `RefusesOldFormat`) and while the worlds are locked,
+and an out-of-range port (`MainMenuController.TryParsePort`) keeps the page up with `BadPortNotice`; otherwise it
+returns `MainMenuAction.Host` with a `HostTarget(world, port, upnp)` (`TakeHostRequest`). NEW WORLD opens the create
+page with `View.CreateThenHost`: its CREATE checks the port first (so a bad port never leaves a stray world), creates
+the world and hosts it, and its BACK/ESC return to the host page. The port and the toggle start from the last host
+that started (`GameSettings.HostPort`/`HostUpnp`, restored by `HostSession.RestoreChoices`).
+
+**Hosting from the game.** The game hosts in process, the way both reference Godot projects run a listen server: the
+same `GameServer` over the same headless server-mode `World` the dedicated server runs, opened by the one shared
+launch (`Networking/Hosting/ServerLaunch.Start`: the save-format gate, the world source, the save store's lock, the
+operators, `WorldSeed.Apply`, the World and the listening server, each failure typed as a `ServerLaunchFailure` and
+leaving nothing live or locked; `ServerProgram` uses it too). Program defers the HOST click like a world open
+(`PendingWork.Host`, a "Starting the server..." frame), then `HostSession.TryStart` builds the `HostedServer` and the
+host's own client connects to it over loopback (`HostedServer.LoopbackAddress`) through the normal connect path, so
+the host plays by the server's rules like everyone else. A refused start (`Port N is unavailable`, the world open
+elsewhere, ...) returns to the host page with the reason (`Program.AbortConnect`, which lands on the host page
+whenever a hosting session ends). The hosting player (`GameServer.HostPlayer`, the chat's local name) is always an
+operator and never written to `ops.json`. The server ticks on the **main thread**, once a frame before the client
+world (`HostSession.Tick` at the top of `Program.OnUpdate`), exactly as the loopback tests run a server and a client
+world side by side, so no world state is shared across threads; its chunk workers run on their own threads as on a
+dedicated server. A failing tick stops the server (saving the world) instead of the game, and the client then
+returns to the menu. Two worlds in one process share only what is safe to share: the content registries, the seed's
+pure worldgen caches and the far-LOD edit tables (`LodSurface`, `LodColumnCaps`, `TreeCanopy`), which a client world
+never writes (`BlockEditor.NotifyLodEdit`); the one process-wide hook that was not safe, the raw cell-write journal,
+is per world (`ChunkManager.CellWrites`). The join address is the LAN IPv4 of the gateway adapter
+(`LanAddress.Find`/`Pick`: up, not loopback, never link-local, private ranges preferred), shown once in the chat when
+the host is in (`HostSession.AnnounceOnce`) and under the pause menu's buttons (`PauseMenuView.HostLines`), whose
+third button reads CLOSE SERVER while hosting. CLOSE SERVER, a lost connection and the window closing all stop the
+server (`HostedServer.Stop`: kick everyone, save the players and the world, release the folder) after the client
+world is dropped, so the other players return to their server list. With UPNP: ON, `UpnpMapping` (Mono.Nat, UPnP or
+NAT-PMP) forwards the TCP port in the background: discovery gives up after 5 s, a mapping another device already
+holds on the port is left alone and reported, the lease (2 h) is renewed at half-time, and `Dispose` deletes the
+mapping only when a readback still shows this session's per-session description; its state is the pause menu's
+second line (asking / open at the external address / failed with the reason). A router that is itself behind a
+carrier NAT reports a private external address: the mapping succeeds but the internet still cannot reach it.
+
 **The wire protocol** is in `OpenGLTest/src/Networking/NetProtocol.cs`: `NetFraming` writes a
 4-byte little-endian length then the payload whose first byte is a `NetMessage`, and
 `PacketWriter`/`PacketReader` carry the fields (`BinaryWriter`/`BinaryReader`, strings 7-bit

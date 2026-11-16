@@ -422,6 +422,10 @@ public class ChunkManager
         }
     }
 
+    /// <summary>This world's raw cell writes, shared by every chunk made here (<see cref="Chunk.WriteHook"/>); a
+    /// server observes it to journal them for its clients.</summary>
+    public CellWriteHook CellWrites { get; } = new();
+
     /// <summary>
     /// Builds the chunk at <paramref name="pos"/> with its block data ready; the single seam for
     /// where a chunk's blocks come from. The save store wins: a chunk it holds for
@@ -433,10 +437,6 @@ public class ChunkManager
     /// restored one for the main thread to adopt its player-placed cells, which must happen after
     /// the chunk is published (see <see cref="QueueChunk"/>).
     /// </summary>
-    /// <summary>This world's raw cell writes, shared by every chunk made here (<see cref="Chunk.WriteHook"/>); a
-    /// server observes it to journal them for its clients.</summary>
-    public CellWriteHook CellWrites { get; } = new();
-
     internal Chunk CreateChunk(Vector3 pos, long key)
     {
         var cx = MathUtils.FloorToInt(pos.X);

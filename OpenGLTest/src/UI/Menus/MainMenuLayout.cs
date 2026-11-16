@@ -132,20 +132,35 @@ public static class MainMenuLayout
             screenSize.Y - ListBottomMargin * 0.5f);
     }
 
+    // Four bottom slots spanning the panel exactly: 4 x 210 + 3 x 40 = PanelWidth
+    private const float QuadSlotWidth = 210f;
+    private const float QuadSlotGap = 40f;
+
     /// <summary>
-    /// Center of one of three bottom buttons (0, 1, 2 left to right): ADD SERVER / DIRECT CONNECT /
-    /// BACK on the multiplayer page. Slightly narrower than <see cref="PauseMenuLayout.ButtonWidth"/>
-    /// so the three still fit the panel.
+    /// Center of one of four bottom slots (0..3 left to right) spanning the panel: ADD SERVER / DIRECT CONNECT /
+    /// HOST / BACK on the multiplayer page; the port, UPnP, NEW WORLD and BACK on the host page.
     /// </summary>
-    public static Vector2 TripleButtonCenter(Vector2 screenSize, int index)
+    public static Vector2 QuadButtonCenter(Vector2 screenSize, int index) =>
+        new(PanelLeft(screenSize) + QuadSlotWidth * 0.5f + index * (QuadSlotWidth + QuadSlotGap),
+            screenSize.Y - ListBottomMargin * 0.5f);
+
+    public static Vector2 QuadButtonSize => new(QuadSlotWidth, PauseMenuLayout.ButtonHeight);
+
+    /// <summary>The host page's port field: the right part of the first bottom slot, its PORT label on the left.</summary>
+    public static Vector2 PortFieldSize => new(120f, PauseMenuLayout.ButtonHeight);
+
+    public static Vector2 PortFieldCenter(Vector2 screenSize)
     {
-        const float width = 280f;
-        var total = 3 * width + 2 * BottomButtonGap;
-        var left = screenSize.X * 0.5f - total * 0.5f + width * 0.5f;
-        return new Vector2(left + index * (width + BottomButtonGap), screenSize.Y - ListBottomMargin * 0.5f);
+        var slot = QuadButtonCenter(screenSize, 0);
+        return new Vector2(slot.X + QuadSlotWidth * 0.5f - PortFieldSize.X * 0.5f, slot.Y);
     }
 
-    public static Vector2 TripleButtonSize => new(280f, PauseMenuLayout.ButtonHeight);
+    /// <summary>Left edge of the host page's PORT label, at the start of the first bottom slot.</summary>
+    public static float PortLabelLeft(Vector2 screenSize) => QuadButtonCenter(screenSize, 0).X - QuadSlotWidth * 0.5f;
+
+    /// <summary>A host page row's one HOST button.</summary>
+    public static Vector2 HostRowButtonCenter(Vector2 screenSize, int row, float offset) =>
+        RowButtonCenter(screenSize, row, offset, 0, 1);
 
     /// <summary>Top of the notice line, between the list bottom and the bottom buttons.</summary>
     public static float NoticeTop(Vector2 screenSize)
@@ -192,8 +207,13 @@ public static class MainMenuLayout
     {
         MainMenuHitKind.SeedField => SeedFieldCenter(screenSize),
         MainMenuHitKind.AddressField when page == MainMenuPage.AddServer => SeedFieldCenter(screenSize),
+        MainMenuHitKind.PortField => PortFieldCenter(screenSize),
         _ => NameFieldCenter(screenSize),
     };
+
+    /// <summary>The size of the text field a field hit stands for (the port field is narrower than the forms').</summary>
+    public static Vector2 FieldSizeFor(MainMenuHitKind kind) =>
+        kind == MainMenuHitKind.PortField ? PortFieldSize : FieldSize;
 
     public static MainMenuHit HitAt(Vector2 point, Vector2 screenSize, MainMenuView view)
     {
@@ -244,15 +264,8 @@ public static class MainMenuLayout
                 var count = view.Servers.Count;
                 var offset = ClampedOffset(view.ServerScrollOffset, count, screenSize);
                 if (RowAt(point, screenSize, offset, count) is not { } row)
-                {
-                    if (InBox(point, TripleButtonCenter(screenSize, 0), TripleButtonSize))
-                        return new(MainMenuHitKind.AddServer);
-                    if (InBox(point, TripleButtonCenter(screenSize, 1), TripleButtonSize))
-                        return new(MainMenuHitKind.DirectConnect);
-                    if (InBox(point, TripleButtonCenter(screenSize, 2), TripleButtonSize))
-                        return new(MainMenuHitKind.Back);
-                    return new(MainMenuHitKind.None);
-                }
+                    return QuadHit(point, screenSize, MainMenuHitKind.AddServer, MainMenuHitKind.DirectConnect,
+                        MainMenuHitKind.OpenHost);
 
                 if (InBox(point, RowButtonCenter(screenSize, row, offset, 0, 2), RowButtonSize))
                     return new(MainMenuHitKind.Connect, row);
@@ -277,10 +290,34 @@ public static class MainMenuLayout
                     return new(MainMenuHitKind.CancelDeleteServer);
                 return new(MainMenuHitKind.None);
 
+            case MainMenuPage.Host:
+            {
+                var count = view.Worlds.Count;
+                var offset = ClampedOffset(view.ScrollOffset, count, screenSize);
+                if (RowAt(point, screenSize, offset, count) is { } row)
+                    return InBox(point, HostRowButtonCenter(screenSize, row, offset), RowButtonSize)
+                        ? new(MainMenuHitKind.HostWorld, row)
+                        : new(MainMenuHitKind.None);
+                // The port field takes the first slot's field part; its label is not a hit
+                if (InBox(point, PortFieldCenter(screenSize), PortFieldSize)) return new(MainMenuHitKind.PortField);
+                return QuadHit(point, screenSize, MainMenuHitKind.None, MainMenuHitKind.ToggleUpnp, MainMenuHitKind.Create);
+            }
+
             default:
                 // Settings: SettingsLayout owns that page's clicks.
                 return new(MainMenuHitKind.None);
         }
+    }
+
+    // The four bottom slots: the three given kinds, then BACK
+    private static MainMenuHit QuadHit(Vector2 point, Vector2 screenSize, MainMenuHitKind first, MainMenuHitKind second,
+        MainMenuHitKind third)
+    {
+        if (InBox(point, QuadButtonCenter(screenSize, 0), QuadButtonSize)) return new(first);
+        if (InBox(point, QuadButtonCenter(screenSize, 1), QuadButtonSize)) return new(second);
+        if (InBox(point, QuadButtonCenter(screenSize, 2), QuadButtonSize)) return new(third);
+        if (InBox(point, QuadButtonCenter(screenSize, 3), QuadButtonSize)) return new(MainMenuHitKind.Back);
+        return new(MainMenuHitKind.None);
     }
 
     private static MainMenuHit BottomHit(Vector2 point, Vector2 screenSize, MainMenuHitKind left)

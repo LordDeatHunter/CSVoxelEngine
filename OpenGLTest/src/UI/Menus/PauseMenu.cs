@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Rendering.Overlays;
 
@@ -31,6 +32,12 @@ public sealed class PauseMenuView
     public PauseMenuPage Page { get; set; } = PauseMenuPage.Closed;
 
     public bool IsOpen => Page != PauseMenuPage.Closed;
+
+    /// <summary>While this game hosts the world, where others join (and the UPnP state, when asked for), one line
+    /// each under the buttons; empty otherwise. The third button then reads CLOSE SERVER.</summary>
+    public List<string> HostLines { get; } = [];
+
+    public bool IsHosting => HostLines.Count > 0;
 }
 
 /// <summary>
@@ -57,6 +64,11 @@ public static class PauseMenuLayout
     /// <summary>Center of the Back button on the settings page.</summary>
     public static Vector2 BackButtonCenter(Vector2 screenSize) =>
         new(screenSize.X * 0.5f, screenSize.Y * 0.5f + 80f);
+
+    /// <summary>Top edge (Y) of the main page's status line <paramref name="line"/> (the hosting address), under
+    /// the buttons.</summary>
+    public static float StatusTop(Vector2 screenSize, int line) =>
+        MainButtonCenter(screenSize, 2).Y + ButtonHeight * 0.5f + 32f + line * 30f;
 
     /// <summary>Top edge (Y) of the page title text.</summary>
     public static float TitleTop(Vector2 screenSize, PauseMenuPage page) =>

@@ -157,7 +157,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   hotbar feedback, toasts, tooltips, the look label, screenshot paths
     InventoryPanel/            # the inventory and its save shape, the [E] panel layout, crafting cards, the creative catalog, search
                                #   and its scope, the tab counts, the right-click equip
-    Menus/                     # main and pause menus, the loading screen, text fields
+    Menus/                     # main and pause menus, the loading screen, text fields (digits-only), the HOST page's
+                               #   port check, refusals and new-world-then-host
     SpellBuilder/              # the builder's selection rules, live stats and layout hit-tests
     Waystone/                  # the waystone screen's page rules, rows and layout hit-tests
     QuestBookLayoutTests.cs    # the quest book's zoom about the pointer, drag-to-pan and visible-only hit test

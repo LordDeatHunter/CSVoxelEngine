@@ -23,6 +23,7 @@
         <InternalsVisibleTo Include="VoxelEngine.ItemDebugger" />
     </ItemGroup>
     <ItemGroup>
+        <PackageReference Include="Mono.Nat" Version="3.0.4" />
         <PackageReference Include="Silk.NET.Input" Version="2.22.0" />
         <PackageReference Include="Silk.NET.Windowing" Version="2.*" />
         <PackageReference Include="Silk.NET.OpenGL" Version="2.*" />

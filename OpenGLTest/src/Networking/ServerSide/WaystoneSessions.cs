@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using VoxelEngine.Networking;
 using VoxelEngine.Simulation.Waystones;
 
 namespace VoxelEngine.Networking.ServerSide;

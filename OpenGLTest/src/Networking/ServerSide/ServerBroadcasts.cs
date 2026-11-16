@@ -13,7 +13,6 @@ using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Entities.TowerMobs;
-using VoxelEngine.Networking;
 
 namespace VoxelEngine.Networking.ServerSide;
 

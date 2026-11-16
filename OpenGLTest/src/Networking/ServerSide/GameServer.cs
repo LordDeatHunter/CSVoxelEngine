@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using VoxelEngine.Chunks;
-using VoxelEngine.Networking;
 using VoxelEngine.Saves;
 
 namespace VoxelEngine.Networking.ServerSide;

@@ -11,20 +11,25 @@ namespace VoxelEngine.Networking.Hosting;
 /// as a client over loopback, so the host plays by the server's rules like everyone else. The server ticks on the
 /// game's main thread, once a frame before the client world (<see cref="Tick"/>), exactly as the loopback tests run
 /// a server and a client world side by side; its chunk workers run on their own threads as on a dedicated server.
-/// The hosting player (<see cref="GameServer.HostPlayer"/>) is always an operator.
+/// The hosting player (<see cref="GameServer.HostPlayer"/>) is always an operator. With UPnP asked for, a
+/// <see cref="UpnpMapping"/> forwards the port on the router in the background for as long as the server runs.
 /// </summary>
 public sealed class HostedServer
 {
     private readonly World _world;
     private readonly GameServer _server;
 
-    private HostedServer(WorldInfo world, World serverWorld, GameServer server)
+    private HostedServer(WorldInfo world, World serverWorld, GameServer server, bool upnp)
     {
         WorldName = world.Name;
         _world = serverWorld;
         _server = server;
         LanAddress = Hosting.LanAddress.Find();
+        Upnp = upnp ? UpnpMapping.Start(server.BoundPort) : null;
     }
+
+    /// <summary>The router port mapping, null when UPnP was not asked for.</summary>
+    public UpnpMapping? Upnp { get; }
 
     /// <summary>The hosted world's name.</summary>
     public string WorldName { get; }
@@ -48,17 +53,18 @@ public sealed class HostedServer
 
     /// <summary>
     /// Opens <paramref name="world"/> as a server on <paramref name="port"/> with <paramref name="hostPlayer"/> as
-    /// its permanent operator; null with the reason in <paramref name="error"/> when it cannot (the port in use,
-    /// the world open elsewhere, an old save format). Main thread only, and only while no world is live.
+    /// its permanent operator, mapping the port on the router when <paramref name="upnp"/> is set; null with the
+    /// reason in <paramref name="error"/> when it cannot (the port in use, the world open elsewhere, an old save
+    /// format). Main thread only, and only while no world is live.
     /// </summary>
-    public static HostedServer? TryStart(WorldInfo world, int port, string hostPlayer, out string error)
+    public static HostedServer? TryStart(WorldInfo world, int port, string hostPlayer, bool upnp, out string error)
     {
         var launch = ServerLaunch.Start(world, port, new OperatorList(), hostPlayer: hostPlayer);
         error = launch.Message;
         if (!launch.Started)
             return null;
         Log.WriteLine($"Hosting '{world.Name}' on port {launch.Server!.BoundPort}");
-        return new HostedServer(world, launch.World!, launch.Server);
+        return new HostedServer(world, launch.World!, launch.Server, upnp);
     }
 
     /// <summary>
@@ -89,6 +95,7 @@ public sealed class HostedServer
         Stopped = true;
         _server.Stop();
         _world.SaveAndDispose();
+        Upnp?.Dispose();
         Log.WriteLine($"Stopped hosting '{WorldName}'");
     }
 }

@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using Silk.NET.Maths;
 using Silk.NET.Input;
 using VoxelEngine.Interaction;
 using VoxelEngine.Magic;
@@ -11,6 +13,7 @@ using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
+using VoxelEngine.VisualTest;
 
 namespace VoxelEngine.App;
 
@@ -102,8 +105,21 @@ internal sealed class GameplayInput
     /// <summary>Whether the HUD draws (F1).</summary>
     internal bool HudVisible => hudVisible;
 
-    /// <summary>An F2 screenshot waiting for the next rendered frame, which clears it.</summary>
-    internal bool ScreenshotRequested { get => screenshotRequested; set => screenshotRequested = value; }
+    /// <summary>
+    /// Saves this frame as a screenshot when one is due: the scripted step's (to its path) or an F2 press's (to
+    /// <see cref="ScreenshotPaths.Directory"/>), each cleared once taken. Call after the frame is drawn.
+    /// </summary>
+    internal void CaptureScreenshotIfDue(VisualDirector? director, Vector2D<int> framebuffer)
+    {
+        var scripted = director?.TakeScreenshot == true;
+        if (!scripted && !screenshotRequested) return;
+        var path = scripted ? director!.ScreenshotPath : Path.Combine(ScreenshotPaths.Directory,
+            ScreenshotPaths.NameFor(DateTime.Now));
+        if (scripted) director!.TakeScreenshot = false;
+        else screenshotRequested = false;
+        var pixels = VisualCapture.ReadPixels(renderManager.gl, framebuffer.X, framebuffer.Y);
+        VisualCapture.QueueSave(pixels, framebuffer.X, framebuffer.Y, path);
+    }
 
     /// <summary>Whether Tab holds the player list up this frame.</summary>
     internal bool TabHeld => tabHeld;

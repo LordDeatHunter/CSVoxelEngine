@@ -6,6 +6,18 @@ namespace VoxelEngine.Tests.UI.Menus;
 public sealed class TextFieldStateTests
 {
     [Fact]
+    public void ADigitsOnlyFieldTakesDigitsTypedOrPasted()
+    {
+        var field = new TextFieldState(5, digitsOnly: true);
+        Assert.False(field.TryAppend('a'));
+        Assert.True(field.TryAppend('2'));
+        Assert.True(field.Insert("55-66 :7x8"));
+        // Only the digits arrive, cut to the room left
+        Assert.Equal("25566", field.Text);
+        Assert.False(field.Insert("1"));
+    }
+
+    [Fact]
     public void AcceptsOnlyPrintableFontCharacters()
     {
         var field = new TextFieldState(16);

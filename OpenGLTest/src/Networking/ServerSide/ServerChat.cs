@@ -1,5 +1,4 @@
 using VoxelEngine.Commands;
-using VoxelEngine.Networking;
 using VoxelEngine.UI.Hud;
 
 namespace VoxelEngine.Networking.ServerSide;

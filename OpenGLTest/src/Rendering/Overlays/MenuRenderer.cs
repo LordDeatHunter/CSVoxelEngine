@@ -1,10 +1,10 @@
 using System.Numerics;
 using Silk.NET.OpenGL;
 using VoxelEngine.Data;
+using VoxelEngine.Networking;
 using VoxelEngine.Saves;
 using VoxelEngine.UI;
 using VoxelEngine.UI.Menus;
-using static VoxelEngine.Rendering.Overlays.UIRenderer;
 using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
@@ -29,8 +29,8 @@ internal sealed class MenuRenderer
     /// The ESC pause menu over the still-rendered game: a fullscreen dim standing in for a
     /// blur (this pass has no blur target; the dark translucency keeps the scene visible
     /// but unreadable, like the Godot reference's BlurOverlay in overlay mode), then a
-    /// centered title with RESUME / SETTINGS / SAVE &amp; QUIT buttons, or the settings title with a
-    /// BACK button. Click targets come from <see cref="PauseMenuLayout"/> so drawing and
+    /// centered title with RESUME / SETTINGS / SAVE &amp; QUIT buttons (CLOSE SERVER and the join address
+    /// under them while this game hosts the world), or the settings title with a BACK button. Click targets come from <see cref="PauseMenuLayout"/> so drawing and
     /// hit-testing can never drift apart (the third button is still <see cref="PauseMenuHit.Exit"/>).
     /// </summary>
     internal void DrawPauseMenu(PauseMenuView view, SettingsMenuView settings)
@@ -46,7 +46,10 @@ internal sealed class MenuRenderer
                 PauseMenuLayout.TitleTop(screen, view.Page), _ui.HeadScale, Rgba.White);
             DrawMenuButton(PauseMenuLayout.MainButtonCenter(screen, 0), "RESUME");
             DrawMenuButton(PauseMenuLayout.MainButtonCenter(screen, 1), "SETTINGS");
-            DrawMenuButton(PauseMenuLayout.MainButtonCenter(screen, 2), "SAVE & QUIT");
+            DrawMenuButton(PauseMenuLayout.MainButtonCenter(screen, 2), view.IsHosting ? "CLOSE SERVER" : "SAVE & QUIT");
+            for (var i = 0; i < view.HostLines.Count; i++)
+                _ui.DrawTextCentered(view.HostLines[i], screen.X * 0.5f, PauseMenuLayout.StatusTop(screen, i),
+                    _ui.CountScale, i == 0 ? AccentGold : TextDim);
             return;
         }
 
@@ -248,6 +251,10 @@ internal sealed class MenuRenderer
                 DrawConfirmDelete(screen, "Delete this world?", view.SelectedWorld?.Name);
                 break;
 
+            case MainMenuPage.Host:
+                DrawHostPage(view, screen, time);
+                break;
+
             case MainMenuPage.Settings:
                 DrawSettingsMenu(settings);
                 break;
@@ -298,6 +305,17 @@ internal sealed class MenuRenderer
                 MainMenuLayout.RowButtonSize, "DELETE", DangerRed);
         };
 
+    // A host row: the name over the seed and last-played line, then HOST.
+    private static readonly ListRowDrawer HostRow =
+        static (renderer, view, screen, i, offset, rowTop, nameLeft, nameWidth) =>
+        {
+            var world = view.Worlds[i];
+            renderer.DrawRowText(world.Name, MainMenuLayout.WorldDetailText(world.Seed, world.LastPlayedUnixMs),
+                rowTop, nameLeft, nameWidth);
+            renderer.DrawSmallButton(MainMenuLayout.HostRowButtonCenter(screen, i, offset),
+                MainMenuLayout.RowButtonSize, "HOST");
+        };
+
     // The worlds list with its CREATE / BACK buttons.
     private void DrawWorldsPage(MainMenuView view, Vector2 screen)
     {
@@ -312,9 +330,27 @@ internal sealed class MenuRenderer
     {
         DrawListPage(view, screen, "MULTIPLAYER", MainMenuPage.Multiplayer, view.Servers.Count,
             view.ServerScrollOffset, "No servers yet - add one", ServerRow);
-        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 0), MainMenuLayout.TripleButtonSize, "ADD SERVER");
-        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 1), MainMenuLayout.TripleButtonSize, "DIRECT CONNECT");
-        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 2), MainMenuLayout.TripleButtonSize, "BACK");
+        DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 0), MainMenuLayout.QuadButtonSize, "ADD SERVER");
+        DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 1), MainMenuLayout.QuadButtonSize, "DIRECT CONNECT");
+        DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 2), MainMenuLayout.QuadButtonSize, "HOST");
+        DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 3), MainMenuLayout.QuadButtonSize, "BACK");
+    }
+
+    // The host page: the worlds with a HOST button each, then the PORT field, the UPnP toggle (gold while on),
+    // NEW WORLD and BACK across the bottom.
+    private void DrawHostPage(MainMenuView view, Vector2 screen, float time)
+    {
+        DrawListPage(view, screen, "HOST A WORLD", MainMenuPage.Host, view.Worlds.Count, view.ScrollOffset,
+            "No worlds yet - make a new one", HostRow);
+
+        var portCenter = MainMenuLayout.PortFieldCenter(screen);
+        _ui.DrawTextCenteredY("PORT", MainMenuLayout.PortLabelLeft(screen), portCenter.Y, _ui.CountScale, TextDim);
+        _ui.DrawInputField(portCenter, MainMenuLayout.PortFieldSize, view.Port, view.Focus == MenuField.Port,
+            ServerAddress.DefaultPort.ToString(), time);
+        DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 1), MainMenuLayout.QuadButtonSize,
+            view.Upnp ? "UPNP: ON" : "UPNP: OFF", view.Upnp ? AccentGold : null);
+        DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 2), MainMenuLayout.QuadButtonSize, "NEW WORLD");
+        DrawSmallButton(MainMenuLayout.QuadButtonCenter(screen, 3), MainMenuLayout.QuadButtonSize, "BACK");
     }
 
     // A scrolled list page (worlds or multiplayer): title, panel, the scissored rows (name and detail

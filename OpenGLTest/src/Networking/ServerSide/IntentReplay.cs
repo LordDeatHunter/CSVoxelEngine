@@ -4,7 +4,6 @@ using VoxelEngine.Audio;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
 using VoxelEngine.Magic;
-using VoxelEngine.Networking;
 using VoxelEngine.Simulation.Smithing;
 
 namespace VoxelEngine.Networking.ServerSide;

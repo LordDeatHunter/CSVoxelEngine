@@ -22,6 +22,23 @@ internal sealed class DevDiagnostics
 
     private double debugLogTimer;
 
+    private double fpsTimer;
+    private int fpsFrames;
+
+    /// <summary>The frame rate the HUD shows, counted over the last whole second (<see cref="CountFrame"/>).</summary>
+    internal int ShownFps { get; private set; }
+
+    /// <summary>Counts one rendered frame toward <see cref="ShownFps"/>.</summary>
+    internal void CountFrame(double deltaTime)
+    {
+        fpsTimer += deltaTime;
+        fpsFrames++;
+        if (fpsTimer < 1.0) return;
+        ShownFps = (int)(fpsFrames / fpsTimer);
+        fpsTimer = 0.0;
+        fpsFrames = 0;
+    }
+
     /// <summary>
     /// One line naming the build the timings were taken on. A Debug build, an attached
     /// debugger and workstation GC each cost enough that a measurement without them recorded

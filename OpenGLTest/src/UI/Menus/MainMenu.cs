@@ -18,6 +18,7 @@ public enum MainMenuPage
     AddServer,
     DirectConnect,
     ConfirmDeleteServer,
+    Host,
 }
 
 /// <summary>What a click on the main menu landed on.</summary>
@@ -46,6 +47,10 @@ public enum MainMenuHitKind
     AddressField,
     ConfirmDeleteServer,
     CancelDeleteServer,
+    OpenHost,
+    HostWorld,
+    PortField,
+    ToggleUpnp,
 }
 
 /// <summary>
@@ -63,6 +68,7 @@ public enum MenuField
     Seed,
     ServerName,
     Address,
+    Port,
 }
 
 /// <summary>
@@ -84,10 +90,15 @@ public enum MainMenuAction
     Play,
     Exit,
     Connect,
+    Host,
 }
 
 /// <summary>A server the menu asked Program to connect to, until <see cref="MainMenuController.TakeConnectRequest"/>.</summary>
 public readonly record struct ConnectTarget(string Name, ServerAddress Address);
+
+/// <summary>A world the menu asked Program to host, until <see cref="MainMenuController.TakeHostRequest"/>: the
+/// world, the port to listen on and whether to ask the router for a UPnP mapping.</summary>
+public readonly record struct HostTarget(WorldInfo World, int Port, bool Upnp);
 
 /// <summary>
 /// Selection and text state of the main menu. Owned by Program's <see cref="MainMenuController"/>;
@@ -100,6 +111,9 @@ public sealed class MainMenuView
 
     /// <summary>Most characters the server address field accepts.</summary>
     public const int AddressMaxLength = 64;
+
+    /// <summary>Most digits the host page's port field accepts (65535).</summary>
+    public const int PortMaxLength = 5;
 
     public MainMenuPage Page { get; set; } = MainMenuPage.Main;
 
@@ -140,6 +154,15 @@ public sealed class MainMenuView
     /// <summary>The add-server and direct-connect page's host[:port] field.</summary>
     public TextFieldState Address { get; } = new(AddressMaxLength);
 
+    /// <summary>The host page's port, digits only; empty means <see cref="ServerAddress.DefaultPort"/>.</summary>
+    public TextFieldState Port { get; } = new(PortMaxLength, digitsOnly: true);
+
+    /// <summary>Whether the host page asks the router for a UPnP port mapping.</summary>
+    public bool Upnp { get; set; }
+
+    /// <summary>Whether the create page was opened from the host page, so CREATE hosts the new world.</summary>
+    public bool CreateThenHost { get; set; }
+
     public MenuField Focus { get; set; }
 
     public TextFieldState? FocusedField => Focus switch
@@ -148,6 +171,7 @@ public sealed class MainMenuView
         MenuField.Seed => Seed,
         MenuField.ServerName => ServerName,
         MenuField.Address => Address,
+        MenuField.Port => Port,
         _ => null,
     };
 

@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading;
-using VoxelEngine.Networking;
 
 namespace VoxelEngine.Networking.ServerSide;
 

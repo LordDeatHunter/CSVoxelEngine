@@ -12,7 +12,8 @@ namespace VoxelEngine.UI.Menus;
 /// call (list, create, rename, delete, add server). Program cannot be tested, so the whole flow is
 /// pinned here and InputEvents only feeds it hits and keys while Program acts on the <see cref="MainMenuAction"/>
 /// it gets back (a <see cref="MainMenuAction.Play"/> carries its world in <see cref="PlayRequest"/>,
-/// a <see cref="MainMenuAction.Connect"/> its server in <see cref="ConnectRequest"/>).
+/// a <see cref="MainMenuAction.Connect"/> its server in <see cref="ConnectRequest"/>, a
+/// <see cref="MainMenuAction.Host"/> its world and port in <see cref="HostRequest"/>).
 /// <para>
 /// It never touches GL, the cursor or Silk. The settings page is only opened and closed here;
 /// MenuInput owns that page's own clicks and slider drags through <see cref="SettingsLayout"/>,
@@ -28,6 +29,10 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
     /// <summary>The notice shown when a typed server address cannot be parsed.</summary>
     public const string BadAddressNotice = "Enter an address like 192.168.1.10 or host:25566";
 
+    /// <summary>The notice shown when the host page's port is out of range.</summary>
+    public static readonly string BadPortNotice =
+        $"Enter a port from {ServerAddress.MinPort} to {ServerAddress.MaxPort} (empty for {ServerAddress.DefaultPort})";
+
     public MainMenuView View { get; } = new();
 
     /// <summary>The world PLAY or CREATE asked Program to open, until <see cref="TakePlayRequest"/>.</summary>
@@ -38,6 +43,17 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
 
     /// <summary>The server a CONNECT asked Program to open, until <see cref="TakeConnectRequest"/>.</summary>
     public ConnectTarget? ConnectRequest { get; private set; }
+
+    /// <summary>The world a HOST asked Program to host, until <see cref="TakeHostRequest"/>.</summary>
+    public HostTarget? HostRequest { get; private set; }
+
+    /// <summary>Returns the pending host request and clears it.</summary>
+    public HostTarget? TakeHostRequest()
+    {
+        var request = HostRequest;
+        HostRequest = null;
+        return request;
+    }
 
     /// <summary>Returns the pending play request and clears it.</summary>
     public WorldInfo? TakePlayRequest()
@@ -91,6 +107,22 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
         View.Page = MainMenuPage.Multiplayer;
     }
 
+    /// <summary>Re-reads the store's worlds and shows the host page (the worlds with a HOST button each, the port and
+    /// the UPnP toggle) from the top. The port and the toggle keep what they held. Clears the notice unless the worlds
+    /// are locked.</summary>
+    public void OpenHost()
+    {
+        if (!View.WorldsLocked)
+            View.Notice = null;
+        View.Worlds.Clear();
+        Guarded(() => View.Worlds.AddRange(store.List()));
+        View.ScrollOffset = 0f;
+        View.SelectedRow = -1;
+        View.Focus = MenuField.None;
+        View.CreateThenHost = false;
+        View.Page = MainMenuPage.Host;
+    }
+
     public void OpenSettings() => View.Page = MainMenuPage.Settings;
 
     /// <summary>Back from the settings page to the main page; InputEvents clears the slider drag itself.</summary>
@@ -130,7 +162,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
                     case MainMenuHitKind.NameField: View.Focus = MenuField.Name; break;
                     case MainMenuHitKind.SeedField: View.Focus = MenuField.Seed; break;
                     case MainMenuHitKind.Confirm: return Confirm();
-                    case MainMenuHitKind.Back: OpenWorlds(); break;
+                    case MainMenuHitKind.Back: LeaveCreate(); break;
                 }
                 return MainMenuAction.None;
 
@@ -168,6 +200,9 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
                 }
                 return MainMenuAction.None;
 
+            case MainMenuPage.Host:
+                return ClickHost(hit);
+
             default:
                 return MainMenuAction.None;
         }
@@ -203,10 +238,11 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
                 {
                     case MainMenuPage.ConfirmDelete: CancelDelete(); break;
                     case MainMenuPage.ConfirmDeleteServer: CancelDeleteServer(); break;
-                    case MainMenuPage.Create:
+                    case MainMenuPage.Create: LeaveCreate(); break;
                     case MainMenuPage.Edit: OpenWorlds(); break; // unsaved edits are discarded
                     case MainMenuPage.AddServer:
-                    case MainMenuPage.DirectConnect: OpenMultiplayer(); break; // one page back, like BACK
+                    case MainMenuPage.DirectConnect:
+                    case MainMenuPage.Host: OpenMultiplayer(); break; // one page back, like BACK
                     case MainMenuPage.Multiplayer: OpenMain(); break;
                     case MainMenuPage.Worlds:
                     case MainMenuPage.Settings: OpenMain(); break;
@@ -228,6 +264,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
             case MainMenuHitKind.SeedField: View.Focus = MenuField.Seed; break;
             case MainMenuHitKind.ServerNameField: View.Focus = MenuField.ServerName; break;
             case MainMenuHitKind.AddressField: View.Focus = MenuField.Address; break;
+            case MainMenuHitKind.PortField: View.Focus = MenuField.Port; break;
             default: return null;
         }
         return View.FocusedField;
@@ -242,6 +279,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
         switch (View.Page)
         {
             case MainMenuPage.Worlds:
+            case MainMenuPage.Host:
                 View.ScrollOffset = MainMenuLayout.ClampedOffset(
                     View.ScrollOffset + rows * MainMenuLayout.RowHeight, View.Worlds.Count, screenSize);
                 break;
@@ -259,16 +297,9 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
             case MainMenuHitKind.Play when IsRow(hit.Row):
                 if (View.WorldsLocked)
                     return MainMenuAction.None;
-                // A world written by another save format is refused here, the one place a world
-                // is opened from, rather than half-loaded; EDIT and DELETE stay available so the
-                // player can wipe it.
                 var world = View.Worlds[hit.Row];
-                if (world.Version != WorldStore.CurrentVersion)
-                {
-                    ShowNotice($"'{world.Name}' was saved by an older version (format {world.Version}, " +
-                               $"this build reads {WorldStore.CurrentVersion}); delete it to make room.");
+                if (RefusesOldFormat(world))
                     return MainMenuAction.None;
-                }
                 PlayRequest = world;
                 PlayRequestIsNew = false;
                 return MainMenuAction.Play;
@@ -286,12 +317,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
                 return MainMenuAction.None;
 
             case MainMenuHitKind.Create:
-                if (View.WorldsLocked)
-                    return MainMenuAction.None;
-                View.Name.Clear();
-                View.Seed.Clear();
-                View.Focus = MenuField.Name;
-                View.Page = MainMenuPage.Create;
+                OpenCreate(thenHost: false);
                 return MainMenuAction.None;
 
             case MainMenuHitKind.Back:
@@ -333,6 +359,10 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
                 View.Address.Clear();
                 View.Focus = MenuField.Address;
                 View.Page = MainMenuPage.DirectConnect;
+                return MainMenuAction.None;
+
+            case MainMenuHitKind.OpenHost:
+                OpenHost();
                 return MainMenuAction.None;
 
             case MainMenuHitKind.Back:
@@ -390,6 +420,83 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
         }
     }
 
+    private MainMenuAction ClickHost(MainMenuHit hit)
+    {
+        switch (hit.Kind)
+        {
+            case MainMenuHitKind.HostWorld when IsRow(hit.Row):
+            {
+                if (View.WorldsLocked)
+                    return MainMenuAction.None;
+                var world = View.Worlds[hit.Row];
+                return RefusesOldFormat(world) ? MainMenuAction.None : RequestHost(world);
+            }
+
+            case MainMenuHitKind.PortField: View.Focus = MenuField.Port; return MainMenuAction.None;
+            case MainMenuHitKind.ToggleUpnp: View.Upnp = !View.Upnp; return MainMenuAction.None;
+            case MainMenuHitKind.Create: OpenCreate(thenHost: true); return MainMenuAction.None;
+            case MainMenuHitKind.Back: OpenMultiplayer(); return MainMenuAction.None;
+            default: return MainMenuAction.None;
+        }
+    }
+
+    // A host request for the world with the page's port and UPnP choice, or the bad-port notice with the page kept up
+    // to fix it (a busy port comes back the same way once Program tries it).
+    private MainMenuAction RequestHost(WorldInfo world)
+    {
+        if (!TryParsePort(View.Port.Text, out var port))
+        {
+            View.Notice = BadPortNotice;
+            return MainMenuAction.None;
+        }
+        HostRequest = new HostTarget(world, port, View.Upnp);
+        return MainMenuAction.Host;
+    }
+
+    /// <summary>The host page's port: blank is <see cref="ServerAddress.DefaultPort"/>, otherwise a number in the
+    /// port range.</summary>
+    public static bool TryParsePort(string text, out int port)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            port = ServerAddress.DefaultPort;
+            return true;
+        }
+        return int.TryParse(text, out port) && port is >= ServerAddress.MinPort and <= ServerAddress.MaxPort;
+    }
+
+    // A world written by another save format is refused where a world is opened (PLAY) or hosted, rather than
+    // half-loaded; EDIT and DELETE stay available so the player can wipe it.
+    private bool RefusesOldFormat(WorldInfo world)
+    {
+        if (world.Version == WorldStore.CurrentVersion)
+            return false;
+        ShowNotice($"'{world.Name}' was saved by an older version (format {world.Version}, " +
+                   $"this build reads {WorldStore.CurrentVersion}); delete it to make room.");
+        return true;
+    }
+
+    // The new-world form, from the worlds page (CREATE plays the world) or the host page (CREATE hosts it)
+    private void OpenCreate(bool thenHost)
+    {
+        if (View.WorldsLocked)
+            return;
+        View.Name.Clear();
+        View.Seed.Clear();
+        View.Focus = MenuField.Name;
+        View.CreateThenHost = thenHost;
+        View.Page = MainMenuPage.Create;
+    }
+
+    // Back from the new-world form to the page that opened it
+    private void LeaveCreate()
+    {
+        if (View.CreateThenHost)
+            OpenHost();
+        else
+            OpenWorlds();
+    }
+
     private bool IsRow(int row) => row >= 0 && row < View.Worlds.Count;
 
     private bool IsServerRow(int row) => row >= 0 && row < View.Servers.Count;
@@ -398,15 +505,30 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
     {
         if (View.Page == MainMenuPage.Create)
         {
+            // A bad port is caught before the world is made, so no stray world is left behind
+            if (View.CreateThenHost && !TryParsePort(View.Port.Text, out _))
+            {
+                OpenHost();
+                View.Notice = BadPortNotice;
+                return MainMenuAction.None;
+            }
             WorldInfo? created = null;
             if (Guarded(() => created = store.Create(View.Name.Text, WorldSeedParser.Parse(View.Seed.Text, randomSeed))))
             {
+                if (View.CreateThenHost)
+                    return RequestHost(created!);
                 PlayRequest = created;
                 PlayRequestIsNew = true;
                 return MainMenuAction.Play;
             }
-            // The notice lives on the worlds page, so a failed create lands there with it.
-            OpenWorldsWithError();
+            // The notice lives on the list page, so a failed create lands there with it.
+            if (View.CreateThenHost)
+            {
+                OpenHost();
+                SetErrorNotice();
+            }
+            else
+                OpenWorldsWithError();
             return MainMenuAction.None;
         }
 

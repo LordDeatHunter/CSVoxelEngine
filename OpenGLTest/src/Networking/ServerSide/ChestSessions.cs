@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using VoxelEngine.Networking;
 using VoxelEngine.Simulation.Chests;
 
 namespace VoxelEngine.Networking.ServerSide;

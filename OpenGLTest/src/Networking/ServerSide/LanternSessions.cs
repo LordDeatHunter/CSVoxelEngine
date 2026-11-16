@@ -1,4 +1,3 @@
-using VoxelEngine.Networking;
 using VoxelEngine.Simulation.Lanterns;
 
 namespace VoxelEngine.Networking.ServerSide;

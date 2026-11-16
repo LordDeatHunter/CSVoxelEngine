@@ -27,12 +27,16 @@ OpenGLTest/
                                #   player list's names
       LocalCommandHost.cs      # singleplayer's ICommandHost: the local player, the world's clock, mobs and towers, chat announcements
       LocalCommandPlayer.cs    # singleplayer's ICommandPlayer: the camera, the world's inventory and LocalPlayer.Kill
-      DevDiagnostics.cs        # the startup build line, the VOXEL_TIME read, the live debug flag (X, VOXEL_DEBUG) and the X debug line
+      DevDiagnostics.cs        # the startup build line, the VOXEL_TIME read, the live debug flag (X, VOXEL_DEBUG), the X debug line
+                               #   and the HUD's frame counter (CountFrame, ShownFps)
       ForgeInput.cs            # the anvil's recipe list input (built by GameplayInput): open on a hammer's right-click on a stacked
                                #   anvil, cursor and look capture, card clicks forge, the close rules; connected, predicts and
                                #   sends the Forge intent
       GameplayInput.cs         # a playing world's per-frame polled input: key edges, hotbar, right-click chain, pause-gated world update, mining, middle pick;
-                               #   frees the cursor while the chat is open (SyncChatCursor)
+                               #   frees the cursor while the chat is open (SyncChatCursor); saves a due F2 or scripted screenshot
+                               #   (CaptureScreenshotIfDue)
+      HostSession.cs           # the world this game hosts: start from the HOST page (remembers the port and UPnP choice in
+                               #   GameSettings), the per-frame Tick, the chat's join line once, the pause menu's HostLines, Stop
       InputEvents.cs           # the window's mouse and keyboard events, routed to whatever owns them on the current screen (a click on a chat link
                                #   suggests its command)
       FieldPointer.cs          # the mouse's side of text fields: a press places the caret, Shift extends, holding drags a selection (menu fields, the chat line,

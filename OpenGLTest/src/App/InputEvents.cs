@@ -188,7 +188,7 @@ internal sealed class InputEvents
         if (Screen == AppScreen.Menu)
         {
             // wheel.Y > 0 is toward the top, i.e. a smaller offset
-            if (inputManager.Mouse != null && menu.View.Page == MainMenuPage.Worlds
+            if (inputManager.Mouse != null && menu.View.Page is MainMenuPage.Worlds or MainMenuPage.Host
                 && renderManager.Ui.Menu.IsOverWorldList(inputManager.Mouse.Position))
                 menu.Scroll(-wheel.Y * MainMenuLayout.WheelStepRows, renderManager.Ui.ScreenSize);
             else if (inputManager.Mouse != null && menu.View.Page == MainMenuPage.Multiplayer
