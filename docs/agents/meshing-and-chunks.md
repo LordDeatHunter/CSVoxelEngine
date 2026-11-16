@@ -176,6 +176,11 @@ fewer vertices (`plans/PERF.md` item 11), not the 5-10× of flat worlds; smooth 
 almost untouched (+0.2 % vertices over eight sampled surface and cave chunks, mesh-build time
 within noise), since generated terrain is mostly uniformly lit and only lamp and shadow
 gradients split merges.
+The six-quad geometry count tests use `MeshTestWorld.DarkRoofArea`: a stone roof across the
+light volume and matching flat column heights make their actual sunlight and block light
+uniformly zero. Merely placing test blocks high above generated terrain is insufficient,
+because opaque blocks still shade the faces beneath them. Light-gradient and roof tests keep
+the normal `WalledArea` fixture.
 
 **Chests are not meshed.** A chest block (`BlockType.Chest`) emits no quads: `GenerateMeshDataFromSnapshot` records its
 cell in `ChunkMeshData.ChestCells` (local `Chunk.Idx` indices, published as `Chunk.ChestCells` like the flame points) and
