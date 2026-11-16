@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text.RegularExpressions;
+using VoxelEngine.Effects.Sky;
 using Silk.NET.Input;
 using VoxelEngine.Items;
 using VoxelEngine.UI.InventoryPanel;
@@ -403,6 +405,39 @@ public sealed class VisualScenarioTests
         {
             var scenario = VisualScenario.Load(file);
             Assert.True(scenario.Steps.Any(step => step.Op == "screenshot"), $"{file} takes no screenshot");
+        }
+    }
+
+    [Fact]
+    public void GeneratedWikiNightShotsUseTheNightPhaseAtEveryCapture()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+
+        var scenarioPath = Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "wiki-night.json");
+        var contents = File.ReadAllText(scenarioPath);
+        var match = Regex.Match(contents, @"VOXEL_TIME=(?<time>\d+(?:\.\d+)?)");
+        Assert.True(match.Success, $"{scenarioPath} has no VOXEL_TIME header");
+        var time = double.Parse(match.Groups["time"].Value, System.Globalization.CultureInfo.InvariantCulture);
+        var scenario = VisualScenario.Load(scenarioPath);
+
+        foreach (var step in scenario.Steps)
+        {
+            if (step.Op == "wait")
+            {
+                time += step.Seconds;
+                continue;
+            }
+
+            if (step.Op != "screenshot")
+                continue;
+
+            Console.WriteLine($"Wiki night capture {step.ShotName}: {time:F1}s, NightFactor {DayCycle.NightFactor(time):F3}");
+            Assert.True(DayCycle.NightFactor(time) >= 0.99f,
+                $"Wiki night screenshot '{step.ShotName}' occurs at lighting time {time:F1}s " +
+                $"with NightFactor {DayCycle.NightFactor(time):F3}");
         }
     }
 
