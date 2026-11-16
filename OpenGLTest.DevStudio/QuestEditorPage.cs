@@ -24,7 +24,8 @@ namespace VoxelEngine.DevStudio;
 /// panel. SAVE ALL / REVERT ALL (a second click within <see cref="ConfirmSeconds"/> confirms) act on every graph,
 /// SAVE QUEST / REVERT QUEST on the selected quest alone; a quest with unsaved edits carries a gold corner mark.
 /// Clicking a node selects it, dragging moves it (shift-drag moves its whole graph, Alt turns snapping off),
-/// Ctrl+click toggles the clicked node as a parent of the selected one, a double-click on empty canvas adds a quest
+/// a right-drag from one node to another makes the second depend on the first (dropped on empty canvas, it adds a
+/// quest there that depends on the first), Ctrl+click toggles the clicked node as a parent of the selected one, a double-click on empty canvas adds a quest
 /// there, dragging empty canvas pans and the wheel zooms. A grid click picks the quest's icon, or the target of a
 /// requirement whose PICK is armed; dragging a grid slot onto the canvas adds a quest there with that icon, named
 /// after it. A requirement's type is a <see cref="DropdownState"/>. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
@@ -62,7 +63,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private string? _dropdownQuest;
     private string? _focusQuest;
 
-    private enum Drag { None, Pan, Node, Graph }
+    private enum Drag { None, Pan, Node, Graph, Link }
     private Drag _drag;
     // A middle-button pan, which never clears the selection the way an unmoved left click on empty canvas does
     private bool _panOnly;
@@ -129,11 +130,16 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     {
         _screen = ui.ScreenSize;
         var book = State.Preview;
-        var hovered = pointer is { } p && _drag == Drag.None && OverCanvas(p)
+        var hovered = pointer is { } p && _drag is Drag.None or Drag.Link && OverCanvas(p)
             ? QuestBookLayout.NodeAt(book.Quests, _ => true, Camera, _screen, p)
             : null;
         QuestType? selected = State.SelectedQuestId is { } id && book.TryGet(id, out var q) ? q : null;
         ui.Quests.DrawGraph(book, Camera, _ => true, _ => false, selected, hovered, time);
+
+        // The link being right-dragged: a gold line from its parent to the pointer
+        if (_drag == Drag.Link && _dragQuest != null && book.TryGet(_dragQuest, out var from) && pointer is { } tip)
+            ui.Quests.DrawLine(QuestBookLayout.ToCanvas(from.Position, Camera, _screen), tip,
+                QuestConfig.EdgeThickness * Camera.Zoom, DevStudioUi.Accent);
 
         // A gold corner mark on every quest with unsaved edits
         var mark = QuestBookLayout.NodeSize(Camera) * 0.16f;
@@ -304,6 +310,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             [
                 "Click a node to select it; click empty canvas to clear the selection.",
                 "Drag a node to move it (Alt: no snap); shift-drag moves its graph.",
+                "Right-drag from a quest to another to make the second depend on the first; drop on empty canvas to add a quest that depends on it.",
                 "Ctrl+click a node to toggle it as a parent of the selected quest.",
                 "Double-click empty canvas, or drag an icon from the grid onto it, to add a quest.",
                 "Drag empty canvas or middle-drag anywhere to pan; the wheel zooms.",
@@ -511,6 +518,36 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             return true;
         }
         return false;
+    }
+
+    /// <summary>A right press on a node starts a link from it; <see cref="RightUp"/> ends it.</summary>
+    public void RightDown(Vector2 point)
+    {
+        Blur();
+        if (!OverCanvas(point)) return;
+        if (QuestBookLayout.NodeAt(State.Preview.Quests, _ => true, Camera, _screen, point) is not { } node) return;
+        _pressAt = point;
+        _drag = Drag.Link;
+        _dragQuest = node.Id;
+    }
+
+    /// <summary>Ends a right-drag link: on another node it makes that node depend on the start, on empty canvas it adds a
+    /// quest there depending on the start, anywhere else (or with no travel) it does nothing.</summary>
+    public void RightUp(Vector2 point)
+    {
+        var parent = _drag == Drag.Link ? _dragQuest : null;
+        _drag = Drag.None;
+        _dragQuest = null;
+        if (parent == null || !OverCanvas(point) || Vector2.Distance(point, _pressAt) < QuestConfig.DragThreshold) return;
+
+        if (QuestBookLayout.NodeAt(State.Preview.Quests, _ => true, Camera, _screen, point) is { } target)
+        {
+            Status = State.AddParent(target.Id, parent) ?? $"{target.Id} now depends on {parent}";
+            return;
+        }
+        var icon = State.Find(parent)?.Quest.Icon;
+        if (State.AddQuest(QuestBookLayout.ToGrid(point, Camera, _screen), icon, parent: parent) is { } added)
+            Status = $"Added {added}, which depends on {parent}";
     }
 
     /// <summary>A middle press: pans from anywhere over the canvas, nodes included.</summary>

@@ -137,8 +137,8 @@ internal sealed class QuestBookRenderer : IDisposable
             _ui.DrawRect(new Vector2(canvas.X * 0.5f, y), new Vector2(canvas.X, 1f), GridLine);
     }
 
-    // A thick segment: the unit square stretched along the line and turned to its angle
-    private void DrawLine(Vector2 from, Vector2 to, float thickness, Rgba color)
+    /// <summary>A thick segment: the unit square stretched along the line and turned to its angle.</summary>
+    internal void DrawLine(Vector2 from, Vector2 to, float thickness, Rgba color)
     {
         var delta = to - from;
         var length = delta.Length();

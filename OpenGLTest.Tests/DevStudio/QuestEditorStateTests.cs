@@ -79,6 +79,34 @@ public sealed class QuestEditorStateTests : IDisposable
     }
 
     [Fact]
+    public void AddingAParentRefusesADuplicateOrACycleAndOtherwiseLinks()
+    {
+        var editor = Editor(Graph("g", null,
+            Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone")), Quest("b", null, Break("stone"))));
+
+        Assert.NotNull(editor.AddParent("a", "root"));
+        Assert.NotNull(editor.AddParent("root", "a"));
+        Assert.False(editor.Dirty);
+
+        Assert.Null(editor.AddParent("b", "a"));
+        Assert.Equal(["a"], editor.Find("b")!.Value.Quest.Parents);
+    }
+
+    [Fact]
+    public void AQuestAddedFromAParentJoinsItsGraphDependingOnIt()
+    {
+        Graph("first", null, Quest("root", null, Break("stone")));
+        var editor = Editor(Graph("second", [20, 0], Quest("far", null, Break("stone"))));
+        editor.Select("root");
+
+        var added = editor.AddQuest(new Vector2(25f, 1f), parent: "far")!;
+
+        Assert.Equal("second", editor.Find(added)!.Value.Document.Name);
+        Assert.Equal(["far"], editor.Find(added)!.Value.Quest.Parents);
+        Assert.Null(editor.Error);
+    }
+
+    [Fact]
     public void RenamingAQuestFollowsItsChildrenAndRefusesATakenId()
     {
         var editor = Editor(Graph("g", null,

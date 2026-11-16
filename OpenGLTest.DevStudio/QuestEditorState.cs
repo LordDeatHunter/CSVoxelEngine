@@ -98,10 +98,12 @@ public sealed class QuestEditorState
 
     /// <summary>Adds a quest at the absolute grid point to the selected graph and selects it. Its icon and its one
     /// obtain requirement name <paramref name="icon"/> (default stone), so it compiles as it is; its title is
-    /// <paramref name="title"/>, default "New Quest".</summary>
-    public string? AddQuest(Vector2 grid, string? icon = null, string? title = null)
+    /// <paramref name="title"/>, default "New Quest". With a <paramref name="parent"/>, it goes into that quest's graph
+    /// already depending on it.</summary>
+    public string? AddQuest(Vector2 grid, string? icon = null, string? title = null, string? parent = null)
     {
-        if (Graph is not { } document) return null;
+        var document = parent != null && Find(parent) is { } owner ? owner.Document : Graph;
+        if (document == null) return null;
         var id = UniqueId("quest");
         icon ??= DefaultIcon;
         var position = Snap(grid - document.Origin, true);
@@ -111,6 +113,7 @@ public sealed class QuestEditorState
             Title = title ?? "New Quest",
             Icon = icon,
             Pos = [position.X, position.Y],
+            Parents = parent != null && Find(parent) != null ? [parent] : null,
             Requirements = [new QuestGraphDefinition.RequirementDefinition { Type = "obtain", Item = icon }],
         });
         Select(id);
@@ -156,13 +159,22 @@ public sealed class QuestEditorState
     {
         if (child == parent) return "A quest cannot be its own parent.";
         if (Find(child) is not { } found || Find(parent) == null) return "No such quest.";
+        if (found.Quest.Parents?.Contains(parent) != true) return AddParent(child, parent);
+        found.Quest.Parents = Shrink(found.Quest.Parents.Where(p => p != parent));
+        Recompile();
+        return null;
+    }
+
+    /// <summary>Makes <paramref name="child"/> depend on <paramref name="parent"/>. Returns why the link is refused
+    /// (itself, an unknown quest, a link that already exists, or a cycle), else null.</summary>
+    public string? AddParent(string child, string parent)
+    {
+        if (child == parent) return "A quest cannot be its own parent.";
+        if (Find(child) is not { } found || Find(parent) == null) return "No such quest.";
         var parents = found.Quest.Parents ?? [];
-        if (parents.Contains(parent))
-            found.Quest.Parents = Shrink(parents.Where(p => p != parent));
-        else if (IsAncestor(child, parent))
-            return $"'{parent}' already depends on '{child}': linking would make a cycle.";
-        else
-            found.Quest.Parents = [.. parents, parent];
+        if (parents.Contains(parent)) return $"'{child}' already depends on '{parent}'.";
+        if (IsAncestor(child, parent)) return $"'{parent}' already depends on '{child}': linking would make a cycle.";
+        found.Quest.Parents = [.. parents, parent];
         Recompile();
         return null;
     }
