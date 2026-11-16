@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
@@ -32,24 +33,28 @@ public sealed class WaystoneServerTests : IDisposable
 
     private readonly World _world;
     private readonly GameServer _server;
+    private readonly GatedWorldSource _source;
     private readonly Dictionary<NetworkClient, Inbox> _inboxes = new(ReferenceEqualityComparer.Instance);
 
     public WaystoneServerTests()
     {
         TestContent.EnsureLoaded();
         WorldSeed.Apply(WorldSeed.Default);
-        var source = new FlatWorldSource(-Reach, Reach, -Reach, Reach, FloorY, ContentRegistry.RequireBlock("stone").Id,
+        var flatSource = new FlatWorldSource(-Reach, Reach, -Reach, Reach, FloorY, ContentRegistry.RequireBlock("stone").Id,
             Biome.Forest, warmth: 0.5f, wetness: 0.5f);
+        _source = new GatedWorldSource(flatSource, (Far.X / Chunk.Size, Far.Y / Chunk.Size, Far.Z / Chunk.Size));
         _world = new World(null!, null!, null!, null!, null!, null!, null, null, serverMode: true, spawn: EyeBeside(Home),
-            worldSource: source);
+            worldSource: _source);
         _server = new GameServer(_world, "Test World", WorldSeed.Default, 0);
         _server.Start();
     }
 
     public void Dispose()
     {
+        _source.Release();
         _server.Dispose();
         _world.SaveAndDispose();
+        _source.Dispose();
         try
         {
             WorldSeed.Apply(WorldSeed.Default);
@@ -104,6 +109,43 @@ public sealed class WaystoneServerTests : IDisposable
         }
 
         public WaystoneNetRow RowAt((int X, int Y, int Z) cell) => Rows.Find(r => (r.X, r.Y, r.Z) == cell);
+    }
+
+    /// <summary>Blocks only the destination chunk fill for the controlled trip publication schedule.</summary>
+    private sealed class GatedWorldSource(IWorldSource inner, (int X, int Y, int Z) gatedChunk) : IWorldSource, IDisposable
+    {
+        private readonly ManualResetEventSlim _release = new(false);
+        private int _armed;
+        private int _blockedFillCount;
+
+        public int BlockedFillCount => Volatile.Read(ref _blockedFillCount);
+
+        public void Arm() => Volatile.Write(ref _armed, 1);
+
+        public void Release() => _release.Set();
+
+        public bool Supplies(int chunkX, int chunkZ) => inner.Supplies(chunkX, chunkZ);
+
+        public ColumnData GetColumn(int chunkX, int chunkZ) => inner.GetColumn(chunkX, chunkZ);
+
+        public bool IsReady(int chunkX, int chunkZ) => inner.IsReady(chunkX, chunkZ);
+
+        public bool TryGet(int chunkX, int chunkZ, out ColumnTerrain terrain) => inner.TryGet(chunkX, chunkZ, out terrain);
+
+        public void Fill(Chunk chunk)
+        {
+            var position = ((int)chunk.Position.X, (int)chunk.Position.Y, (int)chunk.Position.Z);
+            if (position == gatedChunk && Volatile.Read(ref _armed) != 0)
+            {
+                Interlocked.Increment(ref _blockedFillCount);
+                if (!_release.Wait(TimeSpan.FromSeconds(10)))
+                    throw new TimeoutException("The controlled waystone destination fill was not released.");
+            }
+
+            inner.Fill(chunk);
+        }
+
+        public void Dispose() => _release.Dispose();
     }
 
     private static Vector3 EyeBeside((int X, int Y, int Z) waystone) =>
@@ -248,41 +290,74 @@ public sealed class WaystoneServerTests : IDisposable
         var inbox = _inboxes[alice];
         BuildBeside(alice, Far);
         Assert.True(Activate(alice, Far));
+        Assert.True(Loaded(Far));
+        // Far is live, so no generation for its chunk can already be in flight. Arm before moving away; after the
+        // unload removes its queued key, every re-generation route must cross this source Fill gate.
+        _source.Arm();
         BuildBeside(alice, Home);
         Assert.True(Activate(alice, Home));
         TickUntil(() => !Loaded(Far), "the far waystone's chunk never unloaded");
         var player = PlayerOf(alice);
         player.Status.Mana.Refill();
 
-        // No time passes while the trip is judged, so the drained pool cannot regenerate before it is read
-        Assert.True(Trip(alice, Far, dt: 0));
-        Assert.Equal(0f, player.Status.Mana.Current);
-        TickUntil(() => inbox.ManaSeen.Contains(0), "the drained pool never reached the client", dt: 0);
-        // Held over the destination while it loads, immune: the states the client keeps sending from home move nothing
-        // and are never corrected, so the one correction of the whole trip is its landing
-        Assert.NotNull(player.WaystoneTrip);
-        Assert.True(player.IsImmune);
-        var correctionsBefore = inbox.Corrections.Count;
-        TickUntil(() =>
+        // A zero-delta pump still streams asynchronously. Hold the exact destination chunk at the existing source seam
+        // so the accepted result and mana packet are observed while arrival cells are provably still unloaded.
+        Assert.Null(_world.SaveStore);
+        try
         {
-            SendState(alice, EyeBeside(Home), ack: 0);
-            return inbox.Corrections.Count > correctionsBefore;
-        }, "the traveler never landed");
-        for (var i = 0; i < 10; i++) Tick(0.02);
-        Assert.Equal(correctionsBefore + 1, inbox.Corrections.Count);
-        Assert.Null(player.WaystoneTrip);
-        var (seq, eye) = inbox.Corrections[^1];
-        Assert.Equal(player.Position, eye);
-        var feet = eye.Y - Camera.EyeHeight;
-        Assert.InRange(feet, Far.Y - 0.01f, Far.Y + 0.1f);
-        var away = new Vector2(eye.X - (Far.X + 0.5f), eye.Z - (Far.Z + 0.5f)).Length();
-        Assert.InRange(away, 0.5f, WaystoneArrival.SearchRadius * 1.5f);
+            Assert.True(Trip(alice, Far, dt: 0));
+            Assert.Equal(0f, player.Status.Mana.Current);
+            TickUntil(() => inbox.ManaSeen.Contains(0), "the drained pool never reached the client", dt: 0);
+            TickUntil(() => _source.BlockedFillCount > 0, "the destination chunk fill never reached the gate", dt: 0);
+            Assert.False(Loaded(Far));
+            Assert.Equal(WaystoneArrivalStatus.Unloaded,
+                WaystoneArrival.Find(new ChunkArrivalCells(_world.GetChunkManager()), Far).Status);
 
-        // Once the client acks the landing its states count again, and standing there is legal
-        SendState(alice, eye, seq);
-        for (var i = 0; i < 10; i++) Tick(0.02);
-        Assert.Equal(seq, inbox.Corrections[^1].Seq);
-        Assert.Equal(eye, player.Position);
+            // Held over the destination while it loads, immune: stale home states move nothing and are not corrected;
+            // the one correction of the trip remains its landing.
+            var trip = Assert.IsType<WaystoneArrivalHold>(player.WaystoneTrip);
+            Assert.True(player.IsImmune);
+            Assert.Equal(trip.HoldEye, player.Position);
+            var correctionsBefore = inbox.Corrections.Count;
+            for (var i = 0; i < 10; i++)
+            {
+                SendState(alice, EyeBeside(Home), ack: 0);
+                Tick(0);
+                Assert.Equal(WaystoneArrivalStatus.Unloaded,
+                    WaystoneArrival.Find(new ChunkArrivalCells(_world.GetChunkManager()), Far).Status);
+            }
+            Assert.Equal(correctionsBefore, inbox.Corrections.Count);
+            Assert.Equal(trip.HoldEye, player.Position);
+            Assert.Equal(0f, player.Status.Mana.Current);
+
+            _source.Release();
+            TickUntil(() => WaystoneArrival.Find(new ChunkArrivalCells(_world.GetChunkManager()), Far).Status
+                == WaystoneArrivalStatus.Found, "the destination landing cells never became available");
+            TickUntil(() =>
+            {
+                SendState(alice, EyeBeside(Home), ack: 0);
+                return inbox.Corrections.Count > correctionsBefore;
+            }, "the traveler never landed");
+            for (var i = 0; i < 10; i++) Tick(0.02);
+            Assert.Equal(correctionsBefore + 1, inbox.Corrections.Count);
+            Assert.Null(player.WaystoneTrip);
+            var (seq, eye) = inbox.Corrections[^1];
+            Assert.Equal(player.Position, eye);
+            var feet = eye.Y - Camera.EyeHeight;
+            Assert.InRange(feet, Far.Y - 0.01f, Far.Y + 0.1f);
+            var away = new Vector2(eye.X - (Far.X + 0.5f), eye.Z - (Far.Z + 0.5f)).Length();
+            Assert.InRange(away, 0.5f, WaystoneArrival.SearchRadius * 1.5f);
+
+            // Once the client acks the landing its states count again, and standing there is legal.
+            SendState(alice, eye, seq);
+            for (var i = 0; i < 10; i++) Tick(0.02);
+            Assert.Equal(seq, inbox.Corrections[^1].Seq);
+            Assert.Equal(eye, player.Position);
+        }
+        finally
+        {
+            _source.Release();
+        }
     }
 
     [Fact]
