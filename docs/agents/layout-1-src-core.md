@@ -302,7 +302,8 @@ OpenGLTest/
         RecipeDefinition.cs    # JSON shape of assets/data/recipes/<name>.json
         SpellPartDefinition.cs # JSON shape of assets/data/spell/<kind>/<name>.json
         StatusEffectDefinition.cs # JSON shape of assets/data/effects/<name>.json
-        QuestGraphDefinition.cs # JSON shape of assets/data/quests/<graph>.json (the graph, its quests, their requirements)
+        QuestDefinition.cs     # JSON shape of assets/data/quests/<id>.json, one quest (its id is the file name)
+        QuestRequirementDefinition.cs # JSON shape of one quest requirement
         TagDefinition.cs       # JSON shape of assets/data/tags/<name>.json
         TreeSpeciesDefinition.cs # JSON DTO of assets/data/trees/<species>.json
       Loot/                    # compiled loot tables, loot context, wood loot bands
@@ -356,7 +357,7 @@ OpenGLTest/
         SpellRecipe.cs         # element + shape + modifiers + trigger -> cost, verdict, fizzle, factors
         SpellStats.cs, SpellVerdict.cs  # what a recipe compiles to; the first rule it breaks
       Quests/                  # quests (see "Quests (U-15)"): the compiled quest book, loader and registry
-        QuestBook.cs           # every compiled quest and the graph titles, by index and id
+        QuestBook.cs           # every compiled quest, by index and id
         QuestLoader.cs         # data/quests/*.json -> a QuestBook; Compile is pure (tests); refuses cycles and unknown names
         QuestRegistry.cs       # the published QuestBook, set once by ContentRegistry.Load
         QuestType.cs           # one compiled quest: id, text, icon, grid position, shape, parents, children, requirements

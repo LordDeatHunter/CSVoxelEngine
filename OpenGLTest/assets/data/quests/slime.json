@@ -1,0 +1,9 @@
+{
+  "title": "Sticky Situation",
+  "description": "Defeat a slime.",
+  "icon": "item/slimeball",
+  "pos": [6, -7],
+  "requirements": [
+    { "type": "kill", "entity": "slime" }
+  ]
+}

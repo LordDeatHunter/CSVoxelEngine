@@ -1,0 +1,10 @@
+{
+  "title": "Stone Age",
+  "description": "Dig into the rock under the soil.",
+  "icon": "stone",
+  "pos": [-6, -4],
+  "parents": ["primitive_tools"],
+  "requirements": [
+    { "type": "break", "block": "stone", "count": 16 }
+  ]
+}

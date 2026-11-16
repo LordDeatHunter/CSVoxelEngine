@@ -1,0 +1,9 @@
+{
+  "title": "Arachnophobia",
+  "description": "Kill a giant spider in the caves.",
+  "icon": "item/spider_silk",
+  "pos": [8, -7],
+  "requirements": [
+    { "type": "kill", "entity": "spider" }
+  ]
+}

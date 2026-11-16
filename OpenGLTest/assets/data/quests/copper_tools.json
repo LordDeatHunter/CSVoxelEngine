@@ -1,0 +1,11 @@
+{
+  "title": "Shiny Tools",
+  "description": "Trade the flint for copper.",
+  "icon": "item/copper_pickaxe",
+  "pos": [-6, 3],
+  "parents": ["copper"],
+  "requirements": [
+    { "type": "craft", "item": "item/copper_pickaxe" },
+    { "type": "craft", "item": "item/copper_axe" }
+  ]
+}

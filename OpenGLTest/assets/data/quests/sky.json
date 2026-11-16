@@ -1,0 +1,9 @@
+{
+  "title": "Above the Clouds",
+  "description": "Reach the sky islands and bring back a cloud shard.",
+  "icon": "item/cloud_shard",
+  "pos": [8, -5],
+  "requirements": [
+    { "type": "obtain", "item": "item/cloud_shard" }
+  ]
+}

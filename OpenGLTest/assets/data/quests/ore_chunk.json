@@ -1,0 +1,12 @@
+{
+  "title": "Raw Ore",
+  "description": "Mine a chunk of copper or tin ore.",
+  "icon": "item/malachite_ore",
+  "pos": [-8, -1.5],
+  "parents": ["primitive_tools"],
+  "anyOf": true,
+  "requirements": [
+    { "type": "obtain", "item": "item/malachite_ore" },
+    { "type": "obtain", "item": "item/tin_ore" }
+  ]
+}

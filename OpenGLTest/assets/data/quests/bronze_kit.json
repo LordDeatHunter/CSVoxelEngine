@@ -1,0 +1,11 @@
+{
+  "title": "Bronze Kit",
+  "description": "A bronze pickaxe and a bronze sword.",
+  "icon": "item/bronze_sword",
+  "pos": [-2, 3],
+  "parents": ["bronze"],
+  "requirements": [
+    { "type": "craft", "item": "item/bronze_pickaxe" },
+    { "type": "craft", "item": "item/bronze_sword" }
+  ]
+}

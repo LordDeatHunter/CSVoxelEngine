@@ -1,0 +1,10 @@
+{
+  "title": "Hot Pot",
+  "description": "A crucible carries molten metal from the kiln to the mold.",
+  "icon": "item/crucible",
+  "pos": [-10, 3],
+  "parents": ["mud_bricks"],
+  "requirements": [
+    { "type": "craft", "item": "item/crucible" }
+  ]
+}

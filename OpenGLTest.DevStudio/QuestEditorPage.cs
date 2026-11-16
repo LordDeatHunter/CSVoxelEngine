@@ -18,12 +18,12 @@ using VoxelEngine.UI.Widgets;
 namespace VoxelEngine.DevStudio;
 
 /// <summary>
-/// DevStudio's QUESTS tab over a <see cref="QuestEditorState"/>: the quest graphs drawn exactly as the in-game book
-/// draws them (<see cref="QuestBookRenderer.DrawGraph"/>) on the canvas between the side panels, a top bar (graph
-/// selector, graph title, NEW GRAPH, ADD QUEST, SAVE), and the selected quest's fields and requirements in the right
+/// DevStudio's QUESTS tab over a <see cref="QuestEditorState"/>: the quests drawn exactly as the in-game book draws them
+/// (<see cref="QuestBookRenderer.DrawGraph"/>) on the canvas between the side panels, a top bar (ADD QUEST, UNDO, REDO,
+/// SAVE ALL, REVERT ALL), and the selected quest's fields and requirements in the right
 /// panel. UNDO / REDO (Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z) step through <see cref="QuestEditorState"/>'s history, where
 /// one typed field or one drag is one step (the page names the gesture in <see cref="QuestEditorState.Gesture"/>).
-/// SAVE ALL / REVERT ALL (a second click within <see cref="ConfirmSeconds"/> confirms) act on every graph,
+/// SAVE ALL / REVERT ALL (a second click within <see cref="ConfirmSeconds"/> confirms) act on every quest file,
 /// SAVE QUEST / REVERT QUEST on the selected quest alone; a quest with unsaved edits carries a gold corner mark.
 /// Clicking a node selects it, Ctrl+click adds it to the selection (or takes it out), dragging moves it (shift-drag
 /// moves every quest linked to it, Alt turns snapping off; dragging any quest of a multi-selection moves them all), shift-drag on empty canvas draws a box that selects every quest in it,
@@ -36,11 +36,11 @@ namespace VoxelEngine.DevStudio;
 /// </summary>
 internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys)
 {
-    private enum Field { GraphTitle, Id, Title, Description, Target, Label }
+    private enum Field { Id, Title, Description, Target, Label }
 
     private enum Action
     {
-        PrevGraph, NextGraph, NewGraph, AddQuest, Save, RevertAll, Undo, Redo,
+        AddQuest, Save, RevertAll, Undo, Redo,
         Shape, Readable, AnyOf, PickIcon, AddRequirement, DeleteQuest, SaveQuest, RevertQuest, SwapLink, DeleteLink,
         DeleteSelected,
         // The Arg of these is the requirement index.
@@ -148,7 +148,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
     // ---- drawing
 
-    /// <summary>Draws the graphs over the whole window; the studio's panels go over it.</summary>
+    /// <summary>Draws the quests over the whole window; the studio's panels go over it.</summary>
     public void DrawCanvas(UIRenderer ui, Vector2? pointer, float time)
     {
         _screen = ui.ScreenSize;
@@ -250,17 +250,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     {
         var y = Pad + TopBarH * 0.5f;
         var x = CanvasLeft;
-        var hasGraph = State.Graph != null;
-        const float titleWidth = 180f;
         const float wide = 100f;
         const float narrow = 64f;
-        x = AddButtonAt(x, y, 34f, Action.PrevGraph, "<", State.SelectedGraph > 0);
-        _fields.Add((new UiRect(new Vector2(x + titleWidth * 0.5f, y), new Vector2(titleWidth, FieldH)), Field.GraphTitle, 0,
-            "graph title"));
-        x += titleWidth + Gap;
-        x = AddButtonAt(x, y, 34f, Action.NextGraph, ">", State.SelectedGraph < State.Documents.Count - 1);
-        x = AddButtonAt(x + Gap * 2f, y, wide, Action.NewGraph, "NEW GRAPH", true);
-        x = AddButtonAt(x, y, wide, Action.AddQuest, "ADD QUEST", hasGraph);
+        x = AddButtonAt(x, y, wide, Action.AddQuest, "ADD QUEST", true);
         x = AddButtonAt(x + Gap * 2f, y, narrow, Action.Undo, "UNDO", State.CanUndo);
         x = AddButtonAt(x, y, narrow, Action.Redo, "REDO", State.CanRedo);
         x = AddButtonAt(x + Gap * 2f, y, wide, Action.Save, State.Dirty ? "SAVE ALL *" : "SAVE ALL", State.Dirty);
@@ -564,7 +556,6 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
     private string ValueOf(Field field, int arg)
     {
-        if (field == Field.GraphTitle) return State.Graph?.Definition.Title ?? "";
         if (State.SelectedQuest is not { } quest) return "";
         return field switch
         {
@@ -577,7 +568,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         };
     }
 
-    private static QuestGraphDefinition.RequirementDefinition? Requirement(QuestGraphDefinition.QuestDefinition quest, int index) =>
+    private static QuestRequirementDefinition? Requirement(QuestDefinition quest, int index) =>
         quest.Requirements is { } list && index >= 0 && index < list.Count ? list[index] : null;
 
     private float AddButtonAt(float x, float y, float width, Action action, string label, bool enabled)
@@ -741,7 +732,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         _pressPan = new Vector2(Camera.PanX, Camera.PanY);
     }
 
-    /// <summary>Follows a held press: pans, or moves the grabbed node or graph once past the drag threshold.</summary>
+    /// <summary>Follows a held press: pans, draws the selection box, or moves the grabbed quests once past the drag
+    /// threshold.</summary>
     public void MouseMove(Vector2 point, bool alt)
     {
         var travel = point - _pressAt;
@@ -891,25 +883,13 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
     private Vector2 GridTravel(Vector2 travel) => travel / (QuestConfig.GridSpacing * Camera.Zoom);
 
-    private QuestGraphDefinition.QuestDefinition? Selected() => State.SelectedQuest;
+    private QuestDefinition? Selected() => State.SelectedQuest;
 
     private void Run(Action action, int arg)
     {
         var id = State.SelectedQuestId;
         switch (action)
         {
-            case Action.PrevGraph:
-                State.SelectedGraph--;
-                FrameGraph();
-                break;
-            case Action.NextGraph:
-                State.SelectedGraph++;
-                FrameGraph();
-                break;
-            case Action.NewGraph:
-                var document = State.AddGraph(new Vector2(Camera.PanX, Camera.PanY));
-                Status = $"New graph {System.IO.Path.GetFileName(document.Path)}";
-                break;
             case Action.AddQuest:
                 State.AddQuest(new Vector2(Camera.PanX, Camera.PanY), Selected()?.Icon);
                 Status = $"Added {State.SelectedQuestId}";
@@ -1000,17 +980,6 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         State.SetRequirementTarget(id, index, next);
     }
 
-    private void FrameGraph()
-    {
-        if (State.Graph is not { } graph) return;
-        var ids = graph.Quests.Select(q => q.Id).ToHashSet();
-        var quests = State.Preview.Quests.Where(q => ids.Contains(q.Id)).ToList();
-        if (quests.Count == 0) return;
-        var center = quests.Aggregate(Vector2.Zero, (sum, q) => sum + q.Position) / quests.Count;
-        Camera.PanX = center.X;
-        Camera.PanY = center.Y;
-    }
-
     private void Focus(Field field, int arg)
     {
         Blur();
@@ -1033,11 +1002,6 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private void Commit((Field Field, int Arg) focus, bool final)
     {
         var text = _field.Text;
-        if (focus.Field == Field.GraphTitle)
-        {
-            if (State.Graph is { } graph) State.SetGraphTitle(graph, text);
-            return;
-        }
         if (_focusQuest is not { } id || State.Find(id) == null) return;
         switch (focus.Field)
         {

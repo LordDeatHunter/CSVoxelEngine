@@ -1,0 +1,10 @@
+{
+  "title": "Grind Stone",
+  "description": "Build a quern to crush ore before it goes in the kiln.",
+  "icon": "quern",
+  "pos": [-6, -1.5],
+  "parents": ["stone_age"],
+  "requirements": [
+    { "type": "craft", "item": "quern" }
+  ]
+}

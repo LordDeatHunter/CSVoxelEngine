@@ -1,0 +1,10 @@
+{
+  "title": "Brickwork",
+  "description": "Bind mud bricks into blocks for a kiln.",
+  "icon": "mud_bricks",
+  "pos": [-10, 1],
+  "parents": ["mud_bricks"],
+  "requirements": [
+    { "type": "craft", "item": "mud_bricks", "count": 8 }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "title": "Getting a Grip",
+  "description": "Bind flint to a branch with vines: a crude pickaxe and axe.",
+  "icon": "item/primitive_pickaxe",
+  "pos": [-8, -4],
+  "parents": ["sticks_and_stones"],
+  "requirements": [
+    { "type": "craft", "item": "item/primitive_pickaxe" },
+    { "type": "craft", "item": "item/primitive_axe" }
+  ]
+}

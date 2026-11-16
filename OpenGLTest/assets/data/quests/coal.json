@@ -1,0 +1,10 @@
+{
+  "title": "Black Gold",
+  "description": "Find coal in the stone.",
+  "icon": "item/coal",
+  "pos": [-4, -5],
+  "parents": ["stone_age"],
+  "requirements": [
+    { "type": "obtain", "item": "item/coal", "count": 4 }
+  ]
+}

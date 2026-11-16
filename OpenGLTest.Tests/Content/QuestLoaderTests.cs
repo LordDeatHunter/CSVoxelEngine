@@ -8,8 +8,8 @@ using static VoxelEngine.Tests.Support.QuestFixtures;
 
 namespace VoxelEngine.Tests.Content;
 
-/// <summary>The quest loader's graph rules: every quest of the shipped graphs can unlock, and a broken graph is refused
-/// at load naming its file.</summary>
+/// <summary>The quest loader's rules: every shipped quest can unlock, a broken quest is refused at load naming its file,
+/// and a quest file's name is its id.</summary>
 public class QuestLoaderTests
 {
     [Fact]
@@ -26,7 +26,7 @@ public class QuestLoaderTests
         Assert.All(book.Quests, quest => Assert.True(log.IsComplete(quest), quest.Id));
     }
 
-    public static TheoryData<string, QuestGraphDefinition.QuestDefinition[]> BrokenGraphs => new()
+    public static TheoryData<string, QuestDefinition[]> BrokenGraphs => new()
     {
         { "unknown parent", [Quest("a", ["nope"], Break("stone"))] },
         { "self parent", [Quest("a", ["a"], Break("stone"))] },
@@ -37,12 +37,12 @@ public class QuestLoaderTests
         { "unknown entity", [Quest("a", null, Kill("not_a_mob"))] },
         { "zero count", [Quest("a", null, Break("stone", 0))] },
         { "no requirements", [Quest("a", null)] },
-        { "bad type", [Quest("a", null, new QuestGraphDefinition.RequirementDefinition { Type = "dance", Item = "stone" })] },
+        { "bad type", [Quest("a", null, new QuestRequirementDefinition { Type = "dance", Item = "stone" })] },
         { "bad reveal", [Revealing(Quest("a", null, Break("stone")), "sometimes")] },
         { "numeric reveal", [Revealing(Quest("a", null, Break("stone")), "1")] },
     };
 
-    private static QuestGraphDefinition.QuestDefinition Revealing(QuestGraphDefinition.QuestDefinition quest, string reveal)
+    private static QuestDefinition Revealing(QuestDefinition quest, string reveal)
     {
         quest.Reveal = reveal;
         return quest;
@@ -50,26 +50,47 @@ public class QuestLoaderTests
 
     [Theory]
     [MemberData(nameof(BrokenGraphs))]
-    public void ABrokenGraphIsRefusedNamingItsFile(string _, QuestGraphDefinition.QuestDefinition[] quests)
+    public void ABrokenGraphIsRefusedNamingItsFile(string _, QuestDefinition[] quests)
     {
         var error = Assert.Throws<InvalidOperationException>(() => Book(quests));
-        Assert.Contains("test.json", error.Message);
+        Assert.Contains(quests, q => error.Message.Contains(q.Id + ".json"));
     }
 
     [Fact]
-    public void ARootDefaultsToAHexAndAChildToACircleAndTheOriginOffsetsEveryNode()
+    public void ARootDefaultsToAHexAndAChildToACircleAtTheirOwnPositions()
     {
-        TestContent.EnsureLoaded();
         var root = Quest("root", null, Break("stone"));
         root.Pos = [1, 2];
         var child = Quest("child", ["root"], Break("stone"));
         child.Pos = [3, 2];
-        var book = QuestLoader.Compile([("g", new QuestGraphDefinition { Origin = [10, -5], Quests = [root, child] }, "g.json")]);
+        var book = Book(root, child);
 
         Assert.Equal(QuestShape.Hex, book.Of("root").Shape);
         Assert.Equal(QuestShape.Circle, book.Of("child").Shape);
-        Assert.Equal(new System.Numerics.Vector2(2, 0), book.Of("child").Position - book.Of("root").Position);
-        Assert.Equal(new System.Numerics.Vector2(11, -3), book.Of("root").Position);
+        Assert.Equal(new System.Numerics.Vector2(1, 2), book.Of("root").Position);
         Assert.Equal([book.Of("child").Index], book.Of("root").Children.ToArray());
+    }
+
+    [Fact]
+    public void AQuestFileIsNamedByItsIdWhateverItsJsonSays()
+    {
+        TestContent.EnsureLoaded();
+        var folder = System.IO.Directory.CreateTempSubdirectory("quest-loader").FullName;
+        try
+        {
+            System.IO.File.WriteAllText(System.IO.Path.Combine(folder, "first.json"),
+                """{ "id": "ignored", "icon": "stone", "pos": [0, 0], "requirements": [{ "type": "break", "block": "stone" }] }""");
+            System.IO.File.WriteAllText(System.IO.Path.Combine(folder, "second.json"),
+                """{ "icon": "stone", "pos": [1, 0], "parents": ["first"], "requirements": [{ "type": "break", "block": "stone" }] }""");
+
+            var book = QuestLoader.ReadQuests(folder);
+
+            Assert.Equal(["first", "second"], book.Quests.Select(q => q.Id));
+            Assert.Equal([book.Of("first").Index], book.Of("second").Parents);
+        }
+        finally
+        {
+            System.IO.Directory.Delete(folder, true);
+        }
     }
 }

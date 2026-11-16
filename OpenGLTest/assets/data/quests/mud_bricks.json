@@ -1,0 +1,9 @@
+{
+  "title": "Mud and Fire",
+  "description": "Shape and fire mud into bricks: the start of every furnace.",
+  "icon": "item/mud_brick",
+  "pos": [-12, 3],
+  "requirements": [
+    { "type": "obtain", "item": "item/mud_brick", "count": 8 }
+  ]
+}

@@ -10,8 +10,8 @@ using VoxelEngine.Items;
 namespace VoxelEngine.Content.Quests;
 
 /// <summary>
-/// Loads <c>data/quests/&lt;graph&gt;.json</c> into <see cref="QuestRegistry"/>. A missing folder is no quests.
-/// Every error names its file: a duplicate or blank id, an unknown parent, a parent cycle, an unknown
+/// Loads <c>data/quests/&lt;id&gt;.json</c>, one quest per file named by its id, into <see cref="QuestRegistry"/>. A
+/// missing folder is no quests. Every error names its file: a duplicate or blank id, an unknown parent, a parent cycle, an unknown
 /// icon, block, item or entity, a bad shape, position or count. <see cref="ReadQuests"/> and
 /// <see cref="Compile"/> touch no static state but the content tables, so tests call them directly.
 /// Runs last in <see cref="ContentRegistry.Load"/>, once blocks, items and entities are registered.
@@ -20,38 +20,36 @@ internal static class QuestLoader
 {
     internal static void LoadQuests(string folder) => QuestRegistry.Publish(ReadQuests(folder));
 
-    /// <summary>Every quest graph under <paramref name="folder"/>, in file-name order; empty when the folder is missing.</summary>
+    /// <summary>Every quest file directly in <paramref name="folder"/>, in file-name order, each quest's id its file
+    /// name; empty when the folder is missing.</summary>
     internal static QuestBook ReadQuests(string folder)
     {
         if (!Directory.Exists(folder)) return QuestBook.Empty;
-        var graphs = ContentFiles.JsonFilesIn(folder)
-            .Select(file => (file.Name, ContentFiles.ReadJson<QuestGraphDefinition>(file.Path), file.Path))
-            .ToList();
-        return Compile(graphs);
+        return Compile([.. ContentFiles.JsonFilesIn(folder).Select(file => (ReadQuest(file.Path), file.Path))]);
     }
 
-    /// <summary>Compiles the graphs into one book, throwing an error that names the offending file.</summary>
-    internal static QuestBook Compile(IReadOnlyList<(string Name, QuestGraphDefinition Definition, string Path)> graphs)
+    /// <summary>One quest file, its <see cref="QuestDefinition.Id"/> set from the file name.</summary>
+    internal static QuestDefinition ReadQuest(string path)
     {
-        var titles = new List<string>();
-        // Pass 1: ids, so a parent may name a quest further down the file or in another file
-        var entries = new List<(QuestGraphDefinition.QuestDefinition Quest, int Graph, string Path, Vector2 Origin)>();
+        var quest = ContentFiles.ReadJson<QuestDefinition>(path);
+        quest.Id = Path.GetFileNameWithoutExtension(path);
+        return quest;
+    }
+
+    /// <summary>Compiles the quests (each with its id set, and the file it came from) into one book, throwing an error
+    /// that names the offending file.</summary>
+    internal static QuestBook Compile(IReadOnlyList<(QuestDefinition Quest, string Path)> quests)
+    {
+        // Pass 1: ids, so a parent may name any quest
+        var entries = new List<(QuestDefinition Quest, string Path)>();
         var indexById = new Dictionary<string, int>(StringComparer.Ordinal);
-        for (var g = 0; g < graphs.Count; g++)
+        foreach (var (quest, path) in quests)
         {
-            var (name, definition, path) = graphs[g];
-            titles.Add(string.IsNullOrWhiteSpace(definition.Title) ? name : definition.Title);
-            var origin = ReadVector(definition.Origin, "origin", path) ?? Vector2.Zero;
-            if (definition.Quests is not { Count: > 0 } quests)
-                throw new InvalidOperationException($"Quest graph '{path}' has no quests.");
-            foreach (var quest in quests)
-            {
-                if (string.IsNullOrWhiteSpace(quest.Id))
-                    throw new InvalidOperationException($"Quest graph '{path}' has a quest with no id.");
-                if (!indexById.TryAdd(quest.Id, entries.Count))
-                    throw new InvalidOperationException($"Quest graph '{path}' repeats quest id '{quest.Id}', already used.");
-                entries.Add((quest, g, path, origin));
-            }
+            if (string.IsNullOrWhiteSpace(quest.Id))
+                throw new InvalidOperationException($"Quest file '{path}' has no id.");
+            if (!indexById.TryAdd(quest.Id, entries.Count))
+                throw new InvalidOperationException($"Quest file '{path}' repeats quest id '{quest.Id}', already used.");
+            entries.Add((quest, path));
         }
 
         // Pass 2: parents and children by index
@@ -60,7 +58,7 @@ internal static class QuestLoader
         for (var i = 0; i < entries.Count; i++) children[i] = [];
         for (var i = 0; i < entries.Count; i++)
         {
-            var (quest, _, path, _) = entries[i];
+            var (quest, path) = entries[i];
             var names = quest.Parents ?? [];
             var list = new List<int>();
             foreach (var parent in names)
@@ -81,7 +79,7 @@ internal static class QuestLoader
         var compiled = new QuestType[entries.Count];
         for (var i = 0; i < entries.Count; i++)
         {
-            var (quest, graph, path, origin) = entries[i];
+            var (quest, path) = entries[i];
             var position = ReadVector(quest.Pos, "pos", path)
                            ?? throw new InvalidOperationException($"Quest '{quest.Id}' in '{path}' has no pos.");
             if (quest.Icon == null || !ContentFiles.TryResolve(quest.Icon, out var icon))
@@ -96,21 +94,20 @@ internal static class QuestLoader
                 Title = string.IsNullOrWhiteSpace(quest.Title) ? quest.Id! : quest.Title,
                 Description = quest.Description ?? "",
                 IconId = icon,
-                Position = origin + position,
+                Position = position,
                 Shape = ReadShape(quest.Shape, parents[i].Length == 0, quest.Id!, path),
                 Reveal = ReadReveal(quest.Reveal, quest.Id!, path),
                 Readable = quest.Readable ?? true,
                 AnyOf = quest.AnyOf ?? false,
-                Graph = graph,
                 Parents = parents[i],
                 Children = [.. children[i]],
                 Requirements = [.. requirements.Select(r => CompileRequirement(r, quest.Id!, path))]
             };
         }
-        return new QuestBook(compiled, titles);
+        return new QuestBook(compiled);
     }
 
-    private static QuestRequirement CompileRequirement(QuestGraphDefinition.RequirementDefinition definition, string quest, string path)
+    private static QuestRequirement CompileRequirement(QuestRequirementDefinition definition, string quest, string path)
     {
         var count = definition.Count ?? 1;
         if (count < 1)
@@ -146,7 +143,7 @@ internal static class QuestLoader
         }
     }
 
-    private static QuestRequirement CompileTagRequirement(QuestGraphDefinition.RequirementDefinition definition,
+    private static QuestRequirement CompileTagRequirement(QuestRequirementDefinition definition,
         QuestRequirementKind kind, int count, string quest, string path)
     {
         if (definition.Item != null)
@@ -192,7 +189,7 @@ internal static class QuestLoader
 
     // Kahn's algorithm: every quest must be reachable by peeling off quests whose parents are all peeled
     private static void RejectCycles(
-        List<(QuestGraphDefinition.QuestDefinition Quest, int Graph, string Path, Vector2 Origin)> entries,
+        List<(QuestDefinition Quest, string Path)> entries,
         int[][] parents, List<int>[] children)
     {
         var pending = parents.Select(p => p.Length).ToArray();

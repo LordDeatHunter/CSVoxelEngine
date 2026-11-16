@@ -10,14 +10,14 @@ namespace VoxelEngine.Tests.Quests;
 /// progress. The fixture chain: root, mid (needs root) and late (needs mid), all with the default mode.</summary>
 public class QuestRevealTests
 {
-    private static QuestGraphDefinition.QuestDefinition Revealed(string id, string reveal, params string[] parents)
+    private static QuestDefinition Revealed(string id, string reveal, params string[] parents)
     {
         var quest = Quest(id, parents, Break("stone"));
         quest.Reveal = reveal;
         return quest;
     }
 
-    private static (QuestBook Book, QuestLog Log) Chain(QuestGraphDefinition.QuestDefinition probe)
+    private static (QuestBook Book, QuestLog Log) Chain(QuestDefinition probe)
     {
         var book = Book(Quest("root", null, Break("dirt")), Quest("mid", ["root"], Break("dirt")),
             Quest("late", ["mid"], Break("dirt")), probe);

@@ -24,9 +24,9 @@ OpenGLTest.DevStudio/                 # the preview and authoring tool (ITEMS, E
   QuestEditorState.cs                 # GL-free quest editing rules: add, delete, move, link (cycle-safe), rename,
                                       #   fields, requirements, the lenient preview book, compile errors, dirty
                                       #   tracking, save and revert (all, or one quest)
-  QuestGraphDocument.cs               # one quest graph file being edited: path, header comment, definition, its saved
-                                      #   version and each quest's id on disk (per-quest save and revert)
-  QuestGraphWriter.cs                 # writes a quest graph back in the shipped files' hand-written JSON layout
+  QuestDocument.cs                    # one quest file being edited: the quest, the copy and id its file holds, and
+                                      #   whether it was deleted (the file goes on the next save)
+  QuestWriter.cs                      # writes a quest file back in the shipped files' hand-written JSON layout
   SliceTrailSampler.cs                # the delegate that poses the previewed blade for PlayerPreviewState's slice trail
   TreePreviewState.cs                 # GL-free state of the TREES tab: species, seed, step, per-step
                                       #   snapshots, ground plane and framing bounds
@@ -110,7 +110,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   SupportTestWorld
   DevStudio/                   # the OpenGLTest.DevStudio project: the timeline, the
                                #   preview states, the display editor and its JSON writer, the quest editor
-                               #   and the quest graph writer
+                               #   and the quest writer
   Items/                       # item uses (acorn, firestarter, heal, grow-tree,
                                #   timed use), the staff slot binding and the hierarchy; its own helper StubItemUseWorld
   Juice/                       # game-feel rules: blast shake, damage direction and fringe,

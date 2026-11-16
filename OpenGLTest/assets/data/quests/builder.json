@@ -1,0 +1,10 @@
+{
+  "title": "A Roof Overhead",
+  "description": "Put the planks to use and build something.",
+  "icon": "oak_planks_stairs",
+  "pos": [-5, -9],
+  "parents": ["planks"],
+  "requirements": [
+    { "type": "place", "block": "oak_planks", "count": 32 }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "title": "Masonry",
+  "description": "Dress stone into bricks.",
+  "icon": "stone_bricks",
+  "pos": [-4, -3],
+  "parents": ["stone_age"],
+  "requirements": [
+    { "type": "craft", "item": "stone_bricks", "count": 8 }
+  ]
+}

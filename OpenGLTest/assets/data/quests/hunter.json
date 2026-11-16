@@ -1,0 +1,10 @@
+{
+  "title": "Hunter",
+  "description": "Bring down a deer.",
+  "icon": "item/raw_venison",
+  "pos": [-12, -2.5],
+  "parents": ["sticks_and_stones"],
+  "requirements": [
+    { "type": "kill", "entity": "deer" }
+  ]
+}

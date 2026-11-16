@@ -1,0 +1,11 @@
+{
+  "title": "Hammer Time",
+  "description": "Build an anvil and a smithing hammer.",
+  "icon": "anvil",
+  "pos": [-2, 5],
+  "parents": ["iron"],
+  "requirements": [
+    { "type": "craft", "item": "anvil" },
+    { "type": "craft", "item": "item/smithing_hammer" }
+  ]
+}

@@ -12,22 +12,18 @@ public sealed class QuestBook
 {
     private readonly Dictionary<string, QuestType> _byId;
 
-    public QuestBook(IReadOnlyList<QuestType> quests, IReadOnlyList<string> graphs)
+    public QuestBook(IReadOnlyList<QuestType> quests)
     {
         Quests = quests;
-        Graphs = graphs;
         _byId = new Dictionary<string, QuestType>(StringComparer.Ordinal);
         foreach (var quest in quests) _byId[quest.Id] = quest;
     }
 
     /// <summary>A book with no quests.</summary>
-    public static QuestBook Empty { get; } = new([], []);
+    public static QuestBook Empty { get; } = new([]);
 
     /// <summary>Every quest, indexed by <see cref="QuestType.Index"/>.</summary>
     public IReadOnlyList<QuestType> Quests { get; }
-
-    /// <summary>Every graph's title, indexed by <see cref="QuestType.Graph"/>.</summary>
-    public IReadOnlyList<string> Graphs { get; }
 
     /// <summary>The quest with that id, if any.</summary>
     public bool TryGet(string id, out QuestType quest) => _byId.TryGetValue(id, out quest!);

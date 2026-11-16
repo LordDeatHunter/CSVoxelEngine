@@ -84,7 +84,7 @@ internal sealed class QuestBookRenderer : IDisposable
             DrawDetails(selected, log, view.Camera, canvas, time);
     }
 
-    /// <summary>The book's backdrop, grid, parent edges, nodes and graph titles over the whole canvas: what the quest
+    /// <summary>The book's backdrop, grid, parent edges and nodes over the whole canvas: what the quest
     /// book and the DevStudio quest editor both draw. A quest <paramref name="visible"/> refuses is skipped (and so is
     /// every edge to it), one <paramref name="complete"/> accepts draws done (a lit node, a green edge in, a check
     /// badge), one <paramref name="preview"/> accepts draws locked (a dark frame, its icon shaded, a "?"), and every one
@@ -120,13 +120,6 @@ internal sealed class QuestBookRenderer : IDisposable
                 preview?.Invoke(quest) == true, selected(quest), quest == hovered, camera.Zoom, time);
         }
 
-        // Each graph's title rides above its root
-        foreach (var quest in book.Quests)
-        {
-            if (quest.Parents.Count > 0) continue;
-            var top = QuestBookLayout.ToCanvas(quest.Position, camera, canvas) - new Vector2(0f, size * 0.5f + 16f);
-            _ui.DrawTextMiddle(book.Graphs[quest.Graph], top, _ui.CountScale, TextDim);
-        }
     }
 
     // A faint grid that pans and zooms with the book; dropped once its lines would crowd together

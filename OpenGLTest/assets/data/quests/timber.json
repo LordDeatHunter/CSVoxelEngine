@@ -1,0 +1,10 @@
+{
+  "title": "Timber!",
+  "description": "Chop into an oak.",
+  "icon": "oak_log",
+  "pos": [-7, -6.5],
+  "parents": ["primitive_tools"],
+  "requirements": [
+    { "type": "break", "block": "oak_log", "count": 4 }
+  ]
+}

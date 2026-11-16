@@ -405,12 +405,11 @@ correction that follows its accepted result, holds the camera there (`WaystoneTr
 waystone, ticked in `World.UpdateClient`) until its own streamed chunk there is meshed. `/tp` ends a waiting trip.
 `WaystoneServerTests` (loopback), `WaystoneNetCodecTests`, `WaystoneArrivalHoldTests`.
 
-**Quests (U-15).** Quests are data: `assets/data/quests/<graph>.json`, one file per graph (a cluster of nodes in the
-book; `survival`, `metalworks`, `adventure` ship), loaded last in `ContentRegistry.Load` by `QuestLoader` into
-`QuestRegistry.Book` (a `QuestBook` of compiled `QuestType`s). A graph has an optional `title` and `origin` (`[x, y]` grid
-offset added to every node, so a graph moves as a unit) and its `quests`. A quest has an `id` (unique across every file;
-saves and the wire name a quest by it), `title`, `description`, `icon` (a block or item, `item/`/`block/` prefix allowed),
-`pos` (`[x, y]` grid steps), `parents` (quest ids, any file), `shape` (`hex` or `circle`; default hex for a quest with no
+**Quests (U-15).** Quests are data: `assets/data/quests/<id>.json`, one file per quest (`QuestDefinition`), loaded last
+in `ContentRegistry.Load` by `QuestLoader` into `QuestRegistry.Book` (a `QuestBook` of compiled `QuestType`s). A quest's id
+is its file name (saves and the wire name a quest by it; an `id` key in the file is never read). A quest has a `title`,
+`description`, `icon` (a block or item, `item/`/`block/` prefix allowed), `pos` (`[x, y]` grid steps in the book),
+`parents` (quest ids), `shape` (`hex` or `circle`; default hex for a quest with no
 parents, circle otherwise), `reveal` (when the quest shows in the book as a locked preview before it unlocks:
 `unlocked`, the default, not before; `always`; `anyParentShown` or `allParentsShown`, while one or every parent shows, done
 or not; `anyParentDone`, once one parent is done; `anyParentDoneAllShown`, once one is done and every other shows;

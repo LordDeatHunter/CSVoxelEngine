@@ -1,0 +1,10 @@
+{
+  "title": "Forged in Fire",
+  "description": "Forge an iron sword head on the anvil.",
+  "icon": "item/iron_sword_head",
+  "pos": [0, 5],
+  "parents": ["anvil"],
+  "requirements": [
+    { "type": "craft", "item": "item/iron_sword_head" }
+  ]
+}

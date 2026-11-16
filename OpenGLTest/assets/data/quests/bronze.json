@@ -1,0 +1,10 @@
+{
+  "title": "Bronze Age",
+  "description": "Alloy copper and tin into bronze.",
+  "icon": "item/bronze_ingot",
+  "pos": [-4, 3],
+  "parents": ["copper_tools"],
+  "requirements": [
+    { "type": "obtain", "item": "item/bronze_ingot", "count": 2 }
+  ]
+}

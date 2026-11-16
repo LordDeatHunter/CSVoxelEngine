@@ -1,0 +1,12 @@
+{
+  "title": "Crushed Hopes",
+  "description": "Grind a copper or tin chunk to powder in the quern.",
+  "icon": "item/crushed_copper",
+  "pos": [-8, 1],
+  "parents": ["quern", "ore_chunk"],
+  "anyOf": true,
+  "requirements": [
+    { "type": "obtain", "item": "item/crushed_copper" },
+    { "type": "obtain", "item": "item/crushed_tin" }
+  ]
+}

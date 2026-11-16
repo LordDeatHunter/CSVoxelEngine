@@ -34,9 +34,6 @@ public sealed class QuestType
     /// <summary>Whether the details panel lists the requirements before the quest is complete.</summary>
     public required bool Readable { get; init; }
 
-    /// <summary>The index of the graph (file) the quest came from, in <see cref="QuestBook.Graphs"/>.</summary>
-    public required int Graph { get; init; }
-
     public required IReadOnlyList<int> Parents { get; init; }
 
     public required IReadOnlyList<int> Children { get; init; }

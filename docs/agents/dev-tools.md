@@ -92,8 +92,7 @@ drag narrows the selection to that quest) (snapped to `QuestEditorState.SnapStep
 (`QuestEditorState.ComponentOf`: its parent links followed both ways, so an unlinked quest stays put), right-drag from one node to another to make the second depend on the first (dropped on empty canvas, it adds a
 quest there that depends on the first, a self link, a duplicate or a cycle is refused), click a line to select that link (the panel names which quest depends on which, SWAP DIRECTION turns it around unless
 that would close a cycle, DELETE LINK or Delete removes it), double-click empty canvas to add a quest there, drag empty canvas (or middle-drag anywhere) to pan, wheel to zoom. The
-top bar picks the graph (`<`/`>`), edits its title, adds a graph file (`NEW GRAPH`, `graph_N.json`) or a quest at the
-view center, and saves. With several quests selected the right panel lists them instead (icon and title, the wheel
+top bar adds a quest at the view center (a new file once saved), undoes, redoes, saves and reverts. With several quests selected the right panel lists them instead (icon and title, the wheel
 scrolls a long list, a click on a row opens that quest alone) over DELETE N QUESTS; Delete removes every selected quest
 as one undo step. The right panel edits the selected quest's id (committed on Enter or leaving the field; a rename
 follows every parent link), title, description, shape (AUTO/HEX/CIRCLE), readable, any-of, SHOW (the `reveal` mode, a
@@ -102,18 +101,18 @@ dropdown (the reusable `UI/Widgets/DropdownState`, drawn by `DropdownRenderer`) 
 or an entity, `-`/`+` set the count, PICK arms the left grid for the target (NEXT MOB steps a kill through the registered
 entities), and a plain grid click sets the icon. Dragging a grid slot onto the canvas adds a quest where it is dropped,
 with that icon, titled after it and asking to obtain it. UNDO and REDO (Ctrl+Z, and Ctrl+Y or Ctrl+Shift+Z) step through `QuestEditHistory`: every change that alters the
-graphs is a step (one typed field or one drag is one step, a refused edit or a save none; REVERT ALL is a step too), and a
+quests is a step (one typed field or one drag is one step, a refused edit or a save none; REVERT ALL is a step too), and a
 new change after an undo drops what was undone; an undo never touches the files, so a quest saved since reads as unsaved
 again. Delete removes the selected quest and every link to it, Ctrl+S saves,
 Escape clears the selection. Every edit recompiles through `QuestLoader.Compile`: an error is listed in red under the
-canvas and its quest ringed, and SAVE ALL refuses until it compiles. SAVE ALL writes only the changed files through
-`QuestGraphWriter`, in the shipped files' layout with their header comment kept, so an unedited graph writes back
-unchanged (`QuestGraphWriterTests`). Each document keeps its graph as on disk (`QuestGraphDocument.Saved`) and each quest
-the id it has there, so a quest with unsaved edits is known (a gold corner mark on its node, `*` after its heading):
-SAVE QUEST writes that quest alone into the file as saved, refused when the files would then not load (a rename its saved
-children still name: save all instead), and REVERT QUEST puts back its saved version, id and links included, or removes
-a quest never saved. REVERT ALL (click again on CONFIRM? within 3 s) re-reads every graph from disk and drops graphs
-never saved. Closing with unsaved edits only logs a warning. The rules are
+canvas and its quest ringed, and SAVE ALL refuses until it compiles. SAVE ALL writes only the changed quest files through
+`QuestWriter`, in the shipped files' layout, so an unedited quest writes back unchanged (`QuestWriterTests`), and deletes
+the files of deleted quests and the old file of a renamed one (a deletion or rename touches the disk only on save). Each
+`QuestDocument` keeps its quest as its file holds it (`Saved`, under `SavedId`), so a quest with unsaved edits is known (a
+gold corner mark on its node, `*` after its heading): SAVE QUEST writes that quest's file alone, refused when the files
+would then not load (a rename its saved children still name: save all instead), and REVERT QUEST puts back its saved
+version, id and links included, or removes a quest never saved. REVERT ALL (click again on CONFIRM? within 3 s) re-reads
+every quest file from disk. Closing with unsaved edits only logs a warning. The rules are
 `OpenGLTest.DevStudio/QuestEditorState.cs` (GL-free, `QuestEditorStateTests`), the page is `QuestEditorPage.cs`. The game
 reads the files at startup, so restart it to play an edit.
 
