@@ -11,6 +11,7 @@ using VoxelEngine.Data;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Graphics;
 using VoxelEngine.Items;
@@ -191,9 +192,40 @@ public sealed class DebugSceneRenderer : IDisposable
     /// rig has one, the item its entity file holds, and the hurt mode's hit-flash tint. Same frame setup as <see cref="Render"/>.
     /// </summary>
     public void RenderEntity(Matrix4x4 viewProj, Vector3 eyePos, EntityPreviewState state, float time,
-        Vector2D<int> size)
+        Vector2D<int> size) => RenderEntity(viewProj, eyePos, state, time, size, SceneClear);
+
+    /// <summary>
+    /// Draws <paramref name="state"/>'s entity into the bound framebuffer (<paramref name="size"/> pixels square) as a
+    /// still thumbnail: its current pose, framed by <see cref="EntityFraming"/> on its posed bounds, over a transparent
+    /// background.
+    /// </summary>
+    public void RenderEntityThumbnail(EntityPreviewState state, int size)
     {
-        BeginScene(viewProj, eyePos, time, size);
+        if (state.Selected is not { } type) return;
+        var preview = Preview(type, state.SelectedVariant);
+        var feet = state.DrawOffset;
+        var effect = state.BodyEffect();
+        var parts = new List<(Matrix4x4, IReadOnlyList<PlayerRig.RigCube>)>();
+        foreach (var name in preview.PartNames)
+            if (preview.Rig.Parts.TryGetValue(name, out var part))
+                parts.Add((state.PartMatrix(name, preview.Rig, feet) * effect, part.Cubes));
+        var (min, max) = EntityFraming.Bounds(parts);
+        // The tab turns a model round to face +Z (EntityPreviewState.FacingYaw); a crawler poses itself and faces -Z
+        var front = state.PreviewMob is CrawlerMob ? -Vector3.UnitZ : Vector3.UnitZ;
+        var (viewProj, eye) = EntityFraming.Frame(min, max, front);
+        // The UI samples a texture top row first, a framebuffer fills it bottom row first: flip the picture (no culling
+        // here, so the mirrored winding draws the same)
+        viewProj *= Matrix4x4.CreateScale(1f, -1f, 1f);
+        RenderEntity(viewProj, eye, state, 0f, new Vector2D<int>(size, size), Vector4.Zero);
+    }
+
+    // The sky-blue the tabs clear to
+    private static readonly Vector4 SceneClear = new(0.53f, 0.64f, 0.76f, 1f);
+
+    private void RenderEntity(Matrix4x4 viewProj, Vector3 eyePos, EntityPreviewState state, float time,
+        Vector2D<int> size, Vector4 clear)
+    {
+        BeginScene(viewProj, eyePos, time, size, clear);
         if (state.Selected is not { } type) return;
 
         var preview = Preview(type, state.SelectedVariant);
@@ -236,7 +268,7 @@ public sealed class DebugSceneRenderer : IDisposable
     public void RenderTree(Matrix4x4 viewProj, Vector3 eyePos, TreePreviewState state, float time,
         Vector2D<int> size)
     {
-        BeginScene(viewProj, eyePos, time, size);
+        BeginScene(viewProj, eyePos, time, size, SceneClear);
         if (state.Selected is null) return;
 
         if (state.Version != _treeVersion)
@@ -298,10 +330,10 @@ public sealed class DebugSceneRenderer : IDisposable
     }
 
     // The frame setup shared by the ENTITIES and TREES tabs.
-    private void BeginScene(Matrix4x4 viewProj, Vector3 eyePos, float time, Vector2D<int> size)
+    private void BeginScene(Matrix4x4 viewProj, Vector3 eyePos, float time, Vector2D<int> size, Vector4 clear)
     {
         _gl.Viewport(0, 0, (uint)size.X, (uint)size.Y);
-        _gl.ClearColor(0.53f, 0.64f, 0.76f, 1f);
+        _gl.ClearColor(clear.X, clear.Y, clear.Z, clear.W);
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
         _gl.Enable(EnableCap.DepthTest);
         _gl.DepthFunc(DepthFunction.Lequal);

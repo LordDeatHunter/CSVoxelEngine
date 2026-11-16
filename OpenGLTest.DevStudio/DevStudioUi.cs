@@ -200,7 +200,8 @@ public sealed class DevStudioUi
 
     public void Draw(UIRenderer ui, ItemDisplayEditor editor, EntityPreviewState entities, TreePreviewState trees,
         StudioTab tab, PlayerPreviewState player, Vector2 screen, string status, bool firstPerson,
-        AnimationClock? timeline = null, QuestIconPicker? questIcons = null, ushort questIcon = 0)
+        AnimationClock? timeline = null, QuestIconPicker? questIcons = null, ushort questIcon = 0,
+        EntityThumbnails? thumbnails = null)
     {
         _tab = tab;
         _sliders.Clear();
@@ -214,9 +215,10 @@ public sealed class DevStudioUi
             StudioTab.Quests => questIcons?.Visible.Count ?? 0,
             _ => Entries.Count,
         };
-        // The quest grid takes the wide name slots only when it shows nothing but entities
+        // The quest grid draws entities as thumbnails in the icon slots; only without them would it need wide name slots
         var nameSlots = tab is StudioTab.Entities or StudioTab.Trees
-                        || (tab == StudioTab.Quests && questIcons?.Visible.All(e => e.Kind == IconKind.Entity) == true && count > 0);
+                        || (tab == StudioTab.Quests && thumbnails == null
+                            && questIcons?.Visible.All(e => e.Kind == IconKind.Entity) == true && count > 0);
         BuildGrid(screen, count, tab, nameSlots);
         switch (tab)
         {
@@ -256,7 +258,7 @@ public sealed class DevStudioUi
                 DrawTreeTitle(ui, trees, screen);
                 break;
             case StudioTab.Quests when questIcons != null:
-                DrawQuestIcons(ui, questIcons, questIcon);
+                DrawQuestIcons(ui, questIcons, questIcon, thumbnails);
                 break;
             default:
                 DrawGrid(ui, editor.SelectedId, "ITEMS");
@@ -533,9 +535,9 @@ public sealed class DevStudioUi
         }
     }
 
-    // The quest grid: cubes for blocks, sprites for items, and an entity's name in its slot (entities have no icon);
-    // the quest page draws the header (search and filters) over it
-    private void DrawQuestIcons(UIRenderer ui, QuestIconPicker icons, ushort selectedId)
+    // The quest grid: cubes for blocks, sprites for items, an entity's thumbnail (or, without one, its name); the quest
+    // page draws the header (search and filters) over it
+    private void DrawQuestIcons(UIRenderer ui, QuestIconPicker icons, ushort selectedId, EntityThumbnails? thumbnails)
     {
         foreach (var (center, size, index) in _slots)
         {
@@ -548,6 +550,9 @@ public sealed class DevStudioUi
                     break;
                 case IconKind.Item:
                     ui.DrawItemSprite(center, SlotSize * 0.72f, entry.Id, 0f, 0f);
+                    break;
+                case IconKind.Entity when thumbnails != null && thumbnails.TryGet(entry.Key, out var thumbnail):
+                    ui.DrawTexture(center, new Vector2(SlotSize * 0.9f), thumbnail);
                     break;
                 default:
                     var (scale, cap) = FitText(ui, entry.Name, TextCap, size.X - 6f);

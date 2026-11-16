@@ -34,7 +34,8 @@ namespace VoxelEngine.DevStudio;
 /// move and edited in the right panel (text with \n for a line break, SIZE, COLOR). With several quests selected, the right panel lists them instead (icon and title, scrolled by the wheel
 /// when too long; a click on a row opens that quest alone) over a DELETE button. A requirement's type and the quest's reveal mode (SHOW) are <see cref="DropdownState"/>s. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
 /// </summary>
-internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys, QuestIconPicker icons)
+internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys, QuestIconPicker icons,
+    EntityThumbnails thumbnails)
 {
     private enum Field { Id, Title, Description, Target, Label, LabelText, IconSearch }
 
@@ -282,7 +283,10 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         if (_iconDrag is not { } entry || pointer is not { } p || !IconDragging(p)) return;
         if (entry.Kind == IconKind.Entity)
         {
-            ui.DrawTextMiddle(entry.Name, p, ui.CapHeightScale(DevStudioUi.TextCap), Rgba.White);
+            if (thumbnails.TryGet(entry.Key, out var thumbnail))
+                ui.DrawTexture(p, new Vector2(QuestConfig.NodeIconSize * 1.4f), thumbnail);
+            else
+                ui.DrawTextMiddle(entry.Name, p, ui.CapHeightScale(DevStudioUi.TextCap), Rgba.White);
             return;
         }
         ui.ClearDepthForOverlay();

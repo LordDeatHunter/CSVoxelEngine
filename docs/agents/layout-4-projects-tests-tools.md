@@ -26,6 +26,8 @@ OpenGLTest.DevStudio/                 # the preview and authoring tool (ITEMS, E
   QuestEditorState.cs                 # GL-free quest editing rules: add, delete, move, link (cycle-safe), rename,
                                       #   fields, requirements, the lenient preview book, compile errors, dirty
                                       #   tracking, save and revert (all, or one quest)
+  EntityFraming.cs                    # GL-free thumbnail camera: a model's posed cube bounds, framed from above and the front-right
+  EntityThumbnails.cs                 # each entity drawn once into its own texture (one-layer array) for the QUESTS icon grid
   EditorDocument.cs                   # one content file being edited (generic): the definition, the copy and id its
                                       #   file holds, deleted and dirty; the save, revert and undo rules use it
   QuestLabelDocument.cs               # one quest book label file being edited (labels/<name>.json)
