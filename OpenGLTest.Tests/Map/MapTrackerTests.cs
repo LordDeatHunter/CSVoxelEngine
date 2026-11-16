@@ -5,6 +5,7 @@ using Xunit;
 
 namespace VoxelEngine.Tests.Map;
 
+[Collection("Map scanner")]
 public sealed class MapTrackerTests
 {
     private readonly ushort _stone;

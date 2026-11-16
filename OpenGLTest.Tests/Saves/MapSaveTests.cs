@@ -15,7 +15,7 @@ namespace VoxelEngine.Tests.Saves;
 /// damaged file reads as an unexplored map, only an explored-map change asks for a write, and a world that closes
 /// hands its map to the next world opened over the same folder.
 /// </summary>
-[Collection("Worldgen seed")]
+[Collection("Map scanner")]
 public sealed class MapSaveTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());

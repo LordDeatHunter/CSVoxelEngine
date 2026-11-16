@@ -3,6 +3,7 @@ using Xunit;
 
 namespace VoxelEngine.Tests.Map;
 
+[Collection("Map scanner")]
 public sealed class MapColumnScannerTests
 {
     private readonly ushort _stone;

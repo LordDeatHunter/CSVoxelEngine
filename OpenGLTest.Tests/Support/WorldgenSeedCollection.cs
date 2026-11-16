@@ -9,6 +9,8 @@ namespace VoxelEngine.Tests.Support;
 /// collection that disables parallelization alone, after every parallel collection has finished,
 /// which is the only thing that makes the swap safe. Every test in it restores
 /// <see cref="WorldSeed.Default"/> in a <c>finally</c>, so whatever runs next sees the default world.
+/// <c>MapSaveTests</c> uses the separate non-parallel map-scanner collection because it also calls
+/// the scanner.
 /// </summary>
 [CollectionDefinition("Worldgen seed", DisableParallelization = true)]
 public sealed class WorldgenSeedCollection;
