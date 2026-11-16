@@ -12,7 +12,7 @@ namespace VoxelEngine.Rendering.Actors;
 /// <summary>
 /// The iron works' draws of the entity pass: what a bloomery holds (the ore charge in its throat, the fuel bed and
 /// the finished blooms in its tapping arch, and the glow of its hearth and throat, which follows the fire's heat)
-/// and the metal stacked on an anvil. Where a bloomery's props lie is <see cref="BloomeryLayout"/>. Owns no GL
+/// the metal stacked on an anvil, and every bellows that is pressed down, squashed to its height. Where a bloomery's props lie is <see cref="BloomeryLayout"/>. Owns no GL
 /// resource: the meshes, the ember quad and the texture binds are <see cref="StationPasses"/>'s. Render thread only.
 /// </summary>
 internal sealed class SmithingPasses(RenderManager owner, StationPasses stations)
@@ -29,7 +29,8 @@ internal sealed class SmithingPasses(RenderManager owner, StationPasses stations
     /// </summary>
     internal void RenderSmithing(Camera camera, SmithingStations smithing)
     {
-        if (camera == null || smithing == null || !smithing.HasAny) return;
+        if (camera == null || smithing == null) return;
+        if (!smithing.HasAny && smithing.Bellows.Active.Count == 0) return;
 
         owner.WorldShader.Use();
         owner.BindWorldTextures();
@@ -44,6 +45,18 @@ internal sealed class SmithingPasses(RenderManager owner, StationPasses stations
             if (state.MetalCount > 0)
                 DrawPile(state.MetalId, state.MetalCount, 1f, cell + new Vector3(0.5f, AnvilTopY, 0.5f), 0f,
                     AnvilPieceSize, owner.LightAt(cell + new Vector3(0.5f, 1.2f, 0.5f)), viewProj, ref atlasBound);
+
+        // A pressed bellows: its block's cube squashed to its height, standing on the cell's floor (the chunk
+        // mesh leaves the cell out while it is not a full block, see BellowsSquash)
+        foreach (var (cell, id, height) in smithing.Bellows.Active)
+        {
+            stations.BindAtlas(ref atlasBound);
+            if (owner.BlockCubes.Get(id) is not { } cube) continue;
+            var model = Matrix4x4.CreateScale(1f, height, 1f)
+                        * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, height * 0.5f, 0.5f));
+            owner.SetDrawUniforms(model, model * viewProj, 1f, owner.LightAt(cell + new Vector3(0.5f, 1.2f, 0.5f)));
+            cube.Render();
+        }
 
         // Leave the shared alpha uniform where every other entity pass expects it
         owner.WorldShader.SetUniform(owner.LocAlpha, 1f);

@@ -19,6 +19,9 @@ public sealed class SmithingStations
     /// <summary>The anvils.</summary>
     public AnvilManager Anvils { get; } = new();
 
+    /// <summary>How far each bellows is pressed down, for the draw (display only, never saved or sent).</summary>
+    public BellowsSquash Bellows { get; } = new();
+
     /// <summary>Whether either holds anything, so an empty world sends no snapshot for them.</summary>
     public bool HasAny => Bloomeries.HasAny || Anvils.HasAny;
 

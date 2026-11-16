@@ -74,5 +74,10 @@ public sealed class BloomeryRulesTests
         Assert.True(perJump > 0f);
         Assert.True(perJump > BloomeryConfig.HeatDecayPerSecond * BloomeryConfig.PumpCooldownSeconds);
         Assert.True(perJump > BloomeryConfig.HeatDecayPerSecond * 1f);
+
+        // The bellows gives under the body (a sink block), so a jump from a fully pressed one comes back down on its
+        // top from that much lower an apex: still a landing that counts, and still ahead of the decay
+        var sunkJump = BloomeryRules.LandingHeat(jumpDrop - VoxelEngine.Player.SinkLayer.MaxSink);
+        Assert.True(sunkJump > BloomeryConfig.HeatDecayPerSecond * 1f);
     }
 }

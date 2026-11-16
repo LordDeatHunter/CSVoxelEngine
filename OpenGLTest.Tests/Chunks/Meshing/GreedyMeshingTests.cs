@@ -31,10 +31,12 @@ public sealed class GreedyMeshingTests
     {
         // Every shipped full-cube Model-renderer block is greedy (all derive from the four
         // built-in parents); cross blocks like the flower are Model-rendered but not full
-        // cubes, so they keep the per-quad path with the procedural renderers and water
+        // cubes, so they keep the per-quad path with the procedural renderers and water. A bellows is a
+        // full cube that leaves the chunk mesh per cell while it is pressed down, which only the per-quad
+        // path can do, so it stays out too
         foreach (var type in BlockType.Types.Values)
         {
-            var expected = type.Renderer == BlockRenderer.Model && !type.Fluid
+            var expected = type.Renderer == BlockRenderer.Model && !type.Fluid && !type.IsBellows
                 && type.BakedModel?.IsFullCube == true;
             Assert.True(expected == BlockType.IsGreedy(type.Id), $"{type.Name}: greedy should be {expected}");
         }

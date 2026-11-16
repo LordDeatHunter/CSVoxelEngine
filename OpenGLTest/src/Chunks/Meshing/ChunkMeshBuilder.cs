@@ -470,8 +470,9 @@ internal static class ChunkMeshBuilder
                 continue;
             }
 
-            // A door that is mid-swing is drawn turning by the door pass (DoorPasses) until its panel arrives
-            if (type.SideHinged && swinging.Contains((int)chunk.Position.X * Chunk.Size + x,
+            // A door that is mid-swing is drawn turning by the door pass (DoorPasses) until its panel arrives, and a
+            // bellows that is pressed down is drawn squashed by the smithing pass until it is a full block again
+            if ((type.SideHinged || type.IsBellows) && swinging.Contains((int)chunk.Position.X * Chunk.Size + x,
                     (int)chunk.Position.Y * Chunk.Size + y, (int)chunk.Position.Z * Chunk.Size + z))
                 continue;
 

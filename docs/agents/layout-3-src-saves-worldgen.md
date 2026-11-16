@@ -107,6 +107,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         AnvilManager.cs        # anvils keyed by cell: a stack of one forge metal (stack, take back, the recipes Offered), the
                                #   picked recipe (TrySelect) and its hammer hits (gated by the hammer's gap), save and wire
         BellowsProbe.cs        # GL-free: the bellows cell a landing body came down on (its middle, then its footprint corners)
+        BellowsSquash.cs       # display only: how far each bellows is pressed down by the player feet sunk into it, and
+                               #   its swelling back; a squashed cell leaves the chunk mesh (SwingingCells)
         BloomeryManager.cs     # bloomeries keyed by anchor: ore, fuel, heat, smelting, bellows presses at the tuyeres, the
                                #   integrity sweep, save and wire
         BloomeryRules.cs       # GL-free heat model: the band, decay, progress rate (backward when cold), landing heat

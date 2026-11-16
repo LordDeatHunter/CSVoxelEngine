@@ -292,7 +292,14 @@ is no wrought iron: the bloom is the forge metal.
   never under 0 and never losing the ore. A jump on the spot onto the bellows once per `PumpCooldownSeconds` (or a
   second) beats the decay (`BloomeryRulesTests` asserts the relation).
 - **The bellows** (`bellows`, a plain cube for now with placeholder tiles, crafted from oak planks and hide) carries the
-  `"bellows": true` flag (`BlockType.IsBellows`). It works only from a **tuyere**: the cells the profile names, turned with
+  `"bellows": true` flag (`BlockType.IsBellows`). It **gives under a weight**: `"sink": 0.5` makes it a sink block, so a
+  player's body settles slowly into its top half (`SinkLayer`, the same rule on a client and a server), and
+  `BellowsSquash` (`SmithingStations.Bellows`, display only, fed every player's feet by `LocalPlayer.UpdatePlayerModel`)
+  holds the bag down to the lowest feet standing in it and swells it back at `BloomeryConfig.BellowsExpandSpeed` once
+  they leave. While it is not a full block its cell sits in `ChunkManager.SwingingCells`, so the mesher leaves it out
+  (the bellows never joins the greedy pass for that) and `SmithingPasses` draws its cube squashed; it sets
+  `occludes: false`, since a squashed bag must not hide the face of the block beside it. Only player bodies sink, so a
+  mob standing on it does not press it down (`BellowsSquashTests`, `visual-examples/bellows-squash.json`). It works only from a **tuyere**: the cells the profile names, turned with
   the structure's facing (`BloomeryProfile.IsTuyere`, through `MultiblockShape.RotatePoint`); the shipped bloomery's two
   sit beside the back lower cell of each side wall, where `models/block/bloomery.json` stands a clay nozzle out of the
   inset hearth tier to the face of the volume, its end the `bloomery_tuyere` tile (`BloomeryLayoutTests` holds a nozzle
