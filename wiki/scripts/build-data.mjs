@@ -329,12 +329,24 @@ const title = (s) => s.charAt(0).toUpperCase() + s.slice(1)
 
 // How a structure is worked once built, for those whose use the recipe cards do not tell, as [heading, text]
 const structureUse = {
-  bloomery: ['Smelting', `Load crushed iron and fuel through the opening and light it with a firestarter. The fire cools on its own; to keep it
-hot, set a [Bellows](/game/blocks/bellows) against one of the two holes low in the side walls (the tuyeres) and land on
-it: every landing blows the fire, the more the farther you fell, and any walking mob works it too. A fire too cold to
-smelt slowly loses the progress of the ore it is working (the colder, the faster); there is no such thing as too hot.
-Collect the blooms with an empty hand and forge them on an [anvil](/game/blocks/anvil): stack them, pick a recipe with a
-smithing hammer, then hammer it out (see the [anvil recipes](/game/reference/crafting#anvil)).`]
+  mud_brick_kiln: ['Melting', `Right-click fuel into the mouth (it lies in a row at the back of the hearth), stand a crucible in front of it, charge
+the crucible with anything that melts, and light the kiln with a firestarter. A lit kiln glows with a bed of embers on
+its hearth and smokes from the flue on top of its dome. It keeps a crucible to one metal at a time (see the
+[melting recipes](/game/reference/crafting#melting)).`],
+  alloy_furnace: ['Melting and alloying', `Right-click fuel into the firemouth (two rows of four on the firebox floor), stand a crucible on the pedestal in
+the middle, charge it, and light the furnace with a firestarter. A lit furnace glows with a bed of embers across its
+firebox and smokes from its chimney. It is the only kiln that takes the parts of an alloy together and turns them into
+the alloy (see the [alloys](/game/reference/crafting#alloys)).`],
+  bloomery: ['Smelting', `Right-click crushed iron and fuel into it: the ore piles up in the open throat on top of the stack and the fuel beds
+down on the hearth inside the tapping arch in front. Light it with a firestarter. The fire cools on its own; to keep it
+hot, set a [Bellows](/game/blocks/bellows) against one of the two clay nozzles low on the side walls (the tuyeres) and
+land on it: every landing blows the fire, the more the farther you fell, and throws a burst of sparks out of the
+throat; any walking mob works it too. The hearth and the throat glow brighter the hotter the fire, so a dull glow
+means it is too cold. A fire too cold to smelt slowly loses the progress of the ore it is working (the colder, the
+faster); there is no such thing as too hot. The top piece of the pile shrinks as it smelts, and the finished blooms
+pile up at the front of the arch: collect them with an empty hand and forge them on an [anvil](/game/blocks/anvil):
+stack them, pick a recipe with a smithing hammer, then hammer it out (see the
+[anvil recipes](/game/reference/crafting#anvil)).`]
 }
 
 for (const st of Object.values(structures)) {
