@@ -233,6 +233,27 @@ internal static class BlockSchemaParser
     }
 
     /// <summary>
+    /// Reads a multiblock anchor's <c>multiblock.boxes</c> into the per-cell shape table
+    /// (<see cref="MultiblockBoxes.Build"/>); null when the anchor declares none. A box outside the
+    /// volume or a cell left without a box throws naming the file.
+    /// </summary>
+    internal static BlockHitbox[][][]? ParseMultiblockBoxes(BlockDefinition.MultiblockDefinition? definition, int size,
+        string path)
+    {
+        if (definition == null) return null;
+        var boxes = ParseHitboxes(definition.Boxes, path, size, "multiblock.boxes");
+        if (boxes == null) return null;
+        try
+        {
+            return MultiblockBoxes.Build(boxes, size);
+        }
+        catch (ArgumentException e)
+        {
+            throw new InvalidOperationException($"Block '{path}' has multiblock.boxes with {e.Message}");
+        }
+    }
+
+    /// <summary>
     /// Reads a kiln anchor's <c>kiln</c> object into its <see cref="KilnProfile"/>: omitted
     /// fields take the plain kiln's (fuel cap 4, speed 1, no alloying), and a fuel cap or melt
     /// speed <see cref="KilnProfile.Create"/> refuses throws naming the file. The layout is the
@@ -523,55 +544,56 @@ internal static class BlockSchemaParser
         return true;
     }
 
-    internal static BlockHitbox[]? ParseHitboxes(JsonElement hitbox, string path)
+    internal static BlockHitbox[]? ParseHitboxes(JsonElement hitbox, string path, float limit = 1f,
+        string field = "hitbox")
     {
         switch (hitbox.ValueKind)
         {
             case JsonValueKind.Undefined or JsonValueKind.Null:
                 return null;
             case JsonValueKind.Array when hitbox.GetArrayLength() == 0:
-                throw new InvalidOperationException($"Block '{path}' has an empty hitbox array; omit hitbox for a full cube.");
+                throw new InvalidOperationException($"Block '{path}' has an empty {field} array; omit {field} for a full cube.");
             case JsonValueKind.Array:
             {
                 var boxes = new BlockHitbox[hitbox.GetArrayLength()];
                 var i = 0;
                 foreach (var element in hitbox.EnumerateArray())
-                    boxes[i++] = ParseOneBox(element, path);
+                    boxes[i++] = ParseOneBox(element, path, limit, field);
                 return boxes;
             }
             case JsonValueKind.Object:
-                return [ParseOneBox(hitbox, path)];
+                return [ParseOneBox(hitbox, path, limit, field)];
             default:
-                throw new InvalidOperationException($"Block '{path}' has a hitbox that is neither an object nor an array.");
+                throw new InvalidOperationException($"Block '{path}' has a {field} that is neither an object nor an array.");
         }
     }
 
-    private static BlockHitbox ParseOneBox(JsonElement element, string path)
+    private static BlockHitbox ParseOneBox(JsonElement element, string path, float limit, string field)
     {
         if (element.ValueKind != JsonValueKind.Object)
-            throw new InvalidOperationException($"Block '{path}' has a hitbox entry that is not an object.");
+            throw new InvalidOperationException($"Block '{path}' has a {field} entry that is not an object.");
         if (!element.TryGetProperty("min", out var minElement) || !element.TryGetProperty("max", out var maxElement))
-            throw new InvalidOperationException($"Block '{path}' has a hitbox entry without min and max.");
-        var min = ReadBoxCorner(minElement, "min", path);
-        var max = ReadBoxCorner(maxElement, "max", path);
+            throw new InvalidOperationException($"Block '{path}' has a {field} entry without min and max.");
+        var min = ReadBoxCorner(minElement, field + ".min", path, limit);
+        var max = ReadBoxCorner(maxElement, field + ".max", path, limit);
         if (min.X >= max.X || min.Y >= max.Y || min.Z >= max.Z)
-            throw new InvalidOperationException($"Block '{path}' has a hitbox whose min {min} is not below its max {max}.");
+            throw new InvalidOperationException($"Block '{path}' has a {field} whose min {min} is not below its max {max}.");
         return new BlockHitbox(min, max);
     }
 
-    private static Vector3 ReadBoxCorner(JsonElement element, string field, string path)
+    private static Vector3 ReadBoxCorner(JsonElement element, string field, string path, float limit)
     {
         if (element.ValueKind != JsonValueKind.Array || element.GetArrayLength() != 3)
-            throw new InvalidOperationException($"Block '{path}' has a hitbox.{field} that is not a 3-number array.");
+            throw new InvalidOperationException($"Block '{path}' has a {field} that is not a 3-number array.");
         var values = new float[3];
         var i = 0;
         foreach (var number in element.EnumerateArray())
         {
             if (number.ValueKind != JsonValueKind.Number)
-                throw new InvalidOperationException($"Block '{path}' has a hitbox.{field} that is not a 3-number array.");
+                throw new InvalidOperationException($"Block '{path}' has a {field} that is not a 3-number array.");
             var value = number.GetSingle();
-            if (!float.IsFinite(value) || value < 0f || value > 1f)
-                throw new InvalidOperationException($"Block '{path}' has a hitbox.{field} value {value}; expected 0..1.");
+            if (!float.IsFinite(value) || value < 0f || value > limit)
+                throw new InvalidOperationException($"Block '{path}' has a {field} value {value}; expected 0..{limit}.");
             values[i++] = value;
         }
         return new Vector3(values[0], values[1], values[2]);

@@ -1,14 +1,35 @@
 {
   // Alloy furnace: a 3x3x3 multiblock of alloy_bricks converted in place by the multiblock
   // converter. Only this cell - the volume's minimum corner on every axis - is the anchor, and
-  // it carries the WHOLE 3x3x3 model (authored in 0..48 model units with the opening on north).
+  // it carries the WHOLE 3x3x3 model (authored in 0..48 model units with the firemouth on north).
   // The other 26 cells hold alloy_furnace_part. The cube's center may be built of a brick or
   // left empty: conversion hands an interior brick back, and a revert leaves the center empty.
   // Mining any cell drops one alloy_bricks and reverts the other shell cells.
   "name": "Alloy Furnace",
   "model": "block/alloy_furnace",
   "renderer": "multiblock",
-  "multiblock": { "part": "block/alloy_furnace_part", "source": "block/alloy_bricks", "size": 3 },
+  "multiblock": {
+    "part": "block/alloy_furnace_part",
+    "source": "block/alloy_bricks",
+    "size": 3,
+    // The furnace's pieces (models/block/alloy_furnace.json: plinth, body, four corner buttresses, the
+    // firemouth frame standing proud of the body, copper course, two roof tiers, chimney), in volume cell
+    // space, front on north. Every cell of the structure collides, outlines and is aimed at by the piece of
+    // these that lies inside it; the firemouth stays solid.
+    "boxes": [
+      { "min": [0, 0, 0], "max": [3, 0.25, 3] },
+      { "min": [0.1875, 0.25, 0.1875], "max": [2.8125, 1.875, 2.8125] },
+      { "min": [0, 0.25, 0], "max": [0.375, 1.625, 0.375] },
+      { "min": [2.625, 0.25, 0], "max": [3, 1.625, 0.375] },
+      { "min": [0, 0.25, 2.625], "max": [0.375, 1.625, 3] },
+      { "min": [2.625, 0.25, 2.625], "max": [3, 1.625, 3] },
+      { "min": [0.5, 0.25, 0.0625], "max": [2.5, 1.875, 0.1875] },
+      { "min": [0.125, 1.875, 0.125], "max": [2.875, 2, 2.875] },
+      { "min": [0.4375, 2, 0.4375], "max": [2.5625, 2.3125, 2.5625] },
+      { "min": [0.75, 2.3125, 0.75], "max": [2.25, 2.5625, 2.25] },
+      { "min": [1.0625, 2.5625, 1.0625], "max": [1.9375, 3, 1.9375] }
+    ]
+  },
   // A bigger hearth that burns twice the plain kiln's fuel, melts half again as fast and is the
   // only kiln that takes two metals at once and alloys them.
   "kiln": { "fuelCap": 8, "meltSpeed": 1.5, "canAlloy": true },
@@ -19,9 +40,10 @@
   "tools": { "pickaxe": 1 },
   "sfx": "hit_rock",
   "loot": "alloy_furnace",
-  // Like the kiln: its quads carry no cullface and are lit from the anchor cell, so light has
-  // to reach that cell.
-  "occludes": true,
-  "castsAO": true,
+  // Like the kiln: the shape stands inside its cells, so no cell hides a neighbor's face or darkens the
+  // ground around it; its quads carry no cullface and are lit from the anchor cell, so light has to reach
+  // that cell.
+  "occludes": false,
+  "castsAO": false,
   "light": { "passes": true }
 }

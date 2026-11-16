@@ -126,8 +126,15 @@ fully opaque and tileable on both axes.
   horn, so every part must read on its own. Keep it symmetric.
 - [ ] **Bellows** — `bellows_side.png`, `bellows_top.png` on a plain cube (`blocks/bellows.json`); the block wants a
   real model (boards and a pleated bag) later. Made by `tools/generate-bellows-textures.py`.
-- [ ] **Bloomery tuyere** — `bloomery_tuyere.png`, the floor of the hole sunk into each side wall of the bloomery
-  (`models/block/bloomery.json`), drawn as a full tile on an 8x8-unit quad. Made by `tools/generate-bellows-textures.py`.
+- [ ] **Bloomery tuyere** — `bloomery_tuyere.png`, the end of the clay nozzle standing out of each side wall of the
+  bloomery (`models/block/bloomery.json`), drawn as a full tile on an 8x8-unit quad. Made by
+  `tools/generate-bellows-textures.py`.
+- [ ] **Multiblock model tiles** — made by `tools/generate-furnace-textures.py` for the kiln, bloomery and alloy
+  furnace models: `kiln_soot.png` (the floor and inner walls of a flue, throat or chimney well), `kiln_daub.png` (the
+  mud brick kiln's dome plaster), `bloomery_band.png` (the iron hoops round the bloomery's stack) and
+  `alloy_band.png` (the copper course and the firemouth header of the alloy furnace): both straps repeat every 4
+  rows, because a 2-unit band samples whichever rows its height lands on. `ember_bed.png` is the glowing coals drawn
+  self-lit on a lit hearth, about half a block per tile.
 - [ ] **Cloud block** — `cloud_block.png`. A soft white mottle whose alpha is about 0.7; keep the
   alpha, since it is drawn in the translucent pass.
 - [ ] **Slime block** — `slime_block.png`. Opaque, green gel in 4x4-texel cells with rims and

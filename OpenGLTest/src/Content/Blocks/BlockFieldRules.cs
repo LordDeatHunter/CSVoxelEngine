@@ -67,8 +67,8 @@ internal static class BlockFieldRules
     /// A multiblock is a structure built out of a cube of cells: the anchor names the part that fills
     /// the others and the plain block it is built from and reverts to, and only an anchor can
     /// be a kiln. Both halves are ordinary solid full cells to everything but the mesher, so the
-    /// anchor's surface really does cover its neighbors - which cutout, translucent and fluid would
-    /// all break.
+    /// anchor's surface may cover its neighbors (unless its shape steps in, <c>multiblock.boxes</c>)
+    /// - which cutout, translucent and fluid would all break.
     /// </summary>
     internal static void ValidateMultiblock(BlockDefinition definition, BlockRenderer renderer, string path)
     {
@@ -92,7 +92,7 @@ internal static class BlockFieldRules
                 $"Block '{path}' uses a multiblock renderer without hasItem: false; a structure is built from its source block, never held.");
         if ((definition.Cutout ?? false) || (definition.Translucent ?? false) || (definition.Fluid ?? false))
             throw new InvalidOperationException(
-                $"Block '{path}' uses a multiblock renderer with cutout, translucent or fluid; a multiblock cell must be an opaque solid so the structure occludes its neighbors.");
+                $"Block '{path}' uses a multiblock renderer with cutout, translucent or fluid; a multiblock cell must be an opaque solid.");
     }
 
     /// <summary>

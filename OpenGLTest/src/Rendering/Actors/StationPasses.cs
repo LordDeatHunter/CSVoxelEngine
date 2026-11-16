@@ -25,7 +25,7 @@ namespace VoxelEngine.Rendering.Actors;
 /// <summary>
 /// The station draws of the entity pass: the food cooking on a campfire, every quern's spinning
 /// top and waiting input, what a kiln holds (the crucible bowl, its molten pool, the charge
-/// still melting and the stored fuel) and what sits in a mold's pocket. Owns the quern-top and
+/// still melting, the stored fuel and the ember bed of a lit hearth) and what sits in a mold's pocket. Owns the quern-top and
 /// crucible meshes and the molten quads it draws; the world program and the item and block
 /// caches stay owned by <see cref="RenderManager"/>. Render thread only.
 /// </summary>
@@ -46,6 +46,10 @@ internal sealed class StationPasses : IDisposable
     // first sight. Both the crucible's pool and a mold's fill draw it, scaled and lifted.
     private readonly Dictionary<byte, Mesh> _moltenQuads = new();
 
+    // The glowing coals on a lit hearth: one flat quad wearing the ember tile, built on first sight. A kiln, an
+    // alloy furnace and a bloomery (SmithingPasses) all draw it, scaled to their hearth.
+    private Mesh? _emberQuad;
+
     private TextureUnits Units => _owner.Units;
 
     /// <summary>
@@ -53,7 +57,7 @@ internal sealed class StationPasses : IDisposable
     /// an item's own sprite texture, or the world atlas - a no-op while that is already bound,
     /// so a run of block results never rebinds. Null when the id has no mesh.
     /// </summary>
-    private Mesh? BindStationMesh(ushort id, ref bool atlasBound)
+    internal Mesh? BindStationMesh(ushort id, ref bool atlasBound)
     {
         if (ItemRegistry.IsItem(id))
         {
@@ -68,7 +72,7 @@ internal sealed class StationPasses : IDisposable
     }
 
     /// <summary>Rebinds the world atlas after an item mesh left its own texture on unit 0.</summary>
-    private void BindAtlas(ref bool atlasBound)
+    internal void BindAtlas(ref bool atlasBound)
     {
         if (atlasBound) return;
         _owner.BindWorldTextures();
@@ -343,6 +347,32 @@ internal sealed class StationPasses : IDisposable
     }
 
     /// <summary>
+    /// Draws the ember bed of a lit hearth: ember quads laid side by side over <paramref name="size"/> (across
+    /// the opening, then into it; <see cref="KilnRenderer.EmberGrid"/> keeps each near
+    /// <see cref="KilnRenderer.EmberTileSize"/>, so a wide hearth is not one stretched tile), turned to the
+    /// structure's <paramref name="yaw"/> and centered on <paramref name="center"/>, self-lit and faded to
+    /// <paramref name="alpha"/>. The world atlas must be bound.
+    /// </summary>
+    internal void DrawEmberBed(Vector3 center, Vector2 size, float yaw, float alpha, Matrix4x4 viewProj)
+    {
+        _emberQuad ??= Primitives.CreateFlatQuad(_gl, Rgba.FromFloat(1f, 1f, 1f, 1f),
+            UvRect.Tile(TextureAtlas.TileOf("ember_bed")));
+        var (columns, rows) = KilnRenderer.EmberGrid(size);
+        var cell = new Vector2(size.X / columns, size.Y / rows);
+        var place = Matrix4x4.CreateRotationY(yaw) * Matrix4x4.CreateTranslation(center);
+        for (var row = 0; row < rows; row++)
+        for (var column = 0; column < columns; column++)
+        {
+            var model = Matrix4x4.CreateScale(cell.X, 1f, cell.Y)
+                        * Matrix4x4.CreateTranslation((column + 0.5f) * cell.X - size.X * 0.5f, 0f,
+                            (row + 0.5f) * cell.Y - size.Y * 0.5f)
+                        * place;
+            _owner.SetDrawUniforms(model, model * viewProj, alpha, EntityLightSample.SelfLit);
+            _emberQuad.Render();
+        }
+    }
+
+    /// <summary>
     /// Draws what a kiln holds inside its opening: the crucible bowl, the molten pool rising in
     /// it, the lump of solid charge still waiting to melt over its rim, and the stored fuel
     /// lying on the hearth. The pool's height comes from
@@ -369,6 +399,10 @@ internal sealed class StationPasses : IDisposable
 
             // One sample per kiln, at its mouth (KilnLayout.MouthLocal)
             var light = _owner.LightAt(layout.ToWorld(anchor, facing, layout.MouthLocal));
+
+            if (state.Lit)
+                DrawEmberBed(layout.ToWorld(anchor, facing, layout.EmberLocal), layout.EmberSize,
+                    KilnRenderer.OpeningYaw(facing), 1f, viewProj);
 
             if (state.HasCrucible)
             {
@@ -430,9 +464,8 @@ internal sealed class StationPasses : IDisposable
             var fuelMesh = BindStationMesh(state.FuelItemId, ref atlasBound);
             if (fuelMesh == null) continue;
 
-            // Spread the stored units across the back of the hearth; sprites lie face-up on the
-            // floor, cubes stand on it, both turned to the opening.
-            var along = MultiblockShape.RotateDirection(Vector3.UnitX, facing);
+            // The stored units lie in rows on the hearth floor (KilnLayout.FuelSlotLocal); sprites lie face-up
+            // on it, cubes stand on it, both turned to the opening.
             var yaw = KilnRenderer.OpeningYaw(facing);
             var orient = fuelIsItem
                 ? SpritePose.LyingFaceUp(yaw)
@@ -440,103 +473,16 @@ internal sealed class StationPasses : IDisposable
             var lift = fuelIsItem
                 ? SpritePose.RestingLift(KilnRenderer.FuelSize)
                 : KilnRenderer.FuelSize * 0.5f;
-            var basePos = layout.ToWorld(anchor, facing, layout.FuelLocal)
-                        + new Vector3(0f, lift, 0f);
             for (var i = 0; i < state.Fuel; i++)
             {
                 var placed = Matrix4x4.CreateScale(KilnRenderer.FuelSize)
                             * orient
                             * Matrix4x4.CreateTranslation(
-                                basePos + along * ((i - (state.Fuel - 1) * 0.5f) * KilnRenderer.FuelSpacing));
+                                layout.ToWorld(anchor, facing, layout.FuelSlotLocal(i, state.Fuel))
+                                + new Vector3(0f, lift, 0f));
                 _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
                 fuelMesh.Render();
             }
-        }
-    }
-
-    // Smithing props: a bloomery's loaded ore and fuel lie in two rows on its hearth, its finished blooms and slag
-    // in the ore row; a bloom on an anvil lies face-up on the top and shrinks as the hammer works it, and a metal stack
-    // piles up there piece by piece
-    private const float SmithingPieceSize = KilnRenderer.FuelSize;
-    private const float OreRowBackShift = 0.27f;
-    private const float AnvilTopY = 15f / 16f;
-    private const float AnvilPieceSize = 0.36f;
-    // Radians each piece of an anvil's metal stack turns against the one below, so the pile reads as separate pieces
-    private const float AnvilStackTwist = 0.18f;
-
-    /// <summary>
-    /// Draws the iron works' props: the ore and fuel standing in each bloomery's shaft (and, once a run is done, its
-    /// blooms, in the ore row), and the metal stacked on each anvil, one piece per unit. Nothing
-    /// is drawn for the anvil or the shaft themselves: they are the block's own model.
-    /// </summary>
-    internal void RenderSmithing(Camera camera, SmithingStations smithing)
-    {
-        if (camera == null || smithing == null || !smithing.HasAny) return;
-
-        _owner.WorldShader.Use();
-        _owner.BindWorldTextures();
-
-        var viewProj = camera.GetViewProjection();
-        var atlasBound = true;
-        var layout = KilnLayout.Kiln;
-
-        foreach (var (anchor, facing, state) in smithing.Bloomeries.View())
-        {
-            var light = _owner.LightAt(layout.ToWorld(anchor, facing, layout.MouthLocal));
-            var yaw = KilnRenderer.OpeningYaw(facing);
-            var along = MultiblockShape.RotateDirection(Vector3.UnitX, facing);
-            var back = MultiblockShape.RotateDirection(Vector3.UnitZ, facing);
-            var rowBase = layout.ToWorld(anchor, facing, layout.FuelLocal);
-
-            DrawRow(state.FuelItemId, state.Fuel, rowBase, along, yaw, light, viewProj, ref atlasBound);
-            var oreRow = rowBase - back * OreRowBackShift;
-            DrawRow(state.Profile.OreId, state.Ore, oreRow, along, yaw, light, viewProj, ref atlasBound);
-            // The output waits where the ore stood
-            DrawRow(state.Profile.BloomId, state.Blooms, oreRow, along, yaw, light, viewProj, ref atlasBound);
-        }
-
-        foreach (var (cell, state) in smithing.Anvils.View())
-            if (state.MetalCount > 0)
-                DrawAnvilStack(cell, state.MetalId, state.MetalCount, viewProj, ref atlasBound);
-    }
-
-    // A metal stack on an anvil: one face-up piece per unit, each resting on the one below and turned a little against
-    // it, so the pile grows with every piece laid on
-    private void DrawAnvilStack(Vector3 cell, ushort metalId, int count, Matrix4x4 viewProj, ref bool atlasBound)
-    {
-        if (BindStationMesh(metalId, ref atlasBound) is not { } mesh) return;
-
-        var light = _owner.LightAt(cell + new Vector3(0.5f, 1.2f, 0.5f));
-        var lift = SpritePose.RestingLift(AnvilPieceSize);
-        var step = SpritePose.HalfThickness(AnvilPieceSize, SpritePose.ItemSpriteFrame) * 2f + SpritePose.RestingClearance;
-        for (var i = 0; i < count; i++)
-        {
-            var yaw = (i % 2 == 0 ? 1f : -1f) * AnvilStackTwist * (i % 3);
-            var placed = Matrix4x4.CreateScale(AnvilPieceSize)
-                         * SpritePose.LyingFaceUp(yaw)
-                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, AnvilTopY + lift + i * step, 0.5f));
-            _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
-            mesh.Render();
-        }
-    }
-
-    // One row of up to `count` flat pieces of item `id`, centered on `center` and spread along `along`
-    private void DrawRow(ushort id, int count, Vector3 center, Vector3 along, float yaw, EntityLightSample light,
-        Matrix4x4 viewProj, ref bool atlasBound)
-    {
-        if (count <= 0 || id == 0 || BindStationMesh(id, ref atlasBound) is not { } mesh) return;
-
-        var isItem = ItemRegistry.IsItem(id);
-        var orient = isItem ? SpritePose.LyingFaceUp(yaw) : Matrix4x4.CreateRotationY(yaw);
-        var lift = isItem ? SpritePose.RestingLift(SmithingPieceSize) : SmithingPieceSize * 0.5f;
-        for (var i = 0; i < count; i++)
-        {
-            var placed = Matrix4x4.CreateScale(SmithingPieceSize)
-                         * orient
-                         * Matrix4x4.CreateTranslation(center + new Vector3(0f, lift, 0f)
-                             + along * ((i - (count - 1) * 0.5f) * KilnRenderer.FuelSpacing));
-            _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
-            mesh.Render();
         }
     }
 
@@ -596,13 +542,14 @@ internal sealed class StationPasses : IDisposable
         _owner.WorldShader.SetUniform(_owner.LocAlpha, 1f);
     }
 
-    /// <summary>Frees the quern top, the crucible bowl and every molten quad built so far, in
+    /// <summary>Frees the quern top, the crucible bowl, the ember quad and every molten quad built so far, in
     /// the order the renderer always freed them.</summary>
     public void Dispose()
     {
         _quernTop?.Dispose();
         _crucibleMesh?.Dispose();
         _bonePileMesh?.Dispose();
+        _emberQuad?.Dispose();
         foreach (var quad in _moltenQuads.Values)
             quad.Dispose();
         _moltenQuads.Clear();

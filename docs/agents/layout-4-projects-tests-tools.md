@@ -222,6 +222,8 @@ tools/                                # asset generators: models, animation clip
                                       #   cut from the same faces; stdlib PNG writer; listed in USER_TODO.md; --check
   generate-tower-lock-textures.py     # deterministic placeholder tower_door (portcullis cutout), skeleton_pile and
                                       #   tower_altar_top tiles, stdlib PNG writer, small palettes; listed in USER_TODO.md; --check
+  generate-furnace-textures.py        # deterministic placeholder kiln_soot, kiln_daub, bloomery_band, alloy_band and
+                                      #   ember_bed tiles for the multiblock models; stdlib PNG; listed in USER_TODO.md; --check
   generate-bellows-textures.py        # deterministic placeholder bellows_side/bellows_top and bloomery_tuyere tiles, read off
                                       #   the committed planks, bricks and fired mud; stdlib PNG; listed in USER_TODO.md; --check
   generate-critter-models.py          # deterministic dragonfly, crow and deer .bbmodels (their own bone sets around the

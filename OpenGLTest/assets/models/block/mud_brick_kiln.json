@@ -1,30 +1,36 @@
 {
-  // Mud brick kiln: the anchor model of a 2x2x2 multiblock, so it is authored in 0..32 model
-  // units (two cells on every axis, the anchor cell's origin at 0) with the opening on the
-  // NORTH (-Z) face. ContentRegistry pre-rotates the bake to the other three facings
-  // (MultiblockShape.Rotate), so this file is the only orientation ever written by hand.
+  // Mud brick kiln, a beehive kiln: the anchor model of a 2x2x2 multiblock, so it is authored in 0..32 model
+  // units (two cells on every axis, the anchor cell's origin at 0) with the mouth on the NORTH (-Z) face.
+  // ContentRegistry pre-rotates the bake to the other three facings (MultiblockShape.Rotate), so this file is
+  // the only orientation ever written by hand.
   //
-  // Two rules the bake validation enforces: no face may carry a "cullface" (a multiblock's
-  // cell neighbors are its own part cells, so a cullface would test the wrong thing), and no
-  // face may cover a whole cell face (a rotated quad's corners leave Chunk.CubeFaces order, so
-  // every multiblock quad has to shade flat).
+  // Two rules the bake validation enforces: no face may carry a "cullface" (a multiblock's cell neighbors are
+  // its own part cells, so a cullface would test the wrong thing), and no face may cover a whole cell face (a
+  // rotated quad's corners leave Chunk.CubeFaces order, so every multiblock quad has to shade flat).
   //
-  // No face declares "uv": the baker's defaults span two tile units across a two-cell box and
-  // the sampler's REPEAT tiles the bricks once per cell.
+  // No face declares "uv": the baker's defaults follow the element's position, so the bricks run on across
+  // elements and the sampler's REPEAT tiles them once per cell.
   //
-  // The opening is x 8..24, y 2..18, z 0..12 - cell space [0.5,1.5] x [0.125,1.125] x [0,0.75],
-  // the numbers KilnRenderer mirrors. Every face omitted below is buried inside another element.
+  // The shape, bottom to top: a brick plinth (y 0..3), the brick body (inset 2, y 3..24), two daub dome tiers
+  // (inset 5 to y 28, inset 9 to y 30) and a flue collar (x/z 11..21, y 30..32) around a sooty well. The block's
+  // multiblock.boxes (data/blocks/mud_brick_kiln.json) trace the same five tiers.
+  //
+  // The mouth is x 8..24, y 4..19, z 0..20 - cell space [0.5,1.5] x [0.25,1.1875] x [0,1.25], the numbers
+  // KilnLayout.Kiln mirrors - under a stepped vault (x 10..22 up to y 21) and behind a fired frame standing one
+  // unit proud of the body. Every face omitted below is buried inside another element.
   "textures": {
     "brick": "mud_bricks",
-    "hearth": "fired_mud"
+    "hearth": "fired_mud",
+    "daub": "kiln_daub",
+    "soot": "kiln_soot"
   },
   "elements": [
-    // Back body: the solid rear half. Its north side is hidden by the two piers, the lintel,
-    // the hearth floor and the hearth's back wall.
+    // Plinth
     {
-      "from": [0, 0, 12],
-      "to": [32, 32, 32],
+      "from": [0, 0, 0],
+      "to": [32, 3, 32],
       "faces": {
+        "north": { "texture": "#brick" },
         "south": { "texture": "#brick" },
         "west": { "texture": "#brick" },
         "east": { "texture": "#brick" },
@@ -32,57 +38,221 @@
         "down": { "texture": "#brick" }
       }
     },
-    // Hearth back wall: the single north-facing quad seen through the opening, fired by the
-    // fire in front of it.
+    // Body, back: the solid rear behind the chamber
     {
-      "from": [8, 2, 12],
-      "to": [24, 18, 13],
+      "from": [2, 3, 20],
+      "to": [30, 24, 30],
       "faces": {
-        "north": { "texture": "#hearth" }
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#brick" }
       }
     },
-    // Left pier, west of the opening; its inner (east) side is fired.
+    // Body, left pier, west of the mouth; its inner (east) side is fired
     {
-      "from": [0, 0, 0],
-      "to": [8, 32, 12],
+      "from": [2, 3, 2],
+      "to": [8, 24, 20],
       "faces": {
         "north": { "texture": "#brick" },
         "west": { "texture": "#brick" },
         "east": { "texture": "#hearth" },
-        "up": { "texture": "#brick" },
-        "down": { "texture": "#brick" }
+        "up": { "texture": "#brick" }
       }
     },
-    // Right pier, east of the opening; its inner (west) side is fired.
+    // Body, right pier, east of the mouth; its inner (west) side is fired
     {
-      "from": [24, 0, 0],
-      "to": [32, 32, 12],
+      "from": [24, 3, 2],
+      "to": [30, 24, 20],
       "faces": {
         "north": { "texture": "#brick" },
         "east": { "texture": "#brick" },
         "west": { "texture": "#hearth" },
-        "up": { "texture": "#brick" },
-        "down": { "texture": "#brick" }
+        "up": { "texture": "#brick" }
       }
     },
-    // Lintel over the opening; its underside is fired.
+    // Body, lintel over the vault; its underside is fired
     {
-      "from": [8, 18, 0],
-      "to": [24, 32, 12],
+      "from": [8, 21, 2],
+      "to": [24, 24, 20],
       "faces": {
         "north": { "texture": "#brick" },
         "up": { "texture": "#brick" },
         "down": { "texture": "#hearth" }
       }
     },
-    // Hearth floor: the ledge the fire, the fuel and (later) the crucible sit on.
+    // Vault steps: the two fired corbels that narrow the mouth above y 19
     {
-      "from": [8, 0, 0],
-      "to": [24, 2, 12],
+      "from": [8, 19, 2],
+      "to": [10, 21, 20],
       "faces": {
-        "north": { "texture": "#brick" },
+        "north": { "texture": "#hearth" },
+        "east": { "texture": "#hearth" },
+        "down": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [22, 19, 2],
+      "to": [24, 21, 20],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "west": { "texture": "#hearth" },
+        "down": { "texture": "#hearth" }
+      }
+    },
+    // Chamber back wall: the two north-facing quads seen through the mouth, below and inside the vault
+    {
+      "from": [8, 4, 20],
+      "to": [24, 19, 21],
+      "faces": {
+        "north": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [10, 19, 20],
+      "to": [22, 21, 21],
+      "faces": {
+        "north": { "texture": "#hearth" }
+      }
+    },
+    // Hearth floor: what the crucible, the fire and the fuel stand on
+    {
+      "from": [8, 3, 2],
+      "to": [24, 4, 20],
+      "faces": {
+        "up": { "texture": "#hearth" }
+      }
+    },
+    // Hearth lip: the floor carried out over the plinth to the front of the volume
+    {
+      "from": [8, 3, 0],
+      "to": [24, 4, 2],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "west": { "texture": "#hearth" },
+        "east": { "texture": "#hearth" },
+        "up": { "texture": "#hearth" }
+      }
+    },
+    // Mouth frame: two jambs, the shoulders under the vault steps and the header, one unit proud of the body
+    {
+      "from": [6, 3, 1],
+      "to": [8, 21, 2],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "west": { "texture": "#hearth" },
+        "east": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [24, 3, 1],
+      "to": [26, 21, 2],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "west": { "texture": "#hearth" },
+        "east": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [8, 19, 1],
+      "to": [10, 21, 2],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "east": { "texture": "#hearth" },
+        "down": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [22, 19, 1],
+      "to": [24, 21, 2],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "west": { "texture": "#hearth" },
+        "down": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [6, 21, 1],
+      "to": [26, 23, 2],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "west": { "texture": "#hearth" },
+        "east": { "texture": "#hearth" },
         "up": { "texture": "#hearth" },
-        "down": { "texture": "#brick" }
+        "down": { "texture": "#hearth" }
+      }
+    },
+    // Dome, lower tier
+    {
+      "from": [5, 24, 5],
+      "to": [27, 28, 27],
+      "faces": {
+        "north": { "texture": "#daub" },
+        "south": { "texture": "#daub" },
+        "west": { "texture": "#daub" },
+        "east": { "texture": "#daub" },
+        "up": { "texture": "#daub" }
+      }
+    },
+    // Dome, upper tier
+    {
+      "from": [9, 28, 9],
+      "to": [23, 30, 23],
+      "faces": {
+        "north": { "texture": "#daub" },
+        "south": { "texture": "#daub" },
+        "west": { "texture": "#daub" },
+        "east": { "texture": "#daub" },
+        "up": { "texture": "#daub" }
+      }
+    },
+    // Flue collar: four walls around the well, their inner sides sooty
+    {
+      "from": [11, 30, 11],
+      "to": [21, 32, 13],
+      "faces": {
+        "north": { "texture": "#daub" },
+        "south": { "texture": "#soot" },
+        "west": { "texture": "#daub" },
+        "east": { "texture": "#daub" },
+        "up": { "texture": "#daub" }
+      }
+    },
+    {
+      "from": [11, 30, 19],
+      "to": [21, 32, 21],
+      "faces": {
+        "south": { "texture": "#daub" },
+        "north": { "texture": "#soot" },
+        "west": { "texture": "#daub" },
+        "east": { "texture": "#daub" },
+        "up": { "texture": "#daub" }
+      }
+    },
+    {
+      "from": [11, 30, 13],
+      "to": [13, 32, 19],
+      "faces": {
+        "west": { "texture": "#daub" },
+        "east": { "texture": "#soot" },
+        "up": { "texture": "#daub" }
+      }
+    },
+    {
+      "from": [19, 30, 13],
+      "to": [21, 32, 19],
+      "faces": {
+        "east": { "texture": "#daub" },
+        "west": { "texture": "#soot" },
+        "up": { "texture": "#daub" }
+      }
+    },
+    // Flue well floor, a hair over the dome's top so the two never share a plane
+    {
+      "from": [13, 30, 13],
+      "to": [19, 30.25, 19],
+      "faces": {
+        "up": { "texture": "#soot" }
       }
     }
   ]

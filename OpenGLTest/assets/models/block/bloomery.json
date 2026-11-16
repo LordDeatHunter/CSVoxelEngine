@@ -1,190 +1,209 @@
 {
-  // Bloomery: the anchor model (the mud brick kiln's shape in fired bloomery brick) of a 2x2x2 multiblock, so it is authored in 0..32 model
-  // units (two cells on every axis, the anchor cell's origin at 0) with the opening on the
-  // NORTH (-Z) face. ContentRegistry pre-rotates the bake to the other three facings
-  // (MultiblockShape.Rotate), so this file is the only orientation ever written by hand.
+  // Bloomery, a shaft furnace: the anchor model of a 2x2x2 multiblock, so it is authored in 0..32 model units
+  // (two cells on every axis, the anchor cell's origin at 0) with the tapping arch on the NORTH (-Z) face.
+  // ContentRegistry pre-rotates the bake to the other three facings (MultiblockShape.Rotate), so this file is
+  // the only orientation ever written by hand.
   //
-  // Two rules the bake validation enforces: no face may carry a "cullface" (a multiblock's
-  // cell neighbors are its own part cells, so a cullface would test the wrong thing), and no
-  // face may cover a whole cell face (a rotated quad's corners leave Chunk.CubeFaces order, so
-  // every multiblock quad has to shade flat).
+  // Two rules the bake validation enforces: no face may carry a "cullface" (a multiblock's cell neighbors are
+  // its own part cells, so a cullface would test the wrong thing), and no face may cover a whole cell face (a
+  // rotated quad's corners leave Chunk.CubeFaces order, so every multiblock quad has to shade flat).
   //
-  // No face declares "uv": the baker's defaults span two tile units across a two-cell box and
-  // the sampler's REPEAT tiles the bricks once per cell.
+  // No face declares "uv" but the tuyere ends: the baker's defaults follow the element's position, so the
+  // bricks run on across elements, and the iron hoops (bloomery_band repeats every 2 units) sit on even heights.
   //
-  // The opening is x 8..24, y 2..18, z 0..12 - cell space [0.5,1.5] x [0.125,1.125] x [0,0.75],
-  // the numbers KilnRenderer mirrors. Every face omitted below is buried inside another element.
+  // The shape, bottom to top: a plinth (y 0..4), the hearth tier (inset 3, y 4..14), an iron hoop (inset 2,
+  // y 14..16), the middle tier (inset 5, y 16..24), a second hoop (inset 4, y 24..26) and the top tier (inset 7,
+  // y 26..32) around the open throat, a well x/z 11..21 whose sooty floor is at y 26.25. The block's
+  // multiblock.boxes (data/blocks/bloomery.json) trace the tiers and the two nozzles.
   //
-  // The two tuyeres (the blocks/bloomery.json "tuyeres", where a bellows works it) are holes sunk one unit into the
-  // back lower cell of each side wall (y 3..11, z 20..28): the back body is a core one unit in from each side, skinned by
-  // four brick strips per side that leave the hole open, its walls fired and its floor the hole tile (full tile, so
-  // "uv" is given). A model may not leave its volume, so the holes go in rather than standing out.
+  // The tapping arch is x 10..22, y 5..12, z 3..15 and the throat well x/z 11..21 from y 26.25 up: the numbers
+  // BloomeryLayout mirrors. The two tuyeres (blocks/bloomery.json "tuyeres", where a bellows works it) are clay
+  // nozzles standing out of the hearth tier to the side faces of the volume, at the back lower cell of each side
+  // wall (y 4..12, z 20..28), their ends the hole tile (a full tile, so "uv" is given).
+  // Every face omitted below is buried inside another element.
   "textures": {
     "brick": "bloomery_bricks",
     "hearth": "fired_mud",
+    "band": "bloomery_band",
+    "soot": "kiln_soot",
     "tuyere": "bloomery_tuyere"
   },
   "elements": [
-    // Back body core: the solid rear half, one unit in from each side wall. Its north side is hidden by the two piers,
-    // the lintel, the hearth floor and the hearth's back wall; its sides by the skin strips and the tuyere holes.
-    {
-      "from": [1, 0, 12],
-      "to": [31, 32, 32],
-      "faces": {
-        "south": { "texture": "#brick" },
-        "up": { "texture": "#brick" },
-        "down": { "texture": "#brick" }
-      }
-    },
-    // West skin, below the tuyere
-    {
-      "from": [0, 0, 12],
-      "to": [1, 3, 32],
-      "faces": {
-        "west": { "texture": "#brick" },
-        "south": { "texture": "#brick" },
-        "down": { "texture": "#brick" },
-        "up": { "texture": "#hearth" }
-      }
-    },
-    // West skin, above the tuyere
-    {
-      "from": [0, 11, 12],
-      "to": [1, 32, 32],
-      "faces": {
-        "west": { "texture": "#brick" },
-        "south": { "texture": "#brick" },
-        "up": { "texture": "#brick" },
-        "down": { "texture": "#hearth" }
-      }
-    },
-    // West skin, in front of the tuyere
-    {
-      "from": [0, 3, 12],
-      "to": [1, 11, 20],
-      "faces": {
-        "west": { "texture": "#brick" },
-        "south": { "texture": "#hearth" }
-      }
-    },
-    // West skin, behind the tuyere
-    {
-      "from": [0, 3, 28],
-      "to": [1, 11, 32],
-      "faces": {
-        "west": { "texture": "#brick" },
-        "south": { "texture": "#brick" },
-        "north": { "texture": "#hearth" }
-      }
-    },
-    // West tuyere: the hole's floor, against the bellows cell [-1, 0, 1]
-    {
-      "from": [1, 3, 20],
-      "to": [1, 11, 28],
-      "faces": {
-        "west": { "uv": [0, 0, 16, 16], "texture": "#tuyere" }
-      }
-    },
-    // East skin, below the tuyere
-    {
-      "from": [31, 0, 12],
-      "to": [32, 3, 32],
-      "faces": {
-        "east": { "texture": "#brick" },
-        "south": { "texture": "#brick" },
-        "down": { "texture": "#brick" },
-        "up": { "texture": "#hearth" }
-      }
-    },
-    // East skin, above the tuyere
-    {
-      "from": [31, 11, 12],
-      "to": [32, 32, 32],
-      "faces": {
-        "east": { "texture": "#brick" },
-        "south": { "texture": "#brick" },
-        "up": { "texture": "#brick" },
-        "down": { "texture": "#hearth" }
-      }
-    },
-    // East skin, in front of the tuyere
-    {
-      "from": [31, 3, 12],
-      "to": [32, 11, 20],
-      "faces": {
-        "east": { "texture": "#brick" },
-        "south": { "texture": "#hearth" }
-      }
-    },
-    // East skin, behind the tuyere
-    {
-      "from": [31, 3, 28],
-      "to": [32, 11, 32],
-      "faces": {
-        "east": { "texture": "#brick" },
-        "south": { "texture": "#brick" },
-        "north": { "texture": "#hearth" }
-      }
-    },
-    // East tuyere: the hole's floor, against the bellows cell [2, 0, 1]
-    {
-      "from": [31, 3, 20],
-      "to": [31, 11, 28],
-      "faces": {
-        "east": { "uv": [0, 0, 16, 16], "texture": "#tuyere" }
-      }
-    },
-    // Hearth back wall: the single north-facing quad seen through the opening, fired by the
-    // fire in front of it.
-    {
-      "from": [8, 2, 12],
-      "to": [24, 18, 13],
-      "faces": {
-        "north": { "texture": "#hearth" }
-      }
-    },
-    // Left pier, west of the opening; its inner (east) side is fired.
+    // Plinth
     {
       "from": [0, 0, 0],
-      "to": [8, 32, 12],
+      "to": [32, 4, 32],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#brick" },
+        "down": { "texture": "#brick" }
+      }
+    },
+    // Hearth tier, back: the solid rear behind the arch
+    {
+      "from": [3, 4, 15],
+      "to": [29, 14, 29],
+      "faces": {
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" }
+      }
+    },
+    // Hearth tier, left pier; its inner (east) side is fired
+    {
+      "from": [3, 4, 3],
+      "to": [10, 14, 15],
       "faces": {
         "north": { "texture": "#brick" },
         "west": { "texture": "#brick" },
-        "east": { "texture": "#hearth" },
-        "up": { "texture": "#brick" },
-        "down": { "texture": "#brick" }
+        "east": { "texture": "#hearth" }
       }
     },
-    // Right pier, east of the opening; its inner (west) side is fired.
+    // Hearth tier, right pier; its inner (west) side is fired
     {
-      "from": [24, 0, 0],
-      "to": [32, 32, 12],
+      "from": [22, 4, 3],
+      "to": [29, 14, 15],
       "faces": {
         "north": { "texture": "#brick" },
         "east": { "texture": "#brick" },
-        "west": { "texture": "#hearth" },
-        "up": { "texture": "#brick" },
-        "down": { "texture": "#brick" }
+        "west": { "texture": "#hearth" }
       }
     },
-    // Lintel over the opening; its underside is fired.
+    // Hearth tier, lintel over the arch; its underside is fired
     {
-      "from": [8, 18, 0],
-      "to": [24, 32, 12],
+      "from": [10, 12, 3],
+      "to": [22, 14, 15],
       "faces": {
-        "north": { "texture": "#brick" },
-        "up": { "texture": "#brick" },
+        "north": { "texture": "#hearth" },
         "down": { "texture": "#hearth" }
       }
     },
-    // Hearth floor: the ledge the fire, the fuel and (later) the crucible sit on.
+    // Arch back wall: the north-facing quad seen through the arch
     {
-      "from": [8, 0, 0],
-      "to": [24, 2, 12],
+      "from": [10, 5, 15],
+      "to": [22, 12, 16],
+      "faces": {
+        "north": { "texture": "#hearth" }
+      }
+    },
+    // Hearth floor: what the fuel and the finished blooms lie on
+    {
+      "from": [10, 4, 3],
+      "to": [22, 5, 15],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "up": { "texture": "#hearth" }
+      }
+    },
+    // West tuyere nozzle, against the bellows cell [-1, 0, 1]
+    {
+      "from": [0, 4, 20],
+      "to": [3, 12, 28],
+      "faces": {
+        "west": { "uv": [0, 0, 16, 16], "texture": "#tuyere" },
+        "north": { "texture": "#hearth" },
+        "south": { "texture": "#hearth" },
+        "up": { "texture": "#hearth" }
+      }
+    },
+    // East tuyere nozzle, against the bellows cell [2, 0, 1]
+    {
+      "from": [29, 4, 20],
+      "to": [32, 12, 28],
+      "faces": {
+        "east": { "uv": [0, 0, 16, 16], "texture": "#tuyere" },
+        "north": { "texture": "#hearth" },
+        "south": { "texture": "#hearth" },
+        "up": { "texture": "#hearth" }
+      }
+    },
+    // Lower hoop
+    {
+      "from": [2, 14, 2],
+      "to": [30, 16, 30],
+      "faces": {
+        "north": { "texture": "#band" },
+        "south": { "texture": "#band" },
+        "west": { "texture": "#band" },
+        "east": { "texture": "#band" },
+        "up": { "texture": "#band" },
+        "down": { "texture": "#band" }
+      }
+    },
+    // Middle tier
+    {
+      "from": [5, 16, 5],
+      "to": [27, 24, 27],
       "faces": {
         "north": { "texture": "#brick" },
-        "up": { "texture": "#hearth" },
-        "down": { "texture": "#brick" }
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" }
+      }
+    },
+    // Upper hoop; its top is the ledge around the top tier and lies under the throat's floor
+    {
+      "from": [4, 24, 4],
+      "to": [28, 26, 28],
+      "faces": {
+        "north": { "texture": "#band" },
+        "south": { "texture": "#band" },
+        "west": { "texture": "#band" },
+        "east": { "texture": "#band" },
+        "up": { "texture": "#band" },
+        "down": { "texture": "#band" }
+      }
+    },
+    // Top tier: four walls around the throat, their inner sides fired
+    {
+      "from": [7, 26, 7],
+      "to": [25, 32, 11],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "south": { "texture": "#hearth" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [7, 26, 21],
+      "to": [25, 32, 25],
+      "faces": {
+        "south": { "texture": "#brick" },
+        "north": { "texture": "#hearth" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [7, 26, 11],
+      "to": [11, 32, 21],
+      "faces": {
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#hearth" },
+        "up": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [21, 26, 11],
+      "to": [25, 32, 21],
+      "faces": {
+        "east": { "texture": "#brick" },
+        "west": { "texture": "#hearth" },
+        "up": { "texture": "#hearth" }
+      }
+    },
+    // Throat floor, a hair over the upper hoop's top so the two never share a plane: what the ore charge lies on
+    {
+      "from": [11, 26, 11],
+      "to": [21, 26.25, 21],
+      "faces": {
+        "up": { "texture": "#soot" }
       }
     }
   ]

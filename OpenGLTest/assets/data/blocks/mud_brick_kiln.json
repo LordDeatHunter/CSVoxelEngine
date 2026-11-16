@@ -2,13 +2,26 @@
   // Mud brick kiln, the first multiblock: a 2x2x2 volume of mud_bricks converted in place by
   // the multiblock converter. Only this cell - the volume's minimum corner on every axis - is
   // the anchor, and it carries the WHOLE 2x2x2 model (authored in 0..32 model units with the
-  // opening on north), rotated to the facing its state byte's low two bits hold. The other
-  // seven cells hold mud_brick_kiln_part, which is solid and occludes but draws nothing.
+  // mouth on north), rotated to the facing its state byte's low two bits hold. The other
+  // seven cells hold mud_brick_kiln_part, which is solid but draws nothing.
   // Mining any of the eight cells drops one mud_bricks and reverts the other seven.
   "name": "Mud Brick Kiln",
   "model": "block/mud_brick_kiln",
   "renderer": "multiblock",
-  "multiblock": { "part": "block/mud_brick_kiln_part", "source": "block/mud_bricks" },
+  "multiblock": {
+    "part": "block/mud_brick_kiln_part",
+    "source": "block/mud_bricks",
+    // The beehive's five tiers (models/block/mud_brick_kiln.json: plinth, body, two dome tiers, flue), in
+    // volume cell space, front on north. Every cell of the structure collides, outlines and is aimed at by the
+    // piece of these that lies inside it; the mouth stays solid.
+    "boxes": [
+      { "min": [0, 0, 0], "max": [2, 0.1875, 2] },
+      { "min": [0.125, 0.1875, 0.125], "max": [1.875, 1.5, 1.875] },
+      { "min": [0.3125, 1.5, 0.3125], "max": [1.6875, 1.75, 1.6875] },
+      { "min": [0.5625, 1.75, 0.5625], "max": [1.4375, 1.875, 1.4375] },
+      { "min": [0.6875, 1.875, 0.6875], "max": [1.3125, 2, 1.3125] }
+    ]
+  },
   // The plain kiln: four fuel units, the base melt pace, one metal at a time.
   "kiln": { "fuelCap": 4, "meltSpeed": 1, "canAlloy": false },
   // A structure is built from its source block, never held in the inventory.
@@ -18,10 +31,10 @@
   "tools": { "pickaxe": 1 },
   "sfx": "hit_rock",
   "loot": "mud_brick_kiln",
-  // The anchor's surface really does cover its neighbors, so it occludes and casts AO like a
-  // full cube - but its quads carry no cullface and are lit from the anchor cell itself, so
+  // The shape stands inside its cells rather than filling them, so no cell hides a neighbor's face or
+  // darkens the ground around it. Its quads carry no cullface and are lit from the anchor cell itself, so
   // light has to reach that cell or the whole structure renders black.
-  "occludes": true,
-  "castsAO": true,
+  "occludes": false,
+  "castsAO": false,
   "light": { "passes": true }
 }

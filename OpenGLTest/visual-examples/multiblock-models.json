@@ -1,0 +1,58 @@
+{
+  // The three multiblock models: run with VOXEL_SCRIPT=visual-examples/multiblock-models.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/multiblock-models/.
+  //
+  // The flat desert patch of torches.json (sand at y 11). A cold row (mud brick kiln, bloomery, alloy furnace, all
+  // opening south) and a lit row facing it from the south (opening north), loaded with fuel (the kilns with a crucible, the
+  // bloomery with ore, a bellows against each tuyere and a good heat):
+  //   cold-row / lit-row      each row from the front
+  //   kiln / bloomery / furnace   each lit structure close up, from the front right
+  //   tops                    the lit row from above: the flue, the throat with its charge, the chimney
+  //   back                    the cold row from behind
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [157.5, 20, 290.5], "yaw": -90, "pitch": -30 },
+    { "op": "wait", "seconds": 14 },
+
+    { "op": "kiln", "block": "mud_brick_kiln", "pos": [148, 12, 276], "state": 1 },
+    { "op": "bloomery", "pos": [152, 12, 276], "state": 1 },
+    { "op": "kiln", "block": "alloy_furnace", "pos": [156, 12, 275], "state": 1 },
+
+    { "op": "kiln", "block": "mud_brick_kiln", "pos": [148, 12, 287], "state": 0, "fuel": 4, "crucible": true, "lit": true },
+    { "op": "bloomery", "pos": [152, 12, 287], "state": 0, "ore": 4, "fuel": 4, "lit": true, "heat": 0.9, "bellows": true },
+    { "op": "kiln", "block": "alloy_furnace", "pos": [157, 12, 287], "state": 0, "fuel": 8, "crucible": true, "lit": true },
+    { "op": "wait", "seconds": 3 },
+
+    { "op": "teleport", "pos": [153.5, 14.5, 284.5], "yaw": -90, "pitch": -12 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "cold-row", "hideHud": true },
+
+    { "op": "teleport", "pos": [153.5, 14.5, 279.5], "yaw": 90, "pitch": -12 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "lit-row", "hideHud": true },
+
+    { "op": "teleport", "pos": [147.0, 13.6, 283.4], "yaw": 62, "pitch": -12 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "kiln", "hideHud": true },
+
+    { "op": "teleport", "pos": [151.2, 13.6, 283.4], "yaw": 62, "pitch": -12 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "bloomery", "hideHud": true },
+
+    { "op": "teleport", "pos": [155.6, 14.2, 282.4], "yaw": 60, "pitch": -12 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "furnace", "hideHud": true },
+
+    { "op": "teleport", "pos": [158.5, 13.6, 284.6], "yaw": 90, "pitch": -4 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "furnace-front", "hideHud": true },
+
+    { "op": "teleport", "pos": [153.5, 19.5, 284.5], "yaw": 90, "pitch": -62 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "tops", "hideHud": true },
+
+    { "op": "teleport", "pos": [153.5, 15.5, 269.5], "yaw": 90, "pitch": -18 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "back", "hideHud": true }
+  ]
+}

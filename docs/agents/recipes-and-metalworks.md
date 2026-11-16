@@ -273,7 +273,8 @@ landing on a **bellows** at one of its tuyeres) -> `bloom` -> blooms stacked on 
 smithing hammer's right-click and hammered out with its left (**the forge**, below) -> the part or armor + `slag`. There
 is no wrought iron: the bloom is the forge metal.
 - **The bloomery** (`bloomery` / `bloomery_part`, a 2x2x2 `multiblock` pressed from `bloomery_bricks` by the same
-  bare-hand conversion; it wears the mud brick kiln's shape, so its fire burns where `KilnLayout.Kiln` says) is declared by a
+  bare-hand conversion; a stepped shaft with a tapping arch in front and an open throat on top, whose arch, throat and
+  prop spots are `BloomeryLayout`, mirroring `models/block/bloomery.json`) is declared by a
   `bloomery` object on the anchor block: `{"oreCap", "fuelCap", "ore", "bloom", "tuyeres"}` (`BloomeryProfile`, parsed by
   `BlockSchemaParser.ParseBloomery`, `BlockType.Bloomery`; the two names resolve to ids at load and a missing or unknown
   one throws naming the file; `tuyeres` is at least one `[x, y, z]` cell in the authored, north-facing local space, each
@@ -293,9 +294,9 @@ is no wrought iron: the bloom is the forge metal.
 - **The bellows** (`bellows`, a plain cube for now with placeholder tiles, crafted from oak planks and hide) carries the
   `"bellows": true` flag (`BlockType.IsBellows`). It works only from a **tuyere**: the cells the profile names, turned with
   the structure's facing (`BloomeryProfile.IsTuyere`, through `MultiblockShape.RotatePoint`); the shipped bloomery's two
-  sit beside the back lower cell of each side wall, where `models/block/bloomery.json` sinks a hole one unit into the wall
-  (a core one unit in from each side, four brick strips per side around the hole, its floor the `bloomery_tuyere` tile; a
-  multiblock model may not leave its volume, so the hole goes in rather than standing out). Heat comes only from a body
+  sit beside the back lower cell of each side wall, where `models/block/bloomery.json` stands a clay nozzle out of the
+  inset hearth tier to the face of the volume, its end the `bloomery_tuyere` tile (`BloomeryLayoutTests` holds a nozzle
+  to every tuyere cell). Heat comes only from a body
   **landing** on it: `World.PressBellows(feet, halfWidth, fall)` finds the bellows a hair under the feet
   (`BellowsProbe`: the middle, then the footprint's corners) and calls `BloomeryManager.PressBellows(cell, fall)`, which
   adds `BloomeryRules.LandingHeat(fall)` (nothing under `BellowsMinFallBlocks`, so a settle or an auto-step never pumps;
@@ -343,9 +344,15 @@ is no wrought iron: the bloom is the forge metal.
   `StationState` frame, after the cast molds (`World.WriteStations`, `ClientMirror.ApplyNetworkStations`); an anvil is its
   metal id and count, picked result id, hits and cooldown, a bloomery carries no overheat or slag: protocol **61**. A
   client's copies are display-only mirrors that never tick.
-- **Look and feel.** `RenderManager.Stations.RenderSmithing` draws the loaded ore and fuel in two rows on the hearth, the
-  finished blooms where the ore stood, and an anvil's stack as one face-up piece per unit, each resting on the one below
-  and turned a little against it. A lit bloomery joins `AmbientEffects.FireCells`, so it throws embers and a point light.
+- **Look and feel.** `RenderManager.Smithing.RenderSmithing` (`SmithingPasses`) draws the ore charge as a pile in the
+  throat, its top piece shrinking as the unit smelts (`BloomeryLayout.ChargeStack`), the fuel as a bed on the hearth
+  inside the arch, the finished blooms piled at the arch's front (self-lit while the fire still smelts), and an anvil's
+  stack as one face-up piece per unit, each resting on the one below and turned a little against it. A lit bloomery's
+  hearth and throat glow with an ember bed whose brightness follows the heat (`BloomeryRules.GlowAlpha`, dull under the
+  band, full at `BloomeryConfig.GlowFullHeat`), it smokes out of its throat, and a jump in its heat (a landing on the
+  bellows, or lighting it) throws a burst of sparks out of the throat (`Particles/FurnaceEffects`, `BlastSparks`; it
+  reads the heat alone, so a client's mirror plays it with nothing on the wire). A lit bloomery joins
+  `AmbientEffects.FireCells`, so it throws embers and a point light.
   The look-at label shows a status line (`LookLabelState.Detail`, `SmithingReadout`): a lit bloomery's heat with
   `too cold` / `good`, its ore and smelt percentage, a done run's blooms, or an anvil's `Forging <result> n/m` or its stack
   (`Iron Bloom x3`); the station bar (`StationBars.Anvil`) fills with the picked recipe's hits.
@@ -368,12 +375,19 @@ same bare-hand conversion, with `{"fuelCap": 8, "meltSpeed": 1.5, "canAlloy": tr
 pass (`StationPasses.RenderKilns`) draws the crucible, the pending lump and the fuel row, where the
 fire burns (`KilnManager.LitCells`, the flame and point light `AmbientEffects` gathers) and where
 the hearth's light is sampled are its `KilnLayout` (`KilnProfile.Layout`), which mirrors its model
-`assets/models/block/alloy_furnace.json` (a deep chamber, x 8..40, y 4..30, z 0..36 in 0..48 model
-units, wide enough for eight fuel units in one row) the way `KilnLayout.Kiln` mirrors the mud brick
-kiln's; the crucible bowl's own sizes stay on `KilnRenderer`. `KilnRendererTests` and
-`KilnContentTests` hold both kilns to their layouts; `AlloyFurnaceTests` converts and reverts one in
-a live world; `visual-examples/alloy-furnace.json` (`VOXEL_TIME=147`) builds, converts, loads, lights
-and alloys one.
+`assets/models/block/alloy_furnace.json` (a plinth, a body between four corner buttresses, a copper
+course, a stepped roof and a chimney; the firemouth x 10..38, y 5..24, z 0..36 in 0..48 model units
+under a stepped vault, the crucible on a pedestal in its middle, the eight fuel units in two rows of
+four, `KilnLayout.FuelSlotLocal`) the way `KilnLayout.Kiln` mirrors the mud brick kiln's (a beehive:
+plinth, body, two daub dome tiers and a flue; the mouth x 8..24, y 4..19, z 0..20); the crucible bowl's
+own sizes stay on `KilnRenderer`. A lit kiln of either kind glows with an ember bed on its hearth floor
+(`KilnLayout.EmberLocal`/`EmberSize`, `StationPasses.DrawEmberBed`, tiled by `KilnRenderer.EmberGrid`)
+and smokes out of its flue (`KilnLayout.FlueLocal`, `KilnManager.FlueCells`, `Particles/FurnaceEffects`).
+`KilnRendererTests` and `KilnContentTests` hold both kilns to their layouts (every prop on a surface the
+model has and clear of the model); `AlloyFurnaceTests` converts and reverts one in
+a live world; `visual-examples/alloy-furnace.json` (`VOXEL_TIME=147`) stands one (the `kiln` op), loads, lights
+and alloys it, and `visual-examples/multiblock-models.json` films all three structures cold and lit,
+from the front, above and behind.
 
 **Casting** (`Simulation/CastingManager.cs`, one `CastState` per mold cell) is the other half.
 Right-clicking a fired mold with a crucible binds that tool instance and pours at

@@ -1,28 +1,35 @@
 {
-  // Alloy furnace: the anchor model of a 3x3x3 multiblock, authored in 0..48 model units (three
-  // cells on every axis, the anchor cell's origin at 0) with the opening on the NORTH (-Z) face.
-  // ContentRegistry pre-rotates the bake to the other three facings (MultiblockShape.Rotate), so
-  // this file is the only orientation ever written by hand. The same bake rules as the mud brick
-  // kiln hold: no face carries a "cullface", and no face covers a whole cell face.
+  // Alloy furnace, a crucible furnace under a chimney: the anchor model of a 3x3x3 multiblock, authored in
+  // 0..48 model units (three cells on every axis, the anchor cell's origin at 0) with the firemouth on the
+  // NORTH (-Z) face. ContentRegistry pre-rotates the bake to the other three facings (MultiblockShape.Rotate),
+  // so this file is the only orientation ever written by hand. The same bake rules as the mud brick kiln hold:
+  // no face carries a "cullface", and no face covers a whole cell face.
   //
-  // A hollow shell around a deep chamber: two side walls, a roof slab, a back body and a low
-  // hearth floor the crucible, the fire and the fuel stand on. No face declares "uv": the baker's
-  // defaults span one tile unit per cell and the sampler's REPEAT tiles the bricks once per cell.
+  // No face declares "uv": the baker's defaults follow the element's position, so the bricks run on across
+  // elements, and the copper course (alloy_band repeats every 2 units) sits on even heights.
   //
-  // The opening is x 8..40, y 4..30, z 0..36 - cell space [0.5,2.5] x [0.25,1.875] x [0,2.25],
-  // the numbers KilnLayout.Furnace mirrors. Every face omitted below is buried inside another
-  // element.
+  // The shape, bottom to top: a plinth (y 0..4), the body (inset 3, y 4..30) between four corner buttresses
+  // standing on the full footprint (y 4..26), a copper course (inset 2, y 30..32), two roof tiers (inset 7 to
+  // y 37, inset 12 to y 41) and the chimney (x/z 17..31, y 41..48) around a sooty well. The block's
+  // multiblock.boxes (data/blocks/alloy_furnace.json) trace the same pieces.
+  //
+  // The firemouth is x 10..38, y 5..24, z 0..36 - cell space [0.625,2.375] x [0.3125,1.5] x [0,2.25], the
+  // numbers KilnLayout.Furnace mirrors - under a stepped vault (x 14..34 up to y 28) and behind a frame standing
+  // two units proud of the body. The crucible stands on a pedestal (x 18..30, z 10..22, top at y 8) with the
+  // firebox floor around it. Every face omitted below is buried inside another element.
   "textures": {
     "brick": "alloy_bricks",
-    "hearth": "fired_mud"
+    "hearth": "fired_mud",
+    "band": "alloy_band",
+    "soot": "kiln_soot"
   },
   "elements": [
-    // Back body: the solid rear of the shell. Its north side is hidden by the side walls, the
-    // roof, the hearth floor and the chamber's back wall.
+    // Plinth
     {
-      "from": [0, 0, 36],
-      "to": [48, 48, 48],
+      "from": [0, 0, 0],
+      "to": [48, 4, 48],
       "faces": {
+        "north": { "texture": "#brick" },
         "south": { "texture": "#brick" },
         "west": { "texture": "#brick" },
         "east": { "texture": "#brick" },
@@ -30,57 +37,287 @@
         "down": { "texture": "#brick" }
       }
     },
-    // Chamber back wall: the north-facing quad seen through the opening, fired by the fire in
-    // front of it.
+    // Body, back: the solid rear behind the chamber
     {
-      "from": [8, 4, 36],
-      "to": [40, 30, 37],
+      "from": [3, 4, 36],
+      "to": [45, 30, 45],
+      "faces": {
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" }
+      }
+    },
+    // Body, west wall of the chamber; its inner (east) side is fired
+    {
+      "from": [3, 4, 3],
+      "to": [10, 30, 36],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#hearth" }
+      }
+    },
+    // Body, east wall of the chamber; its inner (west) side is fired
+    {
+      "from": [38, 4, 3],
+      "to": [45, 30, 36],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "west": { "texture": "#hearth" }
+      }
+    },
+    // Body, roof over the vault; its underside is fired
+    {
+      "from": [10, 28, 3],
+      "to": [38, 30, 36],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "down": { "texture": "#hearth" }
+      }
+    },
+    // Vault steps: the two fired corbels that narrow the chamber above y 24
+    {
+      "from": [10, 24, 3],
+      "to": [14, 28, 36],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "east": { "texture": "#hearth" },
+        "down": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [34, 24, 3],
+      "to": [38, 28, 36],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "west": { "texture": "#hearth" },
+        "down": { "texture": "#hearth" }
+      }
+    },
+    // Chamber back wall: the two north-facing quads seen through the firemouth, below and inside the vault
+    {
+      "from": [10, 5, 36],
+      "to": [38, 24, 37],
       "faces": {
         "north": { "texture": "#hearth" }
       }
     },
-    // West wall of the chamber; its inner (east) side is fired.
     {
-      "from": [0, 0, 0],
-      "to": [8, 48, 36],
+      "from": [14, 24, 36],
+      "to": [34, 28, 37],
       "faces": {
-        "north": { "texture": "#brick" },
-        "west": { "texture": "#brick" },
-        "east": { "texture": "#hearth" },
-        "up": { "texture": "#brick" },
-        "down": { "texture": "#brick" }
+        "north": { "texture": "#hearth" }
       }
     },
-    // East wall of the chamber; its inner (west) side is fired.
+    // Firebox floor: what the fire and the fuel lie on
     {
-      "from": [40, 0, 0],
-      "to": [48, 48, 36],
+      "from": [10, 4, 3],
+      "to": [38, 5, 36],
       "faces": {
-        "north": { "texture": "#brick" },
-        "east": { "texture": "#brick" },
+        "up": { "texture": "#hearth" }
+      }
+    },
+    // Hearth lip: the floor carried out over the plinth to the front of the volume
+    {
+      "from": [10, 4, 0],
+      "to": [38, 5, 3],
+      "faces": {
+        "north": { "texture": "#hearth" },
         "west": { "texture": "#hearth" },
-        "up": { "texture": "#brick" },
-        "down": { "texture": "#brick" }
+        "east": { "texture": "#hearth" },
+        "up": { "texture": "#hearth" }
       }
     },
-    // Roof over the chamber; its underside is fired.
+    // Crucible pedestal, standing in the middle of the firebox
     {
-      "from": [8, 30, 0],
-      "to": [40, 48, 36],
+      "from": [18, 5, 10],
+      "to": [30, 8, 22],
       "faces": {
         "north": { "texture": "#brick" },
-        "up": { "texture": "#brick" },
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#hearth" }
+      }
+    },
+    // Firemouth frame: two jambs, the shoulders under the vault steps and the copper header, two units proud
+    // of the body
+    {
+      "from": [8, 4, 1],
+      "to": [10, 28, 3],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "west": { "texture": "#hearth" },
+        "east": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [38, 4, 1],
+      "to": [40, 28, 3],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "west": { "texture": "#hearth" },
+        "east": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [10, 24, 1],
+      "to": [14, 28, 3],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "east": { "texture": "#hearth" },
         "down": { "texture": "#hearth" }
       }
     },
-    // Hearth floor: the ledge the crucible, the fire and the fuel stand on.
     {
-      "from": [8, 0, 0],
-      "to": [40, 4, 36],
+      "from": [34, 24, 1],
+      "to": [38, 28, 3],
+      "faces": {
+        "north": { "texture": "#hearth" },
+        "west": { "texture": "#hearth" },
+        "down": { "texture": "#hearth" }
+      }
+    },
+    {
+      "from": [8, 28, 1],
+      "to": [40, 30, 3],
+      "faces": {
+        "north": { "texture": "#band" },
+        "west": { "texture": "#band" },
+        "east": { "texture": "#band" },
+        "down": { "texture": "#hearth" }
+      }
+    },
+    // Corner buttresses, on the full footprint
+    {
+      "from": [0, 4, 0],
+      "to": [6, 26, 6],
       "faces": {
         "north": { "texture": "#brick" },
-        "up": { "texture": "#hearth" },
-        "down": { "texture": "#brick" }
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#brick" }
+      }
+    },
+    {
+      "from": [42, 4, 0],
+      "to": [48, 26, 6],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#brick" }
+      }
+    },
+    {
+      "from": [0, 4, 42],
+      "to": [6, 26, 48],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#brick" }
+      }
+    },
+    {
+      "from": [42, 4, 42],
+      "to": [48, 26, 48],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#brick" }
+      }
+    },
+    // Copper course under the roof
+    {
+      "from": [2, 30, 2],
+      "to": [46, 32, 46],
+      "faces": {
+        "north": { "texture": "#band" },
+        "south": { "texture": "#band" },
+        "west": { "texture": "#band" },
+        "east": { "texture": "#band" },
+        "up": { "texture": "#band" },
+        "down": { "texture": "#band" }
+      }
+    },
+    // Roof, lower tier
+    {
+      "from": [7, 32, 7],
+      "to": [41, 37, 41],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#brick" }
+      }
+    },
+    // Roof, upper tier
+    {
+      "from": [12, 37, 12],
+      "to": [36, 41, 36],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "south": { "texture": "#brick" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#brick" }
+      }
+    },
+    // Chimney: four walls around the well, their inner sides sooty
+    {
+      "from": [17, 41, 17],
+      "to": [31, 48, 20],
+      "faces": {
+        "north": { "texture": "#brick" },
+        "south": { "texture": "#soot" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#brick" }
+      }
+    },
+    {
+      "from": [17, 41, 28],
+      "to": [31, 48, 31],
+      "faces": {
+        "south": { "texture": "#brick" },
+        "north": { "texture": "#soot" },
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#brick" },
+        "up": { "texture": "#brick" }
+      }
+    },
+    {
+      "from": [17, 41, 20],
+      "to": [20, 48, 28],
+      "faces": {
+        "west": { "texture": "#brick" },
+        "east": { "texture": "#soot" },
+        "up": { "texture": "#brick" }
+      }
+    },
+    {
+      "from": [28, 41, 20],
+      "to": [31, 48, 28],
+      "faces": {
+        "east": { "texture": "#brick" },
+        "west": { "texture": "#soot" },
+        "up": { "texture": "#brick" }
+      }
+    },
+    // Chimney well floor, four units down
+    {
+      "from": [20, 41, 20],
+      "to": [28, 44, 28],
+      "faces": {
+        "up": { "texture": "#soot" }
       }
     }
   ]

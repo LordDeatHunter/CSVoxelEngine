@@ -339,6 +339,8 @@ OpenGLTest/
         BreakOverlayUv.cs      # cell-space crop of the block-breaking crack sprite for one hitbox face
         HorizontalFacing.cs    # quarter turns about a footprint's center: points, boxes,
                                #   baked models (multiblocks at their size, facing blocks at 1)
+        MultiblockBoxes.cs     # a shaped multiblock's `multiblock.boxes` turned to each facing and cut up per
+                               #   cell (Build), and the piece a cell's state byte names (At)
         MultiblockShape.cs     # a multiblock volume's geometry at any size (2..4): rotating a point,
                                #   a direction or a whole baked model to a facing; the legal sizes
         PaneProfile.cs         # one pane block's dimensions (its "pane" JSON): post and
@@ -388,9 +390,12 @@ OpenGLTest/
                                #   authored model (the crucible bowl, fuel lump and
                                #   pending-charge sizes every kiln shares; the mold
                                #   pocket levels and the cooling dissolve curves)
+        BloomeryLayout.cs      # the bloomery model's tapping arch and throat and where its fuel bed, blooms, ore
+                               #   charge (ChargeStack), fire, glow and smoke lie; ToWorld onto a facing
         BloomeryProfile.cs     # a bloomery anchor's compiled `bloomery` object (caps, item ids, tuyere cells and IsTuyere)
-        KilnLayout.cs          # one kiln model's opening and its bowl, fire, fuel and mouth spots, per structure
-                               #   size (Kiln 2, Furnace 3, ForSize), and ToWorld onto a facing
+        KilnLayout.cs          # one kiln model's opening and its bowl, fire, fuel rows (FuelSlotLocal), ember bed,
+                               #   flue and mouth spots, per structure size (Kiln 2, Furnace 3, ForSize), and
+                               #   ToWorld onto a facing
         KilnProfile.cs         # a kiln anchor's compiled `kiln` object: fuel cap, melt speed (MeltSeconds), can-alloy,
                                #   and the Layout of its multiblock size
         MoltenMaterial.cs      # a molten metal: id, tile, tint

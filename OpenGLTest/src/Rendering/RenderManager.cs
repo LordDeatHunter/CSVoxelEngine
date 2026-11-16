@@ -317,6 +317,9 @@ public class RenderManager : IDisposable
     /// what a kiln holds and the cast in a mold.</summary>
     internal StationPasses Stations { get; private set; }
 
+    /// <summary>The iron works' draws of the entity pass: what a bloomery holds and the metal on an anvil.</summary>
+    internal SmithingPasses Smithing { get; private set; }
+
     /// <summary>The loose-object draws of the entity pass: the item drops, thrown items, primed
     /// TNT, falling blocks, mining debris and toppling trees; the water mirror reuses their
     /// Draw* cores.</summary>
@@ -588,6 +591,7 @@ public class RenderManager : IDisposable
         // so one hook covers both callers.
         itemMeshes.GlStateChanged = Units.InvalidateTextureUnits;
         Stations = new StationPasses(gl, this);
+        Smithing = new SmithingPasses(this, Stations);
         Players = new PlayerPasses(gl, this);
         Mobs = new MobPasses(gl, this);
         Chests = new ChestPasses(gl, this);

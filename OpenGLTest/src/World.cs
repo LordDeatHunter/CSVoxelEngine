@@ -1169,7 +1169,7 @@ public class World
         WormEffects?.Update((float)deltaTime, Sandworms);
         CollapseEffects?.Update((float)deltaTime);
         ConqueredEffects?.Update((float)deltaTime);
-        Ambient.GatherStationFires();
+        Ambient.GatherStationFires((float)deltaTime);
         Ambient.AddGoblinTorches();
         _fire.Update((float)deltaTime, Ambient.FireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
         Ambient.UpdateTorchFlames((float)deltaTime, Wind.Direction(LightingTime));
@@ -1312,7 +1312,7 @@ public class World
         // world's own inventory and camera stand for the local player
         _casting.Update((float)deltaTime, _chunkManager, _dropManager, Inventory,
             Inventory.SelectedToolInstance, Camera.Position, InteractionReach);
-        Ambient.GatherStationFires();
+        Ambient.GatherStationFires((float)deltaTime);
         Ambient.AddGoblinTorches();
         // The lighting clock (window time plus VOXEL_TIME), so the smoke blows the way the leaves lean
         var wind = Wind.Direction(LightingTime);

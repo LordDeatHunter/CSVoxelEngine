@@ -189,7 +189,7 @@ internal sealed class WorldRenderer
         renderManager.Stations.RenderIngotPiles(Camera, _world.IngotPiles);
         renderManager.Stations.RenderBonePiles(Camera, _world.Towers);
         renderManager.Stations.RenderKilns(Camera, _kilns);
-        renderManager.Stations.RenderSmithing(Camera, _world.Smithing);
+        renderManager.Smithing.RenderSmithing(Camera, _world.Smithing);
         renderManager.Stations.RenderCastings(Camera, _casting);
         renderManager.Chests.RenderChests(Camera, _chunkManager.ChestChunks, _world.ChestLids);
         renderManager.Doors.RenderDoors(Camera, _world.DoorSwings.Active);

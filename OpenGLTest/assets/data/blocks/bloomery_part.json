@@ -1,6 +1,7 @@
 {
   // One of the seven non-anchor cells of a bloomery's 2x2x2 volume: never meshed (the anchor's model covers the
-  // volume), a solid occluding cell, and mining it reverts the rest of the bloomery.
+  // volume), a solid cell that collides and raycasts by its piece of the anchor's multiblock.boxes and hides no
+  // neighbor's face, and mining it reverts the rest of the bloomery.
   "name": "Bloomery",
   "model": { "parent": "block/cube_all", "textures": { "all": "bloomery_bricks" } },
   "renderer": "multiblock_part",
@@ -10,7 +11,7 @@
   "tools": { "pickaxe": 1 },
   "sfx": "hit_rock",
   "loot": "bloomery",
-  "occludes": true,
-  "castsAO": true,
+  "occludes": false,
+  "castsAO": false,
   "light": { "passes": true }
 }

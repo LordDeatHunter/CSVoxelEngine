@@ -382,6 +382,15 @@ public sealed record BlockType
     /// rotation center read; 0 when the block is not a multiblock anchor.</summary>
     public int MultiblockSize { get; init; }
 
+    /// <summary>The anchor this <see cref="BlockRenderer.MultiblockPart"/> block fills the volume of, or 0 for
+    /// every other block. Resolved with <see cref="MultiblockPartId"/>.</summary>
+    public ushort MultiblockAnchorId { get; internal set; }
+
+    /// <summary>The shape of this multiblock anchor's structure cut up per cell (its <c>multiblock.boxes</c>,
+    /// see <see cref="MultiblockBoxes"/>): indexed by facing, then by cell; null when the anchor declares none
+    /// and every cell stays a full cube.</summary>
+    public BlockHitbox[][][]? MultiblockCellBoxes { get; init; }
+
     /// <summary>The kiln profile of this multiblock anchor (its <c>kiln</c> object), or null when
     /// it is not a kiln. A kiln holds fuel, can be lit and is swept for structural damage. Only
     /// ever set on a <see cref="BlockRenderer.Multiblock"/> block.</summary>
@@ -627,8 +636,9 @@ public sealed record BlockType
 
     /// <summary>Whether body collision tests this block's <see cref="Hitboxes"/> rather than the
     /// full cell, the way tree wood tests its drawn shape; see
-    /// <see cref="TreeWoodShape.OverlapsShape"/>.</summary>
-    public bool CollidesByHitbox { get; init; }
+    /// <see cref="TreeWoodShape.OverlapsShape"/>. Every cell of a shaped multiblock gets it once its links
+    /// resolve (<see cref="MultiblockCellBoxes"/>).</summary>
+    public bool CollidesByHitbox { get; internal set; }
 
     /// <summary>Loot rolled on break. Null means "drop yourself";
     /// <see cref="VoxelEngine.Content.Loot.LootTable.None"/> means "drop nothing".</summary>

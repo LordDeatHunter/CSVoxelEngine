@@ -74,6 +74,20 @@ internal sealed class BlockLinkResolver
             var type = types[pendingId];
             type.MultiblockPartId = ResolveMultiblockPart(part, pendingPath);
             type.MultiblockSourceId = ResolveMultiblockSource(source, pendingPath, pendingId);
+
+            var partType = types[type.MultiblockPartId];
+            if (partType.MultiblockAnchorId != 0)
+                throw new InvalidOperationException(
+                    $"Block '{pendingPath}' names '{part}' in multiblock.part, which already fills another structure; a part belongs to one anchor.");
+            partType.MultiblockAnchorId = pendingId;
+
+            // A shaped structure collides by its boxes in every cell (BlockShape.BoxesAt)
+            if (type.MultiblockCellBoxes == null) continue;
+            foreach (var cell in new[] { type, partType })
+            {
+                cell.CollidesByHitbox = cell.Solid;
+                BlockType.CollidesByHitboxById[cell.Id] = cell.Solid;
+            }
         }
 
         // A torch's wall block (wall_torch) loads after the torch itself.

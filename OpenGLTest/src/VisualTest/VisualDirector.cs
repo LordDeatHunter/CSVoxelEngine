@@ -257,6 +257,12 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 break;
             }
 
+            case "kiln":
+                BuildKiln(step);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} kiln {step.Block} at {step.Pos}");
+                Advance();
+                break;
+
             case "bloomery":
                 BuildBloomery(step);
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} bloomery at {step.Pos}");
@@ -444,12 +450,48 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
 
     /// <summary>An <c>effect</c> step: the effect name is validated here rather than at parse time, so
     /// parsing stays registry-free; an unknown name warns and the step is skipped.</summary>
-    // A bloomery at the step's anchor, built the way the converter builds one (a 2x2x2 of its structure, converted
-    // in place) and loaded with the step's ore and fuel; a lit one burns at the step's heat, and with "bellows" a
-    // bellows stands against each tuyere
+    // A bloomery at the step's anchor (BuildStructure), loaded with the step's ore and fuel; a lit one burns at the
+    // step's heat, and with "bellows" a bellows stands against each tuyere
     private void BuildBloomery(VisualStep step)
     {
         var type = ContentRegistry.RequireBlock("bloomery");
+        var anchor = BuildStructure(step, type);
+
+        var bloomeries = world.Smithing.Bloomeries;
+        bloomeries.Ensure(anchor, step.State & 3, type.Id);
+        for (var i = 0; i < step.Ore; i++)
+            bloomeries.TryAddOre(anchor, type.Bloomery!.OreId);
+        var fuel = ContentRegistry.RequireItem("coal");
+        for (var i = 0; i < step.Fuel; i++)
+            bloomeries.TryAddFuel(anchor, fuel);
+        if (step.On && bloomeries.Ignite(anchor))
+            bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z)!.Heat = step.Heat;
+    }
+
+    // A kiln (the step's "block": any kiln anchor, the mud brick kiln or the alloy furnace) at the step's anchor,
+    // loaded with the step's coal, optionally holding an empty crucible, and lit when asked
+    private void BuildKiln(VisualStep step)
+    {
+        var type = ContentRegistry.RequireBlock(step.Block!);
+        if (type.Kiln == null)
+            throw new InvalidOperationException($"Step {_step + 1} builds kiln '{step.Block}', which is not a kiln anchor.");
+        var anchor = BuildStructure(step, type);
+
+        var kilns = world.Kilns;
+        kilns.Ensure(anchor, step.State & 3, type.Id);
+        var fuel = ContentRegistry.RequireItem("coal");
+        for (var i = 0; i < step.Fuel; i++)
+            kilns.TryAddFuel(anchor, fuel);
+        if (step.Crucible)
+            kilns.TryPlaceCrucible(anchor, ContentRegistry.RequireItem("crucible").Id, default);
+        if (step.On)
+            kilns.Ignite(anchor);
+    }
+
+    // The structure of a multiblock anchor at the step's position, built the way the converter builds one (a cube of
+    // its source block, converted in place, facing the step's state), with a bellows against each tuyere when asked
+    private Vector3 BuildStructure(VisualStep step, BlockType type)
+    {
         var anchor = step.Pos!.Value;
         var chunks = world.GetChunkManager();
         var touched = new HashSet<Vector3>();
@@ -466,16 +508,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
         foreach (var chunkPos in touched)
             if (chunks.Chunks.TryGetValue(chunkPos, out var chunk))
                 chunk.RemeshAfterBatchEdit(chunks);
-
-        var bloomeries = world.Smithing.Bloomeries;
-        bloomeries.Ensure(anchor, step.State & 3, type.Id);
-        for (var i = 0; i < step.Ore; i++)
-            bloomeries.TryAddOre(anchor, type.Bloomery!.OreId);
-        var fuel = ContentRegistry.RequireItem("coal");
-        for (var i = 0; i < step.Fuel; i++)
-            bloomeries.TryAddFuel(anchor, fuel);
-        if (step.On && bloomeries.Ignite(anchor))
-            bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z)!.Heat = step.Heat;
+        return anchor;
     }
 
     // A bellows on every cell where a tuyere of the bloomery at anchor (turned to facing) works it

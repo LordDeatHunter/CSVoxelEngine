@@ -104,7 +104,10 @@ public sealed class VisualStep
     /// <summary>Units of ore a <c>bloomery</c> step loads.</summary>
     public int Ore { get; init; }
 
-    /// <summary>Units of fuel a <c>bloomery</c> step loads.</summary>
+    /// <summary>Whether a <c>kiln</c> step stands an empty crucible in the hearth.</summary>
+    public bool Crucible { get; init; }
+
+    /// <summary>Units of fuel a <c>bloomery</c> or <c>kiln</c> step loads.</summary>
     public int Fuel { get; init; }
 
     /// <summary>The heat (0..1) a lit <c>bloomery</c> step holds the fire at.</summary>
@@ -305,6 +308,16 @@ public sealed class VisualScenario
                     ? st
                     : 0,
             },
+            "kiln" => new VisualStep
+            {
+                Op = "kiln",
+                Pos = ReadPos(element, index, "kiln"),
+                Block = ReadGiveBlock(element, index),
+                State = ReadInt(element, "state"),
+                Fuel = ReadInt(element, "fuel"),
+                On = element.TryGetProperty("lit", out var kilnLit) && kilnLit.ValueKind == JsonValueKind.True,
+                Crucible = element.TryGetProperty("crucible", out var bowl) && bowl.ValueKind == JsonValueKind.True,
+            },
             "bloomery" => new VisualStep
             {
                 Op = "bloomery",
@@ -352,7 +365,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, forge, chest, chestrow, chestwobble, waystone, chat, quests, map, towerclear, altar, towerdefeat, goblincamp or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, kiln, bloomery, anvil, hammer, forge, chest, chestrow, chestwobble, waystone, chat, quests, map, towerclear, altar, towerdefeat, goblincamp or screenshot."),
         };
     }
 

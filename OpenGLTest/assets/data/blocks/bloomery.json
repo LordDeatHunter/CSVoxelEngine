@@ -1,16 +1,31 @@
 {
-  // Bloomery: a 2x2x2 volume of bloomery_bricks converted in place by the multiblock converter, exactly like
-  // the mud brick kiln (same shape, same opening on north, same anchor-carries-the-model rule). Only this cell
-  // - the volume's minimum corner - is the anchor; the other seven hold bloomery_part. It smelts crushed iron
-  // into a bloom without ever melting it (BloomeryManager): load ore and fuel, light it, and keep it hot by
-  // landing on a bellows set against one of its tuyeres. Mining any cell drops one bloomery_bricks and reverts the rest.
+  // Bloomery: a 2x2x2 volume of bloomery_bricks converted in place by the multiblock converter, like the mud
+  // brick kiln (same anchor-carries-the-model rule, the tapping arch on north). Only this cell - the volume's
+  // minimum corner - is the anchor; the other seven hold bloomery_part. It smelts crushed iron into a bloom
+  // without ever melting it (BloomeryManager): load ore and fuel, light it, and keep it hot by landing on a
+  // bellows set against one of its tuyeres. Mining any cell drops one bloomery_bricks and reverts the rest.
   "name": "Bloomery",
   "model": "block/bloomery",
   "renderer": "multiblock",
-  "multiblock": { "part": "block/bloomery_part", "source": "block/bloomery_bricks" },
-  // It smelts crushed iron into a bloom. The tuyeres are the cells (north-facing local space, the opening on -Z)
-  // beside the back lower cell of each side wall, where models/block/bloomery.json draws the holes: a bellows there
-  // works it.
+  "multiblock": {
+    "part": "block/bloomery_part",
+    "source": "block/bloomery_bricks",
+    // The shaft's tiers (models/block/bloomery.json: plinth, hearth tier with its hoop, middle tier with its
+    // hoop, top tier) and the two tuyere nozzles, in volume cell space, front on north. Every cell of the
+    // structure collides, outlines and is aimed at by the piece of these that lies inside it; the arch and the
+    // throat stay solid.
+    "boxes": [
+      { "min": [0, 0, 0], "max": [2, 0.25, 2] },
+      { "min": [0.125, 0.25, 0.125], "max": [1.875, 1, 1.875] },
+      { "min": [0.25, 1, 0.25], "max": [1.75, 1.625, 1.75] },
+      { "min": [0.4375, 1.625, 0.4375], "max": [1.5625, 2, 1.5625] },
+      { "min": [0, 0.25, 1.25], "max": [0.125, 0.75, 1.75] },
+      { "min": [1.875, 0.25, 1.25], "max": [2, 0.75, 1.75] }
+    ]
+  },
+  // It smelts crushed iron into a bloom. The tuyeres are the cells (north-facing local space, the arch on -Z)
+  // beside the back lower cell of each side wall, where models/block/bloomery.json stands the nozzles: a
+  // bellows there works it.
   "bloomery": {
     "oreCap": 4, "fuelCap": 4, "ore": "item/crushed_iron", "bloom": "item/bloom",
     "tuyeres": [[-1, 0, 1], [2, 0, 1]]
@@ -21,7 +36,8 @@
   "tools": { "pickaxe": 1 },
   "sfx": "hit_rock",
   "loot": "bloomery",
-  "occludes": true,
-  "castsAO": true,
+  // The shape stands inside its cells, so no cell hides a neighbor's face or darkens the ground around it
+  "occludes": false,
+  "castsAO": false,
   "light": { "passes": true }
 }

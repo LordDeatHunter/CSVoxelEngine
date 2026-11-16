@@ -49,6 +49,18 @@ public static class KilnRenderer
     /// z-fight.</summary>
     public const float FuelSpacing = FuelSize;
 
+    /// <summary>How far over the hearth floor a lit hearth's ember bed is drawn: clear of the floor it glows
+    /// on, and under the back of a sprite resting on that floor (<see cref="SpritePose.RestingClearance"/>).</summary>
+    public const float EmberLift = SpritePose.RestingClearance * 0.5f;
+
+    /// <summary>Edge length one tile of an ember bed is drawn near: half a block, so the coals stay small.</summary>
+    public const float EmberTileSize = 0.5f;
+
+    /// <summary>How many ember tiles lie across and into a bed of <paramref name="size"/>: at least one each
+    /// way, and as many as keep a tile nearest <see cref="EmberTileSize"/>.</summary>
+    public static (int Columns, int Rows) EmberGrid(System.Numerics.Vector2 size) =>
+        (Math.Max(1, (int)MathF.Round(size.X / EmberTileSize)), Math.Max(1, (int)MathF.Round(size.Y / EmberTileSize)));
+
     /// <summary>Clearance between the bowl's rim and the underside of the lump waiting to
     /// melt.</summary>
     public const float PendingGap = 0.02f;

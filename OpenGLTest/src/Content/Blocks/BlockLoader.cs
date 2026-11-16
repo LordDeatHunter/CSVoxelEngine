@@ -185,6 +185,7 @@ internal static class BlockLoader
             Renderer = renderer,
             Pane = paneProfile,
             MultiblockSize = multiblockSize,
+            MultiblockCellBoxes = BlockSchemaParser.ParseMultiblockBoxes(definition.Multiblock, multiblockSize, path),
             Kiln = BlockSchemaParser.ParseKiln(definition.Kiln, path, multiblockSize),
             Bloomery = BlockSchemaParser.ParseBloomery(definition.Bloomery, multiblockSize, path),
             IsAnvil = BlockSchemaParser.ParseAnvil(definition.Anvil, renderer, path),

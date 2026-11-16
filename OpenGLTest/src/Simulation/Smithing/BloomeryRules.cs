@@ -40,6 +40,14 @@ public static class BloomeryRules
             BloomeryConfig.BellowsBaseHeat + fallBlocks * BloomeryConfig.BellowsHeatPerBlock);
     }
 
+    /// <summary>
+    /// How bright a lit bloomery's hearth and throat glow at <paramref name="heat"/>, 0..1: from
+    /// <see cref="BloomeryConfig.GlowColdAlpha"/> for a fire with no heat up to 1 at
+    /// <see cref="BloomeryConfig.GlowFullHeat"/>, never dimmer for a hotter fire.
+    /// </summary>
+    public static float GlowAlpha(float heat) =>
+        MathUtils.Lerp(BloomeryConfig.GlowColdAlpha, 1f, MathUtils.Clamp01(heat / BloomeryConfig.GlowFullHeat));
+
     /// <summary>The heat after a landing that adds <paramref name="added"/>, never over 1.</summary>
     public static float Pump(float heat, float added) => MathF.Min(1f, heat + added);
 }

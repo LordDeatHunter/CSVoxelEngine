@@ -34,6 +34,14 @@ public static class BloomeryConfig
     /// <summary>Heat below which the ore does not smelt: the fire is too cold and the unit's progress runs back.</summary>
     public const float BandMin = 0.35f;
 
+    /// <summary>How bright the hearth and the throat of a lit bloomery glow with no heat left, as a share of
+    /// their full glow (<see cref="Simulation.Smithing.BloomeryRules.GlowAlpha"/>).</summary>
+    public const float GlowColdAlpha = 0.2f;
+
+    /// <summary>Heat at which the glow is full: well inside the band, so a fire that is merely good enough still
+    /// looks duller than one worked hard.</summary>
+    public const float GlowFullHeat = 0.7f;
+
     /// <summary>Seconds of progress a cold fire takes back per second when it is out entirely; a fire just under
     /// <see cref="BandMin"/> takes back almost nothing, so the colder, the faster the unit unsmelts.</summary>
     public const float ColdReverseRate = 1.5f;

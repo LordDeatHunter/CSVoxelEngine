@@ -9,6 +9,7 @@ namespace VoxelEngine.Content.Shapes;
 /// outline, the break overlay, the mining pop and shape collision, so all of them agree with what
 /// the mesher draws: tree wood follows its thickness and connections (<see cref="TreeWoodShape"/>),
 /// layered snow its stack depth (<see cref="SnowShape"/>), a pane its arms (<see cref="PaneShape"/>),
+/// a shaped multiblock cell its piece of the structure (<see cref="MultiblockBoxes"/>),
 /// a facing block its facing (<see cref="BlockType.RotatedHitboxes"/>, plus the open bit of an
 /// openable block, <see cref="DoorState"/>), and everything else its
 /// registered <see cref="BlockType.Hitboxes"/>. Only thin and beveled tree wood allocate.
@@ -27,6 +28,8 @@ public static class BlockShape
         if (type.Renderer == BlockRenderer.SnowLayers)
             return SnowShape.GetBoxes(x, y, z, chunks.GetStateGlobal(x, y, z), type.StackMax);
         if (type.Renderer == BlockRenderer.Pane) return PaneShape.GetBoxesAt(chunks, x, y, z);
+        if (type.Renderer is BlockRenderer.Multiblock or BlockRenderer.MultiblockPart)
+            return MultiblockBoxes.At(type, chunks.GetStateGlobal(x, y, z)) ?? type.Hitboxes;
         if (type.RotatedHitboxes is { } rotated)
             return rotated[BlockType.ShapeIndex(chunks.GetStateGlobal(x, y, z), rotated.Length)];
         return type.Hitboxes;

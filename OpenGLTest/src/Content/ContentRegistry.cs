@@ -211,8 +211,9 @@ public static class ContentRegistry
             {
                 // A multiblock cell's model says nothing about the cell it sits in: the anchor holds
                 // the whole structure (so its bake is never a full cube of its own cell) and a
-                // part draws nothing at all. The surface of the structure really does cover its
-                // neighbors, so it occludes by default; and its quads carry no cullface, so they
+                // part draws nothing at all. A structure that fills its cube covers its neighbors,
+                // so it occludes by default (a shaped one writes occludes: false, since a neighbor's
+                // face shows past it); and its quads carry no cullface, so they
                 // are lit from the anchor's own cell, which means light has to reach that cell.
                 // Explicit JSON still wins, and the cutout/translucent guard above is kept.
                 // Tree wood is a full cube at full thickness and a thin node and tubes below it, and

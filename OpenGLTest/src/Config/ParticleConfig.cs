@@ -77,6 +77,20 @@ public static class ParticleConfig
     /// <summary>Share of a cell's spawn scatter a flame's base spreads over; the flame hugs the middle of the fire.</summary>
     public const float FireFlameSpreadShare = 0.8f;
 
+    // --- Furnace flues (FurnaceEffects, puffed on the campfire particle instance) ---
+    // A lit kiln, alloy furnace or bloomery smokes out of the top of its model, and a bloomery whose heat jumps
+    // (a landing on its bellows, or lighting it) throws a burst of sparks out of its throat.
+    public const float FlueSmokePerSecond = 5f;
+    public const float FlueEmberPerSecond = 4f;
+    /// <summary>Scatter of a flue's particles across its mouth, in blocks.</summary>
+    public const float FlueSpread = 0.3f;
+    /// <summary>Smallest heat rise (0..1) between two frames that counts as a blast.</summary>
+    public const float BellowsBlastMinRise = 0.03f;
+    /// <summary>Sparks per unit of heat a blast adds.</summary>
+    public const float BellowsBlastSparksPerHeat = 90f;
+    public const int BellowsBlastMaxSparks = 40;
+    public const int BellowsBlastSmoke = 4;
+
     // --- Lava embers and smoke (a second FireParticleSystem instance in World) ---
     // Exposed lava cells ("hot fluid vents", recorded per chunk by the mesher) emit sparse
     // embers and smoke. Their own instance keeps them from competing with campfires.

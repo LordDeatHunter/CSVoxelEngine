@@ -114,7 +114,7 @@ touch a file that violates one of them, fixing it is in scope.
   (`InitWorldProgram`, `ApplyFrameUniforms`, `SetDrawUniforms`); its passes live in the
   components it builds and exposes as internal properties (`GpuPassTimer`, `TextureUnits`,
   `RenderTargets`, `FrameLighting`, `SkyPasses`, `ScreenPasses`, `BillboardPasses`,
-  `SelectionPasses`, `StationPasses`, `ObjectPasses`, `PlayerPasses`, `MobPasses`,
+  `SelectionPasses`, `StationPasses`, `SmithingPasses`, `ObjectPasses`, `PlayerPasses`, `MobPasses`,
   `ShadowPass`, `TerrainPasses`, `ReflectionPass`, `UiPasses`). `UIRenderer.cs` (801
   lines, down from 2,504) has a stated reason too: it owns the UI's GL resources and their
   creation and disposal order (the ui program, the count font, the text batch buffers, the

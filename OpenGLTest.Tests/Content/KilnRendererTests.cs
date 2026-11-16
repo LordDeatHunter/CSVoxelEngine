@@ -54,7 +54,7 @@ public sealed class KilnRendererTests
     /// <summary>
     /// Contract between the renderer's placement constants and the kiln model's opening: a prop
     /// standing outside the opening would clip into the brickwork, and a flame in front of the
-    /// crucible would burn through the bowl instead of under it.
+    /// crucible would burn through the bowl instead of behind it.
     /// </summary>
     [Theory]
     [MemberData(nameof(KilnAnchors))]
@@ -66,22 +66,43 @@ public sealed class KilnRendererTests
         Assert.Equal(ContentRegistry.RequireBlock(anchor).MultiblockSize, layout.VolumeSize);
 
         // The bowl's rim has to clear the lintel whatever the facing
-        Assert.True(layout.OpeningFloorY + KilnRenderer.CrucibleTopY < layout.OpeningCeilingY);
+        Assert.True(layout.CrucibleLocal.Y + KilnRenderer.CrucibleTopY < layout.OpeningCeilingY);
+        // ...and it stands on the hearth floor or on something the model raises above it
+        Assert.True(layout.CrucibleLocal.Y >= layout.OpeningFloorY);
 
-        // The flame burns behind the bowl's back wall, and the fuel sits behind the flame
+        // The flame burns behind the bowl's back wall
         Assert.True(layout.FireLocal.Z >= layout.CrucibleLocal.Z + KilnRenderer.CrucibleOuterHalf);
-        Assert.True(layout.FuelLocal.Z > layout.FireLocal.Z);
 
-        // The whole drawn fuel row - every unit's full width, not just the row's center - has to
-        // fit between the piers and clear the hearth's back wall, and no two units may share a
-        // plane
+        // Every drawn fuel unit - its full width, not just its center - has to fit between the walls and
+        // inside the opening's depth, and no two units may share a plane
         Assert.True(KilnRenderer.FuelSpacing >= KilnRenderer.FuelSize);
-        var halfRow = (profile.FuelCap - 1) * 0.5f * KilnRenderer.FuelSpacing
-                    + KilnRenderer.FuelSize * 0.5f;
-        Assert.True(layout.FuelLocal.X - halfRow >= layout.OpeningMinX);
-        Assert.True(layout.FuelLocal.X + halfRow <= layout.OpeningMaxX);
-        Assert.True(layout.FuelLocal.Z + KilnRenderer.FuelSize * 0.5f <= layout.OpeningDepthZ);
-        Assert.True(layout.FuelLocal.Z - KilnRenderer.FuelSize * 0.5f >= 0f);
+        var half = KilnRenderer.FuelSize * 0.5f;
+        for (var count = 1; count <= profile.FuelCap; count++)
+        for (var i = 0; i < count; i++)
+        {
+            var slot = layout.FuelSlotLocal(i, count);
+            Assert.Equal(layout.OpeningFloorY, slot.Y, precision: 4);
+            Assert.True(slot.X - half >= layout.OpeningMinX - Epsilon);
+            Assert.True(slot.X + half <= layout.OpeningMaxX + Epsilon);
+            Assert.True(slot.Z - half >= -Epsilon);
+            Assert.True(slot.Z + half <= layout.OpeningDepthZ + Epsilon);
+            for (var j = 0; j < i; j++)
+            {
+                var apart = Vector3.Abs(slot - layout.FuelSlotLocal(j, count));
+                Assert.True(apart.X >= KilnRenderer.FuelSize - Epsilon || apart.Z >= KilnRenderer.FuelSize - Epsilon);
+            }
+        }
+
+        // The ember bed glows on the floor, inside the opening, just under whatever rests on that floor
+        Assert.True(layout.EmberMin.X >= layout.OpeningMinX - Epsilon && layout.EmberMax.X <= layout.OpeningMaxX + Epsilon);
+        Assert.True(layout.EmberMin.Y >= -Epsilon && layout.EmberMax.Y <= layout.OpeningDepthZ + Epsilon);
+        Assert.True(layout.EmberLocal.Y > layout.OpeningFloorY);
+        Assert.True(layout.EmberLocal.Y - layout.OpeningFloorY < SpritePose.RestingClearance);
+
+        // The flue smokes on top of the model, over its footprint
+        Assert.Equal(layout.VolumeSize, layout.FlueLocal.Y, precision: 4);
+        Assert.InRange(layout.FlueLocal.X, 0f, layout.VolumeSize);
+        Assert.InRange(layout.FlueLocal.Z, 0f, layout.VolumeSize);
 
         for (var facing = 0; facing < 4; facing++)
         {
@@ -89,22 +110,36 @@ public sealed class KilnRendererTests
             var (minX, maxX, minZ, maxZ) = OpeningFootprint(layout, facing);
 
             var bowl = layout.ToWorld(Vector3.Zero, facing, layout.CrucibleLocal);
-            Assert.Equal(layout.OpeningFloorY, bowl.Y, precision: 4);
+            Assert.Equal(layout.CrucibleLocal.Y, bowl.Y, precision: 4);
             Assert.InRange(bowl.X - KilnRenderer.CrucibleOuterHalf, minX - Epsilon, maxX + Epsilon);
             Assert.InRange(bowl.X + KilnRenderer.CrucibleOuterHalf, minX - Epsilon, maxX + Epsilon);
             Assert.InRange(bowl.Z - KilnRenderer.CrucibleOuterHalf, minZ - Epsilon, maxZ + Epsilon);
             Assert.InRange(bowl.Z + KilnRenderer.CrucibleOuterHalf, minZ - Epsilon, maxZ + Epsilon);
-
-            var fuel = layout.ToWorld(Vector3.Zero, facing, layout.FuelLocal);
-            Assert.Equal(layout.OpeningFloorY, fuel.Y, precision: 4);
 
             // The flame burns inside the opening too, so its light and embers come out of it
             var fire = layout.ToWorld(Vector3.Zero, facing, layout.FireLocal);
             Assert.InRange(fire.X, minX - Epsilon, maxX + Epsilon);
             Assert.InRange(fire.Z, minZ - Epsilon, maxZ + Epsilon);
             Assert.InRange(fire.Y, layout.OpeningFloorY, layout.OpeningCeilingY);
-            Assert.InRange(fuel.X, minX - Epsilon, maxX + Epsilon);
-            Assert.InRange(fuel.Z, minZ - Epsilon, maxZ + Epsilon);
+        }
+    }
+
+    /// <summary>
+    /// A wide hearth's ember bed is laid out of several tiles instead of one stretched one: there is always a
+    /// tile, a bigger bed never gets fewer, and no tile is stretched past twice the size it is meant to be.
+    /// </summary>
+    [Fact]
+    public void EmberBedIsTiledRatherThanStretched()
+    {
+        var previous = 0;
+        for (var size = 0.05f; size <= 4f; size += 0.05f)
+        {
+            var (columns, rows) = KilnRenderer.EmberGrid(new Vector2(size, size));
+            Assert.Equal(columns, rows);
+            Assert.True(columns >= 1);
+            Assert.True(columns >= previous);
+            Assert.True(size / columns <= 2f * KilnRenderer.EmberTileSize);
+            previous = columns;
         }
     }
 
@@ -236,7 +271,7 @@ public sealed class KilnRendererTests
         // It sits over the bowl's rim, and even at full size it clears the lintel
         foreach (var layout in KilnLayout.All)
         {
-            Assert.True(layout.PendingLocal.Y >= layout.OpeningFloorY + KilnRenderer.CrucibleTopY);
+            Assert.True(layout.PendingLocal.Y >= layout.CrucibleLocal.Y + KilnRenderer.CrucibleTopY);
             Assert.True(layout.PendingLocal.Y + KilnRenderer.PendingSize <= layout.OpeningCeilingY);
         }
 

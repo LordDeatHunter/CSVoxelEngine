@@ -104,6 +104,7 @@ public sealed class KilnManager
     private readonly Dictionary<(int X, int Y, int Z), KilnState> _kilns = new();
     private readonly List<(int X, int Y, int Z)> _stale = new();
     private readonly List<Vector3> _litCells = new();
+    private readonly List<Vector3> _flueCells = new();
 
     /// <summary>Whether any kiln is tracked, for render early-out.</summary>
     public bool HasAny => _kilns.Count > 0;
@@ -115,6 +116,10 @@ public sealed class KilnManager
     /// light lands the usual 0.65 blocks above it — still under the kiln's lintel.
     /// </summary>
     public IReadOnlyList<Vector3> LitCells => _litCells;
+
+    /// <summary>Smoke origins of every lit kiln: the mouth of its flue (<see cref="KilnLayout.FlueLocal"/>), in
+    /// the same form as <see cref="LitCells"/>.</summary>
+    public IReadOnlyList<Vector3> FlueCells => _flueCells;
 
     /// <summary>
     /// Registers a kiln structure (or refreshes the facing and anchor id of one already known),
@@ -481,12 +486,15 @@ public sealed class KilnManager
     private void RefreshCells()
     {
         _litCells.Clear();
+        _flueCells.Clear();
         foreach (var (key, state) in _kilns)
         {
             if (!state.Lit) continue;
             var anchor = new Vector3(key.X, key.Y, key.Z);
             var layout = state.Profile.Layout;
             _litCells.Add(layout.ToWorld(anchor, state.Facing, layout.FireLocal)
+                - FireParticleSystem.SpawnOffset);
+            _flueCells.Add(layout.ToWorld(anchor, state.Facing, layout.FlueLocal)
                 - FireParticleSystem.SpawnOffset);
         }
     }

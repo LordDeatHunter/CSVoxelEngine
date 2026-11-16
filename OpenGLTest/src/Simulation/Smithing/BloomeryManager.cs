@@ -84,12 +84,17 @@ public sealed class BloomeryManager
     private readonly Dictionary<(int X, int Y, int Z), BloomeryState> _bloomeries = new();
     private readonly List<(int X, int Y, int Z)> _stale = new();
     private readonly List<Vector3> _litCells = new();
+    private readonly List<Vector3> _flueCells = new();
 
     /// <summary>Whether any bloomery is tracked, for render early-out and the empty-snapshot rule.</summary>
     public bool HasAny => _bloomeries.Count > 0;
 
     /// <summary>Particle and light origins of every lit bloomery, in the form <see cref="KilnManager.LitCells"/> uses.</summary>
     public IReadOnlyList<Vector3> LitCells => _litCells;
+
+    /// <summary>Smoke origins of every lit bloomery: the mouth of its throat (<see cref="BloomeryLayout.ThroatLocal"/>),
+    /// in the same form as <see cref="LitCells"/>.</summary>
+    public IReadOnlyList<Vector3> FlueCells => _flueCells;
 
     /// <summary>Registers a bloomery structure (or refreshes the facing and anchor id of one already known).</summary>
     public void Ensure(Vector3 anchor, int facing, ushort anchorId)
@@ -349,13 +354,15 @@ public sealed class BloomeryManager
     private void RefreshCells()
     {
         _litCells.Clear();
+        _flueCells.Clear();
         foreach (var (key, state) in _bloomeries)
         {
             if (!state.Lit) continue;
             var anchor = new Vector3(key.X, key.Y, key.Z);
-            // A bloomery wears the mud brick kiln's model, so its fire burns where the kiln's does
-            var layout = KilnLayout.Kiln;
-            _litCells.Add(layout.ToWorld(anchor, state.Facing, layout.FireLocal) - FireParticleSystem.SpawnOffset);
+            _litCells.Add(BloomeryLayout.ToWorld(anchor, state.Facing, BloomeryLayout.FireLocal)
+                - FireParticleSystem.SpawnOffset);
+            _flueCells.Add(BloomeryLayout.ToWorld(anchor, state.Facing, BloomeryLayout.ThroatLocal)
+                - FireParticleSystem.SpawnOffset);
         }
     }
 

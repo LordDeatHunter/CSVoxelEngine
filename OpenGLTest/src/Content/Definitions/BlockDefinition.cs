@@ -515,6 +515,11 @@ public sealed class BlockDefinition
         /// <summary>Edge length of the cubic volume in cells, 2..4; default 2 (the kiln). The
         /// model is authored in 0..16 * size model units.</summary>
         public int? Size { get; set; }
+
+        /// <summary>The structure's shape when it is not the whole cubic volume: one <c>{min, max}</c> box or an
+        /// array of them in volume cell space (0..size), authored with the front on north like the model. Every
+        /// cell of the volume must hold a piece of it. Omitted, every cell is a full cube.</summary>
+        public JsonElement Boxes { get; set; }
     }
 
     /// <summary>The <c>"open"</c> object: what an openable block looks like and is hit as while

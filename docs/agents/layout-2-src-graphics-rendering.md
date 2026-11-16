@@ -291,6 +291,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       AmbientEffects.cs        # World component: the fire cells (campfires, lit kilns, goblin torches), cosmetic
                                #   world effects (steam puffs, lava vents, spring steam, torch flames, bubbles,
                                #   water splashes, blast shake)
+      FurnaceEffects.cs        # flue smoke and embers of lit kilns and bloomeries, and the spark burst out of a
+                               #   bloomery's throat when its heat jumps (BlastSparks); run by AmbientEffects
       BlockDebris.cs           # one chunk of mining debris: a small cube textured as the block it broke off from
       BlockDebrisSystem.cs     # owns the live mining debris: small textured cubes chipped off
                                #   on every mining hit plus a bigger burst when the block breaks
@@ -512,6 +514,9 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         PlayerPasses.cs        # the player body, held item and remote players (RenderPlayer, RenderHeldItem, RenderRemotePlayers),
                                #   the player rig and its meshes; the held sprite through HeldItemPose and DrawItemSprite,
                                #   and the assumed blade (SliceTrailSystem.AssumedBlade) while a remote player swings
+        SmithingPasses.cs      # the iron works' draws: a bloomery's charge in the throat, fuel bed, blooms and
+                               #   heat glow (BloomeryLayout), and the metal stacked on an anvil; uses
+                               #   StationPasses' meshes and ember quad
         StationPasses.cs       # the station passes ride inside entityPass: RenderCampfireCooking,
                                #   RenderQuerns, RenderKilns (crucible mesh, molten pool, the last charged
                                #   input hovering over the rim and shrinking into it, stored

@@ -56,11 +56,14 @@ public sealed class KilnContentTests
             // A structure is built from its source block, never held
             Assert.False(cell.HasItem);
             Assert.Null(ItemRegistry.TryGet(cell.Id));
-            // The surface really covers its neighbors, but light must still reach the anchor
-            // cell, which is where every quad of the model is lit from
-            Assert.True(cell.OccludesNeighbors);
+            // The shape stands inside its cells, so no cell may hide a neighbor's face or darken the
+            // ground around it; light must still reach the anchor cell, which is where every quad of
+            // the model is lit from
+            Assert.False(cell.OccludesNeighbors);
             Assert.True(cell.PassesLight);
-            Assert.True(cell.CastsAmbientOcclusion);
+            Assert.False(cell.CastsAmbientOcclusion);
+            // ...and a body meets the shape, not the cell
+            Assert.True(cell.CollidesByHitbox);
             // Neither renderer is the plain model renderer, so neither joins the greedy pass
             Assert.False(BlockType.IsGreedy(cell.Id));
             Assert.Equal(new[] { bricks.Id }, RollOnce(cell.LootTable!));
@@ -112,17 +115,12 @@ public sealed class KilnContentTests
             Assert.False(quad.IsFullFace);
         }
 
-        // The hearth's back wall is the only thing you see looking into the opening
-        var backWalls = north.Quads
-            .Where(q => q.Face == 0 && MathF.Abs(Range(q, p => p.Z).Min - layout.OpeningDepthZ) <= Epsilon)
-            .ToList();
-        var backWall = Assert.Single(backWalls);
-        var wallX = Range(backWall, p => p.X);
-        var wallY = Range(backWall, p => p.Y);
-        Assert.Equal(layout.OpeningMinX, wallX.Min, 3);
-        Assert.Equal(layout.OpeningMaxX, wallX.Max, 3);
-        Assert.Equal(layout.OpeningFloorY, wallY.Min, 3);
-        Assert.Equal(layout.OpeningCeilingY, wallY.Max, 3);
+        // Looking into the opening you see a back wall at the layout's depth
+        var middle = new Vector2((layout.OpeningMinX + layout.OpeningMaxX) * 0.5f,
+            (layout.OpeningFloorY + layout.OpeningCeilingY) * 0.5f);
+        Assert.Contains(north.Quads, q => q.Face == 0
+            && MathF.Abs(Range(q, p => p.Z).Min - layout.OpeningDepthZ) <= Epsilon
+            && Covers(Range(q, p => p.X), middle.X) && Covers(Range(q, p => p.Y), middle.Y));
 
         // ...because nothing covers the opening on the front plane itself
         foreach (var quad in north.Quads)
@@ -136,12 +134,75 @@ public sealed class KilnContentTests
         }
 
         // Rotating to facing 1 turns the opening onto +Z, so the back wall moves with it
-        var rotatedWalls = anchor.RotatedModels[1].Quads
-            .Where(q => q.Face == 1 &&
-                        MathF.Abs(Range(q, p => p.Z).Max - (anchor.MultiblockSize - layout.OpeningDepthZ)) <= Epsilon)
-            .ToList();
-        var rotatedWall = Assert.Single(rotatedWalls);
-        Assert.Equal(anchor.MultiblockSize - layout.OpeningDepthZ, Range(rotatedWall, p => p.Z).Min, 3);
+        Assert.Contains(anchor.RotatedModels[1].Quads, q => q.Face == 1
+            && MathF.Abs(Range(q, p => p.Z).Max - (anchor.MultiblockSize - layout.OpeningDepthZ)) <= Epsilon);
+    }
+
+    private static bool Covers((float Min, float Max) range, float value) =>
+        range.Min <= value + Epsilon && range.Max >= value - Epsilon;
+
+    /// <summary>
+    /// What a kiln holds has to stand on the model and in free air: the bowl, every fuel unit and the ember bed
+    /// each rest on an up-facing surface of the model at their own height, and no part of the model cuts through
+    /// the space the bowl, the waiting charge or a fuel unit is drawn in.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(KilnAnchors))]
+    public void WhatAKilnHoldsStandsOnTheModelAndClearOfIt(string anchorName)
+    {
+        var anchor = ContentRegistry.RequireBlock(anchorName);
+        var profile = anchor.Kiln!;
+        var layout = profile.Layout;
+        var model = anchor.RotatedModels![0];
+
+        AssertStandsOn(model, layout.CrucibleLocal, "the crucible");
+        AssertStandsOn(model, layout.EmberLocal with { Y = layout.OpeningFloorY }, "the ember bed");
+
+        var bowlHalf = new Vector3(KilnRenderer.CrucibleOuterHalf, 0f, KilnRenderer.CrucibleOuterHalf);
+        AssertClear(model, layout.CrucibleLocal - bowlHalf,
+            layout.CrucibleLocal + bowlHalf + new Vector3(0f, KilnRenderer.CrucibleTopY, 0f), "the crucible");
+
+        var lumpHalf = new Vector3(KilnRenderer.PendingSize * 0.5f, 0f, KilnRenderer.PendingSize * 0.5f);
+        AssertClear(model, layout.PendingLocal - lumpHalf,
+            layout.PendingLocal + lumpHalf + new Vector3(0f, KilnRenderer.PendingSize, 0f), "the waiting charge");
+
+        var fuelHalf = new Vector3(KilnRenderer.FuelSize * 0.5f, 0f, KilnRenderer.FuelSize * 0.5f);
+        for (var i = 0; i < profile.FuelCap; i++)
+        {
+            var slot = layout.FuelSlotLocal(i, profile.FuelCap);
+            AssertStandsOn(model, slot, $"fuel unit {i}");
+            AssertClear(model, slot - fuelHalf,
+                slot + fuelHalf + new Vector3(0f, 2f * SpritePose.RestingLift(KilnRenderer.FuelSize), 0f),
+                $"fuel unit {i}");
+            // ...and it lies beside the bowl, never under it
+            var apart = Vector3.Abs(slot - layout.CrucibleLocal);
+            Assert.True(apart.X >= KilnRenderer.CrucibleOuterHalf + fuelHalf.X - Epsilon
+                        || apart.Z >= KilnRenderer.CrucibleOuterHalf + fuelHalf.Z - Epsilon,
+                $"fuel unit {i} lies under the crucible");
+        }
+    }
+
+    // Some up-facing quad of the model lies at the point's height and under the point
+    private static void AssertStandsOn(BakedModel model, Vector3 foot, string what) =>
+        Assert.True(model.Quads.Any(q => q.Face == 4
+                && MathF.Abs(Range(q, p => p.Y).Min - foot.Y) <= Epsilon
+                && Covers(Range(q, p => p.X), foot.X) && Covers(Range(q, p => p.Z), foot.Z)),
+            $"{what} at {foot} stands on nothing");
+
+    // No quad of the model reaches into the open inside of the box
+    private static void AssertClear(BakedModel model, Vector3 min, Vector3 max, string what)
+    {
+        const float skin = 1e-3f;
+        foreach (var quad in model.Quads)
+        {
+            var x = Range(quad, p => p.X);
+            var y = Range(quad, p => p.Y);
+            var z = Range(quad, p => p.Z);
+            var inside = x.Max > min.X + skin && x.Min < max.X - skin
+                         && y.Max > min.Y + skin && y.Min < max.Y - skin
+                         && z.Max > min.Z + skin && z.Min < max.Z - skin;
+            Assert.False(inside, $"the model cuts through {what}");
+        }
     }
 
     [Theory]

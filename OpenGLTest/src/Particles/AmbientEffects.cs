@@ -41,6 +41,7 @@ internal sealed class AmbientEffects
     private readonly bool _serverMode;
     private readonly CampfireManager _campfires;
     private readonly KilnManager _kilns;
+    private readonly FurnaceEffects _furnaces;
     private readonly GoblinManager? _goblins;
 
     private Camera Camera => _world.Camera;
@@ -65,6 +66,7 @@ internal sealed class AmbientEffects
         _campfires = campfires;
         _kilns = kilns;
         _goblins = goblins;
+        _furnaces = new FurnaceEffects(fire, kilns, world.Smithing.Bloomeries);
     }
 
     /// <summary>Every burning cell this frame (campfires, lit kilns, lit bloomeries and
@@ -114,14 +116,16 @@ internal sealed class AmbientEffects
         _lightCells.Add(FireLight.OfBlock(point - Rendering.FrameLighting.FireLightOffset, heldId));
     }
 
-    /// <summary>Refills <see cref="_fireCells"/> with the lit campfires and kilns; both update
-    /// paths call it after the stations ticked and before the fire particles run.</summary>
-    internal void GatherStationFires()
+    /// <summary>Refills <see cref="_fireCells"/> with the lit campfires and kilns and, off a headless server, runs
+    /// the furnaces' flue smoke and bellows blasts (<see cref="FurnaceEffects"/>); both update paths call it
+    /// after the stations ticked and before the fire particles run.</summary>
+    internal void GatherStationFires(float deltaTime)
     {
         _fireCells.Clear();
         _fireCells.AddRange(_campfires.LitCells);
         _fireCells.AddRange(_kilns.LitCells);
         _fireCells.AddRange(_world.Smithing.Bloomeries.LitCells);
+        if (!_serverMode) _furnaces.Update(deltaTime, Camera.RenderEye);
     }
 
     /// <summary>Adds every goblin's lit torch to <see cref="_fireCells"/>, right after

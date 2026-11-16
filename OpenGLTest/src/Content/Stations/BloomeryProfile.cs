@@ -7,8 +7,8 @@ namespace VoxelEngine.Content.Stations;
 /// <summary>
 /// How one kind of bloomery behaves, compiled from its anchor block's <c>bloomery</c> object
 /// (<see cref="BlockType.Bloomery"/>): how many units of ore and of fuel its shaft holds and where its bellows go. The
-/// heat model every bloomery shares lives in <see cref="Config.BloomeryConfig"/>. A bloomery's model is the mud brick
-/// kiln's, so where its fire burns is <see cref="KilnLayout.Kiln"/>'s.
+/// heat model every bloomery shares lives in <see cref="Config.BloomeryConfig"/>, and where its fire burns and its
+/// props lie in <see cref="BloomeryLayout"/>, which mirrors its model.
 /// </summary>
 /// <param name="OreCap">Units of crushed ore the shaft holds at once.</param>
 /// <param name="FuelCap">Units of fuel the shaft holds at once.</param>
