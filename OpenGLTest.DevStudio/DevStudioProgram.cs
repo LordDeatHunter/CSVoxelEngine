@@ -394,7 +394,7 @@ public static class DevStudioProgram
             _firstPerson && _tab == StudioTab.Items, _tab is StudioTab.Items or StudioTab.Entities ? ActiveClock : null,
             _quests.HighlightedIcon);
         if (_tab == StudioTab.Quests)
-            _quests.DrawPanels(_scene.Ui, (float)_time);
+            _quests.DrawPanels(_scene.Ui, _haveMouse ? _lastMouse : null, (float)_time);
         _scene.Ui.End();
         _gl.BindVertexArray(0);
 

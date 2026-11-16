@@ -235,7 +235,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   and evaluates the border, glow, wash, sheen and sparkles (Shade)
       UiCanvas.cs              # the virtual UI canvas: reference size, uniform scale, scissor rects
       Widgets/                 # GL-free widget layouts the renderers only draw: UiRect, PanelFrameLayout, ButtonLayout (+ WidgetState),
-                               #   TabStripLayout, ListRowLayout, TextBoxLayout, ScrollViewLayout, TooltipLayout; the kit the [E] panel,
+                               #   TabStripLayout, ListRowLayout, TextBoxLayout, ScrollViewLayout, TooltipLayout, DropdownState (a drop-down list's
+                               #   open flag, row geometry and click rule, drawn by DropdownRenderer); the kit the [E] panel,
                                #   craft card, spell builder and the gear and chest panels build on (plans/INVENTORY_UI.md)
       Forge/                   # the anvil's recipe list, GL-free (ForgeRenderer draws it, ForgeInput drives it)
         ForgeView.cs           # open flag, the anvil, its metal stack and the recipes offered for it, hover, transition

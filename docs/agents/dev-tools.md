@@ -91,7 +91,7 @@ refused in the status line), double-click empty canvas to add a quest there, dra
 top bar picks the graph (`<`/`>`), edits its title, adds a graph file (`NEW GRAPH`, `graph_N.json`) or a quest at the
 view center, and saves. The right panel edits the selected quest's id (committed on Enter or leaving the field; a rename
 follows every parent link), title, description, shape (AUTO/HEX/CIRCLE), readable, any-of, icon and requirements: a type
-button cycles obtain/craft/break/place/kill, the target field takes an item (or `#tag`, which adds a label field), a block
+dropdown (the reusable `UI/Widgets/DropdownState`, drawn by `DropdownRenderer`) picks obtain/craft/break/place/kill, the target field takes an item (or `#tag`, which adds a label field), a block
 or an entity, `-`/`+` set the count, PICK arms the left grid for the target (NEXT MOB steps a kill through the registered
 entities), and a plain grid click sets the icon. Delete removes the selected quest and every link to it, Ctrl+S saves,
 Escape clears the selection. Every edit recompiles through `QuestLoader.Compile`: an error is listed in red under the

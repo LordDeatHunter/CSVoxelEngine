@@ -23,7 +23,7 @@ namespace VoxelEngine.DevStudio;
 /// panel. Clicking a node selects it, dragging moves it (shift-drag moves its whole graph, Alt turns snapping off),
 /// Ctrl+click toggles the clicked node as a parent of the selected one, a double-click on empty canvas adds a quest
 /// there, dragging empty canvas pans and the wheel zooms. A grid click picks the quest's icon, or the target of a
-/// requirement whose PICK is armed. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
+/// requirement whose PICK is armed. A requirement's type is a <see cref="DropdownState"/>. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
 /// </summary>
 internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys)
 {
@@ -34,7 +34,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         PrevGraph, NextGraph, NewGraph, AddQuest, Save,
         Shape, Readable, AnyOf, PickIcon, AddRequirement, DeleteQuest,
         // The Arg of these is the requirement index.
-        Type, CountDown, CountUp, Pick, Remove,
+        CountDown, CountUp, Pick, Remove,
     }
 
     private const float Pad = DevStudioUi.Pad;
@@ -52,6 +52,10 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private readonly List<(UiRect Rect, Action Action, int Arg, string Label, bool Enabled, bool Active)> _buttons = [];
     private readonly List<(UiRect Rect, Field Field, int Arg, string Placeholder)> _fields = [];
     private (Field Field, int Arg)? _focus;
+    // One type dropdown per requirement row of the selected quest, rebuilt (closed) when the selection changes
+    private static readonly string[] TypeLabels = [.. QuestEditorState.RequirementTypes.Select(t => t.ToUpperInvariant())];
+    private readonly List<DropdownState> _typeDropdowns = [];
+    private string? _dropdownQuest;
     private string? _focusQuest;
 
     private enum Drag { None, Pan, Node, Graph }
@@ -126,7 +130,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     }
 
     /// <summary>Builds and draws the top bar, the right panel and the status lines.</summary>
-    public void DrawPanels(UIRenderer ui, float time)
+    public void DrawPanels(UIRenderer ui, Vector2? pointer, float time)
     {
         _screen = ui.ScreenSize;
         _ui = ui;
@@ -147,6 +151,21 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             DevStudioUi.DrawButton(ui, rect.Center, rect.Size, label, enabled, active);
         DrawDetailsText(ui);
         DrawStatus(ui);
+        DrawTypeDropdowns(ui, pointer);
+    }
+
+    // The closed boxes first, then the open list over everything it covers
+    private void DrawTypeDropdowns(UIRenderer ui, Vector2? pointer)
+    {
+        if (State.SelectedQuest?.Requirements is not { } requirements) return;
+        var scale = ui.CapHeightScale(DevStudioUi.TextCap);
+        foreach (var open in new[] { false, true })
+            for (var i = 0; i < _typeDropdowns.Count && i < requirements.Count; i++)
+            {
+                if (_typeDropdowns[i].IsOpen != open) continue;
+                var type = Array.IndexOf(QuestEditorState.RequirementTypes, requirements[i].Type?.ToLowerInvariant());
+                DropdownRenderer.Draw(ui, _typeDropdowns[i], type, pointer, scale);
+            }
     }
 
     private void BuildTopBar()
@@ -165,6 +184,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
     private void BuildDetails()
     {
+        if (State.SelectedQuestId != _dropdownQuest)
+        {
+            _typeDropdowns.Clear();
+            _dropdownQuest = State.SelectedQuestId;
+        }
         if (State.SelectedQuest is not { } quest) return;
         var left = PanelLeft;
         var width = PanelRight - left;
@@ -188,11 +212,16 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         y += ButtonH + Gap + LabelH;
 
         var requirements = quest.Requirements ?? [];
+        if (_typeDropdowns.Count > requirements.Count) _typeDropdowns.RemoveRange(requirements.Count, _typeDropdowns.Count - requirements.Count);
+        while (_typeDropdowns.Count < requirements.Count) _typeDropdowns.Add(new DropdownState(TypeLabels));
+        const float typeWidth = 110f;
         for (var i = 0; i < requirements.Count; i++)
         {
             var requirement = requirements[i];
-            AddButton(Rect(left, y, 70f, FieldH), Action.Type, (requirement.Type ?? "?").ToUpperInvariant(), true, false, i);
-            _fields.Add((Rect(left + 70f + Gap, y, width - 70f - Gap, FieldH), Field.Target, i,
+            _typeDropdowns[i].Box = Rect(left, y, typeWidth, FieldH);
+            // A row near the bottom opens its list upward, so it stays on screen
+            _typeDropdowns[i].OpensUp = y + FieldH * (TypeLabels.Length + 1) > _screen.Y - Pad;
+            _fields.Add((Rect(left + typeWidth + Gap, y, width - typeWidth - Gap, FieldH), Field.Target, i,
                 requirement.Type == "kill" ? "entity" : QuestEditorState.TakesItem(requirement) ? "item or #tag" : "block"));
             y += FieldH + Gap;
 
@@ -354,6 +383,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     /// <summary>A left press the studio's own widgets did not take. True when the page used it.</summary>
     public bool MouseDown(Vector2 point, double time, bool ctrl, bool shift)
     {
+        if (TypeDropdownClick(point)) return true;
         foreach (var (rect, action, arg, _, enabled, _) in _buttons)
         {
             if (!enabled || !rect.Contains(point)) continue;
@@ -411,6 +441,26 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             _grabbed = node.Position;
         }
         return true;
+    }
+
+    // An open type list takes the click first (a pick, or dismissing it); then a click on a closed box opens it
+    private bool TypeDropdownClick(Vector2 point)
+    {
+        if (State.SelectedQuestId is not { } id) return false;
+        for (var i = 0; i < _typeDropdowns.Count; i++)
+        {
+            if (!_typeDropdowns[i].IsOpen) continue;
+            if (_typeDropdowns[i].Click(point, out var chosen) == DropdownClick.Chosen)
+                State.SetRequirementType(id, i, QuestEditorState.RequirementTypes[chosen]);
+            return true;
+        }
+        foreach (var dropdown in _typeDropdowns)
+        {
+            if (dropdown.Click(point, out _) != DropdownClick.Toggled) continue;
+            Blur();
+            return true;
+        }
+        return false;
     }
 
     /// <summary>Follows a held press: pans, or moves the grabbed node or graph once past the drag threshold.</summary>
@@ -561,9 +611,6 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             case Action.DeleteQuest when id != null:
                 State.DeleteQuest(id);
                 Status = $"Deleted {id}";
-                break;
-            case Action.Type when id != null:
-                State.CycleRequirementType(id, arg);
                 break;
             case Action.CountDown when id != null:
                 State.AdjustRequirementCount(id, arg, -1);

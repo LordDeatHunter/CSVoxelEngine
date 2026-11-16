@@ -125,9 +125,10 @@ public sealed class QuestEditorStateTests : IDisposable
         var editor = Editor(Graph("g", null, Quest("root", null, Obtain("stone"))));
         var requirement = editor.Find("root")!.Value.Quest.Requirements![0];
 
-        foreach (var _ in QuestEditorState.RequirementTypes)
+        foreach (var type in QuestEditorState.RequirementTypes)
         {
-            editor.CycleRequirementType("root", 0);
+            editor.SetRequirementType("root", 0, type);
+            Assert.Equal(type, requirement.Type);
             var set = new object?[] { requirement.Item, requirement.Tag, requirement.Block, requirement.Entity }.Count(f => f != null);
             Assert.Equal(1, set);
             Assert.Equal(requirement.Type == "kill", requirement.Entity != null);

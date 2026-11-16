@@ -22,7 +22,7 @@ public sealed class QuestEditorState
     /// <summary>The grid step a dragged quest or graph origin snaps to.</summary>
     public const float SnapStep = 0.5f;
 
-    /// <summary>The requirement types in the order the type button cycles through them.</summary>
+    /// <summary>The requirement types, in the order the type dropdown lists them.</summary>
     public static readonly string[] RequirementTypes = ["obtain", "craft", "break", "place", "kill"];
 
     /// <summary>The prefix that makes an obtain or craft target a tag instead of an item.</summary>
@@ -219,12 +219,12 @@ public sealed class QuestEditorState
         PickRequirement = -1;
     });
 
-    /// <summary>Steps the requirement to the next type, carrying its target over to the field that type reads.</summary>
-    public void CycleRequirementType(string id, int index) => EditRequirement(id, index, (_, r) =>
+    /// <summary>Sets the requirement's type (one of <see cref="RequirementTypes"/>), carrying its target over to the
+    /// field that type reads.</summary>
+    public void SetRequirementType(string id, int index, string type) => EditRequirement(id, index, (_, r) =>
     {
         var target = TargetOf(r);
-        var next = (Array.IndexOf(RequirementTypes, r.Type?.ToLowerInvariant()) + 1) % RequirementTypes.Length;
-        r.Type = RequirementTypes[next];
+        r.Type = type;
         ApplyTarget(r, target);
     });
 

@@ -564,6 +564,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   CraftCardLayout
         DamageNumberRenderer.cs # draws the floating damage numbers (DamageNumberPool)
                                 #   as world-space text that always faces the camera
+        DropdownRenderer.cs    # draws a DropdownState: the box with the chosen option and a "v" marker, and the open list
+                               #   (hovered row lit, chosen one gold); used by DevStudio's quest editor
         DamageVignetteRenderer.cs # full-screen damage vignette: one oversized triangle with
                                   #   a radial fragment gradient, drawn inside the UI pass
         EntityHealthbarRenderer.cs # five hearts floating above every live mob, always facing the camera
