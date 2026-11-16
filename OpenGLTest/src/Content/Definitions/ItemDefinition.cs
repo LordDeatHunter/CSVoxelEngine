@@ -40,10 +40,17 @@ public sealed class ItemDefinition
 
     /// <summary>
     /// A throwable that flies point first along its velocity (a javelin) instead of tumbling about the
-    /// vertical like a thrown stone. Needs <see cref="ThrowDamage"/>; the sprite's tip is on its (1, 1)
-    /// diagonal, as a held blade's is.
+    /// vertical like a thrown stone, and that is held tip first along the view while the throw is wound up.
+    /// Needs <see cref="ThrowDamage"/>; the sprite's tip is on its (1, 1) diagonal, as a held blade's is.
     /// </summary>
     public bool ThrowAligned { get; set; }
+
+    /// <summary>
+    /// The share of the throw charge (0..1) a release needs before the item leaves the hand; letting go
+    /// earlier cancels the throw and spends nothing (a javelin wants its wind-up). Omitted for 0: any
+    /// release throws. Needs <see cref="ThrowDamage"/>.
+    /// </summary>
+    public float? ThrowChargeNeeded { get; set; }
 
     /// <summary>
     /// A block whose small cube a throw of this item draws in place of the item's sprite (a flint or obsidian shard

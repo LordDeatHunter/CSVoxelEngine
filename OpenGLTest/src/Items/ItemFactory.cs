@@ -65,7 +65,8 @@ public static class ItemFactory
         GearInfo? Equip = null,
         ShrapnelProfile? Shrapnel = null,
         GearPassive? OnHit = null,
-        HeldModel? HeldModel = null);
+        HeldModel? HeldModel = null,
+        float ThrowChargeNeeded = 0f);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,

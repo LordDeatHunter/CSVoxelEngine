@@ -5,6 +5,7 @@ using VoxelEngine.Content.Models;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Items;
+using VoxelEngine.Player;
 using Xunit;
 
 namespace VoxelEngine.Tests.Entities;
@@ -122,6 +123,41 @@ public sealed class ThrownProjectileTests
         var tip = Vector3.TransformNormal(Vector3.UnitY, drawn);
         Assert.True(Vector3.Dot(tip, Vector3.Normalize(velocity)) > 0.9999f);
         Assert.Equal(1f, drawn.GetDeterminant(), 3);
+    }
+
+    [Theory]
+    [MemberData(nameof(Headings))]
+    public void AWoundUpPointFirstItemLiesAlongTheAimInThePalm(float x, float y, float z)
+    {
+        var aim = Vector3.Normalize(new Vector3(x, y, z));
+        var hand = Matrix4x4.CreateRotationY(0.7f) * Matrix4x4.CreateTranslation(3f, 20f, -5f);
+        var held = HeldItemPose.Pose(hand, Item.ComposeDisplay(new Vector3(10f, -90f, 45f), Vector3.Zero, 1.3f), 0.5f,
+            HeldItemPose.HeldItemGrip);
+
+        // At rest the aim changes nothing; fully cocked the tip (the sprite's diagonal) is on the aim, as it will fly
+        Assert.Equal(held, HeldItemPose.Aimed(held, hand, 0f, aim, 0.65f, HeldItemPose.HeldItemGrip));
+        var cocked = HeldItemPose.Aimed(held, hand, 1f, aim, 0.65f, HeldItemPose.HeldItemGrip);
+        var tip = Vector3.Normalize(Vector3.TransformNormal(new Vector3(1f, 1f, 0f), cocked));
+        Assert.True(Vector3.Dot(tip, aim) > 0.999f);
+        // Its size in the hand is kept, and its middle stays within reach of the palm
+        Assert.Equal(0.65f, Vector3.TransformNormal(Vector3.UnitZ, cocked).Length(), 3);
+        var palm = Vector3.Transform(HeldItemPose.HeldItemGrip, hand);
+        Assert.True(Vector3.Distance(cocked.Translation, palm) < 0.2f);
+    }
+
+    [Fact]
+    public void AReleaseBeforeTheNeededChargeThrowsNothing()
+    {
+        var javelin = ContentRegistry.RequireItem("javelin");
+        var flint = ContentRegistry.RequireItem("flint");
+        Assert.True(javelin.ThrowChargeNeeded > 0f);
+
+        Assert.False(javelin.ThrowsAt(javelin.ThrowChargeNeeded * 0.9f));
+        Assert.True(javelin.ThrowsAt(javelin.ThrowChargeNeeded));
+        Assert.True(javelin.ThrowsAt(1f));
+        // An item that names no wind-up leaves on any release; one that cannot be thrown never does
+        Assert.True(flint.ThrowsAt(0f));
+        Assert.False(ContentRegistry.RequireItem("bandage").ThrowsAt(1f));
     }
 
     [Fact]

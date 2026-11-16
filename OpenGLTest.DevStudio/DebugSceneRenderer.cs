@@ -352,6 +352,9 @@ public sealed class DebugSceneRenderer : IDisposable
             BindArray(0, texture);
             var model = RenderManager.PoseHeldItem(hand, editor.DisplayMatrix(player.HeldItemRotationOffset),
                 editor.ItemHeldScale, editor.ItemGrip);
+            if (type.ThrowAligned)
+                model = HeldItemPose.Aimed(model, hand, player.ThrowAimWeight(offhand: false),
+                    Vector3Utils.FromYawPitch(bodyYaw, bodyPitch), editor.ItemHeldScale * editor.Scale, editor.ItemGrip);
             Draw(mesh, model, viewProj);
             return;
         }

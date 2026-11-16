@@ -106,7 +106,7 @@ internal sealed class ThrowAction
         using var hand = inventory.UseHand(OffhandThrows(inventory));
         var id = inventory.SelectedBlockId;
         if (id == 0 || inventory.SelectedCount <= 0) return false;
-        if (ItemRegistry.TryGet(id) is not { IsThrowable: true } item) return false;
+        if (ItemRegistry.TryGet(id) is not { } item || !item.ThrowsAt(charge01)) return false;
         return TryLaunchThrow(inventory, id, item.ThrowDamage ?? 0f, MathUtils.Clamp01(charge01), player.Eye,
             player.ViewDirection, player.IsCreative);
     }
@@ -217,9 +217,10 @@ internal sealed class ThrowAction
         if (!IsThrowCharging) return false;
         IsThrowCharging = false;
         var charge01 = MathUtils.Clamp01(_throwChargeSeconds / PlayerConfig.ThrowChargeSeconds);
-        bool launched;
+        // Let go before the item's wind-up was far enough along: the arm drops and nothing is thrown
+        var launched = ItemRegistry.TryGet(_throwItemId)?.ThrowsAt(charge01) == true;
         using (Inventory.UseHand(_throwOffhand))
-            launched = TryLaunchThrow(Inventory, _throwItemId, _throwBaseDamage, charge01, Camera.Position,
+            launched = launched && TryLaunchThrow(Inventory, _throwItemId, _throwBaseDamage, charge01, Camera.Position,
                 Camera.ViewDirection, Camera.IsCreative);
         if (!launched)
         {

@@ -612,6 +612,11 @@ public class PlayerModel
         _castT = 0f;
     }
 
+    /// <summary>How far the given hand (the left when <paramref name="offhand"/>) is wound up for a throw, 0..1: the
+    /// cocked arm's weight on the hand that throws, 0 on the other. A point-first throwable aims by it
+    /// (<see cref="HeldItemPose.Aimed"/>).</summary>
+    internal float ThrowAimWeight(bool offhand) => offhand == _actionOffhand ? ThrowArm.ThrowArmWeight() : 0f;
+
     public void StartThrowCharge(bool offhand = false)
     {
         _actionOffhand = offhand;

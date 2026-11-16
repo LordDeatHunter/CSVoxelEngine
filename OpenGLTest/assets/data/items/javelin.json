@@ -3,4 +3,5 @@
   "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.1 },
   "entityDamage": 3,
   "throwDamage": 6,
-  "throwAligned": true }
+  "throwAligned": true,
+  "throwChargeNeeded": 0.5 }

@@ -1,4 +1,5 @@
 using System.Numerics;
+using VoxelEngine.Entities;
 using VoxelEngine.Items;
 
 namespace VoxelEngine.Player;
@@ -37,10 +38,39 @@ public static class HeldItemPose
     /// sprite scale and grip. The one definition of the drawn sprite's matrix.
     /// </summary>
     internal static Matrix4x4 SpriteMatrix(PlayerModel player, Item type, Vector3 eye, float yawDeg,
-        float pitchDeg, float backOffset, bool offhand = false) =>
-        Pose(offhand ? player.GetOffhandAnchorMatrix(eye, yawDeg, backOffset, pitchDeg)
-                : player.GetHandAnchorMatrix(eye, yawDeg, backOffset, pitchDeg),
-            type.DisplayMatrix(player.HeldItemRotationOffset), HeldItemScale, HeldItemGrip);
+        float pitchDeg, float backOffset, bool offhand = false)
+    {
+        var hand = offhand ? player.GetOffhandAnchorMatrix(eye, yawDeg, backOffset, pitchDeg)
+            : player.GetHandAnchorMatrix(eye, yawDeg, backOffset, pitchDeg);
+        var held = Pose(hand, type.DisplayMatrix(player.HeldItemRotationOffset), HeldItemScale, HeldItemGrip);
+        return type.ThrowAligned
+            ? Aimed(held, hand, player.ThrowAimWeight(offhand), Vector3Utils.FromYawPitch(yawDeg, pitchDeg),
+                HeldItemScale * type.DisplayScale, HeldItemGrip)
+            : held;
+    }
+
+    /// <summary>How far ahead of the palm, along the aim, an aimed item's center rides: it is held just behind its middle.</summary>
+    internal const float AimedGripForward = 0.06f;
+
+    /// <summary>
+    /// A point-first throwable (<see cref="Item.ThrowAligned"/>) wound up for a throw: <paramref name="held"/>,
+    /// its resting matrix, turned by <paramref name="weight"/> (0 at rest, 1 fully cocked) to lie along
+    /// <paramref name="aim"/>, the thrower's view, tip first, exactly as it will fly
+    /// (<see cref="ThrownProjectile.AlignedRotation"/>), with its middle in the palm of <paramref name="hand"/>.
+    /// So a javelin is carried level over the shoulder and leaves the hand already pointing where it goes,
+    /// whatever the arm is doing. <paramref name="scale"/> is the item's drawn size in the hand.
+    /// </summary>
+    internal static Matrix4x4 Aimed(in Matrix4x4 held, in Matrix4x4 hand, float weight, Vector3 aim, float scale,
+        Vector3 grip)
+    {
+        if (weight <= 0f || !Matrix4x4.Decompose(held, out _, out var rest, out var restAt)) return held;
+
+        var aimed = Quaternion.CreateFromRotationMatrix(ThrownProjectile.AlignedRotation(aim));
+        var palm = Vector3.Transform(grip, hand) + aim * AimedGripForward;
+        return Matrix4x4.CreateScale(scale)
+               * Matrix4x4.CreateFromQuaternion(Quaternion.Slerp(rest, aimed, weight))
+               * Matrix4x4.CreateTranslation(Vector3.Lerp(restAt, palm, weight));
+    }
 
     /// <summary>A lantern hangs upright below the hand's grip, regardless of the wrist's rotation. The left hand
     /// (<paramref name="offhand"/>) mirrors the grip and the tilt so the lantern hangs inward of that arm too.</summary>
