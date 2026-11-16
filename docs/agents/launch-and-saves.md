@@ -171,11 +171,6 @@ pure function of the seed: only **deltas** and the seed are written.
   may pass the natural mob cap but a mob waits while the hard cap (`MobHardCap`, which sizes the
   healthbar buffers) is full; an entry that waits stays pending and is saved again, and is
   discarded only after `EntityRestoreTimeoutSeconds` of play.
-- **Malformed entity files.** If the codec rejects a readable `entities.json`, that load starts
-  without its saved entries and parser rejection marks the file for the store's existing `.bad`
-  set-aside before an autosave or close replacement. When that archive move succeeds, the original
-  bytes remain there. Missing files, JSON `null`, valid partial objects and unresolved names retain
-  their existing fallback or per-entry handling.
 - **The explored map** (`map.bin`, `MapSaveCodec`: "CVMP", a version byte, then a Deflate body of the surface and
   sky `MapTile`s, each its layer kind, chunk column, 256 texels and 256 heights; a cave slice is never kept). Only a
   world that drew a HUD has a map (`WorldRenderer.EnsureMap`, which imports the file when it builds the tracker), so a
@@ -191,6 +186,11 @@ pure function of the seed: only **deltas** and the seed are written.
   chunk loads. An entry whose block, item or molten material name no longer resolves is dropped with
   one aggregated warning, and a cast pour is restored paused (its crucible binding is transient). A
   corrupt file parses to null and is replaced at the next autosave, like `entities.json`.
+- **Malformed entity files.** If the codec rejects a readable `entities.json`, that load starts
+  without its saved entries and parser rejection marks the file for the store's existing `.bad`
+  set-aside before an autosave or close replacement. When that archive move succeeds, the original
+  bytes remain there. Missing files, JSON `null`, valid partial objects and unresolved names retain
+  their existing fallback or per-entry handling.
 - **Lantern state** is name-based, versioned `LanternData` in `ToolData.Lantern` (player, chest and drop payloads)
   and `StationSaveData.Lanterns` (placed). Old block-pool lantern counts migrate into distinct empty instances;
   their hotbar references follow, and exceeding today's tool cap never deletes an old lantern. Legacy chest stacks
