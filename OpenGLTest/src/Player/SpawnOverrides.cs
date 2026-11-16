@@ -41,7 +41,7 @@ internal static class SpawnOverrides
         return new Vector3(0.5f, surface + Camera.EyeHeight, 0.5f);
     }
 
-    private static bool TryParseSpawnOverride(string value, out Vector3 position)
+    internal static bool TryParseSpawnOverride(string value, out Vector3 position)
     {
         position = Vector3.Zero;
 
@@ -52,7 +52,8 @@ internal static class SpawnOverrides
         Span<float> components = stackalloc float[3];
         for (var i = 0; i < 3; i++)
         {
-            if (!float.TryParse(parts[i].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out components[i]))
+            if (!float.TryParse(parts[i].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out components[i])
+                || !float.IsFinite(components[i]))
                 return false;
         }
 
@@ -79,7 +80,7 @@ internal static class SpawnOverrides
         return DefaultLook;
     }
 
-    private static bool TryParseLookOverride(string value, out Vector2 look)
+    internal static bool TryParseLookOverride(string value, out Vector2 look)
     {
         look = DefaultLook;
 
@@ -89,6 +90,8 @@ internal static class SpawnOverrides
 
         if (!float.TryParse(parts[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var yaw)
             || !float.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var pitch))
+            return false;
+        if (!float.IsFinite(yaw) || !float.IsFinite(pitch))
             return false;
 
         // Same clamp the mouse look uses, so an override can never start the view past vertical
