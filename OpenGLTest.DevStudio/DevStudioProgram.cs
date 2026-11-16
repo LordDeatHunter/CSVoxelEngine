@@ -132,12 +132,12 @@ public static class DevStudioProgram
 
         _scene = new DebugSceneRenderer(_gl);
         _input = new InputManager(_window);
+        _ui = new DevStudioUi();
         _quests = new QuestEditorPage(QuestEditorState.Load(Path.Combine("assets", "data", "quests")),
-            new TextFieldKeys(_input));
+            new TextFieldKeys(_input), QuestIconPicker.FromContent(_ui.Entries));
         _quests.Frame(new Vector2(_window.Size.X, _window.Size.Y));
         _entities = new EntityPreviewState();
         _trees = new TreePreviewState();
-        _ui = new DevStudioUi();
         _playerAnim = new PlayerPreviewState(new PlayerModel { Rig = _scene.Rig, HoldingItem = true });
         _playerAnim.TrailSampler = SampleTrail;
         PlayerClock.Attach(_playerAnim);
@@ -392,7 +392,7 @@ public static class DevStudioProgram
             _quests.DrawCanvas(_scene.Ui, _haveMouse ? _lastMouse : null, (float)_time);
         _ui.Draw(_scene.Ui, Editor, _entities, _trees, _tab, _playerAnim, new Vector2(size.X, size.Y), _status,
             _firstPerson && _tab == StudioTab.Items, _tab is StudioTab.Items or StudioTab.Entities ? ActiveClock : null,
-            _quests.HighlightedIcon);
+            _quests.Icons, _quests.HighlightedIcon);
         if (_tab == StudioTab.Quests)
             _quests.DrawPanels(_scene.Ui, _haveMouse ? _lastMouse : null, (float)_time);
         _scene.Ui.End();
@@ -589,7 +589,7 @@ public static class DevStudioProgram
                         _trees.Select(slot);
                         break;
                     case StudioTab.Quests:
-                        _quests.BeginIconDrag(_ui.Entries[slot].Id, position);
+                        _quests.BeginIconDrag(_quests.Icons.Visible[slot], position);
                         break;
                     default:
                         Editor.Select(_ui.Entries[slot].Id);

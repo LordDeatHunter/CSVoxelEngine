@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Data;
 using VoxelEngine.Items;
@@ -90,7 +91,9 @@ public sealed class DevStudioUi
     internal const float ButtonGap = 8f;
     internal const float TextCap = 12f;
     // The tab buttons' row, which pushes the grid header and the grid down.
-    private const float TabRowH = ButtonH + ButtonGap;
+    internal const float TabRowH = ButtonH + ButtonGap;
+    // The QUESTS tab's grid header: its search field and kind filters, which the quest page lays out and draws
+    internal const float QuestHeaderH = 80f;
     // Entities and tree species have no icon, so their slots are wide enough to hold the name.
     private const int EntityColumns = 2;
     private const int ModesPerRow = 3;
@@ -197,7 +200,7 @@ public sealed class DevStudioUi
 
     public void Draw(UIRenderer ui, ItemDisplayEditor editor, EntityPreviewState entities, TreePreviewState trees,
         StudioTab tab, PlayerPreviewState player, Vector2 screen, string status, bool firstPerson,
-        AnimationClock? timeline = null, ushort questIcon = 0)
+        AnimationClock? timeline = null, QuestIconPicker? questIcons = null, ushort questIcon = 0)
     {
         _tab = tab;
         _sliders.Clear();
@@ -208,9 +211,13 @@ public sealed class DevStudioUi
         {
             StudioTab.Entities => entities.Entries.Count,
             StudioTab.Trees => trees.Entries.Count,
+            StudioTab.Quests => questIcons?.Visible.Count ?? 0,
             _ => Entries.Count,
         };
-        BuildGrid(screen, count, tab);
+        // The quest grid takes the wide name slots only when it shows nothing but entities
+        var nameSlots = tab is StudioTab.Entities or StudioTab.Trees
+                        || (tab == StudioTab.Quests && questIcons?.Visible.All(e => e.Kind == IconKind.Entity) == true && count > 0);
+        BuildGrid(screen, count, tab, nameSlots);
         switch (tab)
         {
             case StudioTab.Entities:
@@ -248,8 +255,8 @@ public sealed class DevStudioUi
                 DrawTreeGrid(ui, trees);
                 DrawTreeTitle(ui, trees, screen);
                 break;
-            case StudioTab.Quests:
-                DrawGrid(ui, questIcon, "ICONS");
+            case StudioTab.Quests when questIcons != null:
+                DrawQuestIcons(ui, questIcons, questIcon);
                 break;
             default:
                 DrawGrid(ui, editor.SelectedId, "ITEMS");
@@ -277,13 +284,13 @@ public sealed class DevStudioUi
                 Tabs[i].Button, Tabs[i].Label, true, tab == Tabs[i].Tab);
     }
 
-    private void BuildGrid(Vector2 screen, int count, StudioTab tab)
+    private void BuildGrid(Vector2 screen, int count, StudioTab tab, bool nameSlots)
     {
         _slots.Clear();
         _gridCount = count;
 
         var available = PanelWidth - Pad * 2f;
-        var itemGrid = tab is StudioTab.Items or StudioTab.Quests;
+        var itemGrid = !nameSlots;
         var slotSize = !itemGrid
             ? new Vector2((available - (EntityColumns - 1) * SlotGap) / EntityColumns, SlotSize)
             : new Vector2(SlotSize);
@@ -294,7 +301,7 @@ public sealed class DevStudioUi
         var strideY = slotSize.Y + SlotGap;
         var gridWidth = _columns * slotSize.X + (_columns - 1) * SlotGap;
         var gridLeft = Pad + (PanelWidth - gridWidth) * 0.5f;
-        var gridTop = Pad + TabRowH + HeaderH;
+        var gridTop = Pad + TabRowH + (tab == StudioTab.Quests ? QuestHeaderH : HeaderH);
         _visibleRows = Math.Max(1, (int)((screen.Y - Pad - gridTop + SlotGap) / strideY));
 
         var totalRows = TotalRows();
@@ -523,6 +530,31 @@ public sealed class DevStudioUi
                 ui.DrawBlockIcon(center, SlotSize * 0.74f, entry.Id);
             else
                 ui.DrawItemSprite(center, SlotSize * 0.72f, entry.Id, 0f, 0f);
+        }
+    }
+
+    // The quest grid: cubes for blocks, sprites for items, and an entity's name in its slot (entities have no icon);
+    // the quest page draws the header (search and filters) over it
+    private void DrawQuestIcons(UIRenderer ui, QuestIconPicker icons, ushort selectedId)
+    {
+        foreach (var (center, size, index) in _slots)
+        {
+            var entry = icons.Visible[index];
+            DrawSlot(ui, center, size, entry.Kind != IconKind.Entity && entry.Id == selectedId);
+            switch (entry.Kind)
+            {
+                case IconKind.Block:
+                    ui.DrawBlockIcon(center, SlotSize * 0.74f, entry.Id);
+                    break;
+                case IconKind.Item:
+                    ui.DrawItemSprite(center, SlotSize * 0.72f, entry.Id, 0f, 0f);
+                    break;
+                default:
+                    var (scale, cap) = FitText(ui, entry.Name, TextCap, size.X - 6f);
+                    var width = ui.MeasureTextWidth(entry.Name, scale);
+                    ui.DrawText(entry.Name, new Vector2(center.X - width * 0.5f, center.Y - cap * 0.5f), scale, Rgba.White);
+                    break;
+            }
         }
     }
 

@@ -8,7 +8,6 @@ using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Quests;
 using VoxelEngine.Data;
 using VoxelEngine.Entities;
-using VoxelEngine.Items;
 using VoxelEngine.Rendering.Overlays;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.Menus;
@@ -35,13 +34,15 @@ namespace VoxelEngine.DevStudio;
 /// move and edited in the right panel (text with \n for a line break, SIZE, COLOR). With several quests selected, the right panel lists them instead (icon and title, scrolled by the wheel
 /// when too long; a click on a row opens that quest alone) over a DELETE button. A requirement's type and the quest's reveal mode (SHOW) are <see cref="DropdownState"/>s. Geometry is rebuilt each draw and hit-tested on the next mouse-down.
 /// </summary>
-internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys)
+internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys, QuestIconPicker icons)
 {
-    private enum Field { Id, Title, Description, Target, Label, LabelText }
+    private enum Field { Id, Title, Description, Target, Label, LabelText, IconSearch }
 
     private enum Action
     {
         AddQuest, AddLabel, Save, RevertAll, Undo, Redo, SaveLabel, RevertLabel, DeleteLabel,
+        // The Arg is the IconKind the filter button toggles.
+        ToggleKind,
         Shape, Readable, AnyOf, PickIcon, AddRequirement, DeleteQuest, SaveQuest, RevertQuest, SwapLink, DeleteLink,
         DeleteSelected,
         // The Arg of these is the requirement index.
@@ -114,12 +115,15 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private Vector2 _lastClickAt;
     private Vector2 _screen = new(1600f, 900f);
     // A grid slot pressed in the left panel: a click picks it, a drag onto the canvas adds a quest with it
-    private ushort? _iconDrag;
+    private IconEntry? _iconDrag;
     private Vector2 _iconPressAt;
     // The renderer of the last draw, for placing a clicked caret by the drawn text's widths
     private UIRenderer? _ui;
 
     public QuestEditorState State { get; } = state;
+
+    /// <summary>The icon grid's entries, search and filters; the studio's left panel draws the visible ones.</summary>
+    public QuestIconPicker Icons { get; } = icons;
 
     public QuestViewData Camera { get; } = new();
 
@@ -225,6 +229,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         _fields.Clear();
         _dropdowns.Clear();
         BuildTopBar();
+        BuildIconHeader();
         BuildDetails();
 
         // An opaque strip under the top bar, so nodes panned under it do not show through its fields
@@ -247,9 +252,14 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     // The slot being dragged rides the pointer once it has left the click radius
     private void DrawDraggedIcon(UIRenderer ui, Vector2? pointer, float time)
     {
-        if (_iconDrag is not { } id || pointer is not { } p || !IconDragging(p)) return;
+        if (_iconDrag is not { } entry || pointer is not { } p || !IconDragging(p)) return;
+        if (entry.Kind == IconKind.Entity)
+        {
+            ui.DrawTextMiddle(entry.Name, p, ui.CapHeightScale(DevStudioUi.TextCap), Rgba.White);
+            return;
+        }
         ui.ClearDepthForOverlay();
-        ui.DrawIdIcon(p, QuestConfig.NodeIconSize, id, 0f, time);
+        ui.DrawIdIcon(p, QuestConfig.NodeIconSize, entry.Id, 0f, time);
     }
 
     private bool IconDragging(Vector2 point) => Vector2.Distance(point, _iconPressAt) >= QuestConfig.DragThreshold;
@@ -276,6 +286,20 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         x = AddButtonAt(x, y, narrow, Action.Redo, "REDO", State.CanRedo);
         x = AddButtonAt(x + Gap * 2f, y, wide, Action.Save, State.Dirty ? "SAVE ALL *" : "SAVE ALL", State.Dirty);
         AddButtonAt(x, y, wide, Action.RevertAll, _now < _revertArmedUntil ? "CONFIRM?" : "REVERT ALL", State.Dirty);
+    }
+
+    // The icon grid's header in the left panel: the search field, then one toggle per kind
+    private void BuildIconHeader()
+    {
+        var left = Pad * 2f;
+        var width = PanelWidth - Pad * 2f;
+        var top = Pad + DevStudioUi.TabRowH + 6f;
+        _fields.Add((Rect(left, top, width, FieldH), Field.IconSearch, 0, $"search {Icons.Visible.Count} icons"));
+        var third = (width - Gap * 2f) / 3f;
+        string[] labels = ["ITEMS", "BLOCKS", "ENTITIES"];
+        for (var k = 0; k < labels.Length; k++)
+            AddButton(Rect(left + (third + Gap) * k, top + FieldH + Gap, third, ButtonH), Action.ToggleKind, labels[k], true,
+                Icons.Shows((IconKind)k), k);
     }
 
     private void BuildDetails()
@@ -634,6 +658,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
     private string ValueOf(Field field, int arg)
     {
+        if (field == Field.IconSearch) return Icons.Query;
         // A label's line breaks show as \n, so the one-line field can hold them
         if (field == Field.LabelText)
             return State.SelectedLabel is { } name ? (State.FindLabel(name)?.Label.Text ?? "").Replace("\n", "\\n") : "";
@@ -963,41 +988,49 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
     /// <summary>A press on a left-grid slot: released in place it picks (<see cref="Pick"/>), dragged onto the canvas
     /// it adds a quest.</summary>
-    public void BeginIconDrag(ushort id, Vector2 point)
+    public void BeginIconDrag(IconEntry entry, Vector2 point)
     {
         Blur();
-        _iconDrag = id;
+        _iconDrag = entry;
         _iconPressAt = point;
     }
 
-    private void DropIcon(ushort id, Vector2 point)
+    private void DropIcon(IconEntry entry, Vector2 point)
     {
         if (!IconDragging(point))
         {
-            Pick(id);
+            Pick(entry);
             return;
         }
         if (!OverCanvas(point)) return;
-        var name = QuestEditorState.ContentName(id);
-        if (State.AddQuest(QuestBookLayout.ToGrid(point, Camera, _screen), name, ItemRegistry.TryGet(id)?.Name) is { } added)
-            Status = $"Added {added} ({name})";
+        if (entry.Kind == IconKind.Entity)
+        {
+            Status = "An entity has no icon: drop it on a kill requirement";
+            return;
+        }
+        if (State.AddQuest(QuestBookLayout.ToGrid(point, Camera, _screen), entry.Key, entry.Name) is { } added)
+            Status = $"Added {added} ({entry.Key})";
     }
 
     /// <summary>A left-grid click: the selected quest's icon, or the armed requirement's target.</summary>
-    private void Pick(ushort id)
+    private void Pick(IconEntry entry)
     {
         Blur();
         if (State.SelectedQuestId is not { } quest) return;
-        var name = QuestEditorState.ContentName(id);
         if (State.PickRequirement >= 0)
         {
-            State.SetRequirementTarget(quest, State.PickRequirement, name);
-            Status = $"Requirement {State.PickRequirement + 1} now names {name}";
+            State.SetRequirementTarget(quest, State.PickRequirement, entry.Key);
+            Status = $"Requirement {State.PickRequirement + 1} now names {entry.Key}";
             State.PickRequirement = -1;
             return;
         }
-        State.SetIcon(quest, name);
-        Status = $"Icon: {name}";
+        if (entry.Kind == IconKind.Entity)
+        {
+            Status = "An entity has no icon: pick an item or a block";
+            return;
+        }
+        State.SetIcon(quest, entry.Key);
+        Status = $"Icon: {entry.Key}";
     }
 
     private Vector2 GridTravel(Vector2 travel) => travel / (QuestConfig.GridSpacing * Camera.Zoom);
@@ -1009,6 +1042,9 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         var id = State.SelectedQuestId;
         switch (action)
         {
+            case Action.ToggleKind:
+                Icons.Toggle((IconKind)arg);
+                break;
             case Action.AddLabel:
                 Status = $"Added {State.AddLabel(new Vector2(Camera.PanX, Camera.PanY))}";
                 break;
@@ -1135,6 +1171,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private void Commit((Field Field, int Arg) focus, bool final)
     {
         var text = _field.Text;
+        if (focus.Field == Field.IconSearch)
+        {
+            Icons.SetQuery(text);
+            return;
+        }
         if (focus.Field == Field.LabelText)
         {
             if (_focusLabel is { } label) State.SetLabelText(label, text.Replace("\\n", "\n"));
