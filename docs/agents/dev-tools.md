@@ -96,9 +96,14 @@ or an entity, `-`/`+` set the count, PICK arms the left grid for the target (NEX
 entities), and a plain grid click sets the icon. Dragging a grid slot onto the canvas adds a quest where it is dropped,
 with that icon, titled after it and asking to obtain it. Delete removes the selected quest and every link to it, Ctrl+S saves,
 Escape clears the selection. Every edit recompiles through `QuestLoader.Compile`: an error is listed in red under the
-canvas and its quest ringed, and SAVE refuses until it compiles. A save writes only the changed files through
+canvas and its quest ringed, and SAVE ALL refuses until it compiles. SAVE ALL writes only the changed files through
 `QuestGraphWriter`, in the shipped files' layout with their header comment kept, so an unedited graph writes back
-unchanged (`QuestGraphWriterTests`); closing with unsaved edits only logs a warning. The rules are
+unchanged (`QuestGraphWriterTests`). Each document keeps its graph as on disk (`QuestGraphDocument.Saved`) and each quest
+the id it has there, so a quest with unsaved edits is known (a gold corner mark on its node, `*` after its heading):
+SAVE QUEST writes that quest alone into the file as saved, refused when the files would then not load (a rename its saved
+children still name: save all instead), and REVERT QUEST puts back its saved version, id and links included, or removes
+a quest never saved. REVERT ALL (click again on CONFIRM? within 3 s) re-reads every graph from disk and drops graphs
+never saved. Closing with unsaved edits only logs a warning. The rules are
 `OpenGLTest.DevStudio/QuestEditorState.cs` (GL-free, `QuestEditorStateTests`), the page is `QuestEditorPage.cs`. The game
 reads the files at startup, so restart it to play an edit.
 

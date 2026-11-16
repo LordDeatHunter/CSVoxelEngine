@@ -10,22 +10,31 @@ using static VoxelEngine.Tests.Support.QuestFixtures;
 namespace VoxelEngine.Tests.DevStudio;
 
 /// <summary>The QUESTS tab's edit rules: links stay consistent through deletes and renames, a link that could never
-/// unlock is refused, positions are stored the way the loader reads them, and a broken graph is reported, not thrown,
-/// and never saved.</summary>
+/// unlock is refused, positions are stored the way the loader reads them, a broken graph is reported, not thrown, and
+/// never saved, and a quest saves or reverts on its own while every other edit stays pending.</summary>
 public sealed class QuestEditorStateTests : IDisposable
 {
     private readonly string _folder = Directory.CreateTempSubdirectory("dev-studio-quests").FullName;
 
     public void Dispose() => Directory.Delete(_folder, true);
 
-    private QuestGraphDocument Graph(string name, float[]? origin, params QuestGraphDefinition.QuestDefinition[] quests) =>
-        new(Path.Combine(_folder, name + ".json"), new QuestGraphDefinition { Title = name, Origin = origin, Quests = [.. quests] }, []);
+    // Writes a graph file into the test folder; returns its path
+    private string Graph(string name, float[]? origin, params QuestGraphDefinition.QuestDefinition[] quests)
+    {
+        var path = Path.Combine(_folder, name + ".json");
+        QuestGraphWriter.Save(path, new QuestGraphDefinition { Title = name, Origin = origin, Quests = [.. quests] }, []);
+        return path;
+    }
 
-    private QuestEditorState Editor(params QuestGraphDocument[] graphs)
+    // The editor over the files the arguments wrote
+    private QuestEditorState Editor(params string[] _)
     {
         TestContent.EnsureLoaded();
-        return new QuestEditorState(_folder, graphs);
+        return QuestEditorState.Load(_folder);
     }
+
+    private static string? TitleOnDisk(string path, string id) =>
+        QuestGraphDocument.Load(path).Quests.Single(q => q.Id == id).Title;
 
     [Fact]
     public void DeletingAQuestRemovesEveryLinkToItInEveryGraph()
@@ -39,7 +48,7 @@ public sealed class QuestEditorStateTests : IDisposable
 
         Assert.Null(editor.Find("a"));
         Assert.Equal(["root"], editor.Find("b")!.Value.Quest.Parents);
-        Assert.True(first.Dirty && second.Dirty);
+        Assert.All(editor.Documents, d => Assert.True(d.Dirty, d.Name));
         Assert.Null(editor.Error);
     }
 
@@ -110,12 +119,14 @@ public sealed class QuestEditorStateTests : IDisposable
         Assert.NotNull(editor.Error);
         Assert.Equal("root", editor.ErrorQuestId);
         Assert.Single(editor.Preview.Quests);
+        var before = File.ReadAllText(graph);
         editor.Save();
-        Assert.False(File.Exists(graph.Path));
+        editor.SaveQuest("root");
+        Assert.Equal(before, File.ReadAllText(graph));
 
-        editor.SetRequirementTarget("root", 0, "stone");
+        editor.SetRequirementTarget("root", 0, "block/stone");
         editor.Save();
-        Assert.True(File.Exists(graph.Path));
+        Assert.NotEqual(before, File.ReadAllText(graph));
         Assert.False(editor.Dirty);
     }
 
@@ -137,6 +148,96 @@ public sealed class QuestEditorStateTests : IDisposable
 
         editor.SetRequirementTarget("root", 0, QuestEditorState.TagPrefix + "logs");
         Assert.Equal(QuestEditorState.TakesItem(requirement), requirement.Tag != null);
+    }
+
+    [Fact]
+    public void AFreshlyLoadedEditorHasNothingUnsaved()
+    {
+        var editor = Editor(Graph("g", [1, 2], Quest("root", null, Break("stone")), Quest("a", ["root"], Obtain("stone", 3))));
+
+        Assert.False(editor.Dirty);
+        Assert.All(editor.Preview.Quests, q => Assert.False(editor.IsQuestDirty(q.Id), q.Id));
+    }
+
+    [Fact]
+    public void SavingOneQuestWritesOnlyItsEditAndLeavesTheOthersPending()
+    {
+        var path = Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone")));
+        var editor = Editor(path);
+        editor.SetTitle("root", "Edited root");
+        editor.SetTitle("a", "Edited a");
+
+        editor.SaveQuest("a");
+
+        Assert.Equal("Edited a", TitleOnDisk(path, "a"));
+        Assert.NotEqual("Edited root", TitleOnDisk(path, "root"));
+        Assert.False(editor.IsQuestDirty("a"));
+        Assert.True(editor.IsQuestDirty("root"));
+        Assert.True(editor.Dirty);
+    }
+
+    [Fact]
+    public void AQuestSaveTheFilesCouldNotLoadIsRefused()
+    {
+        var path = Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone")));
+        var editor = Editor(path);
+        var before = File.ReadAllText(path);
+        editor.RenameQuest("root", "start");
+
+        // On disk, a still names root: saving the rename alone would orphan it
+        editor.SaveQuest("start");
+
+        Assert.Equal(before, File.ReadAllText(path));
+        Assert.True(editor.IsQuestDirty("start"));
+    }
+
+    [Fact]
+    public void RevertingAQuestRestoresItsSavedSelfAndTheLinksToIt()
+    {
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone"))));
+        var savedPosition = editor.Preview.Of("root").Position;
+        editor.RenameQuest("root", "start");
+        editor.SetTitle("start", "Edited");
+        editor.MoveQuest("start", savedPosition + new Vector2(3f, 2f), snap: true);
+        editor.SetTitle("a", "Kept");
+
+        editor.RevertQuest("start");
+
+        Assert.Null(editor.Find("start"));
+        Assert.False(editor.IsQuestDirty("root"));
+        Assert.Equal(savedPosition, editor.Preview.Of("root").Position);
+        Assert.Equal(["root"], editor.Find("a")!.Value.Quest.Parents);
+        Assert.Equal("Kept", editor.Find("a")!.Value.Quest.Title);
+        Assert.Null(editor.Error);
+    }
+
+    [Fact]
+    public void RevertingAQuestThatWasNeverSavedRemovesIt()
+    {
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone"))));
+        var added = editor.AddQuest(new Vector2(2f, 0f))!;
+        editor.ToggleParent(added, "root");
+
+        editor.RevertQuest(added);
+
+        Assert.Null(editor.Find(added));
+        Assert.False(editor.Dirty);
+    }
+
+    [Fact]
+    public void RevertingAllRestoresTheFilesAndDropsGraphsNeverSaved()
+    {
+        var editor = Editor(Graph("g", null, Quest("root", null, Break("stone")), Quest("a", ["root"], Break("stone"))));
+        editor.DeleteQuest("a");
+        editor.SetTitle("root", "Edited");
+        editor.AddGraph(new Vector2(-8f, 0f));
+
+        editor.RevertAll();
+
+        Assert.False(editor.Dirty);
+        Assert.Single(editor.Documents);
+        Assert.NotNull(editor.Find("a"));
+        Assert.NotEqual("Edited", editor.Find("root")!.Value.Quest.Title);
     }
 
     [Fact]

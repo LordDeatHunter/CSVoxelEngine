@@ -40,7 +40,7 @@ public sealed class QuestGraphWriterTests : IDisposable
             ],
         };
         var path = Path.Combine(_folder, "g.json");
-        QuestGraphWriter.Save(new QuestGraphDocument(path, definition, ["// a header", "// on two lines"]));
+        QuestGraphWriter.Save(path, definition, ["// a header", "// on two lines"]);
 
         var read = QuestGraphDocument.Load(path);
 

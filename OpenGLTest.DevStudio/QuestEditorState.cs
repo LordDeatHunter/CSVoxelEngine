@@ -13,7 +13,9 @@ namespace VoxelEngine.DevStudio;
 
 /// <summary>
 /// The QUESTS tab's rules, GL-free: the graph documents being edited, the selection, every edit (add, delete, move,
-/// link, rename, the fields and the requirements) and the save. Every edit marks its document dirty and recompiles:
+/// link, rename, the fields and the requirements), saving and reverting the whole set or one quest. Every edit
+/// recompiles, which also works out what differs from disk (<see cref="QuestGraphDocument.Dirty"/>,
+/// <see cref="IsQuestDirty"/>):
 /// <see cref="Preview"/> is a lenient book that always draws (unknown icons and parents are skipped), and
 /// <see cref="Error"/> is what the real <see cref="QuestLoader.Compile"/> refuses, which blocks <see cref="Save"/>.
 /// </summary>
@@ -38,10 +40,14 @@ public sealed class QuestEditorState
     }
 
     /// <summary>Every graph file under <paramref name="folder"/>, in the loader's (file name) order.</summary>
-    public static QuestEditorState Load(string folder) =>
-        new(folder, Directory.Exists(folder)
-            ? ContentFiles.JsonFilesIn(folder).Select(file => QuestGraphDocument.Load(file.Path))
-            : []);
+    public static QuestEditorState Load(string folder) => new(folder, ReadFolder(folder));
+
+    private static IEnumerable<QuestGraphDocument> ReadFolder(string folder) => Directory.Exists(folder)
+        ? ContentFiles.JsonFilesIn(folder).Select(file => QuestGraphDocument.Load(file.Path))
+        : [];
+
+    // The ids of the quests whose block differs from the one on disk (or that are not on disk at all)
+    private readonly HashSet<string> _dirtyQuests = new(StringComparer.Ordinal);
 
     public string Folder { get; }
 
@@ -64,6 +70,9 @@ public sealed class QuestEditorState
     public string? ErrorQuestId { get; private set; }
 
     public bool Dirty => Documents.Any(d => d.Dirty);
+
+    /// <summary>Whether the quest differs from its saved version, or has none.</summary>
+    public bool IsQuestDirty(string id) => _dirtyQuests.Contains(id);
 
     public QuestGraphDocument? Graph => SelectedGraph >= 0 && SelectedGraph < Documents.Count ? Documents[SelectedGraph] : null;
 
@@ -105,7 +114,7 @@ public sealed class QuestEditorState
             Requirements = [new QuestGraphDefinition.RequirementDefinition { Type = "obtain", Item = icon }],
         });
         Select(id);
-        Changed(document);
+        Recompile();
         return id;
     }
 
@@ -114,13 +123,11 @@ public sealed class QuestEditorState
     {
         if (Find(id) is not { } found) return;
         found.Document.Quests.Remove(found.Quest);
-        found.Document.Dirty = true;
         foreach (var document in Documents)
         foreach (var quest in document.Quests)
         {
             if (quest.Parents is not { } parents || !parents.Contains(id)) continue;
             quest.Parents = Shrink(parents.Where(p => p != id));
-            document.Dirty = true;
         }
         if (SelectedQuestId == id) Select(null);
         Recompile();
@@ -132,7 +139,7 @@ public sealed class QuestEditorState
         if (Find(id) is not { } found) return;
         var position = Snap(grid - found.Document.Origin, snap);
         found.Quest.Pos = [position.X, position.Y];
-        Changed(found.Document);
+        Recompile();
     }
 
     /// <summary>Moves a whole graph by setting its origin.</summary>
@@ -140,7 +147,7 @@ public sealed class QuestEditorState
     {
         var snapped = Snap(origin, snap);
         document.Definition.Origin = [snapped.X, snapped.Y];
-        Changed(document);
+        Recompile();
     }
 
     /// <summary>Links <paramref name="parent"/> as a parent of <paramref name="child"/>, or unlinks it when it already
@@ -156,7 +163,7 @@ public sealed class QuestEditorState
             return $"'{parent}' already depends on '{child}': linking would make a cycle.";
         else
             found.Quest.Parents = [.. parents, parent];
-        Changed(found.Document);
+        Recompile();
         return null;
     }
 
@@ -169,13 +176,11 @@ public sealed class QuestEditorState
         if (Find(newId) != null) return $"Quest id '{newId}' is already used.";
         if (Find(id) is not { } found) return "No such quest.";
         found.Quest.Id = newId;
-        found.Document.Dirty = true;
         foreach (var document in Documents)
         foreach (var quest in document.Quests)
         {
             if (quest.Parents is not { } parents || !parents.Contains(id)) continue;
             quest.Parents = [.. parents.Select(p => p == id ? newId : p)];
-            document.Dirty = true;
         }
         if (SelectedQuestId == id) SelectedQuestId = newId;
         Recompile();
@@ -204,7 +209,7 @@ public sealed class QuestEditorState
     public void SetGraphTitle(QuestGraphDocument document, string title)
     {
         document.Definition.Title = title.Length == 0 ? null : title;
-        Changed(document);
+        Recompile();
     }
 
     public void AddRequirement(string id) =>
@@ -262,7 +267,7 @@ public sealed class QuestEditorState
         while (File.Exists(path) || Documents.Any(d => d.Path == path));
         var snapped = Snap(origin, true);
         var document = new QuestGraphDocument(path,
-            new QuestGraphDefinition { Title = "New Graph", Origin = [snapped.X, snapped.Y], Quests = [] }, []);
+            new QuestGraphDefinition { Title = "New Graph", Origin = [snapped.X, snapped.Y], Quests = [] }, [], saved: false);
         Documents.Add(document);
         SelectedGraph = Documents.Count - 1;
         AddQuest(snapped);
@@ -280,9 +285,78 @@ public sealed class QuestEditorState
         foreach (var document in dirty)
         {
             QuestGraphWriter.Save(document);
-            document.Dirty = false;
+            document.MarkSaved();
         }
+        Recompile();
         return $"Saved {string.Join(", ", dirty.Select(d => Path.GetFileName(d.Path)))}";
+    }
+
+    /// <summary>Writes only this quest's edit to its file: the file as saved, with this quest put in (or added).
+    /// Refused when the files on disk would then not compile (a rename its saved children still name, a link to a
+    /// quest that is not saved yet): save all instead. Returns the status line.</summary>
+    public string SaveQuest(string id)
+    {
+        if (Find(id) is not { } found) return "No such quest.";
+        var (document, quest) = found;
+        if (!IsQuestDirty(id)) return $"{id} has no unsaved edits";
+        var saved = document.Saved is { } onDisk
+            ? QuestGraphDocument.Clone(onDisk)
+            : new QuestGraphDefinition { Title = document.Definition.Title, Origin = document.Definition.Origin?.ToArray() };
+        var quests = saved.Quests ??= [];
+        var copy = QuestGraphDocument.Clone(quest);
+        var at = document.OriginalId(quest) is { } original ? quests.FindIndex(q => q.Id == original) : -1;
+        if (at >= 0) quests[at] = copy;
+        else quests.Insert(Math.Min(document.Quests.IndexOf(quest), quests.Count), copy);
+
+        // The graphs as the disk would hold them: this file with the one change, every other file as saved
+        var onDiskAfter = Documents
+            .Where(d => d == document || d.Saved != null)
+            .Select(d => (d.Name, d == document ? saved : d.Saved!, d.Path))
+            .ToList();
+        try
+        {
+            QuestLoader.Compile(onDiskAfter);
+        }
+        catch (InvalidOperationException e)
+        {
+            return $"Cannot save {id} on its own: {e.Message} Save all instead.";
+        }
+
+        Directory.CreateDirectory(Folder);
+        QuestGraphWriter.Save(document.Path, saved, document.Header);
+        document.MarkQuestSaved(saved, quest);
+        Recompile();
+        return $"Saved {id} to {Path.GetFileName(document.Path)}";
+    }
+
+    /// <summary>Puts the quest back as it is on disk (its id too, with every link to it), or removes a quest that was
+    /// never saved. Returns the status line.</summary>
+    public string RevertQuest(string id)
+    {
+        if (Find(id) is not { } found) return "No such quest.";
+        var (document, quest) = found;
+        if (document.SavedQuest(quest) is not { } saved)
+        {
+            DeleteQuest(id);
+            return $"Removed {id}, which was never saved";
+        }
+        var original = saved.Id!;
+        if (RenameQuest(id, original) is { } refused) return $"Cannot revert {id}: {refused}";
+        document.Replace(quest, QuestGraphDocument.Clone(saved), original);
+        Recompile();
+        return $"Reverted {original}";
+    }
+
+    /// <summary>Drops every unsaved edit: the graphs are read from disk again, and a graph never saved is gone.</summary>
+    public string RevertAll()
+    {
+        Documents.Clear();
+        Documents.AddRange(ReadFolder(Folder));
+        SelectedGraph = Math.Clamp(SelectedGraph, 0, Math.Max(0, Documents.Count - 1));
+        PickRequirement = -1;
+        if (SelectedQuestId != null && Find(SelectedQuestId) == null) SelectedQuestId = null;
+        Recompile();
+        return "Reverted every graph to the files on disk";
     }
 
     /// <summary>The content name a quest icon or target uses for a block or item id: a block's bare name, an
@@ -296,10 +370,20 @@ public sealed class QuestEditorState
         return ItemRegistry.TryGet(id)?.Name ?? DefaultIcon;
     }
 
-    /// <summary>Rebuilds <see cref="Preview"/> and <see cref="Error"/> from the documents.</summary>
+    /// <summary>Rebuilds <see cref="Preview"/>, <see cref="Error"/> and what differs from disk from the documents.</summary>
     public void Recompile()
     {
         Preview = BuildPreview();
+        _dirtyQuests.Clear();
+        foreach (var document in Documents)
+        {
+            document.Dirty = document.Saved is not { } saved
+                             || QuestGraphWriter.Format(document) != QuestGraphWriter.Format(saved, document.Header);
+            foreach (var quest in document.Quests)
+                if (quest.Id != null && (document.SavedQuest(quest) is not { } savedQuest
+                                         || QuestGraphWriter.FormatQuest(quest) != QuestGraphWriter.FormatQuest(savedQuest)))
+                    _dirtyQuests.Add(quest.Id);
+        }
         try
         {
             QuestLoader.Compile([.. Documents.Select(d => (d.Name, d.Definition, d.Path))]);
@@ -317,7 +401,7 @@ public sealed class QuestEditorState
     {
         if (Find(id) is not { } found) return;
         edit(found.Quest);
-        Changed(found.Document);
+        Recompile();
     }
 
     private void EditRequirement(string id, int index,
@@ -327,12 +411,6 @@ public sealed class QuestEditorState
             if (q.Requirements is not { } requirements || index < 0 || index >= requirements.Count) return;
             edit(q, requirements[index]);
         });
-
-    private void Changed(QuestGraphDocument document)
-    {
-        document.Dirty = true;
-        Recompile();
-    }
 
     private static void ApplyTarget(QuestGraphDefinition.RequirementDefinition requirement, string target)
     {

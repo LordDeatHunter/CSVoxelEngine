@@ -26,14 +26,18 @@ public static class QuestGraphWriter
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    public static void Save(QuestGraphDocument document) =>
-        File.WriteAllText(document.Path, Format(document), new UTF8Encoding(false));
+    public static void Save(QuestGraphDocument document) => Save(document.Path, document.Definition, document.Header);
 
-    public static string Format(QuestGraphDocument document)
+    /// <summary>Writes <paramref name="graph"/> with the <paramref name="header"/> comment lines to <paramref name="path"/>.</summary>
+    public static void Save(string path, QuestGraphDefinition graph, IReadOnlyList<string> header) =>
+        File.WriteAllText(path, Format(graph, header), new UTF8Encoding(false));
+
+    public static string Format(QuestGraphDocument document) => Format(document.Definition, document.Header);
+
+    public static string Format(QuestGraphDefinition graph, IReadOnlyList<string> header)
     {
-        var graph = document.Definition;
         var lines = new List<string> { "{" };
-        foreach (var comment in document.Header) lines.Add("  " + comment);
+        foreach (var comment in header) lines.Add("  " + comment);
 
         var top = new List<string>();
         if (!string.IsNullOrEmpty(graph.Title)) top.Add($"  \"title\": {Text(graph.Title)}");
@@ -54,7 +58,8 @@ public static class QuestGraphWriter
         return string.Join(NewLine, lines) + NewLine;
     }
 
-    private static string FormatQuest(QuestGraphDefinition.QuestDefinition quest)
+    /// <summary>One quest's block, as it sits in the file; two quests format the same exactly when they save the same.</summary>
+    internal static string FormatQuest(QuestGraphDefinition.QuestDefinition quest)
     {
         var fields = new List<string> { $"\"id\": {Text(quest.Id ?? "")}" };
         if (!string.IsNullOrEmpty(quest.Title)) fields.Add($"\"title\": {Text(quest.Title)}");

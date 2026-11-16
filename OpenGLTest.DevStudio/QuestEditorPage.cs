@@ -21,7 +21,9 @@ namespace VoxelEngine.DevStudio;
 /// DevStudio's QUESTS tab over a <see cref="QuestEditorState"/>: the quest graphs drawn exactly as the in-game book
 /// draws them (<see cref="QuestBookRenderer.DrawGraph"/>) on the canvas between the side panels, a top bar (graph
 /// selector, graph title, NEW GRAPH, ADD QUEST, SAVE), and the selected quest's fields and requirements in the right
-/// panel. Clicking a node selects it, dragging moves it (shift-drag moves its whole graph, Alt turns snapping off),
+/// panel. SAVE ALL / REVERT ALL (a second click within <see cref="ConfirmSeconds"/> confirms) act on every graph,
+/// SAVE QUEST / REVERT QUEST on the selected quest alone; a quest with unsaved edits carries a gold corner mark.
+/// Clicking a node selects it, dragging moves it (shift-drag moves its whole graph, Alt turns snapping off),
 /// Ctrl+click toggles the clicked node as a parent of the selected one, a double-click on empty canvas adds a quest
 /// there, dragging empty canvas pans and the wheel zooms. A grid click picks the quest's icon, or the target of a
 /// requirement whose PICK is armed; dragging a grid slot onto the canvas adds a quest there with that icon, named
@@ -33,8 +35,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
 
     private enum Action
     {
-        PrevGraph, NextGraph, NewGraph, AddQuest, Save,
-        Shape, Readable, AnyOf, PickIcon, AddRequirement, DeleteQuest,
+        PrevGraph, NextGraph, NewGraph, AddQuest, Save, RevertAll,
+        Shape, Readable, AnyOf, PickIcon, AddRequirement, DeleteQuest, SaveQuest, RevertQuest,
         // The Arg of these is the requirement index.
         CountDown, CountUp, Pick, Remove,
     }
@@ -68,6 +70,10 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     private string? _dragQuest;
     private QuestGraphDocument? _dragGraph;
     private double _lastClickTime = double.NegativeInfinity;
+    // REVERT ALL drops every unsaved edit, so it asks for a second click within this many seconds
+    private const double ConfirmSeconds = 3.0;
+    private double _revertArmedUntil = double.NegativeInfinity;
+    private double _now;
     private Vector2 _lastClickAt;
     private Vector2 _screen = new(1600f, 900f);
     // A grid slot pressed in the left panel: a click picks it, a drag onto the canvas adds a quest with it
@@ -127,6 +133,16 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         QuestType? selected = State.SelectedQuestId is { } id && book.TryGet(id, out var q) ? q : null;
         ui.Quests.DrawGraph(book, Camera, _ => true, _ => false, selected, hovered, time);
 
+        // A gold corner mark on every quest with unsaved edits
+        var mark = QuestBookLayout.NodeSize(Camera) * 0.16f;
+        foreach (var quest in book.Quests)
+        {
+            if (!State.IsQuestDirty(quest.Id)) continue;
+            var corner = QuestBookLayout.ToCanvas(quest.Position, Camera, _screen)
+                         - new Vector2(QuestBookLayout.NodeSize(Camera) * 0.36f);
+            ui.DrawRect(corner, new Vector2(mark), DevStudioUi.Accent);
+        }
+
         if (State.ErrorQuestId is { } bad && book.TryGet(bad, out var broken))
         {
             var size = QuestBookLayout.NodeSize(Camera) * 1.3f;
@@ -139,6 +155,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     {
         _screen = ui.ScreenSize;
         _ui = ui;
+        _now = time;
         _buttons.Clear();
         _fields.Clear();
         BuildTopBar();
@@ -195,7 +212,8 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         x = AddButtonAt(x, y, 34f, Action.NextGraph, ">", State.SelectedGraph < State.Documents.Count - 1);
         x = AddButtonAt(x + Gap * 2f, y, 110f, Action.NewGraph, "NEW GRAPH", true);
         x = AddButtonAt(x, y, 110f, Action.AddQuest, "ADD QUEST", hasGraph);
-        AddButtonAt(x, y, 110f, Action.Save, State.Dirty ? "SAVE *" : "SAVE", State.Dirty);
+        x = AddButtonAt(x, y, 110f, Action.Save, State.Dirty ? "SAVE ALL *" : "SAVE ALL", State.Dirty);
+        AddButtonAt(x, y, 110f, Action.RevertAll, _now < _revertArmedUntil ? "CONFIRM?" : "REVERT ALL", State.Dirty);
     }
 
     private void BuildDetails()
@@ -258,7 +276,12 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
         }
         AddButton(Rect(left, y, width, ButtonH), Action.AddRequirement, "+ REQUIREMENT", true, false);
 
-        AddButton(Rect(left, _screen.Y - Pad * 2f - ButtonH, width, ButtonH), Action.DeleteQuest, "DELETE QUEST", true, false);
+        var bottom = _screen.Y - Pad * 2f - ButtonH;
+        var dirty = State.IsQuestDirty(quest.Id!);
+        var half = (width - Gap) * 0.5f;
+        AddButton(Rect(left, bottom - ButtonH - Gap, half, ButtonH), Action.SaveQuest, "SAVE QUEST", dirty, false);
+        AddButton(Rect(left + half + Gap, bottom - ButtonH - Gap, half, ButtonH), Action.RevertQuest, "REVERT QUEST", dirty, false);
+        AddButton(Rect(left, bottom, width, ButtonH), Action.DeleteQuest, "DELETE QUEST", true, false);
     }
 
     private float AddField(Field field, int arg, string label, float left, float y, float width)
@@ -297,8 +320,11 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
             return;
         }
 
-        ui.DrawText(quest.Title is { Length: > 0 } title ? title : quest.Id ?? "", new Vector2(left, Pad + 8f),
-            DevStudioUi.FitText(ui, quest.Title ?? quest.Id ?? "", 18f, PanelRight - left).Scale, Rgba.White);
+        // The heading ends in * while the quest has unsaved edits
+        var heading = (quest.Title is { Length: > 0 } title ? title : quest.Id ?? "")
+                      + (State.IsQuestDirty(quest.Id!) ? " *" : "");
+        ui.DrawText(heading, new Vector2(left, Pad + 8f), DevStudioUi.FitText(ui, heading, 18f, PanelRight - left).Scale,
+            Rgba.White);
         foreach (var (rect, field, _, placeholder) in _fields)
             if (field is Field.Id or Field.Title or Field.Description)
                 ui.DrawText(placeholder.ToUpperInvariant(), new Vector2(rect.Left, rect.Top - LabelH + 2f), scale, DevStudioUi.TextDim);
@@ -405,6 +431,7 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
     /// <summary>A left press the studio's own widgets did not take. True when the page used it.</summary>
     public bool MouseDown(Vector2 point, double time, bool ctrl, bool shift)
     {
+        _now = time;
         if (TypeDropdownClick(point)) return true;
         foreach (var (rect, action, arg, _, enabled, _) in _buttons)
         {
@@ -637,6 +664,20 @@ internal sealed class QuestEditorPage(QuestEditorState state, TextFieldKeys keys
                 break;
             case Action.Save:
                 Status = State.Save();
+                break;
+            case Action.RevertAll when _now < _revertArmedUntil:
+                _revertArmedUntil = double.NegativeInfinity;
+                Status = State.RevertAll();
+                break;
+            case Action.RevertAll:
+                _revertArmedUntil = _now + ConfirmSeconds;
+                Status = "Click CONFIRM? to drop every unsaved quest edit";
+                break;
+            case Action.SaveQuest when id != null:
+                Status = State.SaveQuest(id);
+                break;
+            case Action.RevertQuest when id != null:
+                Status = State.RevertQuest(id);
                 break;
             case Action.Shape when id != null:
                 State.CycleShape(id);

@@ -19,8 +19,10 @@ OpenGLTest.DevStudio/                 # the preview and authoring tool (ITEMS, E
   QuestEditorPage.cs                  # the QUESTS tab: the graph canvas (QuestBookRenderer.DrawGraph), top bar,
                                       #   quest fields and requirement rows, and their mouse and keyboard handling
   QuestEditorState.cs                 # GL-free quest editing rules: add, delete, move, link (cycle-safe), rename,
-                                      #   fields, requirements, the lenient preview book, compile errors and save
-  QuestGraphDocument.cs               # one quest graph file being edited: path, header comment, definition, dirty
+                                      #   fields, requirements, the lenient preview book, compile errors, dirty
+                                      #   tracking, save and revert (all, or one quest)
+  QuestGraphDocument.cs               # one quest graph file being edited: path, header comment, definition, its saved
+                                      #   version and each quest's id on disk (per-quest save and revert)
   QuestGraphWriter.cs                 # writes a quest graph back in the shipped files' hand-written JSON layout
   SliceTrailSampler.cs                # the delegate that poses the previewed blade for PlayerPreviewState's slice trail
   TreePreviewState.cs                 # GL-free state of the TREES tab: species, seed, step, per-step
