@@ -22,9 +22,9 @@
     { "op": "wait", "seconds": 30 },
     { "op": "teleport", "pos": [-1200.5, 80.5, -3000.5], "yaw": 45, "pitch": -32 },
     { "op": "screenshot", "name": "basin_surface", "hideHud": true },
-    { "op": "teleport", "pos": [-1200.5, -104.5, -3000.5], "yaw": 45, "pitch": -18 },
+    { "op": "teleport", "pos": [-1200.5, -110.5, -3000.5], "yaw": 45, "pitch": -55 },
     { "op": "wait", "seconds": 15 },
-    { "op": "teleport", "pos": [-1200.5, -104.5, -3000.5], "yaw": 45, "pitch": -18 },
+    { "op": "teleport", "pos": [-1200.5, -110.5, -3000.5], "yaw": 45, "pitch": -55 },
     { "op": "screenshot", "name": "basin_underwater", "hideHud": true }
   ]
 }
