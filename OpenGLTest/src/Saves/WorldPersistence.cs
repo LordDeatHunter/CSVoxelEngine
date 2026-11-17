@@ -98,10 +98,21 @@ internal sealed class WorldPersistence
             // survival world hosted once does not reopen in creative flight at the centroid.
             _hostedPlayer = _savedPlayer;
         }
+        var skippedNullRecords = 0;
         if (savedEntities?.Mobs != null)
-            _pendingMobs.AddRange(savedEntities.Mobs);
+            foreach (var mob in savedEntities.Mobs)
+                if (mob == null)
+                    skippedNullRecords++;
+                else
+                    _pendingMobs.Add(mob);
         if (savedEntities?.Drops != null)
-            _pendingDrops.AddRange(savedEntities.Drops);
+            foreach (var drop in savedEntities.Drops)
+                if (drop == null)
+                    skippedNullRecords++;
+                else
+                    _pendingDrops.Add(drop);
+        if (skippedNullRecords > 0)
+            Log.Warn($"Entity save: skipped {skippedNullRecords} null record(s) before restore");
     }
 
     /// <summary>The player.json this world was opened with, until the Loading -> Playing flip forgets it.</summary>
@@ -224,9 +235,11 @@ internal sealed class WorldPersistence
                 continue;
 
             var restored = drop.Stuck is { Length: 3 }
-                ? _dropManager.SpawnRestoredStuck(id, position, ToVector(drop.Stuck), inBody: false, drop.Age ?? 0f)
+                ? _dropManager.SpawnRestoredStuck(id, position, ToVector(drop.Stuck), inBody: false,
+                    drop.Age ?? 0f, drop.PickupDelay)
                 : _dropManager.SpawnRestored(id, position, ToVector(drop.Velocity), drop.Age ?? 0f,
-                    drop.Instance == null ? null : InventorySaveCodec.ImportInstance(0, drop.Instance, new List<string>()));
+                    drop.Instance == null ? null : InventorySaveCodec.ImportInstance(0, drop.Instance, new List<string>()),
+                    drop.PickupDelay);
             if (!restored)
                 (dropped ??= []).Add($"drop '{drop.Item}'");
             _pendingDrops.RemoveAt(i);
@@ -495,6 +508,7 @@ internal sealed class WorldPersistence
                 Velocity = [drop.Velocity.X, drop.Velocity.Y, drop.Velocity.Z],
                 Instance = drop.Instance == null ? null : InventorySaveCodec.ExportInstance(drop.Instance, new List<string>()),
                 Age = drop.Age,
+                PickupDelay = drop.PickupDelay,
                 Stuck = drop.Stick == DropStick.Terrain ? [drop.StuckHeading.X, drop.StuckHeading.Y, drop.StuckHeading.Z] : null
             });
         }
@@ -517,20 +531,19 @@ internal sealed class WorldPersistence
     /// Fills the (empty) station registries from <c>stations.json</c>. No wait for chunks is needed:
     /// each manager freezes a cell in an unloaded chunk and, once the chunk is there, its own update
     /// sweeps an entry whose block is gone (dropping what it held), so a stale entry never lives on.
-    /// One warning covers every entry dropped for a name that no longer resolves.
+    /// One warning covers every invalid entry or name that no longer resolves.
     /// </summary>
     private void RestoreStations(StationSaveData? saved)
     {
         if (saved == null)
             return;
-        _world.Lanterns.Restore(saved.Lanterns);
-        var skipped = _campfires.Restore(saved.Campfires) + _querns.Restore(saved.Querns)
+        var skipped = _world.Lanterns.Restore(saved.Lanterns) + _campfires.Restore(saved.Campfires) + _querns.Restore(saved.Querns)
             + _kilns.Restore(saved.Kilns) + _casting.Restore(saved.Casts) + _world.Chests.Restore(saved.Chests)
             + _world.Waystones.Restore(saved.Waystones) + _world.Smithing.Restore(saved)
             + _world.Towers.Restore(saved.Towers) + _world.Stumps.Restore(saved.Stumps) + _world.IngotPiles.Restore(saved.IngotPiles)
             + _world.StandingCrucibles.Restore(saved.StandingCrucibles);
         if (skipped > 0)
-            Log.Warn($"Station save: dropped {skipped} saved station entr{(skipped == 1 ? "y" : "ies")} that no longer resolve");
+            Log.Warn($"Station save: dropped {skipped} invalid or unresolvable saved station entr{(skipped == 1 ? "y" : "ies")}");
     }
 
     /// <summary>Enqueues <see cref="StationSaveCodec.FileName"/>; does nothing without a save store.</summary>

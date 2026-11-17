@@ -607,6 +607,276 @@ public sealed class ChunkSaveStoreTests : IDisposable
     }
 
     [Fact]
+    public void AChunkArchiveFailureKeepsTheOriginalAndRetriesThePendingSnapshot()
+    {
+        var key = ChunkKey.Pack(7, 1, 7);
+        var path = Path.Combine(ChunksDir, WorldStore.ChunkFileName(7, 1, 7));
+        Directory.CreateDirectory(ChunksDir);
+        byte[] original = [1, 2, 3, 4, 5];
+        File.WriteAllBytes(path, original);
+
+        var backupBlocker = path + ".bad";
+        var firstBarrier = Path.Combine(_world, "archive-failure-barrier.bin");
+        var retryBarrier = Path.Combine(_world, "archive-retry-barrier.bin");
+        using var firstDone = new ManualResetEventSlim(false);
+        using var retryDone = new ManualResetEventSlim(false);
+        var store = new ChunkSaveStore(_world);
+        store.MoveFile = (tmp, final) =>
+        {
+            File.Move(tmp, final, overwrite: true);
+            if (string.Equals(final, firstBarrier, StringComparison.Ordinal))
+                firstDone.Set();
+            else if (string.Equals(final, retryBarrier, StringComparison.Ordinal))
+                retryDone.Set();
+        };
+        var replacement = Snapshot("dirt", seed: 71);
+
+        try
+        {
+            Assert.False(store.TryLoad(key, out _));
+            Directory.CreateDirectory(backupBlocker);
+
+            store.Enqueue(key, replacement);
+            store.EnqueueFile("archive-failure-barrier.bin", [8]);
+            Assert.True(firstDone.Wait(ShutdownTimeout), "writer did not finish the blocked-archive job");
+
+            // The chunk remains pending and the original stays at its final path while .bad is blocked.
+            Assert.Equal(original, File.ReadAllBytes(path));
+            Assert.True(store.TryLoad(key, out var pending));
+            AssertSameData(replacement, pending);
+            Assert.Equal(1, store.FailedCount);
+            Assert.Equal(1, store.PendingCount);
+
+            Directory.Delete(backupBlocker);
+            Assert.Equal(1, store.RetryFailed());
+            store.EnqueueFile("archive-retry-barrier.bin", [9]);
+            Assert.True(retryDone.Wait(ShutdownTimeout), "writer did not finish the archival retry");
+
+            Assert.Equal(original, File.ReadAllBytes(path + ".bad"));
+            Assert.True(store.TryLoad(key, out var written));
+            AssertSameData(replacement, written);
+            Assert.Equal(0, store.FailedCount);
+            Assert.Equal(0, store.PendingCount);
+        }
+        finally
+        {
+            if (Directory.Exists(backupBlocker))
+                Directory.Delete(backupBlocker, recursive: true);
+            ShutdownOrFail(store);
+        }
+
+        var reopened = new ChunkSaveStore(_world);
+        try
+        {
+            Assert.True(reopened.TryLoad(key, out var persisted));
+            AssertSameData(replacement, persisted);
+            Assert.Equal(original, File.ReadAllBytes(path + ".bad"));
+        }
+        finally
+        {
+            ShutdownOrFail(reopened);
+        }
+    }
+
+    [Fact]
+    public void AWholeFileArchiveFailureKeepsTheOriginalAndRetriesThePendingBytes()
+    {
+        var fileName = "players/Alice.json";
+        var final = Path.Combine(_world, fileName.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(final)!);
+        byte[] original = [0xFF, 0x00, 0x7B, 0x13];
+        byte[] replacement = [9, 8, 7, 6];
+        File.WriteAllBytes(final, original);
+
+        var backupBlocker = final + ".bad";
+        var firstBarrier = Path.Combine(_world, "whole-file-archive-failure-barrier.bin");
+        var retryBarrier = Path.Combine(_world, "whole-file-archive-retry-barrier.bin");
+        using var firstDone = new ManualResetEventSlim(false);
+        using var retryDone = new ManualResetEventSlim(false);
+        var store = new ChunkSaveStore(_world);
+        store.MoveFile = (tmp, destination) =>
+        {
+            File.Move(tmp, destination, overwrite: true);
+            if (string.Equals(destination, firstBarrier, StringComparison.Ordinal))
+                firstDone.Set();
+            else if (string.Equals(destination, retryBarrier, StringComparison.Ordinal))
+                retryDone.Set();
+        };
+
+        try
+        {
+            // A real exclusive share makes the store's ordinary read path fail and mark this file.
+            using (var exclusive = new FileStream(final, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                Assert.Null(store.ReadFile(fileName));
+
+            Directory.CreateDirectory(backupBlocker);
+            store.EnqueueFile(fileName, replacement);
+            store.EnqueueFile("whole-file-archive-failure-barrier.bin", [8]);
+            Assert.True(firstDone.Wait(ShutdownTimeout), "writer did not finish the blocked-archive job");
+
+            // The new payload is still accepted/readable, while the original remains untouched on disk.
+            Assert.Equal(original, File.ReadAllBytes(final));
+            Assert.Equal(replacement, store.ReadFile(fileName));
+            Assert.Equal(1, store.FailedCount);
+
+            Directory.Delete(backupBlocker);
+            Assert.Equal(1, store.RetryFailed());
+            store.EnqueueFile("whole-file-archive-retry-barrier.bin", [9]);
+            Assert.True(retryDone.Wait(ShutdownTimeout), "writer did not finish the archival retry");
+
+            Assert.Equal(original, File.ReadAllBytes(final + ".bad"));
+            Assert.Equal(replacement, File.ReadAllBytes(final));
+            Assert.Equal(0, store.FailedCount);
+            Assert.Equal(replacement, store.ReadFile(fileName));
+        }
+        finally
+        {
+            if (Directory.Exists(backupBlocker))
+                Directory.Delete(backupBlocker, recursive: true);
+            ShutdownOrFail(store);
+        }
+
+        var reopened = new ChunkSaveStore(_world);
+        try
+        {
+            Assert.Equal(replacement, reopened.ReadFile(fileName));
+            Assert.Equal(original, File.ReadAllBytes(final + ".bad"));
+        }
+        finally
+        {
+            ShutdownOrFail(reopened);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ArchiveFailureAtShutdownRetriesAcceptedPayloadAfterRejectedLateEnqueue(bool wholeFile)
+    {
+        var fileName = "players/ArchiveRace.json";
+        var key = ChunkKey.Pack(8, 1, 8);
+        var final = wholeFile
+            ? Path.Combine(_world, fileName.Replace('/', Path.DirectorySeparatorChar))
+            : Path.Combine(ChunksDir, WorldStore.ChunkFileName(8, 1, 8));
+        Directory.CreateDirectory(Path.GetDirectoryName(final)!);
+        byte[] original = [0xFF, 0x00, 0x21, 0x7B];
+        File.WriteAllBytes(final, original);
+        var backupBlocker = final + ".bad";
+        var barrier = Path.Combine(_world, "archive-shutdown-barrier.bin");
+        using var archiveAttempt = new ManualResetEventSlim(false);
+        using var releaseArchive = new ManualResetEventSlim(false);
+        using var afterFailure = new ManualResetEventSlim(false);
+        using var releaseAfterFailure = new ManualResetEventSlim(false);
+        var acceptedSnapshot = Snapshot("stone", seed: 81);
+        var rejectedSnapshot = Snapshot("dirt", seed: 82);
+        byte[] acceptedBytes = [4, 3, 2, 1];
+        byte[] rejectedBytes = [1, 2, 3, 4];
+        var archiveMoves = 0;
+        var store = new ChunkSaveStore(_world);
+        store.MoveFile = (source, destination) =>
+        {
+            if (string.Equals(destination, backupBlocker, StringComparison.Ordinal) &&
+                Interlocked.Increment(ref archiveMoves) == 1)
+            {
+                archiveAttempt.Set();
+                if (!releaseArchive.Wait(ShutdownTimeout))
+                    throw new TimeoutException("test did not release the archive move");
+            }
+
+            if (string.Equals(destination, barrier, StringComparison.Ordinal))
+            {
+                File.Move(source, destination, overwrite: true);
+                afterFailure.Set();
+                if (!releaseAfterFailure.Wait(ShutdownTimeout))
+                    throw new TimeoutException("test did not release the post-failure barrier");
+                return;
+            }
+
+            File.Move(source, destination, overwrite: true);
+        };
+        Thread? shutdown = null;
+        var shutdownResult = false;
+        try
+        {
+            if (wholeFile)
+            {
+                using var exclusive = new FileStream(final, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                Assert.Null(store.ReadFile(fileName));
+            }
+            else
+            {
+                Assert.False(store.TryLoad(key, out _));
+            }
+
+            if (wholeFile)
+                store.EnqueueFile(fileName, acceptedBytes);
+            else
+                store.Enqueue(key, acceptedSnapshot);
+            store.EnqueueFile("archive-shutdown-barrier.bin", [8]);
+            Assert.True(archiveAttempt.Wait(ShutdownTimeout), "writer did not reach the archive move");
+
+            shutdown = new Thread(() => shutdownResult = store.Shutdown(ShutdownTimeout));
+            shutdown.Start();
+            Assert.True(SpinWait.SpinUntil(() => store.IsAddingCompletedForTests, ShutdownTimeout),
+                "shutdown did not close admission while the accepted archive move was paused");
+
+            // The writer has captured the accepted argument and paused in its archive move.
+            // This enqueue updates memory but shutdown rejects its job.
+            if (wholeFile)
+            {
+                store.EnqueueFile(fileName, rejectedBytes);
+                Assert.Equal(rejectedBytes, store.ReadFile(fileName));
+            }
+            else
+            {
+                store.Enqueue(key, rejectedSnapshot);
+                Assert.True(store.TryLoad(key, out var pending));
+                AssertSameData(rejectedSnapshot, pending);
+            }
+
+            Directory.CreateDirectory(backupBlocker);
+            releaseArchive.Set();
+            Assert.True(afterFailure.Wait(ShutdownTimeout), "writer did not pass the failed archive attempt");
+            Assert.Equal(1, store.FailedCount);
+            Assert.Equal(original, File.ReadAllBytes(final));
+            Assert.True(Directory.Exists(backupBlocker), "the original archive obstacle was not preserved");
+
+            Directory.Delete(backupBlocker);
+            releaseAfterFailure.Set();
+        }
+        finally
+        {
+            releaseArchive.Set();
+            releaseAfterFailure.Set();
+            if (Directory.Exists(backupBlocker))
+                Directory.Delete(backupBlocker, recursive: true);
+            if (shutdown == null)
+                ShutdownOrFail(store);
+            else
+                Assert.True(shutdown.Join(ShutdownTimeout), "shutdown did not finish the close-time retry");
+        }
+
+        Assert.True(shutdownResult, "writer should join after the final accepted-payload retry");
+        Assert.Equal(original, File.ReadAllBytes(final + ".bad"));
+        Assert.Equal(0, store.FailedCount);
+        var reopened = new ChunkSaveStore(_world);
+        try
+        {
+            if (wholeFile)
+                Assert.Equal(acceptedBytes, reopened.ReadFile(fileName));
+            else
+            {
+                Assert.True(reopened.TryLoad(key, out var persisted));
+                AssertSameData(acceptedSnapshot, persisted);
+            }
+        }
+        finally
+        {
+            ShutdownOrFail(reopened);
+        }
+    }
+
+    [Fact]
     public void AFolderWithALiveWriterCannotBeOpenedAgain()
     {
         var key = ChunkKey.Pack(1, 0, 1);

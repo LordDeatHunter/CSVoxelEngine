@@ -155,12 +155,15 @@ public sealed class GoblinManager : IMobPopulation
         }
     }
 
-    /// <summary>Credits a drop scavenged by the collector at <paramref name="index"/> of this
-    /// frame's <see cref="AppendCollectors"/> order: flint becomes ammo, clamped at the cap.</summary>
-    public void AwardScavenged(int index, ushort id)
+    /// <summary>Credits one flint drop scavenged by the collector at <paramref name="index"/> of this
+    /// frame's <see cref="AppendCollectors"/> order. False means the caller must return the drop.</summary>
+    public bool AwardScavenged(int index, ushort id)
     {
-        if (index < 0 || index >= _collectorGoblins.Count || id != _flintId) return;
-        _collectorGoblins[index].AddAmmo(1);
+        if (index < 0 || index >= _collectorGoblins.Count || id != _flintId) return false;
+        var goblin = _collectorGoblins[index];
+        if (goblin.Ammo >= MobConfig.GoblinStoneMax) return false;
+        goblin.AddAmmo(1);
+        return true;
     }
 
     /// <summary>Health the goblins took off every target together during the most recent

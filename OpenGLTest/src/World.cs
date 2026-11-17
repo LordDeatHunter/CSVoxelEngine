@@ -480,7 +480,7 @@ public class World
             {
                 // Held until the Loading -> Playing flip, then spawned as their chunks load
                 savedEntities = EntitySaveReader.Read(saveStore);
-                savedStations = StationSaveCodec.TryParse(saveStore.ReadFile(StationSaveCodec.FileName));
+                savedStations = StationSaveReader.Read(saveStore);
             }
             LocalPlayer.RecordSpawn();
             _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry, saveStore);
@@ -636,7 +636,7 @@ public class World
             // The chop damage of natural trunks, before any chunk meshes so the first meshes already show it;
             // only a singleplayer world keeps any (a server and a client never chop for themselves)
             if (!serverMode && !clientMode)
-                if (WoodDamageCodec.TryParse(_saveStore?.ReadFile(WoodDamageCodec.FileName)) is { } savedDamage)
+                if (WoodDamageSaveReader.Read(_saveStore) is { } savedDamage)
                     _chunkManager.ChopDamage.Import(savedDamage);
 
             // A client never generates: its chunks stream from the server (ClientChunkStreamer).
@@ -644,7 +644,7 @@ public class World
                 _generationWorker.Start();
             // Before the LOD workers start, so the first region builds already see the saved
             // caps, surface overrides and felled canopies; a missing or corrupt file imports nothing.
-            LodEditState.TryParse(_saveStore?.ReadFile(LodEditState.FileName))?.Import();
+            LodEditStateReader.Read(_saveStore)?.Import();
             // A server never renders the far LOD, so it does not start the LodGen threads; the
             // imported edit state still round-trips through a save untouched. A client gets its
             // far LOD from the server (S2), so it starts none either.

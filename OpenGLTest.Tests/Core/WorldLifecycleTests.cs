@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using VoxelEngine.Entities;
@@ -15,8 +16,10 @@ using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Entities.Wildlife;
+using VoxelEngine.Interaction;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Simulation.Lanterns;
 using VoxelEngine.Simulation.Chests;
@@ -41,7 +44,7 @@ namespace VoxelEngine.Tests.Core;
 /// <see cref="World.LoadTimedOut"/> is asserted false so a load is proven by readiness.
 /// </remarks>
 [Collection("Worldgen seed")]
-public sealed class WorldLifecycleTests : IDisposable
+public sealed partial class WorldLifecycleTests : IDisposable
 {
     private const float High = 1e6f;
     private const double LoadWallSeconds = 60;
@@ -76,6 +79,131 @@ public sealed class WorldLifecycleTests : IDisposable
         catch (UnauthorizedAccessException)
         {
         }
+    }
+
+    [Fact]
+    public void SuccessfulSavedConsumableInstanceUseSpendsTheSelectedInstance()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        const string rawPlayer = """
+            {"Position":[0,1000000,0],"Health":100,"Inventory":{"Tools":[
+              {"InstanceId":101,"Name":"item/bandage"},
+              {"InstanceId":200,"Name":"item/copper_pickaxe"}],
+              "Hotbar":[
+                {"IsTool":true,"ToolInstance":101},
+                {"IsTool":true,"ToolInstance":101},
+                {"IsTool":true,"ToolInstance":200}],
+              "Offhand":{"IsTool":true,"ToolInstance":101},
+              "SelectedIndex":0,"NextToolInstance":201}}
+            """;
+        var parsed = PlayerSaveCodec.TryParse(Encoding.UTF8.GetBytes(rawPlayer));
+        Assert.NotNull(parsed);
+        Assert.NotNull(parsed!.Inventory);
+        WriteRawPlayerFile(rawPlayer);
+
+        ChunkSaveStore? store = new(_dir);
+        World? world = null;
+        bool? closed = null;
+        var primaryConsumed = false;
+        var primaryAliasesCleared = false;
+        var unrelatedInstancePreserved = false;
+        var normalStackConsumed = false;
+        try
+        {
+            world = NewWorld(store);
+            store = null; // the World owns the store from here
+            Assert.Equal(WorldPhase.Loading, world.Phase);
+            Assert.True(RunUntil(world, () => world.IsPlaying, LoadWallSeconds), "the saved-player world did not start playing");
+            Assert.False(world.LoadTimedOut, "the world started playing on timeout rather than readiness");
+            Assert.Equal(100, world.Health);
+
+            // A full-health refusal must leave this saved instance and both aliases alone.
+            Assert.False(world.RightClick.TryUseSelected(World.InteractionReach, out _));
+            var bandage = ContentRegistry.RequireItem("bandage").Id;
+            Assert.Equal(bandage, world.Inventory.ToolItemId(101));
+            Assert.Equal(101, world.Inventory.SlotAt(0).ToolInstance);
+            Assert.Equal(101, world.Inventory.Offhand.ToolInstance);
+
+            world.LocalPlayer.DamagePlayer(5);
+            var before = world.Health;
+            Assert.True(world.RightClick.TryUseSelected(World.InteractionReach, out var outcome));
+            Assert.Equal(RightClickOutcome.ItemUse, outcome);
+            Assert.True(world.Health > before, "the successful use did not heal the player");
+            primaryConsumed = world.Inventory.ToolItemId(101) == 0;
+            primaryAliasesCleared = world.Inventory.SlotAt(0).IsEmpty && world.Inventory.SlotAt(1).IsEmpty
+                                    && world.Inventory.Offhand.IsEmpty;
+            unrelatedInstancePreserved = world.Inventory.ToolItemId(200) == ContentRegistry.RequireItem("copper_pickaxe").Id;
+
+            // The ordinary stack path still consumes one and clears the final stack slot.
+            Assert.True(world.Inventory.Add(bandage));
+            world.Inventory.EquipStackable(3, bandage);
+            world.Inventory.Select(3);
+            world.LocalPlayer.DamagePlayer(5);
+            Assert.Equal(1, world.Inventory.CountFor(bandage));
+            Assert.True(world.RightClick.TryUseSelected(World.InteractionReach, out outcome));
+            Assert.Equal(RightClickOutcome.ItemUse, outcome);
+            Assert.Equal(0, world.Inventory.CountFor(bandage));
+            normalStackConsumed = world.Inventory.SlotAt(3).IsEmpty;
+        }
+        finally
+        {
+            if (world != null)
+                closed = world.SaveAndDispose();
+            else if (store != null)
+                closed = store.Shutdown(TimeSpan.FromSeconds(10));
+        }
+
+        Assert.True(closed, "the test world/store did not close cleanly");
+        Assert.Equal(WorldPhase.Disposed, world!.Phase);
+        Assert.False(WorldSeed.WorldIsLive);
+        Assert.True(unrelatedInstancePreserved, "spending the consumable changed an unrelated tool instance");
+        Assert.True(normalStackConsumed, "the ordinary stack-backed consumable path failed to consume its final unit");
+        Assert.True(primaryConsumed && primaryAliasesCleared,
+            $"successful bandage use did not consume saved instance 101 and clear all hotbar/offhand aliases " +
+            $"(instance id={world.Inventory.ToolItemId(101)}, main slot={world.Inventory.SlotAt(0)}, offhand={world.Inventory.Offhand})");
+    }
+
+    [Fact]
+    public void CreativeSuccessfulSavedConsumableInstanceUseRemainsFree()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        const string rawPlayer = """
+            {"Position":[0,1000000,0],"Health":50,"Creative":true,"Inventory":{"Tools":[
+              {"InstanceId":301,"Name":"item/bandage"}],
+              "Hotbar":[{"IsTool":true,"ToolInstance":301}],"SelectedIndex":0,"NextToolInstance":302}}
+            """;
+        WriteRawPlayerFile(rawPlayer);
+
+        ChunkSaveStore? store = new(_dir);
+        World? world = null;
+        bool? closed = null;
+        var effectApplied = false;
+        var instanceRetained = false;
+        try
+        {
+            world = NewWorld(store);
+            store = null;
+            Assert.True(RunUntil(world, () => world.IsPlaying, LoadWallSeconds), "the saved-player world did not start playing");
+            Assert.False(world.LoadTimedOut, "the world started playing on timeout rather than readiness");
+            Assert.True(world.Camera.IsCreative);
+            var before = world.Health;
+            effectApplied = world.RightClick.TryUseSelected(World.InteractionReach, out var outcome);
+            Assert.Equal(RightClickOutcome.ItemUse, outcome);
+            Assert.True(world.Health > before);
+            instanceRetained = world.Inventory.ToolItemId(301) == ContentRegistry.RequireItem("bandage").Id;
+        }
+        finally
+        {
+            if (world != null)
+                closed = world.SaveAndDispose();
+            else if (store != null)
+                closed = store.Shutdown(TimeSpan.FromSeconds(10));
+        }
+
+        Assert.True(closed, "the test world/store did not close cleanly");
+        Assert.Equal(WorldPhase.Disposed, world!.Phase);
+        Assert.False(WorldSeed.WorldIsLive);
+        Assert.True(effectApplied && instanceRetained, "creative use spent the saved consumable instance");
     }
 
     [Fact]
@@ -392,6 +520,112 @@ public sealed class WorldLifecycleTests : IDisposable
     }
 
     [Fact]
+    public void OnlyCreditedFirstFindsReplaceTheHudToast()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+
+        World? world = null;
+        var closed = false;
+        var loaded = false;
+        var loadTimedOut = false;
+        var fillerAdded = false;
+        var targetDropsSpawned = false;
+        var initialItemsUnknown = false;
+        var usedAfterFiller = -1;
+        var collectedIds = Array.Empty<ushort>();
+        var batchDropIds = Array.Empty<ushort>();
+        var toastAfterBatch = "";
+        var flintCountAfterBatch = -1;
+        var coalCountAfterBatch = -1;
+        var flintKnownAfterBatch = false;
+        var coalKnownAfterBatch = true;
+        var knownPickupSpawned = false;
+        var flintCountAfterKnownPickup = -1;
+        var toastAfterKnownPickup = "";
+        try
+        {
+            world = NewWorld(new ChunkSaveStore(_dir));
+            loaded = RunUntil(world, () => world.IsPlaying, LoadWallSeconds);
+            loadTimedOut = world.LoadTimedOut;
+            if (loaded && !loadTimedOut)
+            {
+                var bone = ContentRegistry.RequireItem("bone").Id;
+                var coal = ContentRegistry.RequireItem("coal").Id;
+                var flint = ContentRegistry.RequireItem("flint").Id;
+                initialItemsUnknown = !world.Inventory.Knows(coal) && !world.Inventory.Knows(flint);
+                var fillerCount = Inventory.MiscCapacity - world.Inventory.UsedOf(InventoryCategory.Misc) - 1;
+
+                fillerAdded = Inventory.CategoryOf(bone) == InventoryCategory.Misc
+                    && Inventory.CategoryOf(coal) == InventoryCategory.Misc
+                    && Inventory.CategoryOf(flint) == InventoryCategory.Misc
+                    && fillerCount > 0
+                    && world.Inventory.Add(bone, fillerCount);
+                usedAfterFiller = world.Inventory.UsedOf(InventoryCategory.Misc);
+                if (fillerAdded)
+                {
+                    var target = world.Camera.Position - Vector3.UnitY * DropManager.CollectHeightOffset;
+                    // The manager scans from newest to oldest, so flint is credited before coal.
+                    // Only one shared misc-pool slot remains when both callbacks run.
+                    var coalSpawned = world.DropSpawner.SpawnRestored(coal, target, Vector3.Zero, age: 5f);
+                    var flintSpawned = world.DropSpawner.SpawnRestored(flint, target, Vector3.Zero, age: 5f);
+                    targetDropsSpawned = coalSpawned && flintSpawned;
+                    if (targetDropsSpawned)
+                    {
+                        world.Pickup.Update(1d / 60d);
+                        collectedIds = world.DropSpawner.Collected.ToArray();
+                        batchDropIds = world.Drops.Select(drop => drop.BlockId).ToArray();
+                        toastAfterBatch = world.Toast.Text;
+                        flintCountAfterBatch = world.Inventory.CountFor(flint);
+                        coalCountAfterBatch = world.Inventory.CountFor(coal);
+                        flintKnownAfterBatch = world.Inventory.Knows(flint);
+                        coalKnownAfterBatch = world.Inventory.Knows(coal);
+
+                        // Free one slot, move within the loaded high-air region but out of range
+                        // of the refused coal, and confirm a known accepted pickup leaves the toast alone.
+                        world.Inventory.Remove(bone, 1);
+                        world.Camera.TestTeleport(new Vector3(5f, High, 0f), world.Camera.Yaw, world.Camera.Pitch);
+                        world.Toast.Show("Keep this toast");
+                        var knownTarget = world.Camera.Position - Vector3.UnitY * DropManager.CollectHeightOffset;
+                        knownPickupSpawned = world.DropSpawner.SpawnRestored(flint, knownTarget, Vector3.Zero, age: 5f);
+                        if (knownPickupSpawned)
+                        {
+                            world.Pickup.Update(1d / 60d);
+                            flintCountAfterKnownPickup = world.Inventory.CountFor(flint);
+                            toastAfterKnownPickup = world.Toast.Text;
+                        }
+                    }
+                }
+            }
+        }
+        finally
+        {
+            if (world != null)
+                closed = world.SaveAndDispose();
+        }
+
+        Assert.True(closed, "the world did not shut down cleanly");
+        Assert.True(loaded, "the world did not finish loading");
+        Assert.False(loadTimedOut, "the world started playing on the timeout, not on readiness");
+        Assert.True(initialItemsUnknown);
+        Assert.True(fillerAdded);
+        Assert.Equal(Inventory.MiscCapacity - 1, usedAfterFiller);
+        Assert.True(targetDropsSpawned);
+        var coalId = ContentRegistry.RequireItem("coal").Id;
+        var flintId = ContentRegistry.RequireItem("flint").Id;
+        Assert.Equal(new[] { flintId, coalId }, collectedIds);
+        Assert.Equal(new[] { coalId }, batchDropIds);
+        Assert.Equal(1, flintCountAfterBatch);
+        Assert.Equal(0, coalCountAfterBatch);
+        Assert.True(flintKnownAfterBatch);
+        Assert.False(coalKnownAfterBatch);
+        Assert.Equal($"New: {Inventory.DisplayName(flintId)}", toastAfterBatch);
+        Assert.True(knownPickupSpawned);
+        Assert.Equal(2, flintCountAfterKnownPickup);
+        Assert.Equal("Keep this toast", toastAfterKnownPickup);
+    }
+
+    [Fact]
     public void SaveAndDisposeWritesThePlayerASecondWorldReadsBack()
     {
         // Only a position, so every other field takes its default
@@ -570,6 +804,65 @@ public sealed class WorldLifecycleTests : IDisposable
     }
 
     [Fact]
+    public void AGoblinReturnsFlintItCannotCreditAfterACompletedPickupBatch()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+        WriteEntitiesFile(new EntitySaveData
+        {
+            Mobs =
+            [
+                new EntitySaveData.MobData
+                {
+                    Type = "goblin",
+                    Position = [0f, High, 0f],
+                    Ammo = MobConfig.GoblinStoneMax - 1
+                }
+            ]
+        });
+
+        World? world = null;
+        var closed = false;
+        var collected = 0;
+        var ammoDelta = 0;
+        var remainingDrops = 0;
+        try
+        {
+            world = NewWorld(new ChunkSaveStore(_dir));
+            Assert.True(RunUntil(world, () => world.IsPlaying, LoadWallSeconds), "the world did not finish loading");
+            Assert.False(world.LoadTimedOut);
+
+            var goblin = Assert.Single(world.Goblins);
+            var ammoBefore = goblin.Ammo;
+            Assert.Equal(MobConfig.GoblinStoneMax - 1, ammoBefore);
+
+            // Keep the local player out of the pickup range; this update still runs the world's
+            // production DropPickup path with its real GoblinManager and DropManager.
+            world.Camera.TestTeleport(new Vector3(1_000f, High, 1_000f), world.Camera.Yaw, world.Camera.Pitch);
+            var target = goblin.Position - Vector3.UnitY * DropManager.CollectHeightOffset;
+            var flint = ContentRegistry.RequireItem("flint").Id;
+            Assert.True(world.DropSpawner.SpawnRestored(flint, target, Vector3.Zero, age: 5f));
+            Assert.True(world.DropSpawner.SpawnRestored(flint, target, Vector3.Zero, age: 5f));
+            Assert.Equal(2, world.Drops.Count);
+
+            world.Pickup.Update(1d / 60d);
+            collected = world.DropSpawner.Collected.Length;
+            ammoDelta = goblin.Ammo - ammoBefore;
+            remainingDrops = world.Drops.Count;
+        }
+        finally
+        {
+            if (world != null)
+                closed = world.SaveAndDispose();
+        }
+
+        Assert.True(closed, "the world did not shut down cleanly");
+        Assert.Equal(2, collected);
+        Assert.Equal(1, ammoDelta);
+        Assert.Equal(1, remainingDrops);
+    }
+
+    [Fact]
     public void ACaveMobSpawnedWithNoTierTakesTheDepthTierOfItsFeet()
     {
         var world = NewWorld(null);
@@ -680,6 +973,34 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.True(tower.BossDefeated);
         Assert.Equal(AltarVerdict.Defeated, second.UseAltar(new Vector3(altar.X, altar.Y, altar.Z)));
         Assert.True(second.SaveAndDispose());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MalformedStationSaveIsArchivedBeforeWorldReplacement(bool serverMode)
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        Directory.CreateDirectory(_dir);
+        var path = Path.Combine(_dir, StationSaveCodec.FileName);
+        var original = System.Text.Encoding.UTF8.GetBytes("{\"Querns\":[");
+        File.WriteAllBytes(path, original);
+
+        var world = new World(null!, null!, null!, null!, null!, null!, null, new ChunkSaveStore(_dir),
+            serverMode: serverMode);
+        _worlds.Add(world);
+        Assert.True(world.SaveAndDispose());
+
+        var archivePath = path + ".bad";
+        var archiveExists = File.Exists(archivePath);
+        var archiveMatches = archiveExists && File.ReadAllBytes(archivePath).SequenceEqual(original);
+        var reopened = new ChunkSaveStore(_dir);
+        var replacement = StationSaveCodec.TryParse(reopened.ReadFile(StationSaveCodec.FileName));
+        var replacementParses = replacement != null;
+        Assert.True(reopened.Shutdown(TimeSpan.FromSeconds(10)));
+
+        Assert.True(archiveMatches && replacementParses,
+            $"archive exists={archiveExists}, archived bytes match={archiveMatches}, replacement parses={replacementParses}");
     }
 
     [Fact]
@@ -847,6 +1168,81 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal([3f, High, 3f], mob.Position);
         var drop = Assert.Single(saved.Drops!);
         Assert.Equal([1f, High, 1f], drop.Position);
+    }
+
+    [Fact]
+    public void AThrownQDropKeepsItsPickupGraceAcrossWorldSaveAndReopen()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+
+        var first = NewWorld(new ChunkSaveStore(_dir));
+        World? second = null;
+        Exception? primaryFailure = null;
+        var firstClosed = false;
+        var secondClosed = true;
+        string? cleanupFailure = null;
+        try
+        {
+            Assert.True(RunUntil(first, () => first.IsPlaying, LoadWallSeconds), "the first world did not finish loading");
+            Assert.False(first.LoadTimedOut);
+
+            EquipRock(first);
+            Assert.True(first.ThrowSelected(false, first.Camera.Position, first.Camera.ViewDirection, first.Inventory));
+            var thrown = Assert.Single(first.Drops);
+
+            // Keep the actual local collector beyond the supported pickup radius while ordinary
+            // gameplay updates the real Q-drop's age through the rest of its grace period.
+            var away = first.Camera.Position + new Vector3(8f, 0f, 0f);
+            first.Camera.TestTeleport(away, first.Camera.Yaw, first.Camera.Pitch);
+            Assert.True(RunUntil(first, () => thrown.Age >= 0.8f, 5), "the thrown drop did not age while out of pickup range");
+            Assert.InRange(thrown.Age, 0.4f, 2f);
+            Assert.False(thrown.IsAttracted);
+
+            // Save close to the drop, but do not update between teleport and ordinary teardown.
+            // The target offset keeps the first restored pickup update in range but outside contact.
+            var collectorEye = thrown.Position + Vector3.UnitZ * 2.5f + Vector3.UnitY * DropManager.CollectHeightOffset;
+            first.Camera.TestTeleport(collectorEye, first.Camera.Yaw, first.Camera.Pitch);
+            firstClosed = first.SaveAndDispose();
+            Assert.True(firstClosed);
+
+            var saved = Assert.Single(ReadEntitiesFile()!.Drops!);
+            Assert.NotNull(saved.Age);
+            Assert.InRange(saved.Age.Value, 0.4f, 2f);
+
+            second = NewWorld(new ChunkSaveStore(_dir));
+            Assert.True(RunUntil(second, () => second.IsPlaying && second.Drops.Count > 0, LoadWallSeconds),
+                "the reopened world did not restore its nearby drop");
+            Assert.False(second.LoadTimedOut);
+            var restored = Assert.Single(second.Drops);
+            second.Update(1f / 60f, null);
+            Assert.True(restored.Age < 2f);
+            Assert.False(restored.IsAttracted,
+                $"a thrown drop with only {restored.Age:0.00}s of age should retain its original 2s pickup grace after reload");
+        }
+        catch (Exception ex)
+        {
+            primaryFailure = ex;
+        }
+        finally
+        {
+            try
+            {
+                if (first.Phase != WorldPhase.Disposed)
+                    firstClosed = first.SaveAndDispose();
+                if (second != null && second.Phase != WorldPhase.Disposed)
+                    secondClosed = second.SaveAndDispose();
+            }
+            catch (Exception ex)
+            {
+                cleanupFailure = ex.ToString();
+            }
+            Console.WriteLine($"Q-drop lifecycle cleanup: first={firstClosed}, second={secondClosed}, error={cleanupFailure ?? "none"}");
+        }
+
+        if (primaryFailure != null)
+            ExceptionDispatchInfo.Capture(primaryFailure).Throw();
+        Assert.True(firstClosed && secondClosed, $"world cleanup failed: {cleanupFailure ?? "unknown failure"}");
     }
 
     [Fact]

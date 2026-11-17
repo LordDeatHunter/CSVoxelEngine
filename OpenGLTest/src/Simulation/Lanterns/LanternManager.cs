@@ -133,17 +133,25 @@ public sealed class LanternManager
         return data;
     }
 
-    public void Restore(IReadOnlyList<LanternData>? data)
+    /// <summary>Restores placed lanterns; skips and counts null rows while keeping non-null rows strict.</summary>
+    public int Restore(IReadOnlyList<LanternData>? data)
     {
-        if (data == null) return;
+        if (data == null) return 0;
+        var skipped = 0;
         foreach (var entry in data)
         {
+            if (entry == null)
+            {
+                skipped++;
+                continue;
+            }
             if (!StationSaveCodec.TryCell(entry.Cell, out var cell) || !SaveNames.TryResolve(entry.Block, out var id)
                 || !LanternState.IsLantern(id)) throw new System.IO.InvalidDataException("Invalid saved lantern");
             var stack = new ItemStack(0, id);
             stack.Set(new LanternComponent(LanternCodec.Import(entry)));
             if (!_placed.TryAdd(cell, stack)) throw new System.IO.InvalidDataException("Duplicate saved lantern");
         }
+        return skipped;
     }
 
     public void WriteNet(PacketWriter writer) => writer.WriteBytes(JsonSerializer.SerializeToUtf8Bytes(Capture()));

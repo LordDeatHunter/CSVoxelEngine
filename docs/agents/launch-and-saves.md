@@ -48,7 +48,7 @@ timestamps, format version, and an optional `source` only the dedicated server r
 sources"), `chunks/<cx>_<cy>_<cz>.bin` (one Deflate-compressed,
 block-name-paletted snapshot per **modified** chunk, `ChunkSaveCodec`; an untouched chunk is
 never written and simply regenerates), `lod-edits.bin` (`LodEditState`: column caps,
-felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`WoodDamageCodec`: the permanent chop damage of natural trunk cells, singleplayer only), `map.bin` (`MapSaveCodec`: the explored map's surface and sky tiles, singleplayer only), `player.json` (`PlayerSaveCodec`: position and look,
+felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`WoodDamageCodec`: permanent natural-trunk chop damage, singleplayer only; rejected contents remain ignored and are archived by the save store before a later changed-state replacement when its archive move succeeds; unchanged damage does not trigger a write), `map.bin` (`MapSaveCodec`: the explored map's surface and sky tiles, singleplayer only), `player.json` (`PlayerSaveCodec`: position and look,
 creative/flight, health, mana, respawn eye, lighting clock, the full inventory and hotbar (a staff's bound spells by part key), the known spell parts by key, the discovered waystones and the quest progress by quest id with the quest book's pan and zoom; no position
 while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live mobs
 with health, facing, velocity, ammo, a slime's size and a skeleton's tower floor plus still-pending entries, up to
@@ -75,13 +75,13 @@ pure function of the seed: only **deltas** and the seed are written.
   pending entry — and only if it is still the snapshot it wrote, so a newer enqueue survives. A
   lookup therefore always finds the chunk in one of the two, and a move that finally fails keeps
   its pending entry and is remembered as failed, so the chunk stays readable for the session.
-  A later enqueue, explicit `RetryFailed`, or `Shutdown` retries it. Shutdown drains accepted
-  jobs, then its writer makes one final write cycle for each failed artifact, including failures first
-  reported while closing; its Boolean result says whether the writer joined, not whether every
-  write landed. A file a read gave up on (an
-  `IOException` after a few retries, or a corrupt file) is moved to `.bad` before the writer
-  first replaces it, so what the player had is never overwritten by a regenerated chunk or an
-  empty player file, and the temp file is flushed to disk before the rename. The store holds
+  A later enqueue, explicit `RetryFailed`, or `Shutdown` retries it. Shutdown drains accepted jobs,
+  then its writer makes one final bounded write cycle for each failed artifact, including failures
+  first reported while closing; its Boolean result says whether the writer joined, not whether
+  every write landed. A chunk a read could not decode, or a whole file a read gave up on (an
+  `IOException` after a few retries, or corrupt data), is moved to `.bad` before replacement. If
+  archival fails, the original stays at its final path and the exact accepted replacement remains
+  pending and failed for retry. The temp file is flushed to disk before the rename. The store holds
   `session.lock` (`FileShare.None`) from construction until its writer thread exits, so a second
   store over the same folder — this process after a writer overran its shutdown timeout, or the
   dedicated server beside the game — throws `IOException` from the constructor: `Program` shows
@@ -136,7 +136,10 @@ pure function of the seed: only **deltas** and the seed are written.
   `LodSurface.Pack` longs (the top in bits 16-47, a palette index in the low 16 bits) behind a
   ushort-counted palette of block names. A file of any other version (v1/v2, written before ids
   widened) is ignored with one warning by `LodEditState.TryParse`, so an old world's far LOD
-  loses only its old edits and the world itself loads as usual.
+  loses only its old edits and the world itself loads as usual. Rejected non-null contents remain
+  ignored and are marked for the store's `.bad` set-aside before a later replacement; the original
+  bytes are retained when that archive move succeeds. Missing files and accepted unknown-block
+  fallback are not marked.
 - **`WorldSeed.Apply(seed)`** is how a world gets its seed (`WorldGenerationConfig.Seed` reads
   `WorldSeed.Value`; `WorldSeed.Default` is what tests and scripted runs use). It is legal only
   while no World is live (`WorldSeed.BeginWorld` in the World constructor, `EndWorld` at the very
@@ -175,14 +178,24 @@ pure function of the seed: only **deltas** and the seed are written.
 - **Player and entities.** `player.json` never stores a position before the spawn settled, so a
   world closed mid-load searches the surface again next time. Non-finite position, look, respawn
   eye, or lighting-clock values are ignored field by field while other valid player data is kept.
+  In `entities.json`, a mob position/velocity or drop position/velocity/stuck vector containing
+  any non-finite coordinate is ignored as a whole vector; non-finite mob facing and drop age are
+  ignored individually. Other valid fields and records remain. A cleared position follows the
+  existing no-position restore handling, and a cleared stuck heading restores as a loose drop.
   Saved mobs and drops are spawned
   once loading finishes, each only when its chunk is loaded; a restore is a forced spawn, so it
   may pass the natural mob cap but a mob waits while the hard cap (`MobHardCap`, which sizes the
   healthbar buffers) is full; an entry that waits stays pending and is saved again, and is
-  discarded only after `EntityRestoreTimeoutSeconds` of play.
+  discarded only after `EntityRestoreTimeoutSeconds` of play. Each drop saves its elapsed `Age`
+  separately from its optional per-drop `PickupDelay`, so a thrown drop keeps its remaining pickup
+  grace through reload. Older saves without that delay use the ordinary 0.4-second default; non-finite
+  delay values are treated as absent while other entity data remains loadable.
 - **Malformed player saves.** A local `player.json` or hosted `players/<slug>.json` rejected by the
   parser is marked for `.bad` preservation before a later replacement; missing files, JSON `null`,
   and valid partial objects retain their ordinary load behavior.
+- **Null saved entity records.** Null entries in the top-level mob or drop lists are skipped when
+  persistence imports records for pending restore. The JSON remains a successful parse; non-null
+  records keep their existing per-entry restore behavior.
 - **The explored map** (`map.bin`, `MapSaveCodec`: "CVMP", a version byte, then a Deflate body of the surface and
   sky `MapTile`s, each its layer kind, chunk column, 256 texels and 256 heights; a cave slice is never kept). Only a
   world that drew a HUD has a map (`WorldRenderer.EnsureMap`, which imports the file when it builds the tracker).
@@ -196,11 +209,16 @@ pure function of the seed: only **deltas** and the seed are written.
   autosave never hitches; the closing flush waits for one in flight and encodes inline, so the last write queued is the
   newest map. The first map update after a load rescans every column in range, so tiles saved before a crash catch up
   with the chunks. A damaged or foreign file reads as an unexplored map with one warning. `MapSaveTests`.
-- **Stations** (`stations.json`, `StationSaveCodec`/`StationSaveData`): restored into the empty
-  managers when the world is built, with no wait for chunks, because every manager already freezes a
+- **Stations** (`stations.json`, `StationSaveCodec`/`StationSaveData`): a readable file rejected
+  by `StationSaveCodec` as malformed JSON is marked for the store's `.bad` set-aside before an
+  autosave or close replacement. When that move succeeds, the original bytes remain available.
+  Parsed stations are restored into the empty managers when the world is built, with no wait for
+  chunks, because every manager already freezes a
   cell in an unloaded chunk and sweeps an entry whose block is gone (dropping what it held) once the
-  chunk loads. An entry whose block, item or molten material name no longer resolves is dropped with
-  one aggregated warning, and a cast pour is restored paused (its crucible binding is transient). A
+  chunk loads. Literal null records and null campfire slots are skipped and included with other
+  dropped entries in one aggregated warning; a non-null lantern record still uses strict validation.
+  An entry whose block, item or molten material name no longer resolves is dropped, and a cast pour is
+  restored paused (its crucible binding is transient). A
   corrupt file parses to null and is replaced at the next autosave, like `entities.json`.
 - **Malformed entity files.** If the codec rejects a readable `entities.json`, that load starts
   without its saved entries and parser rejection marks the file for the store's existing `.bad`

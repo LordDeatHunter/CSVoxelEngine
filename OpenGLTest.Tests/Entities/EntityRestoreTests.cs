@@ -11,7 +11,7 @@ namespace VoxelEngine.Tests.Entities;
 /// The entity save-restore seams: <see cref="Mob.RestoreState"/> puts a mob's health, facing and
 /// velocity back (health clamped into the living range of its kind), and
 /// <see cref="DropManager.SpawnRestored"/> puts a drop back with its exact motion and age, the
-/// age carrying the pickup delay.
+/// optional pickup delay retaining its remaining grace while age continues to drive animation.
 /// </summary>
 public sealed class EntityRestoreTests
 {
@@ -81,7 +81,7 @@ public sealed class EntityRestoreTests
     }
 
     [Fact]
-    public void ARestoredAgeCarriesThePickupDelay()
+    public void ARestoredAgeUsesTheLegacyDefaultPickupDelay()
     {
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var drops = new DropManager();
@@ -105,5 +105,47 @@ public sealed class EntityRestoreTests
 
         Assert.DoesNotContain(dropA, drops.Drops);
         Assert.Contains(dropB, drops.Drops);
+    }
+
+    [Fact]
+    public void RestoredThrownDelayPreservesItsRemainingGraceWithoutChangingAge()
+    {
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var drops = new DropManager();
+        var position = new Vector3(0.5f, 10f, 0.5f);
+        const float savedAge = 0.8f;
+        const float savedDelay = 2f;
+        Assert.True(drops.SpawnRestored(stone, position, Vector3.Zero, savedAge, pickupDelaySeconds: savedDelay));
+        var drop = Assert.Single(drops.Drops);
+        var spinAtSave = drop.Spin;
+        var chunks = new ChunkManager(null!);
+        Vector3 Target() => drop.Position + Vector3.UnitY * DropManager.CollectHeightOffset + Vector3.UnitZ;
+
+        drops.Update(1f / 60f, Target(), chunks);
+        Assert.False(drop.IsAttracted);
+        Assert.InRange(drop.Age, savedAge, savedAge + 1f / 60f);
+        Assert.Equal(spinAtSave + (drop.Age - savedAge) * 1.5f, drop.Spin, 5);
+
+        for (var i = 0; i < 90 && !drop.IsAttracted; i++)
+            drops.Update(1f / 60f, Target(), chunks);
+        Assert.True(drop.IsAttracted);
+    }
+
+    [Fact]
+    public void RestoredCustomDelayKeepsItsRemainingGrace()
+    {
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var drops = new DropManager();
+        var position = new Vector3(0.5f, 10f, 0.5f);
+        Assert.True(drops.SpawnRestored(stone, position, Vector3.Zero, age: 0.8f, pickupDelaySeconds: 1.2f));
+        var drop = Assert.Single(drops.Drops);
+        var chunks = new ChunkManager(null!);
+        Vector3 Target() => drop.Position + Vector3.UnitY * DropManager.CollectHeightOffset + Vector3.UnitZ;
+
+        drops.Update(1f / 60f, Target(), chunks);
+        Assert.False(drop.IsAttracted);
+        for (var i = 0; i < 40 && !drop.IsAttracted; i++)
+            drops.Update(1f / 60f, Target(), chunks);
+        Assert.True(drop.IsAttracted);
     }
 }

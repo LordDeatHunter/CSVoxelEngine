@@ -18,6 +18,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       ImportedMapWriter.cs     # writes an imported map (columns/*.col + chunks/*.bin); ExportGenerated seeds
                                #   one from any IWorldSource (tool/test use)
       LodEditState.cs          # lod-edits.bin: export/import of the LOD caps, surface overrides, canopy markers
+      LodEditStateReader.cs    # reads lod-edits.bin and marks parser-rejected bytes for preservation
       MobSaveCodec.cs          # a live Mob -> its EntitySaveData form (per-kind ammo)
       PlayerSaveCodec.cs       # reads/writes player.json
       PlayerSaveReader.cs      # marks rejected player JSON for .bad preservation before replacement
@@ -25,6 +26,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       QuestSaveData.cs, QuestViewData.cs  # quest progress by id (completed, counts) and the quest book's pan and zoom
       SaveNames.cs             # block/ and item/ namespaced content names, so saves never store raw ids
       StationSaveCodec.cs      # reads/writes stations.json
+      StationSaveReader.cs     # marks rejected station JSON for preservation before replacement
       StationSaveData.cs       # the stations.json shape: campfires, querns, kilns, cast molds (content by name), tower locks
       ServerInfo.cs            # one saved server: display name, host, port, last connected (servers.json)
       ServerPlayerSaves.cs     # a hosted world's per-player files: players/<name slug>.json via the store
@@ -33,6 +35,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   SourceName = the raw world.json `source` (null when absent), Source = it
                                #   resolved (`generated` when unset), read by the dedicated server only
       WoodDamageCodec.cs       # reads/writes wood-damage.bin: the permanent chop damage of natural trunk cells
+      WoodDamageSaveReader.cs  # reads wood damage and marks rejected sidecars for preservation before replacement
       MapSaveCodec.cs          # reads/writes map.bin: the explored map's surface and sky tiles (colors and heights)
       MapSaveReader.cs         # reads map.bin and marks parser-rejected bytes for preservation before replacement
       WorldNames.cs            # name normalizing, the "Unnamed World" default, unique numeric suffix, folder slug

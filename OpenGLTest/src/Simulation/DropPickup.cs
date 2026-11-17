@@ -115,7 +115,8 @@ internal sealed class DropPickup
         {
             if (collectors[i] >= goblinCollectors)
             {
-                _goblins!.AwardScavenged(collectors[i] - goblinCollectors, collected[i]);
+                if (!_goblins!.AwardScavenged(collectors[i] - goblinCollectors, collected[i]))
+                    ReturnRefused(i, collected[i], collectedAt[i]);
                 continue;
             }
 
@@ -138,7 +139,7 @@ internal sealed class DropPickup
                 _world.PickupFeed.Record(collected[i], 1, Inventory.CountFor(collected[i]));
             }
             // A first find toasts its name: Add marks the id obtained, so read it before
-            if (!known)
+            if (added && !known)
                 Toast.Show($"New: {Inventory.DisplayName(collected[i])}");
         }
 

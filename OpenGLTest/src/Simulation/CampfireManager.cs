@@ -332,7 +332,7 @@ public sealed class CampfireManager
         if (saved == null) return 0;
         foreach (var data in saved.Take(StationNetCodec.MaxEntries))
         {
-            if (!StationSaveCodec.TryCell(data.Cell, out var key))
+            if (data == null || !StationSaveCodec.TryCell(data.Cell, out var key))
             {
                 skipped++;
                 continue;
@@ -343,7 +343,7 @@ public sealed class CampfireManager
             foreach (var s in data.Slots ?? [])
             {
                 if (slots.Count >= MaxCookSlots) break;
-                if (!SaveNames.TryResolve(s.Input, out var input) || !SaveNames.TryResolve(s.Output, out var output)
+                if (s == null || !SaveNames.TryResolve(s.Input, out var input) || !SaveNames.TryResolve(s.Output, out var output)
                     || !float.IsFinite(s.TimeLeft) || !float.IsFinite(s.TotalTime))
                 {
                     skipped++;

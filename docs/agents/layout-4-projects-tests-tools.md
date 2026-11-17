@@ -82,7 +82,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   Blocks/ holds the per-id tables and WideIdRegistryTests (a registry past
                                #   the byte range, meshed, saved and streamed)
                                #   ColumnCacheGenerationTests compares material-query gating with the legacy column fill
-  Core/                        # the Core utilities and the src-root types (World lifecycle, WorldSeed, WorldLoadGate)
+  Core/                        # the Core utilities and the src-root types (World lifecycle, WorldSeed, WorldLoadGate);
+                               #   pending saved-entity admission and teardown (WorldLifecycleTests.NullEntityAdmission)
   Effects/                     # mirrors src/Effects: one folder per sub-domain of shader twins
     Climate/                   # the biome tint field and its chunk, LOD, pop and texture consumers
     Lighting/                  # the campfire flicker and the block-light tint code
@@ -152,7 +153,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     ScreenSpace/               # the half-res target
   Saves/                       # codecs and stores of world, chunk, player, entity
                                #   and server saves, names, seed parsing, world sources; the explored map's save
-                               #   (MapSaveTests: round trip, damaged file, cave never saved, a world hands it to the next)
+                               #   (MapSaveTests: round trip, damaged file, cave never saved, a world hands it to the next),
+                               #   entity numeric-field admission (EntitySaveNumericAdmissionTests)
   Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
                                #   and felling, saplings, the stations, drops, the mob managers and spawning
     Camps/                     # goblin camps: the fire first, torch-bearing goblins round it, one a dark night

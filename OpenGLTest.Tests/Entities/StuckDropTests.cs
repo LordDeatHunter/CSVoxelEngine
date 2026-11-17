@@ -76,6 +76,30 @@ public sealed class StuckDropTests
     }
 
     [Fact]
+    public void RestoredTerrainDropKeepsItsSavedDelayAndHeading()
+    {
+        var (chunks, _, _, original) = ThrowIntoWall();
+        var drops = new DropManager();
+        const float savedAge = 0.2f;
+        const float savedDelay = 0.5f;
+        Assert.True(drops.SpawnRestoredStuck(_javelin, original.Position, original.StuckHeading,
+            inBody: false, age: savedAge, pickupDelaySeconds: savedDelay));
+        var restored = Assert.Single(drops.Drops);
+        Assert.True(restored.IsStuck);
+        Assert.Equal(original.Position, restored.Position);
+        Assert.Equal(original.StuckHeading, restored.StuckHeading);
+
+        var beside = restored.Position + new Vector3(0f, DropManager.CollectHeightOffset, 1f);
+        for (var i = 0; i < 10; i++) drops.Update(Step, beside, chunks);
+        Assert.True(restored.IsStuck);
+        Assert.False(restored.IsAttracted);
+
+        for (var i = 0; i < 40 && !restored.IsAttracted; i++) drops.Update(Step, beside, chunks);
+        Assert.False(restored.IsStuck);
+        Assert.True(restored.IsAttracted);
+    }
+
+    [Fact]
     public void AJavelinFallsWhenTheBlockItIsInIsGone()
     {
         var (chunks, center, drops, drop) = ThrowIntoWall();

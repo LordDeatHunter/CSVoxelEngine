@@ -258,7 +258,8 @@ A goblin's life has more rules than its AI. **Flee**: below `GoblinFleeHealthSha
 its pool it turns and runs from the player at `GoblinFleeSpeedFactor` of its walk, never throwing or
 swinging (`Goblin.IsFleeing`, `GoblinFleeTests`). **Scavenge**: a live goblin with ammo room joins
 the world's drop pass as a `DropCollector` that takes only flint (`GoblinManager.AppendCollectors`,
-`AwardScavenged`, capped at `GoblinStoneMax`; a client's mirrors never scavenge)
+`AwardScavenged`, capped at `GoblinStoneMax`; a flint that no longer fits after a batch is returned
+to the world, and a client's mirrors never scavenge)
 (`GoblinScavengeTests`). **Dodge**: a charged throw (at least `GoblinDodgeChargeThreshold`) aimed at
 a goblin inside `GoblinDodgeConeDegrees` and within `GoblinDodgeRangeBlocks` makes it sidestep out of
 the line while the aim holds, its side fixed at spawn (`GoblinManager.IsAimedAt`, `Goblin.Decide`;

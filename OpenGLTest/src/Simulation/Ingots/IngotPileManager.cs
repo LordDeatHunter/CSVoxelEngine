@@ -120,7 +120,7 @@ public sealed class IngotPileManager
         var skipped = 0;
         foreach (var data in saved.Take(StationNetCodec.MaxEntries))
         {
-            if (!StationSaveCodec.TryCell(data.Cell, out var key) || data.Ingots == null)
+            if (data == null || !StationSaveCodec.TryCell(data.Cell, out var key) || data.Ingots == null)
             {
                 skipped++;
                 continue;

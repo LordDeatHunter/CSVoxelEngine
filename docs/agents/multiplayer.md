@@ -97,7 +97,9 @@ folder (`<world>/import/` on a server, `ImportedMapSource.DirectoryName`) holdin
 (`Saves/ColumnFileCodec.cs`): the magic `CVXL`, a version byte (1), then a Deflate body of 256
 int32 heights, 256 int32 bed, 256 int32 water levels, 256 biome bytes, 256 dirt-depth bytes and the
 corner warmth and wetness floats, all little-endian; `EntranceWeight` and `CaveIntensity` are
-worldgen-only carver inputs, not stored and decoded as zeros. A chunk file is the save store's own
+worldgen-only carver inputs, not stored and decoded as zeros. Both climate floats must be finite:
+NaN or infinity makes the column unreadable and refuses the whole map; finite values are preserved
+without clamping. A chunk file is the save store's own
 `ChunkSaveCodec` (block-name paletted, so ids never leak into a map; player-placed cells in it are
 ignored). A column with a file is **supplied**: its `ColumnData` comes from the file and every chunk
 of its stack from its chunk file, or is **all air** when there is none; every other column, and its

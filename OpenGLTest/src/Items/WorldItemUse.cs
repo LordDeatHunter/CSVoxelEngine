@@ -434,7 +434,14 @@ internal sealed class WorldItemUse : IItemUseWorld
                 serverPlayer.InventoryChanged = true;
     }
 
-    void IItemUseWorld.ConsumeSelected() => ActiveInventory.ConsumeSelected();
+    void IItemUseWorld.ConsumeSelected()
+    {
+        var inventory = ActiveInventory;
+        if (_activeToolInstance > 0)
+            inventory.RemoveTool(_activeToolInstance);
+        else
+            inventory.ConsumeSelected();
+    }
     #endregion
 
     // A tool that ran out of durability shatters: chips of its sprite's color burst off the hand
