@@ -514,9 +514,10 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         PlayerPasses.cs        # the player body, held item and remote players (RenderPlayer, RenderHeldItem, RenderRemotePlayers),
                                #   the player rig and its meshes; the held sprite through HeldItemPose and DrawItemSprite,
                                #   and the assumed blade (SliceTrailSystem.AssumedBlade) while a remote player swings
-        SmithingPasses.cs      # the iron works' draws: a bloomery's charge in the throat, fuel bed, blooms and
-                               #   heat glow (BloomeryLayout), and the metal stacked on an anvil; uses
-                               #   StationPasses' meshes and ember quad
+        SmithingPasses.cs      # the works' draws: a bloomery's charge in the throat, fuel bed, blooms and
+                               #   heat glow (BloomeryLayout), the stack and waiting results on a work station (anvil,
+                               #   fleshing beam, leather table), and a tanning vat's liquid, hides and leather; uses
+                               #   StationPasses' meshes, ember quad and vat liquids
         StationPasses.cs       # the station passes ride inside entityPass: RenderCampfireCooking,
                                #   RenderQuerns, RenderKilns (crucible mesh, molten pool, the last charged
                                #   input hovering over the rim and shrinking into it, stored
@@ -574,8 +575,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         DamageVignetteRenderer.cs # full-screen damage vignette: one oversized triangle with
                                   #   a radial fragment gradient, drawn inside the UI pass
         EntityHealthbarRenderer.cs # five hearts floating above every live mob, always facing the camera
-        ForgeRenderer.cs       # the anvil's recipe list: title, the stacked metal, a grid of recipe cards (result icon, rarity
-                               #   name, metal cost) with a hover look, CLOSE; geometry from ForgeLayout
+        ForgeRenderer.cs       # a work station's recipe list: the station's name, the stacked input, a grid of recipe cards
+                               #   (result icon, rarity name, input cost) with a hover look, CLOSE; geometry from ForgeLayout
         HudRenderer.cs         # crosshair, hearts, hotbar and its feedback, toasts, FPS and profiler, tooltip,
                                #   player list, the status effect icons (DrawEffects); owns the crosshair, heart and
                                #   effect icon sprites

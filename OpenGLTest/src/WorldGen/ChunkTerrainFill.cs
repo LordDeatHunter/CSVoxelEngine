@@ -180,6 +180,13 @@ internal static class ChunkTerrainFill
             CaveOres.Stamp(blocks, caves, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.CaveOres);
 
+        // Rock salt in the bare stone at the surface (the deep sea floor, stripped mountain rock): after the carvers,
+        // so it never fills a cave, and before the water, which floods the sea over it
+        if (WorldGenerationConfig.RockSaltEnabled && lowerBoundY <= column.MaxHeight
+            && lowerBoundY + Size > RockSaltGenerator.LowestY(column))
+            RockSaltGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.RockSalt);
+
         // After the carvers (so caves under the sea floor flood) and before the trees and
         // pebbles, which skip submerged columns rather than growing underwater
         if (WorldGenerationConfig.WaterEnabled)

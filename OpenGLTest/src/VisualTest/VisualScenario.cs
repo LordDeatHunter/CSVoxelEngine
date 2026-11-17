@@ -333,12 +333,24 @@ public sealed class VisualScenario
             {
                 Op = "anvil",
                 Pos = ReadPos(element, index, "anvil"),
+                Block = element.TryGetProperty("block", out var station) ? station.GetString() : null,
                 Hits = ReadInt(element, "hits"),
                 Metal = element.TryGetProperty("metal", out var metal) ? metal.GetString() : null,
                 Count = element.TryGetProperty("count", out var stack) && stack.TryGetInt32(out var units) ? units : 1,
                 Select = element.TryGetProperty("select", out var select) ? select.GetString() : null,
             },
             "hammer" => new VisualStep { Op = "hammer", Pos = ReadPos(element, index, "hammer") },
+            // A tanning vat: "water" (bool), "bark" and "hides" (counts), "progress" (0..1 of a batch) and "leather"
+            "vat" => new VisualStep
+            {
+                Op = "vat",
+                Pos = ReadPos(element, index, "vat"),
+                On = element.TryGetProperty("water", out var water) && water.ValueKind == JsonValueKind.True,
+                Ore = ReadInt(element, "bark"),
+                Count = ReadInt(element, "hides"),
+                Heat = element.TryGetProperty("progress", out var progress) && progress.TryGetSingle(out var p) ? p : 0f,
+                Fuel = ReadInt(element, "leather"),
+            },
             "chest" => ReadChest(element, index),
             "chestwobble" => new VisualStep { Op = "chestwobble", Pos = ReadPos(element, index, "chestwobble") },
             "chestrow" => new VisualStep
@@ -365,7 +377,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, kiln, bloomery, anvil, hammer, forge, chest, chestrow, chestwobble, waystone, chat, quests, map, towerclear, altar, towerdefeat, goblincamp or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, kiln, bloomery, anvil, hammer, vat, forge, chest, chestrow, chestwobble, waystone, chat, quests, map, towerclear, altar, towerdefeat, goblincamp or screenshot."),
         };
     }
 

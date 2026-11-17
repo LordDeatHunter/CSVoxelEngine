@@ -5,26 +5,33 @@ using VoxelEngine.Entities;
 using VoxelEngine.Graphics;
 using VoxelEngine.Items;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Leatherwork;
 using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.WorkStations;
 
 namespace VoxelEngine.Rendering.Actors;
 
 /// <summary>
 /// The iron works' draws of the entity pass: what a bloomery holds (the ore charge in its throat, the fuel bed and
 /// the finished blooms in its tapping arch, and the glow of its hearth and throat, which follows the fire's heat)
-/// the metal stacked on an anvil, and every bellows that is pressed down, squashed to its height. Where a bloomery's props lie is <see cref="BloomeryLayout"/>. Owns no GL
+/// what lies on a work station (an anvil's metal, a fleshing beam's hides), what is in a tanning vat (its water or
+/// liquor, the hides soaking in it, the leather left when it is done), and every bellows that is pressed down, squashed to its height. Where a bloomery's props lie is <see cref="BloomeryLayout"/>. Owns no GL
 /// resource: the meshes, the ember quad and the texture binds are <see cref="StationPasses"/>'s. Render thread only.
 /// </summary>
 internal sealed class SmithingPasses(RenderManager owner, StationPasses stations)
 {
     private const float PieceSize = KilnRenderer.FuelSize;
-    private const float AnvilTopY = 15f / 16f;
-    private const float AnvilPieceSize = 0.36f;
+    private const float WorkPieceSize = 0.36f;
+    // How far apart along x a station's stack and its finished results lie when both are on it
+    private const float WorkPileSpread = 0.2f;
+    // A tanning vat's inside: the liquid's width and the floor the finished leather lies on
+    private const float VatInnerWidth = 12f / 16f;
+    private const float VatFloorY = 2f / 16f;
     // Radians each piece of a pile turns against the one below, so the pile reads as separate pieces
     private const float StackTwist = 0.18f;
 
     /// <summary>
-    /// Draws every bloomery's props and every anvil's stack. Nothing is drawn for the anvil or the shaft
+    /// Draws every bloomery's props and every work station's stack. Nothing is drawn for the station or the shaft
     /// themselves: they are the block's own model.
     /// </summary>
     internal void RenderSmithing(Camera camera, SmithingStations smithing)
@@ -41,10 +48,11 @@ internal sealed class SmithingPasses(RenderManager owner, StationPasses stations
         foreach (var (anchor, facing, state) in smithing.Bloomeries.View())
             DrawBloomery(anchor, facing, state, viewProj, ref atlasBound);
 
-        foreach (var (cell, state) in smithing.Anvils.View())
-            if (state.MetalCount > 0)
-                DrawPile(state.MetalId, state.MetalCount, 1f, cell + new Vector3(0.5f, AnvilTopY, 0.5f), 0f,
-                    AnvilPieceSize, owner.LightAt(cell + new Vector3(0.5f, 1.2f, 0.5f)), viewProj, ref atlasBound);
+        foreach (var (cell, state) in smithing.WorkStations.View())
+            DrawWorkStation(cell, state, viewProj, ref atlasBound);
+
+        foreach (var (cell, state) in smithing.Vats.View())
+            DrawVat(cell, state, viewProj, ref atlasBound);
 
         // A pressed bellows: its block's cube squashed to its height, standing on the cell's floor (the chunk
         // mesh leaves the cell out while it is not a full block, see BellowsSquash)
@@ -119,6 +127,41 @@ internal sealed class SmithingPasses(RenderManager owner, StationPasses stations
     // A pile of `count` pieces of `id` standing on `foot`: each rests on the one below and is turned a little
     // against it, and the top one is drawn at `topScale` of its size (the unit a bloomery is smelting away). An
     // item is a face-up sprite, a block a cube.
+    // A work station's stack on its surface, and beside it the finished results waiting for their collect item
+    private void DrawWorkStation(Vector3 cell, WorkStationManager.State state, Matrix4x4 viewProj, ref bool atlasBound)
+    {
+        if (state.IsEmpty || BlockType.ById[state.BlockId]?.WorkStation is not { } profile) return;
+        var light = owner.LightAt(cell + new Vector3(0.5f, 1.2f, 0.5f));
+        var spread = state.InputCount > 0 && state.FinishedCount > 0 ? WorkPileSpread : 0f;
+        var surface = cell + new Vector3(0.5f, profile.SurfaceY, 0.5f);
+        if (state.InputCount > 0)
+            DrawPile(state.InputId, state.InputCount, 1f, surface + new Vector3(spread, 0f, 0f), 0f, WorkPieceSize, light,
+                viewProj, ref atlasBound);
+        if (state.FinishedCount > 0)
+            DrawPile(state.FinishedId, state.FinishedCount, 1f, surface - new Vector3(spread, 0f, 0f), 0f, WorkPieceSize,
+                light, viewProj, ref atlasBound);
+    }
+
+    // A vat's liquid at its profile's height, the batch's hides floating in it, and the leather on its floor once done
+    private void DrawVat(Vector3 cell, TanningVatManager.VatState state, Matrix4x4 viewProj, ref bool atlasBound)
+    {
+        if (state.IsEmpty || state.Profile is not { } profile) return;
+        var light = owner.LightAt(cell + new Vector3(0.5f, 1.2f, 0.5f));
+        var surface = cell + new Vector3(0.5f, profile.LiquidY, 0.5f);
+        if (state.Water)
+        {
+            stations.BindAtlas(ref atlasBound);
+            var liquid = Matrix4x4.CreateScale(VatInnerWidth) * Matrix4x4.CreateTranslation(surface);
+            owner.SetDrawUniforms(liquid, liquid * viewProj, 1f, light);
+            stations.VatLiquid(TanningRules.CanTan(state) || state.Progress > 0f).Render();
+        }
+        if (state.Hides > 0)
+            DrawPile(profile.InputId, state.Hides, 1f, surface, 0f, WorkPieceSize, light, viewProj, ref atlasBound);
+        if (state.Leather > 0)
+            DrawPile(profile.ResultId, state.Leather, 1f, cell + new Vector3(0.5f, VatFloorY, 0.5f), 0f, WorkPieceSize,
+                light, viewProj, ref atlasBound);
+    }
+
     private void DrawPile(ushort id, int count, float topScale, Vector3 foot, float yaw, float pieceSize,
         EntityLightSample light, Matrix4x4 viewProj, ref bool atlasBound)
     {

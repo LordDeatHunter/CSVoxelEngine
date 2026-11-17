@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.WorkStations;
 using Xunit;
 
 namespace VoxelEngine.Tests.Interaction;
@@ -99,23 +100,23 @@ public sealed class IronWorksWorldTests : IDisposable
     public void ThePickedRecipesLastHammerHitDropsItsResultAndByproductOnTheAnvil()
     {
         _world = new SupportTestWorld();
-        var anvilBlock = BlockType.Types.Values.First(b => b.IsAnvil);
+        var anvilBlock = ContentRegistry.RequireBlock("anvil");
         var cell = new Vector3(2, _world.Top + 1, 2);
         _world.Load(3, _world.Top + 2, 3);
         _world.Set((int)cell.X, (int)cell.Y, (int)cell.Z, anvilBlock.Id);
 
-        var recipe = ContentRegistry.ForgeRecipes.First(r => r.MetalId == Bloomery.Bloomery!.BloomId && r.ByproductId != 0);
-        var anvils = _world.World.Smithing.Anvils;
-        Assert.True(_world.World.Interactions.TryTrackAnvilAt(cell));
-        for (var i = 0; i < recipe.MetalCount; i++)
-            Assert.True(anvils.TryStack(cell, recipe.MetalId));
+        var recipe = ContentRegistry.WorkRecipes.First(r => r.InputId == Bloomery.Bloomery!.BloomId && r.ByproductId != 0);
+        var anvils = _world.World.Smithing.WorkStations;
+        Assert.True(_world.World.Interactions.TryTrackWorkStationAt(cell, out _));
+        for (var i = 0; i < recipe.InputCount; i++)
+            Assert.True(anvils.TryStack(cell, recipe.InputId));
         Assert.True(_world.World.Smithing.Select(cell, recipe.ResultId));
 
         for (var hit = 1; hit < recipe.Hits; hit++)
-            Assert.Equal(AnvilHitKind.Struck, _world.World.HammerFor(cell, 0f, 0f).Kind);
+            Assert.Equal(WorkHitKind.Struck, _world.World.WorkStationHitFor(cell, 0f, 0f).Kind);
         Assert.Empty(_world.World.Drops);
 
-        Assert.Equal(AnvilHitKind.Finished, _world.World.HammerFor(cell, 0f, 0f).Kind);
+        Assert.Equal(WorkHitKind.Finished, _world.World.WorkStationHitFor(cell, 0f, 0f).Kind);
         Assert.Equal(recipe.ResultCount, _world.World.Drops.Count(d => d.BlockId == recipe.ResultId));
         Assert.Equal(recipe.ByproductCount, _world.World.Drops.Count(d => d.BlockId == recipe.ByproductId));
         Assert.All(_world.World.Drops, d => Assert.True(d.Position.Y > cell.Y + 0.5f));
@@ -126,7 +127,7 @@ public sealed class IronWorksWorldTests : IDisposable
     public void RightClicksStackTheMetalTakeOneBackOrAllWhileSneakingAndAHammerOpensTheRecipes()
     {
         _world = new SupportTestWorld();
-        var anvilBlock = BlockType.Types.Values.First(b => b.IsAnvil);
+        var anvilBlock = ContentRegistry.RequireBlock("anvil");
         var (x, y, z) = (8, _world.Top + 1, 6);
         _world.Load(x, y, z);
         _world.Set(x, y, z, anvilBlock.Id);
@@ -141,27 +142,27 @@ public sealed class IronWorksWorldTests : IDisposable
         Assert.True(inventory.Add(metal, 3));
         var eye = player.Context.Eye;
         player.Aim(eye, Vector3.Normalize(cell + new Vector3(0.5f, 0.9f, 0.5f) - eye));
-        bool Click() => _world.World.Interactions.TryAnvilInteract(World.InteractionReach, player.Context);
+        bool Click() => _world.World.Interactions.TryWorkStationInteract(World.InteractionReach, player.Context);
         bool Hold(ushort id) => inventory.PickBlock(id) && inventory.HeldItem?.Id == id;
 
         // Each click with the metal in hand lays one more on the stack
         Assert.True(Hold(metal));
         for (var i = 0; i < 3; i++)
             Assert.True(Click());
-        var state = _world.World.Smithing.Anvils.StateAt(x, y, z)!;
-        Assert.Equal((metal, 3), (state.MetalId, state.MetalCount));
+        var state = _world.World.Smithing.WorkStations.StateAt(x, y, z)!;
+        Assert.Equal((metal, 3), (state.InputId, state.InputCount));
         Assert.Equal(0, inventory.CountFor(metal));
 
         // Anything else in hand takes one back
         Assert.True(Hold(coal));
         Assert.True(Click());
-        Assert.Equal((2, 1), (state.MetalCount, inventory.CountFor(metal)));
+        Assert.Equal((2, 1), (state.InputCount, inventory.CountFor(metal)));
 
         // A hammer never takes or lays anything: it opens the recipe list on a stack
         Assert.True(inventory.Add(hammer));
         Assert.True(Hold(hammer));
         Assert.False(Click());
-        Assert.True(_world.World.Interactions.TryOpenForge(World.InteractionReach, player.Context, out var forgeCell));
+        Assert.True(_world.World.Interactions.TryOpenWorkList(World.InteractionReach, player.Context, out var forgeCell));
         Assert.Equal(cell, forgeCell);
 
         // ...and while sneaking the whole stack comes back
@@ -174,7 +175,7 @@ public sealed class IronWorksWorldTests : IDisposable
         // An empty anvil does not claim the click, so a block still places against it, and a hammer opens nothing
         Assert.False(Click());
         Assert.True(Hold(hammer));
-        Assert.False(_world.World.Interactions.TryOpenForge(World.InteractionReach, player.Context, out _));
+        Assert.False(_world.World.Interactions.TryOpenWorkList(World.InteractionReach, player.Context, out _));
     }
 
     [Fact]

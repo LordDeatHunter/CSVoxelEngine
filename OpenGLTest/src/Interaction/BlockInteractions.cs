@@ -10,8 +10,10 @@ using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.LeafDecay;
+using VoxelEngine.Simulation.Leatherwork;
 using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.Simulation.Waystones;
+using VoxelEngine.Simulation.WorkStations;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Structures;
 
@@ -339,78 +341,133 @@ internal sealed class BlockInteractions
     }
 
     /// <summary>
-    /// Right-click on an anvil, which holds a stack of one forge metal (<see cref="AnvilManager"/>): a forge metal in
-    /// hand (a bloom, vulcanite) stacks one more on it, and anything else (an empty hand or any other item) takes one
-    /// back off, or all of the stack while sneaking. A hammer never claims the click here (it opens the recipe list,
-    /// <see cref="TryOpenForge"/>, and forges the picked recipe with the left button, <see cref="HammerAnvil"/>), and on
-    /// an empty anvil the click falls through, so a block still places against it. Returns whether the click belonged
-    /// to the anvil.
+    /// Right-click on a work station (an anvil, a fleshing beam, a leather table), which holds a stack of one input
+    /// (<see cref="WorkStationManager"/>): the item a finished result waits for (salt on a beam) takes one of it into the
+    /// inventory, an input of the station's recipes in hand stacks one more, and anything else (an empty hand or any
+    /// other item) takes one of the stack back, or all of it while sneaking. The station's tool never claims the click
+    /// here (it opens the recipe list, <see cref="TryOpenWorkList"/>, and works the recipe with the left button,
+    /// <see cref="WorkStationHit"/>), and on an empty station the click falls through, so a block still places against
+    /// it. Returns whether the click belonged to the station.
     /// </summary>
-    internal bool TryAnvilInteract(float maxDistance, PlayerContext player)
+    internal bool TryWorkStationInteract(float maxDistance, PlayerContext player)
     {
         var inventory = player.Inventory;
         var held = inventory.HeldItem;
-        if (Mining.IsHammer(held) || !TryAimedAnvil(maxDistance, player, out var cell)) return false;
+        if (!TryAimedWorkStation(maxDistance, player, out var cell, out var profile)
+            || Mining.IsStationTool(held, profile))
+            return false;
 
-        var anvils = _world.Smithing.Anvils;
-        var metal = held != null && ContentRegistry.IsForgeMetal(held.Id);
-        if (metal && anvils.TryStack(cell, held!.Id))
+        var stations = _world.Smithing.WorkStations;
+        if (held != null && stations.TryCollect(cell, held.Id, out var result))
+        {
+            if (!player.IsCreative)
+                inventory.ConsumeSelected();
+            Give(inventory, result, 1, cell);
+            return true;
+        }
+        var input = held != null && ContentRegistry.IsWorkInput(profile.Recipes, held.Id);
+        if (input && stations.TryStack(cell, held!.Id))
         {
             if (!player.IsCreative)
                 inventory.ConsumeSelected();
             return true;
         }
-        // A forge metal that does not stack (a full stack, another metal) takes nothing back
-        if (metal) return false;
-        if (!anvils.TryTake(cell, player.IsSneaking, out var taken, out var count)) return false;
-        for (var i = 0; i < count; i++)
-            if (!inventory.Add(taken) && !_world.IsClientMode)
-                _dropManager.Spawn(taken, cell);
+        // An input that does not stack (a full stack, another input) takes nothing back
+        if (input) return false;
+        if (!stations.TryTake(cell, player.IsSneaking, out var taken, out var count)) return false;
+        Give(inventory, taken, count, cell);
         return true;
     }
 
     /// <summary>
-    /// A right-click with a smithing hammer on an anvil holding a metal stack: claims the click (it changes nothing)
-    /// and names the anvil in <paramref name="cell"/>, so the local player opens the anvil's recipe list on it to pick
-    /// what to hammer out. A bare anvil is not claimed.
+    /// Right-click on a tanning vat (<see cref="TanningVatManager.TryUse"/>): water, tannin or an input in hand goes in
+    /// (a water bucket hands back its emptied bucket), anything else collects the tanned result or takes back a batch
+    /// that has not started. On a click the vat refuses the click falls through, so a block still places against it.
+    /// Returns whether the click belonged to the vat.
     /// </summary>
-    internal bool TryOpenForge(float maxDistance, PlayerContext player, out Vector3 cell)
+    internal bool TryVatInteract(float maxDistance, PlayerContext player)
     {
-        cell = default;
-        if (!Mining.IsHammer(player.Inventory.HeldItem) || !TryAimedAnvil(maxDistance, player, out cell)) return false;
-        return _world.Smithing.Anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z) is { MetalCount: > 0 };
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var cell = new Vector3((int)hit.X, (int)hit.Y, (int)hit.Z);
+        if (!_chunkManager.TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out _)
+            || BlockType.ById[id]?.Tanning == null)
+            return false;
+        var vats = _world.Smithing.Vats;
+        vats.Ensure(cell, id);
+
+        var inventory = player.Inventory;
+        var held = inventory.HeldItem;
+        if (!vats.TryUse(cell, held?.Id ?? 0, held?.UseResultId ?? 0, out var use)) return false;
+        // A held tool (the water bucket) turns into what it hands back, as pouring it out anywhere does
+        var tool = inventory.SelectedToolInstance;
+        if (use.Consume && tool > 0 && use.GiveId != 0)
+        {
+            if (!player.IsCreative)
+                inventory.MorphTool(tool, use.GiveId);
+            return true;
+        }
+        if (use.Consume && !player.IsCreative)
+            inventory.ConsumeSelected();
+        Give(inventory, use.GiveId, use.GiveCount, cell);
+        return true;
     }
 
-    // The anvil under this player's crosshair, tracked; false when the ray lands on anything else
-    private bool TryAimedAnvil(float maxDistance, PlayerContext player, out Vector3 cell)
+    // Puts count of an item into the inventory, dropping what does not fit at the cell (an authoritative world only)
+    private void Give(Inventory inventory, ushort item, int count, Vector3 cell)
+    {
+        for (var i = 0; i < count; i++)
+            if (!inventory.Add(item) && !_world.IsClientMode)
+                _dropManager.Spawn(item, cell);
+    }
+
+    /// <summary>
+    /// A right-click with a work station's tool on the station holding a stack: claims the click (it changes nothing)
+    /// and names the station in <paramref name="cell"/>, so the local player opens its recipe list on it to pick what
+    /// to work. A bare station is not claimed.
+    /// </summary>
+    internal bool TryOpenWorkList(float maxDistance, PlayerContext player, out Vector3 cell)
+    {
+        if (!TryAimedWorkStation(maxDistance, player, out cell, out var profile)
+            || !Mining.IsStationTool(player.Inventory.HeldItem, profile))
+            return false;
+        return _world.Smithing.WorkStations.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z) is { InputCount: > 0 };
+    }
+
+    // The work station under this player's crosshair, tracked; false when the ray lands on anything else
+    private bool TryAimedWorkStation(float maxDistance, PlayerContext player, out Vector3 cell,
+        out WorkStationProfile profile)
     {
         cell = default;
+        profile = null!;
         if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
         cell = new Vector3((int)hit.X, (int)hit.Y, (int)hit.Z);
-        return TryTrackAnvilAt(cell);
+        return TryTrackWorkStationAt(cell, out profile);
     }
 
-    /// <summary>Makes sure the anvil block at <paramref name="cell"/> is tracked. False when the cell is not an
-    /// anvil.</summary>
-    internal bool TryTrackAnvilAt(Vector3 cell)
+    /// <summary>Makes sure the work station block at <paramref name="cell"/> is tracked and gives its profile. False
+    /// when the cell is no work station.</summary>
+    internal bool TryTrackWorkStationAt(Vector3 cell, out WorkStationProfile profile)
     {
+        profile = null!;
         if (!_chunkManager.TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out _)
-            || BlockType.ById[id] is not { IsAnvil: true })
+            || BlockType.ById[id]?.WorkStation is not { } station)
             return false;
-        _world.Smithing.Anvils.Ensure(cell, id);
+        profile = station;
+        _world.Smithing.WorkStations.Ensure(cell, id);
         return true;
     }
 
     /// <summary>
-    /// One hammer hit on the anvil at <paramref name="cell"/>, if a recipe is picked on it and the gap since the last
-    /// hit has run down (<paramref name="slackSeconds"/> of jitter allowed). The last hit drops the recipe's result and
-    /// byproduct on top of the anvil. Returns what the hit did; the caller supplies the hammer's own pace.
+    /// One tool hit on the work station at <paramref name="cell"/>, if it has a recipe to work and the gap since the
+    /// last hit has run down (<paramref name="slackSeconds"/> of jitter allowed). The last hit drops the recipe's result
+    /// (unless it waits on the station for its collect item) and byproduct on top of the station. Returns what the hit
+    /// did; the caller supplies the tool's own pace.
     /// </summary>
-    internal AnvilHit HammerAnvil(Vector3 cell, float gapSeconds, float slackSeconds)
+    internal WorkHit WorkStationHit(Vector3 cell, float gapSeconds, float slackSeconds)
     {
-        if (!TryTrackAnvilAt(cell)) return default;
-        var hit = _world.Smithing.Anvils.TryHit(cell, gapSeconds, slackSeconds);
-        if (hit.Kind != AnvilHitKind.Finished || _world.IsClientMode) return hit;
+        if (!TryTrackWorkStationAt(cell, out _)) return default;
+        var hit = _world.Smithing.WorkStations.TryHit(cell, gapSeconds, slackSeconds);
+        if (hit.Kind != WorkHitKind.Finished || _world.IsClientMode) return hit;
 
         var top = cell + new Vector3(0f, 1f, 0f);
         for (var i = 0; i < hit.ResultCount; i++)

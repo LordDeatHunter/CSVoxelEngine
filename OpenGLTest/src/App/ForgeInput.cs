@@ -11,12 +11,13 @@ using VoxelEngine.UI.InventoryPanel;
 namespace VoxelEngine.App;
 
 /// <summary>
-/// The anvil's recipe list input: a right-click with a smithing hammer on an anvil holding a metal stack
-/// (<see cref="RightClickOutcome.Forge"/>) opens it, listing only the recipes that metal and that many of it can make; a
+/// A work station's recipe list input: a right-click with the station's tool (a hammer on an anvil, a knife on a
+/// leather table) on a station holding a stack (<see cref="RightClickOutcome.Forge"/>) opens it, listing only the
+/// recipes that input and that many of it can make; a
 /// click on a card picks it (<see cref="Simulation.Smithing.SmithingStations.Select"/>, which costs nothing yet) and
-/// closes the list, and the hammer's left-button hits then forge it. The cursor is free and the look frozen while it is
-/// up; it closes on a pick, CLOSE, E or Escape, the pause menu, the death screen, putting the hammer away, leaving the
-/// anvil's reach or the stack running out. Connected to a server, a pick is predicted here and sent as a
+/// closes the list, and the tool's left-button hits then work it. The cursor is free and the look frozen while it is
+/// up; it closes on a pick, CLOSE, E or Escape, the pause menu, the death screen, putting the tool away, leaving the
+/// station's reach or the stack running out. Connected to a server, a pick is predicted here and sent as a
 /// <see cref="NetIntentKind.Forge"/> intent; the server's station broadcast is the truth. Owned by
 /// <see cref="GameplayInput"/>; main thread only.
 /// </summary>
@@ -39,7 +40,7 @@ internal sealed class ForgeInput
     /// <summary>Whether the list is up (it owns the mouse while it is).</summary>
     internal bool IsOpen => View.IsOpen;
 
-    /// <summary>Opens the list on the anvil at <paramref name="cell"/> (the right-click chain judged the hammer and the
+    /// <summary>Opens the list on the station at <paramref name="cell"/> (the right-click chain judged the tool and the
     /// stack).</summary>
     internal void Open(World w, Vector3 cell)
     {
@@ -58,22 +59,23 @@ internal sealed class ForgeInput
         if (recapture && Program.ActiveWorld is { } w) Capture(w, false);
     }
 
-    /// <summary>Every playing frame: closes the list once its anvil no longer holds a stack, the hammer left the hand or
-    /// the player left the anvil's reach, else shows the current stack and the hover.</summary>
+    /// <summary>Every playing frame: closes the list once its station no longer holds a stack, the tool left the hand or
+    /// the player left the station's reach, else shows the current stack and the hover.</summary>
     internal void Update(World w)
     {
         if (!View.IsOpen) return;
         var (x, y, z) = View.Cell;
         var center = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
         // The reach is measured to the face the ray hits; the center may lie up to a block's half-diagonal further
-        if (!w.IsPlaying || !Mining.IsHammer(w.Inventory.HeldItem)
-            || Vector3.Distance(w.Camera.Position, center) > World.InteractionReach + 1f
-            || w.Smithing.Anvils.StateAt(x, y, z) is not { MetalCount: > 0 } anvil)
+        if (!w.IsPlaying || w.Smithing.WorkStations.StateAt(x, y, z) is not { InputCount: > 0 } station
+            || BlockType.ById[station.BlockId] is not { WorkStation: { } profile } block
+            || !Mining.IsStationTool(w.Inventory.HeldItem, profile)
+            || Vector3.Distance(w.Camera.Position, center) > World.InteractionReach + 1f)
         {
             Close();
             return;
         }
-        View.Show(anvil.MetalId, anvil.MetalCount, anvil.SelectedResultId);
+        View.Show(profile.Recipes, block.DisplayName, station.InputId, station.InputCount, station.SelectedResultId);
         View.Hover = inputManager.Mouse is { } mouse ? renderManager.Ui.ToCanvas(mouse.Position) : null;
     }
 
@@ -102,7 +104,7 @@ internal sealed class ForgeInput
         return true;
     }
 
-    // Picks the card's recipe for the hammer to forge: locally in singleplayer; connected, predicted here and sent for
+    // Picks the card's recipe for the tool to work: locally in singleplayer; connected, predicted here and sent for
     // the server to judge. The list closes so the hammering can start.
     private void Pick(World w, int card)
     {
@@ -112,7 +114,7 @@ internal sealed class ForgeInput
         if (!w.Smithing.Select(cell, recipe.ResultId)) return;
         if (session.Client != null)
             w.RaiseIntent(WorldIntent.Forge(w.Camera.Position, w.Camera.LastAimDirection, cell, recipe.ResultId));
-        w.Toast.Show($"Hammer out the {Inventory.DisplayName(recipe.ResultId)}: {recipe.Hits} hits");
+        w.Toast.Show($"Work the {Inventory.DisplayName(recipe.ResultId)}: {recipe.Hits} hits");
         Close();
     }
 

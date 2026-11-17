@@ -1,6 +1,7 @@
 using System;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Stations;
 using VoxelEngine.Items;
 using VoxelEngine.WorldGen.Trees;
 
@@ -50,9 +51,11 @@ public static class Mining
     /// overhead chop at what it mines instead of a punch.</summary>
     public static bool IsAxe(Item? held) => held != null && ContentRegistry.IsInTag("axe", held.Id);
 
-    /// <summary>Whether <paramref name="held"/> is a smithing hammer: a member of the <c>hammer</c> tag, which works
-    /// a bloom on an anvil (<see cref="Simulation.Smithing.AnvilManager"/>) instead of mining it.</summary>
-    public static bool IsHammer(Item? held) => held != null && ContentRegistry.IsInTag("hammer", held.Id);
+    /// <summary>Whether <paramref name="held"/> is the tool of <paramref name="station"/>: a member of the station's tool
+    /// tag (a hammer on an anvil, a knife on a fleshing beam), which picks and works its recipes
+    /// (<see cref="Simulation.WorkStations.WorkStationManager"/>) instead of mining it. False with no station.</summary>
+    public static bool IsStationTool(Item? held, WorkStationProfile? station) =>
+        held != null && station != null && ContentRegistry.IsInTag(station.ToolTag, held.Id);
 
     /// <summary>Damage one hit deals, or 0 when the block's gate refuses the held item. An
     /// unbreakable block takes no damage from anything.</summary>

@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using VoxelEngine.Config;
 using VoxelEngine.Content;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Leatherwork;
 using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.WorkStations;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Features;
 
@@ -96,10 +98,16 @@ public static class StationBars
         return bars;
     }
 
-    /// <summary>The bar of an anvil with a recipe picked: how far it has been hammered.</summary>
-    public static List<StationBar>? Anvil(AnvilManager.State? state) =>
+    /// <summary>The bar of a tanning vat whose batch has started: how far it has tanned.</summary>
+    public static List<StationBar>? Vat(TanningVatManager.VatState? state) =>
+        state is { Progress: > 0f, Profile: { } profile }
+            ? [new StationBar("Tanning", TanningRules.Progress01(state, profile), StationBarKind.Progress)]
+            : null;
+
+    /// <summary>The bar of a work station with a recipe picked: how far it has been worked.</summary>
+    public static List<StationBar>? WorkStation(WorkStationManager.State? state) =>
         state?.Selected is { } recipe
-            ? [new StationBar($"Hammered {state.Hits}/{recipe.Hits}", state.Hits / (float)Math.Max(1, recipe.Hits), StationBarKind.Progress)]
+            ? [new StationBar($"Worked {state.Hits}/{recipe.Hits}", state.Hits / (float)Math.Max(1, recipe.Hits), StationBarKind.Progress)]
             : null;
 
     /// <summary>The bar of a quern whose plate is turning: how far through its rotation it is. Null at rest.</summary>

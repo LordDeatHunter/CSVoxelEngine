@@ -1,10 +1,17 @@
 {
-  // What an axe splits a log into on a stump: sixteen lumber (eight of which craft a plank)
+  // What an axe splits a log into on a stump: sixteen lumber (eight of which craft a plank) and its bark, the
+  // tanning vat's tannin
   "pools": [
     {
       "rolls": 1,
       "entries": [
         { "item": "item/lumber", "count": 16 }
+      ]
+    },
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/bark", "count": 2 }
       ]
     }
   ]

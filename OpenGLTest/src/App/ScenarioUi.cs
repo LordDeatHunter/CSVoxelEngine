@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Content.Quests;
+using VoxelEngine.Content.Stations;
 using VoxelEngine.Interaction;
 using VoxelEngine.Magic;
 using VoxelEngine.UI.InventoryPanel;
@@ -191,8 +192,8 @@ internal sealed class ScenarioUi(InventoryPanelInput panelInput, SpellBuilderInp
         switch (action)
         {
             case "open":
-                if (!Mining.IsHammer(world.Inventory.HeldItem))
-                    throw new InvalidOperationException("opening the anvil's recipes needs a smithing hammer in hand (give and select one first).");
+                if (!Mining.IsStationTool(world.Inventory.HeldItem, StationAt(world, cell!.Value)))
+                    throw new InvalidOperationException("opening a work station's recipes needs its tool in hand (give and select one first).");
                 forgeInput.Open(world, cell!.Value);
                 break;
             case "pick":
@@ -203,11 +204,17 @@ internal sealed class ScenarioUi(InventoryPanelInput panelInput, SpellBuilderInp
                 forgeInput.Close();
                 break;
         }
-        // The input's per-frame check (the stack, the hammer, the reach) runs in GameplayInput, which a scenario bypasses
+        // The input's per-frame check (the stack, the tool, the reach) runs in GameplayInput, which a scenario bypasses
         forgeInput.Update(world);
         if (action == "open" && !forgeInput.IsOpen)
-            throw new InvalidOperationException($"{cell} is not an anvil with a metal stack in reach.");
+            throw new InvalidOperationException($"{cell} is not a work station with a stack in reach.");
     }
+
+    // The work station profile of the block at the cell, null when it is none
+    private static WorkStationProfile? StationAt(World world, Vector3 cell) =>
+        world.GetChunkManager().TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out _)
+            ? BlockType.ById[id]?.WorkStation
+            : null;
 
     private static World RequirePlaying(string what) =>
         Program.ActiveWorld is { IsPlaying: true } world

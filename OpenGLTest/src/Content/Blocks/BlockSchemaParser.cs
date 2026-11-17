@@ -339,14 +339,63 @@ internal static class BlockSchemaParser
         return new TextureSheet(texture, cols, rows, frames, fps);
     }
 
-    /// <summary>Reads a block's <c>anvil</c> flag. An anvil is a plain model block; any other renderer is refused.</summary>
-    internal static bool ParseAnvil(bool? anvil, BlockRenderer renderer, string path)
+    /// <summary>Reads a block's <c>tanning</c> object, or null without one. A tanning vat is a plain model block; its
+    /// items must resolve, its capacity is 1..16 (so a batch's result fits the wire's byte) and its seconds positive.</summary>
+    internal static TanningProfile? ParseTanning(BlockDefinition.TanningDefinition? definition, BlockRenderer renderer,
+        string path)
     {
-        if (anvil != true) return false;
+        if (definition == null) return null;
         if (renderer is not BlockRenderer.Model)
             throw new InvalidOperationException(
-                $"Block '{path}' declares an anvil with renderer \"{renderer}\"; an anvil is a plain model block.");
-        return true;
+                $"Block '{path}' declares tanning with renderer \"{renderer}\"; a tanning vat is a plain model block.");
+        var input = RequireItem(definition.Input, "input", path);
+        var result = RequireItem(definition.Result, "result", path);
+        var tannin = RequireItem(definition.Tannin, "tannin", path);
+        var water = RequireItem(definition.Water, "water", path);
+        var count = definition.Count ?? 1;
+        if (count is < 1 or > 8)
+            throw new InvalidOperationException($"Block '{path}' has tanning count {count}; expected 1..8.");
+        var capacity = definition.Capacity ?? 4;
+        if (capacity is < 1 or > 16)
+            throw new InvalidOperationException($"Block '{path}' has tanning capacity {capacity}; expected 1..16.");
+        var seconds = definition.Seconds ?? 0f;
+        if (!(seconds > 0f) || !float.IsFinite(seconds))
+            throw new InvalidOperationException($"Block '{path}' has tanning seconds {definition.Seconds}; expected above 0.");
+        var liquid = definition.Liquid ?? 0.75f;
+        if (liquid is < 0f or > 1f || !float.IsFinite(liquid))
+            throw new InvalidOperationException($"Block '{path}' has tanning liquid {liquid}; expected 0..1.");
+        return new TanningProfile(input, result, count, tannin, water, capacity, seconds, liquid);
+    }
+
+    // An item name of a tanning field resolved to its id; a missing or unknown name throws naming the file
+    private static ushort RequireItem(string? name, string field, string path) =>
+        name != null && ContentFiles.TryResolve(name, out var id)
+            ? id
+            : throw new InvalidOperationException(
+                $"Block '{path}' names tanning {field} '{name}', which is not a registered block or item.");
+
+    /// <summary>Reads a block's <c>workstation</c> object, or null without one. A work station is a plain model block
+    /// naming a tool tag and a recipe folder (a plain name, no path); the tag is checked once tags load.</summary>
+    internal static WorkStationProfile? ParseWorkStation(BlockDefinition.WorkStationDefinition? definition,
+        BlockRenderer renderer, string path)
+    {
+        if (definition == null) return null;
+        if (renderer is not BlockRenderer.Model)
+            throw new InvalidOperationException(
+                $"Block '{path}' declares a workstation with renderer \"{renderer}\"; a work station is a plain model block.");
+        if (string.IsNullOrWhiteSpace(definition.Tool))
+            throw new InvalidOperationException($"Block '{path}' declares a workstation without a tool tag.");
+        if (string.IsNullOrWhiteSpace(definition.Recipes)
+            || definition.Recipes.IndexOfAny(['/', '\\', '.']) >= 0)
+            throw new InvalidOperationException(
+                $"Block '{path}' has workstation recipes '{definition.Recipes}'; expected a folder name under recipes/.");
+        var surface = definition.Surface ?? 1f;
+        if (surface is < 0f or > 1f || !float.IsFinite(surface))
+            throw new InvalidOperationException($"Block '{path}' has workstation surface {surface}; expected 0..1.");
+        var stack = definition.Stack ?? 0;
+        if (definition.Stack != null && stack is < 1 or > 64)
+            throw new InvalidOperationException($"Block '{path}' has workstation stack {stack}; expected 1..64.");
+        return new WorkStationProfile(definition.Tool, definition.Recipes, surface, stack);
     }
 
     /// <summary>

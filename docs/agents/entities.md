@@ -402,7 +402,8 @@ take a new species from it instead of naming it; adding one means a class, a row
 - **Drops.** Each species has a loot table of its own name (`WildlifeDropTests`): raw venison and hide from the
   deer; raw boar meat, hide and sometimes a tusk from the boar; a pile of all three plus its trophy `dire_tusk`
   from the dire boar; feathers from the crow; a wing from the dragonfly. The meats cook on a campfire into food
-  that heals (`heals`), a hide makes leather gear with fewer units than cotton (`recipes/leather_*_from_hide.json`),
+  that heals (`heals`), a hide is scraped, salted and tanned into the leather that cuts the leather set (see
+  "Leatherworking"),
   a feather fletches six arrows where a bone makes four, and a tusk splits into bone.
 - **Health bars.** An animal shows its bar only once hurt (`Animal.ShowsHealthbar`); a provoked boar and the dire
   boar always do.

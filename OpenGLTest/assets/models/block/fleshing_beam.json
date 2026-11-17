@@ -1,0 +1,48 @@
+{
+  // A fleshing beam: a debarked log lying along x on two splayed plank legs, the hide's work surface its top at 11 px
+  // (blocks/fleshing_beam.json "surface"). Symmetric, so it needs no facing. Tiles are the oak log's and planks'.
+  "textures": {
+    "log": "oak_log_side",
+    "end": "oak_log_top",
+    "legs": "oak_planks",
+    "particle": "#log"
+  },
+  "elements": [
+    {
+      "from": [1, 7, 5],
+      "to": [15, 11, 11],
+      "faces": {
+        "down": { "texture": "#log" },
+        "up": { "texture": "#log" },
+        "north": { "texture": "#log" },
+        "south": { "texture": "#log" },
+        "west": { "texture": "#end" },
+        "east": { "texture": "#end" }
+      }
+    },
+    {
+      "from": [2, 0, 6],
+      "to": [4, 7, 10],
+      "faces": {
+        "down": { "texture": "#legs", "cullface": "down" },
+        "up": { "texture": "#legs" },
+        "north": { "texture": "#legs" },
+        "south": { "texture": "#legs" },
+        "west": { "texture": "#legs" },
+        "east": { "texture": "#legs" }
+      }
+    },
+    {
+      "from": [12, 0, 6],
+      "to": [14, 7, 10],
+      "faces": {
+        "down": { "texture": "#legs", "cullface": "down" },
+        "up": { "texture": "#legs" },
+        "north": { "texture": "#legs" },
+        "south": { "texture": "#legs" },
+        "west": { "texture": "#legs" },
+        "east": { "texture": "#legs" }
+      }
+    }
+  ]
+}

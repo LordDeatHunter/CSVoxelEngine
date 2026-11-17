@@ -12,6 +12,7 @@ using VoxelEngine.Networking;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.WorkStations;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen;
@@ -201,18 +202,21 @@ internal sealed class LeftClickAction
         if (type.CrucibleStand) return StationBars.StandingCrucible(_world.StandingCrucibles.Peek((x, y, z)));
         if (type.Kiln != null) return StationBars.Kiln(_world.Kilns.StateAt(ax, ay, az));
         if (type.Bloomery != null) return StationBars.Bloomery(_world.Smithing.Bloomeries.StateAt(ax, ay, az));
-        if (type.IsAnvil) return StationBars.Anvil(_world.Smithing.Anvils.StateAt(x, y, z));
+        if (type.WorkStation != null) return StationBars.WorkStation(_world.Smithing.WorkStations.StateAt(x, y, z));
+        if (type.Tanning != null) return StationBars.Vat(_world.Smithing.Vats.StateAt(x, y, z));
         return StationBars.Mold(blockId, _world.Casting.StateAt(x, y, z));
     }
 
-    // The status line of the bloomery or anvil under the crosshair (see SmithingReadout), null for anything else
+    // The status line of the bloomery, work station or tanning vat under the crosshair (see SmithingReadout), null for anything else
     private string? IronWorksDetail(ushort blockId, Vector3 anchor, int x, int y, int z)
     {
         var type = BlockType.ById[blockId];
         if (type?.Bloomery != null && _world.Smithing.Bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z) is { } bloomery)
             return SmithingReadout.Bloomery(bloomery);
-        if (type is { IsAnvil: true } && _world.Smithing.Anvils.StateAt(x, y, z) is { } anvil)
-            return SmithingReadout.Anvil(anvil);
+        if (type?.WorkStation != null && _world.Smithing.WorkStations.StateAt(x, y, z) is { } station)
+            return SmithingReadout.WorkStation(station);
+        if (type?.Tanning != null && _world.Smithing.Vats.StateAt(x, y, z) is { } vat)
+            return SmithingReadout.Vat(vat);
         return null;
     }
 
@@ -292,7 +296,7 @@ internal sealed class LeftClickAction
         }
         var justPressed = isHolding && !_attackWasPressed;
         _attackWasPressed = isHolding;
-        _anvilCooldown = MathF.Max(0f, _anvilCooldown - (float)deltaTime);
+        _workCooldown = MathF.Max(0f, _workCooldown - (float)deltaTime);
         _stumpCooldown = MathF.Max(0f, _stumpCooldown - (float)deltaTime);
         UpdateSplit((float)deltaTime);
         // A button still held after a split is spent: it must not go on to mine the stump the log stood on
@@ -363,11 +367,12 @@ internal sealed class LeftClickAction
             return;
         }
 
-        // A smithing hammer on an anvil forges the recipe picked on it instead of mining the anvil
-        if (Mining.IsHammer(held) && BlockType.ById[Edits.BlockIdAt(_selectedBlockPosition)] is { IsAnvil: true })
+        // A work station's tool (a hammer on an anvil, a knife on a fleshing beam) works the recipe on it instead of
+        // mining the station
+        if (Mining.IsStationTool(held, BlockType.ById[Edits.BlockIdAt(_selectedBlockPosition)]?.WorkStation))
         {
             StopBreaking();
-            UpdateAnvilHammer(held!);
+            UpdateWorkStationHit(held!);
             return;
         }
 
@@ -506,42 +511,42 @@ internal sealed class LeftClickAction
         }
     }
 
-    // Seconds until the next hammer hit may land: the hammer's own gap, counted down whether or not the button is
+    // Seconds until the next tool hit on a work station may land: the tool's own gap, counted down whether or not the button is
     // held, so releasing and pressing again never skips it
-    private float _anvilCooldown;
+    private float _workCooldown;
 
     /// <summary>
-    /// One hammer hit on the aimed anvil, while the button is held: the first lands at once, the next after the
-    /// hammer's own gap (<see cref="Mining.HitGapSeconds(Item, float)"/>, a smithing hammer's is a couple of seconds, so
-    /// there is no spamming). A hit with no recipe picked on the anvil does nothing. A connected client only predicts it
-    /// (the swing, sound and chips, from the anvil it mirrors) and raises <see cref="NetIntentKind.Hammer"/>; the
+    /// One tool hit on the aimed work station, while the button is held: the first lands at once, the next after the
+    /// tool's own gap (<see cref="Mining.HitGapSeconds(Item, float)"/>, a smithing hammer's is a couple of seconds, so
+    /// there is no spamming). A hit with no recipe to work on the station does nothing. A connected client only predicts
+    /// it (the swing, sound and chips, from the station it mirrors) and raises <see cref="NetIntentKind.Hammer"/>; the
     /// server judges the gap itself and its snapshot carries the result.
     /// </summary>
-    private void UpdateAnvilHammer(Item held)
+    private void UpdateWorkStationHit(Item held)
     {
-        if (_anvilCooldown > 0f) return;
+        if (_workCooldown > 0f) return;
 
         var cell = _selectedBlockPosition;
         var gap = Mining.HitGapSeconds(held,
             (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
         if (_clientMode)
         {
-            _world.Interactions.TryTrackAnvilAt(cell);
-            if (_world.Smithing.Anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z) is not { SelectedResultId: not 0 })
+            _world.Interactions.TryTrackWorkStationAt(cell, out _);
+            if (_world.Smithing.WorkStations.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z) is not { Working: not null })
                 return;
         }
-        else if (_world.HammerFor(cell, gap, 0f).Kind == AnvilHitKind.Refused)
+        else if (_world.WorkStationHitFor(cell, gap, 0f).Kind == WorkHitKind.Refused)
         {
             return;
         }
 
-        _anvilCooldown = gap;
+        _workCooldown = gap;
         Camera.NotifyPlayerAction();
         LocalPlayer.PunchSwing();
-        var anvilId = Edits.BlockIdAt(cell);
-        PlayHitSfx(anvilId, cell);
-        _debris.Burst(cell, anvilId, ParticleConfig.BlockDebrisPerHit, columns: _chunkManager.ColumnSource);
-        Camera.AddHitKick(Vector3.Zero, BreakKick.Strength(AnvilKickHardness, false));
+        var stationId = Edits.BlockIdAt(cell);
+        PlayHitSfx(stationId, cell);
+        _debris.Burst(cell, stationId, ParticleConfig.BlockDebrisPerHit, columns: _chunkManager.ColumnSource);
+        Camera.AddHitKick(Vector3.Zero, BreakKick.Strength(WorkKickHardness, false));
         _world.RaiseIntent(WorldIntent.Hammer(Camera.Position, _selectedAimDirection, cell));
     }
 
@@ -616,8 +621,8 @@ internal sealed class LeftClickAction
 
     private float _stumpCooldown;
 
-    // The hardness the camera kick of a hammer blow is sized as: a solid knock, like mining stone
-    private const float AnvilKickHardness = 5f;
+    // The hardness the camera kick of a work station blow is sized as: a solid knock, like mining stone
+    private const float WorkKickHardness = 5f;
 
     /// <summary>
     /// Breaks a block the local player's mining finished. On a connected client the break is only

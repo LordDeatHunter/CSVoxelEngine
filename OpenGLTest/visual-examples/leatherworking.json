@@ -1,0 +1,46 @@
+{
+  // The leather works: run with VOXEL_SCRIPT=visual-examples/leatherworking.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/leatherworking/. In bloomery.json's forest clearing: a fleshing beam with three raw hides
+  // scraped once (one scraped hide waiting for salt beside the two left), a leather table with six leather, its knife
+  // pattern list and a cut cap, and three tanning vats (water only, a batch tanning in the brown liquor, leather done).
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "fly", "on": true },
+    { "op": "anvil", "block": "fleshing_beam", "pos": [-43, 10, 58], "metal": "hide", "count": 3 },
+    { "op": "anvil", "block": "leather_table", "pos": [-41, 10, 58], "metal": "leather", "count": 6 },
+    { "op": "vat", "pos": [-39, 10, 58], "water": true },
+    { "op": "vat", "pos": [-38, 10, 58], "water": true, "bark": 3, "hides": 3, "progress": 0.4 },
+    { "op": "vat", "pos": [-37, 10, 58], "leather": 4 },
+    { "op": "hammer", "pos": [-43, 10, 58] },
+    { "op": "hammer", "pos": [-43, 10, 58] },
+    { "op": "hammer", "pos": [-43, 10, 58] },
+    { "op": "hammer", "pos": [-43, 10, 58] },
+    { "op": "hammer", "pos": [-43, 10, 58] },
+    { "op": "teleport", "pos": [-41.5, 12.2, 61.5], "yaw": -90, "pitch": -35 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "stations" },
+
+    { "op": "teleport", "pos": [-42.5, 11.6, 59.8], "yaw": -90, "pitch": -45 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "beam" },
+
+    { "op": "give", "block": "item/flint_knife", "count": 1 },
+    { "op": "teleport", "pos": [-40.5, 12, 60.5], "yaw": -90, "pitch": -45 },
+    { "op": "forge", "action": "open", "pos": [-41, 10, 58] },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "patterns" },
+    { "op": "forge", "action": "pick", "card": 1 },
+    { "op": "hammer", "pos": [-41, 10, 58] },
+    { "op": "hammer", "pos": [-41, 10, 58] },
+    { "op": "hammer", "pos": [-41, 10, 58] },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "cut" },
+
+    { "op": "teleport", "pos": [-37.3, 12.4, 60.6], "yaw": -90, "pitch": -55 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "vats", "hideHud": true },
+    { "op": "teleport", "pos": [-36.5, 12.2, 58.9], "yaw": -90, "pitch": -80 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "leather" }
+  ]
+}

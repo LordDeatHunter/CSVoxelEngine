@@ -58,7 +58,7 @@ purpose). When you change code, edit the doc section that owns it (and nothing e
 | Vertex layout, texture arrays, material atlas, greedy mesher, biome tint, chunk drawing, Hi-Z cull | `meshing-and-chunks.md` | `shader-sync` |
 | Block, item, loot, model schemas, multiblocks, building blocks | `content-blocks-items.md` | `add-content`, `partial-block` |
 | Tree species, growth engine, felling, leaf decay | `trees.md` | |
-| Recipes, kiln, casting, bloomery, anvil, iron, the barrier, hell generation | `recipes-and-metalworks.md` | `add-content` |
+| Recipes, kiln, casting, bloomery, anvil, iron, work stations, leatherworking, the barrier, hell generation | `recipes-and-metalworks.md` | `add-content` |
 | Spell parts, casts, status effects | `spells-and-effects.md` | `add-content` |
 | Threading model, state byte, edit-path hooks, fluid/gravity/TNT, worldgen invariants, far LOD | `architecture-and-worldgen.md` | `edit-path-checklist` |
 | Dedicated server, world sources, wire protocol, intents, client, chat | `multiplayer.md` | |

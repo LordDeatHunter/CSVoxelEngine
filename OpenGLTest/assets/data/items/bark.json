@@ -1,0 +1,7 @@
+{
+  // Oak bark, split off with the lumber when an axe splits a log on a stump (loot/log_split.json): the tanning vat's
+  // tannin, one unit per hide. The sprite is placeholder art (tools/generate-leather-sprites.py).
+  "name": "Bark",
+  "texture": "assets/textures/items/bark.png",
+  "fuel": { "burnSeconds": 5 }
+}

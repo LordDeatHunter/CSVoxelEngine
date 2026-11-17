@@ -45,6 +45,7 @@ using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Simulation.Waystones;
+using VoxelEngine.Simulation.WorkStations;
 using VoxelEngine.Status;
 using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.Hud;
@@ -1059,12 +1060,12 @@ public class World
         !_clientMode && BellowsProbe.TryFind(_chunkManager, feet, halfWidth, out var cell)
         && _smithing.Bloomeries.PressBellows(cell, fallBlocks);
 
-    /// <summary>One hammer hit on the anvil at <paramref name="cell"/> (the server replaying a
-    /// <see cref="NetIntentKind.Hammer"/> intent): the hit counts when a piece lies on it and its gap has run down to
-    /// within <paramref name="slackSeconds"/>; the hammer's own pace is <paramref name="gapSeconds"/>. A finished
-    /// piece drops its result and slag on top of the anvil.</summary>
-    public AnvilHit HammerFor(Vector3 cell, float gapSeconds, float slackSeconds) =>
-        Interactions.HammerAnvil(cell, gapSeconds, slackSeconds);
+    /// <summary>One tool hit on the work station at <paramref name="cell"/> (singleplayer's stroke, or the server
+    /// replaying a <see cref="NetIntentKind.Hammer"/> intent): the hit counts when there is a recipe to work on it and
+    /// its gap has run down to within <paramref name="slackSeconds"/>; the tool's own pace is
+    /// <paramref name="gapSeconds"/>. A finished work drops its result and byproduct on top of the station.</summary>
+    public WorkHit WorkStationHitFor(Vector3 cell, float gapSeconds, float slackSeconds) =>
+        Interactions.WorkStationHit(cell, gapSeconds, slackSeconds);
 
     /// <summary>One left-click blow on the tree stump at <paramref name="cell"/> (a <see cref="NetIntentKind.StumpHit"/> intent):
     /// splits the log standing on it when <paramref name="split"/> (an axe's blow), wobbles it otherwise. False when the

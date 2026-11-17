@@ -1,0 +1,4 @@
+{
+  // Knives: the tool of the fleshing beam and the leather table (their blocks' "workstation" tool).
+  "items": ["item/flint_knife", "item/copper_dagger", "item/obsidian_dagger"]
+}

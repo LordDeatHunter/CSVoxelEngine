@@ -1,0 +1,18 @@
+{
+  // A fleshing beam: a log on two legs (models/block/fleshing_beam.json), the first leatherworking station. Raw hides
+  // laid on it (up to four) are scraped clean one after another with a knife (recipes/scrape/), and a scraped hide stays
+  // on the beam until a right-click with salt takes it off as a salted hide (WorkStationManager). Crafted from a log
+  // and planks.
+  "name": "Fleshing Beam",
+  "model": "block/fleshing_beam",
+  "hardness": 3,
+  "sfx": "hit_wood",
+  "workstation": { "tool": "knife", "recipes": "scrape", "surface": 0.6875, "stack": 4 },
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": [
+    { "min": [0.0625, 0.4375, 0.3125], "max": [0.9375, 0.6875, 0.6875] },
+    { "min": [0.125, 0, 0.375], "max": [0.25, 0.4375, 0.625] },
+    { "min": [0.75, 0, 0.375], "max": [0.875, 0.4375, 0.625] }
+  ]
+}

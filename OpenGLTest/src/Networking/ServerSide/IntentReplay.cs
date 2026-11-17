@@ -3,12 +3,14 @@ using System.Numerics;
 using VoxelEngine.Audio;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
+using VoxelEngine.Items;
 using VoxelEngine.Magic;
 using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.WorkStations;
 
 namespace VoxelEngine.Networking.ServerSide;
 
-/// <summary>Replays a player's intents (breaks, placements, uses, throws, attacks, casts, hammer hits, anvil forges, waystone trips, respawns and inventory actions) through the singleplayer rules and answers each one in order: the authoritative cells around a world intent's target, the inventory when it could change or was refused, then the result. Also refuses the retired raw block edit. Main thread only.</summary>
+/// <summary>Replays a player's intents (breaks, placements, uses, throws, attacks, casts, work station hits and picks, waystone trips, respawns and inventory actions) through the singleplayer rules and answers each one in order: the authoritative cells around a world intent's target, the inventory when it could change or was refused, then the result. Also refuses the retired raw block edit. Main thread only.</summary>
 internal sealed class IntentReplay
 {
     private readonly ServerState _state;
@@ -226,35 +228,40 @@ internal sealed class IntentReplay
         _state.World.Sounds.PlayAt(SfxLibrary.HitGroupOf(id), intent.Cell + new Vector3(0.5f), player.Id);
 
     /// <summary>
-    /// One hammer hit on the anvil the intent names: a smithing hammer in hand, the player's own ray landing on
-    /// the anvil's cell, and the anvil's own hit gap run down (the hammer's pace, less jitter slack). The anvil
-    /// manager counts the hit and, on the last, drops the picked recipe's result and byproduct; the station broadcast
-    /// carries the rest.
+    /// One tool hit on the work station the intent names: the station's tool in hand, the player's own ray landing on
+    /// the station's cell, and the station's own hit gap run down (the tool's pace, less jitter slack). The station
+    /// manager counts the hit and, on the last, drops the recipe's result and byproduct; the station broadcast carries
+    /// the rest.
     /// </summary>
     private bool HammerFor(ServerPlayer player, in WorldIntent intent)
     {
         var held = player.Inventory.HeldItem;
-        if (!Mining.IsHammer(held) || !AimsAt(player, intent, out _))
+        if (!HoldsStationTool(held, intent) || !AimsAt(player, intent, out _))
             return false;
         var gap = Mining.HitGapSeconds(held, player.Inventory.Equipment.Stats.MiningFactor);
-        if (_state.World.HammerFor(intent.Cell, gap, BloomeryConfig.HammerSlackSeconds).Kind == AnvilHitKind.Refused)
+        if (_state.World.WorkStationHitFor(intent.Cell, gap, BloomeryConfig.HammerSlackSeconds).Kind == WorkHitKind.Refused)
             return false;
-        if (TryMineable(intent, out var anvil, out _))
-            SoundHit(player, intent, anvil);
+        if (TryMineable(intent, out var station, out _))
+            SoundHit(player, intent, station);
         return true;
     }
 
     /// <summary>
-    /// A pick from the anvil's recipe list: a smithing hammer in hand, the player's own ray landing on the anvil's cell,
-    /// then the pick itself (<see cref="SmithingStations.Select"/>), which needs the recipe offered for the stack on the
-    /// anvil. The hammer's hits forge it; the station broadcast carries the outcome.
+    /// A pick from a work station's recipe list: the station's tool in hand, the player's own ray landing on the
+    /// station's cell, then the pick itself (<see cref="SmithingStations.Select"/>), which needs the recipe offered for
+    /// the stack on the station. The tool's hits work it; the station broadcast carries the outcome.
     /// </summary>
     private bool ForgeFor(ServerPlayer player, in WorldIntent intent)
     {
-        if (!Mining.IsHammer(player.Inventory.HeldItem) || !AimsAt(player, intent, out _))
+        if (!HoldsStationTool(player.Inventory.HeldItem, intent) || !AimsAt(player, intent, out _))
             return false;
         return _state.World.Smithing.Select(intent.Cell, intent.Recipe);
     }
+
+    // Whether the held item is the tool of the work station in the intent's cell
+    private bool HoldsStationTool(Item? held, in WorldIntent intent) =>
+        _state.World.GetChunkManager().TryGetCell((int)intent.Cell.X, (int)intent.Cell.Y, (int)intent.Cell.Z, out var id, out _)
+        && Mining.IsStationTool(held, BlockType.ById[id]?.WorkStation);
 
     private bool PlaceFor(ServerPlayer player, in WorldIntent intent)
     {

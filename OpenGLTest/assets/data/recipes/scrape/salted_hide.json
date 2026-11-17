@@ -1,0 +1,10 @@
+{
+  // A raw hide scraped clean on the fleshing beam with a knife. The scraped hide stays on the beam until salt cures it
+  // and takes it off ("collectWith"): one salt per hide.
+  "input": "item/hide",
+  "inputCount": 1,
+  "result": "item/salted_hide",
+  "count": 1,
+  "hits": 5,
+  "collectWith": "item/salt"
+}

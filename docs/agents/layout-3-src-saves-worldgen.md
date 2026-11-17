@@ -106,17 +106,25 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   (MobMissiles; damage + burning), loot, despawn, the hell-only ring spawn (packs by layer)
       KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible
                                #   slot and its melt loop, plus the multiblock integrity sweep
+      Leatherwork/             # the tanning vat, namespace VoxelEngine.Simulation.Leatherwork (see "Leatherworking")
+        TanningRules.cs        # GL-free: a batch tans with water and a tannin unit per input, pauses without, and finishes
+                               #   into the result while spending the tannin and the water
+        TanningVatManager.cs   # vats keyed by cell: the right-click (water, bark, hides in; leather or an unstarted batch
+                               #   out), the tanning tick, the sweep, save and wire
       Smithing/                # the iron works, namespace VoxelEngine.Simulation.Smithing (see "The bloomery and the anvil")
-        AnvilManager.cs        # anvils keyed by cell: a stack of one forge metal (stack, take back, the recipes Offered), the
-                               #   picked recipe (TrySelect) and its hammer hits (gated by the hammer's gap), save and wire
         BellowsProbe.cs        # GL-free: the bellows cell a landing body came down on (its middle, then its footprint corners)
         BellowsSquash.cs       # display only: how far each bellows is pressed down by the player feet sunk into it, and
                                #   its swelling back; a squashed cell leaves the chunk mesh (SwingingCells)
         BloomeryManager.cs     # bloomeries keyed by anchor: ore, fuel, heat, smelting, bellows presses at the tuyeres, the
                                #   integrity sweep, save and wire
         BloomeryRules.cs       # GL-free heat model: the band, decay, progress rate (backward when cold), landing heat
-        SmithingReadout.cs     # GL-free look-at status lines of a bloomery and an anvil
-        SmithingStations.cs    # both registries as one unit (World.Smithing): update, save, wire, and Select (a recipe pick)
+        SmithingReadout.cs     # GL-free look-at status lines of a bloomery, a work station and a tanning vat
+        SmithingStations.cs    # the bloomeries, work stations and vats as one unit (World.Smithing): update, save, wire, and
+                               #   Select (a recipe pick)
+      WorkStations/            # the work station, namespace VoxelEngine.Simulation.WorkStations (see "Work stations")
+        WorkStationManager.cs  # anvils, fleshing beams and leather tables keyed by cell: a stack of one input (stack, take
+                               #   back, the recipes Offered), the picked recipe (TrySelect, or the only one offered) and its
+                               #   tool hits (gated by the tool's gap), results waiting for their collect item, save and wire
       LeafDecay/               # leaf decay and the orphaned-wood crumble, namespace VoxelEngine.Simulation.LeafDecay
         LeafDecayManager.cs    # the composition root and facade: the scheduled cells, the tick and its slicing,
                                #   ScheduleAround/ScheduleBox from every edit path, TickLeaf/TickWood and the removal
@@ -245,8 +253,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   TabStripLayout, ListRowLayout, TextBoxLayout, ScrollViewLayout, TooltipLayout, DropdownState (a drop-down list's
                                #   open flag, row geometry and click rule, drawn by DropdownRenderer); the kit the [E] panel,
                                #   craft card, spell builder and the gear and chest panels build on (plans/INVENTORY_UI.md)
-      Forge/                   # the anvil's recipe list, GL-free (ForgeRenderer draws it, ForgeInput drives it)
-        ForgeView.cs           # open flag, the anvil, its metal stack and the recipes offered for it, hover, transition
+      Forge/                   # a work station's recipe list, GL-free (ForgeRenderer draws it, ForgeInput drives it)
+        ForgeView.cs           # open flag, the station, its name, its stack and the recipes offered for it, hover, transition
         ForgeLayout.cs         # canvas geometry of the panel, the card grid and CLOSE, and HitAt; ForgeHitKind.cs
       Hud/                     # HUD widgets: chat, clock, compass, crosshair state,
                                #   toasts, hotbar feedback, look label, tooltips, screenshots
@@ -273,7 +281,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         LookLabel.cs           # the look-at label's rule: name, "Unknown", the mineable flag
         LookLabelState.cs      # what one frame's label draws: text, flags, cell, state byte, light, detail line, station bars
         StationBar.cs          # one progress bar (caption, fraction, fuel/progress/done kind)
-        StationBars.cs         # GL-free builders of the bars: campfire fuel + cook slots, kiln, bloomery, anvil, quern, mold
+        StationBars.cs         # GL-free builders of the bars: campfire fuel + cook slots, kiln, bloomery, work station,
+                               #   tanning vat, quern, mold
         ScreenshotPaths.cs     # where F2's capture lands and what it is called
         StaffSlotIndicator.cs  # GL-free, cached label of the held staff's selected spell slot and its parts (or
                                #   empty), drawn by HudRenderer.DrawStaffSlot right of the hotbar
@@ -522,6 +531,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         PlantClumpSpec.cs      # the shape of one clumped plant scatter for PlantClumps:
                                #   at most one clump per square cell of CellSize blocks
         ReedGenerator.cs       # shore reeds on the shallow water edge (PlantClumps)
+        RockSaltGenerator.cs   # rock salt patches in the top cells of bare surface stone (the deep sea floor, soil-stripped
+                               #   columns), on a 2D noise; HasSalt is the point query
         RuinedPillarGenerator.cs # broken stone columns standing on the surface
         SeaStackGenerator.cs   # stone stacks rising out of the sea near a shore
         SnowGenerator.cs       # cold weather: freezes surface water to ice (IsFrozenWater, the pack-ice band
@@ -607,7 +618,9 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
   assets/data/recipes/melt/<in>.json  # what a block or item melts into, and how many ml
   assets/data/recipes/cast/<out>.json # (fired mold + material) -> result, amount and cooling time
   assets/data/recipes/alloy/<name>.json # an alloy: result + parts (material, ml); a full set -> the summed ml of the result
-  assets/data/recipes/forge/<out>.json # an anvil recipe: metal + metalCount stacked on the anvil -> result + count
+  assets/data/recipes/forge/<out>.json # an anvil recipe: input + inputCount stacked on the anvil -> result + count
+  assets/data/recipes/scrape/<out>.json # a fleshing beam recipe (the same schema): a raw hide -> a salted hide, collectWith salt
+  assets/data/recipes/cut/<out>.json   # a leather table recipe (the same schema): leather -> a piece of the leather set
   assets/data/spell/<kind>/<name>.json # spell parts by kind (element, shape, modifier, trigger): cost share,
                                       #   complexity, tags, modifier factors, an element's status `effect`
   assets/data/effects/<name>.json     # status effects (burning, frostburn): duration, damage over time, speed

@@ -1,0 +1,7 @@
+{
+  "result": "block/tanning_vat",
+  "count": 1,
+  "ingredients": [
+    { "item": "block/oak_planks", "count": 5 }
+  ]
+}

@@ -309,8 +309,13 @@ public static class NetFraming
     /// forge. An older peer would misread the station frames.
     /// 62: a drop entry of <see cref="NetMessage.EntityList"/> carries a stuck throw (a landed javelin): its
     /// <see cref="NetEntity.Ammo"/> is what it is stuck in (<c>DropStick</c>, 0 for a loose drop) and its velocity field
-    /// then holds the heading of its tip. An older client would draw it as a loose drop sliding along that heading.</summary>
-    public const int ProtocolVersion = 62;
+    /// then holds the heading of its tip. An older client would draw it as a loose drop sliding along that heading.
+    /// 63: the anvil became the work station (anvils, fleshing beams, leather tables). Each work station entry of
+    /// <see cref="NetMessage.StationState"/> also carries the finished result waiting on it for its collect item (id and
+    /// count, after the cooldown). An older peer would misread the station frames.
+    /// 64: <see cref="NetMessage.StationState"/> ends with the tanning vats (cell, block id, water, bark, hides, progress,
+    /// leather) after the work stations. An older peer would misread the station frames.</summary>
+    public const int ProtocolVersion = 64;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

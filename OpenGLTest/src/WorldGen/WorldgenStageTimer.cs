@@ -44,6 +44,8 @@ internal sealed class WorldgenStageTimer
         Tin,
         /// <summary>CaveOres.Stamp.</summary>
         CaveOres,
+        /// <summary>RockSaltGenerator.Stamp.</summary>
+        RockSalt,
         /// <summary>FillWater (marked only while water is enabled).</summary>
         Water,
         /// <summary>StampMud.</summary>

@@ -1,0 +1,6 @@
+{
+  // Salt, mined from rock salt (sea floor and bare mountain rock). Right-clicked on a fleshing beam it cures a scraped
+  // hide and takes it off as a salted hide (recipes/scrape/salted_hide.json "collectWith"). The sprite is placeholder art.
+  "name": "Salt",
+  "texture": "assets/textures/items/salt.png"
+}

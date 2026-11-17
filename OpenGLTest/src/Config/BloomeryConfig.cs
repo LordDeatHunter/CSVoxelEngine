@@ -3,7 +3,7 @@ namespace VoxelEngine.Config;
 /// <summary>
 /// Iron smelting tuning: the bloomery's heat model (<see cref="VoxelEngine.Simulation.Smithing.BloomeryRules"/>), its
 /// bellows (a block a body lands on) and the anvil the blooms are forged on
-/// (<see cref="VoxelEngine.Simulation.Smithing.AnvilManager"/>). What a particular bloomery holds comes from its block
+/// (<see cref="VoxelEngine.Simulation.Smithing.WorkStationManager"/>). What a particular bloomery holds comes from its block
 /// JSON (<c>bloomery</c> object) and what a forge takes from its recipe; these numbers are shared by all of them.
 /// </summary>
 public static class BloomeryConfig

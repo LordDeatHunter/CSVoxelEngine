@@ -260,7 +260,8 @@ public sealed class BiomeTests
                     : height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanGravelDepth
                         ? gravel
                         : rock;
-                Assert.True(id == expected || (expected == rock && (id == ore || id == coalOre || id == hematiteOre || id == tinOre)),
+                Assert.True(id == expected || (expected == rock && (id == ore || id == coalOre || id == hematiteOre || id == tinOre
+                                                                    || id == RockSaltGenerator.SaltBlock)),
                     $"ocean floor at ({worldX},{height},{worldZ}) is block {id}, expected {expected}");
                 sawSand |= expected == sand;
                 sawGravel |= expected == gravel;

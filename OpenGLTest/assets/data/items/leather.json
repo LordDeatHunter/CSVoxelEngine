@@ -1,0 +1,6 @@
+{
+  // Leather, tanned from salted hides in a tanning vat; a leather table cuts it into the leather set
+  // (recipes/cut/). The sprite is placeholder art.
+  "name": "Leather",
+  "texture": "assets/textures/items/leather.png"
+}

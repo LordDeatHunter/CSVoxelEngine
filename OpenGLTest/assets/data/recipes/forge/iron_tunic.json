@@ -1,8 +1,8 @@
 {
   // The iron tunic: bronze's ring count in blooms.
   // Picked on an anvil holding blooms, then hammered out with a smithing hammer (see AnvilManager).
-  "metal": "item/bloom",
-  "metalCount": 8,
+  "input": "item/bloom",
+  "inputCount": 8,
   "result": "item/iron_tunic",
   "count": 1,
   "hits": 10,

@@ -60,64 +60,90 @@ internal static class RecipeLoader
             ContentRegistry.AlloyRecipesList.Add(CompileAlloyRecipe(ContentFiles.ReadJson<AlloyRecipeDefinition>(path), path, name));
     }
 
-    internal static void LoadForgeRecipes(string folder)
+    /// <summary>
+    /// Loads the work recipes of every work station kind the blocks declare: each distinct
+    /// <see cref="Stations.WorkStationProfile.Recipes"/> folder under <paramref name="recipesRoot"/> (a missing folder is
+    /// no recipes). Also refuses a station whose tool names no loaded tag, so a typo never leaves a station no tool works.
+    /// Runs after the blocks and the tags.
+    /// </summary>
+    internal static void LoadWorkRecipes(string recipesRoot)
     {
-        if (!Directory.Exists(folder)) return;
-        foreach (var (name, path) in ContentFiles.JsonFilesIn(folder))
-            ContentRegistry.ForgeRecipesList.Add(CompileForgeRecipe(name, ContentFiles.ReadJson<ForgeRecipeDefinition>(path), path));
+        var folders = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var type in BlockType.Types.Values)
+        {
+            if (type.WorkStation is not { } station) continue;
+            if (!ContentRegistry.Tags.ContainsKey(station.ToolTag))
+                throw new InvalidOperationException(
+                    $"Block '{type.Name}' has workstation tool '{station.ToolTag}', which is not a loaded tag.");
+            folders.Add(station.Recipes);
+        }
+
+        foreach (var station in folders)
+        {
+            var folder = Path.Combine(recipesRoot, station);
+            if (!Directory.Exists(folder)) continue;
+            foreach (var (name, path) in ContentFiles.JsonFilesIn(folder))
+                ContentRegistry.WorkRecipesList.Add(
+                    CompileWorkRecipe(name, station, ContentFiles.ReadJson<WorkRecipeDefinition>(path), path));
+        }
     }
 
     /// <summary>
-    /// Compiles one anvil recipe: a registered metal taken 1..<see cref="MaxForgeMetalCount"/> at a time, a registered
-    /// result other than the metal, made 1 or more at a time in 1..<see cref="MaxForgeHits"/> hammer hits, an optional
-    /// registered byproduct, and one recipe per result (a pick on the anvil names its recipe by the result). Every
-    /// error names <paramref name="path"/>.
+    /// Compiles one work recipe of <paramref name="station"/>: a registered input taken 1..<see cref="MaxWorkInputCount"/>
+    /// at a time, a registered result other than the input, made 1 or more at a time in 1..<see cref="MaxWorkHits"/>
+    /// hits, an optional registered byproduct, an optional registered item the result waits for, and one recipe per
+    /// result across every station (a pick names its recipe by the result). Every error names <paramref name="path"/>.
     /// </summary>
-    private static ForgeRecipe CompileForgeRecipe(string name, ForgeRecipeDefinition definition, string path)
+    private static WorkRecipe CompileWorkRecipe(string name, string station, WorkRecipeDefinition definition, string path)
     {
-        if (definition.Metal == null || !ContentFiles.TryResolve(definition.Metal, out var metalId))
+        if (definition.Input == null || !ContentFiles.TryResolve(definition.Input, out var inputId))
             throw new InvalidOperationException(
-                $"Forge recipe '{path}' names metal '{definition.Metal}', which is not a registered block or item.");
-        var metalCount = definition.MetalCount ?? 0;
-        if (metalCount is < 1 or > MaxForgeMetalCount)
+                $"Work recipe '{path}' names input '{definition.Input}', which is not a registered block or item.");
+        var inputCount = definition.InputCount ?? 0;
+        if (inputCount is < 1 or > MaxWorkInputCount)
             throw new InvalidOperationException(
-                $"Forge recipe '{path}' has metalCount {definition.MetalCount}; expected 1..{MaxForgeMetalCount}.");
+                $"Work recipe '{path}' has inputCount {definition.InputCount}; expected 1..{MaxWorkInputCount}.");
         if (definition.Result == null || !ContentFiles.TryResolve(definition.Result, out var resultId))
             throw new InvalidOperationException(
-                $"Forge recipe '{path}' names result '{definition.Result}', which is not a registered block or item.");
-        if (resultId == metalId)
-            throw new InvalidOperationException($"Forge recipe '{path}' forges its metal into itself.");
+                $"Work recipe '{path}' names result '{definition.Result}', which is not a registered block or item.");
+        if (resultId == inputId)
+            throw new InvalidOperationException($"Work recipe '{path}' works its input into itself.");
         var resultCount = definition.Count ?? 1;
         if (resultCount <= 0)
-            throw new InvalidOperationException($"Forge recipe '{path}' has count {resultCount}; expected 1 or more.");
-        if (ContentRegistry.ForgeRecipeForResult(resultId) is { } other)
+            throw new InvalidOperationException($"Work recipe '{path}' has count {resultCount}; expected 1 or more.");
+        if (ContentRegistry.WorkRecipeForResult(resultId) is { } other)
             throw new InvalidOperationException(
-                $"Forge recipe '{path}' duplicates the result of '{other.Name}': one forge recipe per result.");
+                $"Work recipe '{path}' duplicates the result of '{other.Name}': one work recipe per result.");
         var hits = definition.Hits ?? 0;
-        if (hits is < 1 or > MaxForgeHits)
+        if (hits is < 1 or > MaxWorkHits)
             throw new InvalidOperationException(
-                $"Forge recipe '{path}' has hits {definition.Hits}; expected 1..{MaxForgeHits}.");
+                $"Work recipe '{path}' has hits {definition.Hits}; expected 1..{MaxWorkHits}.");
         ushort byproductId = 0;
         var byproductCount = 0;
         if (definition.Byproduct is { } byproduct)
         {
             if (byproduct.Item == null || !ContentFiles.TryResolve(byproduct.Item, out byproductId))
                 throw new InvalidOperationException(
-                    $"Forge recipe '{path}' names byproduct '{byproduct.Item}', which is not a registered block or item.");
+                    $"Work recipe '{path}' names byproduct '{byproduct.Item}', which is not a registered block or item.");
             byproductCount = byproduct.Count ?? 1;
             if (byproductCount <= 0)
                 throw new InvalidOperationException(
-                    $"Forge recipe '{path}' has byproduct count {byproductCount}; expected 1 or more.");
+                    $"Work recipe '{path}' has byproduct count {byproductCount}; expected 1 or more.");
         }
-        return new ForgeRecipe(name, metalId, metalCount, resultId, resultCount, hits, byproductId, byproductCount);
+        ushort collectWithId = 0;
+        if (definition.CollectWith != null && !ContentFiles.TryResolve(definition.CollectWith, out collectWithId))
+            throw new InvalidOperationException(
+                $"Work recipe '{path}' names collectWith '{definition.CollectWith}', which is not a registered block or item.");
+        return new WorkRecipe(name, station, inputId, inputCount, resultId, resultCount, hits, byproductId,
+            byproductCount, collectWithId);
     }
 
-    /// <summary>The most metal one forge recipe may take: an anvil's stack is capped by its metal's largest recipe,
+    /// <summary>The most input one work recipe may take: a station's stack is capped by its input's largest recipe,
     /// and the stack rides the wire in a byte.</summary>
-    internal const int MaxForgeMetalCount = 64;
+    internal const int MaxWorkInputCount = 64;
 
-    /// <summary>The most hammer hits one forge recipe may take: an anvil's hit count rides the wire in a byte.</summary>
-    internal const int MaxForgeHits = 64;
+    /// <summary>The most hits one work recipe may take: a station's hit count rides the wire in a byte.</summary>
+    internal const int MaxWorkHits = 64;
 
     /// <summary>
     /// Compiles one alloy recipe: a molten result and at least two parts, each a distinct molten

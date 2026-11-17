@@ -1,8 +1,8 @@
 {
   // A sword blade, drawn out of four blooms on the anvil; hilted in recipes/iron_sword.json.
   // Picked on an anvil holding blooms, then hammered out with a smithing hammer (see AnvilManager).
-  "metal": "item/bloom",
-  "metalCount": 4,
+  "input": "item/bloom",
+  "inputCount": 4,
   "result": "item/iron_sword_head",
   "count": 1,
   "hits": 6,

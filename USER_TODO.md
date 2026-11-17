@@ -55,6 +55,11 @@ body wears.
   resolution, small palettes; the wing's film is half transparent). Made by
   `tools/generate-wildlife-item-sprites.py`: replace them by editing that generator (or remove it in the same
   change), or a re-run puts the placeholders back.
+- [ ] **Leather works** — `flint_knife.png`, `salt.png`, `salted_hide.png`, `leather.png`, `bark.png` (32x32, drawn at
+  half resolution, small palettes) and the `rock_salt.png` block tile (a hashed speckle). Made by
+  `tools/generate-leather-sprites.py`: replace them by editing that generator (or remove it in the same change), or a
+  re-run puts the placeholders back. The fleshing beam, leather table and tanning vat models
+  (`models/block/fleshing_beam.json`, `leather_table.json`, `tanning_vat.json`) are plain boxes wearing the oak tiles.
 - [ ] **Teaching scrolls** — `scroll_fire_projectile.png`, `scroll_frost.png`,
   `scroll_modifiers.png`, `scroll_nature.png`, `scroll_self.png`. Keep them readable at hotbar
   size and distinct from one another.

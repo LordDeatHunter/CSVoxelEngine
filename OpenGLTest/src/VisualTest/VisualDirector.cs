@@ -269,6 +269,12 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 Advance();
                 break;
 
+            case "vat":
+                BuildVat(step);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} vat at {step.Pos}");
+                Advance();
+                break;
+
             case "anvil":
                 BuildAnvil(step);
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} anvil at {step.Pos}");
@@ -277,7 +283,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
 
             case "hammer":
                 // One hit that ignores the hammer's gap, so a scenario can film the whole work in a few frames
-                world.HammerFor(step.Pos!.Value, 0f, 0f);
+                world.WorkStationHitFor(step.Pos!.Value, 0f, 0f);
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} hammer {step.Pos}");
                 Advance();
                 break;
@@ -529,29 +535,50 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
         }
     }
 
-    // An anvil at the step's cell with the step's metal stacked on it, and the step's recipe picked with its hits
+    // A work station (the step's block, an anvil by default) at the step's cell with the step's input stacked on it,
+    // and the step's recipe picked with its hits
     private void BuildAnvil(VisualStep step)
     {
-        var type = ContentRegistry.RequireBlock("anvil");
+        var type = ContentRegistry.RequireBlock(step.Block ?? "anvil");
         var cell = step.Pos!.Value;
         var chunks = world.GetChunkManager();
         var chunk = chunks.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z)
             ?? throw new InvalidOperationException($"Step {_step + 1} builds at {cell}, which is not in a loaded chunk.");
         chunk.PlaceBlockAt(cell, type.Id, chunks, 0);
-        var anvils = world.Smithing.Anvils;
+        var anvils = world.Smithing.WorkStations;
         anvils.Ensure(cell, type.Id);
         if (step.Metal == null) return;
         var metal = ContentRegistry.RequireItem(step.Metal).Id;
         for (var i = 0; i < step.Count; i++)
             if (!anvils.TryStack(cell, metal))
                 throw new InvalidOperationException(
-                    $"Step {_step + 1} stacks {step.Count} {step.Metal}, which is not a forge metal or more than its stack holds.");
+                    $"Step {_step + 1} stacks {step.Count} {step.Metal}, which that station does not take or more than its stack holds.");
         if (step.Select == null) return;
         if (!anvils.TrySelect(cell, ContentRegistry.RequireItem(step.Select).Id))
             throw new InvalidOperationException(
-                $"Step {_step + 1} picks {step.Select}, which no forge recipe offers for {step.Count} {step.Metal}.");
+                $"Step {_step + 1} picks {step.Select}, which no recipe of that station offers for {step.Count} {step.Metal}.");
         var state = anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!;
         state.Hits = Math.Clamp(step.Hits, 0, state.Selected!.Hits - 1);
+    }
+
+    // A tanning vat at the step's cell holding the step's water, bark, hides, batch progress and leather
+    private void BuildVat(VisualStep step)
+    {
+        var type = ContentRegistry.RequireBlock("tanning_vat");
+        var cell = step.Pos!.Value;
+        var chunks = world.GetChunkManager();
+        var chunk = chunks.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z)
+            ?? throw new InvalidOperationException($"Step {_step + 1} builds at {cell}, which is not in a loaded chunk.");
+        chunk.PlaceBlockAt(cell, type.Id, chunks, 0);
+        var vats = world.Smithing.Vats;
+        vats.Ensure(cell, type.Id);
+        var state = vats.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!;
+        var profile = type.Tanning!;
+        state.Water = step.On;
+        state.Bark = Math.Clamp(step.Ore, 0, profile.Capacity);
+        state.Hides = Math.Clamp(step.Count, 0, profile.Capacity);
+        state.Progress = Math.Clamp(step.Heat, 0f, 0.99f) * profile.Seconds;
+        state.Leather = Math.Clamp(step.Fuel, 0, profile.Capacity * profile.ResultPerInput);
     }
 
     private void ApplyEffect(VisualStep step)

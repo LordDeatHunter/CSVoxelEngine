@@ -1,0 +1,71 @@
+{
+  // A leather table: a plank top on four legs, the leather's work surface its top at 14 px
+  // (blocks/leather_table.json "surface"). Symmetric, so it needs no facing. Tiles are the oak planks' and log's.
+  "textures": {
+    "top": "oak_planks",
+    "legs": "oak_log_side",
+    "particle": "#top"
+  },
+  "elements": [
+    {
+      "from": [0, 12, 0],
+      "to": [16, 14, 16],
+      "faces": {
+        "down": { "texture": "#top" },
+        "up": { "texture": "#top" },
+        "north": { "texture": "#top" },
+        "south": { "texture": "#top" },
+        "west": { "texture": "#top" },
+        "east": { "texture": "#top" }
+      }
+    },
+    {
+      "from": [1, 0, 1],
+      "to": [3, 12, 3],
+      "faces": {
+        "down": { "texture": "#legs", "cullface": "down" },
+        "up": { "texture": "#legs" },
+        "north": { "texture": "#legs" },
+        "south": { "texture": "#legs" },
+        "west": { "texture": "#legs" },
+        "east": { "texture": "#legs" }
+      }
+    },
+    {
+      "from": [13, 0, 1],
+      "to": [15, 12, 3],
+      "faces": {
+        "down": { "texture": "#legs", "cullface": "down" },
+        "up": { "texture": "#legs" },
+        "north": { "texture": "#legs" },
+        "south": { "texture": "#legs" },
+        "west": { "texture": "#legs" },
+        "east": { "texture": "#legs" }
+      }
+    },
+    {
+      "from": [1, 0, 13],
+      "to": [3, 12, 15],
+      "faces": {
+        "down": { "texture": "#legs", "cullface": "down" },
+        "up": { "texture": "#legs" },
+        "north": { "texture": "#legs" },
+        "south": { "texture": "#legs" },
+        "west": { "texture": "#legs" },
+        "east": { "texture": "#legs" }
+      }
+    },
+    {
+      "from": [13, 0, 13],
+      "to": [15, 12, 15],
+      "faces": {
+        "down": { "texture": "#legs", "cullface": "down" },
+        "up": { "texture": "#legs" },
+        "north": { "texture": "#legs" },
+        "south": { "texture": "#legs" },
+        "west": { "texture": "#legs" },
+        "east": { "texture": "#legs" }
+      }
+    }
+  ]
+}
