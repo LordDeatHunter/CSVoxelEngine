@@ -61,6 +61,7 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
                     ChunkTerrainFill.GenerateBlockData(chunk);
                     chunks.Add(cy, chunk);
                 }
+                var caveDecorations = 0;
                 for (var x = 0; x < Chunk.Size; x++)
                 for (var z = 0; z < Chunk.Size; z++)
                 {
@@ -69,8 +70,15 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
                     {
                         voxels++;
                         var block = chunks[y >> Chunk.SizeShift].Storage.Get(Chunk.Idx(x, y & Chunk.SizeMask, z));
-                        Assert.True(block == TerrainGenerator.SandBlock || block == BlockType.Air,
-                            $"Core upper cover seed={seed} ({cx * Chunk.Size + x},{y},{cz * Chunk.Size + z}) id={block}");
+                        if (block == TerrainGenerator.SandBlock || block == BlockType.Air) continue;
+                        // The full normal pipeline retains underground cave decorations in carved air.
+                        // Seed 42's real stalactite at y=36 is below its local surface, not scenery.
+                        var name = BlockType.ById[block]?.Name;
+                        var caveDecoration = y < height && (name is "stalactite" or "stalagmite" or "glow_mushroom"
+                            || name?.EndsWith("_stalactite", StringComparison.Ordinal) == true
+                            || name?.EndsWith("_stalagmite", StringComparison.Ordinal) == true);
+                        if (caveDecoration) { caveDecorations++; continue; }
+                        Assert.Fail($"Core upper cover seed={seed} ({cx * Chunk.Size + x},{y},{cz * Chunk.Size + z}) id={block} name={name}");
                     }
                     for (var y = height + 1; y <= column.MaxHeight + 32; y++)
                     {
@@ -79,7 +87,7 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
                         Assert.Equal(BlockType.Air, block);
                     }
                 }
-                output.WriteLine($"bare seed={seed} inspected_voxels={voxels} normal_fills={fills}");
+                output.WriteLine($"bare seed={seed} inspected_voxels={voxels} underground_decorations={caveDecorations} normal_fills={fills}");
             }
         }
         finally
