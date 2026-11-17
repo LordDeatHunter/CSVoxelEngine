@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Numerics;
+using System.Text;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 using VoxelEngine.Networking;
@@ -155,6 +156,34 @@ public sealed class ServerPlayerTests : IDisposable
         freshBack.Restore(PlayerSaveCodec.TryParse(PlayerSaveCodec.ToBytes(fresh.Capture())), allowCreative: false);
         Assert.Null(freshBack.RespawnEye);
         Assert.Equal(fresh.Health, freshBack.Health);
+    }
+
+    [Fact]
+    public void HostedPlayerRestoreIgnoresNonFiniteSavedPoseFields()
+    {
+        var store = new ChunkSaveStore(_dir);
+        store.EnqueueFile(ServerPlayerSaves.FileNameFor("Alice"), Encoding.UTF8.GetBytes(
+            "{\"Position\":[1e1000,70,2],\"RespawnEye\":[1,-1e1000,2],\"Yaw\":1e1000,\"Pitch\":-1e1000,\"Health\":1}"));
+        Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+
+        var reopened = new ChunkSaveStore(_dir);
+        try
+        {
+            var start = new Vector3(12f, 70f, -8f);
+            var player = new ServerPlayer(2, "Alice", start) { Yaw = 22f, Pitch = 3f };
+
+            Assert.False(player.Restore(ServerPlayerSaves.Load(reopened, "Alice"), allowCreative: false));
+
+            Assert.Equal(start, player.Position);
+            Assert.Null(player.RespawnEye);
+            Assert.Equal(22f, player.Yaw);
+            Assert.Equal(3f, player.Pitch);
+            Assert.Equal(1, player.Health);
+        }
+        finally
+        {
+            Assert.True(reopened.Shutdown(TimeSpan.FromSeconds(10)));
+        }
     }
 
     [Fact]
