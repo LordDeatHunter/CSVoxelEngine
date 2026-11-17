@@ -33,7 +33,12 @@ public static class EntitySaveCodec
             return null;
         try
         {
-            return JsonSerializer.Deserialize<EntitySaveData>(bytes, PlayerSaveCodec.Options);
+            var saved = JsonSerializer.Deserialize<EntitySaveData>(bytes, PlayerSaveCodec.Options);
+            if (saved == null)
+                return null;
+            if (IgnoreNonFiniteFields(saved))
+                Log.Warn($"Entity save: ignoring non-finite numeric fields in {FileName}");
+            return saved;
         }
         catch (JsonException e)
         {
@@ -41,5 +46,70 @@ public static class EntitySaveCodec
             Log.Warn($"Entity save: ignoring {FileName}: {e.Message}");
             return null;
         }
+    }
+
+    private static bool IgnoreNonFiniteFields(EntitySaveData saved)
+    {
+        var ignored = false;
+        if (saved.Mobs != null)
+            foreach (var mob in saved.Mobs)
+            {
+                if (mob == null)
+                    continue;
+                if (HasNonFinite(mob.Position))
+                {
+                    mob.Position = null;
+                    ignored = true;
+                }
+                if (HasNonFinite(mob.Velocity))
+                {
+                    mob.Velocity = null;
+                    ignored = true;
+                }
+                if (mob.Facing is { } facing && !float.IsFinite(facing))
+                {
+                    mob.Facing = null;
+                    ignored = true;
+                }
+            }
+
+        if (saved.Drops != null)
+            foreach (var drop in saved.Drops)
+            {
+                if (drop == null)
+                    continue;
+                if (HasNonFinite(drop.Position))
+                {
+                    drop.Position = null;
+                    ignored = true;
+                }
+                if (HasNonFinite(drop.Velocity))
+                {
+                    drop.Velocity = null;
+                    ignored = true;
+                }
+                if (drop.Age is { } age && !float.IsFinite(age))
+                {
+                    drop.Age = null;
+                    ignored = true;
+                }
+                if (HasNonFinite(drop.Stuck))
+                {
+                    drop.Stuck = null;
+                    ignored = true;
+                }
+            }
+
+        return ignored;
+    }
+
+    private static bool HasNonFinite(float[]? values)
+    {
+        if (values == null)
+            return false;
+        foreach (var value in values)
+            if (!float.IsFinite(value))
+                return true;
+        return false;
     }
 }

@@ -152,7 +152,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     ScreenSpace/               # the half-res target
   Saves/                       # codecs and stores of world, chunk, player, entity
                                #   and server saves, names, seed parsing, world sources; the explored map's save
-                               #   (MapSaveTests: round trip, damaged file, cave never saved, a world hands it to the next)
+                               #   (MapSaveTests: round trip, damaged file, cave never saved, a world hands it to the next),
+                               #   entity numeric-field admission (EntitySaveNumericAdmissionTests)
   Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
                                #   and felling, saplings, the stations, drops, the mob managers and spawning
     Camps/                     # goblin camps: the fire first, torch-bearing goblins round it, one a dark night

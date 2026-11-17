@@ -178,6 +178,10 @@ pure function of the seed: only **deltas** and the seed are written.
 - **Player and entities.** `player.json` never stores a position before the spawn settled, so a
   world closed mid-load searches the surface again next time. Non-finite position, look, respawn
   eye, or lighting-clock values are ignored field by field while other valid player data is kept.
+  In `entities.json`, a mob position/velocity or drop position/velocity/stuck vector containing
+  any non-finite coordinate is ignored as a whole vector; non-finite mob facing and drop age are
+  ignored individually. Other valid fields and records remain. A cleared position follows the
+  existing no-position restore handling, and a cleared stuck heading restores as a loose drop.
   Saved mobs and drops are spawned
   once loading finishes, each only when its chunk is loaded; a restore is a forced spawn, so it
   may pass the natural mob cap but a mob waits while the hard cap (`MobHardCap`, which sizes the
