@@ -1154,7 +1154,7 @@ public sealed class GameServerTests : IDisposable
         Assert.False(AwaitResult(client, bare));
         Assert.Equal(0, state.Hits);
 
-        var hammer = ContentRegistry.RequireItem("smithing_hammer");
+        var hammer = ContentRegistry.RequireItem("bronze_hammer");
         GrantAsSurvival(client, hammer.Id, 1);
         var first = SendWorld(client, WorldIntent.Hammer(arena.Eye, arena.AimAtFront, cell));
         Assert.True(AwaitResult(client, first));

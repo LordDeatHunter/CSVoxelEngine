@@ -136,7 +136,7 @@ public sealed class IronWorksWorldTests : IDisposable
         var inventory = player.Inventory;
         var metal = Bloomery.Bloomery!.BloomId;
         var coal = ContentRegistry.RequireItem("coal").Id;
-        var hammer = ContentRegistry.RequireItem("smithing_hammer").Id;
+        var hammer = ContentRegistry.RequireItem("bronze_hammer").Id;
         Assert.True(inventory.Add(coal));
         Assert.True(inventory.Add(metal, 3));
         var eye = player.Context.Eye;

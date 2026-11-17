@@ -13,7 +13,7 @@ namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// The cast-mold pipeline end to end, asserted through the baked tables rather than the JSON:
-/// the twelve slab blocks bake to non-occluding quarter-height shapes inside their declared
+/// the fourteen slab blocks bake to non-occluding quarter-height shapes inside their declared
 /// hitbox, their tops carry a rim and a sunken pocket, their only cullfaces sit on the cell
 /// boundary (so the pocket walls always draw), each raw mold crafts from and uncrafts to three
 /// mudballs, and a raw mold fires into its cooked twin on a lit campfire.
@@ -24,9 +24,9 @@ public sealed class MoldTests
 
     private static readonly string[] All =
     [
-        "mold_pickaxe", "mold_axe", "mold_ingot", "mold_sword", "mold_ring", "mold_dagger",
+        "mold_pickaxe", "mold_axe", "mold_ingot", "mold_sword", "mold_ring", "mold_dagger", "mold_hammer",
         "fired_mold_pickaxe", "fired_mold_axe", "fired_mold_ingot", "fired_mold_sword",
-        "fired_mold_ring", "fired_mold_dagger",
+        "fired_mold_ring", "fired_mold_dagger", "fired_mold_hammer",
     ];
 
     private static readonly (string Raw, string Fired)[] Pairs =
@@ -37,6 +37,7 @@ public sealed class MoldTests
         ("mold_sword", "fired_mold_sword"),
         ("mold_ring", "fired_mold_ring"),
         ("mold_dagger", "fired_mold_dagger"),
+        ("mold_hammer", "fired_mold_hammer"),
     ];
 
     public static IEnumerable<object[]> AllMolds => All.Select(name => new object[] { name });

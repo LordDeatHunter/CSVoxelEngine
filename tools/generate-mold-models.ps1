@@ -1,5 +1,5 @@
-# Generates the block models for the twelve cast molds into assets/models/block/:
-# mold_pickaxe.json, mold_axe.json, mold_ingot.json, mold_sword.json, mold_ring.json, mold_dagger.json and
+# Generates the block models for the fourteen cast molds into assets/models/block/:
+# mold_pickaxe.json, mold_axe.json, mold_ingot.json, mold_sword.json, mold_ring.json, mold_dagger.json, mold_hammer.json and
 # their fired_mold_* twins (mold_sword.png is committed art). Each one is a
 # flat slab whose top is carved out into a pocket shaped like the tool the mold casts, so the
 # geometry is derived from the tool sprite rather than modelled by hand - never hand-edit the
@@ -261,12 +261,14 @@ $models = @(
     @{ Model = 'mold_sword';         Sprite = 'mold_sword';   Tile = 'mud' },
     @{ Model = 'mold_ring';          Sprite = 'mold_ring';    Tile = 'mud' },
     @{ Model = 'mold_dagger';        Sprite = 'mold_dagger';  Tile = 'mud' },
+    @{ Model = 'mold_hammer';        Sprite = 'mold_hammer';  Tile = 'mud' },
     @{ Model = 'fired_mold_pickaxe'; Sprite = 'mold_pickaxe'; Tile = 'fired_mud' },
     @{ Model = 'fired_mold_axe';     Sprite = 'mold_axe';     Tile = 'fired_mud' },
     @{ Model = 'fired_mold_ingot';   Sprite = 'mold_ingot';   Tile = 'fired_mud' },
     @{ Model = 'fired_mold_sword';   Sprite = 'mold_sword';   Tile = 'fired_mud' },
     @{ Model = 'fired_mold_ring';    Sprite = 'mold_ring';    Tile = 'fired_mud' },
-    @{ Model = 'fired_mold_dagger';  Sprite = 'mold_dagger';  Tile = 'fired_mud' }
+    @{ Model = 'fired_mold_dagger';  Sprite = 'mold_dagger';  Tile = 'fired_mud' },
+    @{ Model = 'fired_mold_hammer';  Sprite = 'mold_hammer';  Tile = 'fired_mud' }
 )
 
 $masks = @{}
@@ -283,7 +285,7 @@ foreach ($entry in $models) {
     $blockText = [System.IO.File]::ReadAllText($blockPath)
     $eol = if ($blockText.Contains("`r`n")) { "`r`n" } else { "`n" }
     $hitbox = '"hitbox": [' + $eol + ($built.Boxes -join (',' + $eol)) + $eol + '  ]'
-    $updated = [regex]::Replace($blockText, '"hitbox":[\s\S]*\}(\s*\}\s*)$', { param($m) $hitbox + $m.Groups[1].Value })
+    $updated = [regex]::Replace($blockText, '"hitbox":[\s\S]*\](\s*\}\s*)$', { param($m) $hitbox + $m.Groups[1].Value })
     if ($updated -eq $blockText -and -not $blockText.Contains($hitbox)) { throw "Could not rewrite the hitbox of $blockPath." }
     [System.IO.File]::WriteAllText($blockPath, $updated, $utf8NoBom)
     Write-Output "$($entry.Model): elements=$($built.Elements) faces=$($built.Faces)"
