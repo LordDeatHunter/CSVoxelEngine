@@ -41,7 +41,7 @@ namespace VoxelEngine.Tests.Core;
 /// <see cref="World.LoadTimedOut"/> is asserted false so a load is proven by readiness.
 /// </remarks>
 [Collection("Worldgen seed")]
-public sealed class WorldLifecycleTests : IDisposable
+public sealed partial class WorldLifecycleTests : IDisposable
 {
     private const float High = 1e6f;
     private const double LoadWallSeconds = 60;

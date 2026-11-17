@@ -110,6 +110,46 @@ public sealed class EntitySaveCodecTests
         Assert.True(malformedRejected);
     }
 
+    [Fact]
+    public void NullEntityRecordsRemainSuccessfulCodecValues()
+    {
+        var absent = EntitySaveCodec.TryParse("{}"u8.ToArray(), out var absentRejected);
+        Assert.NotNull(absent);
+        Assert.False(absentRejected);
+        Assert.Null(absent.Mobs);
+        Assert.Null(absent.Drops);
+
+        var nullLists = EntitySaveCodec.TryParse("{\"Mobs\":null,\"Drops\":null}"u8.ToArray(), out var nullListsRejected);
+        Assert.NotNull(nullLists);
+        Assert.False(nullListsRejected);
+        Assert.Null(nullLists.Mobs);
+        Assert.Null(nullLists.Drops);
+
+        var emptyLists = EntitySaveCodec.TryParse("{\"Mobs\":[],\"Drops\":[]}"u8.ToArray(), out var emptyListsRejected);
+        Assert.NotNull(emptyLists);
+        Assert.False(emptyListsRejected);
+        Assert.Empty(emptyLists.Mobs!);
+        Assert.Empty(emptyLists.Drops!);
+
+        var nullRecords = EntitySaveCodec.TryParse("{\"Mobs\":[null],\"Drops\":[null]}"u8.ToArray(), out var nullRecordsRejected);
+        Assert.NotNull(nullRecords);
+        Assert.False(nullRecordsRejected);
+        Assert.Null(Assert.Single(nullRecords.Mobs!));
+        Assert.Null(Assert.Single(nullRecords.Drops!));
+
+        var emptyRecords = EntitySaveCodec.TryParse("{\"Mobs\":[{}],\"Drops\":[{}]}"u8.ToArray(), out var emptyRecordsRejected);
+        Assert.NotNull(emptyRecords);
+        Assert.False(emptyRecordsRejected);
+        Assert.Null(Assert.Single(emptyRecords.Mobs!).Type);
+        Assert.Null(Assert.Single(emptyRecords.Drops!).Item);
+
+        var unresolved = EntitySaveCodec.TryParse("{\"Mobs\":[{\"Type\":\"retired-mob\"}],\"Drops\":[{\"Item\":\"item/retired\"}]}"u8.ToArray(), out var unresolvedRejected);
+        Assert.NotNull(unresolved);
+        Assert.False(unresolvedRejected);
+        Assert.Equal("retired-mob", Assert.Single(unresolved.Mobs!).Type);
+        Assert.Equal("item/retired", Assert.Single(unresolved.Drops!).Item);
+    }
+
     [Theory]
     [InlineData(null, false)]
     [InlineData("null", false)]

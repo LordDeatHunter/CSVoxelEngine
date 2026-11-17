@@ -183,6 +183,9 @@ pure function of the seed: only **deltas** and the seed are written.
 - **Malformed player saves.** A local `player.json` or hosted `players/<slug>.json` rejected by the
   parser is marked for `.bad` preservation before a later replacement; missing files, JSON `null`,
   and valid partial objects retain their ordinary load behavior.
+- **Null saved entity records.** Null entries in the top-level mob or drop lists are skipped when
+  persistence imports records for pending restore. The JSON remains a successful parse; non-null
+  records keep their existing per-entry restore behavior.
 - **The explored map** (`map.bin`, `MapSaveCodec`: "CVMP", a version byte, then a Deflate body of the surface and
   sky `MapTile`s, each its layer kind, chunk column, 256 texels and 256 heights; a cave slice is never kept). Only a
   world that drew a HUD has a map (`WorldRenderer.EnsureMap`, which imports the file when it builds the tracker).
