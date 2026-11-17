@@ -635,7 +635,7 @@ public class World
             // The chop damage of natural trunks, before any chunk meshes so the first meshes already show it;
             // only a singleplayer world keeps any (a server and a client never chop for themselves)
             if (!serverMode && !clientMode)
-                if (WoodDamageCodec.TryParse(_saveStore?.ReadFile(WoodDamageCodec.FileName)) is { } savedDamage)
+                if (WoodDamageSaveReader.Read(_saveStore) is { } savedDamage)
                     _chunkManager.ChopDamage.Import(savedDamage);
 
             // A client never generates: its chunks stream from the server (ClientChunkStreamer).

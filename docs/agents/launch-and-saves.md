@@ -48,7 +48,7 @@ timestamps, format version, and an optional `source` only the dedicated server r
 sources"), `chunks/<cx>_<cy>_<cz>.bin` (one Deflate-compressed,
 block-name-paletted snapshot per **modified** chunk, `ChunkSaveCodec`; an untouched chunk is
 never written and simply regenerates), `lod-edits.bin` (`LodEditState`: column caps,
-felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`WoodDamageCodec`: the permanent chop damage of natural trunk cells, singleplayer only), `map.bin` (`MapSaveCodec`: the explored map's surface and sky tiles, singleplayer only), `player.json` (`PlayerSaveCodec`: position and look,
+felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`WoodDamageCodec`: permanent natural-trunk chop damage, singleplayer only; rejected contents remain ignored and are archived by the save store before a later changed-state replacement when its archive move succeeds; unchanged damage does not trigger a write), `map.bin` (`MapSaveCodec`: the explored map's surface and sky tiles, singleplayer only), `player.json` (`PlayerSaveCodec`: position and look,
 creative/flight, health, mana, respawn eye, lighting clock, the full inventory and hotbar (a staff's bound spells by part key), the known spell parts by key, the discovered waystones and the quest progress by quest id with the quest book's pan and zoom; no position
 while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live mobs
 with health, facing, velocity, ammo, a slime's size and a skeleton's tower floor plus still-pending entries, up to
