@@ -306,8 +306,11 @@ public static class NetFraming
     /// 61: the iron works rework. A bloomery in <see cref="NetMessage.StationState"/> no longer carries its overheat or
     /// slag, and an anvil is a metal stack with a picked recipe and its hits (metal id and count, picked result id, hits,
     /// cooldown) instead of a bloom piece; <see cref="NetIntentKind.Forge"/> now only picks the recipe the hammer's hits
-    /// forge. An older peer would misread the station frames.</summary>
-    public const int ProtocolVersion = 61;
+    /// forge. An older peer would misread the station frames.
+    /// 62: a drop entry of <see cref="NetMessage.EntityList"/> carries a stuck throw (a landed javelin): its
+    /// <see cref="NetEntity.Ammo"/> is what it is stuck in (<c>DropStick</c>, 0 for a loose drop) and its velocity field
+    /// then holds the heading of its tip. An older client would draw it as a loose drop sliding along that heading.</summary>
+    public const int ProtocolVersion = 62;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

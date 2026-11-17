@@ -39,11 +39,28 @@ public sealed class ItemDefinition
     public float? ThrowDamage { get; set; }
 
     /// <summary>
-    /// A throwable that flies point first along its velocity (a spear) instead of tumbling about the
-    /// vertical like a thrown stone. Needs <see cref="ThrowDamage"/>; the sprite's tip is on its (1, 1)
-    /// diagonal, as a held blade's is.
+    /// A throwable that flies point first along its velocity (a javelin) instead of tumbling about the
+    /// vertical like a thrown stone, and that is held tip first along the view while the throw is wound up.
+    /// Needs <see cref="ThrowDamage"/>; the sprite's tip is on its (1, 1) diagonal, as a held blade's is.
     /// </summary>
     public bool ThrowAligned { get; set; }
+
+    /// <summary>
+    /// The share of the throw charge (0..1) a release needs before the item leaves the hand; letting go
+    /// earlier cancels the throw and spends nothing (a javelin wants its wind-up). Omitted for 0: any
+    /// release throws. Needs <see cref="ThrowDamage"/>.
+    /// </summary>
+    public float? ThrowChargeNeeded { get; set; }
+
+    /// <summary>Multiplier on the launch speed of a thrown copy (omitted: 1, the shared throw speed). Needs <see cref="ThrowDamage"/>.</summary>
+    public float? ThrowSpeedScale { get; set; }
+
+    /// <summary>
+    /// A throw of this item stays where it lands instead of turning into a spinning drop: stuck in the
+    /// terrain it hit, tip first, until someone walks up and takes it back, or stuck in the mob it hit,
+    /// riding along until that mob dies and drops it. Needs <see cref="ThrowDamage"/>.
+    /// </summary>
+    public bool ThrowSticks { get; set; }
 
     /// <summary>
     /// A block whose small cube a throw of this item draws in place of the item's sprite (a flint or obsidian shard
@@ -234,6 +251,15 @@ public sealed class ItemDefinition
     /// inventory icon; this only adds a mesh.
     /// </summary>
     public string? Model { get; set; }
+
+    /// <summary>
+    /// Optional Blockbench project (a path like <see cref="Texture"/>, e.g.
+    /// <c>assets/models/item/javelin.bbmodel</c>) the item is drawn as in the world: in a hand, thrown and
+    /// dropped. The sprite stays the inventory icon, and the model takes the sprite's place in its own
+    /// space, so <see cref="Display"/> and <see cref="ThrowAligned"/> pose it the same way (see
+    /// <see cref="VoxelEngine.Content.Models.HeldModel"/> for how to author one).
+    /// </summary>
+    public string? HeldModel { get; set; }
 
     /// <summary>Seconds between uses of this item; omitted for the global click rate.</summary>
     public float? UseDelay { get; set; }

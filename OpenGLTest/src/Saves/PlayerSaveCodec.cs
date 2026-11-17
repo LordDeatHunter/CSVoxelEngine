@@ -10,6 +10,7 @@ namespace VoxelEngine.Saves;
 /// A missing, corrupt or truncated file parses to null with a warning, and the world then starts
 /// as if the file were absent (a surface spawn with the spawn stock) instead of failing the load.
 /// </para>
+/// <para>Non-finite saved position, look, respawn or lighting values are ignored field by field.</para>
 /// </summary>
 public static class PlayerSaveCodec
 {
@@ -30,18 +31,69 @@ public static class PlayerSaveCodec
 
     /// <summary>The parsed file, or null for no file, the JSON <c>null</c> literal or anything
     /// that is not valid JSON of this shape (logged as a warning).</summary>
-    public static PlayerSaveData? TryParse(byte[]? bytes)
+    public static PlayerSaveData? TryParse(byte[]? bytes) => TryParse(bytes, out _);
+
+    /// <summary>
+    /// Parses player bytes and reports only a <see cref="JsonException"/> rejection. Missing bytes
+    /// and a valid JSON <c>null</c> still return null without setting <paramref name="rejectedJson"/>.
+    /// </summary>
+    public static PlayerSaveData? TryParse(byte[]? bytes, out bool rejectedJson)
     {
+        rejectedJson = false;
         if (bytes == null)
             return null;
         try
         {
-            return JsonSerializer.Deserialize<PlayerSaveData>(bytes, Options);
+            var saved = JsonSerializer.Deserialize<PlayerSaveData>(bytes, Options);
+            if (saved == null)
+                return null;
+
+            var ignoredNonFiniteFields = false;
+            if (HasNonFiniteComponent(saved.Position))
+            {
+                saved.Position = null;
+                ignoredNonFiniteFields = true;
+            }
+            if (HasNonFiniteComponent(saved.RespawnEye))
+            {
+                saved.RespawnEye = null;
+                ignoredNonFiniteFields = true;
+            }
+            if (saved.Yaw is { } yaw && !float.IsFinite(yaw))
+            {
+                saved.Yaw = null;
+                ignoredNonFiniteFields = true;
+            }
+            if (saved.Pitch is { } pitch && !float.IsFinite(pitch))
+            {
+                saved.Pitch = null;
+                ignoredNonFiniteFields = true;
+            }
+            if (saved.LightingClock is { } clock && !double.IsFinite(clock))
+            {
+                saved.LightingClock = null;
+                ignoredNonFiniteFields = true;
+            }
+            if (ignoredNonFiniteFields)
+                Log.Warn($"Player save: ignoring non-finite pose, respawn or lighting fields in {FileName}");
+
+            return saved;
         }
         catch (JsonException e)
         {
+            rejectedJson = true;
             Log.Warn($"Player save: ignoring {FileName}: {e.Message}");
             return null;
         }
+    }
+
+    private static bool HasNonFiniteComponent(float[]? values)
+    {
+        if (values == null)
+            return false;
+        foreach (var value in values)
+            if (!float.IsFinite(value))
+                return true;
+        return false;
     }
 }

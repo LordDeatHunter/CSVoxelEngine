@@ -18,18 +18,46 @@ public static class BellowsProbe
     /// <paramref name="halfWidth"/> to each side; false when none lies there.</summary>
     public static bool TryFind(ChunkManager chunks, Vector3 feet, float halfWidth, out (int X, int Y, int Z) cell)
     {
-        var y = MathUtils.FloorToInt(feet.Y - BelowFeet);
-        ReadOnlySpan<(float X, float Z)> probes =
-        [
-            (0f, 0f), (-halfWidth, -halfWidth), (halfWidth, -halfWidth), (-halfWidth, halfWidth), (halfWidth, halfWidth),
-        ];
-        foreach (var (dx, dz) in probes)
+        foreach (var probe in CellsUnder(feet, halfWidth))
         {
-            cell = (MathUtils.FloorToInt(feet.X + dx), y, MathUtils.FloorToInt(feet.Z + dz));
+            cell = probe;
             if (BlockType.ById[chunks.GetBlockGlobal(cell.X, cell.Y, cell.Z)] is { IsBellows: true })
                 return true;
         }
         cell = default;
         return false;
+    }
+
+    /// <summary>The cells a hair under a body's feet, whatever they hold: under its middle first, then under the four
+    /// corners of its footprint (a cell under several of them comes up more than once).</summary>
+    public static CellProbes CellsUnder(Vector3 feet, float halfWidth) => new(feet, halfWidth);
+
+    /// <summary>The five probe cells of <see cref="CellsUnder"/>, enumerated without allocating.</summary>
+    public readonly struct CellProbes(Vector3 feet, float halfWidth)
+    {
+        /// <summary>Starts the enumeration.</summary>
+        public Enumerator GetEnumerator() => new(feet, halfWidth);
+
+        /// <summary>Walks the middle and the four corners.</summary>
+        public struct Enumerator(Vector3 feet, float halfWidth)
+        {
+            private int _index = -1;
+
+            /// <summary>The probe cell at the enumerator's position.</summary>
+            public readonly (int X, int Y, int Z) Current
+            {
+                get
+                {
+                    // 0 is the middle; 1..4 are the corners, x from bit 0 and z from bit 1 of (index - 1)
+                    var dx = _index == 0 ? 0f : ((_index - 1) & 1) == 0 ? -halfWidth : halfWidth;
+                    var dz = _index == 0 ? 0f : ((_index - 1) & 2) == 0 ? -halfWidth : halfWidth;
+                    return (MathUtils.FloorToInt(feet.X + dx), MathUtils.FloorToInt(feet.Y - BelowFeet),
+                        MathUtils.FloorToInt(feet.Z + dz));
+                }
+            }
+
+            /// <summary>Moves to the next probe; false past the last.</summary>
+            public bool MoveNext() => ++_index < 5;
+        }
     }
 }

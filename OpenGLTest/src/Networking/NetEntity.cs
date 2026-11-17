@@ -53,7 +53,8 @@ public enum NetEntityKind : byte
 /// count; a spider or scorpion packs the face it clings to above the tier, <c>CrawlerMob.PackStance</c>, and its <see cref="Yaw"/> is its
 /// heading's angle on that face) or a wild animal's posture (<c>Animal.Posture</c>: whether a flyer sits on the ground,
 /// which a mirror cannot tell from its velocity); a drop uses
-/// <see cref="ItemId"/>.
+/// <see cref="ItemId"/>, and a stuck one (a landed javelin) puts what it is stuck in (<c>DropStick</c>) in
+/// <see cref="Ammo"/> and the heading of its tip in <see cref="Velocity"/>.
 /// A sandworm is a mob entry for its head (<see cref="Position"/>, <see cref="Yaw"/> its heading, <see cref="Velocity"/> the
 /// head velocity a client dead-reckons along) whose <see cref="Ammo"/> is its phase (<c>SandwormPhase</c>); its body is
 /// not on the wire, since the client drags its own chain after the head. While it digs toward a surfacing point a

@@ -243,7 +243,7 @@ tools/                                # asset generators: models, animation clip
                                       #   palette skins, on the hell script's machinery; listed in USER_TODO.md; --check
   generate-skeleton-king-model.py     # deterministic skeleton_king .bbmodel (crowned rig with its club, clips) and palette
                                       #   skin, on the hell and skeleton scripts' machinery; listed in USER_TODO.md; --check
-  generate-mold-models.ps1            # the twelve cast molds' block models under assets/models/block/, from their sprites' alpha silhouettes
+  generate-mold-models.ps1            # the fourteen cast molds' block models under assets/models/block/, from their sprites' alpha silhouettes
   generate-sandworm-model.py          # deterministic sandworm .bbmodel, skin and fang sprite (placeholder art); --check
   generate-spell-sfx.py               # deterministic placeholder spell sounds (spell_cast/impact/fizzle.wav), --check
   generate-crawler-item-sprites.py    # deterministic placeholder sprites of the crawlers' drops (spider silk, scorpion

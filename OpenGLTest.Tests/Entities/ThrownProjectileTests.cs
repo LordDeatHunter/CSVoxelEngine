@@ -1,9 +1,11 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Items;
+using VoxelEngine.Player;
 using Xunit;
 
 namespace VoxelEngine.Tests.Entities;
@@ -110,13 +112,89 @@ public sealed class ThrownProjectileTests
         Assert.Equal(1f, Vector3.TransformNormal(Vector3.UnitX, rotation).Length(), 3);
     }
 
-    [Fact]
-    public void OnlyTheSpearFliesPointFirst()
+    [Theory]
+    [MemberData(nameof(Headings))]
+    public void AHeldModelAuthoredTipUpFliesTipFirstLikeASprite(float x, float y, float z)
     {
-        var spear = ContentRegistry.RequireItem("spear");
-        Assert.True(spear.IsThrowable && spear.ThrowAligned);
+        // The model stands in for the sprite in the sprite's space, so the one aligned rotation serves both
+        var velocity = new Vector3(x, y, z) * 13f;
+        var drawn = HeldModel.ToSpriteSpace * ThrownProjectile.AlignedRotation(velocity);
+
+        var tip = Vector3.TransformNormal(Vector3.UnitY, drawn);
+        Assert.True(Vector3.Dot(tip, Vector3.Normalize(velocity)) > 0.9999f);
+        Assert.Equal(1f, drawn.GetDeterminant(), 3);
+    }
+
+    [Theory]
+    [MemberData(nameof(Headings))]
+    public void AWoundUpPointFirstItemLiesAlongTheAimInThePalm(float x, float y, float z)
+    {
+        var aim = Vector3.Normalize(new Vector3(x, y, z));
+        var hand = Matrix4x4.CreateRotationY(0.7f) * Matrix4x4.CreateTranslation(3f, 20f, -5f);
+        var held = HeldItemPose.Pose(hand, Item.ComposeDisplay(new Vector3(10f, -90f, 45f), Vector3.Zero, 1.3f), 0.5f,
+            HeldItemPose.HeldItemGrip);
+
+        // At rest the aim changes nothing; fully cocked the tip (the sprite's diagonal) is on the aim, as it will fly
+        Assert.Equal(held, HeldItemPose.Aimed(held, hand, 0f, aim, 0.65f, HeldItemPose.HeldItemGrip));
+        var cocked = HeldItemPose.Aimed(held, hand, 1f, aim, 0.65f, HeldItemPose.HeldItemGrip);
+        var tip = Vector3.Normalize(Vector3.TransformNormal(new Vector3(1f, 1f, 0f), cocked));
+        Assert.True(Vector3.Dot(tip, aim) > 0.999f);
+        // Its size in the hand is kept, and the spot the hand grips never leaves the palm on the way there
+        Assert.Equal(0.65f, Vector3.TransformNormal(Vector3.UnitZ, cocked).Length(), 3);
+        var palm = Vector3.Transform(HeldItemPose.HeldItemGrip, hand);
+        Assert.True(Matrix4x4.Invert(held, out var toItem));
+        var gripped = Vector3.Transform(palm, toItem);
+        foreach (var weight in new[] { 0.3f, 0.7f, 1f })
+        {
+            var turning = HeldItemPose.Aimed(held, hand, weight, aim, 0.65f, HeldItemPose.HeldItemGrip);
+            Assert.True(Vector3.Distance(Vector3.Transform(gripped, turning), palm) < 1e-3f);
+        }
+    }
+
+    [Fact]
+    public void OnlyTheFirstPersonViewBringsAWoundUpItemTowardTheLineOfSight()
+    {
+        var aim = Vector3.Normalize(new Vector3(1f, 0.2f, 0.4f));
+        // A cocked hand beside and behind the eye
+        var palm = new Vector3(-0.3f, 0.1f, 0.5f);
+        static float OffAxis(Vector3 point, Vector3 axis) => (point - axis * Vector3.Dot(point, axis)).Length();
+
+        // The shoulder camera and a remote player (no first-person back shift) see the item where the hand has it
+        Assert.Equal(Vector3.Zero, HeldItemPose.FirstPersonAimShift(palm, aim, 0f));
+
+        var shifted = palm + HeldItemPose.FirstPersonAimShift(palm, aim, PlayerModel.FirstPersonBodyBack);
+        Assert.True(Vector3.Dot(shifted, aim) > Vector3.Dot(palm, aim));
+        Assert.True(OffAxis(shifted, aim) < OffAxis(palm, aim));
+        // It stays on the hand's side of the view rather than crossing it
+        Assert.True(Vector3.Dot(shifted - aim * Vector3.Dot(shifted, aim), palm - aim * Vector3.Dot(palm, aim)) > 0f);
+
+        // Half way through the glide to the shoulder camera, half the move
+        var half = HeldItemPose.FirstPersonAimShift(palm, aim, PlayerModel.FirstPersonBodyBack * 0.5f);
+        Assert.Equal((shifted - palm).Length() * 0.5f, half.Length(), 4);
+    }
+
+    [Fact]
+    public void AReleaseBeforeTheNeededChargeThrowsNothing()
+    {
+        var javelin = ContentRegistry.RequireItem("javelin");
+        var flint = ContentRegistry.RequireItem("flint");
+        Assert.True(javelin.ThrowChargeNeeded > 0f);
+
+        Assert.False(javelin.ThrowsAt(javelin.ThrowChargeNeeded * 0.9f));
+        Assert.True(javelin.ThrowsAt(javelin.ThrowChargeNeeded));
+        Assert.True(javelin.ThrowsAt(1f));
+        // An item that names no wind-up leaves on any release; one that cannot be thrown never does
+        Assert.True(flint.ThrowsAt(0f));
+        Assert.False(ContentRegistry.RequireItem("bandage").ThrowsAt(1f));
+    }
+
+    [Fact]
+    public void OnlyTheJavelinFliesPointFirst()
+    {
+        var javelin = ContentRegistry.RequireItem("javelin");
+        Assert.True(javelin.IsThrowable && javelin.ThrowAligned);
         Assert.False(ContentRegistry.RequireItem("flint").ThrowAligned);
-        Assert.True(new ThrownProjectile(spear.Id, Vector3.Zero, Vector3.UnitX, 1f, 1f).Aligned);
+        Assert.True(new ThrownProjectile(javelin.Id, Vector3.Zero, Vector3.UnitX, 1f, 1f).Aligned);
         Assert.False(new ThrownProjectile(ContentRegistry.RequireItem("flint").Id, Vector3.Zero, Vector3.UnitX, 1f, 1f).Aligned);
     }
 }

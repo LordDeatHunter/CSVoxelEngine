@@ -213,9 +213,15 @@ public sealed class PlayerRig
     public static Mesh BuildArmorMesh(GL gl, RigPart part, float inflate, (byte R, byte G, byte B) tint, int openFace = -1) =>
         BuildPartMesh(gl, part, inflate, tint, openFace);
 
+    /// <summary>One part's textured mesh with every vertex and normal carried through <paramref name="transform"/>
+    /// (a rotation): a rigid shape baked into another space, like an item's <c>HeldModel</c> into its sprite's.</summary>
+    public static Mesh BuildTransformedMesh(GL gl, RigPart part, in Matrix4x4 transform) =>
+        BuildPartMesh(gl, part, transform: transform);
+
     private static Mesh BuildPartMesh(GL gl, PlayerRig.RigPart part, float inflate = 0f, (byte R, byte G, byte B)? tint = null,
-        int openFace = -1)
+        int openFace = -1, Matrix4x4? transform = null)
     {
+        var bake = transform ?? Matrix4x4.Identity;
         var vertices = new List<Vertex>();
         var indices = new List<ushort>();
         Span<Vector2> corners = stackalloc Vector2[4];
@@ -232,13 +238,13 @@ public sealed class PlayerRig
                 rect.CornersTo(corners);
 
                 var positions = Chunk.CubeFaces[face].face;
-                var normal = Chunk.CubeFaces[face].normal;
+                var normal = Vector3.TransformNormal(Chunk.CubeFaces[face].normal, bake);
                 var quadBase = (ushort)vertices.Count;
                 for (var corner = 0; corner < 4; corner++)
                 {
                     var p = positions[corner];
                     vertices.Add(new Vertex(
-                        min + new Vector3(p.X * size.X, p.Y * size.Y, p.Z * size.Z),
+                        Vector3.Transform(min + new Vector3(p.X * size.X, p.Y * size.Y, p.Z * size.Z), bake),
                         tint?.R ?? 255, tint?.G ?? 255, tint?.B ?? 255, 255,
                         tint == null ? corners[corner] : new Vector2(0.5f, 0.5f), 0, 1f, 0f, normal));
                 }

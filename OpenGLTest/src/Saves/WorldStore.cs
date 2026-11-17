@@ -100,7 +100,7 @@ public sealed class WorldStore(string root)
     /// made unique against the existing worlds and the slug against the existing folders.</summary>
     public WorldInfo Create(string? requestedName, int seed)
     {
-        var name = WorldNames.Unique(requestedName, List().Select(w => w.Name));
+        var name = WorldNames.Unique(requestedName, ListForMutation().Select(w => w.Name));
         var slug = WorldNames.UniqueSlug(name, s => Directory.Exists(Path.Combine(Root, s)));
         var directory = Path.Combine(Root, slug);
         Directory.CreateDirectory(Path.Combine(directory, ChunksDirectoryName));
@@ -114,7 +114,7 @@ public sealed class WorldStore(string root)
     /// <summary>Renames a world, unique against every OTHER world's name. The folder is untouched.</summary>
     public void Rename(WorldInfo world, string? requestedName)
     {
-        var others = List().Where(w => w.Slug != world.Slug).Select(w => w.Name);
+        var others = ListForMutation().Where(w => w.Slug != world.Slug).Select(w => w.Name);
         world.Name = WorldNames.Unique(requestedName, others);
         Write(world);
     }
@@ -203,6 +203,13 @@ public sealed class WorldStore(string root)
             dto.Version ?? 0,
             Path.GetFullPath(folder),
             dto.Source);
+    }
+
+    private IReadOnlyList<WorldInfo> ListForMutation()
+    {
+        if (TryList(out var worlds))
+            return worlds;
+        throw new IOException($"Could not list saved worlds in '{Root}'.");
     }
 
     private static void Write(WorldInfo world)

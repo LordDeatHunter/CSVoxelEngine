@@ -223,8 +223,11 @@ internal sealed class WorldPersistence
             if (!IsCellLoaded(position))
                 continue;
 
-            if (!_dropManager.SpawnRestored(id, position, ToVector(drop.Velocity), drop.Age ?? 0f,
-                    drop.Instance == null ? null : InventorySaveCodec.ImportInstance(0, drop.Instance, new List<string>())))
+            var restored = drop.Stuck is { Length: 3 }
+                ? _dropManager.SpawnRestoredStuck(id, position, ToVector(drop.Stuck), inBody: false, drop.Age ?? 0f)
+                : _dropManager.SpawnRestored(id, position, ToVector(drop.Velocity), drop.Age ?? 0f,
+                    drop.Instance == null ? null : InventorySaveCodec.ImportInstance(0, drop.Instance, new List<string>()));
+            if (!restored)
                 (dropped ??= []).Add($"drop '{drop.Item}'");
             _pendingDrops.RemoveAt(i);
         }
@@ -491,7 +494,8 @@ internal sealed class WorldPersistence
                 Position = [drop.Position.X, drop.Position.Y, drop.Position.Z],
                 Velocity = [drop.Velocity.X, drop.Velocity.Y, drop.Velocity.Z],
                 Instance = drop.Instance == null ? null : InventorySaveCodec.ExportInstance(drop.Instance, new List<string>()),
-                Age = drop.Age
+                Age = drop.Age,
+                Stuck = drop.Stick == DropStick.Terrain ? [drop.StuckHeading.X, drop.StuckHeading.Y, drop.StuckHeading.Z] : null
             });
         }
         _dropSort.Clear();

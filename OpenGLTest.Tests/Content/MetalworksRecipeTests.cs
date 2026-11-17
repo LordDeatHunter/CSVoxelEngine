@@ -52,7 +52,7 @@ public sealed class MetalworksRecipeTests
         var bronze = ContentRegistry.MoltenMaterialByName("bronze");
         Assert.NotNull(bronze);
 
-        foreach (var name in new[] { "bronze_ingot", "bronze_pickaxe_head", "bronze_axe_head", "bronze_sword_head", "bronze_ring" })
+        foreach (var name in new[] { "bronze_ingot", "bronze_pickaxe_head", "bronze_axe_head", "bronze_sword_head", "bronze_hammer_head", "bronze_ring" })
         {
             var recipe = ContentRegistry.MeltRecipeForInput(Item(name));
             Assert.NotNull(recipe);
@@ -60,7 +60,7 @@ public sealed class MetalworksRecipeTests
         }
 
         // Bronze is cast in the same fired molds as the other metals; the material picks the result.
-        foreach (var mold in new[] { "fired_mold_ingot", "fired_mold_pickaxe", "fired_mold_axe", "fired_mold_sword", "fired_mold_ring" })
+        foreach (var mold in new[] { "fired_mold_ingot", "fired_mold_pickaxe", "fired_mold_axe", "fired_mold_sword", "fired_mold_hammer", "fired_mold_ring" })
         {
             var cast = ContentRegistry.CastRecipeFor(Block(mold), bronze.Id);
             Assert.NotNull(cast);

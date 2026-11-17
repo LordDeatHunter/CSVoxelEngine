@@ -80,5 +80,9 @@ public sealed class EntitySaveData
         public float? Age { get; set; }
 
         public PlayerSaveData.ToolData? Instance { get; set; }
+
+        /// <summary>The heading of the tip of a throw stuck in the terrain (a landed javelin); omitted for a loose
+        /// drop. One stuck in a mob is saved loose, since it falls out when the mob is gone.</summary>
+        public float[]? Stuck { get; set; }
     }
 }

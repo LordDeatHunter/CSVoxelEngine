@@ -17,7 +17,7 @@ public static class ServerPlayerSaves
 
     /// <summary>The saved player, or null when there is none (or no store).</summary>
     public static PlayerSaveData? Load(ChunkSaveStore? store, string name) =>
-        store == null ? null : PlayerSaveCodec.TryParse(store.ReadFile(FileNameFor(name)));
+        PlayerSaveReader.Read(store, FileNameFor(name));
 
     /// <summary>Queues the player's file; does nothing without a store.</summary>
     public static void Save(ChunkSaveStore? store, ServerPlayer player)

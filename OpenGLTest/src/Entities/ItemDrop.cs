@@ -72,6 +72,81 @@ public class ItemDrop
     private float _attractElapsed;
     private bool _attracted;
 
+    /// <summary>What a stuck drop is stuck in (<see cref="DropStick.None"/> for a loose one).</summary>
+    public DropStick Stick { get; private set; }
+
+    /// <summary>Whether the drop is a thrown item stuck where it landed: no spin, no physics, tip along <see cref="StuckHeading"/>.</summary>
+    public bool IsStuck => Stick != DropStick.None;
+
+    /// <summary>The unit direction a stuck drop's tip points (the flight's heading when it hit).</summary>
+    public Vector3 StuckHeading { get; private set; }
+
+    /// <summary>The mob a <see cref="DropStick.Body"/> drop rides; null for a client's mirror of one, which only stays put.</summary>
+    public Mob? Host { get; private set; }
+
+    // A hosted drop's center and heading in its host's frame (about the body center, before the facing yaw)
+    private Vector3 _hostOffset;
+    private Vector3 _hostHeading;
+
+    /// <summary>Sticks the drop in the terrain at its position, tip along the unit <paramref name="heading"/>: it stays
+    /// until a collector comes in range (it then flies in like any drop) or the block it hit is gone.</summary>
+    internal void StickInTerrain(Vector3 heading)
+    {
+        Stick = DropStick.Terrain;
+        StuckHeading = heading;
+        Host = null;
+        _velocity = Vector3.Zero;
+        IsGrounded = false;
+    }
+
+    /// <summary>Sticks the drop in <paramref name="host"/>'s body at its position, tip along the unit
+    /// <paramref name="heading"/>: it rides the mob, turning with it, and nobody can take it until <see cref="Unstick"/>
+    /// (the mob died or left). A null host is a client's mirror of the server's.</summary>
+    internal void StickInBody(Vector3 heading, Mob? host)
+    {
+        Stick = DropStick.Body;
+        StuckHeading = heading;
+        Host = host;
+        _velocity = Vector3.Zero;
+        IsGrounded = false;
+        if (host == null) return;
+        var toHost = Matrix4x4.CreateRotationY(-host.Facing);
+        _hostOffset = Vector3.Transform(Position - host.Position, toHost);
+        _hostHeading = Vector3.TransformNormal(heading, toHost);
+    }
+
+    /// <summary>Lets a stuck drop go: it falls and behaves as a loose drop from here on.</summary>
+    internal void Unstick()
+    {
+        Stick = DropStick.None;
+        Host = null;
+        _velocity = Vector3.Zero;
+    }
+
+    // A stuck drop's frame: rides its host, or checks that the terrain it is in still stands. True while it stays stuck
+    // and out of reach; false once it is loose (the caller then runs the ordinary drop frame).
+    private bool StayStuck(bool inRange, ChunkManager chunks)
+    {
+        if (Stick == DropStick.Body)
+        {
+            if (Host == null) return true;
+            var fromHost = Matrix4x4.CreateRotationY(Host.Facing);
+            Position = Host.Position + Vector3.Transform(_hostOffset, fromHost);
+            StuckHeading = Vector3.TransformNormal(_hostHeading, fromHost);
+            return true;
+        }
+
+        var impact = ThrownProjectile.StuckImpact(BlockId, Position, StuckHeading);
+        var held = chunks == null
+                   || BoxSweep.IsColliding(impact, new Vector3(ThrownProjectile.HalfExtent + StuckHoldMargin), chunks);
+        if (held && (!inRange || _age < _pickupDelay)) return true;
+        Unstick();
+        return false;
+    }
+
+    // How far past the projectile's box the terrain holding a stuck drop may be (the sweep stops a step short of it)
+    private const float StuckHoldMargin = 0.2f;
+
     /// <summary>Whether the drop has landed and is resting on the terrain.</summary>
     public bool IsGrounded { get; private set; }
 
@@ -137,6 +212,7 @@ public class ItemDrop
     /// swinging door that moves it can never push it into a solid cell.</summary>
     internal void Nudge(Vector3 delta, ChunkManager chunks)
     {
+        if (IsStuck) return;
         var half = new Vector3(HalfExtent);
         Position = BoxSweep.MoveOnAxis(Position, delta.X, 0, half, chunks, out _);
         Position = BoxSweep.MoveOnAxis(Position, delta.Z, 2, half, chunks, out _);
@@ -146,7 +222,9 @@ public class ItemDrop
     /// shove (<see cref="BlastImpulse"/>). A drop already flying at a player ignores it.</summary>
     internal void Push(Vector3 impulse)
     {
-        if (_attracted) return;
+        if (_attracted || Stick == DropStick.Body) return;
+        // A blast shakes a javelin out of the ground
+        if (IsStuck) Unstick();
         _velocity += impulse;
     }
 
@@ -170,6 +248,7 @@ public class ItemDrop
     public bool Update(float deltaTime, Vector3 target, bool inRange, ChunkManager chunks)
     {
         _age += deltaTime;
+        if (IsStuck && StayStuck(inRange, chunks)) return false;
 
         if (!_attracted)
         {

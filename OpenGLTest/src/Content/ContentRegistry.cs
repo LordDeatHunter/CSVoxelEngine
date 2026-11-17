@@ -302,7 +302,10 @@ public static class ContentRegistry
             BlockType.OccludesById[id] = type.OccludesNeighbors;
             BlockType.FullCubeById[id] = type.Solid && type.Renderer == BlockRenderer.Model && !type.Fluid && baked.IsFullCube;
             BlockType.PassesLightById[id] = type.PassesLight;
-            BlockType.GreedyById[id] = type.Renderer == BlockRenderer.Model && !type.Fluid && ModelBakeSteps.BakesGreedy(baked);
+            // A bellows leaves the chunk mesh while it is pressed down (BellowsSquash), which only the per-quad
+            // path can do per cell, so it never joins the greedy pass
+            BlockType.GreedyById[id] = type.Renderer == BlockRenderer.Model && !type.Fluid && !type.IsBellows
+                                       && ModelBakeSteps.BakesGreedy(baked);
         }
 
         // Needs every block's greedy flag and face tiles, settled just above.

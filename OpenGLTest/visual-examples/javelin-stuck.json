@@ -1,0 +1,41 @@
+{
+  // A thrown javelin stays where it lands: run with VOXEL_SCRIPT=visual-examples/javelin-stuck.json VOXEL_TIME=147
+  // from OpenGLTest/. Shots land in visual/javelin-stuck/. On the meadow of the javelin scenario (ground at y 9) a
+  // creative flier at standing eye height throws one down into the grass ahead, puts the rest away and looks from the
+  // side (seen from the thrower a stuck javelin is end-on, a dot): it stands in the ground, tip first, as a 3D model.
+  // It then steps within reach and waits out a landed throw's pickup delay (the javelin is taken back), and throws one
+  // into a goblin (it rides the goblin's body).
+  "steps": [
+    {"op": "creative"},
+    {"op": "fly"},
+    {"op": "teleport", "pos": [-43.5, 10.7, 60.5], "yaw": 90, "pitch": -30},
+    {"op": "wait", "seconds": 5},
+    {"op": "give", "block": "item/javelin", "count": 3},
+    {"op": "select", "slot": 1},
+    {"op": "wait", "seconds": 0.5},
+    {"op": "player", "action": "throw"},
+    {"op": "wait", "seconds": 0.4},
+    {"op": "select", "slot": 2},
+    {"op": "teleport", "pos": [-40.0, 10.7, 63.3], "yaw": 180, "pitch": -15},
+    {"op": "wait", "seconds": 0.2},
+    {"op": "screenshot", "name": "ground_stuck", "hideHud": true},
+    {"op": "teleport", "pos": [-42.6, 10.7, 63.0], "yaw": 180, "pitch": -15},
+    {"op": "wait", "seconds": 2.5},
+    {"op": "teleport", "pos": [-40.0, 10.7, 63.3], "yaw": 180, "pitch": -15},
+    {"op": "wait", "seconds": 0.2},
+    {"op": "screenshot", "name": "ground_taken", "hideHud": true},
+    {"op": "teleport", "pos": [-43.5, 10.7, 60.5], "yaw": 90, "pitch": -8},
+    {"op": "spawn", "entity": "goblin", "pos": [-43.5, 64.5]},
+    {"op": "wait", "seconds": 0.6},
+    {"op": "select", "slot": 1},
+    {"op": "wait", "seconds": 0.2},
+    {"op": "player", "action": "throw"},
+    {"op": "wait", "seconds": 0.25},
+    {"op": "select", "slot": 2},
+    {"op": "teleport", "pos": [-40.0, 10.7, 64.5], "yaw": 180, "pitch": -10},
+    {"op": "wait", "seconds": 0.15},
+    {"op": "screenshot", "name": "mob_stuck", "hideHud": true},
+    {"op": "wait", "seconds": 1.2},
+    {"op": "screenshot", "name": "mob_later", "hideHud": true}
+  ]
+}

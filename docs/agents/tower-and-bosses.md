@@ -49,7 +49,7 @@ share `MobConfig.SkeletonHeight` as their body box.
   pieces are a look, not items (no copper armor exists): they never drop. The outfit is saved
   (`MobData.Outfit`) and rides the wire with the role in the item byte (`Skeleton.PackLook`, protocol 43), so a mirror
   draws the same skeleton. A scenario's `spawn` names the kind (`skeleton` or `skeleton_warrior`) and rolls the outfit.
-- **Arrows** are `ThrownProjectile`s of the `arrow` item (`throwAligned`, so they fly point first like the spear, which
+- **Arrows** are `ThrownProjectile`s of the `arrow` item (`throwAligned`, so they fly point first like the javelin, which
   a player may also hand-throw; `recipes/arrow.json` makes four from a branch, a flint and a bone), flown by the shared
   `MobMissiles` (`SkeletonManager.Arrows`, merged into `ThrowAction.RefreshProjectiles`): a non-immune target touched
   takes the skeleton's `ArrowDamage` and a small shove, an immune one stops the arrow unhurt.

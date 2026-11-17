@@ -282,7 +282,7 @@ internal sealed class PlayerPasses : IDisposable
     }
 
     /// <summary>
-    /// Draws one frame of an item's extruded sprite with <paramref name="model"/> through the bound
+    /// Draws an item's world shape (its held model, or one frame of its extruded sprite) with <paramref name="model"/> through the bound
     /// world program: the world textures, the draw uniforms, the frame's texture on unit 0, the mesh.
     /// Leaves the item texture on unit 0; restoring the caller's textures is the caller's job. False
     /// when the item has no such frame, before anything is bound but the world textures.
@@ -290,7 +290,7 @@ internal sealed class PlayerPasses : IDisposable
     private bool DrawItemSprite(Item type, int frame, Matrix4x4 model, Matrix4x4 viewProj, EntityLightSample light)
     {
         _owner.BindWorldTextures();
-        if (!_owner.ItemMeshes.TryGetFrame(type.Id, frame, out var mesh, out var texture)) return false;
+        if (!_owner.ItemMeshes.TryGetShape(type.Id, out var mesh, out var texture, frame)) return false;
 
         _owner.SetDrawUniforms(model, model * viewProj, 1f, light);
         Units.BindUnit(0, TextureTarget.Texture2DArray, texture);
