@@ -617,6 +617,12 @@ internal sealed class LeftClickAction
     // The stump the split swing in flight is aimed at (null when none) and the seconds until its blow lands
     private Vector3? _splitCell;
     private float _splitImpactIn;
+
+    /// <summary>
+    /// Whether an axe split swing is in flight. The hotbar selection is locked meanwhile, so the axe cannot be swapped
+    /// out mid-swing (the blow would land with another item in hand).
+    /// </summary>
+    internal bool IsSplitting => _splitCell != null;
     private bool _awaitRelease;
 
     private float _stumpCooldown;
