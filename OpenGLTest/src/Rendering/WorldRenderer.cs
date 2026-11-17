@@ -388,7 +388,7 @@ internal sealed class WorldRenderer
     {
         if (_mapTracker != null) return _mapTracker;
         var tracker = new MapTracker(new ChunkMapCells(_chunkManager));
-        if (MapSaveCodec.TryParse(_world.SaveStore?.ReadFile(MapSaveCodec.FileName)) is { } saved)
+        if (MapSaveReader.Read(_world.SaveStore) is { } saved)
             tracker.Import(saved);
         _chunkManager.ChunkMeshed += chunk => tracker.MarkColumnDirty((int)chunk.Position.X, (int)chunk.Position.Z);
         return _mapTracker = tracker;

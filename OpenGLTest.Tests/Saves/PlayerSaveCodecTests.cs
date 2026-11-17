@@ -120,6 +120,89 @@ public sealed class PlayerSaveCodecTests
         Assert.Equal(a.NextToolInstance, b.NextToolInstance);
     }
 
+    [Theory]
+    [MemberData(nameof(OverflowingSavedNumericFields))]
+    public void OverflowingPoseAndClockFieldsAreIgnoredIndependently(string field, int component, string literal)
+    {
+        var position = new[] { "1", "2", "3" };
+        var respawn = new[] { "4", "5", "6" };
+        var yaw = "45";
+        var pitch = "-30";
+        var clock = "123.5";
+        switch (field)
+        {
+            case "Position": position[component] = literal; break;
+            case "RespawnEye": respawn[component] = literal; break;
+            case "Yaw": yaw = literal; break;
+            case "Pitch": pitch = literal; break;
+            case "LightingClock": clock = literal; break;
+        }
+
+        var json = $"{{\"Position\":[{string.Join(",", position)}],\"RespawnEye\":[{string.Join(",", respawn)}],\"Yaw\":{yaw},\"Pitch\":{pitch},\"LightingClock\":{clock},\"Health\":17}}";
+
+        var saved = PlayerSaveCodec.TryParse(Encoding.UTF8.GetBytes(json));
+
+        Assert.NotNull(saved);
+        Assert.Equal(17, saved.Health);
+        if (field == "Position") Assert.Null(saved.Position);
+        else Assert.Equal(new[] { 1f, 2f, 3f }, saved.Position);
+        if (field == "RespawnEye") Assert.Null(saved.RespawnEye);
+        else Assert.Equal(new[] { 4f, 5f, 6f }, saved.RespawnEye);
+        if (field == "Yaw") Assert.Null(saved.Yaw);
+        else Assert.Equal(45f, saved.Yaw!.Value);
+        if (field == "Pitch") Assert.Null(saved.Pitch);
+        else Assert.Equal(-30f, saved.Pitch!.Value);
+        if (field == "LightingClock") Assert.Null(saved.LightingClock);
+        else Assert.Equal(123.5, saved.LightingClock!.Value);
+    }
+
+    public static IEnumerable<object[]> OverflowingSavedNumericFields()
+    {
+        foreach (var field in new[] { "Position", "RespawnEye" })
+            for (var component = 0; component < 3; component++)
+                foreach (var sign in new[] { "", "-" })
+                    yield return [field, component, $"{sign}1e1000"];
+
+        foreach (var field in new[] { "Yaw", "Pitch" })
+            foreach (var sign in new[] { "", "-" })
+                yield return [field, 0, $"{sign}1e1000"];
+
+        foreach (var sign in new[] { "", "-" })
+            yield return ["LightingClock", 0, $"{sign}1e9999"];
+    }
+
+    [Fact]
+    public void FiniteLargeValuesAndUnderflowRemainAdmitted()
+    {
+        var json = "{\"Position\":[3.4e38,-1e-1000,2],\"RespawnEye\":[-3.4e38,4,5],\"Yaw\":-3.4e38,\"Pitch\":1000,\"LightingClock\":1e308}";
+
+        var saved = PlayerSaveCodec.TryParse(Encoding.UTF8.GetBytes(json));
+
+        Assert.NotNull(saved);
+        Assert.Equal(3.4e38f, saved.Position![0]);
+        Assert.Equal(0f, saved.Position[1]);
+        Assert.Equal(2f, saved.Position[2]);
+        Assert.Equal(-3.4e38f, saved.RespawnEye![0]);
+        Assert.Equal(-3.4e38f, saved.Yaw!.Value);
+        Assert.Equal(1000f, saved.Pitch);
+        Assert.Equal(1e308, saved.LightingClock!.Value);
+    }
+
+    [Fact]
+    public void NullAndWrongLengthPoseFieldsKeepTheirExistingShapeBehavior()
+    {
+        var json = "{\"Position\":[1,2],\"RespawnEye\":null,\"Yaw\":null,\"Pitch\":null,\"LightingClock\":null}";
+
+        var saved = PlayerSaveCodec.TryParse(Encoding.UTF8.GetBytes(json));
+
+        Assert.NotNull(saved);
+        Assert.Equal(new[] { 1f, 2f }, saved.Position);
+        Assert.Null(saved.RespawnEye);
+        Assert.Null(saved.Yaw);
+        Assert.Null(saved.Pitch);
+        Assert.Null(saved.LightingClock);
+    }
+
     [Fact]
     public void MissingFieldsReadAsNullAndBadInputAsNoFile()
     {

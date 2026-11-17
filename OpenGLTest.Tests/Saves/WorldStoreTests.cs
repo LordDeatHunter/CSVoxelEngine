@@ -155,6 +155,62 @@ public sealed class WorldStoreTests : IDisposable
     }
 
     [Fact]
+    public void CreateRefusesWhenWorldNamesCannotBeListed()
+    {
+        var store = new WorldStore(_root);
+        var existing = store.Create("Home", 1);
+        var existingMetadataPath = Path.Combine(existing.Directory, WorldStore.MetadataFileName);
+        var existingMetadata = File.ReadAllBytes(existingMetadataPath);
+        var foldersBefore = Directory.GetDirectories(_root).OrderBy(path => path, StringComparer.Ordinal).ToArray();
+        var failNext = true;
+        store.EnumerateDirectories = path =>
+        {
+            if (!failNext) return Directory.GetDirectories(path);
+            failNext = false;
+            throw new IOException("injected enumeration failure");
+        };
+
+        var failure = Record.Exception(() => store.Create("Home", 2));
+        var foldersAfter = Directory.GetDirectories(_root).OrderBy(path => path, StringComparer.Ordinal).ToArray();
+        var worlds = store.List();
+        var metadataUnchanged = File.ReadAllBytes(existingMetadataPath).SequenceEqual(existingMetadata);
+        var namesUnique = worlds.Select(world => world.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Count() == worlds.Count;
+
+        Assert.True(failure is IOException && foldersBefore.SequenceEqual(foldersAfter, StringComparer.Ordinal)
+                    && metadataUnchanged && namesUnique,
+            $"failure={failure?.GetType().Name ?? "none"}; folders=[{string.Join(",", foldersAfter)}]; " +
+            $"names=[{string.Join(",", worlds.Select(world => world.Name))}]; metadataUnchanged={metadataUnchanged}");
+    }
+
+    [Fact]
+    public void RenameRefusesWhenWorldNamesCannotBeListed()
+    {
+        var store = new WorldStore(_root);
+        store.Create("A", 1);
+        var renamed = store.Create("B", 2);
+        var metadataPath = Path.Combine(renamed.Directory, WorldStore.MetadataFileName);
+        var metadataBefore = File.ReadAllBytes(metadataPath);
+        var failNext = true;
+        store.EnumerateDirectories = path =>
+        {
+            if (!failNext) return Directory.GetDirectories(path);
+            failNext = false;
+            throw new IOException("injected enumeration failure");
+        };
+
+        var failure = Record.Exception(() => store.Rename(renamed, "A"));
+        var metadataAfter = File.ReadAllBytes(metadataPath);
+        var names = store.List().Select(world => world.Name).ToArray();
+        var namesUnique = names.Distinct(StringComparer.OrdinalIgnoreCase).Count() == names.Length;
+
+        Assert.True(failure is IOException && renamed.Name == "B" && metadataBefore.SequenceEqual(metadataAfter)
+                    && namesUnique,
+            $"failure={failure?.GetType().Name ?? "none"}; inMemoryName={renamed.Name}; " +
+            $"names=[{string.Join(",", names)}]; metadataUnchanged={metadataBefore.SequenceEqual(metadataAfter)}");
+    }
+
+    [Fact]
     public void TouchLastPlayedReordersTheList()
     {
         long now = 1_000;

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Numerics;
+using System.Text;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 using VoxelEngine.Networking;
@@ -92,6 +93,72 @@ public sealed class ServerPlayerTests : IDisposable
     }
 
     [Fact]
+    public void ACorruptHostedPlayerFileIsPreservedWhenThePlayerIsSaved()
+    {
+        var fileName = ServerPlayerSaves.FileNameFor("Alice");
+        var file = Path.Combine(_dir, fileName.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        byte[] original = "{\"Inventory\":"u8.ToArray();
+        File.WriteAllBytes(file, original);
+
+        var store = new ChunkSaveStore(_dir);
+        try
+        {
+            var saved = ServerPlayerSaves.Load(store, "Alice");
+            Assert.Null(saved);
+            var player = new ServerPlayer(1, "Alice", Vector3.Zero);
+            Assert.False(player.Restore(saved, allowCreative: false));
+            ServerPlayerSaves.Save(store, player);
+            Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+
+            var backup = file + ".bad";
+            Assert.True(File.Exists(backup), "a rejected hosted player file should be archived before replacement");
+            Assert.Equal(original, File.ReadAllBytes(backup));
+            Assert.NotNull(PlayerSaveCodec.TryParse(File.ReadAllBytes(file)));
+        }
+        finally
+        {
+            store.Shutdown(TimeSpan.FromSeconds(10));
+        }
+    }
+
+    [Fact]
+    public void MissingNullAndValidPlayerInputsDoNotMarkFilesUnreadable()
+    {
+        AssertNotArchivedAfterReplacement("missing", null, expectPlayer: false);
+        AssertNotArchivedAfterReplacement("literal-null", "null"u8.ToArray(), expectPlayer: false);
+        AssertNotArchivedAfterReplacement("valid-object", "{}"u8.ToArray(), expectPlayer: true);
+        AssertNotArchivedAfterReplacement("finite-field-degraded", "{\"Position\":[1e1000,2,3]}"u8.ToArray(), expectPlayer: true);
+    }
+
+    private void AssertNotArchivedAfterReplacement(string name, byte[]? original, bool expectPlayer)
+    {
+        var folder = Path.Combine(_dir, name);
+        var fileName = ServerPlayerSaves.FileNameFor("Alice");
+        var file = Path.Combine(folder, fileName.Replace('/', Path.DirectorySeparatorChar));
+        if (original != null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllBytes(file, original);
+        }
+
+        var store = new ChunkSaveStore(folder);
+        try
+        {
+            var saved = ServerPlayerSaves.Load(store, "Alice");
+            Assert.Equal(expectPlayer, saved != null);
+            ServerPlayerSaves.Save(store, new ServerPlayer(2, "Alice", Vector3.Zero));
+            Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+            Assert.False(File.Exists(file + ".bad"), $"{name} must not be classified as a rejected JSON file");
+            Assert.NotNull(PlayerSaveCodec.TryParse(File.ReadAllBytes(file)));
+        }
+        finally
+        {
+            store.Shutdown(TimeSpan.FromSeconds(10));
+        }
+    }
+
+    [Fact]
     public void DistinctNamesGetDistinctFilesInsideThePlayersFolder()
     {
         var alice = ServerPlayerSaves.FileNameFor("Alice");
@@ -155,6 +222,34 @@ public sealed class ServerPlayerTests : IDisposable
         freshBack.Restore(PlayerSaveCodec.TryParse(PlayerSaveCodec.ToBytes(fresh.Capture())), allowCreative: false);
         Assert.Null(freshBack.RespawnEye);
         Assert.Equal(fresh.Health, freshBack.Health);
+    }
+
+    [Fact]
+    public void HostedPlayerRestoreIgnoresNonFiniteSavedPoseFields()
+    {
+        var store = new ChunkSaveStore(_dir);
+        store.EnqueueFile(ServerPlayerSaves.FileNameFor("Alice"), Encoding.UTF8.GetBytes(
+            "{\"Position\":[1e1000,70,2],\"RespawnEye\":[1,-1e1000,2],\"Yaw\":1e1000,\"Pitch\":-1e1000,\"Health\":1}"));
+        Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+
+        var reopened = new ChunkSaveStore(_dir);
+        try
+        {
+            var start = new Vector3(12f, 70f, -8f);
+            var player = new ServerPlayer(2, "Alice", start) { Yaw = 22f, Pitch = 3f };
+
+            Assert.False(player.Restore(ServerPlayerSaves.Load(reopened, "Alice"), allowCreative: false));
+
+            Assert.Equal(start, player.Position);
+            Assert.Null(player.RespawnEye);
+            Assert.Equal(22f, player.Yaw);
+            Assert.Equal(3f, player.Pitch);
+            Assert.Equal(1, player.Health);
+        }
+        finally
+        {
+            Assert.True(reopened.Shutdown(TimeSpan.FromSeconds(10)));
+        }
     }
 
     [Fact]

@@ -13,7 +13,9 @@ report failed root listings with the saves-folder notice instead of presenting t
 dedicated-server prompt also reports a failed listing without offering to create a world from that
 empty result. CREATE opens a name field
 (placeholder `Unnamed World`, which is what an empty field becomes; the store makes a taken name
-unique with the smallest free numeric suffix, `WorldNames.Unique`) and a seed field (empty =
+unique with the smallest free numeric suffix, `WorldNames.Unique`); create and rename require a
+successful world listing and report a saves-folder error if it fails. A missing root is still an
+empty listing. The form also has a seed field (empty =
 random, an integer is used verbatim, any other text is FNV-1a-hashed by `WorldSeedParser`).
 Enter confirms the create and edit pages (never the delete popup), Tab switches field, and ESC
 steps back one page and does nothing on the main page. SETTINGS and EXIT are the pause menu's
@@ -68,13 +70,15 @@ pure function of the seed: only **deltas** and the seed are written.
   thread (`ChunkSaveWriter`) builds the name palette, deflates and writes. `Enqueue` publishes the
   snapshot in the pending map **before** the job is queued, and `ChunkManager` enqueues
   **before** it forgets the unloading chunk, so a chunk that streams straight back in is
-  restored from memory. The writer writes `.bin.tmp`, moves it over the final file (retried
-  `SaveMoveRetries` times), adds the key to the on-disk index and only **then** removes the
+  restored from memory. The writer writes `.bin.tmp`, moves it over the final file (up to
+  `SaveMoveRetries` additional move attempts), adds the key to the on-disk index and only **then** removes the
   pending entry — and only if it is still the snapshot it wrote, so a newer enqueue survives. A
   lookup therefore always finds the chunk in one of the two, and a move that finally fails keeps
-  its pending entry and is remembered as failed, so the chunk stays readable for the session,
-  the next flush of it retries, and `Shutdown` re-queues every failed write once more
-  (`ChunkSaveStore.RetryFailed`) before the writer stops. A file a read gave up on (an
+  its pending entry and is remembered as failed, so the chunk stays readable for the session.
+  A later enqueue, explicit `RetryFailed`, or `Shutdown` retries it. Shutdown drains accepted
+  jobs, then its writer makes one final write cycle for each failed artifact, including failures first
+  reported while closing; its Boolean result says whether the writer joined, not whether every
+  write landed. A file a read gave up on (an
   `IOException` after a few retries, or a corrupt file) is moved to `.bad` before the writer
   first replaces it, so what the player had is never overwritten by a regenerated chunk or an
   empty player file, and the temp file is flushed to disk before the rename. The store holds
@@ -102,8 +106,11 @@ pure function of the seed: only **deltas** and the seed are written.
   the snapshot's storage into a dense array and re-derives the name palette in first-seen cell
   order, so stale in-memory entries never reach the file and the bytes depend only on the cells;
   `ReadCore` decodes into `ChunkBlocks.DenseScratch` and compacts it with `FromDense`, so a loaded
-  chunk holds the smallest storage for its ids. A file of any other version (a v2 file from a build whose ids were bytes)
-  is refused as `InvalidDataException`, never misread: `ChunkSaveStore` warns once, regenerates
+  chunk holds the smallest storage for its ids. Palette names must be well-formed UTF-8; malformed
+  name bytes refuse the file and use the normal regenerate-and-archive path, while valid names the
+  current content registry does not know still load as air. A file of any other version (a v2 file
+  from a build whose ids were bytes) is refused as `InvalidDataException`, never misread:
+  `ChunkSaveStore` warns once, regenerates
   the chunk and sets the old file aside as `.bad` before the first write over it. An imported
   map's chunk files share the format, so a map written by an older build loads as air
   (`ImportedMapSource` warns per chunk) and must be re-imported.
@@ -166,16 +173,25 @@ pure function of the seed: only **deltas** and the seed are written.
   snapshots a call, the rest on following frames) after the fluid tick, under the one `save`
   profiler row, which is entered nowhere else.
 - **Player and entities.** `player.json` never stores a position before the spawn settled, so a
-  world closed mid-load searches the surface again next time. Saved mobs and drops are spawned
+  world closed mid-load searches the surface again next time. Non-finite position, look, respawn
+  eye, or lighting-clock values are ignored field by field while other valid player data is kept.
+  Saved mobs and drops are spawned
   once loading finishes, each only when its chunk is loaded; a restore is a forced spawn, so it
   may pass the natural mob cap but a mob waits while the hard cap (`MobHardCap`, which sizes the
   healthbar buffers) is full; an entry that waits stays pending and is saved again, and is
   discarded only after `EntityRestoreTimeoutSeconds` of play.
+- **Malformed player saves.** A local `player.json` or hosted `players/<slug>.json` rejected by the
+  parser is marked for `.bad` preservation before a later replacement; missing files, JSON `null`,
+  and valid partial objects retain their ordinary load behavior.
 - **The explored map** (`map.bin`, `MapSaveCodec`: "CVMP", a version byte, then a Deflate body of the surface and
   sky `MapTile`s, each its layer kind, chunk column, 256 texels and 256 heights; a cave slice is never kept). Only a
-  world that drew a HUD has a map (`WorldRenderer.EnsureMap`, which imports the file when it builds the tracker), so a
-  server never writes one and a world whose HUD never drew keeps its file untouched. `WorldPersistence.SaveMapIfChanged`
-  writes it when `MapTracker.ExploredVersion` moved: at autosave it copies the tiles on the main thread
+  world that drew a HUD has a map (`WorldRenderer.EnsureMap`, which imports the file when it builds the tracker).
+  `WorldPersistence.SaveMapIfChanged` writes only when a tracker exists and `MapTracker.ExploredVersion` has advanced
+  since the prior save: a missing map stays absent until exploration advances the version, while importing valid map
+  data itself advances it. The store marks parser-rejected existing bytes for its `.bad` set-aside before replacement;
+  the original is retained when that move succeeds. A server never writes one and a world whose HUD never drew keeps
+  its file untouched. At autosave it copies
+  the tiles on the main thread
   (`ExportExplored`; the tracker reuses tile objects) and deflates them on a pool thread, one encode at a time, so an
   autosave never hitches; the closing flush waits for one in flight and encodes inline, so the last write queued is the
   newest map. The first map update after a load rescans every column in range, so tiles saved before a crash catch up
@@ -186,6 +202,11 @@ pure function of the seed: only **deltas** and the seed are written.
   chunk loads. An entry whose block, item or molten material name no longer resolves is dropped with
   one aggregated warning, and a cast pour is restored paused (its crucible binding is transient). A
   corrupt file parses to null and is replaced at the next autosave, like `entities.json`.
+- **Malformed entity files.** If the codec rejects a readable `entities.json`, that load starts
+  without its saved entries and parser rejection marks the file for the store's existing `.bad`
+  set-aside before an autosave or close replacement. When that archive move succeeds, the original
+  bytes remain there. Missing files, JSON `null`, valid partial objects and unresolved names retain
+  their existing fallback or per-entry handling.
 - **Lantern state** is name-based, versioned `LanternData` in `ToolData.Lantern` (player, chest and drop payloads)
   and `StationSaveData.Lanterns` (placed). Old block-pool lantern counts migrate into distinct empty instances;
   their hotbar references follow, and exceeding today's tool cap never deletes an old lantern. Legacy chest stacks

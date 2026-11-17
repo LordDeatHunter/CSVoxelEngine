@@ -465,7 +465,7 @@ public class World
                 Camera.Healer = amount => _health.Heal(amount);
             LocalPlayer = new LocalPlayer(this, _health, _dust, _debris, _mobs, serverMode, clientMode);
             if (!serverMode) Footsteps.FootfallTaken += Footprints.Spawn;
-            var savedPlayer = PlayerSaveCodec.TryParse(saveStore?.ReadFile(PlayerSaveCodec.FileName));
+            var savedPlayer = PlayerSaveReader.Read(saveStore, PlayerSaveCodec.FileName);
             if (savedPlayer != null)
                 LocalPlayer.ApplySavedPlayer(savedPlayer);
             // A new store-backed survival player starts with the hint scroll; storeless scenario and
@@ -478,7 +478,7 @@ public class World
             if (saveStore != null)
             {
                 // Held until the Loading -> Playing flip, then spawned as their chunks load
-                savedEntities = EntitySaveCodec.TryParse(saveStore.ReadFile(EntitySaveCodec.FileName));
+                savedEntities = EntitySaveReader.Read(saveStore);
                 savedStations = StationSaveCodec.TryParse(saveStore.ReadFile(StationSaveCodec.FileName));
             }
             LocalPlayer.RecordSpawn();
