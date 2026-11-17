@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content;
+using VoxelEngine.Lod;
 using VoxelEngine.WorldGen;
 using Xunit;
 using Xunit.Abstractions;
@@ -107,5 +108,36 @@ public sealed class S2MaterialsTests(ITestOutputHelper output)
             probes++;
         }
         return result;
+    }
+
+    [Fact]
+    public void GeneratedCanyonLodShowsTheNewWallPalette()
+    {
+        TestContent.EnsureLoaded();
+        var probes = 0;
+        try
+        {
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
+            var spec = LodRegion.Levels[0];
+            var rx = (int)MathF.Floor(-4000f / spec.RegionBlocks);
+            var rz = (int)MathF.Floor(5000f / spec.RegionBlocks);
+            var mesh = LodRegion.BuildMeshData(0, rx, rz);
+            probes += spec.Cells * spec.Cells;
+            var red = VoxelEngine.BlockType.ById[ContentRegistry.RequireBlock("red_sandstone").Id]!.FaceTiles[0];
+            var ochre = VoxelEngine.BlockType.ById[ContentRegistry.RequireBlock("ochre_clay").Id]!.FaceTiles[0];
+            var wallFaces = 0;
+            foreach (var vertex in mesh.Vertices)
+            {
+                if ((vertex.Normal & 7) == 4) continue;
+                if (vertex.Layer == red || vertex.Layer == ochre) wallFaces++;
+            }
+            output.WriteLine($"generated canyon LOD colored wall vertices={wallFaces}; direct cell entries={probes}");
+            Assert.True(wallFaces > 0);
+        }
+        finally
+        {
+            output.WriteLine($"S2 materials direct entries={probes}, new chunks=0");
+            WorldSeed.Apply(WorldSeed.Default);
+        }
     }
 }
