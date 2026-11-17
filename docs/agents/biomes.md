@@ -206,8 +206,8 @@ The separate oasis and hot-spring discs and their face banks refuse an additiona
 cut because those features assign their own pond levels outside the shared water query. Deep cuts
 reuse the ravine soil-stripping rule, exposing rock. Dynamic bare Desert, Steppe and Savanna
 columns then receive seeded, slightly wobbled sandstone, red sandstone, ochre clay and stone
-bands in their upper 72 blocks. The fill replaces only original plain rock before carvers,
-ores, fluids and features; cave-biome cells and soil keep their own palette. Generated far LOD
+bands under their bare top in the upper 72 blocks. The fill replaces only plain rock left after
+carvers, ores, cave features and the cave palette; their other cells and soil stay intact. Generated far LOD
 samples the same band selector for bare arid faces, while supplied columns keep saved material.
 `ColumnCache`,
 generated chunks and far LOD read the same final height; supplied chunks keep their saved

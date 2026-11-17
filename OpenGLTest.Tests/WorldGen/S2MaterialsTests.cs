@@ -44,6 +44,9 @@ public sealed class S2MaterialsTests(ITestOutputHelper output)
             var sandstone = ContentRegistry.RequireBlock("sandstone").Id;
             var ochre = ContentRegistry.RequireBlock("ochre_clay").Id;
             output.WriteLine($"real bare Savanna canyon ({x},{z}) top {column.Heights[local]} IDs {string.Join(",", ids)}");
+            Assert.Equal(TerrainGenerator.RockBlock,
+                chunk.Storage.Get(Chunk.Idx(x & Chunk.SizeMask, column.Heights[local] & Chunk.SizeMask,
+                    z & Chunk.SizeMask)));
             Assert.Contains(sandstone, ids);
             Assert.Contains(ochre, ids);
         }

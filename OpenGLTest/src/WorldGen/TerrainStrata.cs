@@ -34,7 +34,7 @@ internal static class TerrainStrata
     internal static bool Admits(ColumnData column, int index, int y) =>
         column.DirtDepth[index] == 0
         && IsArid(column.Biomes[index])
-        && y <= column.Heights[index]
+        && y < column.Heights[index]
         && column.Heights[index] - y <= WorldGenerationConfig.StrataMaxDepth;
 
     internal static void Stamp(ushort[] blocks, ColumnData column, CaveBiomeMap? caves,
@@ -46,7 +46,7 @@ internal static class TerrainStrata
             var columnIndex = (x << Chunk.SizeShift) | z;
             if (column.DirtDepth[columnIndex] != 0 || !IsArid(column.Biomes[columnIndex])) continue;
             var firstY = Math.Max(lowerBoundY, column.Heights[columnIndex] - WorldGenerationConfig.StrataMaxDepth);
-            var lastY = Math.Min(lowerBoundY + Chunk.Size - 1, column.Heights[columnIndex]);
+            var lastY = Math.Min(lowerBoundY + Chunk.Size - 1, column.Heights[columnIndex] - 1);
             for (var y = firstY; y <= lastY; y++)
             {
                 var index = Chunk.Idx(x, y & Chunk.SizeMask, z);

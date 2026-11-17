@@ -324,11 +324,6 @@ internal ref struct LodFaceEmitter
             ? BlockType.ById[eb]
             : null;
         var strataColumn = StrataColumn(i, j);
-        var strataTop = strataColumn is { } site && !isSeaCell && stripped && !beach && !snowCell
-            && TerrainStrata.Admits(site.column, site.index, (ground + 1) * _cellSize - 1)
-            ? BlockType.ById[TerrainStrata.BlockAt(site.x, (ground + 1) * _cellSize - 1, site.z,
-                site.column.Biomes[site.index])]
-            : null;
 
         // The block the cell's drawn surface wears: the canopy bump's leaves above the
         // ground, else the edited block, else the generated material chain.
@@ -338,7 +333,6 @@ internal ref struct LodFaceEmitter
             // Dynamic's snow stamp covers rock and scree too. Legacy keeps its earlier
             // rock-before-snow LOD precedence; supplied rock/snow classifications never overlap.
             : WorldSeed.Profile == WorldGenProfile.Dynamic && rock && snowCell ? _snow
-            : strataTop is not null ? strataTop
             : rock ? (_gravelTop[gi * _heightGrid + gj] ? _gravel : _stone)
             : snowCell ? _snow
             : biome == Biome.Desert ? _sand

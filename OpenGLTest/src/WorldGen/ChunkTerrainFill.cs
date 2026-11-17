@@ -133,12 +133,6 @@ internal static class ChunkTerrainFill
         }
         timer?.Mark(Stage.CaveBiomeMap);
 
-        // Dress only original plain rock in bare arid columns. Later carvers, ores,
-        // water and structures keep their established ownership of those cells.
-        if (WorldSeed.Profile == WorldGenProfile.Dynamic)
-            TerrainStrata.Stamp(blocks, column, caves, (int)chunk.Position.X * Size,
-                lowerBoundY, (int)chunk.Position.Z * Size);
-
         // Both carvers only ever clear blocks at or below their own column's terrain top:
         // NoiseCaves breaks each column at `depth < 0` before it reads a block or a sample, and
         // WormCarver skips every y at `depth < margin`, margin = WormSurfaceMargin * (1 - EntranceWeight)
@@ -322,6 +316,12 @@ internal static class ChunkTerrainFill
         if (caves is not null)
             CaveBiomes.Stamp(blocks, caves, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.CaveBiomes);
+
+        // Dress the natural plain rock left below an exposed arid wall after the carvers,
+        // ore and cave-feature host checks. Only that rock is replaced: air, fluids, ores,
+        // cave palettes and the surface features above the ground retain their cells.
+        if (WorldSeed.Profile == WorldGenProfile.Dynamic)
+            TerrainStrata.Stamp(blocks, column, caves, worldX0, lowerBoundY, worldZ0);
 
         // Sealed underground rooms and their waystone chambers, after the deep features and the cave life, so no
         // geode, mushroom, formation, gravel pocket or pool is left inside a room. A room's loot chests take their
