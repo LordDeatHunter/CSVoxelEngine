@@ -416,6 +416,8 @@ public class World
     /// as soon as its chunk is loaded (<see cref="WorldPersistence.RestorePendingEntities"/>). A
     /// world with a store starts <see cref="WorldPhase.Loading"/>; null (the default) keeps the old
     /// regenerate-and-forget behavior and starts <see cref="WorldPhase.Playing"/> at once.
+    /// The World owns a supplied store from construction onward: failed construction stops its
+    /// workers before shutting the store down, without writing a replacement player save.
     /// </summary>
     /// <remarks>
     /// Passing null for <paramref name="gl"/>, the three pools, <paramref name="window"/> and
@@ -426,7 +428,7 @@ public class World
     /// <see cref="WorldSeed.Apply"/> refuses to run from here on: its worker threads read the
     /// worldgen statics unsynchronized. <see cref="SaveAndDispose"/> is the teardown; it stops the
     /// workers and calls <see cref="WorldSeed.EndWorld"/> last. A constructor that throws stops what
-    /// it started and ends the world itself.
+    /// it started, closes its store and ends the world itself when workers joined.
     /// </para>
     /// <para>
     /// <paramref name="spawn"/> is the eye to start at, which a multiplayer client passes from the
@@ -447,11 +449,13 @@ public class World
         ChunkSaveStore? saveStore = null, bool serverMode = false, bool clientMode = false,
         Vector3? spawn = null, IWorldSource? worldSource = null)
     {
-        WorldSeed.BeginWorld();
         ChunkGenerationWorker? generationWorker = null;
         LodManager? lodManager = null;
+        var worldBegan = false;
         try
         {
+            WorldSeed.BeginWorld();
+            worldBegan = true;
             _window = window;
             _saveStore = saveStore;
             Sounds = new WorldSounds(sfx, serverMode);
@@ -661,9 +665,20 @@ public class World
             var joined = (generationWorker?.Stop() ?? true) & (lodManager?.Stop() ?? true);
             Camera?.Detach();
             if (joined)
-                WorldSeed.EndWorld();
+            {
+                try
+                {
+                    if (saveStore?.Shutdown(TimeSpan.FromSeconds(SaveConfig.SaveWriterShutdownTimeoutSeconds)) == false)
+                        Log.Warn("World construction failed: the save writer remains live and its folder stays locked");
+                }
+                catch (Exception cleanupError)
+                {
+                    Log.Warn($"World construction failed: could not close its save store: {cleanupError.Message}");
+                }
+                if (worldBegan) WorldSeed.EndWorld();
+            }
             else
-                Log.Warn("World construction failed with a worker still running; the seed can no longer be changed in this process");
+                Log.Warn("World construction failed with a worker still running; its store stays open and the seed cannot be changed in this process");
             throw;
         }
     }

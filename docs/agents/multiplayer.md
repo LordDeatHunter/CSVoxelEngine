@@ -181,8 +181,11 @@ that started (`GameSettings.HostPort`/`HostUpnp`, restored by `HostSession.Resto
 **Hosting from the game.** The game hosts in process, the way both reference Godot projects run a listen server: the
 same `GameServer` over the same headless server-mode `World` the dedicated server runs, opened by the one shared
 launch (`Networking/Hosting/ServerLaunch.Start`: the save-format gate, the world source, the save store's lock, the
-operators, `WorldSeed.Apply`, the World and the listening server, each failure typed as a `ServerLaunchFailure` and
-leaving nothing live or locked; `ServerProgram` uses it too). Program defers the HOST click like a world open
+operators, `WorldSeed.Apply`, the World and the listening server, each expected failure typed as a
+`ServerLaunchFailure`; `ServerProgram` uses it too). A parsed player save that cannot restore its
+legacy lanterns returns `InvalidSave` before listening, with the original file unchanged. Failed
+World construction closes its store after stopping workers; a timed-out worker or writer can still
+keep the seed or folder locked. Program defers the HOST click like a world open
 (`PendingWork.Host`, a "Starting the server..." frame), then `HostSession.TryStart` builds the `HostedServer` and the
 host's own client connects to it over loopback (`HostedServer.LoopbackAddress`) through the normal connect path, so
 the host plays by the server's rules like everyone else. A refused start (`Port N is unavailable`, the world open
