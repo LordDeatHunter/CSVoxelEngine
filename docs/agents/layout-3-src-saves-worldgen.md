@@ -34,6 +34,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   resolved (`generated` when unset), read by the dedicated server only
       WoodDamageCodec.cs       # reads/writes wood-damage.bin: the permanent chop damage of natural trunk cells
       MapSaveCodec.cs          # reads/writes map.bin: the explored map's surface and sky tiles (colors and heights)
+      MapSaveReader.cs         # reads map.bin and marks parser-rejected bytes for preservation before replacement
       WorldNames.cs            # name normalizing, the "Unnamed World" default, unique numeric suffix, folder slug
       WorldPersistence.cs      # World component: autosave, FlushAll, the player and entity capture and the
                                #   pending entity restore and the station restore (player.json, entities.json, stations.json, lod-edits.bin)
