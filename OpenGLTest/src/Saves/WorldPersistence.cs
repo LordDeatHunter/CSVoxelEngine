@@ -531,20 +531,19 @@ internal sealed class WorldPersistence
     /// Fills the (empty) station registries from <c>stations.json</c>. No wait for chunks is needed:
     /// each manager freezes a cell in an unloaded chunk and, once the chunk is there, its own update
     /// sweeps an entry whose block is gone (dropping what it held), so a stale entry never lives on.
-    /// One warning covers every entry dropped for a name that no longer resolves.
+    /// One warning covers every invalid entry or name that no longer resolves.
     /// </summary>
     private void RestoreStations(StationSaveData? saved)
     {
         if (saved == null)
             return;
-        _world.Lanterns.Restore(saved.Lanterns);
-        var skipped = _campfires.Restore(saved.Campfires) + _querns.Restore(saved.Querns)
+        var skipped = _world.Lanterns.Restore(saved.Lanterns) + _campfires.Restore(saved.Campfires) + _querns.Restore(saved.Querns)
             + _kilns.Restore(saved.Kilns) + _casting.Restore(saved.Casts) + _world.Chests.Restore(saved.Chests)
             + _world.Waystones.Restore(saved.Waystones) + _world.Smithing.Restore(saved)
             + _world.Towers.Restore(saved.Towers) + _world.Stumps.Restore(saved.Stumps) + _world.IngotPiles.Restore(saved.IngotPiles)
             + _world.StandingCrucibles.Restore(saved.StandingCrucibles);
         if (skipped > 0)
-            Log.Warn($"Station save: dropped {skipped} saved station entr{(skipped == 1 ? "y" : "ies")} that no longer resolve");
+            Log.Warn($"Station save: dropped {skipped} invalid or unresolvable saved station entr{(skipped == 1 ? "y" : "ies")}");
     }
 
     /// <summary>Enqueues <see cref="StationSaveCodec.FileName"/>; does nothing without a save store.</summary>

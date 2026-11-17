@@ -537,7 +537,7 @@ public sealed class KilnManager
         if (saved == null) return 0;
         foreach (var data in saved.Take(StationNetCodec.MaxEntries))
         {
-            if (!StationSaveCodec.TryCell(data.Cell, out var key)
+            if (data == null || !StationSaveCodec.TryCell(data.Cell, out var key)
                 || !SaveNames.TryResolve(data.Anchor, out var anchor)
                 || data.Facing is < 0 or > 3 || data.Fuel < 0 || data.Fuel > ProfileOf(anchor).FuelCap
                 || !float.IsFinite(data.FuelSeconds) || !float.IsFinite(data.BurnLeft)
