@@ -394,6 +394,112 @@ public sealed partial class WorldLifecycleTests : IDisposable
     }
 
     [Fact]
+    public void OnlyCreditedFirstFindsReplaceTheHudToast()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+
+        World? world = null;
+        var closed = false;
+        var loaded = false;
+        var loadTimedOut = false;
+        var fillerAdded = false;
+        var targetDropsSpawned = false;
+        var initialItemsUnknown = false;
+        var usedAfterFiller = -1;
+        var collectedIds = Array.Empty<ushort>();
+        var batchDropIds = Array.Empty<ushort>();
+        var toastAfterBatch = "";
+        var flintCountAfterBatch = -1;
+        var coalCountAfterBatch = -1;
+        var flintKnownAfterBatch = false;
+        var coalKnownAfterBatch = true;
+        var knownPickupSpawned = false;
+        var flintCountAfterKnownPickup = -1;
+        var toastAfterKnownPickup = "";
+        try
+        {
+            world = NewWorld(new ChunkSaveStore(_dir));
+            loaded = RunUntil(world, () => world.IsPlaying, LoadWallSeconds);
+            loadTimedOut = world.LoadTimedOut;
+            if (loaded && !loadTimedOut)
+            {
+                var bone = ContentRegistry.RequireItem("bone").Id;
+                var coal = ContentRegistry.RequireItem("coal").Id;
+                var flint = ContentRegistry.RequireItem("flint").Id;
+                initialItemsUnknown = !world.Inventory.Knows(coal) && !world.Inventory.Knows(flint);
+                var fillerCount = Inventory.MiscCapacity - world.Inventory.UsedOf(InventoryCategory.Misc) - 1;
+
+                fillerAdded = Inventory.CategoryOf(bone) == InventoryCategory.Misc
+                    && Inventory.CategoryOf(coal) == InventoryCategory.Misc
+                    && Inventory.CategoryOf(flint) == InventoryCategory.Misc
+                    && fillerCount > 0
+                    && world.Inventory.Add(bone, fillerCount);
+                usedAfterFiller = world.Inventory.UsedOf(InventoryCategory.Misc);
+                if (fillerAdded)
+                {
+                    var target = world.Camera.Position - Vector3.UnitY * DropManager.CollectHeightOffset;
+                    // The manager scans from newest to oldest, so flint is credited before coal.
+                    // Only one shared misc-pool slot remains when both callbacks run.
+                    var coalSpawned = world.DropSpawner.SpawnRestored(coal, target, Vector3.Zero, age: 5f);
+                    var flintSpawned = world.DropSpawner.SpawnRestored(flint, target, Vector3.Zero, age: 5f);
+                    targetDropsSpawned = coalSpawned && flintSpawned;
+                    if (targetDropsSpawned)
+                    {
+                        world.Pickup.Update(1d / 60d);
+                        collectedIds = world.DropSpawner.Collected.ToArray();
+                        batchDropIds = world.Drops.Select(drop => drop.BlockId).ToArray();
+                        toastAfterBatch = world.Toast.Text;
+                        flintCountAfterBatch = world.Inventory.CountFor(flint);
+                        coalCountAfterBatch = world.Inventory.CountFor(coal);
+                        flintKnownAfterBatch = world.Inventory.Knows(flint);
+                        coalKnownAfterBatch = world.Inventory.Knows(coal);
+
+                        // Free one slot, move within the loaded high-air region but out of range
+                        // of the refused coal, and confirm a known accepted pickup leaves the toast alone.
+                        world.Inventory.Remove(bone, 1);
+                        world.Camera.TestTeleport(new Vector3(5f, High, 0f), world.Camera.Yaw, world.Camera.Pitch);
+                        world.Toast.Show("Keep this toast");
+                        var knownTarget = world.Camera.Position - Vector3.UnitY * DropManager.CollectHeightOffset;
+                        knownPickupSpawned = world.DropSpawner.SpawnRestored(flint, knownTarget, Vector3.Zero, age: 5f);
+                        if (knownPickupSpawned)
+                        {
+                            world.Pickup.Update(1d / 60d);
+                            flintCountAfterKnownPickup = world.Inventory.CountFor(flint);
+                            toastAfterKnownPickup = world.Toast.Text;
+                        }
+                    }
+                }
+            }
+        }
+        finally
+        {
+            if (world != null)
+                closed = world.SaveAndDispose();
+        }
+
+        Assert.True(closed, "the world did not shut down cleanly");
+        Assert.True(loaded, "the world did not finish loading");
+        Assert.False(loadTimedOut, "the world started playing on the timeout, not on readiness");
+        Assert.True(initialItemsUnknown);
+        Assert.True(fillerAdded);
+        Assert.Equal(Inventory.MiscCapacity - 1, usedAfterFiller);
+        Assert.True(targetDropsSpawned);
+        var coalId = ContentRegistry.RequireItem("coal").Id;
+        var flintId = ContentRegistry.RequireItem("flint").Id;
+        Assert.Equal(new[] { flintId, coalId }, collectedIds);
+        Assert.Equal(new[] { coalId }, batchDropIds);
+        Assert.Equal(1, flintCountAfterBatch);
+        Assert.Equal(0, coalCountAfterBatch);
+        Assert.True(flintKnownAfterBatch);
+        Assert.False(coalKnownAfterBatch);
+        Assert.Equal($"New: {Inventory.DisplayName(flintId)}", toastAfterBatch);
+        Assert.True(knownPickupSpawned);
+        Assert.Equal(2, flintCountAfterKnownPickup);
+        Assert.Equal("Keep this toast", toastAfterKnownPickup);
+    }
+
+    [Fact]
     public void SaveAndDisposeWritesThePlayerASecondWorldReadsBack()
     {
         // Only a position, so every other field takes its default
