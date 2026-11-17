@@ -1,5 +1,0 @@
-{
-  "pools": [
-    { "rolls": 1, "entries": [ { "item": "item/tin_ore" } ] }
-  ]
-}

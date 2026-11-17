@@ -5,7 +5,7 @@ Writes, under OpenGLTest/assets/textures/blocks (plans/CAVE_BIOMES.md CB-2):
   jade_ore.png       the fungal caves' ore: pale green mineral
   cinnabar_ore.png   the magma-touched deep's ore: red mineral
 
-Each is a palette swap of the regular ore tile, never noise, exactly as tin_ore.png recolors malachite_ore.png: the
+Each is a palette swap of the regular ore tile, never noise, exactly as cassiterite_ore.png recolors malachite_ore.png: the
 script decodes malachite_ore.png, keeps its brown matrix pixels (red over green) as they are, and repaints every
 green mineral pixel with a six-color hand palette, the color picked by the source shade's luminance rank (darkest
 source shade -> darkest palette color). So the tile keeps malachite's shapes and shading, and only the hue changes.

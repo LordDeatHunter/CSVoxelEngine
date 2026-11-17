@@ -129,7 +129,7 @@ public sealed class MiningTests
     [Fact]
     public void TinSitsBetweenThePrimitiveAndCopperToolsAndMinesItsOwnOre()
     {
-        var tinOre = BlockOf("tin_ore");
+        var tinOre = BlockOf("cassiterite_ore");
         var primitive = ItemOf("primitive_pickaxe");
         var tin = ItemOf("tin_pickaxe");
         var copper = ItemOf("copper_pickaxe");
@@ -153,7 +153,7 @@ public sealed class MiningTests
         Assert.True(ItemOf("bronze_axe").ToolPower > ItemOf("copper_axe").ToolPower);
 
         // A higher tier only widens the gate: every ore copper opens, bronze opens too.
-        foreach (var ore in new[] { "malachite_ore", "tin_ore", "hematite_ore" })
+        foreach (var ore in new[] { "malachite_ore", "cassiterite_ore", "hematite_ore" })
         {
             var block = BlockOf(ore);
             if (Mining.CanMine(block, copper))

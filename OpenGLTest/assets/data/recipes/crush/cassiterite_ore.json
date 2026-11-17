@@ -1,5 +1,5 @@
 {
-  "input": "item/tin_ore",
+  "input": "item/cassiterite_ore",
   "result": "item/crushed_tin",
   "count": 1
 }

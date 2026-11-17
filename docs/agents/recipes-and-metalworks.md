@@ -44,7 +44,7 @@ generic metal part for everything else made of copper, tin or bronze: the bronze
 gloves 4 rings), `bronze_chest` (8 rings and 4 planks), `clock` (4 copper rings and a mud brick), `lantern`,
 `crystal_staff`, `alloy_bricks` (a copper and a tin ring) and the `focus_ring` / `reserve_charm` (2 rings and a vine).
 
-**Tin** (`tin_ore`, `TinGenerator`) is the second, weaker metal: commoner than malachite, in the
+**Tin** (`cassiterite_ore`, `TinGenerator`) is the second, weaker metal: commoner than malachite, in the
 `TinMinY..TinMaxY` band, mined with any pickaxe; it crushes in the quern into `crushed_tin`, melts as `tin`
 (ingot and crushed 100 ml, axe, pickaxe, sword and ring 200 ml; the raw ore does not melt, only crushed ore does) and casts into the five molds. Tin and
 copper each have an axe, pickaxe and sword (`attack: "sword"`), the tool ladder runs primitive < tin < copper

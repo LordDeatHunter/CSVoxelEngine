@@ -77,7 +77,7 @@ body wears.
 ### Tin (everything but the ring)
 
 - [ ] **Tin ingot** — `tin_ingot.png`.
-- [ ] **Tin ore (item)** — `tin_ore.png` (the raw ore chunk, not the block tile below).
+- [ ] **Cassiterite ore (item)** — `cassiterite_ore.png` (the raw ore chunk, not the block tile below).
 - [ ] **Tin tool heads** — `tin_axe_head.png`, `tin_pickaxe_head.png`, `tin_sword_head.png`
   (the sword head is 42x42).
 - [ ] **Tin tools** — `tin_axe.png`, `tin_pickaxe.png`, `tin_sword.png`. The sword is 42x42 (the
@@ -183,7 +183,7 @@ plinth and cap; both models are symmetric.
 
 ### Other
 
-- [ ] **Tin ore block** — `tin_ore.png` (the block tile; the item sprite above is a separate file
+- [ ] **Cassiterite ore block** — `cassiterite_ore.png` (the block tile; the item sprite above is a separate file
   with the same name). Opaque and tileable.
 - [ ] **Lily pad** — `lily_pad.png`. Cutout; the model crops the whole tile on top and a one-texel
   edge on the sides.
@@ -224,7 +224,7 @@ All three made by `tools/generate-tower-lock-textures.py`: re-running puts the p
 ### Cave biome ores
 
 All three made by `tools/generate-cave-ore-textures.py` as palette swaps of `malachite_ore.png` (its
-brown matrix kept, its six green mineral shades repainted by luminance rank, the way `tin_ore.png`
+brown matrix kept, its six green mineral shades repainted by luminance rank, the way `cassiterite_ore.png`
 recolors it): re-running puts the placeholders back (`--check` compares), so remove or repoint that
 generator with the replacement. Each must stay 32x32, fully opaque and tileable (a `cube_all`
 block), and its own tile: the block's reflective `material` is keyed per tile, so a shared tile

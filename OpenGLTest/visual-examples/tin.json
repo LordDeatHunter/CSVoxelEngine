@@ -12,7 +12,7 @@
     { "op": "give", "block": "malachite_ore", "count": 1 },
     { "op": "look", "yaw": -97, "pitch": -30 },
     { "op": "place" },
-    { "op": "give", "block": "tin_ore", "count": 1 },
+    { "op": "give", "block": "cassiterite_ore", "count": 1 },
     { "op": "look", "yaw": -83, "pitch": -30 },
     { "op": "place" },
     { "op": "select", "slot": 9 },

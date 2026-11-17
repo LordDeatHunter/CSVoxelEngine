@@ -229,7 +229,7 @@ public sealed class BiomeTests
         var ore = ContentRegistry.RequireBlock("malachite_ore").Id;
         var coalOre = ContentRegistry.RequireBlock("coal_ore").Id;
         var hematiteOre = ContentRegistry.RequireBlock("hematite_ore").Id;
-        var tinOre = ContentRegistry.RequireBlock("tin_ore").Id;
+        var tinOre = ContentRegistry.RequireBlock("cassiterite_ore").Id;
 
         var sawSand = false;
         var sawGravel = false;
