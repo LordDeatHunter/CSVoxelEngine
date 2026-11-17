@@ -88,6 +88,12 @@ public abstract class Item
     /// </summary>
     public BakedModel? BakedModel { get; internal set; }
 
+    /// <summary>
+    /// The 3D shape this item is drawn as in the world (held, thrown, dropped) in place of its extruded
+    /// sprite, from its JSON <c>heldModel</c>; null for a sprite item. The sprite stays the icon either way.
+    /// </summary>
+    public HeldModel? HeldModel { get; internal init; }
+
     /// <summary>Whether the item declares a <c>tool</c> block and therefore mines as a tool
     /// rather than at the bare-hand baseline. Membership in tool tags comes from the tag
     /// files, not from this flag.</summary>
@@ -133,8 +139,20 @@ public abstract class Item
     /// <summary>Whether right-click in the air can charge and release this item as a projectile.</summary>
     public bool IsThrowable => ThrowDamage.HasValue;
 
-    /// <summary>Whether a thrown copy flies point first along its velocity (a spear) rather than tumbling.</summary>
+    /// <summary>Whether a thrown copy flies point first along its velocity (a javelin) rather than tumbling, and is aimed that way in the hand while it is wound up.</summary>
     public bool ThrowAligned { get; internal init; }
+
+    /// <summary>The share of the throw charge (0..1) a release needs to throw this item; an earlier release cancels.</summary>
+    public float ThrowChargeNeeded { get; internal init; }
+
+    /// <summary>Multiplier on the launch speed of a thrown copy (1 = the shared throw speed).</summary>
+    public float ThrowSpeedScale { get; internal init; } = 1f;
+
+    /// <summary>Whether a thrown copy stays stuck where it lands (terrain or a mob) rather than becoming a loose drop.</summary>
+    public bool ThrowSticks { get; internal init; }
+
+    /// <summary>Whether a release at <paramref name="charge01"/> throws this item rather than canceling the wind-up.</summary>
+    public bool ThrowsAt(float charge01) => IsThrowable && charge01 >= ThrowChargeNeeded;
 
     /// <summary>The block whose cube a thrown copy is drawn as instead of this item's sprite, or 0 for the sprite.</summary>
     public ushort ThrowBlockId { get; internal init; }
@@ -297,6 +315,10 @@ public abstract class Item
         ThrowAligned = spec.ThrowAligned;
         ThrowBlockId = spec.ThrowBlockId;
         IngotBlockId = spec.IngotBlockId;
+        HeldModel = spec.HeldModel;
+        ThrowChargeNeeded = spec.ThrowChargeNeeded;
+        ThrowSpeedScale = spec.ThrowSpeedScale;
+        ThrowSticks = spec.ThrowSticks;
         Rarity = spec.Rarity;
     }
 

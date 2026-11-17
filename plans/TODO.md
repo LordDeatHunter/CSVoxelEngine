@@ -304,7 +304,7 @@ single-arc player.
   Melee landed: punch, the two-phase obsidian-dagger slice (`SliceCombo`), knockback, per-item
   `entityDamage`, and mobs that hit back. Still open: a **bow + arrows** (animation `V-15`; the `arrow` item, an
   aligned throwable, and the skeleton's arrows already exist), a throwable
-  **spear** (reuses the throw animations, `V-16`), **right-click
+  **javelin** (reuses the throw animations, `V-16`), **right-click
   shield/block**, the **fireball** bridging to `P-14`, attack cooldown, and armor (`P-7`).
 - [ ] **`F-5` · Weather & day/night threat** — P1, M.
   Rain/snow, thunder, cold at night so shelter matters; drives `V-1` and `P-39`. Pairs `P-57`.

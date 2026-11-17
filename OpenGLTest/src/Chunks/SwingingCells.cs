@@ -6,7 +6,9 @@ namespace VoxelEngine.Chunks;
 /// <summary>
 /// The cells of the doors that are mid-swing right now. Such a cell is drawn and collided by its moving panel
 /// alone, so the mesher leaves its model out of the chunk mesh and the body sweeps skip its boxes until the swing
-/// ends (<c>DoorSwings</c> owns the entries). Written on the main thread and read by the mesh workers, so it is
+/// ends (<c>DoorSwings</c> owns the entries). A bellows that is pressed down is in here too (<c>BellowsSquash</c>):
+/// the mesher leaves it to the smithing pass, which draws it squashed, while its collision stays its block's own.
+/// Written on the main thread and read by the mesh workers, so it is
 /// thread-safe, and a world with no door swinging answers from one counter.
 /// </summary>
 public sealed class SwingingCells

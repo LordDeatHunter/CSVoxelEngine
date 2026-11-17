@@ -14,11 +14,13 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   (heights, bed, water levels, biomes, dirt depth, corner climate)
       EntitySaveCodec.cs       # reads/writes entities.json
       EntitySaveData.cs        # the entities.json shape: mobs (health/facing/velocity/ammo) and drops
+      EntitySaveReader.cs      # marks rejected entity JSON for preservation
       ImportedMapWriter.cs     # writes an imported map (columns/*.col + chunks/*.bin); ExportGenerated seeds
                                #   one from any IWorldSource (tool/test use)
       LodEditState.cs          # lod-edits.bin: export/import of the LOD caps, surface overrides, canopy markers
       MobSaveCodec.cs          # a live Mob -> its EntitySaveData form (per-kind ammo)
       PlayerSaveCodec.cs       # reads/writes player.json
+      PlayerSaveReader.cs      # marks rejected player JSON for .bad preservation before replacement
       PlayerSaveData.cs        # the player.json shape: pose, modes, health, clock, inventory + hotbar, quests
       QuestSaveData.cs, QuestViewData.cs  # quest progress by id (completed, counts) and the quest book's pan and zoom
       SaveNames.cs             # block/ and item/ namespaced content names, so saves never store raw ids
@@ -33,6 +35,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   resolved (`generated` when unset), read by the dedicated server only
       WoodDamageCodec.cs       # reads/writes wood-damage.bin: the permanent chop damage of natural trunk cells
       MapSaveCodec.cs          # reads/writes map.bin: the explored map's surface and sky tiles (colors and heights)
+      MapSaveReader.cs         # reads map.bin and marks parser-rejected bytes for preservation before replacement
       WorldNames.cs            # name normalizing, the "Unnamed World" default, unique numeric suffix, folder slug
       WorldPersistence.cs      # World component: autosave, FlushAll, the player and entity capture and the
                                #   pending entity restore and the station restore (player.json, entities.json, stations.json, lod-edits.bin)
@@ -108,6 +111,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         AnvilManager.cs        # anvils keyed by cell: a stack of one forge metal (stack, take back, the recipes Offered), the
                                #   picked recipe (TrySelect) and its hammer hits (gated by the hammer's gap), save and wire
         BellowsProbe.cs        # GL-free: the bellows cell a landing body came down on (its middle, then its footprint corners)
+        BellowsSquash.cs       # display only: how far each bellows is pressed down by the player feet sunk into it, and
+                               #   its swelling back; a squashed cell leaves the chunk mesh (SwingingCells)
         BloomeryManager.cs     # bloomeries keyed by anchor: ore, fuel, heat, smelting, bellows presses at the tuyeres, the
                                #   integrity sweep, save and wire
         BloomeryRules.cs       # GL-free heat model: the band, decay, progress rate (backward when cold), landing heat
@@ -612,6 +617,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                       #   cube, cube_all, cube_column, cube_bottom_top
   assets/models/entity/<name>.bbmodel # Blockbench entity projects (slime, goblin with its four
                                       #   clips) + <name>.png skins
+  assets/models/item/<name>.bbmodel   # 3D items (an item's `heldModel`), skin embedded: javelin
   assets/models/player/               # the player rig (player.bbmodel) and its skin
   visual-examples/                    # the VOXEL_SCRIPT scenario JSONs (see `VOXEL_SCRIPT`)
 ```

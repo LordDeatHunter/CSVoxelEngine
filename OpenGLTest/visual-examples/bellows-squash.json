@@ -1,0 +1,35 @@
+{
+  // The bellows giving under a weight: run with VOXEL_SCRIPT=visual-examples/bellows-squash.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/bellows-squash/.
+  //
+  // The flat desert patch of torches.json (sand at y 11): two bellows side by side at x 152 and 154, y 12, z 280, with
+  // a cobblestone block against the first so a see-through face would show. The player (creative, so the drop does
+  // not hurt, and not flying) comes down on the first one, seen over the shoulder:
+  //   landed      just landed: the bag still nearly a full block, the second bellows the full-size reference
+  //   sunk        a second and a half later: pressed down to half a block, the player standing in it
+  //   swelling    the player gone: the bag part of the way back up
+  //   full        later: a full block again
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [153.5, 20, 284.5], "yaw": -90, "pitch": -30 },
+    { "op": "wait", "seconds": 14 },
+    { "op": "setblock", "pos": [152, 12, 280], "block": "bellows" },
+    { "op": "setblock", "pos": [154, 12, 280], "block": "bellows" },
+    { "op": "setblock", "pos": [151, 12, 280], "block": "cobblestone" },
+    { "op": "creative" },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "fly", "on": false },
+    { "op": "teleport", "pos": [152.5, 15.0, 280.5], "yaw": -90, "pitch": -25 },
+    { "op": "wait", "seconds": 0.45 },
+    { "op": "screenshot", "name": "landed", "hideHud": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "sunk", "hideHud": true },
+    { "op": "view", "mode": "first" },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [153.5, 13.4, 283.5], "yaw": -90, "pitch": -15 },
+    { "op": "wait", "seconds": 0.25 },
+    { "op": "screenshot", "name": "swelling", "hideHud": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "full", "hideHud": true }
+  ]
+}

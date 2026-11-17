@@ -321,7 +321,7 @@ internal sealed class MobPasses : IDisposable
         in Matrix4x4 effect)
     {
         var type = mob.Type;
-        if (type.HeldItemId == 0 || !_owner.ItemMeshes.TryGet(type.HeldItemId, out var mesh, out var texture)) return;
+        if (type.HeldItemId == 0 || !_owner.ItemMeshes.TryGetShape(type.HeldItemId, out var mesh, out var texture)) return;
         Units.BindUnit(0, TextureTarget.Texture2DArray, texture);
         var model = type.HeldMatrix(mob.Animation, rig.Rig, mob.Feet, mob.Facing) * effect;
         _owner.SetDrawUniforms(model, model * viewProj, 1f, light);

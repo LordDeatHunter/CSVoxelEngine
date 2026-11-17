@@ -23,6 +23,10 @@ public static class BloomeryConfig
     /// <summary>Most heat one landing adds, however far the body fell.</summary>
     public const float BellowsMaxHeat = 0.35f;
 
+    /// <summary>Blocks per second a bellows swells back toward a full block once nothing stands in it: fast enough to
+    /// be full again by the time a body that jumped off it comes back down, so the landing presses a full bag.</summary>
+    public const float BellowsExpandSpeed = 0.8f;
+
     /// <summary>Shortest fall (blocks) that works the bellows, so stepping on it or settling onto it does not; a jump
     /// on the spot drops more than this.</summary>
     public const float BellowsMinFallBlocks = 0.4f;

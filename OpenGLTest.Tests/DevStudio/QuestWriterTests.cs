@@ -22,7 +22,7 @@ public sealed class QuestWriterTests : IDisposable
     {
         var quest = new QuestDefinition
         {
-            Id = "root", Title = "It's \"here\"", Description = "Line with a \\ and a tab\t.", Icon = "item/spear",
+            Id = "root", Title = "It's \"here\"", Description = "Line with a \\ and a tab\t.", Icon = "item/javelin",
             Pos = [-2.5f, 0.125f], Shape = "circle", Parents = ["a", "b"], Reveal = "anyParentDone", Unlock = "always", Readable = false,
             AnyOf = true,
             Requirements =

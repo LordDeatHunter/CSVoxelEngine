@@ -175,6 +175,9 @@ internal sealed class LocalPlayer
     // Refreshed from the camera by LocalContext() before every use, so it never allocates.
     private readonly PlayerContext _localContext;
 
+    // Reused per frame: the feet of the local player and of every remote one (BellowsSquash)
+    private readonly List<Vector3> _playerFeet = [];
+
     // True once the player rests on real ground at the spawn. The camera's initial position is only a
     // heightmap guess (pre-carve, see SpawnOverrides.SpawnPosition), so the spawn is an arrival that
     // holds the player until the column has loaded (see PlayerArrival).
@@ -295,6 +298,12 @@ internal sealed class LocalPlayer
     internal void UpdatePlayerModel(double deltaTime, ChunkManager chunkManager)
     {
         var camPos = Camera.Position;
+        // The bellows under any player's feet squash, and the ones just left swell back (display only)
+        _playerFeet.Clear();
+        _playerFeet.Add(camPos with { Y = camPos.Y - Camera.EyeHeight });
+        foreach (var remote in _world.RemotePlayers)
+            _playerFeet.Add(remote.Eye with { Y = remote.Eye.Y - Camera.EyeHeight });
+        _world.Smithing.Bellows.Update((float)deltaTime, chunkManager, _playerFeet, PlayerPhysics.PlayerRadius);
         var horizontalSpeed = 0f;
         var headingForward = 0f;
         var headingSide = 0f;

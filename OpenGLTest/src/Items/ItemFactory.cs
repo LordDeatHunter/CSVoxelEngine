@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Data;
 
 namespace VoxelEngine.Items;
@@ -63,7 +64,11 @@ public static class ItemFactory
         Rarity Rarity = Rarity.Common,
         GearInfo? Equip = null,
         ShrapnelProfile? Shrapnel = null,
-        GearPassive? OnHit = null);
+        GearPassive? OnHit = null,
+        HeldModel? HeldModel = null,
+        float ThrowChargeNeeded = 0f,
+        bool ThrowSticks = false,
+        float ThrowSpeedScale = 1f);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,

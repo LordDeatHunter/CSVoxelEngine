@@ -59,7 +59,7 @@ internal sealed class ObjectPasses
             Mesh? mesh;
             if (ItemRegistry.IsItem(drop.BlockId))
             {
-                if (!_owner.ItemMeshes.TryGet(drop.BlockId, out mesh, out var itemTexture)) continue;
+                if (!_owner.ItemMeshes.TryGetShape(drop.BlockId, out mesh, out var itemTexture)) continue;
                 Units.BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
                 atlasBound = false;
             }
@@ -75,12 +75,20 @@ internal sealed class ObjectPasses
                 if (mesh == null) continue;
             }
 
-            // The shape is centered on its own origin, so it spins in place
-            var model = Matrix4x4.CreateScale(drop.Scale)
-                        * Matrix4x4.CreateRotationY(drop.Spin)
-                        * Matrix4x4.CreateTranslation(drop.Position);
+            // The shape is centered on its own origin, so it spins in place; a stuck one keeps the pose and size it
+            // flew with, and is lit from its tail, which is outside whatever it is stuck in
+            var model = drop.IsStuck
+                ? Matrix4x4.CreateScale(ThrownProjectile.ScaleOf(drop.BlockId))
+                  * ThrownProjectile.AlignedRotation(drop.StuckHeading)
+                  * Matrix4x4.CreateTranslation(drop.Position)
+                : Matrix4x4.CreateScale(drop.Scale)
+                  * Matrix4x4.CreateRotationY(drop.Spin)
+                  * Matrix4x4.CreateTranslation(drop.Position);
+            var lightAt = drop.IsStuck
+                ? drop.Position - drop.StuckHeading * ThrownProjectile.TipReach(drop.BlockId)
+                : drop.Position;
 
-            _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(drop.Position));
+            _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(lightAt));
             mesh.Render();
         }
     }
@@ -104,7 +112,7 @@ internal sealed class ObjectPasses
             var renderId = projectile.RenderId;
             if (ItemRegistry.IsItem(renderId))
             {
-                if (!_owner.ItemMeshes.TryGet(renderId, out mesh, out var itemTexture)) continue;
+                if (!_owner.ItemMeshes.TryGetShape(renderId, out mesh, out var itemTexture)) continue;
                 Units.BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
                 atlasBound = false;
             }

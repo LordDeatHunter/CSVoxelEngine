@@ -1,0 +1,8 @@
+{
+  "mold": "block/fired_mold_hammer",
+  "fluid": "bronze",
+  "amountMl": 400,
+  "coolSeconds": 2,
+  "result": "item/bronze_hammer_head",
+  "count": 1
+}

@@ -99,6 +99,59 @@ public class DropManager
     }
 
     /// <summary>
+    /// A thrown <paramref name="itemId"/> that stays where it landed (<see cref="Item.ThrowSticks"/>): its flight stopped
+    /// at <paramref name="impact"/> heading along the unit <paramref name="heading"/>, in the terrain, or in
+    /// <paramref name="host"/>'s body when one is given. See <see cref="ItemDrop.StickInTerrain"/> and
+    /// <see cref="ItemDrop.StickInBody"/>. Null (nothing spawned) for an unknown id.
+    /// </summary>
+    public ItemDrop? SpawnStuck(ushort itemId, Vector3 impact, Vector3 heading, Mob? host = null,
+        float? pickupDelaySeconds = null)
+    {
+        if (BlockType.ById[itemId] == null && !ItemRegistry.IsItem(itemId)) return null;
+
+        var drop = new ItemDrop(itemId, ThrownProjectile.StuckCenter(itemId, impact, heading), toss: null, pickupDelaySeconds);
+        if (host != null) drop.StickInBody(heading, host);
+        else drop.StickInTerrain(heading);
+        _drops.Add(drop);
+        return drop;
+    }
+
+    /// <summary>
+    /// Puts back a stuck drop exactly where a save or a server snapshot recorded it (<paramref name="center"/> is
+    /// <see cref="ItemDrop.Position"/>, not the impact): in the terrain, or (<paramref name="inBody"/>) a client's
+    /// hostless mirror of one riding a mob. False for an unknown id.
+    /// </summary>
+    public bool SpawnRestoredStuck(ushort itemId, Vector3 center, Vector3 heading, bool inBody, float age)
+    {
+        if (!SpawnRestored(itemId, center, Vector3.Zero, age)) return false;
+        var drop = _drops[^1];
+        if (heading.LengthSquared() < 1e-8f) return true;
+        heading = Vector3.Normalize(heading);
+        if (inBody) drop.StickInBody(heading, null);
+        else drop.StickInTerrain(heading);
+        return true;
+    }
+
+    /// <summary>Lets go of every drop stuck in a mob that died or is no longer among <paramref name="mobs"/>, so it
+    /// falls where the mob was and can be taken.</summary>
+    public void ReleaseOrphans(IReadOnlyList<Mob> mobs)
+    {
+        for (var i = 0; i < _drops.Count; i++)
+        {
+            if (_drops[i].Host is not { } host) continue;
+            if (!host.IsDead && Contains(mobs, host)) continue;
+            _drops[i].Unstick();
+        }
+    }
+
+    private static bool Contains(IReadOnlyList<Mob> mobs, Mob mob)
+    {
+        for (var i = 0; i < mobs.Count; i++)
+            if (ReferenceEquals(mobs[i], mob)) return true;
+        return false;
+    }
+
+    /// <summary>
     /// Puts back a drop a save recorded, with its exact position, velocity and age and no pop.
     /// False (and nothing added) for an id that is neither a block nor an item, the same guard
     /// as <see cref="SpawnAt"/>.

@@ -314,6 +314,7 @@ OpenGLTest/
         WoodLootBand.cs        # one thickness band of a tree_wood block's loot (self or a table)
       Models/                  # Minecraft model format and Blockbench projects: parents, baking, quads
         ModelBaker.cs, BakedModel.cs, BakedQuad.cs  # elements -> atlas-ready quads + full-cube flags
+        HeldModel.cs           # GL-free: a 3D item's shape (item JSON `heldModel`), its cubes flattened and turned into the sprite's space
         BbmodelLoader.cs       # Blockbench .bbmodel: groups (nested, with Parent),
                                #   cubes, per-face UVs, the skin texture and the
                                #   keyframe `animations`; rest rotations rejected
@@ -515,7 +516,8 @@ OpenGLTest/
       MobCaps.cs, IMobPopulation.cs  # the natural and hard mob caps every kind shares, over the
                                      #   living count each registered manager reports
       IMobTarget.cs            # what a mob chases and hurts: eye, immunity, TakeHit (Camera, ServerPlayer)
-      ItemDrop.cs              # a collectable left behind by mining: usually a block, sometimes a pure item (see Item)
+      ItemDrop.cs              # a collectable left behind by mining: usually a block, sometimes a pure item (see Item); also a stuck throw
+      DropStick.cs             # what a thrown item that stays where it landed is stuck in (none, terrain, a mob's body)
       LedgeProbe.cs            # GL-free ledge caution: the drop to the first ground ahead, safe-step rule
       EntityContract.cs        # the startup checks of a clip-animated kind's model: the humanoid groups, a clip,
                                #   a clip's timeline event (RequireHumanoid), each naming the model file

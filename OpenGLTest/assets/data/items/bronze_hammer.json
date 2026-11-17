@@ -1,6 +1,6 @@
 {
-  "name": "Smithing Hammer",
-  "texture": "assets/textures/items/smithing_hammer.png",
+  "name": "Bronze Hammer",
+  "texture": "assets/textures/items/bronze_hammer.png",
   "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.4 },
   "blockDamage": 0.5,
   "entityDamage": 2,

@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.CaveMobs;
@@ -205,6 +206,13 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
     }
 
+    private void WriteRawPlayerFile(string json)
+    {
+        var store = new ChunkSaveStore(_dir);
+        store.EnqueueFile(PlayerSaveCodec.FileName, Encoding.UTF8.GetBytes(json));
+        Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+    }
+
     private void WriteEntitiesFile(EntitySaveData data)
     {
         var store = new ChunkSaveStore(_dir);
@@ -286,6 +294,22 @@ public sealed class WorldLifecycleTests : IDisposable
         var reopened = NewWorld(null, clientMode: true);
         snapshot.AssertMatches(ColumnCache.Get(CacheProbeX, CacheProbeZ));
         Assert.True(reopened.SaveAndDispose());
+    }
+
+    [Fact]
+    public void StoreBackedWorldIgnoresNonFiniteSavedLookAndClockFields()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        WriteRawPlayerFile($"{{\"Position\":[0,{High},0],\"Yaw\":1e1000,\"Pitch\":-1e1000,\"RespawnEye\":[1,1e1000,1],\"LightingClock\":1e9999,\"Health\":37}}");
+
+        var world = NewWorld(new ChunkSaveStore(_dir));
+        Assert.Equal(new Vector3(0f, High, 0f), world.Camera.Position);
+        Assert.True(float.IsFinite(world.Camera.Yaw));
+        Assert.True(float.IsFinite(world.Camera.Pitch));
+        Assert.Equal(37, world.Health);
+        Assert.True(RunUntil(world, () => world.IsPlaying, LoadWallSeconds));
+        Assert.True(double.IsFinite(world.LightingTime));
+        Assert.True(world.SaveAndDispose());
     }
 
     [Fact]
@@ -903,6 +927,24 @@ public sealed class WorldLifecycleTests : IDisposable
     }
 
     [Fact]
+    public void ACorruptPlayerFileIsPreservedWhenTheWorldWritesItsFallback()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        Directory.CreateDirectory(_dir);
+        var file = Path.Combine(_dir, PlayerSaveCodec.FileName);
+        byte[] original = "{\"Position\":["u8.ToArray();
+        File.WriteAllBytes(file, original);
+
+        var world = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(world.SaveAndDispose());
+
+        var backup = file + ".bad";
+        Assert.True(File.Exists(backup), "a rejected player file should be archived before the fallback save");
+        Assert.Equal(original, File.ReadAllBytes(backup));
+        Assert.NotNull(PlayerSaveCodec.TryParse(File.ReadAllBytes(file)));
+    }
+
+    [Fact]
     public void UnknownEntityNamesAreDroppedWithoutFailingTheLoad()
     {
         WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
@@ -922,5 +964,35 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Empty(world.Goblins);
         Assert.Empty(world.Drops);
         Assert.True(world.SaveAndDispose());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MalformedEntityJsonIsArchivedBeforeWorldSave(bool serverMode)
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        Directory.CreateDirectory(_dir);
+        var path = Path.Combine(_dir, EntitySaveCodec.FileName);
+        var original = Encoding.UTF8.GetBytes("{\"Mobs\":[");
+        File.WriteAllBytes(path, original);
+
+        var world = new World(null!, null!, null!, null!, null!, null!, null, new ChunkSaveStore(_dir),
+            serverMode: serverMode, spawn: new Vector3(0f, High, 0f));
+        _worlds.Add(world);
+        Assert.True(world.SaveAndDispose());
+
+        var badPath = path + ".bad";
+        var archived = File.Exists(badPath) ? File.ReadAllBytes(badPath) : null;
+        var reopened = new ChunkSaveStore(_dir);
+        var replacement = reopened.ReadFile(EntitySaveCodec.FileName);
+        var replacementParses = EntitySaveCodec.TryParse(replacement) != null;
+        var shutdown = reopened.Shutdown(TimeSpan.FromSeconds(10));
+        var archiveMatches = archived != null && archived.SequenceEqual(original);
+
+        Assert.True(shutdown, "the read-only verification store did not shut down");
+        Assert.True(archiveMatches,
+            $"serverMode={serverMode}; .bad exists={archived != null}; archived bytes match={archiveMatches}; replacement parses={replacementParses}");
+        Assert.True(replacementParses, "the replacement entities.json did not parse after reopening the store");
     }
 }

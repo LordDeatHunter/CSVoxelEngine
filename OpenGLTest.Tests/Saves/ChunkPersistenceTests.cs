@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Numerics;
 using VoxelEngine.Data;
 using VoxelEngine.Player;
@@ -63,6 +64,25 @@ public sealed class ChunkPersistenceTests : IDisposable
         Assert.Equal(Block("water"), chunk.GetLocalBlock(6, 2, 6));
         Assert.Equal(FluidState.Flowing(3), chunk.GetLocalState(6, 2, 6));
         Assert.Equal(0, chunk.GetLocalBlock(0, 0, 0));
+    }
+
+    private static byte[] ForgeMalformedPaletteChunk()
+    {
+        var indices = new byte[Chunk.BlockCount];
+        indices[Chunk.Idx(1, 0, 0)] = 1;
+        using var forged = new MemoryStream();
+        using (var header = new BinaryWriter(forged, System.Text.Encoding.UTF8, leaveOpen: true))
+        {
+            header.Write("CVXC"u8);
+            header.Write(ChunkSaveCodec.Version);
+            header.Write((byte)0);
+            header.Write((ushort)1);
+            header.Write((byte)1);
+            header.Write((byte)0xFF);
+        }
+        using (var deflate = new DeflateStream(forged, CompressionLevel.Fastest, leaveOpen: true))
+            deflate.Write(indices);
+        return forged.ToArray();
     }
 
     [Fact]
@@ -135,6 +155,47 @@ public sealed class ChunkPersistenceTests : IDisposable
             var manager = new ChunkManager(null!, saveStore: reopened);
             manager.QueueChunk(Pos);
             Assert.False(manager.Chunks[Pos].IsRestored);
+        }
+        finally
+        {
+            ShutdownOrFail(reopened);
+        }
+    }
+
+    [Fact]
+    public void MalformedPaletteEncodingRegeneratesAndArchivesTheOriginalOnEdit()
+    {
+        var original = ForgeMalformedPaletteChunk();
+        var chunks = Path.Combine(_world, WorldStore.ChunksDirectoryName);
+        Directory.CreateDirectory(chunks);
+        var path = Path.Combine(chunks, WorldStore.ChunkFileName((int)Pos.X, (int)Pos.Y, (int)Pos.Z));
+        File.WriteAllBytes(path, original);
+
+        var store = new ChunkSaveStore(_world);
+        try
+        {
+            var manager = new ChunkManager(null!, saveStore: store);
+            manager.QueueChunk(Pos);
+            var regenerated = manager.Chunks[Pos];
+
+            Assert.False(regenerated.IsRestored);
+            Assert.Equal(0, regenerated.GetLocalBlock(1, 0, 0));
+
+            regenerated.SetBlockRaw(1, 0, 0, Block("stone"), 0);
+            Assert.True(manager.FlushModified(int.MaxValue) > 0);
+        }
+        finally
+        {
+            ShutdownOrFail(store);
+        }
+
+        Assert.Equal(original, File.ReadAllBytes(path + ".bad"));
+
+        var reopened = new ChunkSaveStore(_world);
+        try
+        {
+            Assert.True(reopened.TryLoad(Key, out var saved));
+            Assert.Equal(Block("stone"), saved.Storage.Get(Chunk.Idx(1, 0, 0)));
         }
         finally
         {

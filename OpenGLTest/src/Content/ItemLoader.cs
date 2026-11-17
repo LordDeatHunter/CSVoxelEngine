@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Data;
@@ -113,6 +114,8 @@ internal static class ItemLoader
                 }
             }
 
+            var heldModel = LoadHeldModel(definition.HeldModel, path);
+
             var sheet = ParseSpritesheet(definition.Spritesheet, path);
             var display = ParseDisplay(definition.Display, path);
 
@@ -159,6 +162,23 @@ internal static class ItemLoader
             if (definition.ThrowAligned && throwDamage == null)
                 throw new InvalidOperationException($"Item '{path}' sets throwAligned but has no throwDamage.");
 
+            if (definition.ThrowSticks && throwDamage == null)
+                throw new InvalidOperationException($"Item '{path}' sets throwSticks but has no throwDamage.");
+
+            var throwChargeNeeded = definition.ThrowChargeNeeded ?? 0f;
+            if (definition.ThrowChargeNeeded.HasValue && throwDamage == null)
+                throw new InvalidOperationException($"Item '{path}' sets throwChargeNeeded but has no throwDamage.");
+            if (!(throwChargeNeeded >= 0f && throwChargeNeeded <= 1f))
+                throw new InvalidOperationException(
+                    $"Item '{path}' has throwChargeNeeded {definition.ThrowChargeNeeded}; expected 0..1.");
+
+            var throwSpeedScale = definition.ThrowSpeedScale ?? 1f;
+            if (definition.ThrowSpeedScale.HasValue && throwDamage == null)
+                throw new InvalidOperationException($"Item '{path}' sets throwSpeedScale but has no throwDamage.");
+            if (!(throwSpeedScale > 0f))
+                throw new InvalidOperationException(
+                    $"Item '{path}' has throwSpeedScale {definition.ThrowSpeedScale}; expected above 0.");
+
             if (definition.ThrowBlock != null && throwDamage == null)
                 throw new InvalidOperationException($"Item '{path}' sets throwBlock but has no throwDamage.");
 
@@ -191,7 +211,11 @@ internal static class ItemLoader
                 Rarity: rarity,
                 Equip: equip,
                 Shrapnel: shrapnel,
-                OnHit: onHit));
+                OnHit: onHit,
+                HeldModel: heldModel,
+                ThrowChargeNeeded: throwChargeNeeded,
+                ThrowSticks: definition.ThrowSticks,
+                ThrowSpeedScale: throwSpeedScale));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, ushort>(ContentRegistry.ItemIds, StringComparer.Ordinal));
@@ -521,6 +545,20 @@ internal static class ItemLoader
     /// Reads a held-in-hand transform (an item's <c>display</c>, or an entity's <c>held.display</c>),
     /// defaulting to the upright side-facing tool pose when the file says nothing.
     /// </summary>
+    // The Blockbench project an item's heldModel names, or null when it names none; a failure names the item
+    private static HeldModel? LoadHeldModel(string? modelPath, string path)
+    {
+        if (string.IsNullOrWhiteSpace(modelPath)) return null;
+        try
+        {
+            return HeldModel.Load(modelPath);
+        }
+        catch (Exception e)
+        {
+            throw new InvalidOperationException($"Item '{path}' heldModel: {e.Message}", e);
+        }
+    }
+
     internal static ParsedDisplay ParseDisplay(ItemDefinition.DisplayDefinition? display, string path)
     {
         if (display == null)

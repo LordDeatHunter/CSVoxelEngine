@@ -48,8 +48,12 @@ public static class MapSaveCodec
     }
 
     /// <summary>The saved tiles, or null for no file or a file that is not this format (warned).</summary>
-    public static IReadOnlyList<(MapLayerKind Kind, MapTile Tile)>? TryParse(byte[]? bytes)
+    public static IReadOnlyList<(MapLayerKind Kind, MapTile Tile)>? TryParse(byte[]? bytes) =>
+        TryParse(bytes, out _);
+
+    internal static IReadOnlyList<(MapLayerKind Kind, MapTile Tile)>? TryParse(byte[]? bytes, out bool rejected)
     {
+        rejected = false;
         if (bytes == null) return null;
         try
         {
@@ -79,6 +83,7 @@ public static class MapSaveCodec
         }
         catch (Exception e) when (e is IOException or InvalidDataException or EndOfStreamException)
         {
+            rejected = true;
             Log.Warn($"Map: ignoring {FileName}: {e.Message}");
             return null;
         }

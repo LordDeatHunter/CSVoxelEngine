@@ -13,7 +13,7 @@
     { "op": "wait", "seconds": 1.5 },
     { "op": "screenshot", "name": "stacks" },
 
-    { "op": "give", "block": "item/smithing_hammer", "count": 1 },
+    { "op": "give", "block": "item/bronze_hammer", "count": 1 },
     { "op": "forge", "action": "open", "pos": [-40, 10, 58] },
     { "op": "wait", "seconds": 0.6 },
     { "op": "screenshot", "name": "recipes-eight" },

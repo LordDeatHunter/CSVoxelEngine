@@ -1,11 +1,11 @@
 {
-  // The spear in flight: run with VOXEL_SCRIPT=visual-examples/spear.json VOXEL_TIME=147 from
-  // OpenGLTest/. Shots land in visual/spear/. A creative flier on the open meadow of the animations
-  // scenarios gives itself spears and throws them along +Z (the `throw` player action launches the
+  // The javelin in flight: run with VOXEL_SCRIPT=visual-examples/javelin.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/javelin/. A creative flier on the open meadow of the animations
+  // scenarios gives itself javelins and throws them along +Z (the `throw` player action launches the
   // selected throwable at full charge, 40 blocks per second, and plays the arm's release). A thrown
-  // spear is a thin sprite and tiny from behind, so each shot throws, waits, and then jumps the
-  // camera beside where the spear will be (x -40, 3.5 blocks off its line, facing it) before
-  // shooting: the spear flies point first along its velocity, level at first and tipping down along
+  // javelin is a thin 3D model (its heldModel) and tiny from behind, so each shot throws, waits, and then jumps the
+  // camera beside where the javelin will be (x -40, 3.5 blocks off its line, facing it) before
+  // shooting: the javelin flies point first along its velocity, level at first and tipping down along
   // its arc. The first shots are the ready pose and the charge from the shoulder camera; the flight shots are first person. Positions
   // assume 40 b/s and are approximate.
   "steps": [
@@ -13,7 +13,7 @@
     { "op": "fly" },
     { "op": "teleport", "pos": [-43.5, 16.5, 60.5], "yaw": 90, "pitch": 0 },
     { "op": "wait", "seconds": 5 },
-    { "op": "give", "block": "item/spear", "count": 3 },
+    { "op": "give", "block": "item/javelin", "count": 3 },
     { "op": "select", "slot": 1 },
     { "op": "view", "mode": "shoulder" },
     { "op": "wait", "seconds": 1 },

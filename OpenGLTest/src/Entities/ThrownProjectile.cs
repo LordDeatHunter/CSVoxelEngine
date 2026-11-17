@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Items;
 using VoxelEngine.Particles;
+using VoxelEngine.Player;
 
 namespace VoxelEngine.Entities;
 
@@ -28,7 +29,7 @@ public sealed class ThrownProjectile
     /// <summary>The projectile's velocity in blocks per second.</summary>
     public Vector3 Velocity => _velocity;
 
-    /// <summary>Whether it flies point first along its velocity (a spear) instead of tumbling.</summary>
+    /// <summary>Whether it flies point first along its velocity (a javelin) instead of tumbling.</summary>
     public bool Aligned => ItemRegistry.TryGet(ItemId)?.ThrowAligned == true;
 
     /// <summary>
@@ -66,8 +67,47 @@ public sealed class ThrownProjectile
     /// the item itself (a sprite) or the block it is.</summary>
     public ushort RenderId => ItemRegistry.TryGet(ItemId) is { ThrowBlockId: not 0 } item ? item.ThrowBlockId : ItemId;
 
+    /// <summary>How deep a stuck item's tip sits in what it hit, in blocks.</summary>
+    public const float StuckDepth = 0.2f;
+
+    /// <summary>How far the tip of <paramref name="renderId"/> reaches from its center as a thrown (or stuck) projectile:
+    /// a 3D item's own tip, a sprite's corner on its diagonal.</summary>
+    public static float TipReach(ushort renderId) =>
+        (ItemRegistry.TryGet(renderId)?.HeldModel?.TipHeight ?? 0.70710678f) * ScaleOf(renderId);
+
+    /// <summary>
+    /// Where the center of a stuck <paramref name="itemId"/> rests for a flight that stopped at <paramref name="impact"/>
+    /// (the projectile's last position, a <see cref="HalfExtent"/> short of what it hit) heading along the unit
+    /// <paramref name="heading"/>: back along the shaft, so the tip ends <see cref="StuckDepth"/> inside.
+    /// <see cref="StuckImpact"/> is its inverse.
+    /// </summary>
+    public static Vector3 StuckCenter(ushort itemId, Vector3 impact, Vector3 heading) =>
+        impact - heading * StuckBack(itemId);
+
+    /// <summary>The impact point a stuck item's <paramref name="center"/> was placed from (<see cref="StuckCenter"/>).</summary>
+    public static Vector3 StuckImpact(ushort itemId, Vector3 center, Vector3 heading) =>
+        center + heading * StuckBack(itemId);
+
+    private static float StuckBack(ushort itemId) => MathF.Max(0f, TipReach(itemId) - StuckDepth - HalfExtent);
+
+    /// <summary>Whether the flight ended against terrain (rather than on a mob, or by running out of life in the air).</summary>
+    public bool Landed { get; private set; }
+
+    /// <summary>The unit direction it is flying (or was, when it stopped); +X for one with no speed.</summary>
+    public Vector3 Heading => _velocity.LengthSquared() < 1e-8f ? Vector3.UnitX : Vector3.Normalize(_velocity);
+
     public float Spin => _age * 9f;
-    public float Scale => ItemDrop.Size * (ItemRegistry.IsItem(RenderId) ? 1.5f : 1f);
+    /// <summary>The drawn size: a 3D item (<see cref="Item.HeldModel"/>) keeps the size it had in the hand, so it
+    /// neither shrinks nor grows as it leaves it; a sprite or a block cube flies at its drop's size.</summary>
+    public float Scale => ScaleOf(RenderId);
+
+    /// <summary>The size <paramref name="renderId"/> is drawn at as a thrown (or stuck) projectile; see <see cref="Scale"/>.</summary>
+    public static float ScaleOf(ushort renderId) => ItemRegistry.TryGet(renderId) switch
+    {
+        { HeldModel: not null } item => HeldItemPose.HeldItemScale * item.DisplayScale,
+        null => ItemDrop.Size,
+        _ => ItemDrop.Size * 1.5f,
+    };
     public bool IsExpired => _age >= _lifeSeconds;
 
     /// <summary>A projectile that falls under <paramref name="gravityScale"/> of <see cref="Gravity"/> (bone shrapnel
@@ -93,11 +133,11 @@ public sealed class ThrownProjectile
 
     public int Damage => DamageFor(BaseDamage, Charge01);
 
-    public static Vector3 LaunchVelocity(Vector3 direction, float charge01)
+    public static Vector3 LaunchVelocity(Vector3 direction, float charge01, float speedScale = 1f)
     {
         if (direction.LengthSquared() < 1e-8f) direction = Vector3.UnitX;
         direction = Vector3.Normalize(direction);
-        return direction * (PlayerConfig.ThrowSpeed * ChargeFactor(charge01));
+        return direction * (PlayerConfig.ThrowSpeed * speedScale * ChargeFactor(charge01));
     }
 
     public bool Update(float deltaTime, ChunkManager chunks, IReadOnlyList<Mob>? mobs, out Mob? hit,
@@ -114,7 +154,11 @@ public sealed class ThrownProjectile
         next = BoxSweep.MoveOnAxis(next, movement.Z, 2, half, chunks, out var hitZ);
         next = BoxSweep.MoveOnAxis(next, movement.Y, 1, half, chunks, out var hitY);
         Position = next;
-        if (hitX || hitY || hitZ) return false;
+        if (hitX || hitY || hitZ)
+        {
+            Landed = true;
+            return false;
+        }
 
         hit = FindMobHit(Position, HalfExtent, mobs, ignore);
         return hit == null;
