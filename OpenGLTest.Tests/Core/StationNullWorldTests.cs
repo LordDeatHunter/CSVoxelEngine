@@ -22,6 +22,7 @@ public sealed class StationNullWorldTests
         var directory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         var initialStore = new ChunkSaveStore(directory);
         var initialStoreClosed = false;
+        ChunkSaveStore? worldStore = null;
         World? world = null;
         try
         {
@@ -43,8 +44,8 @@ public sealed class StationNullWorldTests
             initialStoreClosed = initialStore.Shutdown(TimeSpan.FromSeconds(10));
             Assert.True(initialStoreClosed, "the initial test save did not drain");
 
-            world = new World(null!, null!, null!, null!, null!, null!, null,
-                new ChunkSaveStore(directory));
+            worldStore = new ChunkSaveStore(directory);
+            world = new World(null!, null!, null!, null!, null!, null!, null, worldStore);
             Assert.True(RunUntil(world, () => world.IsPlaying, 60), "the store-backed world did not become ready");
             Assert.False(world.LoadTimedOut);
             Assert.True(world.Campfires.IsLit(2, (int)High, 2));
@@ -62,7 +63,10 @@ public sealed class StationNullWorldTests
         {
             if (!initialStoreClosed)
                 initialStore.Shutdown(TimeSpan.FromSeconds(10));
-            world?.SaveAndDispose();
+            if (world == null)
+                worldStore?.Shutdown(TimeSpan.FromSeconds(10));
+            else
+                world.SaveAndDispose();
             try
             {
                 WorldSeed.Apply(WorldSeed.Default);
