@@ -299,7 +299,8 @@ public sealed class DynamicReliefTests(ITestOutputHelper output)
         try
         {
             WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
-            (int CellX, int CellZ, int Ground)? chosen = null;
+            (int CellX, int CellZ, int Ground, ushort Near)? chosen = null;
+            var chunks = new Dictionary<(int X, int Y, int Z), Chunk>();
             for (var cellX = 1792; cellX < 1824 && chosen == null; cellX += 2)
             for (var cellZ = 6592; cellZ < 6624; cellZ += 2)
             {
@@ -308,24 +309,33 @@ public sealed class DynamicReliefTests(ITestOutputHelper output)
                 var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
                 var li = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
                 var h = column.Heights[li];
-                if (!BiomeTraits.ShowsBareRock(column.Biomes[li])
+                // This S1b snow-cap control needs an intact rocky surface. A later
+                // open-canyon cut or a cave can leave air at the heightmap ground cell.
+                if (column.Bed[li] != h || !BiomeTraits.ShowsBareRock(column.Biomes[li])
                     || h < TerrainGenerator.MountainRockHeight || (h & Chunk.SizeMask) == Chunk.SizeMask
                     || TerrainGenerator.IsWaterColumn(x, z, h)
                     || !SnowGenerator.HasSnow(x, z, SnowGenerator.ColdWeightAt(x, z, h))) continue;
-                chosen = (cellX, cellZ, h);
+                var cy = (h + 1) >> Chunk.SizeShift;
+                var key = (x >> Chunk.SizeShift, cy, z >> Chunk.SizeShift);
+                if (!chunks.TryGetValue(key, out var chunk))
+                {
+                    chunk = new Chunk(null!, new Vector3(key.Item1, key.cy, key.Item3),
+                        generateBlockData: false);
+                    ChunkTerrainFill.GenerateBlockData(chunk);
+                    chunks.Add(key, chunk);
+                }
+                var groundBlock = chunk.Storage.Get(Chunk.Idx(x & Chunk.SizeMask,
+                    h & Chunk.SizeMask, z & Chunk.SizeMask));
+                if (groundBlock == BlockType.Air || BlockType.IsFluid(groundBlock)) continue;
+                var candidateNear = chunk.Storage.Get(Chunk.Idx(x & Chunk.SizeMask,
+                    (h + 1) & Chunk.SizeMask, z & Chunk.SizeMask));
+                chosen = (cellX, cellZ, h, candidateNear);
                 break;
             }
             Assert.NotNull(chosen);
-            var (chosenX, chosenZ, ground) = chosen.Value;
+            var (chosenX, chosenZ, ground, near) = chosen.Value;
             var nearX = chosenX + 1;
             var nearZ = chosenZ + 1;
-
-            var cy = (ground + 1) >> Chunk.SizeShift;
-            var chunk = new Chunk(null!, new Vector3(nearX >> Chunk.SizeShift, cy, nearZ >> Chunk.SizeShift),
-                generateBlockData: false);
-            ChunkTerrainFill.GenerateBlockData(chunk);
-            var near = chunk.Storage.Get(Chunk.Idx(nearX & Chunk.SizeMask, (ground + 1) & Chunk.SizeMask,
-                nearZ & Chunk.SizeMask));
             Assert.Equal(TerrainGenerator.SnowBlock, near);
 
             var spec = LodRegion.Levels[0];
@@ -348,7 +358,7 @@ public sealed class DynamicReliefTests(ITestOutputHelper output)
             Assert.NotEmpty(topTiles);
             var snowTile = BlockType.ById[TerrainGenerator.SnowBlock]!.FaceTiles[4];
             Assert.Contains(snowTile, topTiles);
-            output.WriteLine($"rocky snow cell ({nearX},{nearZ}) Y{ground}, near block {near}, LOD tiles [{string.Join(',', topTiles)}], snow tile {snowTile}");
+            output.WriteLine($"rocky snow cell ({nearX},{nearZ}) Y{ground}, near block {near}, LOD tiles [{string.Join(',', topTiles)}], snow tile {snowTile}, generated candidate chunks {chunks.Count}");
         }
         finally { WorldSeed.Apply(WorldSeed.Default); }
     }
