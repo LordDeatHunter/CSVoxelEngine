@@ -282,6 +282,8 @@ public sealed class WorldStoreTests : IDisposable
 
     [Theory]
     [InlineData("99")]
+    [InlineData("1.5")]
+    [InlineData("4294967296")]
     [InlineData("\"dynamic\"")]
     [InlineData("null")]
     public void UnsupportedTerrainRemainsListedAndCannotBeRewritten(string value)

@@ -66,7 +66,9 @@ Newly created worlds save `terrain: 2` (Dynamic); older files without `terrain` 
 the exact pre-profile generator. Dynamic currently delegates to that same generator; visible
 terrain changes belong to later stages. Rename, last-played and source metadata rewrites retain
 the profile. An unknown or malformed saved profile remains listed but cannot be opened, hosted
-or rewritten; its original `world.json` is left untouched. `WorldStore.CurrentVersion` stays 2.
+or rewritten; its original `world.json` is left untouched. EDIT confirmation shows the menu's
+store-failure notice without escaping the input handler, while DELETE remains available.
+`WorldStore.CurrentVersion` stays 2.
 
 - **Chunk persistence ordering** (`ChunkSaveStore`'s class doc is the reference). Writes are
   asynchronous: the main thread only clones the chunk's palette storage and state

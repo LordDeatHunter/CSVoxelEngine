@@ -642,7 +642,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
             call();
             return true;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
         {
             Log.Warn($"Worlds: {e.Message}");
             SetErrorNotice();

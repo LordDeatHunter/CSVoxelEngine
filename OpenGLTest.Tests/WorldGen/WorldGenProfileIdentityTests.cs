@@ -76,11 +76,14 @@ public sealed class WorldGenProfileIdentityTests
         writer.Write(column.MaxWaterLevel);
     });
 
+    // Names survive a content registry reorder; numeric block ids do not.
     private static string ChunkDigest(Chunk chunk) => Digest(writer =>
     {
         var blocks = chunk.Storage.ToDense();
         writer.Write(blocks.Length);
-        foreach (var block in blocks) writer.Write(block);
+        foreach (var block in blocks)
+            writer.Write(block == BlockType.Air ? "air" : BlockType.ById[block]?.Name
+                ?? throw new InvalidDataException($"Unknown generated block id {block}"));
         writer.Write(chunk.StateArray != null);
         if (chunk.StateArray != null) Write(writer, chunk.StateArray);
         writer.Write(chunk.FluidFrontier != null);
@@ -123,6 +126,27 @@ public sealed class WorldGenProfileIdentityTests
         return rows.ToArray();
     }
 
+    private static string[] ReadRows(TextReader reader)
+    {
+        var rows = new System.Collections.Generic.List<string>();
+        while (reader.ReadLine() is { } row)
+            if (row.Length > 0) rows.Add(row);
+        return rows.ToArray();
+    }
+
+    [Fact]
+    public void IdentityFixtureReadsBothLineEndings()
+    {
+        using var resource = typeof(WorldGenProfileIdentityTests).Assembly.GetManifestResourceStream(
+            "VoxelEngine.Tests.WorldGen.LegacyEa201Identity.csv");
+        Assert.NotNull(resource);
+        using var reader = new StreamReader(resource);
+        var rows = ReadRows(reader);
+        Assert.Equal(60, rows.Length);
+        Assert.Equal(rows, ReadRows(new StringReader(string.Join("\n", rows) + "\n")));
+        Assert.Equal(rows, ReadRows(new StringReader(string.Join("\r\n", rows) + "\r\n")));
+    }
+
     [Fact]
     public void LegacyGenerationMatchesFrozenEaMaster()
     {
@@ -133,7 +157,7 @@ public sealed class WorldGenProfileIdentityTests
                 "VoxelEngine.Tests.WorldGen.LegacyEa201Identity.csv");
             Assert.NotNull(resource);
             using var reader = new StreamReader(resource);
-            var expected = reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var expected = ReadRows(reader);
             // S0 Dynamic intentionally delegates to the EA generator. Legacy runs after a
             // Dynamic -> Legacy transition, so stale profile-dependent cache entries show up.
             Assert.Equal(expected, Sample(WorldGenProfile.Dynamic));
