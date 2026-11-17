@@ -57,6 +57,9 @@ public class Inventory
     // hotbar slot can name its instance and dead references are detectable
     private readonly List<ItemStack> _tools = [];
     private int _nextToolInstance = 1;
+    // No positive int follows int.MaxValue. Persist this marker so removing the highest live
+    // instance cannot make an old identity available again after a reload.
+    internal const int ExhaustedInstanceId = int.MinValue;
 
     private readonly HotbarSlot[] _hotbar = new HotbarSlot[SlotCount];
 
@@ -166,7 +169,9 @@ public class Inventory
     public bool CanAccept(ushort id)
     {
         var category = CategoryOf(id);
-        return category.HasValue && UsedOf(category.Value) < CapacityOf(category.Value);
+        return category.HasValue && UsedOf(category.Value) < CapacityOf(category.Value)
+            && (category is not (InventoryCategory.Tools or InventoryCategory.Gear)
+                || _nextToolInstance != ExhaustedInstanceId);
     }
 
     /// <summary>
@@ -204,11 +209,12 @@ public class Inventory
             case InventoryCategory.Tools:
             case InventoryCategory.Gear:
                 var room = CapacityOf(category.Value) - UsedOf(category.Value);
-                if (room <= 0) return false;
+                if (room <= 0 || _nextToolInstance == ExhaustedInstanceId) return false;
                 var newTool = CountFor(id) == 0;
                 var firstNewIndex = _tools.Count;
-                for (var i = 0; i < Math.Min(room, amount); i++)
-                    _tools.Add(new ItemStack(_nextToolInstance++, id));
+                var take = (int)Math.Min(Math.Min(room, amount), (long)int.MaxValue - _nextToolInstance + 1);
+                for (var i = 0; i < take; i++)
+                    _tools.Add(new ItemStack(AllocateInstanceId(), id));
                 if ((newTool || LanternState.IsLantern(id)) && autoEquip && category.Value == InventoryCategory.Tools)
                     EquipNewTool(_tools[firstNewIndex].InstanceId);
                 return true;
@@ -277,14 +283,22 @@ public class Inventory
     {
         var category = CategoryOf(template.DefinitionId);
         if (category is not (InventoryCategory.Tools or InventoryCategory.Gear)
-            || UsedOf(category.Value) >= CapacityOf(category.Value))
+            || UsedOf(category.Value) >= CapacityOf(category.Value)
+            || _nextToolInstance == ExhaustedInstanceId)
             return false;
         _known.Add(template.DefinitionId);
-        _tools.Add(template.CloneAs(_nextToolInstance++));
+        _tools.Add(template.CloneAs(AllocateInstanceId()));
         if (autoEquip && LanternState.IsLantern(template.DefinitionId))
             EquipNewTool(_tools[^1].InstanceId);
         Gained?.Invoke(template.DefinitionId);
         return true;
+    }
+
+    internal int AllocateInstanceId()
+    {
+        var id = _nextToolInstance;
+        _nextToolInstance = id == int.MaxValue ? ExhaustedInstanceId : id + 1;
+        return id;
     }
 
     /// <summary>
@@ -364,21 +378,20 @@ public class Inventory
     /// </summary>
     public bool RemoveAll(ushort id)
     {
-        if (CategoryOf(id) is InventoryCategory.Tools or InventoryCategory.Gear)
-        {
-            var instances = _tools.Where(t => t.DefinitionId == id)
-                .Select(t => t.InstanceId)
-                .ToArray();
-            var removed = false;
-            foreach (var instance in instances)
-                removed |= RemoveTool(instance);
-            return removed;
-        }
+        var instances = _tools.Where(t => t.DefinitionId == id)
+            .Select(t => t.InstanceId)
+            .ToArray();
+        var removed = false;
+        foreach (var instance in instances)
+            removed |= RemoveTool(instance);
 
         var store = StoreOf(id);
-        if (store == null || !store.Remove(id)) return false;
-        ClearSlotsShowing(id);
-        return true;
+        if (store?.Remove(id) == true)
+        {
+            ClearSlotsShowing(id);
+            removed = true;
+        }
+        return removed;
     }
 
     /// <summary>Spends one unit from the selected slot. Tools are never spent — they morph.

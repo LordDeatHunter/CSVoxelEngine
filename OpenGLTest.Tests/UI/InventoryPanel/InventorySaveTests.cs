@@ -277,6 +277,87 @@ public sealed class InventorySaveTests
     }
 
     [Fact]
+    public void RestoredMaximumInstanceIdCannotBeReusedByEitherAddPath()
+    {
+        var tool = ToolItem(_ => true);
+        var name = SaveNames.NameOf(tool.Id)!;
+        var json = """{"Inventory":{"Tools":[{"InstanceId":1,"Name":"__NAME__"},{"InstanceId":2147483647,"Name":"__NAME__"}],"NextToolInstance":1,"Hotbar":[{"IsTool":true,"ToolInstance":1}],"Offhand":{"IsTool":true,"ToolInstance":2147483647}}}""".Replace("__NAME__", name);
+        var saved = PlayerSaveCodec.TryParse(System.Text.Encoding.UTF8.GetBytes(json))!;
+        var inventory = Inventory.Empty();
+        inventory.Import(saved.Inventory!);
+
+        Assert.Equal(new[] { 1, int.MaxValue }, inventory.ToolEntries().Select(t => t.InstanceId));
+        Assert.Equal(1, inventory.SlotAt(0).ToolInstance);
+        Assert.Equal(int.MaxValue, inventory.Offhand.ToolInstance);
+        Assert.False(inventory.Add(tool.Id, autoEquip: false));
+        var offered = new ItemStack(77, tool);
+        offered.Rename("Still in chest");
+        Assert.False(inventory.AddInstance(offered));
+        Assert.Equal(77, offered.InstanceId);
+        Assert.Equal("Still in chest", offered.ResolvedName);
+        Assert.Equal(new[] { 1, int.MaxValue }, inventory.ToolEntries().Select(t => t.InstanceId));
+        Assert.True(inventory.Add(Stone));
+        Assert.True(inventory.Add(MiscItem().Id));
+    }
+
+    [Fact]
+    public void SavedMaximumNextIdAllowsOneFinalAllocationThenPersistsExhaustion()
+    {
+        var tool = ToolItem(_ => true);
+        var name = SaveNames.NameOf(tool.Id)!;
+        var json = """{"Inventory":{"Tools":[{"InstanceId":1,"Name":"__NAME__"}],"NextToolInstance":2147483647}}""".Replace("__NAME__", name);
+        var inventory = Inventory.Empty();
+        inventory.Import(PlayerSaveCodec.TryParse(System.Text.Encoding.UTF8.GetBytes(json))!.Inventory!);
+
+        Assert.True(inventory.Add(tool.Id, autoEquip: false));
+        Assert.Contains(inventory.ToolEntries(), t => t.InstanceId == int.MaxValue);
+        Assert.False(inventory.Add(tool.Id, autoEquip: false));
+        Assert.True(inventory.RemoveTool(int.MaxValue));
+        var saved = PlayerSaveCodec.TryParse(PlayerSaveCodec.ToBytes(new PlayerSaveData { Inventory = inventory.Export() }))!;
+        var restored = Inventory.Empty();
+        restored.Import(saved.Inventory!);
+        Assert.False(restored.Add(tool.Id, autoEquip: false));
+        Assert.Equal(1, Assert.Single(restored.ToolEntries()).InstanceId);
+    }
+
+    [Fact]
+    public void LegacyLanternMigrationRefusesWithoutChangingExistingInventory()
+    {
+        var tool = ToolItem(_ => true);
+        var name = SaveNames.NameOf(tool.Id)!;
+        var json = """{"Inventory":{"Tools":[{"InstanceId":2147483646,"Name":"__NAME__"}],"Blocks":[{"Name":"block/lantern","Count":3}]}}""".Replace("__NAME__", name);
+        var saved = PlayerSaveCodec.TryParse(System.Text.Encoding.UTF8.GetBytes(json))!;
+        var inventory = Inventory.Empty();
+        Assert.True(inventory.Add(tool.Id));
+        var before = PlayerSaveCodec.ToBytes(new PlayerSaveData { Inventory = inventory.Export() });
+
+        Assert.Throws<System.IO.InvalidDataException>(() => inventory.Import(saved.Inventory!));
+
+        Assert.Equal(before, PlayerSaveCodec.ToBytes(new PlayerSaveData { Inventory = inventory.Export() }));
+    }
+
+    [Fact]
+    public void LegacyLanternMigrationUsesTheLastAvailableIdsAndKeepsItsHotbarAlias()
+    {
+        var tool = ToolItem(_ => true);
+        var name = SaveNames.NameOf(tool.Id)!;
+        var json = """{"Inventory":{"Tools":[{"InstanceId":2147483645,"Name":"__NAME__"}],"Blocks":[{"Name":"block/lantern","Count":2}],"Hotbar":[{"Name":"block/lantern"}],"NextToolInstance":1}}""".Replace("__NAME__", name);
+        var inventory = Inventory.Empty();
+        inventory.Import(PlayerSaveCodec.TryParse(System.Text.Encoding.UTF8.GetBytes(json))!.Inventory!);
+
+        Assert.Equal(new[] { int.MaxValue - 2, int.MaxValue - 1, int.MaxValue },
+            inventory.ToolEntries().Select(t => t.InstanceId));
+        Assert.Equal(int.MaxValue - 1, inventory.SlotAt(0).ToolInstance);
+        Assert.False(inventory.Add(tool.Id, autoEquip: false));
+        var restored = Inventory.Empty();
+        restored.Import(PlayerSaveCodec.TryParse(PlayerSaveCodec.ToBytes(new PlayerSaveData
+            { Inventory = inventory.Export() }))!.Inventory!);
+        Assert.Equal(inventory.ToolEntries().Select(t => t.InstanceId),
+            restored.ToolEntries().Select(t => t.InstanceId));
+        Assert.False(restored.Add(tool.Id, autoEquip: false));
+    }
+
+    [Fact]
     public void EveryStackComponentIsCoveredByTheCodec()
     {
         var stacks = new List<ItemStack>();

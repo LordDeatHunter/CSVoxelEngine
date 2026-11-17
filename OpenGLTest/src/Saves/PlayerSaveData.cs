@@ -66,8 +66,8 @@ public sealed class PlayerSaveData
 
         public int? SelectedIndex { get; set; }
 
-        /// <summary>The next tool instance id to hand out, so restored and new instances
-        /// never collide.</summary>
+        /// <summary>The next positive tool instance id to hand out. Int32.MinValue records that
+        /// the namespace is exhausted, even if its highest live instance is later removed.</summary>
         public int? NextToolInstance { get; set; }
 
         /// <summary>Names of the ids this player has obtained (the look-at label's "Unknown"
