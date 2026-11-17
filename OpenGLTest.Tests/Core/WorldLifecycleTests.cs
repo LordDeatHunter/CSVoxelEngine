@@ -1313,6 +1313,23 @@ public sealed partial class WorldLifecycleTests : IDisposable
     }
 
     [Fact]
+    public void ExhaustedLegacyLanternMigrationLeavesOriginalPlayerFileUntouched()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        Directory.CreateDirectory(_dir);
+        var file = Path.Combine(_dir, PlayerSaveCodec.FileName);
+        var original = """{"Inventory":{"Tools":[{"InstanceId":2147483647,"Name":"block/lantern"}],"Blocks":[{"Name":"block/lantern","Count":1}]}}"""u8.ToArray();
+        File.WriteAllBytes(file, original);
+        var store = new ChunkSaveStore(_dir);
+
+        Assert.Throws<InvalidDataException>(() => NewWorld(store));
+
+        Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+        Assert.Equal(original, File.ReadAllBytes(file));
+        Assert.False(File.Exists(file + ".bad"));
+    }
+
+    [Fact]
     public void UnknownEntityNamesAreDroppedWithoutFailingTheLoad()
     {
         WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });

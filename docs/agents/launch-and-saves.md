@@ -231,6 +231,11 @@ pure function of the seed: only **deltas** and the seed are written.
   remain withdrawable counts until taken into the instance inventory. Unknown lantern versions or invalid fuel
   fail explicitly before an existing player inventory is cleared. Instance drops are retained beyond the ordinary
   loose-block save limit and pending-restore timeout so a lantern's contents are never silently discarded.
+  Tool and gear instance IDs remain positive and are never reused. `InventoryData.NextToolInstance` stores
+  `Int32.MinValue` after the final positive ID is allocated; this exhaustion marker survives removal and reload.
+  Instance pickups and transfers then refuse ownership while stackable pickups still work. A legacy block-pool
+  lantern migration that needs more IDs than remain fails before replacing the inventory; opening that save
+  fails without queuing a replacement `player.json`, so the original file remains available.
 - **Not persisted** (tracked as `M-12` in `plans/TODO.md`): primed TNT, falling blocks, projectiles
   in flight, spell bolts in flight, toppling trees and the sapling clock (a half-grown sapling stands where it is until it
   is grown again).
