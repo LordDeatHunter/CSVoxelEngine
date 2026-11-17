@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
@@ -70,14 +71,23 @@ public sealed class EntitySaveData
     /// <summary>One item drop lying (or falling) in the world.</summary>
     public sealed class DropData
     {
+        private float? _pickupDelay;
+
         /// <summary>A <see cref="SaveNames"/> name of the block or item the drop collects as.</summary>
         public string? Item { get; set; }
 
         public float[]? Position { get; set; }
         public float[]? Velocity { get; set; }
 
-        /// <summary>Seconds since the drop appeared, which carries its pickup delay.</summary>
+        /// <summary>Seconds since the drop appeared; retained for spin, pulse and age progression.</summary>
         public float? Age { get; set; }
+
+        /// <summary>Seconds this drop waits before nearby collectors may attract it. Missing old-save data uses the default.</summary>
+        public float? PickupDelay
+        {
+            get => _pickupDelay;
+            set => _pickupDelay = value is float delay && float.IsFinite(delay) ? delay : null;
+        }
 
         public PlayerSaveData.ToolData? Instance { get; set; }
 

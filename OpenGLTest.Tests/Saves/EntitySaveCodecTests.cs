@@ -37,10 +37,12 @@ public sealed class EntitySaveCodecTests
                 new EntitySaveData.DropData
                 {
                     Item = "block/c", Position = [2.5f, 65.1f, 2.5f], Velocity = [0.75f, 3f, -0.5f], Age = 0.2f,
+                    PickupDelay = 2f,
                 },
                 new EntitySaveData.DropData
                 {
                     Item = "item/d", Position = [-1f, 66f, 4f], Velocity = [0f, 0f, 0f], Age = 12.5f,
+                    PickupDelay = -3.5f,
                 },
             ],
         };
@@ -72,7 +74,44 @@ public sealed class EntitySaveCodecTests
             Assert.Equal(a.Position, b.Position);
             Assert.Equal(a.Velocity, b.Velocity);
             Assert.Equal(a.Age, b.Age);
+            Assert.Equal(a.PickupDelay, b.PickupDelay);
         }
+    }
+
+    [Theory]
+    [InlineData("1e1000")]
+    [InlineData("-1e1000")]
+    public void NonFinitePickupDelayFallsBackWithoutRejectingOtherEntityData(string rawNumber)
+    {
+        var json = $$"""
+            {"Drops":[
+              {"Item":"block/stone","Age":0.75,"PickupDelay":{{rawNumber}}},
+              {"Item":"item/torch","Age":1.25,"PickupDelay":-3.5},
+              {"Item":"block/stone","Age":0.5,"PickupDelay":null},
+              {"Item":"block/stone","Age":0.25}
+            ]}
+            """;
+
+        var parsed = EntitySaveCodec.TryParse(Encoding.UTF8.GetBytes(json), out var rejectedJson);
+
+        Assert.NotNull(parsed);
+        Assert.False(rejectedJson);
+        Assert.Collection(parsed!.Drops!,
+            invalid => { Assert.Equal(0.75f, invalid.Age); Assert.Null(invalid.PickupDelay); },
+            finite => { Assert.Equal(1.25f, finite.Age); Assert.Equal(-3.5f, finite.PickupDelay); },
+            explicitNull => { Assert.Equal(0.5f, explicitNull.Age); Assert.Null(explicitNull.PickupDelay); },
+            absent => { Assert.Equal(0.25f, absent.Age); Assert.Null(absent.PickupDelay); });
+    }
+
+    [Theory]
+    [InlineData("NaN")]
+    [InlineData("\"Infinity\"")]
+    public void NamedNonFinitePickupDelayTokensKeepExistingJsonRejection(string token)
+    {
+        var json = $"{{\"Drops\":[{{\"Item\":\"block/stone\",\"PickupDelay\":{token}}}]}}";
+
+        Assert.Null(EntitySaveCodec.TryParse(Encoding.UTF8.GetBytes(json), out var rejectedJson));
+        Assert.True(rejectedJson);
     }
 
     [Fact]
@@ -115,6 +154,7 @@ public sealed class EntitySaveCodecTests
     [InlineData("null", false)]
     [InlineData("{}", true)]
     [InlineData("{\"Mobs\":[{\"Type\":\"retired-mob\"}],\"Drops\":[{\"Item\":\"item/retired\"}]}", true)]
+    [InlineData("{\"Drops\":[{\"Item\":\"block/stone\",\"PickupDelay\":1e1000}]}", true)]
     public void MissingNullPartialAndUnresolvedEntityFilesAreNotArchived(string? json, bool hasData)
     {
         var directory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());

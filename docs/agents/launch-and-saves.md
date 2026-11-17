@@ -179,7 +179,10 @@ pure function of the seed: only **deltas** and the seed are written.
   once loading finishes, each only when its chunk is loaded; a restore is a forced spawn, so it
   may pass the natural mob cap but a mob waits while the hard cap (`MobHardCap`, which sizes the
   healthbar buffers) is full; an entry that waits stays pending and is saved again, and is
-  discarded only after `EntityRestoreTimeoutSeconds` of play.
+  discarded only after `EntityRestoreTimeoutSeconds` of play. Each drop saves its elapsed `Age`
+  separately from its optional per-drop `PickupDelay`, so a thrown drop keeps its remaining pickup
+  grace through reload. Older saves without that delay use the ordinary 0.4-second default; non-finite
+  delay values are treated as absent while other entity data remains loadable.
 - **Malformed player saves.** A local `player.json` or hosted `players/<slug>.json` rejected by the
   parser is marked for `.bad` preservation before a later replacement; missing files, JSON `null`,
   and valid partial objects retain their ordinary load behavior.

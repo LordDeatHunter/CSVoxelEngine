@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using VoxelEngine.Entities;
@@ -17,6 +18,7 @@ using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Simulation.Lanterns;
 using VoxelEngine.Simulation.Chests;
@@ -847,6 +849,81 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal([3f, High, 3f], mob.Position);
         var drop = Assert.Single(saved.Drops!);
         Assert.Equal([1f, High, 1f], drop.Position);
+    }
+
+    [Fact]
+    public void AThrownQDropKeepsItsPickupGraceAcrossWorldSaveAndReopen()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+
+        var first = NewWorld(new ChunkSaveStore(_dir));
+        World? second = null;
+        Exception? primaryFailure = null;
+        var firstClosed = false;
+        var secondClosed = true;
+        string? cleanupFailure = null;
+        try
+        {
+            Assert.True(RunUntil(first, () => first.IsPlaying, LoadWallSeconds), "the first world did not finish loading");
+            Assert.False(first.LoadTimedOut);
+
+            EquipRock(first);
+            Assert.True(first.ThrowSelected(false, first.Camera.Position, first.Camera.ViewDirection, first.Inventory));
+            var thrown = Assert.Single(first.Drops);
+
+            // Keep the actual local collector beyond the supported pickup radius while ordinary
+            // gameplay updates the real Q-drop's age through the rest of its grace period.
+            var away = first.Camera.Position + new Vector3(8f, 0f, 0f);
+            first.Camera.TestTeleport(away, first.Camera.Yaw, first.Camera.Pitch);
+            Assert.True(RunUntil(first, () => thrown.Age >= 0.8f, 5), "the thrown drop did not age while out of pickup range");
+            Assert.InRange(thrown.Age, 0.4f, 2f);
+            Assert.False(thrown.IsAttracted);
+
+            // Save close to the drop, but do not update between teleport and ordinary teardown.
+            // The target offset keeps the first restored pickup update in range but outside contact.
+            var collectorEye = thrown.Position + Vector3.UnitZ * 2.5f + Vector3.UnitY * DropManager.CollectHeightOffset;
+            first.Camera.TestTeleport(collectorEye, first.Camera.Yaw, first.Camera.Pitch);
+            firstClosed = first.SaveAndDispose();
+            Assert.True(firstClosed);
+
+            var saved = Assert.Single(ReadEntitiesFile()!.Drops!);
+            Assert.NotNull(saved.Age);
+            Assert.InRange(saved.Age.Value, 0.4f, 2f);
+
+            second = NewWorld(new ChunkSaveStore(_dir));
+            Assert.True(RunUntil(second, () => second.IsPlaying && second.Drops.Count > 0, LoadWallSeconds),
+                "the reopened world did not restore its nearby drop");
+            Assert.False(second.LoadTimedOut);
+            var restored = Assert.Single(second.Drops);
+            second.Update(1f / 60f, null);
+            Assert.True(restored.Age < 2f);
+            Assert.False(restored.IsAttracted,
+                $"a thrown drop with only {restored.Age:0.00}s of age should retain its original 2s pickup grace after reload");
+        }
+        catch (Exception ex)
+        {
+            primaryFailure = ex;
+        }
+        finally
+        {
+            try
+            {
+                if (first.Phase != WorldPhase.Disposed)
+                    firstClosed = first.SaveAndDispose();
+                if (second != null && second.Phase != WorldPhase.Disposed)
+                    secondClosed = second.SaveAndDispose();
+            }
+            catch (Exception ex)
+            {
+                cleanupFailure = ex.ToString();
+            }
+            Console.WriteLine($"Q-drop lifecycle cleanup: first={firstClosed}, second={secondClosed}, error={cleanupFailure ?? "none"}");
+        }
+
+        if (primaryFailure != null)
+            ExceptionDispatchInfo.Capture(primaryFailure).Throw();
+        Assert.True(firstClosed && secondClosed, $"world cleanup failed: {cleanupFailure ?? "unknown failure"}");
     }
 
     [Fact]
