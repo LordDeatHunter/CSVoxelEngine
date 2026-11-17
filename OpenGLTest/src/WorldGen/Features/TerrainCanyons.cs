@@ -14,27 +14,29 @@ internal static class TerrainCanyons
         return MathF.Abs(TerrainNoise.CanyonRidgeNoise.GetNoise(wx, wz));
     }
 
-    internal static float SupportAt(float x, float z, Biome biome, float oceanWeight)
+    internal static float SupportAt(float x, float z, float oceanWeight)
     {
-        if (WorldSeed.Profile != WorldGenProfile.Dynamic || oceanWeight >= WorldGenerationConfig.OceanShoreWeight)
-            return 0f;
+        if (WorldSeed.Profile != WorldGenProfile.Dynamic) return 0f;
+        var shore = 1f - MathUtils.SmoothStep(WorldGenerationConfig.OceanShoreWeight
+            - WorldGenerationConfig.EntranceShoreFade, WorldGenerationConfig.OceanShoreWeight, oceanWeight);
+        if (shore <= 0f) return 0f;
         var clear = TerrainRelief.DynamicSpawnClear(x, z);
         if (clear <= 0f) return 0f;
         var highland = TerrainRelief.HighlandWeight(x, z);
-        var dry = biome is Biome.Desert or Biome.Steppe or Biome.Savanna ? 1f : 0f;
-        var land = MathF.Max(dry, highland);
+        BiomeClassifier.WeightsForOcean(x, z, oceanWeight, out _, out var aridWeight);
+        var land = MathF.Max(aridWeight * (1f - BiomeClassifier.ColdWeight(x, z)), highland);
         if (land <= 0f) return 0f;
-        return land * clear * MathUtils.SmoothStep(WorldGenerationConfig.CanyonMaskStart,
+        return land * shore * clear * MathUtils.SmoothStep(WorldGenerationConfig.CanyonMaskStart,
             WorldGenerationConfig.CanyonMaskEnd, TerrainNoise.CanyonMaskNoise.GetNoise(x, z));
     }
 
     /// <summary>Additional nonraising cut. The caller's water weight includes the great-lake bank guard.</summary>
-    internal static int CutDepth(int x, int z, int height, int waterLevel, Biome biome, float oceanWeight,
+    internal static int CutDepth(int x, int z, int height, int waterLevel, float oceanWeight,
         float waterFade)
     {
         if (waterFade <= 0f || height <= WorldGenerationConfig.SeaLevel + WorldGenerationConfig.CanyonMinFloorAboveSea)
             return 0;
-        var support = SupportAt(x, z, biome, oceanWeight) * waterFade;
+        var support = SupportAt(x, z, oceanWeight) * waterFade;
         if (support <= 0f) return 0;
         var ridge = RidgeAt(x, z);
         if (ridge >= WorldGenerationConfig.CanyonOuterRidge) return 0;

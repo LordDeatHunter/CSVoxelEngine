@@ -198,7 +198,9 @@ S2a adds Dynamic-only escarpments and dry, roofless canyons. `TerrainShelves` te
 broad highland plateau lift before valley compression and the whole-profile ceiling; its
 smooth support and spawn fade return exactly zero outside the selected region. After water
 planning, `TerrainCanyons` cuts a warped ridged channel from the final heightmap beside
-ravines. The existing lake/river guard and ocean-shore fade protect water footprints and
+ravines. Its arid climate weight fades with coldness, while independent highland support and
+the shoreline fade return smoothly to zero instead of ending a canyon at a classified biome
+or coast line. The existing lake/river guard and ocean-shore fade protect water footprints and
 banks; face-adjacent and nearby shared-water levels also bound a dry cut above elevated water.
 The separate oasis and hot-spring discs and their face banks refuse an additional canyon
 cut because those features assign their own pond levels outside the shared water query. Deep cuts

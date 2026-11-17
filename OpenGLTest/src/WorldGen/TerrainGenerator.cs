@@ -492,7 +492,7 @@ public static class TerrainGenerator
                     : 0;
                 var canyonDepth = WorldSeed.Profile == WorldGenProfile.Dynamic
                     ? TerrainCanyons.CutDepth((int)worldX, (int)worldZ, height - ravineDepth, waterLevel[i],
-                        biome, oceanWeight, RavineCutFade(oceanWeight, surfaceWater))
+                        oceanWeight, RavineCutFade(oceanWeight, surfaceWater))
                     : 0;
                 var totalCut = ravineDepth + canyonDepth;
 

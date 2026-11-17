@@ -19,6 +19,89 @@ public sealed class S2aTerrainTests(ITestOutputHelper output)
     private const int CanyonZ = 5000;
 
     [Fact]
+    public void RealDryClassificationBoundaryHasContinuousCanyonSupport()
+    {
+        TestContent.EnsureLoaded();
+        var probes = 0;
+        try
+        {
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
+            // The bounded red walk found this actual Forest-to-Steppe edge and an old
+            // one-cell support jump of 0.738. Keep the same climatic branch pinned.
+            var beforeBiome = BiomeClassifier.BiomeWeights(CanyonX, 3390, out var beforeOcean, out _);
+            var afterBiome = BiomeClassifier.BiomeWeights(CanyonX, 3391, out var afterOcean, out _);
+            Assert.Equal(Biome.Forest, beforeBiome);
+            Assert.Equal(Biome.Steppe, afterBiome);
+            Assert.True(beforeOcean < WorldGenerationConfig.OceanShoreWeight
+                && afterOcean < WorldGenerationConfig.OceanShoreWeight);
+            var before = TerrainCanyons.SupportAt(CanyonX, 3390, beforeOcean);
+            probes++;
+            var after = TerrainCanyons.SupportAt(CanyonX, 3391, afterOcean);
+            probes++;
+            var difference = MathF.Abs(after - before);
+            output.WriteLine($"real dry edge ({CanyonX},3390) {beforeBiome}/{before:F4} to ({CanyonX},3391) {afterBiome}/{after:F4}; delta {difference:F4}");
+            Assert.InRange(difference, 0f, 0.05f);
+        }
+        finally
+        {
+            output.WriteLine($"S2 direct pinned boundary probes: {probes}");
+            WorldSeed.Apply(WorldSeed.Default);
+        }
+    }
+
+    [Fact]
+    public void CanyonShoreSupportFadesBeforeItsOceanThreshold()
+    {
+        TestContent.EnsureLoaded();
+        var probes = 0;
+        try
+        {
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
+            var near = TerrainCanyons.SupportAt(CanyonX, CanyonZ,
+                WorldGenerationConfig.OceanShoreWeight - 0.001f);
+            probes++;
+            var shore = TerrainCanyons.SupportAt(CanyonX, CanyonZ,
+                WorldGenerationConfig.OceanShoreWeight);
+            probes++;
+            Assert.Equal(0f, shore);
+            Assert.InRange(MathF.Abs(near - shore), 0f, 0.05f);
+        }
+        finally
+        {
+            output.WriteLine($"S2 direct controlled shore probes: {probes}");
+            WorldSeed.Apply(WorldSeed.Default);
+        }
+    }
+
+    [Fact]
+    public void InjectedOwnWaterBoundsAnOtherwiseRealCanyonCut()
+    {
+        TestContent.EnsureLoaded();
+        var probes = 0;
+        try
+        {
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
+            var biome = BiomeClassifier.BiomeWeights(CanyonX, CanyonZ, out var ocean, out _);
+            Assert.Equal(Biome.Savanna, biome);
+            // The position/noise/height are the measured real canyon; only its own water
+            // level is injected to isolate the dry-bank clamp from the water planner.
+            var dry = TerrainCanyons.CutDepth(CanyonX, CanyonZ, 155,
+                TerrainGenerator.NoWater, ocean, 1f);
+            probes++;
+            var wet = TerrainCanyons.CutDepth(CanyonX, CanyonZ, 155, 120, ocean, 1f);
+            probes++;
+            Assert.True(dry >= 60, $"expected an otherwise substantial real-noise cut, got {dry}");
+            Assert.True(155 - wet >= 122, $"injected water level 120 opened a lower dry bank: cut {wet}");
+            output.WriteLine($"real-noise canyon dry cut {dry}, controlled own-water cut {wet} from height155 with injected level120");
+        }
+        finally
+        {
+            output.WriteLine($"S2 direct controlled water probes: {probes}");
+            WorldSeed.Apply(WorldSeed.Default);
+        }
+    }
+
+    [Fact]
     public void ActualOasisAndSpringPondsKeepTheirSavedColumnFootprints()
     {
         TestContent.EnsureLoaded();
@@ -102,6 +185,7 @@ public sealed class S2aTerrainTests(ITestOutputHelper output)
             Assert.True(center.Height >= WorldGenerationConfig.SeaLevel + 4);
             Assert.True(center.Water < center.Height);
 
+            var narrowTwoSidedWalls = false;
             for (var axis = 0; axis < 2; axis++)
             {
                 var rows = new List<string>();
@@ -121,8 +205,13 @@ public sealed class S2aTerrainTests(ITestOutputHelper output)
                     && heights.Where(kv => kv.Key > 0 && kv.Key <= 24)
                         .Any(kv => kv.Value - heights[0] >= 30),
                     "the dry floor must have two open, steep walls within 24 blocks in each real cross-section");
+                narrowTwoSidedWalls |= heights.Where(kv => kv.Key >= -10 && kv.Key < 0)
+                        .Any(kv => kv.Value - heights[0] >= 30)
+                    && heights.Where(kv => kv.Key > 0 && kv.Key <= 10)
+                        .Any(kv => kv.Value - heights[0] >= 30);
                 output.WriteLine($"canyon axis {(axis == 0 ? 'X' : 'Z')} offset:height/bed/water {string.Join(' ', rows)}");
             }
+            Assert.True(narrowTwoSidedWalls, "at least one axis must expose both steep walls within ten blocks");
             var surfaceChunk = new Chunk(null!, new Vector3(CanyonX >> Chunk.SizeShift, 6,
                 CanyonZ >> Chunk.SizeShift), generateBlockData: false);
             ChunkTerrainFill.GenerateBlockData(surfaceChunk);
@@ -133,7 +222,7 @@ public sealed class S2aTerrainTests(ITestOutputHelper output)
             var centerLocal = ((CanyonX & Chunk.SizeMask) << Chunk.SizeShift) | (CanyonZ & Chunk.SizeMask);
             Assert.Equal(0, centerColumn.DirtDepth[centerLocal]);
             var biome = BiomeClassifier.BiomeWeights(CanyonX, CanyonZ, out var ocean, out _);
-            output.WriteLine($"canyon center ({CanyonX},{CanyonZ}) biome {biome}, support {TerrainCanyons.SupportAt(CanyonX, CanyonZ, biome, ocean):F3}, ridge {TerrainCanyons.RidgeAt(CanyonX, CanyonZ):F4}");
+            output.WriteLine($"canyon center ({CanyonX},{CanyonZ}) biome {biome}, support {TerrainCanyons.SupportAt(CanyonX, CanyonZ, ocean):F3}, ridge {TerrainCanyons.RidgeAt(CanyonX, CanyonZ):F4}");
         }
         finally
         {
@@ -235,12 +324,14 @@ public sealed class S2aTerrainTests(ITestOutputHelper output)
                 if (biome == Biome.Ocean)
                 {
                     ocean++;
-                    Assert.Equal(row.Bed, row.Height);
+                    Assert.InRange(row.Bed - row.Height, 0, WorldGenerationConfig.RavineDepth);
                     continue;
                 }
                 if (oceanWeight >= WorldGenerationConfig.OceanShoreWeight)
                 {
-                    Assert.Equal(row.Bed, row.Height);
+                    // The old ravine may legally fade through the shore band; the
+                    // new canyon contributes zero there, so only its old depth remains.
+                    Assert.InRange(row.Bed - row.Height, 0, WorldGenerationConfig.RavineDepth);
                 }
                 if (row.Water == TerrainGenerator.NoWater) continue;
                 wetLand++;
