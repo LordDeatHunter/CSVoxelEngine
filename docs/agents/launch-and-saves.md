@@ -177,8 +177,8 @@ pure function of the seed: only **deltas** and the seed are written.
   `WorldPersistence.SaveMapIfChanged` writes only when a tracker exists and `MapTracker.ExploredVersion` has advanced
   since the prior save: a missing map stays absent until exploration advances the version, while importing valid map
   data itself advances it. The store marks parser-rejected existing bytes for its `.bad` set-aside before replacement;
-  the original is retained when that move succeeds. This independent base does not include PR46's archive-failure
-  guard. A server never writes one and a world whose HUD never drew keeps its file untouched. At autosave it copies
+  the original is retained when that move succeeds. A server never writes one and a world whose HUD never drew keeps
+  its file untouched. At autosave it copies
   the tiles on the main thread
   (`ExportExplored`; the tracker reuses tile objects) and deflates them on a pool thread, one encode at a time, so an
   autosave never hitches; the closing flush waits for one in flight and encodes inline, so the last write queued is the
