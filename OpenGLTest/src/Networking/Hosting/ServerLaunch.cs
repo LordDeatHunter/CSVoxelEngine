@@ -21,6 +21,8 @@ public enum ServerLaunchFailure
     Locked,
     /// <summary>The port could not be listened on, most often because it is in use.</summary>
     PortInUse,
+    /// <summary>The saved terrain profile is missing a supported interpretation.</summary>
+    InvalidTerrain,
 }
 
 /// <summary>A started server and its headless world, or why none started (<see cref="Message"/> says it for a
@@ -47,7 +49,8 @@ public sealed record ServerLaunchResult(
 public static class ServerLaunch
 {
     /// <summary>Whether this build reads <paramref name="world"/>'s save format (the menu's PLAY gate).</summary>
-    public static bool IsHostable(WorldInfo world) => world.Version == WorldStore.CurrentVersion;
+    public static bool IsHostable(WorldInfo world) => world.Version == WorldStore.CurrentVersion
+        && world.TryGetTerrainProfile(out _, out _);
 
     /// <summary>
     /// Starts <paramref name="world"/> on <paramref name="port"/> (0 picks a free one). <paramref name="sourceName"/>
@@ -58,9 +61,15 @@ public static class ServerLaunch
         string? sourceName = null, string? hostPlayer = null)
     {
         if (!IsHostable(world))
-            return Fail(ServerLaunchFailure.OldFormat,
-                $"'{world.Name}' was saved by an older version (format {world.Version}, this build reads " +
-                $"{WorldStore.CurrentVersion}); it cannot be hosted.");
+        {
+            if (world.Version != WorldStore.CurrentVersion)
+                return Fail(ServerLaunchFailure.OldFormat,
+                    $"'{world.Name}' was saved by an older version (format {world.Version}, this build reads " +
+                    $"{WorldStore.CurrentVersion}); it cannot be hosted.");
+            world.TryGetTerrainProfile(out _, out var reason);
+            return Fail(ServerLaunchFailure.InvalidTerrain, reason);
+        }
+        world.TryGetTerrainProfile(out var profile, out _);
         if (WorldSeed.WorldIsLive)
             return Fail(ServerLaunchFailure.WorldLive, "A world is already live in this process; cannot start a second.");
 
@@ -93,7 +102,7 @@ public static class ServerLaunch
         launchOperators.AddAll(operators);
         launchOperators.AddAll(OperatorList.Parse(save.ReadFile(OperatorList.FileName)));
 
-        WorldSeed.Apply(world.Seed);
+        WorldSeed.Apply(world.Seed, profile);
         var gameWorld = new World(null!, null!, null!, null!, null!, null!, null, save, serverMode: true,
             worldSource: source);
         var server = new GameServer(gameWorld, world.Name, world.Seed, port)

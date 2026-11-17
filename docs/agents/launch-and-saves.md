@@ -22,7 +22,7 @@ steps back one page and does nothing on the main page. SETTINGS and EXIT are the
 (the settings page is shared: the one `MenuInput.SettingsPageOpen` predicate drives the slider drag
 and its save on both menus). PLAY / CREATE never block inside the click: the click records the
 pending work, `OnRender` presents one loading-screen frame, and the next update runs
-`WorldSeed.Apply(seed)` -> `new ChunkSaveStore(dir)` -> `new World(..., store)`. The world then
+`WorldSeed.Apply(seed, saved terrain profile)` -> `new ChunkSaveStore(dir)` -> `new World(..., store)`. The world then
 streams in `WorldPhase.Loading` behind an animated loading screen (`LoadingScreenView` /
 `LoadingScreenRenderer.DrawLoadingScreen`: a progress bar eased monotonically toward `World.LoadProgress`, a
 wall-clock spinner, the world name and `Generating terrain...` for a new world vs `Loading
@@ -39,12 +39,12 @@ a store-backed world saves it the same way (`OnClosing`). While this game hosts 
 game") the button reads CLOSE SERVER: it stops the server, which saves the world, and returns to the host page; the
 window closing stops it the same way. The dev overrides `VOXEL_SCRIPT`,
 `VOXEL_SPAWN` and `VOXEL_LOOK` (`LaunchMode.BypassesMenu`) skip the menu entirely and build a
-**storeless** World exactly as before — no persistence, no seed change, no loading phase — which
+**storeless** Dynamic-profile World with the default seed — no persistence or loading phase — which
 is why a dev override can never reach a saved world; `VOXEL_TIME` alone does not bypass.
 
 Saves live in `%APPDATA%/CSVoxelEngine/saves/<slug>/` (`WorldStore.DefaultRoot`; the slug is
 fixed at creation and never follows a rename): `world.json` (name, seed, created and last-played
-timestamps, format version, and an optional `source` only the dedicated server reads — see "World
+timestamps, format version, optional `terrain` profile, and an optional `source` only the dedicated server reads — see "World
 sources"), `chunks/<cx>_<cy>_<cz>.bin` (one Deflate-compressed,
 block-name-paletted snapshot per **modified** chunk, `ChunkSaveCodec`; an untouched chunk is
 never written and simply regenerates), `lod-edits.bin` (`LodEditState`: column caps,
@@ -61,7 +61,12 @@ the waystone registry and the battle towers' floor locks). See "Saves" below for
 A world opened from the main menu owns a `ChunkSaveStore` over its save folder (layout under
 "Launch flow" above); a World built without one (the tests, and every `VOXEL_SCRIPT` /
 `VOXEL_SPAWN` / `VOXEL_LOOK` run) regenerates and forgets exactly as before. Worldgen stays a
-pure function of the seed: only **deltas** and the seed are written.
+pure function of the seed and selected terrain profile: only **deltas**, seed and profile are written.
+Newly created worlds save `terrain: 2` (Dynamic); older files without `terrain` select Legacy,
+the exact pre-profile generator. Dynamic currently delegates to that same generator; visible
+terrain changes belong to later stages. Rename, last-played and source metadata rewrites retain
+the profile. An unknown or malformed saved profile remains listed but cannot be opened, hosted
+or rewritten; its original `world.json` is left untouched. `WorldStore.CurrentVersion` stays 2.
 
 - **Chunk persistence ordering** (`ChunkSaveStore`'s class doc is the reference). Writes are
   asynchronous: the main thread only clones the chunk's palette storage and state

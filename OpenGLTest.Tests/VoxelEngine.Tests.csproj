@@ -19,4 +19,8 @@
         <ProjectReference Include="..\OpenGLTest.WikiExport\VoxelEngine.WikiExport.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <EmbeddedResource Include="WorldGen/LegacyEa201Identity.csv" />
+    </ItemGroup>
+
 </Project>

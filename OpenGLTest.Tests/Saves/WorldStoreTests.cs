@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using VoxelEngine.Networking.Hosting;
 using VoxelEngine.Saves;
 using Xunit;
 
@@ -258,6 +259,53 @@ public sealed class WorldStoreTests : IDisposable
 
         var listed = Assert.Single(store.List());
         Assert.Equal(WorldSeed.Default, listed.Seed);
+    }
+
+    [Fact]
+    public void NewWorldsPersistDynamicTerrainAndOldFilesStayUnmarkedAcrossRewrites()
+    {
+        var store = new WorldStore(_root);
+        var created = store.Create("New terrain", 7);
+        Assert.Equal(2, TerrainProperty(created.Directory)?.GetInt32());
+        store.Rename(created, "Renamed terrain");
+        store.TouchLastPlayed(created);
+        Assert.Equal(2, TerrainProperty(created.Directory)?.GetInt32());
+
+        var old = store.Create("Old terrain", 8);
+        var path = Path.Combine(old.Directory, WorldStore.MetadataFileName);
+        File.WriteAllText(path, """{"Name":"Old terrain","Seed":8,"Created":1,"LastPlayed":1,"Version":2}""");
+        var listed = store.List().Single(w => w.Slug == old.Slug);
+        store.Rename(listed, "Old renamed");
+        store.TouchLastPlayed(listed);
+        Assert.Null(TerrainProperty(old.Directory));
+    }
+
+    [Theory]
+    [InlineData("99")]
+    [InlineData("\"dynamic\"")]
+    [InlineData("null")]
+    public void UnsupportedTerrainRemainsListedAndCannotBeRewritten(string value)
+    {
+        var store = new WorldStore(_root);
+        var created = store.Create("Unrecognized", 9);
+        var path = Path.Combine(created.Directory, WorldStore.MetadataFileName);
+        var original = "{\"Name\":\"Unrecognized\",\"Seed\":9,\"Version\":2,\"terrain\":" + value + "}";
+        File.WriteAllText(path, original);
+
+        var listed = Assert.Single(store.List());
+        Assert.False(ServerLaunch.IsHostable(listed));
+        Assert.Throws<InvalidDataException>(() => store.Rename(listed, "Lost"));
+        Assert.Throws<InvalidDataException>(() => store.TouchLastPlayed(listed));
+        Assert.Equal(original, File.ReadAllText(path));
+    }
+
+    private static JsonElement? TerrainProperty(string worldDirectory)
+    {
+        using var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(worldDirectory, WorldStore.MetadataFileName)));
+        foreach (var property in json.RootElement.EnumerateObject())
+            if (property.Name.Equals("terrain", StringComparison.OrdinalIgnoreCase))
+                return property.Value.Clone();
+        return null;
     }
 
     [Fact]

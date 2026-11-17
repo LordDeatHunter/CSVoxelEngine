@@ -22,6 +22,11 @@ The world list marks a world whose `WorldInfo.Version` is not `WorldStore.Curren
 folder another session still holds (the store's `session.lock`, an `IOException` from the
 `ChunkSaveStore` constructor) is refused with a message before any World is built. A port already
 in use (`SocketException` from `GameServer.Start`) prints a line, closes the world and exits.
+Unsupported `world.json` terrain metadata is likewise refused before seed selection or store
+acquisition. New server worlds persist Dynamic; old worlds with no terrain field use Legacy.
+Generated fallback chunks of an imported world use its saved profile, while the source's supplied
+chunks are unchanged. Clients stream chunks, columns and LOD without applying the server's
+profile locally; the wire protocol is unchanged.
 Ctrl+C, a typed `stop`, `AppDomain.ProcessExit` and the `SIGTERM`/`SIGHUP` `PosixSignalRegistration`s
 (each in a try/catch for `PlatformNotSupportedException`) all set the stop event; the loop's
 `finally` runs `GameServer.Stop`, `SaveAndDispose` and `Log.Shutdown` on a clean stop and on an

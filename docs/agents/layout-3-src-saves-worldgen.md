@@ -371,6 +371,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   steps loaded from JSON (VOXEL_SCRIPT)
     WorldGen/                  # procedural worldgen: terrain, biomes, caves and worms, the
                                #   tree front end and batches, clouds, the generational cache
+      WorldGenProfile.cs      # persisted Legacy/Dynamic generation recipe selector
       Biome.cs                 # the Forest / Desert / Ocean / Taiga / Frozen / Steppe / Savanna enum (appended, never reordered)
       BiomeClassifier.cs       # the biome climate split: SampleClimate (the one temperature/humidity reader, at the
                                #   ClimateWarp-displaced position), BiomeWeights

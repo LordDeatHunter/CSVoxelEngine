@@ -130,6 +130,45 @@ public class WorldSeedTests
     }
 
     [Fact]
+    public void ProfileSelectionResetsCachedColumnsEvenForTheSameSeed()
+    {
+        Assert.False(WorldSeed.WorldIsLive);
+        try
+        {
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Legacy);
+            var first = ColumnCache.Get(27, 51);
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Legacy);
+            var repeated = ColumnCache.Get(27, 51);
+            Assert.NotSame(first, repeated);
+            Assert.Equal(first.Heights, repeated.Heights);
+
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
+            var dynamic = ColumnCache.Get(27, 51);
+            Assert.NotSame(repeated, dynamic);
+            Assert.Equal(repeated.Heights, dynamic.Heights);
+            Assert.Equal(WorldGenProfile.Dynamic, WorldSeed.Profile);
+
+            WorldSeed.BeginWorld();
+            try
+            {
+                Assert.Throws<InvalidOperationException>(() =>
+                    WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Legacy));
+                Assert.Same(dynamic, ColumnCache.Get(27, 51));
+                Assert.Equal(WorldGenProfile.Dynamic, WorldSeed.Profile);
+            }
+            finally
+            {
+                WorldSeed.EndWorld();
+            }
+        }
+        finally
+        {
+            WorldSeed.Apply(WorldSeed.Default);
+        }
+        Assert.Equal(WorldGenProfile.Legacy, WorldSeed.Profile);
+    }
+
+    [Fact]
     public void ApplyResetsEditState()
     {
         try

@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using VoxelEngine.WorldGen;
 
 namespace VoxelEngine.Saves;
 
@@ -106,7 +107,8 @@ public sealed class WorldStore(string root)
         Directory.CreateDirectory(Path.Combine(directory, ChunksDirectoryName));
 
         var now = Clock();
-        var world = new WorldInfo(slug, name, seed, now, now, CurrentVersion, directory);
+        var world = new WorldInfo(slug, name, seed, now, now, CurrentVersion, directory,
+            terrainValue: (int)WorldGenProfile.Dynamic);
         Write(world);
         return world;
     }
@@ -114,6 +116,7 @@ public sealed class WorldStore(string root)
     /// <summary>Renames a world, unique against every OTHER world's name. The folder is untouched.</summary>
     public void Rename(WorldInfo world, string? requestedName)
     {
+        _ = world.TerrainProfile;
         var others = ListForMutation().Where(w => w.Slug != world.Slug).Select(w => w.Name);
         world.Name = WorldNames.Unique(requestedName, others);
         Write(world);
@@ -136,6 +139,7 @@ public sealed class WorldStore(string root)
     /// <summary>Stamps the world as played now and rewrites its metadata.</summary>
     public void TouchLastPlayed(WorldInfo world)
     {
+        _ = world.TerrainProfile;
         world.LastPlayedUnixMs = Clock();
         Write(world);
     }
@@ -193,6 +197,15 @@ public sealed class WorldStore(string root)
         }
 
         var created = dto.Created ?? 0;
+        int? terrainValue = null;
+        var terrainInvalid = false;
+        if (dto.Terrain.ValueKind == JsonValueKind.Number)
+        {
+            if (dto.Terrain.TryGetInt32(out var value)) terrainValue = value;
+            else terrainInvalid = true;
+        }
+        else if (dto.Terrain.ValueKind != JsonValueKind.Undefined)
+            terrainInvalid = true;
         return new WorldInfo(
             Path.GetFileName(folder),
             string.IsNullOrWhiteSpace(dto.Name) ? WorldNames.DefaultName : dto.Name,
@@ -202,7 +215,9 @@ public sealed class WorldStore(string root)
             dto.LastPlayed ?? created,
             dto.Version ?? 0,
             Path.GetFullPath(folder),
-            dto.Source);
+            dto.Source,
+            terrainValue,
+            terrainInvalid);
     }
 
     private IReadOnlyList<WorldInfo> ListForMutation()
@@ -214,6 +229,7 @@ public sealed class WorldStore(string root)
 
     private static void Write(WorldInfo world)
     {
+        _ = world.TerrainProfile;
         var dto = new WorldDto
         {
             Name = world.Name,
@@ -223,6 +239,7 @@ public sealed class WorldStore(string root)
             Version = world.Version,
             // Null stays null and is not written, so only a world whose file named a source keeps one
             Source = world.SourceName,
+            Terrain = world.TerrainValue is { } terrain ? JsonSerializer.SerializeToElement(terrain) : default,
         };
         var path = Path.Combine(world.Directory, MetadataFileName);
         var tmp = path + ".tmp";
@@ -243,5 +260,11 @@ public sealed class WorldStore(string root)
         // every file the game writes, which reads as generated
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Source { get; set; }
+
+        // Missing means the EA generator. Keep the literal JSON kind on read so null, strings
+        // and non-integral numbers can be refused without dropping the world from the menu.
+        [JsonPropertyName("terrain")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public JsonElement Terrain { get; set; }
     }
 }

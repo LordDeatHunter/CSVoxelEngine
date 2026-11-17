@@ -15,6 +15,7 @@ using VoxelEngine.UI.Menus;
 using VoxelEngine.UI.SpellBuilder;
 using VoxelEngine.UI.Waystone;
 using VoxelEngine.VisualTest;
+using VoxelEngine.WorldGen;
 
 namespace VoxelEngine;
 
@@ -142,12 +143,12 @@ public static class Program
         fieldPointer = new FieldPointer(inputManager, renderManager, menu, chatView, inventoryView, pauseMenuView, waystoneView, new TextFieldKeys(inputManager));
         inputEvents = new InputEvents(inputManager, renderManager, menu, inventoryView, chatView, pauseMenuView, settingsMenuView, panelInput, builderInput, waystoneInput, menuInput, chatInput, gameplay, fieldPointer);
 
-        // A dev override (VOXEL_SCRIPT/SPAWN/LOOK) takes the old path unchanged: a storeless world
-        // built right here, no seed change, no persistence and no menu, so scripted runs stay
-        // byte-identical and an override can never reach a saved world.
+        // A dev override (VOXEL_SCRIPT/SPAWN/LOOK) starts a storeless Dynamic world directly;
+        // S0 uses the same terrain recipe, and no override can reach a saved world.
         var bypassMenu = LaunchMode.BypassesMenu(Environment.GetEnvironmentVariable);
         if (bypassMenu)
         {
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
             var devWorld = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
                 renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,
                 windowManager.Window, inputManager.InputContext, sfx);
@@ -327,6 +328,11 @@ public static class Program
             AbortOpen(null);
             return;
         }
+        if (!info.TryGetTerrainProfile(out var profile, out var profileError))
+        {
+            AbortOpen(profileError);
+            return;
+        }
         // A world that never finished tearing down keeps the worldgen statics in use; Apply
         // would throw, so the worlds page stays locked for this process.
         if (WorldSeed.WorldIsLive)
@@ -339,7 +345,7 @@ public static class Program
         World opened;
         try
         {
-            WorldSeed.Apply(info.Seed);
+            WorldSeed.Apply(info.Seed, profile);
             var store = new ChunkSaveStore(info.Directory);
             opened = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
                 renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,

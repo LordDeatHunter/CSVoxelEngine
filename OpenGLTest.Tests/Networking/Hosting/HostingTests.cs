@@ -8,6 +8,7 @@ using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.Hosting;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Saves;
+using VoxelEngine.WorldGen;
 using Xunit;
 
 namespace VoxelEngine.Tests.Networking.Hosting;
@@ -81,6 +82,76 @@ public sealed class HostingTests : IDisposable
 
         Assert.Equal(ServerLaunchFailure.OldFormat, launch.Failure);
         Assert.False(WorldSeed.WorldIsLive);
+    }
+
+    [Fact]
+    public void UnsupportedSavedTerrainIsRefusedBeforeSeedAndStoreChange()
+    {
+        var world = _store.Create("Unknown terrain", WorldSeed.Default + 101);
+        var path = Path.Combine(world.Directory, WorldStore.MetadataFileName);
+        var original = "{\"Name\":\"Unknown terrain\",\"Seed\":" + world.Seed +
+            ",\"Version\":" + WorldStore.CurrentVersion + ",\"terrain\":99}";
+        File.WriteAllText(path, original);
+        var listed = Assert.Single(_store.List());
+        WorldSeed.Apply(WorldSeed.Default);
+        ServerLaunchResult? launch = null;
+        ChunkSaveStore? reopened = null;
+        try
+        {
+            launch = ServerLaunch.Start(listed, 0, new OperatorList());
+            Assert.False(launch.Started);
+            Assert.Equal("InvalidTerrain", launch.Failure.ToString());
+            Assert.Equal(WorldSeed.Default, WorldSeed.Value);
+            Assert.False(WorldSeed.WorldIsLive);
+            reopened = new ChunkSaveStore(world.Directory);
+            Assert.Equal(original, File.ReadAllText(path));
+        }
+        finally
+        {
+            if (launch?.Started == true)
+            {
+                launch.Server!.Dispose();
+                launch.World!.SaveAndDispose();
+            }
+            reopened?.Shutdown(Budget);
+        }
+    }
+
+    [Fact]
+    public void ServerLaunchSelectsTheSavedProfileForNewAndOldWorlds()
+    {
+        var dynamicWorld = _store.Create("Dynamic", WorldSeed.Default + 1);
+        var oldWorld = _store.Create("Old", WorldSeed.Default + 2);
+        File.WriteAllText(Path.Combine(oldWorld.Directory, WorldStore.MetadataFileName),
+            "{\"Name\":\"Old\",\"Seed\":" + oldWorld.Seed +
+            ",\"Version\":" + WorldStore.CurrentVersion + "}");
+
+        foreach (var (world, expected) in new[]
+        {
+            (dynamicWorld, WorldGenProfile.Dynamic),
+            (_store.List().Single(w => w.Slug == oldWorld.Slug), WorldGenProfile.Legacy),
+        })
+        {
+            ServerLaunchResult? launch = null;
+            try
+            {
+                launch = ServerLaunch.Start(world, 0, new OperatorList());
+                Assert.True(launch.Started, launch.Message);
+                Assert.Equal(expected, WorldSeed.Profile);
+                Assert.Equal(world.Seed, WorldSeed.Value);
+            }
+            finally
+            {
+                if (launch?.Started == true)
+                {
+                    launch.Server!.Dispose();
+                    Assert.True(launch.World!.SaveAndDispose());
+                }
+            }
+            Assert.False(WorldSeed.WorldIsLive);
+            var reopened = new ChunkSaveStore(world.Directory);
+            Assert.True(reopened.Shutdown(Budget));
+        }
     }
 
     [Fact]
