@@ -6,8 +6,9 @@
   // Shelf near (2100,-3608): lower at z=-3612 y=73, upper at z=-3608 y=84.
   // Actual floor camera cell (-4001,5000) is Y86 under eye88.5. The radius-16
   // ring's lowest forward channel cells lie at yaws 56.2 and 67.5, so aim 62.
-  // Escarpment camera floors to (2100,-3632), measured Y71 under eye77.5;
-  // the same x rises from Y73 at z=-3612 to Y84 at z=-3608.
+  // Escarpment at (528,6600)->(524,6600) rises Y143 to Y154 with an 11-block
+  // shelf contribution. Normal generated blocks leave the lower face and lip
+  // clear from the measured air eye (540.5,151.5,6600.5).
   "steps": [
     { "op": "fly", "on": true },
     { "op": "teleport", "pos": [-4014.5, 163.5, 5000.5], "yaw": 0, "pitch": -24 },
@@ -25,9 +26,9 @@
     { "op": "teleport", "pos": [-4005.5, 121.5, 5000.5], "yaw": 0, "pitch": -18 },
     { "op": "screenshot", "name": "terraced_wall", "hideHud": true },
 
-    { "op": "teleport", "pos": [2100.5, 77.5, -3631.5], "yaw": 90, "pitch": 4 },
+    { "op": "teleport", "pos": [540.5, 151.5, 6600.5], "yaw": 180, "pitch": 0 },
     { "op": "wait", "seconds": 25 },
-    { "op": "teleport", "pos": [2100.5, 77.5, -3631.5], "yaw": 90, "pitch": 4 },
+    { "op": "teleport", "pos": [540.5, 151.5, 6600.5], "yaw": 180, "pitch": 0 },
     { "op": "screenshot", "name": "escarpment_from_below", "hideHud": true },
 
     { "op": "teleport", "pos": [-4020.5, 177.5, 5000.5], "yaw": 18, "pitch": -30 },
