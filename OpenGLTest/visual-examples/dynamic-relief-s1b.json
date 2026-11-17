@@ -10,9 +10,9 @@
     { "op": "teleport", "pos": [0.5, 85.5, 0.5], "yaw": 45, "pitch": -26 },
     { "op": "screenshot", "name": "spawn_horizon", "hideHud": true },
 
-    { "op": "teleport", "pos": [600.5, 43.5, 6000.5], "yaw": 45, "pitch": 8 },
+    { "op": "teleport", "pos": [600.5, 82.5, 6000.5], "yaw": 27, "pitch": -5 },
     { "op": "wait", "seconds": 25 },
-    { "op": "teleport", "pos": [600.5, 43.5, 6000.5], "yaw": 45, "pitch": 8 },
+    { "op": "teleport", "pos": [600.5, 82.5, 6000.5], "yaw": 27, "pitch": -5 },
     { "op": "screenshot", "name": "valley_to_cordillera", "hideHud": true },
 
     { "op": "teleport", "pos": [1200.5, 186.5, 6600.5], "yaw": 25, "pitch": -28 },
@@ -29,9 +29,9 @@
     { "op": "teleport", "pos": [1500.5, 151.5, 6000.5], "yaw": -25, "pitch": -35 },
     { "op": "screenshot", "name": "rock_snow_flank_and_far_lod", "hideHud": true },
 
-    { "op": "teleport", "pos": [-6550.5, 116.5, -3500.5], "yaw": 0, "pitch": -20 },
+    { "op": "teleport", "pos": [-6500.5, 132.5, -3500.5], "yaw": 0, "pitch": -75 },
     { "op": "wait", "seconds": 20 },
-    { "op": "teleport", "pos": [-6550.5, 116.5, -3500.5], "yaw": 0, "pitch": -20 },
+    { "op": "teleport", "pos": [-6500.5, 132.5, -3500.5], "yaw": 0, "pitch": -75 },
     { "op": "screenshot", "name": "scree_flank", "hideHud": true },
 
     { "op": "teleport", "pos": [-4590.5, 35.5, -1584.5], "yaw": 0, "pitch": -8 },
