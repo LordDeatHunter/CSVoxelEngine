@@ -25,6 +25,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       QuestSaveData.cs, QuestViewData.cs  # quest progress by id (completed, counts) and the quest book's pan and zoom
       SaveNames.cs             # block/ and item/ namespaced content names, so saves never store raw ids
       StationSaveCodec.cs      # reads/writes stations.json
+      StationSaveReader.cs     # marks rejected station JSON for preservation before replacement
       StationSaveData.cs       # the stations.json shape: campfires, querns, kilns, cast molds (content by name), tower locks
       ServerInfo.cs            # one saved server: display name, host, port, last connected (servers.json)
       ServerPlayerSaves.cs     # a hosted world's per-player files: players/<name slug>.json via the store

@@ -196,8 +196,11 @@ pure function of the seed: only **deltas** and the seed are written.
   autosave never hitches; the closing flush waits for one in flight and encodes inline, so the last write queued is the
   newest map. The first map update after a load rescans every column in range, so tiles saved before a crash catch up
   with the chunks. A damaged or foreign file reads as an unexplored map with one warning. `MapSaveTests`.
-- **Stations** (`stations.json`, `StationSaveCodec`/`StationSaveData`): restored into the empty
-  managers when the world is built, with no wait for chunks, because every manager already freezes a
+- **Stations** (`stations.json`, `StationSaveCodec`/`StationSaveData`): a readable file rejected
+  by `StationSaveCodec` as malformed JSON is marked for the store's `.bad` set-aside before an
+  autosave or close replacement. When that move succeeds, the original bytes remain available.
+  Parsed stations are restored into the empty managers when the world is built, with no wait for
+  chunks, because every manager already freezes a
   cell in an unloaded chunk and sweeps an entry whose block is gone (dropping what it held) once the
   chunk loads. An entry whose block, item or molten material name no longer resolves is dropped with
   one aggregated warning, and a cast pour is restored paused (its crucible binding is transient). A

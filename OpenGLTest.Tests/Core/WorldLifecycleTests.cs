@@ -682,6 +682,34 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.True(second.SaveAndDispose());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MalformedStationSaveIsArchivedBeforeWorldReplacement(bool serverMode)
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        Directory.CreateDirectory(_dir);
+        var path = Path.Combine(_dir, StationSaveCodec.FileName);
+        var original = System.Text.Encoding.UTF8.GetBytes("{\"Querns\":[");
+        File.WriteAllBytes(path, original);
+
+        var world = new World(null!, null!, null!, null!, null!, null!, null, new ChunkSaveStore(_dir),
+            serverMode: serverMode);
+        _worlds.Add(world);
+        Assert.True(world.SaveAndDispose());
+
+        var archivePath = path + ".bad";
+        var archiveExists = File.Exists(archivePath);
+        var archiveMatches = archiveExists && File.ReadAllBytes(archivePath).SequenceEqual(original);
+        var reopened = new ChunkSaveStore(_dir);
+        var replacement = StationSaveCodec.TryParse(reopened.ReadFile(StationSaveCodec.FileName));
+        var replacementParses = replacement != null;
+        Assert.True(reopened.Shutdown(TimeSpan.FromSeconds(10)));
+
+        Assert.True(archiveMatches && replacementParses,
+            $"archive exists={archiveExists}, archived bytes match={archiveMatches}, replacement parses={replacementParses}");
+    }
+
     [Fact]
     public void StationsSurviveASaveAndReloadWhileTheirChunkIsAway()
     {

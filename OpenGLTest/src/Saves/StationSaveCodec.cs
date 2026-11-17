@@ -20,8 +20,11 @@ public static class StationSaveCodec
 
     /// <summary>The parsed file, or null for no file, the JSON <c>null</c> literal or anything
     /// that is not valid JSON of this shape (logged as a warning).</summary>
-    public static StationSaveData? TryParse(byte[]? bytes)
+    public static StationSaveData? TryParse(byte[]? bytes) => TryParse(bytes, out _);
+
+    internal static StationSaveData? TryParse(byte[]? bytes, out bool rejectedJson)
     {
+        rejectedJson = false;
         if (bytes == null)
             return null;
         try
@@ -30,6 +33,7 @@ public static class StationSaveCodec
         }
         catch (JsonException e)
         {
+            rejectedJson = true;
             Log.Warn($"Station save: ignoring {FileName}: {e.Message}");
             return null;
         }
