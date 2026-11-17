@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using VoxelEngine.Saves;
@@ -33,7 +34,8 @@ public class ColumnFileCodecTests
     // Varied terrain: heights on both sides of zero, a bed at or above every height (ravines cut
     // the heights below it), dry and wet cells, every biome, bare rock and deep soil, and climate
     // floats with no short binary form.
-    private static ColumnData VariedColumn(Biome[]? biomesOverride = null)
+    private static ColumnData VariedColumn(Biome[]? biomesOverride = null, float cornerWarmth = MathF.PI / 7f,
+        float cornerWetness = 1f / 3f)
     {
         var random = new Random(1234);
         var biomeValues = Enum.GetValues<Biome>();
@@ -52,7 +54,7 @@ public class ColumnFileCodecTests
         }
 
         return new ColumnData(heights, dirt, new float[ColumnArea], new float[ColumnArea], biomesOverride ?? biomes,
-            bed, water, cornerWarmth: MathF.PI / 7f, cornerWetness: 1f / 3f);
+            bed, water, cornerWarmth, cornerWetness);
     }
 
     [Fact]
@@ -111,5 +113,36 @@ public class ColumnFileCodecTests
         biomes[ColumnArea / 2] = undefined;
         var badBiome = Encode(VariedColumn(biomes));
         Assert.Throws<InvalidDataException>(() => Decode(badBiome));
+    }
+
+    public static IEnumerable<object[]> NonFiniteClimateValues()
+    {
+        foreach (var value in new[] { float.NaN, float.PositiveInfinity, float.NegativeInfinity })
+        {
+            yield return new object[] { "warmth", value };
+            yield return new object[] { "wetness", value };
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(NonFiniteClimateValues))]
+    public void ANonFiniteCornerClimateIsRefused(string field, float value)
+    {
+        var column = field == "warmth"
+            ? VariedColumn(cornerWarmth: value)
+            : VariedColumn(cornerWetness: value);
+
+        Assert.Throws<InvalidDataException>(() => Decode(Encode(column)));
+    }
+
+    [Fact]
+    public void FiniteOutOfRangeClimateKeepsItsBits()
+    {
+        var column = VariedColumn(cornerWarmth: -1.25f, cornerWetness: 2.5f);
+
+        var back = Decode(Encode(column));
+
+        Assert.Equal(BitConverter.SingleToInt32Bits(column.CornerWarmth), BitConverter.SingleToInt32Bits(back.CornerWarmth));
+        Assert.Equal(BitConverter.SingleToInt32Bits(column.CornerWetness), BitConverter.SingleToInt32Bits(back.CornerWetness));
     }
 }

@@ -135,6 +135,8 @@ public static class ColumnFileCodec
         var warmth = BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(offset));
         offset += sizeof(float);
         var wetness = BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(offset));
+        if (!float.IsFinite(warmth) || !float.IsFinite(wetness))
+            throw new InvalidDataException("Column file has non-finite corner climate values.");
 
         // The carvers never run on a supplied column, so its cave inputs stay zero
         return new ColumnData(heights, dirtDepth, new float[ColumnArea], new float[ColumnArea], biomes, bed, waterLevel,

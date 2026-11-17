@@ -75,7 +75,7 @@ public sealed class ImportedMapSourceTests : IDisposable
     }
 
     // A flat column at top, wet over a third of its cells, unlike anything worldgen holds there
-    private static ColumnData FlatColumn(int top)
+    private static ColumnData FlatColumn(int top, float warmth = 0.9f, float wetness = 0.1f)
     {
         var heights = Enumerable.Repeat(top, ColumnArea).ToArray();
         var water = new int[ColumnArea];
@@ -84,7 +84,7 @@ public sealed class ImportedMapSourceTests : IDisposable
         var biomes = Enumerable.Repeat(Biome.Desert, ColumnArea).ToArray();
         var dirt = Enumerable.Repeat((byte)WorldGenerationConfig.NominalDirtDepth, ColumnArea).ToArray();
         return new ColumnData(heights, dirt, new float[ColumnArea], new float[ColumnArea], biomes,
-            (int[])heights.Clone(), water, cornerWarmth: 0.9f, cornerWetness: 0.1f);
+            (int[])heights.Clone(), water, cornerWarmth: warmth, cornerWetness: wetness);
     }
 
     // A chunk whose cells at or below top are block and the rest air
@@ -249,6 +249,19 @@ public sealed class ImportedMapSourceTests : IDisposable
         File.WriteAllBytes(Path.Combine(_map, ImportedMapSource.ColumnsDirectoryName, name), "garbage"u8.ToArray());
 
         var error = Assert.Throws<InvalidDataException>(() => new ImportedMapSource(_map));
+        Assert.Contains(name, error.Message);
+    }
+
+    [Fact]
+    public void AColumnWithNonFiniteClimateRefusesTheWholeMapAndNamesTheFile()
+    {
+        var top = ColumnCache.Get(0, 0).MaxHeight;
+        ImportedMapWriter.WriteColumn(_map, 0, 0, FlatColumn(top));
+        var name = ImportedMapWriter.ColumnFileName(1, 1);
+        ImportedMapWriter.WriteColumn(_map, 1, 1, FlatColumn(top, warmth: float.NaN));
+
+        var error = Assert.Throws<InvalidDataException>(() => new ImportedMapSource(_map));
+
         Assert.Contains(name, error.Message);
     }
 
