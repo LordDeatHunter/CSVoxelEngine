@@ -33,6 +33,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   SourceName = the raw world.json `source` (null when absent), Source = it
                                #   resolved (`generated` when unset), read by the dedicated server only
       WoodDamageCodec.cs       # reads/writes wood-damage.bin: the permanent chop damage of natural trunk cells
+      WoodDamageSaveReader.cs  # reads wood damage and marks rejected sidecars for preservation before replacement
       MapSaveCodec.cs          # reads/writes map.bin: the explored map's surface and sky tiles (colors and heights)
       MapSaveReader.cs         # reads map.bin and marks parser-rejected bytes for preservation before replacement
       WorldNames.cs            # name normalizing, the "Unnamed World" default, unique numeric suffix, folder slug

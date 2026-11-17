@@ -52,8 +52,12 @@ public static class WoodDamageCodec
     }
 
     /// <summary>The saved entries, or null for no file or a file that is not this format (warned).</summary>
-    public static IReadOnlyList<(long Key, WoodDamage.Entry Entry)>? TryParse(byte[]? bytes)
+    public static IReadOnlyList<(long Key, WoodDamage.Entry Entry)>? TryParse(byte[]? bytes) =>
+        TryParse(bytes, out _);
+
+    internal static IReadOnlyList<(long Key, WoodDamage.Entry Entry)>? TryParse(byte[]? bytes, out bool rejected)
     {
+        rejected = false;
         if (bytes == null) return null;
         try
         {
@@ -85,6 +89,7 @@ public static class WoodDamageCodec
         }
         catch (Exception e) when (e is IOException or InvalidDataException or EndOfStreamException)
         {
+            rejected = true;
             Log.Warn($"Wood damage: ignoring {FileName}: {e.Message}");
             return null;
         }
