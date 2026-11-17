@@ -31,7 +31,7 @@ public abstract class RiggedMob : Mob
 
     // Body language drawn on top of the clips (see BodyEffect): a forward lean that follows the
     // walk, a flinch on a hit, a fall backward on death and the spawn pop.
-    private const float TurnRate = 14f;
+    private const float DefaultTurnRate = 14f;
     private const float LeanPerSpeed = 0.045f;
     private const float MaxLean = 0.2f;
     private const float HitLeanPerKick = 1.1f;
@@ -225,6 +225,10 @@ public abstract class RiggedMob : Mob
         Animation.Play(DeathClip);
     }
 
+    /// <summary>The damp rate the facing turns toward its goal at (<see cref="FaceYaw"/>); a long body that
+    /// should sweep round rather than snap answers a lower one.</summary>
+    protected virtual float TurnRate => DefaultTurnRate;
+
     /// <summary>Turns the facing toward <paramref name="yaw"/> over a few frames, or at once on the
     /// very first look.</summary>
     protected void FaceYaw(float yaw, float deltaTime)
@@ -235,7 +239,7 @@ public abstract class RiggedMob : Mob
     }
 
     /// <summary>The yaw that points the model's -Z front along the horizontal <paramref name="to"/>.</summary>
-    protected static float YawOf(Vector3 to) => MathF.Atan2(-to.X, -to.Z);
+    public static float YawOf(Vector3 to) => MathF.Atan2(-to.X, -to.Z);
 
     /// <summary>
     /// A stroll toward <paramref name="goal"/> (a wander point) at <see cref="MobConfig.MobWanderSpeedFactor"/>:

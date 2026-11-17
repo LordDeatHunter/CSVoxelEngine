@@ -264,10 +264,11 @@ single-arc player.
   sand, a hermit variant.
   *Hook:* `Entities/Wildlife/` (`WildlifeSpecies`, `WildlifeManager`), `Boar` for the aggro rule.
 - [ ] **`P-63` · Giant centipede, the physical body** — P3, L.
-  The centipede ships (`Entities/Wildlife/Centipede.cs`) as one rigid body that plays its authored `walk` clip: a jungle
-  hunter that runs a player down and bites with venom, spawned by the jungle's wildlife rule. Still open: the body as a
-  chain (each segment trails the one ahead along the head's path, like the sandworm's, but on the ground and over
-  steps), per-segment hit testing on one health pool, inverse kinematics for twenty legs (`LegIk.Solve` and the hold
+  The centipede ships (`Entities/Wildlife/Centipede.cs`) as one simulated body that plays its authored `walk` clip: a
+  jungle hunter that runs a player down and bites with venom, spawned by the jungle's wildlife rule. Its body is drawn
+  as a flat chain (`CentipedeSpine`: each joint trails the one ahead, so it turns segment by segment), a pose only.
+  Still open: the chain over steps (every joint shares the feet height) and as the collision body,
+  per-segment hit testing on one health pool, inverse kinematics for twenty legs (`LegIk.Solve` and the hold
   probing of `CrawlerLegs`, generalized from four legs a side on one body to one pair per segment, in the segment's
   space), the metachronal stepping order the `walk` clip shows, whether it climbs like the crawlers, and the wire for a
   chain (more than one pose, see the sandworm). Also open: a rearing threat clip and length variants (the segments

@@ -221,6 +221,10 @@ public static class WildlifeConfig
     public const float CentipedeBiteCooldownSeconds = 1.8f;
     public const float CentipedeKnockbackSpeed = 4f;
     public const float CentipedeKnockbackLift = 1.5f;
+    // Its body is drawn as a chain (CentipedeSpine): the head turns at CentipedeTurnRate (slower than a short
+    // mob's, so it sweeps round) and no joint bends sharper than CentipedeMaxBendDegrees against the one ahead.
+    public const float CentipedeTurnRate = 5f;
+    public const float CentipedeMaxBendDegrees = 28f;
 
     // --- Sea life (AquaticAnimal: Fish, Shark, Jellyfish) ---
     // Swimmers fly the shared flight rules through water (Mob.Swims, RiggedMob.Fly): each kind's hover band is

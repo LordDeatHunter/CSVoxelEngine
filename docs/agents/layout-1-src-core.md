@@ -565,6 +565,7 @@ OpenGLTest/
         IBonePose.cs           # a pose of a Blockbench rig: each bone's animated local transform
         RigPose.cs             # GL-free: composes a pose down the rig's parent chain into a part's world matrix
         ClipPose.cs            # one clip sampled at one time as a pose, no layers (a chest's lid); default = rest
+        ChainFollow.cs         # GL-free: the follow-the-leader step of a body chain with its bend limit (sandworm, centipede)
       SkyMobs/                 # the sky islands' mobs (see "Sky mobs"): the shared base, the two kinds, the zone difficulty
       Wildlife/                # the animals of the wild (see "Wildlife"): Animal (heeding, idle habits, gaits), the
                                #   WildlifeSpecies table, Deer (watches, bolts, grazes), Boar (neutral until crowded or
@@ -573,6 +574,7 @@ OpenGLTest/
                                #   WildlifeCalls (one species' ambient call on a randomized timer, played when one is in earshot), WildlifeCallSet (the crow's caw and the boar and dire boar grunts),
                                #   Dragonfly (waterside hunter: darts and bites),
                                #   CorpseBloom (rooted jungle ambusher: poison burst and a lingering cloud), Centipede (jungle hunter: runs down and bites with venom),
+                               #   CentipedeRig (the model's joints front to back and their link lengths), CentipedeSpine (its drawn body chain: turns segment by segment, a pose only),
                                #   AquaticAnimal (a swimmer: kept under the surface, beached it flops and suffocates; posture bits), Fish (cod, salmon, tuna: a school, darts from a threat), Shark (charges and bites), Jellyfish (drifts, stings what touches it)
         SkyMob.cs              # abstract sky mob (a RealmMob): the zone tier it spawned in and its tier-scaled pool
         Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event

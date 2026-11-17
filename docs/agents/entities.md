@@ -331,10 +331,19 @@ no rest rotations, so parts the clips fold lie flat along an axis.
   shut, the bulb swells, the burst is the `impact`), `hurt` and `death`. The bulb's swelling is a scale track.
 - **Giant Centipede** (`Centipede`, `centipede.json`, hp 70): a wildlife species that runs a player within
   `CentipedeNoticeRangeBlocks` down on `walk` and bites within `CentipedeBiteReach` at the `bite` clip's `impact` for
-  `CentipedeBiteDamage` and `venom`. It is one rigid body playing its authored clips (legs clip-driven, the segments a pose,
-  not a chain: the physical chain and solved legs are `P-63`). Model: `Head` (with `MandibleL/R`, `AntennaL/R` > `...Tip`),
+  `CentipedeBiteDamage` and `venom`. It is one simulated body (one position, facing, collision box and health pool)
+  playing its authored clips, **drawn as a chain**: `CentipedeSpine` keeps its joints (`CentipedeRig`: `Head`, every
+  `Segment<n>`, `Tail`, read from the model) on the ground plane, the head's pinned where the body holds it and each
+  other trailing the one ahead (`ChainFollow`, the sandworm's follow step, no joint past `CentipedeMaxBendDegrees`),
+  and `Centipede.PartMatrix` poses every part on its joint's root, so a turn runs down the body segment by segment
+  and a straight body is exactly the rigid pose. The chain is a pose only: it follows on the simulation
+  (`Locomote`) and on a client's mirror (`AnimateMirror`) alike, each from its own position and facing, so nothing
+  about it is saved or on the wire, all joints share the feet height, and a head that jumps farther than the body is
+  long lays it out straight again. It turns at `CentipedeTurnRate` (`RiggedMob.TurnRate`, slower than the default so
+  the head sweeps round). DevStudio shows the clips on the straight body. Legs are clip-driven; segment hits, solved
+  legs and draping over steps are `P-63`. Model: `Head` (with `MandibleL/R`, `AntennaL/R` > `...Tip`),
   `Segment1..10` front to back and `Tail` (with `TailProngL/R`), all top-level, each group's origin on the body's
-  axis at the part's joint or center, 6 units apart, so a chain can place every part by its origin. Each segment
+  axis at the part's joint or center, 6 units apart, so the chain places every part by its origin. Each segment
   owns one leg pair as children, `LegR<n>` and `LegL<n>` with a `...Lower`, shaped like a crawler leg (along X,
   the knee straight out from the hip) for `LegIk`; a clip-driven centipede plays `walk`, a traveling wave whose
   pairs step 0.14 of a cycle apart. Clips: `idle`, `walk`, `bite` with `impact`, `hurt` and `death`.

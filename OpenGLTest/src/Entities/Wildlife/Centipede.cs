@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Entities.Posing;
+using VoxelEngine.Player;
 
 namespace VoxelEngine.Entities.Wildlife;
 
@@ -9,8 +11,10 @@ namespace VoxelEngine.Entities.Wildlife;
 /// The giant centipede: the jungle's long hunter. A player within <see cref="WildlifeConfig.CentipedeNoticeRangeBlocks"/>
 /// is prey: it runs at them on its <c>walk</c> clip (a traveling wave over its ten leg pairs) and, within
 /// <see cref="WildlifeConfig.CentipedeBiteReach"/> and off its cooldown, plays <c>bite</c>; at the clip's
-/// <see cref="ImpactEvent"/> its jaws land (<see cref="TryTakeStrike"/>) and the venom takes hold. It is one body
-/// that plays its authored clips: the segments are a pose, not a physical chain, and its legs are clip-driven, not
+/// <see cref="ImpactEvent"/> its jaws land (<see cref="TryTakeStrike"/>) and the venom takes hold. It is one
+/// simulated body that plays its authored clips, drawn as a chain (<see cref="Spine"/>): the head turns and each
+/// segment trails the one ahead, so it bends through a turn like a worm instead of swinging round whole. The
+/// chain is a pose, not physics (nothing collides with or hits a segment), and its legs are clip-driven, not
 /// solved against the ground. Main thread only.
 /// </summary>
 public sealed class Centipede : Animal
@@ -31,7 +35,12 @@ public sealed class Centipede : Animal
     public Centipede(EntityType type, Vector3 position, bool spawnIn = true)
         : base(type, position, WildlifeConfig.CentipedeWalkSpeed, spawnIn)
     {
+        Spine = new CentipedeSpine(CentipedeRig.For(type));
     }
+
+    /// <summary>The body chain the parts are drawn on; it follows the body once a frame, on the simulation and on a
+    /// client's mirror alike.</summary>
+    public CentipedeSpine Spine { get; }
 
     /// <inheritdoc />
     public override WildlifeKind Kind => WildlifeKind.Centipede;
@@ -51,6 +60,9 @@ public sealed class Centipede : Animal
     /// <inheritdoc />
     protected override float JumpSpeed => WildlifeConfig.CentipedeJumpSpeed;
 
+    /// <inheritdoc />
+    protected override float TurnRate => WildlifeConfig.CentipedeTurnRate;
+
     // A hunter worth reading: its bar always shows
     /// <inheritdoc />
     public override bool ShowsHealthbar => true;
@@ -63,8 +75,8 @@ public sealed class Centipede : Animal
     public static bool InBiteReach(Vector3 center, Vector3 eye) =>
         MobTargets.InMeleeReach(center, eye, WildlifeConfig.CentipedeBiteReach);
 
-    /// <summary>Throws, naming the model file, unless the model has the head, a segment and the tail, the idle and
-    /// walk clips and a bite clip carrying the impact event.</summary>
+    /// <summary>Throws, naming the model file, unless the model has the head, a segment and the tail laid out as
+    /// a chain (<see cref="CentipedeRig"/>), the idle and walk clips and a bite clip carrying the impact event.</summary>
     public static void ValidateContent(EntityType type)
     {
         EntityContract.RequireParts(type, "Giant Centipede", ["Head", "Segment1", "Tail"]);
@@ -72,6 +84,31 @@ public sealed class Centipede : Animal
         EntityContract.RequireClip(type, "Giant Centipede", EntityAnimator.WalkClip);
         EntityContract.RequireEvent(type, "Giant Centipede",
             EntityContract.RequireClip(type, "Giant Centipede", BiteClip), ImpactEvent);
+        CentipedeRig.For(type);
+    }
+
+    /// <inheritdoc />
+    protected override void Locomote(Vector3 move, IMobTarget? target, Vector3? wander, float deltaTime,
+        ChunkManager chunks)
+    {
+        base.Locomote(move, target, wander, deltaTime, chunks);
+        Spine.Follow(Feet, Facing);
+    }
+
+    /// <inheritdoc />
+    public override void AnimateMirror(float deltaTime)
+    {
+        base.AnimateMirror(deltaTime);
+        Spine.Follow(Feet, Facing);
+    }
+
+    /// <summary>The world matrix of rig part <paramref name="part"/>: the clips' pose on the root of the joint the
+    /// part rides (<see cref="CentipedeSpine.RootOf"/>) rather than on the one body's.</summary>
+    public override Matrix4x4 PartMatrix(string part, PlayerRig rig)
+    {
+        // Drawn before its first frame (a spawn this frame), the chain lies straight
+        if (!Spine.IsLaid) Spine.Follow(Feet, Facing);
+        return RigPose.PartMatrix(Animation, part, rig, Spine.RootOf(part));
     }
 
     /// <inheritdoc />
