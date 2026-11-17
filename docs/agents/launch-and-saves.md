@@ -136,7 +136,10 @@ pure function of the seed: only **deltas** and the seed are written.
   `LodSurface.Pack` longs (the top in bits 16-47, a palette index in the low 16 bits) behind a
   ushort-counted palette of block names. A file of any other version (v1/v2, written before ids
   widened) is ignored with one warning by `LodEditState.TryParse`, so an old world's far LOD
-  loses only its old edits and the world itself loads as usual.
+  loses only its old edits and the world itself loads as usual. Rejected non-null contents remain
+  ignored and are marked for the store's `.bad` set-aside before a later replacement; the original
+  bytes are retained when that archive move succeeds. Missing files and accepted unknown-block
+  fallback are not marked.
 - **`WorldSeed.Apply(seed)`** is how a world gets its seed (`WorldGenerationConfig.Seed` reads
   `WorldSeed.Value`; `WorldSeed.Default` is what tests and scripted runs use). It is legal only
   while no World is live (`WorldSeed.BeginWorld` in the World constructor, `EndWorld` at the very
