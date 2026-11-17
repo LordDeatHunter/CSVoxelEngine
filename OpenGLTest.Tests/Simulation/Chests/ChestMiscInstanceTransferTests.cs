@@ -60,6 +60,7 @@ public sealed class ChestMiscInstanceTransferTests
         using var writer = new PacketWriter(NetMessage.ChestContents);
         ChestNetCodec.WriteOpenContents(writer, 4, 5, 6, chest);
         using var reader = new PacketReader(writer.ToArray());
+        Assert.Equal(NetMessage.ChestContents, reader.Message);
         var networkContents = ChestNetCodec.ReadContents(reader);
         Assert.NotNull(networkContents);
         Assert.Equal(SavedDisplayName, networkContents!.Value.Contents[0].Instance!.ResolvedName);
