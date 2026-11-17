@@ -140,9 +140,10 @@ public sealed class DynamicClimateOceanTests(ITestOutputHelper output)
                                 MathF.Abs(BiomeClassifier.JungleOf(temperature, humidity) - 0.5f))));
                     Assert.True(near <= WorldGenerationConfig.DynamicEcotoneBand,
                         $"surface biome changed away from a climate boundary at ({x},{z})");
-                    if (pure is Biome.Desert or Biome.Savanna or Biome.Steppe) continue;
                     var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
                     Assert.Equal(stored, column.Biomes[0]);
+                    Assert.Equal(stored, TerrainGenerator.FloraBiomeAt(x, z));
+                    if (pure is Biome.Desert or Biome.Savanna or Biome.Steppe) continue;
                     var left = ColumnCache.Get((x - 1) >> Chunk.SizeShift, z >> Chunk.SizeShift);
                     var leftPure = TerrainGenerator.BiomeWeights(x - 1, z, out _, out var leftDesert);
                     Assert.Equal(BiomeClassifier.DitherBiome(x - 1, z, leftPure, leftDesert),
@@ -170,6 +171,34 @@ public sealed class DynamicClimateOceanTests(ITestOutputHelper output)
                 ChunkTerrainFill.GenerateBlockData(repeated);
                 Assert.Equal(first.Storage.ToDense(), repeated.Storage.ToDense());
             }
+        }
+        finally { WorldSeed.Apply(WorldSeed.Default); }
+    }
+
+    [Fact]
+    public void DynamicEcotoneSoloTreeShapeUsesTheAcceptedSpecies()
+    {
+        TestContent.EnsureLoaded();
+        try
+        {
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
+            // The first sampled non-desert flip is near (-1728,1824). Search only its
+            // local ecotone for a real accepted trunk, rather than inventing a species.
+            for (var x = -1776; x <= -1680; x++)
+            for (var z = 1776; z <= 1872; z++)
+            {
+                var pure = TerrainGenerator.BiomeAt(x, z);
+                var flora = TerrainGenerator.FloraBiomeAt(x, z);
+                if (pure == flora || !TreeGenerator.TryGetTree(x, z, out var accepted, out _)) continue;
+                if (TreeGenerator.SpeciesByBiome[(int)flora] != accepted
+                    || TreeGenerator.SpeciesByBiome[(int)pure] == accepted) continue;
+
+                var solo = TreeBatches.ShapeOf(x, z);
+                output.WriteLine($"real Dynamic ecotone trunk ({x},{z}): pure {pure}, flora {flora}, accepted {accepted.Name}");
+                Assert.Same(accepted, solo.Species);
+                return;
+            }
+            Assert.Fail("no accepted tree with changed species in the bounded ecotone");
         }
         finally { WorldSeed.Apply(WorldSeed.Default); }
     }

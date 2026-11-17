@@ -221,6 +221,8 @@ internal static class BiomeClassifier
     {
         if (WorldSeed.Profile == WorldGenProfile.Dynamic)
         {
+            var gate = WorldGenerationConfig.BiomesEnabled ? 1f : 0f;
+            if (gate < 0.5f) return biome;
             if (biome == Biome.Ocean) return biome;
             SampleClimate(x, z, out var dynamicTemperature, out var dynamicHumidity);
             var cold = ColdOf(dynamicTemperature);
