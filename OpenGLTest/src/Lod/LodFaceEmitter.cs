@@ -319,6 +319,9 @@ internal ref struct LodFaceEmitter
         var surface = edited
             ?? (isSeaCell ? FloorBlock(floor)   // seabed wears its depth band, not dirt
             : beach ? cap
+            // Dynamic's snow stamp covers rock and scree too. Legacy keeps its earlier
+            // rock-before-snow LOD precedence; supplied rock/snow classifications never overlap.
+            : WorldSeed.Profile == WorldGenProfile.Dynamic && rock && snowCell ? _snow
             : rock ? (_gravelTop[gi * _heightGrid + gj] ? _gravel : _stone)
             : snowCell ? _snow
             : biome == Biome.Desert ? _sand

@@ -186,6 +186,10 @@ cloud slab starting at Y 198. Legacy keeps the earlier terrain formula and the f
 identity fixture. Dynamic high grass land begins showing bare rock at Y 96, occasional
 gravel scree appears from 96 through 120, and snow reaches full altitude weight at Y 140;
 `ColumnCache`, `SnowGenerator`, and generated far LOD use these same profile rules.
+The valley transfer flattens its low band while returning continuously to the original
+height at its knee; that return can steepen the upper transition band by up to about 1.22×.
+Dynamic far LOD shows snow over rocky or gravelly tops when the near snow pass does;
+Legacy keeps its prior rock-before-snow far-cap precedence.
 This S1b stage changes relief only; cliffs, dunes, new flora, volcanoes and habitats remain
 later issue #64 stages. `visual-examples/dynamic-relief-s1b.json` frames the bounded
 representative range, high summit, rock/snow/scree flanks, LOD vista, spawn horizon and valley knoll.
