@@ -145,15 +145,19 @@ public class WorldSeedTests
             WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
             var dynamic = ColumnCache.Get(27, 51);
             Assert.NotSame(repeated, dynamic);
-            Assert.Equal(repeated.Heights, dynamic.Heights);
             Assert.Equal(WorldGenProfile.Dynamic, WorldSeed.Profile);
+
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
+            var repeatedDynamic = ColumnCache.Get(27, 51);
+            Assert.NotSame(dynamic, repeatedDynamic);
+            Assert.Equal(dynamic.Heights, repeatedDynamic.Heights);
 
             WorldSeed.BeginWorld();
             try
             {
                 Assert.Throws<InvalidOperationException>(() =>
                     WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Legacy));
-                Assert.Same(dynamic, ColumnCache.Get(27, 51));
+                Assert.Same(repeatedDynamic, ColumnCache.Get(27, 51));
                 Assert.Equal(WorldGenProfile.Dynamic, WorldSeed.Profile);
             }
             finally

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Items;
@@ -181,6 +182,7 @@ public static class InventorySaveCodec
         if (data.Tools != null)
             foreach (var tool in data.Tools)
                 if (tool != null) ImportLantern(tool);
+        PreflightLegacyLanterns(data);
         inventory.Blocks.Clear();
         inventory.Misc.Clear();
         inventory.Tools.Clear();
@@ -261,13 +263,35 @@ public static class InventorySaveCodec
     }
 
     // Old lanterns were block-pool counts. Preserve every bounded old unit even when that exceeds today's tool cap.
+    // Check all IDs against the same accepted-tool import rules before clearing the destination.
+    private static void PreflightLegacyLanterns(PlayerSaveData.InventoryData data)
+    {
+        if (data.Blocks == null || !data.Blocks.Any(e => e != null
+                && SaveNames.TryResolve(e.Name, out var id) && LanternState.IsLantern(id)
+                && (e.Count ?? 0) > 0)) return;
+
+        var restored = Inventory.Empty();
+        ImportTools(restored, data, new List<string>());
+        var available = restored.NextToolInstance == Inventory.ExhaustedInstanceId
+            ? 0L : (long)int.MaxValue - restored.NextToolInstance + 1;
+        foreach (var entry in data.Blocks)
+        {
+            if (entry == null || !SaveNames.TryResolve(entry.Name, out var id) || !LanternState.IsLantern(id))
+                continue;
+            var count = Math.Clamp(entry.Count ?? 0, 0, Inventory.BlockCapacity);
+            if (count > available)
+                throw new InvalidDataException("Legacy lantern migration needs more positive inventory instance IDs");
+            available -= count;
+        }
+    }
+
     private static void MigrateLanterns(Inventory inventory, List<PlayerSaveData.StackData>? entries)
     {
         if (entries == null) return;
         foreach (var entry in entries)
             if (entry != null && SaveNames.TryResolve(entry.Name, out var id) && LanternState.IsLantern(id))
                 for (var i = 0; i < Math.Clamp(entry.Count ?? 0, 0, Inventory.BlockCapacity); i++)
-                    inventory.Tools.Add(new ItemStack(inventory.NextToolInstance++, id));
+                    inventory.Tools.Add(new ItemStack(inventory.AllocateInstanceId(), id));
     }
 
     private static void ImportTools(Inventory inventory, PlayerSaveData.InventoryData data, List<string> dropped)
@@ -301,7 +325,10 @@ public static class InventorySaveCodec
                 inventory.Tools.Add(stack);
                 maxRestored = Math.Max(maxRestored, instanceId);
             }
-        inventory.NextToolInstance = Math.Max(data.NextToolInstance ?? 1, maxRestored + 1);
+        inventory.NextToolInstance = data.NextToolInstance == Inventory.ExhaustedInstanceId
+            || maxRestored == int.MaxValue
+            ? Inventory.ExhaustedInstanceId
+            : Math.Max(Math.Max(data.NextToolInstance ?? 1, 1), maxRestored + 1);
     }
 
     private static PlayerSaveData.RolledData ExportRolled(ModifiersComponent rolled) => new()
