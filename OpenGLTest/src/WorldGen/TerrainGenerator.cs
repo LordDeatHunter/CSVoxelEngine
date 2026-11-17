@@ -93,6 +93,16 @@ public static class TerrainGenerator
     /// <summary>Biome at a world column; a pure function of (x, z) like the rest of the 2D half.</summary>
     public static Biome BiomeAt(float x, float z) => BiomeWeights(x, z, out _, out _);
 
+    /// <summary>The dithered surface biome for Dynamic flora; Legacy flora keeps its historical
+    /// undithered query even though the old desert material line was dithered.</summary>
+    internal static Biome FloraBiomeAt(float x, float z)
+    {
+        var biome = BiomeWeights(x, z, out var oceanWeight, out var desertWeight);
+        return WorldSeed.Profile == WorldGenProfile.Dynamic
+            ? BiomeClassifier.DitherBiome(x, z, biome, oceanWeight, desertWeight)
+            : biome;
+    }
+
     /// <summary>The ocean and desert weights and the biome they classify to (<see cref="BiomeClassifier.BiomeWeights(float, float, out float, out float)"/>).</summary>
     public static Biome BiomeWeights(float x, float z, out float oceanWeight, out float desertWeight) =>
         BiomeClassifier.BiomeWeights(x, z, out oceanWeight, out desertWeight);
@@ -166,7 +176,9 @@ public static class TerrainGenerator
         if (ridge >= WorldGenerationConfig.TrenchWidth) return 0f;
 
         var t = ridge / WorldGenerationConfig.TrenchWidth;
-        return WorldGenerationConfig.TrenchDepth * mask * (1f - t * t);
+        var depth = WorldSeed.Profile == WorldGenProfile.Dynamic
+            ? WorldGenerationConfig.DynamicTrenchDepth : WorldGenerationConfig.TrenchDepth;
+        return depth * mask * (1f - t * t);
     }
 
     /// <summary>OpenSimplex2 noise seeded from the world seed (<see cref="TerrainNoise.MakeNoise"/>).</summary>
@@ -299,9 +311,20 @@ public static class TerrainGenerator
         if (oceanWeight > 0f)
         {
             var depth = MathF.Pow(oceanWeight, WorldGenerationConfig.OceanDepthExponent);
-            var oceanHeight = MathUtils.Lerp(WorldGenerationConfig.OceanShoreHeight,
-                WorldGenerationConfig.OceanFloorHeight, depth);
+            var oceanFloor = WorldSeed.Profile == WorldGenProfile.Dynamic
+                ? WorldGenerationConfig.DynamicOceanFloorHeight : WorldGenerationConfig.OceanFloorHeight;
+            var oceanHeight = MathUtils.Lerp(WorldGenerationConfig.OceanShoreHeight, oceanFloor, depth);
             oceanHeight -= TrenchDepthAt(worldX, worldZ) * oceanWeight;
+            if (WorldSeed.Profile == WorldGenProfile.Dynamic)
+            {
+                var oceanMask = MathUtils.SmoothStep(WorldGenerationConfig.DynamicAbyssMaskStart,
+                    WorldGenerationConfig.DynamicAbyssMaskEnd, oceanWeight);
+                if (oceanMask > 0f)
+                    oceanHeight -= WorldGenerationConfig.DynamicAbyssDepth * oceanMask
+                        * MathUtils.SmoothStep(WorldGenerationConfig.DynamicAbyssStart,
+                            WorldGenerationConfig.DynamicAbyssEnd,
+                            TerrainNoise.AbyssNoise.GetNoise(worldX, worldZ));
+            }
             heightF = MathUtils.Lerp(heightF, oceanHeight, oceanWeight);
         }
 
@@ -479,7 +502,7 @@ public static class TerrainGenerator
                     TerrainNoise.EntranceNoise.GetNoise(worldX, worldZ)) * entranceShore;
 
                 intensity[i] = TerrainNoise.IntensityNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.CaveIntensityRange;
-                biomes[i] = BiomeClassifier.DitherBiome(worldX, worldZ, biome, desertWeight);
+                biomes[i] = BiomeClassifier.DitherBiome(worldX, worldZ, biome, oceanWeight, desertWeight);
             }
         }
 

@@ -48,7 +48,7 @@ public static class FlowerGenerator
     /// between the woodland and the open temperate grassland instead of the woods themselves.
     /// </summary>
     public static bool IsOpenMeadow(int x, int z) =>
-        TerrainGenerator.BiomeAt(x, z) is Biome.Forest or Biome.Steppe
+        TerrainGenerator.FloraBiomeAt(x, z) is Biome.Forest or Biome.Steppe
         && TerrainGenerator.ForestOpenness(x, z) >= WorldFeatureConfig.MeadowMinOpenness;
 
     /// <summary>Whether the surface column (x, z) grows a flower, before the terrain checks.</summary>

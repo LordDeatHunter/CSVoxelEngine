@@ -158,9 +158,10 @@ public sealed class WorldGenProfileIdentityTests
             Assert.NotNull(resource);
             using var reader = new StreamReader(resource);
             var expected = ReadRows(reader);
-            // S0 Dynamic intentionally delegates to the EA generator. Legacy runs after a
-            // Dynamic -> Legacy transition, so stale profile-dependent cache entries show up.
-            Assert.Equal(expected, Sample(WorldGenProfile.Dynamic));
+            // S1a changes Dynamic terrain. Prime its cache first, then require the exact EA
+            // Legacy output after a profile transition and full reset.
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
+            _ = ColumnCache.Get(27, 51);
             Assert.Equal(expected, Sample(WorldGenProfile.Legacy));
         }
         finally
