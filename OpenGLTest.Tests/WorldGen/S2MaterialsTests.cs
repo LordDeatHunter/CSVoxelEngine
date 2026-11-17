@@ -143,4 +143,48 @@ public sealed class S2MaterialsTests(ITestOutputHelper output)
             WorldSeed.Apply(WorldSeed.Default);
         }
     }
+
+    [Fact]
+    public void RealBandsContinueAcrossNegativeChunkBoundary()
+    {
+        TestContent.EnsureLoaded();
+        var probes = 0;
+        var chunks = 0;
+        try
+        {
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
+            const int z = 5000;
+            var ochre = ContentRegistry.RequireBlock("ochre_clay").Id;
+            var leftColumn = ColumnCache.Get(-4001 >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var rightColumn = ColumnCache.Get(-4000 >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            probes += 2;
+            var leftLocal = ((-4001 & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+            var rightLocal = ((-4000 & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+            Assert.Equal(0, leftColumn.DirtDepth[leftLocal]);
+            Assert.Equal(0, rightColumn.DirtDepth[rightLocal]);
+            var left = new Chunk(null!, new Vector3(-4001 >> Chunk.SizeShift, 5, z >> Chunk.SizeShift),
+                generateBlockData: false);
+            ChunkTerrainFill.GenerateBlockData(left);
+            chunks++;
+            var right = new Chunk(null!, new Vector3(-4000 >> Chunk.SizeShift, 5, z >> Chunk.SizeShift),
+                generateBlockData: false);
+            ChunkTerrainFill.GenerateBlockData(right);
+            chunks++;
+            var shared = 0;
+            for (var y = 80; y < Math.Min(leftColumn.Heights[leftLocal], rightColumn.Heights[rightLocal]); y++)
+            {
+                probes++;
+                if (left.Storage.Get(Chunk.Idx(Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask)) == ochre
+                    && right.Storage.Get(Chunk.Idx(0, y & Chunk.SizeMask, z & Chunk.SizeMask)) == ochre)
+                    shared++;
+            }
+            output.WriteLine($"negative-X seam common ochre wall cells={shared}");
+            Assert.True(shared > 0);
+        }
+        finally
+        {
+            output.WriteLine($"S2 materials direct entries={probes}, new chunks={chunks}");
+            WorldSeed.Apply(WorldSeed.Default);
+        }
+    }
 }
