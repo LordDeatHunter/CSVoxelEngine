@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -129,5 +130,135 @@ public sealed class MapSaveTests : IDisposable
         Assert.True(_world.Renderer.EnsureMap().TryGetTile(5, -9, out var back));
         Assert.Equal(tile.Texels, back.Texels);
         Assert.Equal(tile.Heights, back.Heights);
+    }
+
+    public static IEnumerable<object[]> RejectedMapFiles()
+    {
+        var tile = Painted(5, -9, 4);
+        var currentFormat = MapSaveCodec.ToBytes([(MapLayerKind.Surface, tile)]);
+        yield return new object[] { "truncated-body", currentFormat[..(currentFormat.Length / 2)] };
+        yield return new object[] { "short-header", "CV"u8.ToArray() };
+        yield return new object[] { "foreign-magic", "CVWD\u0001garbage"u8.ToArray() };
+        yield return new object[]
+        {
+            "unsupported-version",
+            new byte[] { (byte)'C', (byte)'V', (byte)'M', (byte)'P', (byte)(MapSaveCodec.Version + 1), 0x42 }
+        };
+    }
+
+    [Theory]
+    [MemberData(nameof(RejectedMapFiles))]
+    public void RejectedMapIsPreservedWhenAnImportedExploredMapReplacesIt(string _, byte[] rejected)
+    {
+        Directory.CreateDirectory(_dir);
+        var mapPath = Path.Combine(_dir, MapSaveCodec.FileName);
+        var badPath = mapPath + ".bad";
+        File.WriteAllBytes(mapPath, rejected);
+
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, new ChunkSaveStore(_dir));
+        var map = _world.Renderer.EnsureMap();
+        Assert.Empty(map.ExportExplored());
+        var oldVersion = map.ExploredVersion;
+        var tile = Painted(5, -9, 4);
+        map.Import([(MapLayerKind.Surface, tile)]);
+        Assert.True(map.ExploredVersion > oldVersion);
+
+        Assert.True(_world.SaveAndDispose());
+        _world = null;
+
+        var archiveExists = File.Exists(badPath);
+        var archived = archiveExists ? File.ReadAllBytes(badPath) : [];
+        var replacement = File.Exists(mapPath) ? MapSaveCodec.TryParse(File.ReadAllBytes(mapPath)) : null;
+        Assert.True(archiveExists && archived.SequenceEqual(rejected),
+            $"archiveExists={archiveExists}, archivedBytesMatch={archived.SequenceEqual(rejected)}, replacementParses={replacement != null}");
+        var restored = Assert.Single(replacement!);
+        Assert.Equal((MapLayerKind.Surface, tile.ChunkX, tile.ChunkZ), (restored.Kind, restored.Tile.ChunkX, restored.Tile.ChunkZ));
+        Assert.Equal(tile.Texels, restored.Tile.Texels);
+        Assert.Equal(tile.Heights, restored.Tile.Heights);
+    }
+
+    [Theory]
+    [MemberData(nameof(RejectedMapFiles))]
+    public void RejectedMapIsUntouchedUntilAnExploredChangeIsSaved(string _, byte[] rejected)
+    {
+        Directory.CreateDirectory(_dir);
+        var mapPath = Path.Combine(_dir, MapSaveCodec.FileName);
+        var badPath = mapPath + ".bad";
+        File.WriteAllBytes(mapPath, rejected);
+
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, new ChunkSaveStore(_dir));
+        Assert.Empty(_world.Renderer.EnsureMap().ExportExplored());
+        Assert.True(_world.SaveAndDispose());
+        _world = null;
+
+        Assert.False(File.Exists(badPath));
+        Assert.Equal(rejected, File.ReadAllBytes(mapPath));
+    }
+
+    [Fact]
+    public void AnUnopenedMapFileIsUntouchedWhenTheWorldCloses()
+    {
+        Directory.CreateDirectory(_dir);
+        var mapPath = Path.Combine(_dir, MapSaveCodec.FileName);
+        var bytes = "CVMP\u0001"u8.ToArray();
+        File.WriteAllBytes(mapPath, bytes);
+
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, new ChunkSaveStore(_dir));
+        Assert.True(_world.SaveAndDispose());
+        _world = null;
+
+        Assert.Equal(bytes, File.ReadAllBytes(mapPath));
+        Assert.False(File.Exists(mapPath + ".bad"));
+    }
+
+    [Fact]
+    public void AMissingMapRemainsAbsentWithoutExploration()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, new ChunkSaveStore(_dir));
+        Assert.Empty(_world.Renderer.EnsureMap().ExportExplored());
+        Assert.True(_world.SaveAndDispose());
+        _world = null;
+
+        Assert.False(File.Exists(Path.Combine(_dir, MapSaveCodec.FileName)));
+        Assert.False(File.Exists(Path.Combine(_dir, MapSaveCodec.FileName + ".bad")));
+    }
+
+    public static IEnumerable<object[]> ValidMapFiles()
+    {
+        yield return new object[] { "empty", MapSaveCodec.ToBytes([]), Array.Empty<(MapLayerKind, MapTile)>() };
+        var tile = Painted(5, -9, 4);
+        yield return new object[] { "tile", MapSaveCodec.ToBytes([(MapLayerKind.Surface, tile)]), new[] { (MapLayerKind.Surface, tile) } };
+    }
+
+    [Theory]
+    [MemberData(nameof(ValidMapFiles))]
+    public void ValidMapFilesRemainUnarchivedAndKeepTheirTiles(string _, byte[] valid, (MapLayerKind Kind, MapTile Tile)[] expected)
+    {
+        Directory.CreateDirectory(_dir);
+        var mapPath = Path.Combine(_dir, MapSaveCodec.FileName);
+        File.WriteAllBytes(mapPath, valid);
+
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, new ChunkSaveStore(_dir));
+        Assert.Equal(expected.Length, _world.Renderer.EnsureMap().ExportExplored().Count);
+        Assert.True(_world.SaveAndDispose());
+        _world = null;
+
+        Assert.False(File.Exists(mapPath + ".bad"));
+        var actual = MapSaveCodec.TryParse(File.ReadAllBytes(mapPath));
+        Assert.NotNull(actual);
+        Assert.Equal(expected.Length, actual!.Count);
+        for (var i = 0; i < expected.Length; i++)
+        {
+            Assert.Equal(expected[i].Kind, actual[i].Kind);
+            Assert.Equal(expected[i].Tile.ChunkX, actual[i].Tile.ChunkX);
+            Assert.Equal(expected[i].Tile.ChunkZ, actual[i].Tile.ChunkZ);
+            Assert.Equal(expected[i].Tile.Texels, actual[i].Tile.Texels);
+            Assert.Equal(expected[i].Tile.Heights, actual[i].Tile.Heights);
+        }
     }
 }

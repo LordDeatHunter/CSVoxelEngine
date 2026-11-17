@@ -173,8 +173,10 @@ pure function of the seed: only **deltas** and the seed are written.
   discarded only after `EntityRestoreTimeoutSeconds` of play.
 - **The explored map** (`map.bin`, `MapSaveCodec`: "CVMP", a version byte, then a Deflate body of the surface and
   sky `MapTile`s, each its layer kind, chunk column, 256 texels and 256 heights; a cave slice is never kept). Only a
-  world that drew a HUD has a map (`WorldRenderer.EnsureMap`, which imports the file when it builds the tracker), so a
-  server never writes one and a world whose HUD never drew keeps its file untouched. `WorldPersistence.SaveMapIfChanged`
+  world that drew a HUD has a map (`WorldRenderer.EnsureMap`, which imports the file when it builds the tracker); the
+  store sets rejected existing bytes aside as `.bad` when a later explored-map change is written, while missing or
+  unchanged maps are not written. A server never writes one and a world whose HUD never drew keeps its file untouched.
+  `WorldPersistence.SaveMapIfChanged`
   writes it when `MapTracker.ExploredVersion` moved: at autosave it copies the tiles on the main thread
   (`ExportExplored`; the tracker reuses tile objects) and deflates them on a pool thread, one encode at a time, so an
   autosave never hitches; the closing flush waits for one in flight and encodes inline, so the last write queued is the
