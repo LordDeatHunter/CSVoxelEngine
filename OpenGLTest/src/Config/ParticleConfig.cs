@@ -282,4 +282,19 @@ public static class ParticleConfig
 
     /// <summary>Cave motes per second in the magma deep (embers).</summary>
     public const float CaveMoteMagmaDeepPerSecond = 6f;
+
+    // --- Corpse bloom miasma (AmbientEffects.UpdateBloomClouds, FireParticleKind.Miasma) ---
+    /// <summary>Miasma puffs per second a corpse bloom's cloud sheds at full strength; the rate falls with the
+    /// cloud's strength, which is how it fades.</summary>
+    public const float MiasmaPerSecond = 40f;
+
+    /// <summary>Most miasma puffs one cloud spawns in a frame, however long the frame was.</summary>
+    public const int MiasmaMaxPerFrame = 6;
+
+    public const float MiasmaLifetime = 3f;
+    public const float MiasmaRise = 0.12f;
+    public const float MiasmaDrift = 0.25f;
+    public const float MiasmaSize = 0.7f;
+    public const float MiasmaGrow = 0.25f;
+    public const float MiasmaAlpha = 0.4f;
 }

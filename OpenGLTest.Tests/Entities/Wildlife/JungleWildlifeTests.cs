@@ -92,9 +92,54 @@ public sealed class JungleWildlifeTests
         Assert.True(bloom.CloudReaches(player.Eye));
         Assert.False(bloom.CloudReaches(player.Eye + new Vector3(WildlifeConfig.BloomBurstRadiusBlocks + 2f, 0f, 0f)));
 
-        // The cloud thins out: with nobody awake to spew again it ends
+        // A mirror given its posture is open like it and knows the cloud hangs
+        var mirror = new CorpseBloom(bloom.Type, bloom.Position, spawnIn: false);
+        mirror.MirrorPosture(bloom.Posture);
+        Assert.Equal(bloom.IsOpen, mirror.IsOpen);
+        Assert.True(mirror.CloudActive);
+
+        // The cloud thins out: with nobody awake to spew again it only fades, and ends
         var gone = PlayerAt(8f + WildlifeConfig.BloomWakeRangeBlocks + 10f, 8f);
-        Assert.True(RunUntil(manager, chunks, [gone], WildlifeConfig.BloomCloudSeconds + 2f, () => !bloom.CloudActive));
+        var strength = bloom.CloudStrength;
+        var grew = false;
+        Assert.True(RunUntil(manager, chunks, [gone], WildlifeConfig.BloomCloudSeconds + 2f, () =>
+        {
+            grew |= bloom.CloudStrength > strength;
+            strength = bloom.CloudStrength;
+            return !bloom.CloudActive;
+        }));
+        Assert.False(grew, "a fading cloud grew thicker");
+        Assert.Equal(0f, bloom.CloudStrength);
+        Assert.False(bloom.CloudHolds(bloom.Feet));
+
+        mirror.MirrorPosture(bloom.Posture);
+        Assert.False(mirror.CloudActive);
+    }
+
+    [Fact]
+    public void ABloomsCloudPoisonsTheMobsStandingInItExceptTheImmune()
+    {
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
+        var manager = NewManager();
+        var bloom = Standing<CorpseBloom>(manager, CorpseBloom.EntityName, 8f, 8f);
+        var player = PlayerAt(8f + 1.5f, 8f);
+        var poison = StatusEffectRegistry.Require(CorpseBloom.PoisonEffect);
+
+        Assert.True(RunUntil(manager, chunks, [player], 20f, () => bloom.CloudActive), "no cloud after the burst");
+
+        // The reach is a body's feet: inside the cloud's radius, not beyond it
+        Assert.True(bloom.CloudHolds(bloom.Feet + new Vector3(WildlifeConfig.BloomBurstRadiusBlocks * 0.5f, 0f, 0f)));
+        Assert.False(bloom.CloudHolds(bloom.Feet + new Vector3(WildlifeConfig.BloomBurstRadiusBlocks + 1f, 0f, 0f)));
+
+        // A centipede hunting the player through the cloud is poisoned by it; a second bloom rooted in the cloud is
+        // poisoned exactly when its kind is not immune to poison
+        var hunter = Standing<Centipede>(manager, Centipede.EntityName, 8f - 1.5f, 8f);
+        var neighbor = Standing<CorpseBloom>(manager, CorpseBloom.EntityName, 8f, 8f + 2f);
+        Assert.True(RunUntil(manager, chunks, [player], WildlifeConfig.BloomCloudPulseSeconds * 3f,
+            () => hunter.Effects.IsActive(poison)), "the cloud never poisoned the mob in it");
+        RunUntil(manager, chunks, [player], WildlifeConfig.BloomCloudPulseSeconds * 3f, () => false);
+        Assert.Equal(!neighbor.Type.Immune.Contains(CorpseBloom.PoisonEffect), neighbor.Effects.IsActive(poison));
+        Assert.Equal(!bloom.Type.Immune.Contains(CorpseBloom.PoisonEffect), bloom.Effects.IsActive(poison));
     }
 
     [Fact]

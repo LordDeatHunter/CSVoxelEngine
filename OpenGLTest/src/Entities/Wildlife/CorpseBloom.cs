@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Player;
 
 namespace VoxelEngine.Entities.Wildlife;
 
@@ -11,11 +12,12 @@ namespace VoxelEngine.Entities.Wildlife;
 /// within <see cref="WildlifeConfig.BloomTriggerRadiusBlocks"/> and off its cooldown, plays its <c>spew</c> clip:
 /// at the clip's <see cref="ImpactEvent"/> a poison burst goes out (<see cref="TryTakeStrike"/>,
 /// <see cref="StrikeReaches"/>) and leaves a lingering cloud (<see cref="TakeCloudPulse"/>,
-/// <see cref="CloudReaches"/>) that poisons whoever stands in it every
-/// <see cref="WildlifeConfig.BloomCloudPulseSeconds"/> for <see cref="WildlifeConfig.BloomCloudSeconds"/>. The
-/// manager bills both (<c>WildlifeManager.Attack</c>); the bloom is never hurt by its own cloud, which only
-/// reaches targets. Whether it is open rides <see cref="Posture"/>, so a client's mirror opens and shuts with
-/// it. Main thread only.
+/// <see cref="CloudReaches"/>, <see cref="CloudHolds"/>) that poisons whoever stands in it, player or mob, every
+/// <see cref="WildlifeConfig.BloomCloudPulseSeconds"/> for <see cref="WildlifeConfig.BloomCloudSeconds"/>, fading as
+/// it goes (<see cref="CloudStrength"/>). The manager bills both (<c>WildlifeManager.Attack</c>); a kind whose
+/// entity file lists <c>poison</c> under <c>immune</c> (the bloom itself, the dragonfly) is never poisoned. Whether
+/// it is open and how much cloud is left ride <see cref="Posture"/>, so a client's mirror opens, shuts and sheds
+/// the cloud with it. Main thread only.
 /// </summary>
 public sealed class CorpseBloom : Animal
 {
@@ -30,6 +32,11 @@ public sealed class CorpseBloom : Animal
 
     /// <summary>The status effect its poison gives (<c>assets/data/effects/poison.json</c>).</summary>
     public const string PoisonEffect = "poison";
+
+    private const int OpenBit = 1;
+
+    // The steps the cloud's strength rides the posture byte in, above the open bit
+    private const int CloudLevels = 7;
 
     private bool _open;
     private bool _wokenThisFrame;
@@ -75,11 +82,22 @@ public sealed class CorpseBloom : Animal
     /// <summary>Whether its poison cloud still hangs.</summary>
     public bool CloudActive => _cloudRemaining > 0f;
 
+    /// <summary>How much of the cloud is left, 1 right after the burst falling to 0 as it fades: what thins the
+    /// particles it sheds (<c>AmbientEffects.UpdateBloomClouds</c>). The poison keeps its full reach until 0.</summary>
+    public float CloudStrength => MathUtils.Clamp01(_cloudRemaining / WildlifeConfig.BloomCloudSeconds);
+
+    // Bit 0 says whether it is open; the bits above carry the cloud's strength in CloudLevels steps, rounded up so
+    // a mirror keeps a cloud for as long as one hangs
     /// <inheritdoc />
-    public override byte Posture => _open ? (byte)1 : (byte)0;
+    public override byte Posture =>
+        (byte)((_open ? OpenBit : 0) | ((int)MathF.Ceiling(CloudStrength * CloudLevels) << 1));
 
     /// <inheritdoc />
-    public override void MirrorPosture(byte posture) => SetOpen(posture != 0);
+    public override void MirrorPosture(byte posture)
+    {
+        SetOpen((posture & OpenBit) != 0);
+        _cloudRemaining = WildlifeConfig.BloomCloudSeconds * Math.Min(posture >> 1, CloudLevels) / CloudLevels;
+    }
 
     /// <summary>Whether a bloom standing at <paramref name="feet"/> burst-poisons a player whose eye is at
     /// <paramref name="eye"/>: within <see cref="WildlifeConfig.BloomBurstRadiusBlocks"/> horizontally, the player's feet
@@ -89,9 +107,18 @@ public sealed class CorpseBloom : Animal
 
     /// <summary>Whether a player whose eye is at <paramref name="eye"/> stands in the cloud: the burst's reach, a little
     /// taller, since the cloud hangs and drifts up.</summary>
-    public bool CloudReaches(Vector3 eye) =>
-        CloudActive && MobTargets.InShockwave(Feet, eye, WildlifeConfig.BloomBurstRadiusBlocks,
-            WildlifeConfig.BloomBurstHeightBlocks * 1.5f);
+    public bool CloudReaches(Vector3 eye) => CloudHolds(eye - new Vector3(0f, Camera.EyeHeight, 0f));
+
+    /// <summary>Whether a body whose feet are at <paramref name="feet"/> (a mob's, a player's) stands in the cloud:
+    /// the one reach rule <see cref="CloudReaches"/> shares.</summary>
+    public bool CloudHolds(Vector3 feet)
+    {
+        if (!CloudActive) return false;
+        var dx = feet.X - Position.X;
+        var dz = feet.Z - Position.Z;
+        return dx * dx + dz * dz <= WildlifeConfig.BloomBurstRadiusBlocks * WildlifeConfig.BloomBurstRadiusBlocks
+               && MathF.Abs(feet.Y - Feet.Y) <= WildlifeConfig.BloomBurstHeightBlocks * 1.5f;
+    }
 
     /// <summary>True once per <see cref="WildlifeConfig.BloomCloudPulseSeconds"/> while the cloud hangs: the manager then
     /// poisons every target <see cref="CloudReaches"/> holds.</summary>

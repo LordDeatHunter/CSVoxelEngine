@@ -537,7 +537,7 @@ public class World
             foreach (var name in WildlifeSpecies.Names)
                 if (EntityRegistry.TryGet(name) is { } animalType) animalTypes.Add(animalType);
             if (animalTypes.Count > 0)
-                _wildlife = new WildlifeManager(animalTypes, _mobCaps);
+                _wildlife = new WildlifeManager(animalTypes, _mobCaps, _mobs);
             var shardlingType = EntityRegistry.TryGet(Shardling.EntityName);
             var sporelingType = EntityRegistry.TryGet(Sporeling.EntityName);
             var magmabornType = EntityRegistry.TryGet(Magmaborn.EntityName);
@@ -1165,6 +1165,7 @@ public class World
         _sandworms?.AnimateMirrors((float)deltaTime, _chunkManager);
         _tntManager.AnimateMirrors((float)deltaTime);
         Ambient.UpdateStatusParticles((float)deltaTime);
+        Ambient.UpdateBloomClouds((float)deltaTime);
         Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
         Ambient.UpdateKingEffects((float)deltaTime);
         WormEffects?.Update((float)deltaTime, Sandworms);
@@ -1351,6 +1352,7 @@ public class World
         {
             _dust.TakeMobLandings(_mobs, _chunkManager, _debris);
             Ambient.UpdateStatusParticles((float)deltaTime);
+            Ambient.UpdateBloomClouds((float)deltaTime);
             Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
             Ambient.UpdateKingEffects((float)deltaTime);
             WormEffects?.Update((float)deltaTime, Sandworms);

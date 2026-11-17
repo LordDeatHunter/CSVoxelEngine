@@ -316,9 +316,15 @@ no rest rotations, so parts the clips fold lie flat along an axis.
   moves. Shut on its `closed` loop until a player is within `BloomWakeRangeBlocks` (it opens to `idle`, and shuts again
   `BloomCloseDelaySeconds` after the last one left; the open bit rides `Animal.Posture` so a mirror matches); with a clear
   line within `BloomTriggerRadiusBlocks` and off its cooldown it plays `spew`, and at `impact` a burst hits every target in
-  `BloomBurstRadiusBlocks` for `BloomBurstDamage` and the `poison` effect and leaves a **cloud** (`CloudActive`) that
-  `WildlifeManager` re-poisons every `BloomCloudPulseSeconds` for `BloomCloudSeconds`, server-side only (no cloud particles
-  yet, `P-63`); the immune are never billed and the bloom is never hurt by its own cloud. Model: `Base` > `Bulb` >
+  `BloomBurstRadiusBlocks` for `BloomBurstDamage` and the `poison` effect and leaves a **cloud** (`CloudActive`) in
+  which `WildlifeManager.PoisonInCloud` re-poisons, every `BloomCloudPulseSeconds` for `BloomCloudSeconds`, every
+  player (`CloudReaches`) and every mob of the world (`CloudHolds`, over `World.Mobs`), authoritative only. Immunity is
+  data: an immune player is never billed, and a kind whose entity file lists `poison` under `immune` (the bloom itself,
+  the dragonfly) refuses it in its effect set. The cloud is drawn as purple `FireParticleKind.Miasma` puffs
+  (`AmbientEffects.UpdateBloomClouds`, never on a server) shed across its reach at `ParticleConfig.MiasmaPerSecond`
+  times `CloudStrength` (1 at the burst, falling to 0), so it thins as it fades; the poison keeps its full reach until
+  the cloud ends, and the cloud ends with a dying bloom. `Posture` carries the open bit and, above it, the strength
+  in 7 steps, so a client's mirror sheds the same cloud. Framed in `visual-examples/corpse-bloom-cloud.json`. Model: `Base` > `Bulb` >
   `Spadix` > `SpadixTip`, and under `Bulb` the petals `PetalN/S/E/W`, each with a `...Tip`, lying flat outward.
   Clips: `idle` (open), `closed` (a loop: the bud shut, the ambush pose), `spew` with `impact` (the petals gulp
   shut, the bulb swells, the burst is the `impact`), `hurt` and `death`. The bulb's swelling is a scale track.
@@ -406,7 +412,8 @@ take a new species from it instead of naming it; adding one means a class, a row
   Its hits and kills play `crow_hit` and `crow_death` clips (`Mob.HitSoundGroup`/`DeathSoundGroup`). Separately, `WildlifeCalls`
   (`src/Entities/Wildlife/`, built by `WildlifeCallSet`, ticked by `World`) plays a random `crow_caw` clip every `CrowCawMinSeconds`..`Max` (`AudioConfig`)
   from the nearest live crow within `CrowCawRangeBlocks` of the camera, positionally.
-- **Dragonfly** (`Dragonfly`): the man-sized hunter of the waterside. A player within `DragonflyNoticeRangeBlocks` is
+- **Dragonfly** (`Dragonfly`): the man-sized hunter of the waterside, immune to `poison` (its entity file's `immune`),
+  so it flies through a corpse bloom's cloud unharmed. A player within `DragonflyNoticeRangeBlocks` is
   prey: it holds itself over their head and darts in its `bite` clip, biting whoever is within `DragonflyBiteReach`
   at the impact. On the ground it plays `perch`. Riding one is a later task (`plans/TODO.md`).
 - **Deer** (`Deer`): watches a player inside `DeerAlertRangeBlocks` (its `alert` clip once), bolts from one inside

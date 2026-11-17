@@ -314,8 +314,10 @@ public static class NetFraming
     /// <see cref="NetMessage.StationState"/> also carries the finished result waiting on it for its collect item (id and
     /// count, after the cooldown). An older peer would misread the station frames.
     /// 64: <see cref="NetMessage.StationState"/> ends with the tanning vats (cell, block id, water, bark, hides, progress,
-    /// leather) after the work stations. An older peer would misread the station frames.</summary>
-    public const int ProtocolVersion = 64;
+    /// leather) after the work stations. An older peer would misread the station frames.
+    /// 65: a <see cref="NetEntityKind.CorpseBloom"/>'s posture byte carries, above its open bit, how much of its poison
+    /// cloud is left; an older client would read a shut bloom under a cloud as open and draw no cloud.</summary>
+    public const int ProtocolVersion = 65;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

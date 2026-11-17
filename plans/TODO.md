@@ -270,8 +270,8 @@ single-arc player.
   steps), per-segment hit testing on one health pool, inverse kinematics for twenty legs (`LegIk.Solve` and the hold
   probing of `CrawlerLegs`, generalized from four legs a side on one body to one pair per segment, in the segment's
   space), the metachronal stepping order the `walk` clip shows, whether it climbs like the crawlers, and the wire for a
-  chain (more than one pose, see the sandworm). Also open: a lingering-cloud particle for the corpse bloom (its cloud
-  poisons server-side with no particles yet), a rearing threat clip and length variants (the segments are identical).
+  chain (more than one pose, see the sandworm). Also open: a rearing threat clip and length variants (the segments
+  are identical).
   *Hook:* `Entities/Crawlers/` (`CrawlerRig`, `CrawlerLegs`, `LegIk`), the sandworm's chain (`plans/SANDWORM.md`).
 - [ ] **`P-56` · Ocean & island content** — P3, M.
   Islands, shipwrecks, reefs, deep-sea POIs; makes the ocean a destination rather than a border.

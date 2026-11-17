@@ -190,7 +190,8 @@ public static class WildlifeConfig
     // The jungle's rooted ambusher. A player within BloomWakeRangeBlocks opens it; within BloomTriggerRadiusBlocks
     // with a clear line it spews, off its BloomSpewCooldownSeconds cooldown. The burst reaches BloomBurstRadiusBlocks
     // horizontally and BloomBurstHeightBlocks vertically for BloomBurstDamage and the poison effect, and leaves a
-    // cloud of the same reach that poisons whoever stands in it every BloomCloudPulseSeconds for BloomCloudSeconds.
+    // cloud of the same reach that poisons whoever stands in it, player or mob, every BloomCloudPulseSeconds for
+    // BloomCloudSeconds, thinning as it goes.
     // It shuts BloomCloseDelaySeconds after the last player left its wake range.
     public const float BloomSpawnWeight = 3f;
     public const float BloomHeight = 1.1f;
@@ -201,7 +202,7 @@ public static class WildlifeConfig
     public const float BloomBurstHeightBlocks = 2f;
     public const int BloomBurstDamage = 3;
     public const float BloomSpewCooldownSeconds = 6f;
-    public const float BloomCloudSeconds = 5f;
+    public const float BloomCloudSeconds = 8f;
     public const float BloomCloudPulseSeconds = 1f;
     public const float BloomCloseDelaySeconds = 4f;
 

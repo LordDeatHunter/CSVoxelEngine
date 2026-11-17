@@ -14,7 +14,8 @@ namespace VoxelEngine.Simulation;
 /// Owns the animals of the wild (<see cref="Animal"/>: <see cref="Deer"/>, <see cref="Boar"/>,
 /// <see cref="Crow"/>, <see cref="Dragonfly"/>): on the shared realm frame (<see cref="RealmMobManager{TMob}"/>)
 /// each animal reacts only to the players it heeds (<see cref="Animal.Heeds"/>) and wanders otherwise, an attack
-/// is billed at its impact to every target it still reaches (<see cref="Animal.TryTakeStrike"/>), and nothing
+/// is billed at its impact to every target it still reaches (<see cref="Animal.TryTakeStrike"/>), a
+/// <see cref="CorpseBloom"/>'s cloud poisons every player and mob standing in it, and nothing
 /// despawns for standing idle. It spawns herds and flocks on dry surface around the players (a flyer in the open
 /// air over its column)
 /// (<see cref="MobSpawner.TryFindSurfaceSpawn(ChunkManager, SpawnOrigin, float, float, int, out int, out int, out int)"/>),
@@ -26,13 +27,20 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
     // The registered species' content by WildlifeKind; null where a species' entity is not registered
     private readonly EntityType?[] _types = new EntityType?[WildlifeSpecies.Names.Length];
 
+    // Every live mob of the world, for the corpse bloom's cloud; null (tests) leaves only the animals
+    private readonly IReadOnlyList<Mob>? _bystanders;
+
     /// <summary>
     /// Takes every wild animal among <paramref name="types"/>, validating its content first so a model missing a
     /// part, clip or event fails at startup naming its file; any other entity is ignored. Joins
     /// <paramref name="caps"/> (the world's), or caps itself alone when none is given (tests).
+    /// <paramref name="bystanders"/> is every live mob of the world (<c>World.Mobs</c>), which a corpse bloom's
+    /// cloud poisons; without it only the animals themselves stand in a cloud.
     /// </summary>
-    public WildlifeManager(IEnumerable<EntityType> types, MobCaps? caps = null) : base(caps)
+    public WildlifeManager(IEnumerable<EntityType> types, MobCaps? caps = null, IReadOnlyList<Mob>? bystanders = null)
+        : base(caps)
     {
+        _bystanders = bystanders;
         foreach (var type in types)
         {
             if (WildlifeSpecies.KindOf(type.Name) is not { } kind) continue;
@@ -156,13 +164,22 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
     }
 
     // A corpse bloom's cloud lingers after its burst: each pulse poisons every target still standing in it
-    private static void PoisonInCloud(CorpseBloom bloom, IReadOnlyList<IMobTarget> targets)
+    // and every mob too; a kind immune to poison (the bloom itself, a dragonfly) refuses it in its effect set
+    private void PoisonInCloud(CorpseBloom bloom, IReadOnlyList<IMobTarget> targets)
     {
         if (!bloom.TakeCloudPulse()) return;
         for (var t = 0; t < targets.Count; t++)
         {
             var target = targets[t];
             if (!target.IsImmune && bloom.CloudReaches(target.Eye)) StatusEffects.Apply(target, CorpseBloom.PoisonEffect, 1f);
+        }
+
+        var bystanders = _bystanders ?? Mobs;
+        for (var i = 0; i < bystanders.Count; i++)
+        {
+            var mob = bystanders[i];
+            if (bloom.CloudHolds(mob.Position - new Vector3(0f, mob.BodyHalfHeight, 0f)))
+                StatusEffects.Apply(mob, CorpseBloom.PoisonEffect);
         }
     }
 
