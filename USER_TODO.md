@@ -294,8 +294,8 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   blocks long, 128x64 skin), `cod.bbmodel` (olive-brown, speckled, a chin barbel, 32x16), `salmon.bbmodel` (silver with
   a pink flank band, 32x32), `tuna.bbmodel` (navy back, yellow finlets, a crescent tail, 64x32) and
   `jellyfish.bbmodel` (a violet bell, pink oral arms, banded tentacles, 64x32). Built and saved in Blockbench 5
-  through its MCP plugin (no generator, the skin embedded, flat speckled colors packed face by face): edit them in
-  Blockbench. None is wired yet (`plans/TODO.md` `F-19`); the group and clip names to keep are in
+  through its MCP plugin (no generator, the skin embedded, a fixed palette of 7 to 9 colors per skin, packed face by
+  face): edit them in Blockbench. None is wired yet (`plans/TODO.md` `F-19`); the group and clip names to keep are in
   `docs/agents/entities.md` "Modeled, not wired" (the three fish share one contract). No rest rotations anywhere:
   the pectoral fins lie flat along X and the clips pose them, swept fins are stepped cubes, and per-face UVs.
 - [ ] **Boar and Dire Boar** — `boar.bbmodel` (a wild boar, 64x64 skin) and `dire_boar.bbmodel` (the oversized
