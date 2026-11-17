@@ -17,6 +17,7 @@ using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Simulation.Lanterns;
 using VoxelEngine.Simulation.Chests;
@@ -847,6 +848,65 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal([3f, High, 3f], mob.Position);
         var drop = Assert.Single(saved.Drops!);
         Assert.Equal([1f, High, 1f], drop.Position);
+    }
+
+    [Fact]
+    public void AGoblinReturnsFlintItCannotCreditAfterACompletedPickupBatch()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+        WriteEntitiesFile(new EntitySaveData
+        {
+            Mobs =
+            [
+                new EntitySaveData.MobData
+                {
+                    Type = "goblin",
+                    Position = [0f, High, 0f],
+                    Ammo = MobConfig.GoblinStoneMax - 1
+                }
+            ]
+        });
+
+        World? world = null;
+        var closed = false;
+        var collected = 0;
+        var ammoDelta = 0;
+        var remainingDrops = 0;
+        try
+        {
+            world = NewWorld(new ChunkSaveStore(_dir));
+            Assert.True(RunUntil(world, () => world.IsPlaying, LoadWallSeconds), "the world did not finish loading");
+            Assert.False(world.LoadTimedOut);
+
+            var goblin = Assert.Single(world.Goblins);
+            var ammoBefore = goblin.Ammo;
+            Assert.Equal(MobConfig.GoblinStoneMax - 1, ammoBefore);
+
+            // Keep the local player out of the pickup range; this update still runs the world's
+            // production DropPickup path with its real GoblinManager and DropManager.
+            world.Camera.TestTeleport(new Vector3(1_000f, High, 1_000f), world.Camera.Yaw, world.Camera.Pitch);
+            var target = goblin.Position - Vector3.UnitY * DropManager.CollectHeightOffset;
+            var flint = ContentRegistry.RequireItem("flint").Id;
+            Assert.True(world.DropSpawner.SpawnRestored(flint, target, Vector3.Zero, age: 5f));
+            Assert.True(world.DropSpawner.SpawnRestored(flint, target, Vector3.Zero, age: 5f));
+            Assert.Equal(2, world.Drops.Count);
+
+            world.Pickup.Update(1d / 60d);
+            collected = world.DropSpawner.Collected.Length;
+            ammoDelta = goblin.Ammo - ammoBefore;
+            remainingDrops = world.Drops.Count;
+        }
+        finally
+        {
+            if (world != null)
+                closed = world.SaveAndDispose();
+        }
+
+        Assert.True(closed, "the world did not shut down cleanly");
+        Assert.Equal(2, collected);
+        Assert.Equal(1, ammoDelta);
+        Assert.Equal(1, remainingDrops);
     }
 
     [Fact]

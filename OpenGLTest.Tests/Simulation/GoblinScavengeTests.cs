@@ -41,7 +41,7 @@ public sealed class GoblinScavengeTests
             drops.Update(Dt, collectors, chunks);
             for (var c = 0; c < drops.Collected.Length; c++)
             {
-                goblins.AwardScavenged(drops.CollectedBy[c], drops.Collected[c]);
+                Assert.True(goblins.AwardScavenged(drops.CollectedBy[c], drops.Collected[c]));
                 got = true;
             }
         }
@@ -60,13 +60,18 @@ public sealed class GoblinScavengeTests
         Assert.Empty(full);
 
         // Taking one off its cap makes it collect again, and the cap holds through a credit
-        goblins.Spawn(Body(4.5f, 4.5f), ammo: MobConfig.GoblinStoneMax - 1);
+        var nearCap = goblins.Spawn(Body(4.5f, 4.5f), ammo: MobConfig.GoblinStoneMax - 1)!;
         var room = new List<DropCollector>();
         goblins.AppendCollectors(room);
         Assert.Single(room);
         var flint = ContentRegistry.RequireItem("flint").Id;
-        goblins.AwardScavenged(0, flint);
-        goblins.AwardScavenged(0, flint);
+        Assert.True(goblins.AwardScavenged(0, flint));
+        Assert.False(goblins.AwardScavenged(0, flint));
+        var ammoAtCap = nearCap.Ammo;
+        Assert.False(goblins.AwardScavenged(-1, flint));
+        Assert.False(goblins.AwardScavenged(1, flint));
+        Assert.False(goblins.AwardScavenged(0, ContentRegistry.RequireItem("coal").Id));
+        Assert.Equal(ammoAtCap, nearCap.Ammo);
         var after = new List<DropCollector>();
         goblins.AppendCollectors(after);
         Assert.Empty(after);

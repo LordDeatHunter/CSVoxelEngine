@@ -115,7 +115,8 @@ internal sealed class DropPickup
         {
             if (collectors[i] >= goblinCollectors)
             {
-                _goblins!.AwardScavenged(collectors[i] - goblinCollectors, collected[i]);
+                if (!_goblins!.AwardScavenged(collectors[i] - goblinCollectors, collected[i]))
+                    ReturnRefused(i, collected[i], collectedAt[i]);
                 continue;
             }
 
