@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Lod;
 using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen;
 using Xunit;
 using Xunit.Abstractions;
@@ -16,6 +17,44 @@ public sealed class S2aTerrainTests(ITestOutputHelper output)
 {
     private const int CanyonX = -4000;
     private const int CanyonZ = 5000;
+
+    [Fact]
+    public void ActualOasisAndSpringPondsKeepTheirSavedColumnFootprints()
+    {
+        TestContent.EnsureLoaded();
+        var probes = 0;
+        try
+        {
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
+            const int oasisX = 2285;
+            const int oasisZ = 1926;
+            Assert.True(OasisGenerator.TryGetDisc(oasisX, oasisZ, out _, out _, out var oasisSurface));
+            Assert.True(OasisGenerator.IsPond(oasisX, oasisZ));
+            var oasis = Read(oasisX, oasisZ, ref probes);
+            var oasisColumn = ColumnCache.Get(oasisX >> Chunk.SizeShift, oasisZ >> Chunk.SizeShift);
+            Assert.True(oasisColumn.Oasis[((oasisX & Chunk.SizeMask) << Chunk.SizeShift) | (oasisZ & Chunk.SizeMask)]);
+            Assert.Equal(oasisSurface, oasis.Water);
+            Assert.True(oasis.Height < oasis.Water);
+
+            var ring = Read(oasisX + WorldFeatureConfig.OasisPondRadius + 1, oasisZ, ref probes);
+            Assert.True(OasisGenerator.IsDisc(oasisX + WorldFeatureConfig.OasisPondRadius + 1, oasisZ));
+            Assert.False(OasisGenerator.IsPond(oasisX + WorldFeatureConfig.OasisPondRadius + 1, oasisZ));
+            Assert.Equal(TerrainGenerator.NoWater, ring.Water);
+
+            const int springX = -1533;
+            const int springZ = 1597;
+            Assert.True(HotSpringGenerator.TryGetSite(springX, springZ, out var springLevel));
+            var spring = Read(springX, springZ, ref probes);
+            Assert.Equal(springLevel, spring.Water);
+            Assert.True(spring.Height < spring.Water);
+            output.WriteLine($"oasis ({oasisX},{oasisZ}) floor {oasis.Height}, water {oasis.Water}, ring {ring.Height}/{ring.Water}; spring ({springX},{springZ}) floor {spring.Height}, water {spring.Water}");
+        }
+        finally
+        {
+            output.WriteLine($"S2 owner direct final-column probes: {probes}");
+            WorldSeed.Apply(WorldSeed.Default);
+        }
+    }
 
     [Fact]
     public void DynamicContainsADeepDryOpenHeightmapCut()

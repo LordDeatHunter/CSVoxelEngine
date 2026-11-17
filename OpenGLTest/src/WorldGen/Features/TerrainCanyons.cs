@@ -1,4 +1,5 @@
 using System;
+using VoxelEngine.WorldGen.Features.Underground;
 
 namespace VoxelEngine.WorldGen.Features;
 
@@ -54,6 +55,11 @@ internal static class TerrainCanyons
         var cut = (int)MathF.Floor(MathF.Max(0f, (height - target) * support));
         if (cut <= 0) return 0;
 
+        // Oasis and spring ponds assign their own water levels in Compute. They do not
+        // appear in WaterBodies.WaterLevelAt, so leave their full discs and face banks
+        // alone before consulting the shared-water levels below.
+        if (TouchesFeatureWater(x, z)) return 0;
+
         // A dry bank may stand above an elevated pond or ramp. Every face-adjacent
         // planned water level bounds the cut, so it cannot open a lower wall directly
         // into that water. The wider samples and existing weight/guard preserve banks.
@@ -71,5 +77,18 @@ internal static class TerrainCanyons
         if (water != WaterBodies.NoWater)
             dryFloor = Math.Max(dryFloor, water + WorldGenerationConfig.CanyonWaterBankMargin);
         return Math.Min(cut, Math.Max(0, height - dryFloor));
+    }
+
+    private static bool TouchesFeatureWater(int x, int z)
+    {
+        if (WorldFeatureConfig.OasesEnabled &&
+            (OasisGenerator.IsDisc(x, z) || OasisGenerator.IsDisc(x - 1, z)
+                || OasisGenerator.IsDisc(x + 1, z) || OasisGenerator.IsDisc(x, z - 1)
+                || OasisGenerator.IsDisc(x, z + 1))) return true;
+
+        return WorldFeatureConfig.HotSpringsEnabled &&
+            (HotSpringGenerator.IsSite(x, z) || HotSpringGenerator.IsSite(x - 1, z)
+                || HotSpringGenerator.IsSite(x + 1, z) || HotSpringGenerator.IsSite(x, z - 1)
+                || HotSpringGenerator.IsSite(x, z + 1));
     }
 }
