@@ -29,11 +29,13 @@ public static class RuinedPillarGenerator
         height = 0;
         gaps = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x7111);
-        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldFeatureConfig.PillarChance) return false;
+        var roll = (SplitMix64.Mix(h) >> 40) * (1f / (1 << 24));
+        if (roll >= WorldFeatureConfig.PillarChance) return false;
 
         var span = (ulong)(1 << WorldFeatureConfig.PillarCellShift);
         x = (cellX << WorldFeatureConfig.PillarCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
         z = (cellZ << WorldFeatureConfig.PillarCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        if (roll >= WorldFeatureConfig.PillarChance * TerrainErg.Retention(x, z)) return false;
         var heights = WorldFeatureConfig.PillarMaxHeight - WorldFeatureConfig.PillarMinHeight + 1;
         height = WorldFeatureConfig.PillarMinHeight + (int)(SplitMix64.Mix(h + 3) % (ulong)heights);
         gaps = (uint)(SplitMix64.Mix(h + 4) & 0xF);

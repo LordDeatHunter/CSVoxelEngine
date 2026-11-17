@@ -37,11 +37,13 @@ public static class CairnGenerator
         x = 0;
         z = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0xCA12);
-        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldFeatureConfig.CairnChance) return false;
+        var roll = (SplitMix64.Mix(h) >> 40) * (1f / (1 << 24));
+        if (roll >= WorldFeatureConfig.CairnChance) return false;
 
         var span = (ulong)(1 << WorldFeatureConfig.CairnCellShift);
         x = (cellX << WorldFeatureConfig.CairnCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
         z = (cellZ << WorldFeatureConfig.CairnCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        if (roll >= WorldFeatureConfig.CairnChance * TerrainErg.Retention(x, z)) return false;
         if (TerrainErg.Intersects(x, z, x, z)) return false;
         return true;
     }

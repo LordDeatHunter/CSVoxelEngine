@@ -169,6 +169,8 @@ public static class TreeGenerator
 
         if (own >= rules.Density)
             return false;
+        if (own >= rules.Density * TerrainErg.Retention(x, z))
+            return false;
 
         // Open regions thin the trees (see TerrainGenerator.ForestOpenness), each species by its
         // own share of it. The mask is read only for the few columns that already pass the raw

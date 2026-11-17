@@ -29,11 +29,13 @@ public static class MeteorGenerator
         z = 0;
         radius = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x3E7E);
-        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldFeatureConfig.MeteorChance) return false;
+        var roll = (SplitMix64.Mix(h) >> 40) * (1f / (1 << 24));
+        if (roll >= WorldFeatureConfig.MeteorChance) return false;
 
         var span = (ulong)(1 << WorldFeatureConfig.MeteorCellShift);
         x = (cellX << WorldFeatureConfig.MeteorCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
         z = (cellZ << WorldFeatureConfig.MeteorCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        if (roll >= WorldFeatureConfig.MeteorChance * TerrainErg.Retention(x, z)) return false;
         var radii = WorldFeatureConfig.MeteorMaxRadius - WorldFeatureConfig.MeteorMinRadius + 1;
         radius = WorldFeatureConfig.MeteorMinRadius + (int)(SplitMix64.Mix(h + 3) % (ulong)radii);
         if (TerrainErg.IntersectsDisc(x, z, radius)) return false;

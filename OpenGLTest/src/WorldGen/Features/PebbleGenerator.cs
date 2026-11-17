@@ -60,7 +60,9 @@ public static class PebbleGenerator
         if (TerrainErg.Intersects(x, z, x, z)) return false;
         if (surfaceWeight <= 0f) return false;
         if (PatchNoise.GetNoise(x, z) <= WorldFeatureConfig.PebblePatchThreshold) return false;
-        if (UnitHash(x, z, DensitySalt) >= WorldFeatureConfig.PebbleDensity * surfaceWeight) return false;
+        var roll = UnitHash(x, z, DensitySalt);
+        var chance = WorldFeatureConfig.PebbleDensity * surfaceWeight;
+        if (roll >= chance || roll >= chance * TerrainErg.Retention(x, z)) return false;
         count = CountAt(x, z);
         return true;
     }

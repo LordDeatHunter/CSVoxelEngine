@@ -10,6 +10,7 @@ internal static class TerrainErg
     private static readonly GenerationalCache<(int X, int Z), bool> CoreCache =
         new(WorldGenerationConfig.ErgCoreCacheCapacity, WorldGenerationConfig.ErgCoreCacheGenerations);
     private static readonly Func<(int X, int Z), bool> BuildCoreFor = static key => BuildCore(key.X, key.Z);
+    internal static volatile bool ReadCountsEnabled;
     private static long _coreBuilds;
     private static long _storedBiomeReads;
 
@@ -20,8 +21,6 @@ internal static class TerrainErg
     internal static void ResetCache()
     {
         CoreCache.Clear();
-        Interlocked.Exchange(ref _coreBuilds, 0);
-        Interlocked.Exchange(ref _storedBiomeReads, 0);
     }
 
     internal static float Weight(float x, float z, float desertWeight)
@@ -29,6 +28,14 @@ internal static class TerrainErg
         if (WorldSeed.Profile != WorldGenProfile.Dynamic || desertWeight <= 0f) return 0f;
         return desertWeight * MathUtils.SmoothStep(WorldGenerationConfig.ErgStart,
             WorldGenerationConfig.ErgFull, TerrainNoise.ErgNoise.GetNoise(x, z));
+    }
+
+    /// <summary>The existing deterministic density roll's retained share outside the hard core.</summary>
+    internal static float Retention(float x, float z)
+    {
+        if (WorldSeed.Profile != WorldGenProfile.Dynamic) return 1f;
+        BiomeClassifier.BiomeWeights(x, z, out _, out var desertWeight);
+        return 1f - Weight(x, z, desertWeight);
     }
 
     // The wind coordinate rises gently for most of a wavelength and drops rapidly on its slip
@@ -79,7 +86,7 @@ internal static class TerrainErg
 
     private static bool BuildCore(int chunkX, int chunkZ)
     {
-        Interlocked.Increment(ref _coreBuilds);
+        if (ReadCountsEnabled) Interlocked.Increment(ref _coreBuilds);
         var x0 = chunkX << Chunk.SizeShift;
         var z0 = chunkZ << Chunk.SizeShift;
         BiomeClassifier.BiomeWeights(x0 + Chunk.Size / 2, z0 + Chunk.Size / 2,
@@ -89,7 +96,7 @@ internal static class TerrainErg
         for (var x = x0; x < x0 + Chunk.Size; x++)
         for (var z = z0; z < z0 + Chunk.Size; z++)
         {
-            Interlocked.Increment(ref _storedBiomeReads);
+            if (ReadCountsEnabled) Interlocked.Increment(ref _storedBiomeReads);
             var biome = BiomeClassifier.BiomeWeights(x, z, out var ocean, out var desertWeight);
             if (BiomeClassifier.DitherBiome(x, z, biome, ocean, desertWeight) != Biome.Desert)
                 return false;

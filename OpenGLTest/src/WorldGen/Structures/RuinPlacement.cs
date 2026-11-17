@@ -348,10 +348,12 @@ public static class RuinPlacement
         hash = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ salt);
         x = 0;
         z = 0;
-        if (SplitMix64.Unit(hash, 0) >= chance) return false;
+        var roll = SplitMix64.Unit(hash, 0);
+        if (roll >= chance) return false;
         var span = (ulong)CellBlocks;
         x = (cellX << WorldFeatureConfig.RuinCellShift) + (int)(SplitMix64.Mix(hash + 1) % span);
         z = (cellZ << WorldFeatureConfig.RuinCellShift) + (int)(SplitMix64.Mix(hash + 2) % span);
+        if (kind == StructureKind.Surface && roll >= chance * TerrainErg.Retention(x, z)) return false;
         return true;
     }
 

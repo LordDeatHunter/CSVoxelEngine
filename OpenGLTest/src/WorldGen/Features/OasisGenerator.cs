@@ -22,11 +22,13 @@ public static class OasisGenerator
         centerZ = 0;
         surface = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x0A51);
-        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldFeatureConfig.OasisChance) return false;
+        var roll = (SplitMix64.Mix(h) >> 40) * (1f / (1 << 24));
+        if (roll >= WorldFeatureConfig.OasisChance) return false;
 
         var span = (ulong)(1 << WorldFeatureConfig.OasisCellShift);
         centerX = (cellX << WorldFeatureConfig.OasisCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
         centerZ = (cellZ << WorldFeatureConfig.OasisCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        if (roll >= WorldFeatureConfig.OasisChance * TerrainErg.Retention(centerX, centerZ)) return false;
         var radius = WorldFeatureConfig.OasisRadius;
         if (TerrainErg.IntersectsDisc(centerX, centerZ, radius))
             return false;

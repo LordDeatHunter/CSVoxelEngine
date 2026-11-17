@@ -227,12 +227,18 @@ support, wind-aligned dunes have a long gentle stoss rise and a shorter steep sl
 outside support the earlier dune calculation is unchanged. A hard sand-sea core is an entire
 chunk column whose center has strong erg weight and whose 256 stored, dithered biomes are all
 Desert. Its pure classifier verdict is cached per chunk column and reset on a quiescent seed or
-profile change. No site may put even part of a tree, log, boulder, well, ruin, waystone, tower,
-oasis disc or other surface scenery into a core. Core ground is sand through the usual
-sandstone depth plus six cells, with caves and ores retaining their existing ownership;
-generated far LOD shows its sand cap and exposed upper sides. Imported columns remain
-authoritative. Legacy terrain and saved-world profile selection are unchanged. Small desert
-flowers and cactus variants, richer vegetation, volcanoes and ocean habitats are later stages.
+profile change. Outside the hard core, existing deterministic density rolls for trees,
+dead shrubs, pebbles, flowers and surface scenery retain a share of `1 - ergWeight`; this
+is exactly the old admission when erg weight is zero or the profile is Legacy. No site may
+put even part of a tree, log, boulder, well, ruin, waystone, tower, oasis disc or other
+surface scenery into a core. Core ground is sand through the usual sandstone depth plus
+six cells (eleven cells including the top), with caves and ores retaining their existing
+ownership; ordinary stone and cave palettes still begin below that cover. Sand is a
+falling block, so edits and fluid exposure can move this thicker upper cover. Generated
+far LOD shows its sand cap and exposed upper sides at its represented resolution, not
+cell-for-cell near geometry; supplied columns remain authoritative. Legacy terrain and
+saved-world profile selection are unchanged. Small desert flowers and cactus variants,
+richer vegetation, volcanoes and ocean habitats are later stages.
 
 **openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
 forest alternates between rolling woodland and open grass instead of one uniform canopy

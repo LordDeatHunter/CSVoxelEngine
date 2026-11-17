@@ -93,7 +93,9 @@ public static class FoliageGenerator
     private static bool ShrubRoll(int x, int z)
     {
         if (ShrubPatchNoise.GetNoise(x, z) <= WorldFeatureConfig.ShrubPatchThreshold) return false;
-        return UnitHash(x, z, ShrubDensitySalt) < WorldFeatureConfig.ShrubDensity;
+        var roll = UnitHash(x, z, ShrubDensitySalt);
+        return roll < WorldFeatureConfig.ShrubDensity
+            && roll < WorldFeatureConfig.ShrubDensity * TerrainErg.Retention(x, z);
     }
 
     /// <summary>

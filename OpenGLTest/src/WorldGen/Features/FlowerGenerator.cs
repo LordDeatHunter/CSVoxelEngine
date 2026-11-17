@@ -72,11 +72,13 @@ public static class FlowerGenerator
         var patchX = MathUtils.FloorDiv(x, spacing);
         var patchZ = MathUtils.FloorDiv(z, spacing);
         var h = SplitMix64.Hash(patchX, patchZ, WorldGenerationConfig.Seed ^ SpreadSalt);
-        if (SplitMix64.Unit(h, 0) >= WorldFeatureConfig.MeadowFlowerChance) return false;
+        var roll = SplitMix64.Unit(h, 0);
+        if (roll >= WorldFeatureConfig.MeadowFlowerChance) return false;
 
         const int span = spacing - 1;
         return x - patchX * spacing == (int)(SplitMix64.Unit(h, 1) * span)
-               && z - patchZ * spacing == (int)(SplitMix64.Unit(h, 2) * span);
+               && z - patchZ * spacing == (int)(SplitMix64.Unit(h, 2) * span)
+               && roll < WorldFeatureConfig.MeadowFlowerChance * TerrainErg.Retention(x, z);
     }
 
     /// <summary>
