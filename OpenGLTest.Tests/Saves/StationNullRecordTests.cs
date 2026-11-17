@@ -192,7 +192,7 @@ public sealed class StationNullRecordTests
         Assert.Equal(1, restored.Restore(Parse(WithNullFirst("Stumps", saved)).Stumps));
         var row = Assert.Single(restored.Capture());
         Assert.Equal("block/oak_log", row.Log);
-        Assert.Equal(0.2f, row.OffsetX);
+        Assert.Equal(1, row.Hits);
     }
 
     [Fact]
