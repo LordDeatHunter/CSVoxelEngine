@@ -364,21 +364,20 @@ public class Inventory
     /// </summary>
     public bool RemoveAll(ushort id)
     {
-        if (CategoryOf(id) is InventoryCategory.Tools or InventoryCategory.Gear)
-        {
-            var instances = _tools.Where(t => t.DefinitionId == id)
-                .Select(t => t.InstanceId)
-                .ToArray();
-            var removed = false;
-            foreach (var instance in instances)
-                removed |= RemoveTool(instance);
-            return removed;
-        }
+        var instances = _tools.Where(t => t.DefinitionId == id)
+            .Select(t => t.InstanceId)
+            .ToArray();
+        var removed = false;
+        foreach (var instance in instances)
+            removed |= RemoveTool(instance);
 
         var store = StoreOf(id);
-        if (store == null || !store.Remove(id)) return false;
-        ClearSlotsShowing(id);
-        return true;
+        if (store?.Remove(id) == true)
+        {
+            ClearSlotsShowing(id);
+            removed = true;
+        }
+        return removed;
     }
 
     /// <summary>Spends one unit from the selected slot. Tools are never spent — they morph.
