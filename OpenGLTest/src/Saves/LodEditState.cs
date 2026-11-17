@@ -256,7 +256,12 @@ public sealed class LodEditState(
     /// with a warning, so a damaged save only costs the far LOD its edits, never the world load.
     /// </summary>
     public static LodEditState? TryParse(byte[]? bytes)
+        => TryParse(bytes, out _);
+
+    /// <summary>Decodes bytes and reports whether a non-null payload was rejected.</summary>
+    internal static LodEditState? TryParse(byte[]? bytes, out bool rejected)
     {
+        rejected = false;
         if (bytes == null) return null;
         try
         {
@@ -264,6 +269,7 @@ public sealed class LodEditState(
         }
         catch (InvalidDataException e)
         {
+            rejected = true;
             Log.Warn($"LOD edits: ignoring {FileName}: {e.Message}");
             return null;
         }

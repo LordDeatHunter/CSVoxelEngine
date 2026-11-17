@@ -643,7 +643,7 @@ public class World
                 _generationWorker.Start();
             // Before the LOD workers start, so the first region builds already see the saved
             // caps, surface overrides and felled canopies; a missing or corrupt file imports nothing.
-            LodEditState.TryParse(_saveStore?.ReadFile(LodEditState.FileName))?.Import();
+            LodEditStateReader.Read(_saveStore)?.Import();
             // A server never renders the far LOD, so it does not start the LodGen threads; the
             // imported edit state still round-trips through a save untouched. A client gets its
             // far LOD from the server (S2), so it starts none either.

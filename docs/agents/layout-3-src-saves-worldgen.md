@@ -18,6 +18,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       ImportedMapWriter.cs     # writes an imported map (columns/*.col + chunks/*.bin); ExportGenerated seeds
                                #   one from any IWorldSource (tool/test use)
       LodEditState.cs          # lod-edits.bin: export/import of the LOD caps, surface overrides, canopy markers
+      LodEditStateReader.cs    # reads lod-edits.bin and marks parser-rejected bytes for preservation
       MobSaveCodec.cs          # a live Mob -> its EntitySaveData form (per-kind ammo)
       PlayerSaveCodec.cs       # reads/writes player.json
       PlayerSaveReader.cs      # marks rejected player JSON for .bad preservation before replacement
