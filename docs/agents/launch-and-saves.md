@@ -75,13 +75,13 @@ pure function of the seed: only **deltas** and the seed are written.
   pending entry — and only if it is still the snapshot it wrote, so a newer enqueue survives. A
   lookup therefore always finds the chunk in one of the two, and a move that finally fails keeps
   its pending entry and is remembered as failed, so the chunk stays readable for the session.
-  A later enqueue, explicit `RetryFailed`, or `Shutdown` retries it. Shutdown drains accepted
-  jobs, then its writer makes one final write cycle for each failed artifact, including failures first
-  reported while closing; its Boolean result says whether the writer joined, not whether every
-  write landed. A file a read gave up on (an
-  `IOException` after a few retries, or a corrupt file) is moved to `.bad` before the writer
-  first replaces it, so what the player had is never overwritten by a regenerated chunk or an
-  empty player file, and the temp file is flushed to disk before the rename. The store holds
+  A later enqueue, explicit `RetryFailed`, or `Shutdown` retries it. Shutdown drains accepted jobs,
+  then its writer makes one final bounded write cycle for each failed artifact, including failures
+  first reported while closing; its Boolean result says whether the writer joined, not whether
+  every write landed. A chunk a read could not decode, or a whole file a read gave up on (an
+  `IOException` after a few retries, or corrupt data), is moved to `.bad` before replacement. If
+  archival fails, the original stays at its final path and the exact accepted replacement remains
+  pending and failed for retry. The temp file is flushed to disk before the rename. The store holds
   `session.lock` (`FileShare.None`) from construction until its writer thread exits, so a second
   store over the same folder — this process after a writer overran its shutdown timeout, or the
   dedicated server beside the game — throws `IOException` from the constructor: `Program` shows
