@@ -1,0 +1,19 @@
+{
+  // Follow-up to the S1a frozen-surface captures. Run from OpenGLTest/:
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/dynamic-unfrozen-shore-s1a.json
+  // Storeless scripted launch selects Dynamic seed 1337. The bounded actual-column
+  // finder found open water at (-3000,4000), floor -3.39, with land 96 blocks
+  // north and open, unfrozen ocean 96 blocks south. The water/shelf shot faces
+  // north across that edge. The submerged shot looks down at its shallow floor.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-3000.5, 28.5, 3950.5], "yaw": 90, "pitch": -25 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [-3000.5, 28.5, 3950.5], "yaw": 90, "pitch": -25 },
+    { "op": "screenshot", "name": "open_shore_shelf", "hideHud": true },
+    { "op": "teleport", "pos": [-3000.5, -1.5, 4000.5], "yaw": 90, "pitch": -45 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "teleport", "pos": [-3000.5, -1.5, 4000.5], "yaw": 90, "pitch": -45 },
+    { "op": "screenshot", "name": "shallow_underwater_shelf", "hideHud": true }
+  ]
+}
