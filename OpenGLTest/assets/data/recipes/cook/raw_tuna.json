@@ -1,0 +1,6 @@
+{
+  "input": "item/raw_tuna",
+  "result": "item/cooked_tuna",
+  "count": 1,
+  "cookSeconds": 16
+}

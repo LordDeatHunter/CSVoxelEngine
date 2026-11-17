@@ -169,8 +169,8 @@ for (const { id, file } of listJson(path.join(rdir, 'forge'))) {
   const d = readJson(file)
   const byproduct = d.byproduct ? { ref: R(d.byproduct.item), count: d.byproduct.count ?? 1 } : null
   recipes.push({
-    kind: 'forge', id, count: d.count ?? 1, metalCount: d.metalCount, hits: d.hits, byproduct,
-    outputs: [R(d.result), ...(byproduct ? [byproduct.ref] : [])], inputs: [R(d.metal)]
+    kind: 'forge', id, count: d.count ?? 1, metalCount: d.inputCount, hits: d.hits, byproduct,
+    outputs: [R(d.result), ...(byproduct ? [byproduct.ref] : [])], inputs: [R(d.input)]
   })
 }
 const recipeIndex = buildRecipeIndex(recipes)

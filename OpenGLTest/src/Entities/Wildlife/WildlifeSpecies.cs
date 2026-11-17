@@ -14,6 +14,11 @@ public enum WildlifeKind : byte
     Dragonfly = 4,
     CorpseBloom = 5,
     Centipede = 6,
+    Cod = 7,
+    Salmon = 8,
+    Tuna = 9,
+    Shark = 10,
+    Jellyfish = 11,
 }
 
 /// <summary>
@@ -26,7 +31,8 @@ public static class WildlifeSpecies
     /// <summary>The entity file names (<c>assets/data/entities/&lt;name&gt;.json</c>), indexed by <see cref="WildlifeKind"/>.</summary>
     public static readonly string[] Names =
         [Deer.EntityName, Boar.EntityName, Boar.DireEntityName, Crow.EntityName, Dragonfly.EntityName,
-         CorpseBloom.EntityName, Centipede.EntityName];
+         CorpseBloom.EntityName, Centipede.EntityName, Fish.CodName, Fish.SalmonName, Fish.TunaName, Shark.EntityName,
+         Jellyfish.EntityName];
 
     /// <summary>The species an entity name belongs to, or null for any other entity.</summary>
     public static WildlifeKind? KindOf(string name)
@@ -51,6 +57,9 @@ public static class WildlifeSpecies
         WildlifeKind.Dragonfly => new Dragonfly(type, position, spawnIn),
         WildlifeKind.CorpseBloom => new CorpseBloom(type, position, spawnIn),
         WildlifeKind.Centipede => new Centipede(type, position, spawnIn),
+        WildlifeKind.Cod or WildlifeKind.Salmon or WildlifeKind.Tuna => new Fish(type, position, KindOf(type.Name)!.Value, spawnIn),
+        WildlifeKind.Shark => new Shark(type, position, spawnIn),
+        WildlifeKind.Jellyfish => new Jellyfish(type, position, spawnIn),
         _ => null,
     };
 
@@ -66,6 +75,9 @@ public static class WildlifeSpecies
             case WildlifeKind.Dragonfly: Dragonfly.ValidateContent(type); break;
             case WildlifeKind.CorpseBloom: CorpseBloom.ValidateContent(type); break;
             case WildlifeKind.Centipede: Centipede.ValidateContent(type); break;
+            case WildlifeKind.Cod or WildlifeKind.Salmon or WildlifeKind.Tuna: Fish.ValidateContent(type); break;
+            case WildlifeKind.Shark: Shark.ValidateContent(type); break;
+            case WildlifeKind.Jellyfish: Jellyfish.ValidateContent(type); break;
         }
     }
 
@@ -80,11 +92,18 @@ public static class WildlifeSpecies
         WildlifeKind.Dragonfly => WildlifeConfig.DragonflyHeight,
         WildlifeKind.CorpseBloom => WildlifeConfig.BloomHeight,
         WildlifeKind.Centipede => WildlifeConfig.CentipedeHeight,
+        WildlifeKind.Cod or WildlifeKind.Salmon or WildlifeKind.Tuna => Fish.HeightOf(KindOf(name)!.Value),
+        WildlifeKind.Shark => WildlifeConfig.SharkHeight,
+        WildlifeKind.Jellyfish => WildlifeConfig.JellyfishHeight,
         _ => 0f,
     };
 
     /// <summary>Whether <paramref name="kind"/> is a flyer, which spawns in the air over its column.</summary>
     public static bool Flies(WildlifeKind kind) => kind is WildlifeKind.Crow or WildlifeKind.Dragonfly;
+
+    /// <summary>Whether <paramref name="kind"/> is an animal of the sea (<see cref="AquaticAnimal"/>), which spawns
+    /// in the water of a column rather than on its ground.</summary>
+    public static bool Swims(WildlifeKind kind) => kind >= WildlifeKind.Cod;
 
     /// <summary>Half the horizontal edge of the named species' body, or 0 for an entity that is not a wild animal.</summary>
     public static float HalfExtentOf(string name) => KindOf(name) switch
@@ -96,6 +115,9 @@ public static class WildlifeSpecies
         WildlifeKind.Dragonfly => WildlifeConfig.DragonflyHalfExtent,
         WildlifeKind.CorpseBloom => WildlifeConfig.BloomHalfExtent,
         WildlifeKind.Centipede => WildlifeConfig.CentipedeHalfExtent,
+        WildlifeKind.Cod or WildlifeKind.Salmon or WildlifeKind.Tuna => Fish.HalfExtentOf(KindOf(name)!.Value),
+        WildlifeKind.Shark => WildlifeConfig.SharkHalfExtent,
+        WildlifeKind.Jellyfish => WildlifeConfig.JellyfishHalfExtent,
         _ => 0f,
     };
 }

@@ -253,6 +253,8 @@ tools/                                # asset generators: models, animation clip
                                       #   stinger); --check
   generate-wildlife-item-sprites.py   # deterministic placeholder sprites of the wild animals' drops (meats raw and cooked,
                                       #   hide, feather, tusks, dragonfly wing); --check
+  generate-sea-item-sprites.py        # deterministic placeholder sprites of the sea animals' drops (raw and cooked cod, salmon
+                                      #   and tuna, shark tooth, jellyfish gel); --check
   generate-lumber-sprite.py           # deterministic placeholder sprite of the lumber item (a stack of boards); --check
   generate-leather-sprites.py         # deterministic placeholder sprites of the leather works (flint knife, salt, salted
                                       #   hide, leather, bark) and the rock salt tile; --check

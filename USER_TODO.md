@@ -55,6 +55,10 @@ body wears.
   resolution, small palettes; the wing's film is half transparent). Made by
   `tools/generate-wildlife-item-sprites.py`: replace them by editing that generator (or remove it in the same
   change), or a re-run puts the placeholders back.
+- [ ] **Sea animal drops** — `raw_cod.png`, `cooked_cod.png`, `raw_salmon.png`, `cooked_salmon.png`, `raw_tuna.png`,
+  `cooked_tuna.png`, `shark_tooth.png` and `jellyfish_gel.png` (32x32, drawn at half resolution, 3 to 6 colors each; the
+  gel is half transparent). Made by `tools/generate-sea-item-sprites.py`: replace them by editing that generator (or remove
+  it in the same change), or a re-run puts the placeholders back.
 - [ ] **Leather works** — `flint_knife.png`, `salt.png`, `salted_hide.png`, `leather.png`, `bark.png` (32x32, drawn at
   half resolution, small palettes) and the `rock_salt.png` block tile (a hashed speckle). Made by
   `tools/generate-leather-sprites.py`: replace them by editing that generator (or remove it in the same change), or a
@@ -295,8 +299,8 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   a pink flank band, 32x32), `tuna.bbmodel` (navy back, yellow finlets, a crescent tail, 64x32) and
   `jellyfish.bbmodel` (a violet bell, pink oral arms, banded tentacles, 64x32). Built and saved in Blockbench 5
   through its MCP plugin (no generator, the skin embedded, a fixed palette of 7 to 9 colors per skin, packed face by
-  face): edit them in Blockbench. None is wired yet (`plans/TODO.md` `F-19`); the group and clip names to keep are in
-  `docs/agents/entities.md` "Modeled, not wired" (the three fish share one contract). No rest rotations anywhere:
+  face): edit them in Blockbench. All five are wired (`plans/TODO.md` `F-19`); the group and clip names to keep are in
+  `docs/agents/entities.md` "Sea life" (the three fish share one contract). No rest rotations anywhere:
   the pectoral fins lie flat along X and the clips pose them, swept fins are stepped cubes, and per-face UVs.
 - [ ] **Boar and Dire Boar** — `boar.bbmodel` (a wild boar, 64x64 skin) and `dire_boar.bbmodel` (the oversized
   miniboss: charcoal hide, scars, bone spikes, red eyes, 128x128 skin). Built and saved in Blockbench 5 through its

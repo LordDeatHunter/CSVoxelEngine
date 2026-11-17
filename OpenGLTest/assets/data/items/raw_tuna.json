@@ -1,0 +1,6 @@
+{
+  // A tuna off the sea (loot/tuna.json). Inedible raw: a lit campfire cooks it (recipes/cook/raw_tuna.json).
+  // The sprite is placeholder art.
+  "name": "Raw Tuna",
+  "texture": "assets/textures/items/raw_tuna.png"
+}

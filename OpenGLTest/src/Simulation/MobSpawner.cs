@@ -86,6 +86,38 @@ public static class MobSpawner
     }
 
     /// <summary>
+    /// The sea's counterpart of <see cref="TryFindSurfaceSpawn(ChunkManager, SpawnOrigin, float, float, int, out int, out int, out int)"/>:
+    /// up to <paramref name="tries"/> random columns in the ring whose terrain lies under its water level (the sea, a
+    /// lake, a river) and whose top water cell is loaded and wet. On success <paramref name="bedY"/> is the
+    /// bed Y, <paramref name="waterTopY"/> the Y of the column top water cell and <paramref name="biome"/> its
+    /// biome; the caller sizes its body to the depth between them.
+    /// </summary>
+    public static bool TryFindWaterSpawn(ChunkManager chunks, SpawnOrigin origin, float minRadius, float maxRadius,
+        int tries, out int x, out int bedY, out int waterTopY, out int z, out Biome biome)
+    {
+        for (var attempt = 0; attempt < tries; attempt++)
+        {
+            RingColumn(origin, minRadius, maxRadius, out x, out z);
+            var column = chunks.WorldSource.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
+            var i = VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z));
+            var height = column.Heights[i];
+            var level = column.WaterLevel[i];
+            if (height >= level) continue;
+            // The top water cell must be loaded and wet, or the column is not (yet) flooded in the live map
+            if (!chunks.TryGetCell(x, level, z, out var top, out _) || !BlockType.IsFluid(top)) continue;
+
+            bedY = height;
+            waterTopY = level;
+            biome = SurfaceBiomeAt(chunks, x, z);
+            return true;
+        }
+
+        x = bedY = waterTopY = z = 0;
+        biome = Biome.Ocean;
+        return false;
+    }
+
+    /// <summary>
     /// The height of the center of a body standing on ground cell <paramref name="groundY"/>, half its height
     /// being <paramref name="halfHeight"/>: the floor plus that half, raised by the few float steps it takes for
     /// the body's bottom (center minus half) not to round to under the floor. Without that a fit test of the

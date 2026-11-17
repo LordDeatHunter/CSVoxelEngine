@@ -516,7 +516,7 @@ OpenGLTest/
       EntityType.cs            # one entity kind loaded from assets/data/entities/<name>.json: its display name, health pool
       FallingBlock.cs          # a gravity-affected block (sand, gravel) in flight
       FallingBlockLanding.cs   # a falling cube written back as a block: cell, block, fall, submerged (its dust)
-      FlightSteering.cs        # GL-free flight rules: chase goal, floor probe, hover/clearance height, bob, steered
+      FlightSteering.cs        # GL-free flight rules (a swimmer too: under-surface goal, dry-cell probe): chase goal, floor probe, hover/clearance height, bob, steered
                                #   velocity, the wall probe that slides or lifts a flyer (RiggedMob.Fly)
       FlightTuning.cs          # one flying kind's speeds, acceleration, hover band, clearance and bob (Validate)
       MobCaps.cs, IMobPopulation.cs  # the natural and hard mob caps every kind shares, over the
@@ -572,7 +572,8 @@ OpenGLTest/
                                #   (lands, rests, takes off; posture for mirrors), Crow (flock pest: swoops, pecks, caws),
                                #   WildlifeCalls (one species' ambient call on a randomized timer, played when one is in earshot), WildlifeCallSet (the crow's caw and the boar and dire boar grunts),
                                #   Dragonfly (waterside hunter: darts and bites),
-                               #   CorpseBloom (rooted jungle ambusher: poison burst and a lingering cloud), Centipede (jungle hunter: runs down and bites with venom)
+                               #   CorpseBloom (rooted jungle ambusher: poison burst and a lingering cloud), Centipede (jungle hunter: runs down and bites with venom),
+                               #   AquaticAnimal (a swimmer: kept under the surface, beached it flops and suffocates; posture bits), Fish (cod, salmon, tuna: a school, darts from a threat), Shark (charges and bites), Jellyfish (drifts, stings what touches it)
         SkyMob.cs              # abstract sky mob (a RealmMob): the zone tier it spawned in and its tier-scaled pool
         Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event
         Cloudgolem.cs          # the ground bruiser: walk with ledge caution, the slam clip's impact event, the shockwave

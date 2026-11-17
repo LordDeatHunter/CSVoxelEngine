@@ -1,0 +1,28 @@
+{
+  // The sea's animals: run with VOXEL_SCRIPT=visual-examples/sea-life.json VOXEL_TIME=70 from OpenGLTest/. Shots land
+  // in visual/sea-life/. The warm sea at x~432, z~0 (10+ blocks deep, see deep-water.json): the player hovers
+  // creative and flying (so the shark and the jellyfish leave them alone) below the surface facing +X, with a cod
+  // school, a tuna, a jellyfish and a shark in front of them. Then a cod is dropped on the shore sand to flop.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [432.5, 8.5, 0.5], "yaw": 0, "pitch": -20 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [432.5, -3.5, 0.5], "yaw": 0, "pitch": -4 },
+    { "op": "spawn", "entity": "cod", "pos": [438.5, -5.5, -1.5] },
+    { "op": "spawn", "entity": "cod", "pos": [439.5, -5.0, 0.5] },
+    { "op": "spawn", "entity": "cod", "pos": [438.0, -6.0, 2.5] },
+    { "op": "spawn", "entity": "tuna", "pos": [441.5, -4.5, -3.5] },
+    { "op": "spawn", "entity": "jellyfish", "pos": [437.5, -6.0, 4.5] },
+    { "op": "spawn", "entity": "shark", "pos": [447.5, -6.0, 0.5] },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "school", "hideHud": true },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "cruise", "hideHud": true },
+    { "op": "creative", "on": false },
+    { "op": "fly", "on": false },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "charge", "hideHud": true },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "bite", "hideHud": true }
+  ]
+}

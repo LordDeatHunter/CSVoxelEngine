@@ -1,9 +1,9 @@
 {
   "name": "Salmon",
   // A slim silver fish with a pink flank; shares the cod's rig and clips.
-  // Model and clips only so far; nothing spawns or drives it yet (plans/TODO.md F-19)
   "blood": { "color": [150, 40, 40] },
   "attitude": "neutral",
   "hp": 4,
+  "loot": "salmon",
   "model": "assets/models/entity/salmon.bbmodel"
 }

@@ -1,0 +1,7 @@
+{
+  // Cod off the campfire (use.action "heal" with heals; HealItem). The sprite is placeholder art.
+  "name": "Cooked Cod",
+  "texture": "assets/textures/items/cooked_cod.png",
+  "use": { "action": "heal", "seconds": 1.2 },
+  "heals": 30
+}

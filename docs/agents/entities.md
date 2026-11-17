@@ -302,8 +302,8 @@ target stands lower (`LedgeCautionTests`).
 ### Modeled, not wired
 
 Some entities have an entity file, a Blockbench model and clips but **no class, spawn rule, loot or wire kind**: they
-load and show in DevStudio's ENTITIES tab, and nothing in the game raises them (the crab and the sea life below; the
-corpse bloom and the centipede have since been wired). The first three were built in
+load and show in DevStudio's ENTITIES tab, and nothing in the game raises them (the crab; the
+corpse bloom, the centipede and the sea life have since been wired). The first three were built in
 Blockbench through its MCP plugin (no generator, the skin embedded; `USER_TODO.md`), face -Z, stand on y = 0 and have
 no rest rotations, so parts the clips fold lie flat along an axis.
 - **Crab** (`crab.json`, hp 14; `plans/TODO.md` `P-61`): the beach's neutral mob, about one block across. `Body`
@@ -337,25 +337,6 @@ no rest rotations, so parts the clips fold lie flat along an axis.
   owns one leg pair as children, `LegR<n>` and `LegL<n>` with a `...Lower`, shaped like a crawler leg (along X,
   the knee straight out from the hip) for `LegIk`; a clip-driven centipede plays `walk`, a traveling wave whose
   pairs step 0.14 of a cycle apart. Clips: `idle`, `walk`, `bite` with `impact`, `hurt` and `death`.
-
-**Sea life** (`plans/TODO.md` `F-19`) is modeled the same way and not wired at all: five entity files with a model and
-clips, no class, spawn rule, loot or wire kind. Built in Blockbench through its MCP plugin, facing -Z, the lowest fin or
-tentacle on y = 0, no rest rotations; the pectoral fins lie flat along X and every locomotion clip keys their droop and
-sweep. A body wave is a yaw (rotation y) that travels down the chain with a phase lag per joint.
-- **Shark** (`shark.json`, hostile, hp 60), about 3.5 blocks long. `Body` > `Head` > `Jaw`; under `Body` also
-  `DorsalFin`, `PectoralFinL/R` and `Tail1` > `Tail2` > `TailFin`, with `PelvicFinL/R` under `Tail1`. Clips: `idle`
-  (a slow hover), `swim`, `charge` (a fast, wide wave with the jaw open), `bite` with `impact` (a lunge, the snap and
-  a head shake), `hurt`, `death` (it rolls belly-up) and `spawn` (a scale pop on `Body`).
-- **Cod, Salmon, Tuna** (`cod.json`, `salmon.json` hp 4, `tuna.json` hp 10, all neutral): three models with their own
-  proportions and skins over **one fish contract**, so one class can drive them all. `Body` > `Head` > `Jaw`; under
-  `Body` also `DorsalFin`, `FinL/R` and `Tail` > `TailFin`. Clips: `idle`, `swim`, `dart` (the flee burst, a short
-  loop), `flop` (a loop: on its side out of water, `Body` rolled 90 degrees and dropped onto its flank), `hurt` and
-  `death` (belly-up).
-- **Jellyfish** (`jellyfish.json`, neutral, hp 6): `Bell` > `BellRim`; under `Bell` the four oral arms `Arm1..4` and
-  the eight tentacles `Tentacle1..8` (clockwise from the front), each with a `...Lower` child, all hanging straight
-  down. Clips: `idle` (a drift), `swim` (the bell pulse, a scale track on `Bell` and `BellRim`, the tentacles trailing
-  in and flaring out), `sting` with `impact` (the tentacles whip outward), `hurt` and `death` (the bell deflates and
-  tips over). Its skin is opaque: translucency is a wiring decision.
 
 ### Wildlife
 
@@ -440,3 +421,53 @@ take a new species from it instead of naming it; adding one means a class, a row
   sky mobs and restore them settled. `WildlifeTests` drives the rules headless and
   `visual-examples/wildlife.json` (`VOXEL_TIME=147`) films a herd calm, then reacting to a player on foot, and
   `visual-examples/wildlife-flyers.json` the crows aloft and resting and a dragonfly coming in.
+
+### Sea life
+
+The sea's animals (`plans/TODO.md` `F-19`) are `AquaticAnimal`s (`Entities/Wildlife/`), wildlife species like the rest
+(`WildlifeKind.Cod..Jellyfish`, wire kinds 25..29, the same `WildlifeManager`, budget and saves). Built in Blockbench
+through its MCP plugin, facing -Z, the lowest fin or tentacle on y = 0, no rest rotations; the pectoral fins lie flat
+along X and every locomotion clip keys their droop and sweep. A body wave is a yaw (rotation y) that travels down the
+chain with a phase lag per joint.
+
+- **Swimming.** A swimmer is a flyer whose medium is water (`Mob.Swims`; `RiggedMob.Fly` is the one steering): the
+  seabed is its floor (`FlightSteering.GroundBelow` with `fluidIsFloor` off, so the kind's hover band is the height it
+  keeps over the bed), the goal height is held under the surface (`FlightSteering.KeepUnderSurface`, `MobSwimSurfaceMarginBlocks`),
+  a horizontal step into a cell with no fluid is dropped (`FlightSteering.AvoidDry`, so it presses along the shore), and
+  its wander goals lie in fluid cells (`Mob.FlyingWanderGoal`). Its locomotion clip is `swim` (`RiggedMob.MoveClip`). With no
+  fluid in the cell of its body it is **beached**: a walker under gravity that plays its `flop` (a fish hops about,
+  `Flop*` in `WildlifeConfig`) and loses `BeachedDamage` every `BeachedDamageIntervalSeconds`; a dying swimmer is a
+  walker too, so it floats belly-up. `Animal.Posture` carries a darting bit and a beached bit (`SeaLifeTests`).
+- **Spawning.** `WildlifeManager.UpdateSpawning` rolls `SeaSpawnChance` of its turns for the sea first when surface water
+  lies within `SeaSpawnNearBlocks` of the target: `MobSpawner.TryFindWaterSpawn` takes a ring column whose terrain lies under
+  its water level, `WildlifeSpawnRules.PickSea` picks by the column's water depth and biome (`SeaSpawnRule.LivesIn`:
+  cod and tuna, the shark and the jellyfish only in the ocean, each from its `...MinWaterDepthBlocks`, the salmon in any
+  water), and `PlaceInWater` puts the body at a random height between the bed and the surface. A fish arrives with a school of
+  `SchoolMinSize..MaxSize`, the rest following the first (`Fish.Follow`). Sea animals count in the wildlife budget.
+- **Fish** (`Fish`, one class over `Cod`/`Salmon`/`Tuna`, per-kind numbers in `WildlifeConfig`): neutral. A threat within
+  `FishDartRangeBlocks` (`FishAlarmFactor` times that for `FishAlarmSeconds` after a blow) sends it fleeing straight away on its
+  `dart` clip at `FishDartSpeedFactor` of its cruise; calm, it wanders, or swims to its place beside its school leader.
+- **Shark** (`Shark`, hostile): a player within `SharkNoticeRangeBlocks` is charged on `charge` at `SharkChargeSpeedFactor`; within
+  `SharkBiteReach` of their chest in 3D and off its cooldown it plays `bite`, lunging, and at the `impact` event lands
+  `SharkBiteDamage`. It never leaves the water, so a player ashore is only bitten at the water's edge.
+- **Jellyfish** (`Jellyfish`, neutral): never chases, it drifts at `JellyfishDriftSpeed`; a player within `JellyfishStingReach`
+  of its bell makes it play `sting`, and at `impact` everyone still in reach takes `JellyfishStingDamage` and `venom`.
+- **Loot.** Fish drop their raw item (`raw_cod`, `raw_salmon`, `raw_tuna`, cooked on a campfire into `cooked_*` that heal) and
+  now and then a bone; the shark drops `shark_tooth`, the jellyfish `jellyfish_gel` (trophies for now). The sprites are placeholder
+  art from `tools/generate-sea-item-sprites.py` (`USER_TODO.md`). `visual-examples/sea-life.json` films them.
+
+The model contracts:
+- **Shark** (`shark.json`, hostile, hp 60), about 3.5 blocks long. `Body` > `Head` > `Jaw`; under `Body` also
+  `DorsalFin`, `PectoralFinL/R` and `Tail1` > `Tail2` > `TailFin`, with `PelvicFinL/R` under `Tail1`. Clips: `idle`
+  (a slow hover), `swim`, `charge` (a fast, wide wave with the jaw open), `bite` with `impact` (a lunge, the snap and
+  a head shake), `hurt`, `death` (it rolls belly-up) and `spawn` (a scale pop on `Body`).
+- **Cod, Salmon, Tuna** (`cod.json`, `salmon.json` hp 4, `tuna.json` hp 10, all neutral): three models with their own
+  proportions and skins over **one fish contract**, so one class can drive them all. `Body` > `Head` > `Jaw`; under
+  `Body` also `DorsalFin`, `FinL/R` and `Tail` > `TailFin`. Clips: `idle`, `swim`, `dart` (the flee burst, a short
+  loop), `flop` (a loop: on its side out of water, `Body` rolled 90 degrees and dropped onto its flank), `hurt` and
+  `death` (belly-up).
+- **Jellyfish** (`jellyfish.json`, neutral, hp 6): `Bell` > `BellRim`; under `Bell` the four oral arms `Arm1..4` and
+  the eight tentacles `Tentacle1..8` (clockwise from the front), each with a `...Lower` child, all hanging straight
+  down. Clips: `idle` (a drift), `swim` (the bell pulse, a scale track on `Bell` and `BellRim`, the tentacles trailing
+  in and flaring out), `sting` with `impact` (the tentacles whip outward), `hurt` and `death` (the bell deflates and
+  tips over). Its skin is opaque: translucency is a wiring decision.

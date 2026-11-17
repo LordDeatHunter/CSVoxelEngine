@@ -1,9 +1,9 @@
 {
   "name": "Jellyfish",
   // A drifting bell with stinging tentacles: harmless until touched.
-  // Model and clips only so far; nothing spawns or drives it yet (plans/TODO.md F-19)
   "blood": { "color": [200, 170, 240] },
   "attitude": "neutral",
   "hp": 6,
+  "loot": "jellyfish",
   "model": "assets/models/entity/jellyfish.bbmodel"
 }

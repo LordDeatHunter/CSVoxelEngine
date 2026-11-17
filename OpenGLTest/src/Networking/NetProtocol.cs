@@ -316,8 +316,11 @@ public static class NetFraming
     /// 64: <see cref="NetMessage.StationState"/> ends with the tanning vats (cell, block id, water, bark, hides, progress,
     /// leather) after the work stations. An older peer would misread the station frames.
     /// 65: a <see cref="NetEntityKind.CorpseBloom"/>'s posture byte carries, above its open bit, how much of its poison
-    /// cloud is left; an older client would read a shut bloom under a cloud as open and draw no cloud.</summary>
-    public const int ProtocolVersion = 65;
+    /// cloud is left; an older client would read a shut bloom under a cloud as open and draw no cloud.
+    /// 66: the sea's animals, <see cref="NetEntityKind.Cod"/>, <see cref="NetEntityKind.Salmon"/>,
+    /// <see cref="NetEntityKind.Tuna"/>, <see cref="NetEntityKind.Shark"/> and <see cref="NetEntityKind.Jellyfish"/>, in
+    /// <see cref="NetMessage.EntityList"/> (their posture byte says darting or beached); an older client would not draw them.</summary>
+    public const int ProtocolVersion = 66;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

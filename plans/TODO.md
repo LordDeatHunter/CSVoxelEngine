@@ -333,13 +333,10 @@ single-arc player.
 - [ ] **`F-18` · Village raids & defense** — P3, L.
   Hostile waves against player bases/villages; gives `P-54` wards and `F-3` a purpose.
 - [ ] **`F-19` · Ocean life & hazards** — P3, M.
-  Fish schools, hostile sea mobs, currents, drowning depth (`P-13`); pairs `P-56`.
-  The shark, cod, salmon, tuna and jellyfish entities, models and clips exist and nothing drives them yet
-  (`assets/data/entities/`, contract in `docs/agents/entities.md` "Modeled, not wired"). Still to build: swimming
-  movement (a mob that stays in water, 3D steering, `flop` when beached), a `Fish` class over the shared fish
-  contract with schooling and `dart` on a nearby swimmer, the shark's cruise, `charge` and `bite`, the jellyfish's
-  drift and contact `sting`, ocean spawn rules, loot (fish items tie `F-9`), wire kinds, and whether the jellyfish
-  draws translucent.
+  The sea's animals are wired (`docs/agents/entities.md` "Sea life": cod, salmon, tuna, shark, jellyfish: swimming,
+  schools, spawn, loot, wire kinds). Still to build: currents, drowning depth (`P-13`) and sea hazards, a boat to
+  meet them from (pairs `P-56`), the jellyfish drawing translucent, drops and a use for the shark tooth and the
+  jellyfish gel, and fish items tying `F-9` (a fishing rod; today they are only cooked and eaten).
 
 ### 3. UI
 

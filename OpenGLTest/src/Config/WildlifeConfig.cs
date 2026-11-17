@@ -221,4 +221,111 @@ public static class WildlifeConfig
     public const float CentipedeBiteCooldownSeconds = 1.8f;
     public const float CentipedeKnockbackSpeed = 4f;
     public const float CentipedeKnockbackLift = 1.5f;
-}
+
+    // --- Sea life (AquaticAnimal: Fish, Shark, Jellyfish) ---
+    // Swimmers fly the shared flight rules through water (Mob.Swims, RiggedMob.Fly): each kind's hover band is
+    // the height it keeps over the seabed, capped under the surface. They spawn in water only
+    // (MobSpawner.TryFindWaterSpawn): a ring turn near the sea (SeaSpawnChance of the turns, when a player is
+    // within SeaSpawnNearBlocks of surface water) picks the kind whose rule fits the column's water depth.
+    // Out of water a swimmer falls, flops (fish) and loses BeachedDamage every BeachedDamageIntervalSeconds.
+    public const float SeaSpawnChance = 0.5f;
+    public const float SeaSpawnNearBlocks = 40f;
+    public const int SeaSpawnTries = 24;
+    public const float SeaSpawnMinRadiusBlocks = 14f;
+    public const float SeaSpawnMaxRadiusBlocks = 40f;
+    public const int SchoolMinSize = 3;
+    public const int SchoolMaxSize = 5;
+    public const float SchoolSpreadBlocks = 2.5f;
+    public const int BeachedDamage = 1;
+    public const float BeachedDamageIntervalSeconds = 2.5f;
+    public const float FlopMinSeconds = 0.6f;
+    public const float FlopMaxSeconds = 1.6f;
+    public const float FlopHopSpeed = 3.2f;
+    public const float FlopSideSpeed = 1.2f;
+
+    // Fish (Cod, Salmon, Tuna): neutral. A threat within FishDartRangeBlocks (FishAlarmFactor times that for
+    // FishAlarmSeconds after a blow) sends it fleeing on its dart clip at FishDartSpeedFactor of its cruise.
+    // A school follows its first fish at a SchoolSpreadBlocks offset.
+    public const float FishDartRangeBlocks = 5f;
+    public const float FishAlarmFactor = 2.5f;
+    public const float FishAlarmSeconds = 4f;
+    public const float FishDartSpeedFactor = 2.4f;
+    public const float FishFleeBlocks = 10f;
+    public const float FishVerticalSpeed = 1.6f;
+    public const float FishAcceleration = 3f;
+    public const float FishMinClearanceBlocks = 0.3f;
+    public const float FishBobBlocks = 0.15f;
+    public const float FishBobHz = 0.4f;
+    public const float FishShoveSpeed = 1.5f;
+
+    public const float CodSpawnWeight = 4f;
+    public const float CodHeight = 0.44f;
+    public const float CodHalfExtent = 0.22f;
+    public const float CodCruiseSpeed = 1.6f;
+    public const float CodHoverMinBlocks = 0.5f;
+    public const float CodHoverMaxBlocks = 6f;
+    public const int CodMinWaterDepthBlocks = 3;
+
+    public const float SalmonSpawnWeight = 3f;
+    public const float SalmonHeight = 0.5f;
+    public const float SalmonHalfExtent = 0.22f;
+    public const float SalmonCruiseSpeed = 1.9f;
+    public const float SalmonHoverMinBlocks = 0.5f;
+    public const float SalmonHoverMaxBlocks = 8f;
+    public const int SalmonMinWaterDepthBlocks = 3;
+
+    public const float TunaSpawnWeight = 2f;
+    public const float TunaHeight = 0.94f;
+    public const float TunaHalfExtent = 0.5f;
+    public const float TunaCruiseSpeed = 2.8f;
+    public const float TunaHoverMinBlocks = 2f;
+    public const float TunaHoverMaxBlocks = 14f;
+    public const int TunaMinWaterDepthBlocks = 8;
+
+    // Shark: hostile. A player within SharkNoticeRangeBlocks is prey: it charges at SharkChargeSpeedFactor of its
+    // cruise on its charge clip and, within SharkBiteReach of their chest in 3D and off its cooldown, plays bite;
+    // the impact event lands SharkBiteDamage. It lunges at SharkLungeSpeedFactor while the bite clip plays.
+    public const float SharkSpawnWeight = 0.6f;
+    public const float SharkHeight = 1.31f;
+    public const float SharkHalfExtent = 0.88f;
+    public const float SharkShoveSpeed = 1f;
+    public const float SharkCruiseSpeed = 3f;
+    public const float SharkVerticalSpeed = 2.2f;
+    public const float SharkAcceleration = 2.2f;
+    public const float SharkHoverMinBlocks = 2f;
+    public const float SharkHoverMaxBlocks = 12f;
+    public const float SharkMinClearanceBlocks = 0.5f;
+    public const float SharkBobBlocks = 0.2f;
+    public const float SharkBobHz = 0.2f;
+    public const int SharkMinWaterDepthBlocks = 8;
+    public const float SharkNoticeRangeBlocks = 18f;
+    public const float SharkChargeSpeedFactor = 2.2f;
+    public const float SharkLungeSpeedFactor = 1.6f;
+    public const float SharkBiteReach = 2.8f;
+    public const int SharkBiteDamage = 12;
+    public const float SharkBiteCooldownSeconds = 1.6f;
+    public const float SharkKnockbackSpeed = 4f;
+    public const float SharkKnockbackLift = 1f;
+
+    // Jellyfish: neutral and never chasing. It drifts at JellyfishDriftSpeed; a player (or mob) within
+    // JellyfishStingReach in 3D of its bell and off its cooldown makes it play sting, and the impact event stings
+    // everyone still in reach for JellyfishStingDamage and the venom effect.
+    public const float JellyfishSpawnWeight = 2f;
+    public const float JellyfishHeight = 1.25f;
+    public const float JellyfishHalfExtent = 0.31f;
+    public const float JellyfishShoveSpeed = 0.8f;
+    public const float JellyfishDriftSpeed = 0.7f;
+    public const float JellyfishVerticalSpeed = 0.5f;
+    public const float JellyfishAcceleration = 1.2f;
+    public const float JellyfishHoverMinBlocks = 2f;
+    public const float JellyfishHoverMaxBlocks = 16f;
+    public const float JellyfishMinClearanceBlocks = 0.5f;
+    public const float JellyfishBobBlocks = 0.35f;
+    public const float JellyfishBobHz = 0.25f;
+    public const int JellyfishMinWaterDepthBlocks = 5;
+    public const float JellyfishStingReach = 1.6f;
+    public const int JellyfishStingDamage = 4;
+    public const float JellyfishStingCooldownSeconds = 2.5f;
+    public const float JellyfishKnockbackSpeed = 1.5f;
+    public const float JellyfishKnockbackLift = 0.5f;
+}

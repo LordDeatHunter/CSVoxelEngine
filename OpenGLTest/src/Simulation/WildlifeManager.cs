@@ -192,6 +192,7 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
     {
         if (!TryTakeSpawnTurn(deltaTime, targets, WildlifeConfig.SpawnIntervalSeconds, out var target)) return;
         if (MobSpawner.TargetUnderground(chunks, target.Eye)) return;
+        if (Random.Shared.NextSingle() < WildlifeConfig.SeaSpawnChance && TrySpawnSea(chunks, target)) return;
 
         if (!MobSpawner.TryFindSurfaceSpawn(chunks, SpawnOrigin.Of(target), WildlifeConfig.SpawnMinRadiusBlocks,
                 WildlifeConfig.SpawnMaxRadiusBlocks, WildlifeConfig.SpawnTries, out var x, out var groundY, out var z))
@@ -203,6 +204,57 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
         if (picked is not { } rule) return;
 
         Place(chunks, rule.Kind, x, groundY, z);
+    }
+
+    // A turn of the sea: when surface water lies near the target, one water column of the ring, the species its
+    // depth and biome allow (a fish arrives with a school); false when there was none to place, so the turn falls
+    // through to the land
+    private bool TrySpawnSea(ChunkManager chunks, IMobTarget target)
+    {
+        var (tx, _, tz) = target.Eye.BlockCell();
+        if (!MobSpawner.IsNearSurfaceWater(chunks, tx, tz, WildlifeConfig.SeaSpawnNearBlocks)) return false;
+        if (!MobSpawner.TryFindWaterSpawn(chunks, SpawnOrigin.Of(target), WildlifeConfig.SeaSpawnMinRadiusBlocks,
+                WildlifeConfig.SeaSpawnMaxRadiusBlocks, WildlifeConfig.SeaSpawnTries, out var x, out var bedY,
+                out var waterTopY, out var z, out var biome))
+            return false;
+
+        var depth = waterTopY - bedY;
+        if (WildlifeSpawnRules.PickSea(biome, depth, Random.Shared.NextSingle(), kind => _types[(int)kind] != null)
+            is not { } rule)
+            return false;
+
+        var first = PlaceInWater(chunks, rule.Kind, x + 0.5f, bedY, waterTopY, z + 0.5f);
+        if (first == null) return false;
+        if (first is not Fish leader) return true;
+
+        var school = Random.Shared.Next(WildlifeConfig.SchoolMinSize, WildlifeConfig.SchoolMaxSize + 1);
+        var spread = WildlifeConfig.SchoolSpreadBlocks;
+        for (var i = 1; i < school; i++)
+        {
+            var mate = PlaceInWater(chunks, rule.Kind, x + 0.5f + MathUtils.Lerp(-spread, spread, Random.Shared.NextSingle()),
+                bedY, waterTopY, z + 0.5f + MathUtils.Lerp(-spread, spread, Random.Shared.NextSingle()));
+            (mate as Fish)?.Follow(leader);
+        }
+        return true;
+    }
+
+    // One sea animal at a random height in the water of column (x, z) between its bed and its top water cell, kept
+    // off the bed and under the surface; null when that cell is not water, its body overlaps a block or the hard cap
+    // is full
+    private Animal? PlaceInWater(ChunkManager chunks, WildlifeKind kind, float x, int bedY, int waterTopY, float z)
+    {
+        var name = WildlifeSpecies.NameOf(kind);
+        var height = WildlifeSpecies.HeightOf(name);
+        var halfWidth = WildlifeSpecies.HalfExtentOf(name);
+        var lowest = bedY + 1f + height * 0.5f + 0.2f;
+        var highest = waterTopY + 0.5f - height * 0.5f;
+        if (highest < lowest) return null;
+
+        var center = new Vector3(x, MathUtils.Lerp(lowest, highest, Random.Shared.NextSingle()), z);
+        var (cx, cy, cz) = center.BlockCell();
+        if (!chunks.TryGetCell(cx, cy, cz, out var id, out _) || !BlockType.IsFluid(id)) return null;
+        if (BoxSweep.IsColliding(center, new Vector3(halfWidth, height * 0.5f, halfWidth), chunks)) return null;
+        return Spawn(name, center);
     }
 
     // One animal of the species over ground cell (x, y, z): standing on it, or for a flyer in the air a few
