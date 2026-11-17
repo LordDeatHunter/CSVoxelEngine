@@ -5,16 +5,18 @@
   // 35x35 x 3 grid and its local 5x5 follow-up, not a claim over all coordinates.
   "steps": [
     { "op": "fly", "on": true },
-    { "op": "teleport", "pos": [600.5, 90.5, 6000.5], "yaw": 45, "pitch": -12 },
+    { "op": "teleport", "pos": [600.5, 43.5, 6000.5], "yaw": 45, "pitch": 8 },
     { "op": "wait", "seconds": 25 },
-    { "op": "teleport", "pos": [600.5, 90.5, 6000.5], "yaw": 45, "pitch": -12 },
+    { "op": "teleport", "pos": [600.5, 43.5, 6000.5], "yaw": 45, "pitch": 8 },
     { "op": "screenshot", "name": "valley_to_cordillera", "hideHud": true },
 
     { "op": "teleport", "pos": [1200.5, 186.5, 6600.5], "yaw": 25, "pitch": -28 },
     { "op": "wait", "seconds": 25 },
     { "op": "teleport", "pos": [1200.5, 186.5, 6600.5], "yaw": 25, "pitch": -28 },
     { "op": "screenshot", "name": "summit_above_drawn_clouds", "hideHud": true },
-    { "op": "teleport", "pos": [1200.5, 163.5, 6600.5], "yaw": 45, "pitch": -8 },
+    { "op": "teleport", "pos": [900.5, 163.5, 7200.5], "yaw": 45, "pitch": -8 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [900.5, 163.5, 7200.5], "yaw": 45, "pitch": -8 },
     { "op": "screenshot", "name": "inside_drawn_cloud_layer", "hideHud": true },
 
     { "op": "teleport", "pos": [1500.5, 151.5, 6000.5], "yaw": -25, "pitch": -35 },
