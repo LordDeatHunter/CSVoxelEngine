@@ -199,8 +199,10 @@ pure function of the seed: only **deltas** and the seed are written.
 - **Stations** (`stations.json`, `StationSaveCodec`/`StationSaveData`): restored into the empty
   managers when the world is built, with no wait for chunks, because every manager already freezes a
   cell in an unloaded chunk and sweeps an entry whose block is gone (dropping what it held) once the
-  chunk loads. An entry whose block, item or molten material name no longer resolves is dropped with
-  one aggregated warning, and a cast pour is restored paused (its crucible binding is transient). A
+  chunk loads. Literal null records and null campfire slots are skipped and included with other
+  dropped entries in one aggregated warning; a non-null lantern record still uses strict validation.
+  An entry whose block, item or molten material name no longer resolves is dropped, and a cast pour is
+  restored paused (its crucible binding is transient). A
   corrupt file parses to null and is replaced at the next autosave, like `entities.json`.
 - **Malformed entity files.** If the codec rejects a readable `entities.json`, that load starts
   without its saved entries and parser rejection marks the file for the store's existing `.bad`

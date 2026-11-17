@@ -266,7 +266,7 @@ public sealed class AnvilManager
         if (saved == null) return 0;
         foreach (var data in saved.Take(StationNetCodec.MaxEntries))
         {
-            if (!StationSaveCodec.TryCell(data.Cell, out var key) || !SaveNames.TryResolve(data.Block, out var block)
+            if (data == null || !StationSaveCodec.TryCell(data.Cell, out var key) || !SaveNames.TryResolve(data.Block, out var block)
                 || RestoredState(data, block) is not { } state)
             {
                 skipped++;
