@@ -565,7 +565,7 @@ OpenGLTest/
         IBonePose.cs           # a pose of a Blockbench rig: each bone's animated local transform
         RigPose.cs             # GL-free: composes a pose down the rig's parent chain into a part's world matrix
         ClipPose.cs            # one clip sampled at one time as a pose, no layers (a chest's lid); default = rest
-        ChainFollow.cs         # GL-free: the follow-the-leader step of a body chain with its bend limit (sandworm, centipede)
+        ChainFollow.cs         # GL-free: the follow-the-leader step of a body chain with its bend limit (sandworm)
       SkyMobs/                 # the sky islands' mobs (see "Sky mobs"): the shared base, the two kinds, the zone difficulty
       Wildlife/                # the animals of the wild (see "Wildlife"): Animal (heeding, idle habits, gaits), the
                                #   WildlifeSpecies table, Deer (watches, bolts, grazes), Boar (neutral until crowded or
@@ -573,8 +573,8 @@ OpenGLTest/
                                #   (lands, rests, takes off; posture for mirrors), Crow (flock pest: swoops, pecks, caws),
                                #   WildlifeCalls (one species' ambient call on a randomized timer, played when one is in earshot), WildlifeCallSet (the crow's caw and the boar and dire boar grunts),
                                #   Dragonfly (waterside hunter: darts and bites),
-                               #   CorpseBloom (rooted jungle ambusher: poison burst and a lingering cloud), Centipede (jungle hunter: runs down and bites with venom),
-                               #   CentipedeRig (the model's joints front to back and their link lengths), CentipedeSpine (its drawn body chain: turns segment by segment, a pose only),
+                               #   CorpseBloom (rooted jungle ambusher: poison burst and a lingering cloud), Centipede (jungle hunter: its head crawls every surface on a CrawlDrive, bites with venom),
+                               #   CentipedeRig (the model's joints front to back and their link lengths), CentipedeSpine (its body chain: the joints trail the head's path round turns and up walls),
                                #   AquaticAnimal (a swimmer: kept under the surface, beached it flops and suffocates; posture bits), Fish (cod, salmon, tuna: a school, darts from a threat), Shark (charges and bites), Jellyfish (drifts, stings what touches it)
         SkyMob.cs              # abstract sky mob (a RealmMob): the zone tier it spawned in and its tier-scaled pool
         Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event
@@ -614,9 +614,11 @@ OpenGLTest/
         SandwormChain.cs       # GL-free follow-the-leader chain of segments: fixed link lengths, a bend limit, the taper
         SandwormPose.cs        # GL-free world matrices of the model parts: a segment's, the lower jaw's
       Crawlers/                # the mobs that walk every surface on solved legs (see "Spiders", "Scorpion")
-        CrawlerMob.cs          # abstract crawler (a CaveMob): the crawl toward its target, the leap and the path when
-                               #   it stalls, the ceiling drop, the knock off a wall, the ranged shot's aim and release,
+        CrawlerMob.cs          # abstract crawler (a CaveMob) on a CrawlDrive: the ranged shot's aim and release,
                                #   the drawn orientation, its part matrices, wire stance and model contract
+        CrawlDrive.cs          # the crawl of a mob on any surface (crawlers, the centipede's head): toward its target,
+                               #   the leap and the path when it stalls, the ceiling drop, the knock off a wall
+        CrawlOrder.cs          # what a mob asks of its CrawlDrive for one frame
         CrawlerNavigator.cs    # GL-free: notices a stalled chase, follows a planned path foothold by foothold
         CrawlerPathfinder.cs   # GL-free A* over block faces: along a face, climb, wrap an edge, let go and fall
         CrawlerFoothold.cs     # one path step: an air cell and the face held there, its body center, a fall marker

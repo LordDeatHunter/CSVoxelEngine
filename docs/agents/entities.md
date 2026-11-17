@@ -330,18 +330,24 @@ no rest rotations, so parts the clips fold lie flat along an axis.
   Clips: `idle` (open), `closed` (a loop: the bud shut, the ambush pose), `spew` with `impact` (the petals gulp
   shut, the bulb swells, the burst is the `impact`), `hurt` and `death`. The bulb's swelling is a scale track.
 - **Giant Centipede** (`Centipede`, `centipede.json`, hp 70): a wildlife species that runs a player within
-  `CentipedeNoticeRangeBlocks` down on `walk` and bites within `CentipedeBiteReach` at the `bite` clip's `impact` for
-  `CentipedeBiteDamage` and `venom`. It is one simulated body (one position, facing, collision box and health pool)
-  playing its authored clips, **drawn as a chain**: `CentipedeSpine` keeps its joints (`CentipedeRig`: `Head`, every
-  `Segment<n>`, `Tail`, read from the model) on the ground plane, the head's pinned where the body holds it and each
-  other trailing the one ahead (`ChainFollow`, the sandworm's follow step, no joint past `CentipedeMaxBendDegrees`),
-  and `Centipede.PartMatrix` poses every part on its joint's root, so a turn runs down the body segment by segment
-  and a straight body is exactly the rigid pose. The chain is a pose only: it follows on the simulation
-  (`Locomote`) and on a client's mirror (`AnimateMirror`) alike, each from its own position and facing, so nothing
-  about it is saved or on the wire, all joints share the feet height, and a head that jumps farther than the body is
-  long lays it out straight again. It turns at `CentipedeTurnRate` (`RiggedMob.TurnRate`, slower than the default so
-  the head sweeps round). DevStudio shows the clips on the straight body. Legs are clip-driven; segment hits, solved
-  legs and draping over steps are `P-63`. Model: `Head` (with `MandibleL/R`, `AntennaL/R` > `...Tip`),
+  `CentipedeNoticeRangeBlocks` down on `walk` and bites, with their chest within `CentipedeBiteReach` of its head
+  (from any side), at the `bite` clip's `impact` for `CentipedeBiteDamage` and `venom`. **The one simulated body is
+  its head**, a cube of `CentipedeBodySize` that **crawls like the spiders** through the shared `CrawlDrive` (see
+  "Spiders" in `realm-mobs.md`): it climbs what it walks into instead of jumping, rounds ledges, walks walls and
+  ceilings, leaps and plans a path when the chase stalls, is knocked off a wall by a blow and never takes fall
+  damage. At full speed the head turns no tighter than `CentipedeTurnRadiusBlocks` (`SurfaceCrawler.MaxTurnSpeed`).
+  **The body trails the head's path**: `CentipedeSpine` remembers where the head has been and the up it had there
+  (a sample every `CentipedeTrailSpacingBlocks`) and stands each joint (`CentipedeRig`: `Head`, every `Segment<n>`,
+  `Tail`, read from the model) its link distance further back along that trail, so the body bends through a turn and
+  drapes over a ledge and up a wall segment by segment; `Centipede.PartMatrix` poses every part on its joint's root,
+  and a straight body is exactly the rigid pose. The chain follows on the simulation (`Locomote`) and on a client's
+  mirror (`AnimateMirror`) alike, each from its own head, so nothing about it is saved; a head that jumps farther
+  than the body is long lays it out straight again. The segments do not collide with blocks, but **a blow lands on
+  any of them** (`OverlapsBox`, `AimPointFrom` test every joint), on the one health pool. On the wire its posture
+  byte is the face the head holds (`CrawlDrive.SurfaceIndex`) and its yaw the heading's angle on that face
+  (protocol 67). DevStudio shows the clips on the straight body. Legs are clip-driven; solved legs are `P-63`.
+  Tests: `CentipedeSpineTests`, `JungleWildlifeTests`. `visual-examples/centipede-turn.json` films the body through
+  a turn, `centipede-climb.json` a climb up a pillar (both `VOXEL_TIME=147`). Model: `Head` (with `MandibleL/R`, `AntennaL/R` > `...Tip`),
   `Segment1..10` front to back and `Tail` (with `TailProngL/R`), all top-level, each group's origin on the body's
   axis at the part's joint or center, 6 units apart, so the chain places every part by its origin. Each segment
   owns one leg pair as children, `LegR<n>` and `LegL<n>` with a `...Lower`, shaped like a crawler leg (along X,

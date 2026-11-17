@@ -1,0 +1,55 @@
+{
+  // The centipede's crawl: run with VOXEL_SCRIPT=visual-examples/centipede-climb.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/centipede-climb/. The camera lays a three-block stone pillar under itself (the spot of
+  // spiders.json), then stands on it as a survival player, so it is prey. A centipede spawned eight blocks ahead
+  // runs up to the pillar and climbs its side instead of jumping at it: the head goes up the face while the body
+  // trails along the ground and up after it, each segment tipping over the corner in turn, and it bites from the
+  // side of the pillar. The last shots are from over the shoulder.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [0.5, 17.5, 4.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "give", "block": "stone", "count": 8 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "place" },
+    { "op": "select", "slot": 9 },
+    { "op": "fly", "on": false },
+    { "op": "creative", "on": false },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "look", "yaw": -90, "pitch": -50 },
+    { "op": "spawn", "entity": "centipede", "pos": [0.5, -3.5] },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "climb01", "hideHud": true },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "climb02", "hideHud": true },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "climb03", "hideHud": true },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "climb04", "hideHud": true },
+    { "op": "look", "yaw": -90, "pitch": -72 },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "climb05", "hideHud": true },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "climb06", "hideHud": true },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "climb07", "hideHud": true },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "climb08", "hideHud": true },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "climb09", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "climb10", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "climb11", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "climb12", "hideHud": true },
+    { "op": "view", "mode": "first" },
+    { "op": "wait", "seconds": 0.5 }
+  ]
+}

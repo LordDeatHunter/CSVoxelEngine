@@ -26,8 +26,8 @@ public sealed class SpiderTests
     private const float Dt = 1f / 60f;
 
     // The plateau the climbing tests use: every column from PlateauX on is solid up to PlateauTop
-    private const int PlateauX = 8;
-    private const int PlateauTop = 4;
+    internal const int PlateauX = 8;
+    internal const int PlateauTop = 4;
 
     private static EntityType TypeOf(bool broodmother) =>
         EntityRegistry.Require(broodmother ? Spider.BroodmotherEntityName : Spider.EntityName);

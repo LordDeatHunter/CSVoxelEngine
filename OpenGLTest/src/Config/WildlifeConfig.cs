@@ -208,23 +208,24 @@ public static class WildlifeConfig
 
     // --- Giant centipede (Centipede) ---
     // A long hunter: a player within CentipedeNoticeRangeBlocks is prey, run down at CentipedeWalkSpeed and bitten
-    // within CentipedeBiteReach for CentipedeBiteDamage and venom, every CentipedeBiteCooldownSeconds.
+    // with the chest within CentipedeBiteReach of the head for CentipedeBiteDamage and venom, every
+    // CentipedeBiteCooldownSeconds. The simulated body is its head, a cube of CentipedeBodySize that crawls over
+    // floors, walls and ceilings like a spider's (CrawlDrive).
     public const float CentipedeSpawnWeight = 2.5f;
-    public const float CentipedeHeight = 0.7f;
-    public const float CentipedeHalfExtent = 0.7f;
+    public const float CentipedeBodySize = 0.7f;
     public const float CentipedeShoveSpeed = 2f;
     public const float CentipedeWalkSpeed = 3.6f;
-    public const float CentipedeJumpSpeed = 7f;
     public const float CentipedeNoticeRangeBlocks = 14f;
-    public const float CentipedeBiteReach = 2.4f;
+    public const float CentipedeBiteReach = 1.8f;
     public const int CentipedeBiteDamage = 9;
     public const float CentipedeBiteCooldownSeconds = 1.8f;
     public const float CentipedeKnockbackSpeed = 4f;
     public const float CentipedeKnockbackLift = 1.5f;
-    // Its body is drawn as a chain (CentipedeSpine): the head turns at CentipedeTurnRate (slower than a short
-    // mob's, so it sweeps round) and no joint bends sharper than CentipedeMaxBendDegrees against the one ahead.
-    public const float CentipedeTurnRate = 5f;
-    public const float CentipedeMaxBendDegrees = 28f;
+    // The body trails the head along the path it took (CentipedeSpine), remembered every
+    // CentipedeTrailSpacingBlocks. At full speed the head turns no tighter than a circle of
+    // CentipedeTurnRadiusBlocks, so the body sweeps round instead of doubling back on itself.
+    public const float CentipedeTurnRadiusBlocks = 0.8f;
+    public const float CentipedeTrailSpacingBlocks = 0.1f;
 
     // --- Sea life (AquaticAnimal: Fish, Shark, Jellyfish) ---
     // Swimmers fly the shared flight rules through water (Mob.Swims, RiggedMob.Fly): each kind's hover band is

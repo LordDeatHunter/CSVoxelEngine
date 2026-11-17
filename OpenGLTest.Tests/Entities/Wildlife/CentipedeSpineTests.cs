@@ -1,52 +1,61 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Crawlers;
 using VoxelEngine.Entities.Wildlife;
 using Xunit;
 
 namespace VoxelEngine.Tests.Entities.Wildlife;
 
 /// <summary>
-/// The centipede's drawn body chain: a straight chain is the rigid pose, a turn runs down the body from the head
-/// instead of swinging it whole, and no path stretches a link or folds a joint.
+/// The centipede's body chain: a straight chain is the rigid pose, every joint stands on the path the head took
+/// (round a turn, up a wall) with the up the head had there, no link stretches, and a head that jumps lays the
+/// chain out afresh.
 /// </summary>
 public sealed class CentipedeSpineTests
 {
     public CentipedeSpineTests() => TestContent.EnsureLoaded();
 
     private const float Eps = 1e-3f;
-    private const float StepBlocks = 0.06f;
+    private const float StepBlocks = 0.03f;
+    private const float Half = WildlifeConfig.CentipedeBodySize * 0.5f;
 
     private static EntityType Type => EntityRegistry.Require(Centipede.EntityName);
 
     private static CentipedeRig Rig => CentipedeRig.For(Type);
 
-    // The way a body facing `facing` walks: the model's -Z front turned by the yaw
-    private static Vector3 Forward(float facing) => new(-MathF.Sin(facing), 0f, -MathF.Cos(facing));
+    private static CentipedeSpine NewSpine() => new(Rig, Half);
 
-    private static float Angle(Vector3 a, Vector3 b) =>
-        MathF.Acos(Math.Clamp(Vector3.Dot(Vector3.Normalize(a), Vector3.Normalize(b)), -1f, 1f));
-
-    private static Vector3 Walk(CentipedeSpine spine, Vector3 feet, float facing, float blocks)
+    // Crawls the head `blocks` along `heading` on the face whose normal is `up`, noting every place it was
+    private static Vector3 Crawl(CentipedeSpine spine, Vector3 center, Vector3 up, Vector3 heading, float blocks,
+        List<Vector3>? path = null)
     {
-        for (var walked = 0f; walked < blocks; walked += StepBlocks)
+        for (var crawled = 0f; crawled < blocks; crawled += StepBlocks)
         {
-            feet += Forward(facing) * StepBlocks;
-            spine.Follow(feet, facing);
+            center += heading * StepBlocks;
+            spine.Follow(center, up, heading);
+            path?.Add(center);
         }
-        return feet;
+        return center;
     }
 
     [Fact]
     public void AStraightChainIsTheRigidPose()
     {
-        var spine = new CentipedeSpine(Rig);
-        var feet = new Vector3(3f, 7f, -5f);
+        var rig = Rig;
+        var spine = NewSpine();
         const float facing = 0.7f;
-        spine.Follow(feet, facing);
-        feet = Walk(spine, feet, facing, 2f);
+        var heading = CrawlFrame.HeadingOf(Vector3.UnitY, facing);
+        var center = new Vector3(3f, 7f, -5f);
+        spine.Follow(center, Vector3.UnitY, heading);
+        center = Crawl(spine, center, Vector3.UnitY, heading, 2f);
 
-        var rigid = Matrix4x4.CreateRotationY(facing) * Matrix4x4.CreateTranslation(feet);
+        // The whole model turned by the facing, the head's origin on the floor under the head's center
+        var rigid = Matrix4x4.CreateTranslation(-rig.Pivots[0].X, 0f, -rig.Pivots[0].Z)
+                    * Matrix4x4.CreateRotationY(facing)
+                    * Matrix4x4.CreateTranslation(center - Vector3.UnitY * Half);
         foreach (var part in Type.Model.Parts.Keys)
         {
             var root = spine.RootOf(part);
@@ -57,66 +66,88 @@ public sealed class CentipedeSpineTests
     }
 
     [Fact]
-    public void NoPathStretchesALinkOrFoldsAJoint()
+    public void TheBodyFollowsTheHeadsPathUpAWallWithoutStretching()
     {
         var rig = Rig;
-        var spine = new CentipedeSpine(rig);
-        var rng = new Random(11);
-        var feet = Vector3.Zero;
-        var facing = 0f;
-        var limit = WildlifeConfig.CentipedeMaxBendDegrees * MathF.PI / 180f + Eps;
-        spine.Follow(feet, facing);
+        var spine = NewSpine();
+        var last = spine.Count - 1;
+        var path = new List<Vector3>();
+        var floor = Vector3.UnitY;
+        var wall = -Vector3.UnitX;
 
-        for (var step = 0; step < 600; step++)
+        // Along a floor to a wall, then up it: first only the front of the body is on the wall
+        var center = new Vector3(2f, 1f + Half, 5f);
+        spine.Follow(center, floor, Vector3.UnitX);
+        center = Crawl(spine, center, floor, Vector3.UnitX, rig.Length * 1.5f, path);
+        center = Crawl(spine, center, wall, Vector3.UnitY, rig.Length * 0.5f, path);
+
+        Assert.Equal(wall, spine.UpAt(0));
+        Assert.Equal(floor, spine.UpAt(last));
+        Assert.True(spine[1].Y > spine[last].Y + 0.1f, "the front of the body did not rise with the head");
+        AssertOnPath(spine, rig, path);
+
+        // Climbing on, the whole body is on the wall, straight under the head
+        Crawl(spine, center, wall, Vector3.UnitY, rig.Length * 1.5f, path);
+        AssertOnPath(spine, rig, path);
+        for (var i = 0; i < spine.Count; i++)
         {
-            // Turns far sharper than any mob's, some of them on the spot
-            facing += ((float)rng.NextDouble() - 0.5f) * 1.2f;
-            if (step % 3 != 0) feet += Forward(facing) * StepBlocks;
-            spine.Follow(feet, facing);
+            Assert.Equal(wall, spine.UpAt(i));
+            Assert.True(MathF.Abs(spine[i].X - spine[0].X) < Eps, $"joint {i} is off the wall");
+        }
+    }
 
-            for (var i = 1; i < spine.Count; i++)
-            {
-                Assert.InRange(Vector3.Distance(spine[i], spine[i - 1]), rig.Links[i] - Eps, rig.Links[i] + Eps);
-                var ahead = i == 1 ? -Forward(facing) : spine[i - 1] - spine[i - 2];
-                Assert.True(Angle(ahead, spine[i] - spine[i - 1]) <= limit, $"joint {i} folded at step {step}");
-            }
+    // Every joint is where the head once was, and no farther from the one ahead than its link is long
+    private static void AssertOnPath(CentipedeSpine spine, CentipedeRig rig, List<Vector3> path)
+    {
+        for (var i = 1; i < spine.Count; i++)
+        {
+            var off = path.Min(point => Vector3.Distance(point, spine[i]));
+            Assert.True(off < WildlifeConfig.CentipedeTrailSpacingBlocks, $"joint {i} is {off} off the head's path");
+            Assert.True(Vector3.Distance(spine[i], spine[i - 1]) <= rig.Links[i] + Eps, $"the link to joint {i} stretched");
         }
     }
 
     [Fact]
     public void ATurnRunsDownTheBodyFromTheHeadAndWalkingOnStraightensIt()
     {
-        var spine = new CentipedeSpine(Rig);
+        var rig = Rig;
+        var spine = NewSpine();
         var last = spine.Count - 1;
-        var feet = Vector3.Zero;
-        spine.Follow(feet, 0f);
-        feet = Walk(spine, feet, 0f, 1f);
-        var tailBefore = spine[last - 1] - spine[last];
+        var up = Vector3.UnitY;
+        var center = new Vector3(0f, Half, 0f);
+        spine.Follow(center, up, Vector3.UnitX);
+        center = Crawl(spine, center, up, Vector3.UnitX, rig.Length * 1.5f);
+        var line = center.Z;
 
-        // A quarter turn on the spot: the head has turned all the way, the tail has barely begun to
-        const float turned = MathF.PI / 2f;
-        spine.Follow(feet, turned);
-        var headTurn = Angle(Forward(0f), Forward(turned));
-        var tailTurn = Angle(tailBefore, spine[last - 1] - spine[last]);
-        Assert.True(tailTurn < headTurn * 0.5f, $"the tail swung {tailTurn} rad with the head's {headTurn}");
+        // A quarter turn and a short way on: the joints behind the head have left the old line, the tail has not
+        center = Crawl(spine, center, up, Vector3.UnitZ, rig.Length * 0.25f);
+        Assert.True(spine[1].Z > line + 0.05f, "the joint behind the head did not follow it round the turn");
+        Assert.True(MathF.Abs(spine[last].Z - line) < Eps, "the tail swung round with the head");
 
-        // Walking on for a few body lengths pulls every joint in line behind the head again
-        Walk(spine, feet, turned, Rig.Length * 4f);
+        // Walking on for more than a body length pulls every joint in line behind the head again
+        center = Crawl(spine, center, up, Vector3.UnitZ, rig.Length * 1.5f);
         for (var i = 1; i < spine.Count; i++)
-            Assert.True(Angle(Forward(turned), spine[i - 1] - spine[i]) < 0.05f, $"joint {i} still trails off the line");
+            Assert.True(MathF.Abs(spine[i].X - center.X) < Eps && spine[i].Z < spine[i - 1].Z,
+                $"joint {i} still trails off the line");
     }
 
     [Fact]
     public void AHeadThatJumpsFartherThanTheBodyIsLongLaysTheChainOutStraight()
     {
         var rig = Rig;
-        var spine = new CentipedeSpine(rig);
-        spine.Follow(Vector3.Zero, 0f);
-        Walk(spine, Vector3.Zero, 1.2f, 3f);
+        var spine = NewSpine();
+        var up = Vector3.UnitY;
+        spine.Follow(Vector3.Zero, up, Vector3.UnitX);
+        Crawl(spine, Vector3.Zero, up, Vector3.UnitX, 3f);
 
-        const float facing = -2f;
-        spine.Follow(new Vector3(rig.Length * 3f, 0f, 40f), facing);
+        var heading = Vector3.Normalize(new Vector3(-1f, 0f, 2f));
+        var landed = new Vector3(rig.Length * 3f, 0f, 40f);
+        spine.Follow(landed, up, heading);
+        var reach = 0f;
         for (var i = 1; i < spine.Count; i++)
-            Assert.True(Angle(Forward(facing), spine[i - 1] - spine[i]) < Eps, $"joint {i} was dragged across the jump");
+        {
+            reach += rig.Links[i];
+            Assert.True(Vector3.Distance(landed - heading * reach, spine[i]) < Eps, $"joint {i} was dragged across the jump");
+        }
     }
 }

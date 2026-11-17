@@ -226,8 +226,9 @@ MCP plugin (no generator, the skin embedded; `USER_TODO.md`).
   may hang unsupported for `WrapGraceSeconds` while it rounds the corner. With nothing to hold it **falls** (gravity,
   buoyancy and paddling in water, `BodyMotion`), lands on a floor or grabs the first wall it is carried into (out of
   water it climbs up). A floor under water is let go of, so it floats rather than walking a lake bed.
-- **The mob**: `CrawlerMob.Locomote` replaces the realm walk: it aims the crawl at the chased target's chest (or the wander
-  point), lets go of a ceiling once the target stands under it within `CeilingDropRadiusBlocks`, and lets go of a wall
+- **The mob**: `CrawlerMob.Locomote` replaces the realm walk through a `CrawlDrive` (the crawl, the leap and the path
+  below, shared with the giant centipede, whose head it drives; see `entities.md`): it aims the crawl at the chased
+  target's chest (or the wander point), lets go of a ceiling once the target stands under it within `CeilingDropRadiusBlocks`, and lets go of a wall
   or ceiling when dying. `Mob.Facing` is the heading's angle on the held face (`CrawlFrame`: on a floor the usual yaw).
   In `BiteReach` of the chest (from any side) and off its cooldown it plays `bite`; at the clip's `impact` the manager
   bills every non-immune target still in reach `BiteDamage` (tier-scaled) with a shove and the `venom` status effect
@@ -242,7 +243,7 @@ MCP plugin (no generator, the skin embedded; `USER_TODO.md`).
 - **Getting unstuck** (`CrawlerNavigator`, `CrawlerPathfinder`, both GL-free): the straight crawl hovers level with a
   target off the face it holds (a crawler on a wall beside a player across the room keeps turning back past the
   player's height) or presses into a dead end. The navigator watches the chase: no `StallProgressBlocks` closer to the
-  chest in `StallSeconds` is a stall. A stalled crawler first **leaps** (`CrawlerMob.TryLeap`): off
+  chest in `StallSeconds` is a stall. A stalled crawler first **leaps** (`CrawlDrive.TryLeap`): off
   `LeapCooldownSeconds`, holding a surface, the target's feet `LeapMinBlocks`..`LeapMaxBlocks` off in a clear line, on
   the arc `SurfaceCrawler.LeapVelocity` solves (the horizontal distance at `LeapHorizontalSpeed`, in the air long
   enough to come down onto the spot, `LeapMinSeconds`..`LeapMaxSeconds`), launched away from the held face and no

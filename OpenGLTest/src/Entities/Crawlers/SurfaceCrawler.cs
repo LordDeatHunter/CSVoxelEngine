@@ -24,6 +24,10 @@ public sealed class SurfaceCrawler
     /// <summary>The unit direction the crawler travels and faces, in the plane of its face.</summary>
     public Vector3 Heading { get; private set; } = -Vector3.UnitZ;
 
+    /// <summary>The fastest the heading turns on a face, in radians a second: unlimited by default; a long body
+    /// that must sweep round rather than double back on itself sets one.</summary>
+    public float MaxTurnSpeed { get; init; } = float.PositiveInfinity;
+
     /// <summary>Whether the crawler holds a surface; false while it falls or floats.</summary>
     public bool Attached { get; private set; }
 
@@ -289,12 +293,14 @@ public sealed class SurfaceCrawler
     }
 
     // The heading turned about the normal toward a target in the face, by an eased share of the angle between
-    // them, so a target straight behind is turned to as well
+    // them (no faster than MaxTurnSpeed), so a target straight behind is turned to as well
     private Vector3 TurnToward(Vector3 target, float deltaTime)
     {
         var side = Vector3.Cross(Normal, Heading);
         var angle = MathF.Atan2(Vector3.Dot(side, target), Vector3.Dot(Heading, target));
         angle *= 1f - MathF.Exp(-CrawlerConfig.TurnRate * deltaTime);
+        var most = MaxTurnSpeed * deltaTime;
+        angle = Math.Clamp(angle, -most, most);
         return Flattened(Heading * MathF.Cos(angle) + side * MathF.Sin(angle), Normal, target);
     }
 

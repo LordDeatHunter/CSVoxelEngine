@@ -264,14 +264,14 @@ single-arc player.
   sand, a hermit variant.
   *Hook:* `Entities/Wildlife/` (`WildlifeSpecies`, `WildlifeManager`), `Boar` for the aggro rule.
 - [ ] **`P-63` · Giant centipede, the physical body** — P3, L.
-  The centipede ships (`Entities/Wildlife/Centipede.cs`) as one simulated body that plays its authored `walk` clip: a
-  jungle hunter that runs a player down and bites with venom, spawned by the jungle's wildlife rule. Its body is drawn
-  as a flat chain (`CentipedeSpine`: each joint trails the one ahead, so it turns segment by segment), a pose only.
-  Still open: the chain over steps (every joint shares the feet height) and as the collision body,
-  per-segment hit testing on one health pool, inverse kinematics for twenty legs (`LegIk.Solve` and the hold
-  probing of `CrawlerLegs`, generalized from four legs a side on one body to one pair per segment, in the segment's
-  space), the metachronal stepping order the `walk` clip shows, whether it climbs like the crawlers, and the wire for a
-  chain (more than one pose, see the sandworm). Also open: a rearing threat clip and length variants (the segments
+  The centipede ships (`Entities/Wildlife/Centipede.cs`): a jungle hunter that runs a player down and bites with
+  venom, spawned by the jungle's wildlife rule. Its head is the one simulated body and crawls every surface like the
+  spiders (`CrawlDrive`); the body is a chain that trails the head's path (`CentipedeSpine`), so it turns and climbs
+  segment by segment, and a blow lands on any segment.
+  Still open: the segments as collision bodies (they pass through blocks the head went round), inverse kinematics
+  for twenty legs (`LegIk.Solve` and the hold probing of `CrawlerLegs`, generalized from four legs a side on one
+  body to one pair per segment, in the segment's space), the metachronal stepping order the `walk` clip shows, and
+  the chain on the wire (a mirror rebuilds it from the head it is sent). Also open: a rearing threat clip and length variants (the segments
   are identical).
   *Hook:* `Entities/Crawlers/` (`CrawlerRig`, `CrawlerLegs`, `LegIk`), the sandworm's chain (`plans/SANDWORM.md`).
 - [ ] **`P-56` · Ocean & island content** — P3, M.
