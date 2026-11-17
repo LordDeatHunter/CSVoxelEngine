@@ -24,6 +24,49 @@ internal static class TerrainRelief
         MathUtils.SmoothStep(WorldGenerationConfig.ReliefSpawnClearStart, WorldGenerationConfig.ReliefSpawnClearEnd,
             MathF.Sqrt(x * x + z * z));
 
+    /// <summary>The shorter clearing used only by the new Dynamic relief and sites.</summary>
+    internal static float DynamicSpawnClear(float x, float z) =>
+        MathUtils.SmoothStep(WorldGenerationConfig.DynamicReliefSpawnClearStart,
+            WorldGenerationConfig.DynamicReliefSpawnClearEnd, MathF.Sqrt(x * x + z * z));
+
+    /// <summary>A warped, continuous ridge support. It is exactly zero off the ridge and in the
+    /// spawn clearing; site factories can read it without querying a height or a cache.</summary>
+    internal static float CordilleraSupport(float x, float z)
+    {
+        var clear = DynamicSpawnClear(x, z);
+        if (clear <= 0f) return 0f;
+        var region = MathUtils.SmoothStep(WorldGenerationConfig.CordilleraRegionStart,
+            WorldGenerationConfig.CordilleraRegionEnd, TerrainNoise.ReliefNoise.GetNoise(x, z));
+        if (region <= 0f) return 0f;
+        var wx = x;
+        var wz = z;
+        TerrainNoise.CordilleraWarp.DomainWarp(ref wx, ref wz);
+        var ridge = 1f - MathF.Abs(TerrainNoise.CordilleraNoise.GetNoise(wx, wz));
+        return MathUtils.SmoothStep(WorldGenerationConfig.CordilleraRidgeStart,
+            WorldGenerationConfig.CordilleraRidgeEnd, ridge) * region * clear;
+    }
+
+    internal static float CordilleraHeight(float x, float z) =>
+        WorldGenerationConfig.CordilleraAmplitude * CordilleraSupport(x, z);
+
+    /// <summary>Continuous, nonraising and monotone in the incoming height. The depression
+    /// vanishes at the floor and the knee, and outside the flat-valley mask.</summary>
+    internal static float FlattenValley(float x, float z, float height)
+    {
+        var floor = WorldGenerationConfig.ValleyFloor;
+        var knee = WorldGenerationConfig.ValleyKnee;
+        if (height <= floor || height >= knee) return height;
+        var clear = DynamicSpawnClear(x, z);
+        if (clear <= 0f) return height;
+        var flat = MathUtils.SmoothStep(WorldGenerationConfig.ValleyFlatMaskStart,
+            WorldGenerationConfig.ValleyFlatMaskEnd, TerrainNoise.ValleyFlatNoise.GetNoise(x, z));
+        var mask = flat * (1f - CordilleraSupport(x, z)) * clear;
+        if (mask <= 0f) return height;
+        var t = (height - floor) / (knee - floor);
+        return height - WorldGenerationConfig.ValleyMaxCompression * mask
+            * (height - floor) * (1f - t) * (1f - t);
+    }
+
     /// <summary>
     /// 0..1 how highland (x, z) is: a smoothstep of the low-frequency <see cref="TerrainNoise.ReliefNoise"/>,
     /// faded out around the spawn. Exactly 0 over lowlands.

@@ -507,7 +507,9 @@ internal sealed class LodMeshBuilder
             _beachTop[(i + 1) * _heightGrid + (j + 1)] && TerrainGenerator.IsGravelPatch(centerX, centerZ);
         // The same bare-rock rule TerrainGenerator.Compute strips a column's soil by
         _rockTop[(i + 1) * _heightGrid + (j + 1)] =
-            BiomeTraits.ShowsBareRock(cellBiome) && maxOwn >= WorldGenerationConfig.MountainRockHeight;
+            BiomeTraits.ShowsBareRock(cellBiome) && maxOwn >= TerrainGenerator.MountainRockHeight;
+        if (_rockTop[(i + 1) * _heightGrid + (j + 1)] && TerrainGenerator.IsScree(centerX, centerZ, maxOwn))
+            _gravelTop[(i + 1) * _heightGrid + (j + 1)] = true;
 
         var cold = SnowGenerator.ColdWeightAt(centerX, centerZ, maxOwn);
         // The plain snow line: it also decides snow on land cells. On a sea sheet the emitter

@@ -88,6 +88,7 @@ public static class BoulderGenerator
             var height = heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(centerX),
                 VoxelCoords.WorldToLocal(centerZ))];
             if (TerrainGenerator.IsWaterColumn(centerX, centerZ, height)) continue;
+            if (!SurfaceClearance.Allows(height, 1)) continue;
 
             var ly = height + 1 - worldY0;
             if ((uint)ly >= Chunk.Size) continue;

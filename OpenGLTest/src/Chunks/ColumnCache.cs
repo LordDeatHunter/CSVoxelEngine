@@ -155,7 +155,9 @@ public static class ColumnCache
             var depth = terrainHeight - (lowerBoundY + y);
             if (depth < 0) break;
 
-            blocks[Idx(x, y, z)] = soilDepth == 0 ? TerrainGenerator.RockBlock
+            blocks[Idx(x, y, z)] = soilDepth == 0
+                ? depth == 0 && TerrainGenerator.IsScree(worldX, worldZ, terrainHeight)
+                    ? TerrainGenerator.GravelBlock : TerrainGenerator.RockBlock
                 : depth == 0 ? topBlock
                 : depth <= soilDepth ? soilBlock
                 : TerrainGenerator.RockBlock;

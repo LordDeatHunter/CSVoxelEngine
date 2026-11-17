@@ -82,10 +82,11 @@ public static class SnowGenerator
     public static float ColdWeightAt(float x, float z, int height)
     {
         var cold = TerrainGenerator.ColdWeight(x, z);
-        if (height <= WorldGenerationConfig.MountainRockHeight) return cold;
-        var altitude = (height - WorldGenerationConfig.MountainRockHeight)
-                       / (float)(WorldGenerationConfig.MountainSnowFullHeight
-                                 - WorldGenerationConfig.MountainRockHeight);
+        var rock = TerrainGenerator.MountainRockHeight;
+        var fullSnow = WorldSeed.Profile == WorldGenProfile.Dynamic
+            ? WorldGenerationConfig.DynamicMountainSnowFullHeight : WorldGenerationConfig.MountainSnowFullHeight;
+        if (height <= rock) return cold;
+        var altitude = (height - rock) / (fullSnow - rock);
         return MathF.Max(cold, MathUtils.Clamp01(altitude));
     }
 

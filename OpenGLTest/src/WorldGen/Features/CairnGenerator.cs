@@ -53,7 +53,8 @@ public static class CairnGenerator
     public static bool IsSummit(int x, int z)
     {
         var height = HeightAt(x, z);
-        if (height < WorldGenerationConfig.MountainRockHeight) return false;
+        if (height < TerrainGenerator.MountainRockHeight || !SurfaceClearance.Allows(height, StackCells + 1))
+            return false;
         for (var dx = -1; dx <= 1; dx++)
         for (var dz = -1; dz <= 1; dz++)
         {

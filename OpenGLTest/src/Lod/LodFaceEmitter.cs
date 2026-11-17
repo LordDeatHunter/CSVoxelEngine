@@ -319,7 +319,7 @@ internal ref struct LodFaceEmitter
         var surface = edited
             ?? (isSeaCell ? FloorBlock(floor)   // seabed wears its depth band, not dirt
             : beach ? cap
-            : rock ? _stone
+            : rock ? (_gravelTop[gi * _heightGrid + gj] ? _gravel : _stone)
             : snowCell ? _snow
             : biome == Biome.Desert ? _sand
             : _grass);

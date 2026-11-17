@@ -542,6 +542,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         SnowGenerator.cs       # cold weather: freezes surface water to ice (IsFrozenWater, the pack-ice band
                                #   the far LOD shares), lays one layered-snow cell per cold column (StampGround)
                                #   and dusts cold canopy tops (StampCanopy)
+        SurfaceClearance.cs    # Dynamic surface-writer top-Y admission below the cloud slab; Legacy unchanged
         StampBand.cs           # the world-y band a feature stamp can write (WriteBand); ChunkTerrainFill skips a
                                #   stamp whose band misses the chunk
         Underground/           # below the surface: ores, geodes, gravel pockets, lava, cave formations and mushrooms, hot springs, pools,

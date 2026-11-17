@@ -1,0 +1,30 @@
+{
+  // S1b source handoff only. Release GL capture waits for the root's Phase B grant.
+  // From OpenGLTest/: VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/dynamic-relief-s1b.json
+  // Storeless seed 1337 selects Dynamic. Sites come from DynamicReliefTests' bounded
+  // 35x35 x 3 grid and its local 5x5 follow-up, not a claim over all coordinates.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [600.5, 90.5, 6000.5], "yaw": 45, "pitch": -12 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [600.5, 90.5, 6000.5], "yaw": 45, "pitch": -12 },
+    { "op": "screenshot", "name": "valley_to_cordillera", "hideHud": true },
+
+    { "op": "teleport", "pos": [1200.5, 186.5, 6600.5], "yaw": 25, "pitch": -28 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [1200.5, 186.5, 6600.5], "yaw": 25, "pitch": -28 },
+    { "op": "screenshot", "name": "summit_above_drawn_clouds", "hideHud": true },
+    { "op": "teleport", "pos": [1200.5, 163.5, 6600.5], "yaw": 45, "pitch": -8 },
+    { "op": "screenshot", "name": "inside_drawn_cloud_layer", "hideHud": true },
+
+    { "op": "teleport", "pos": [1500.5, 151.5, 6000.5], "yaw": -25, "pitch": -35 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [1500.5, 151.5, 6000.5], "yaw": -25, "pitch": -35 },
+    { "op": "screenshot", "name": "rock_snow_flank_and_far_lod", "hideHud": true },
+
+    { "op": "teleport", "pos": [-4494.5, 72.5, -1584.5], "yaw": 35, "pitch": -50 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-4494.5, 72.5, -1584.5], "yaw": 35, "pitch": -50 },
+    { "op": "screenshot", "name": "flat_valley_knoll", "hideHud": true }
+  ]
+}

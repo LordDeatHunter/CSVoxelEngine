@@ -10,6 +10,9 @@ internal static class TerrainNoise
 {
     private const int DynamicAbyssSeedOffset = 200;
     private const int DynamicEcotoneSeedOffset = 204;
+    private const int CordilleraSeedOffset = 190;
+    private const int CordilleraWarpSeedOffset = 191;
+    private const int ValleyFlatSeedOffset = 192;
     internal static FastNoiseLite ForestSwellNoise;
     internal static FastNoiseLite HillNoise;
     internal static FastNoiseLite HillMaskNoise;
@@ -40,6 +43,9 @@ internal static class TerrainNoise
     internal static FastNoiseLite BiomeDitherNoise;
     internal static FastNoiseLite EcotoneNoise;
     internal static FastNoiseLite AbyssNoise;
+    internal static FastNoiseLite CordilleraNoise;
+    internal static FastNoiseLite CordilleraWarp;
+    internal static FastNoiseLite ValleyFlatNoise;
     internal static FastNoiseLite LakeShapeNoise;
 
     /// <summary>The pack-ice floe field, read only by <see cref="Features.SnowGenerator.IsFrozenWater"/>.</summary>
@@ -145,6 +151,10 @@ internal static class TerrainNoise
         // Abyss uses 200; ecotones follow the reserved 190-203 future channels.
         AbyssNoise = MakeNoise(DynamicAbyssSeedOffset, WorldGenerationConfig.DynamicAbyssFrequency);
         EcotoneNoise = MakeNoise(DynamicEcotoneSeedOffset, WorldGenerationConfig.DynamicEcotoneFrequency);
+        CordilleraNoise = MakeNoise(CordilleraSeedOffset, WorldGenerationConfig.CordilleraFrequency);
+        CordilleraWarp = MakeWarp(CordilleraWarpSeedOffset, WorldGenerationConfig.CordilleraWarpFrequency,
+            WorldGenerationConfig.CordilleraWarpAmplitude);
+        ValleyFlatNoise = MakeNoise(ValleyFlatSeedOffset, WorldGenerationConfig.ValleyFlatFrequency);
         LakeShapeNoise = MakeNoise(90, WorldGenerationConfig.LakeShapeFrequency);
         // Offset 152 was unused (ClimateWarp took 151, the feature generators stop at 142)
         PackIceNoise = MakeNoise(152, WorldGenerationConfig.PackIceFrequency, octaves: 2);

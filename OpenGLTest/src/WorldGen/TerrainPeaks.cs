@@ -51,6 +51,11 @@ internal static class TerrainPeaks
 
     private static readonly Func<(int X, int Z), TerrainSite> BuildPeakSiteFor = BuildPeakSite;
 
+    private const int KnollSalt = 0x4B4E4F4C;
+    private static readonly GenerationalCache<(int X, int Z), TerrainSite> KnollCache =
+        new(WorldGenerationConfig.KnollCacheCapacity, WorldGenerationConfig.KnollCacheGenerations);
+    private static readonly Func<(int X, int Z), TerrainSite> BuildKnollSiteFor = BuildKnollSite;
+
     /// <summary>
     /// A soft ceiling for land a hashed site raised: the identity up to
     /// <see cref="WorldGenerationConfig.ReliefCeilingHeight"/> - <see cref="WorldGenerationConfig.ReliefCeilingKnee"/>,
@@ -65,6 +70,17 @@ internal static class TerrainPeaks
             - WorldGenerationConfig.ReliefCeilingKnee
             * MathF.Exp(-(height - knee0) / WorldGenerationConfig.ReliefCeilingKnee);
     }
+
+    internal static float DynamicSoftCeiling(float height)
+    {
+        var ceiling = WorldGenerationConfig.DynamicReliefCeilingHeight;
+        var knee = WorldGenerationConfig.DynamicReliefCeilingKnee;
+        if (height <= ceiling - knee) return height;
+        return MathF.Min(ceiling, ceiling - knee * MathF.Exp(-(height - (ceiling - knee)) / knee));
+    }
+
+    private static float ProfileCeiling(float height) => WorldSeed.Profile == WorldGenProfile.Dynamic
+        ? DynamicSoftCeiling(height) : SoftCeiling(height);
 
     /// <summary>The cached verdict of massif cell (<paramref name="gx"/>, <paramref name="gz"/>):
     /// <see cref="BuildMassifSite"/>, computed once per cell.</summary>
@@ -87,6 +103,11 @@ internal static class TerrainPeaks
                 out var hash, out var centerX, out var centerZ, out var size))
             return default;
         if (TerrainRelief.SpawnClear(centerX, centerZ) <= 0f) return default;
+        if (WorldSeed.Profile == WorldGenProfile.Dynamic
+            && SplitMix64.Unit(hash, 5) > WorldGenerationConfig.DynamicMassifOffSpineShare
+                + (1f - WorldGenerationConfig.DynamicMassifOffSpineShare)
+                * TerrainRelief.CordilleraSupport(centerX, centerZ))
+            return default;
         if (TerrainSites.YieldsToNeighbor(cell.X, cell.Z, hash, centerX, centerZ,
                 WorldGenerationConfig.MassifMinSpacing, WorldGenerationConfig.MassifCellBlocks, MassifSalt,
                 WorldGenerationConfig.MassifChance, WorldGenerationConfig.MassifSizeSkew))
@@ -101,7 +122,10 @@ internal static class TerrainPeaks
             if (!IsForestProfile(rimX, rimZ, continental)) return default;
         }
 
-        var summit = MathUtils.Lerp(WorldGenerationConfig.MassifMinSummit, WorldGenerationConfig.MassifMaxSummit,
+        var dynamic = WorldSeed.Profile == WorldGenProfile.Dynamic;
+        var summit = MathUtils.Lerp(dynamic ? WorldGenerationConfig.DynamicMassifMinSummit
+                : WorldGenerationConfig.MassifMinSummit,
+            dynamic ? WorldGenerationConfig.DynamicMassifMaxSummit : WorldGenerationConfig.MassifMaxSummit,
             SplitMix64.Unit(hash, 4));
         var rise = summit - TerrainGenerator.ReliefLandHeight(centerX, centerZ);
         if (rise < WorldGenerationConfig.MassifMinRise) return default;
@@ -201,7 +225,7 @@ internal static class TerrainPeaks
     {
         var add = MassifHeight(x, z);
         if (add <= 0f) return forest;
-        return MathF.Max(forest, SoftCeiling(forest + add));
+        return MathF.Max(forest, ProfileCeiling(forest + add));
     }
 
     /// <summary>The cached verdict of lone-peak cell (<paramref name="gx"/>, <paramref name="gz"/>):
@@ -249,7 +273,9 @@ internal static class TerrainPeaks
 
         var height = MathUtils.Lerp(WorldGenerationConfig.PeakMinHeight, WorldGenerationConfig.PeakMaxHeight,
             SplitMix64.Unit(hash, 4));
-        var knee0 = WorldGenerationConfig.ReliefCeilingHeight - WorldGenerationConfig.ReliefCeilingKnee;
+        var knee0 = WorldSeed.Profile == WorldGenProfile.Dynamic
+            ? WorldGenerationConfig.DynamicReliefCeilingHeight - WorldGenerationConfig.DynamicReliefCeilingKnee
+            : WorldGenerationConfig.ReliefCeilingHeight - WorldGenerationConfig.ReliefCeilingKnee;
         if (TerrainGenerator.PreFeatureLandHeight(centerX, centerZ) + height > knee0) return default;
 
         return new TerrainSite(true, centerX, centerZ, nominal, height, OnIsland: !continental);
@@ -321,7 +347,66 @@ internal static class TerrainPeaks
     {
         var add = LonePeakHeight(x, z);
         if (add <= 0f) return forest;
-        return MathF.Max(forest, SoftCeiling(forest + add));
+        return MathF.Max(forest, ProfileCeiling(forest + add));
+    }
+
+    /// <summary>A sparse valley site. Its verdict reads Q2 (massifs but no peaks or knolls)
+    /// and the peak term, never final height or its own cache.</summary>
+    internal static TerrainSite KnollSiteAt(int gx, int gz) => KnollCache.GetOrAdd((gx, gz), BuildKnollSiteFor);
+
+    private static TerrainSite BuildKnollSite((int X, int Z) cell)
+    {
+        if (!TerrainSites.TryRoll(cell.X, cell.Z, WorldGenerationConfig.KnollCellBlocks, KnollSalt,
+                WorldGenerationConfig.KnollChance, 1f, out var hash, out var x, out var z, out var size))
+            return default;
+        if (TerrainRelief.DynamicSpawnClear(x, z) <= 0f) return default;
+        if (TerrainRelief.CordilleraSupport(x, z) > WorldGenerationConfig.KnollMaxCordilleraSupport
+            || LonePeakHeight(x, z) > 0f) return default;
+        var radius = MathUtils.Lerp(WorldGenerationConfig.KnollMinRadius, WorldGenerationConfig.KnollMaxRadius, size);
+        var continental = BiomeClassifier.PreIslandOceanWeight(x, z) == 0f;
+        if (!IsForestProfile(x, z, continental)) return default;
+        for (var k = 0; k < TerrainSites.RimPoints; k++)
+        {
+            TerrainSites.RimPoint(x, z, radius, k, out var rx, out var rz);
+            if (!IsForestProfile(rx, rz, continental)) return default;
+        }
+        TerrainSites.RimRange(x, z, radius, TerrainGenerator.PreFeatureHeightAt, out var min, out var max);
+        if (min <= WorldGenerationConfig.SeaLevel || max - min > WorldGenerationConfig.KnollSiteFlatness)
+            return default;
+        var center = TerrainGenerator.PreFeatureLandHeight(x, z);
+        if (center >= WorldGenerationConfig.ValleyKnee) return default;
+        var rise = MathUtils.Lerp(WorldGenerationConfig.KnollMinRise, WorldGenerationConfig.KnollMaxRise,
+            SplitMix64.Unit(hash, 4));
+        return new TerrainSite(true, x, z, radius, rise, OnIsland: !continental);
+    }
+
+    internal static float KnollHeight(float x, float z)
+    {
+        if (TerrainRelief.DynamicSpawnClear(x, z) <= 0f) return 0f;
+        const int cellBlocks = WorldGenerationConfig.KnollCellBlocks;
+        TerrainSites.CellRange(x, cellBlocks, WorldGenerationConfig.KnollMaxRadius, out var minX, out var maxX);
+        TerrainSites.CellRange(z, cellBlocks, WorldGenerationConfig.KnollMaxRadius, out var minZ, out var maxZ);
+        var best = 0f;
+        for (var gx = minX; gx <= maxX; gx++)
+        for (var gz = minZ; gz <= maxZ; gz++)
+        {
+            var site = KnollSiteAt(gx, gz);
+            if (!site.Exists) continue;
+            var dx = x - site.CenterX;
+            var dz = z - site.CenterZ;
+            var d2 = dx * dx + dz * dz;
+            if (d2 >= site.Radius * site.Radius) continue;
+            var h = site.Height * MathF.Pow(1f - d2 / (site.Radius * site.Radius), 2f);
+            if (site.OnIsland) h *= TerrainIslands.LandWeight(x, z, BiomeClassifier.PreIslandOceanWeight(x, z));
+            best = MathF.Max(best, h);
+        }
+        return best * TerrainRelief.DynamicSpawnClear(x, z);
+    }
+
+    internal static float WithKnoll(float x, float z, float forest)
+    {
+        var add = KnollHeight(x, z);
+        return add <= 0f ? forest : MathF.Max(forest, DynamicSoftCeiling(forest + add));
     }
 
     /// <summary>Drops every cached site verdict. Only for <see cref="WorldSeed.Apply"/>, while no
@@ -330,5 +415,6 @@ internal static class TerrainPeaks
     {
         MassifCache.Clear();
         PeakCache.Clear();
+        KnollCache.Clear();
     }
 }

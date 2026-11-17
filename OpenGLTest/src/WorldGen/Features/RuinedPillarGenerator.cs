@@ -59,6 +59,7 @@ public static class RuinedPillarGenerator
             if (x < worldX0 || x >= worldX0 + Chunk.Size || z < worldZ0 || z >= worldZ0 + Chunk.Size) continue;
             var ground = HeightAt(x, z);
             if (TerrainGenerator.IsWaterColumn(x, z, ground)) continue;
+            if (!SurfaceClearance.Allows(ground, height)) continue;
             StampPillar(blocks, worldY0, x, z, ground, height, gaps);
         }
     }
