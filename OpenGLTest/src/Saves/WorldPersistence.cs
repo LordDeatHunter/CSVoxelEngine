@@ -98,10 +98,21 @@ internal sealed class WorldPersistence
             // survival world hosted once does not reopen in creative flight at the centroid.
             _hostedPlayer = _savedPlayer;
         }
+        var skippedNullRecords = 0;
         if (savedEntities?.Mobs != null)
-            _pendingMobs.AddRange(savedEntities.Mobs);
+            foreach (var mob in savedEntities.Mobs)
+                if (mob == null)
+                    skippedNullRecords++;
+                else
+                    _pendingMobs.Add(mob);
         if (savedEntities?.Drops != null)
-            _pendingDrops.AddRange(savedEntities.Drops);
+            foreach (var drop in savedEntities.Drops)
+                if (drop == null)
+                    skippedNullRecords++;
+                else
+                    _pendingDrops.Add(drop);
+        if (skippedNullRecords > 0)
+            Log.Warn($"Entity save: skipped {skippedNullRecords} null record(s) before restore");
     }
 
     /// <summary>The player.json this world was opened with, until the Loading -> Playing flip forgets it.</summary>
