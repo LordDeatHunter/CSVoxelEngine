@@ -199,7 +199,7 @@ broad highland plateau lift before valley compression and the whole-profile ceil
 smooth support and spawn fade return exactly zero outside the selected region. After water
 planning, `TerrainCanyons` cuts a warped ridged channel from the final heightmap beside
 ravines. The existing lake/river guard and ocean-shore fade protect water footprints and
-banks; nearby planned water levels also bound a dry cut above elevated water. Deep cuts
+banks; face-adjacent and nearby planned water levels also bound a dry cut above elevated water. Deep cuts
 reuse the ravine soil-stripping rule, exposing the existing rock/sand palette. `ColumnCache`,
 generated chunks and far LOD read the same final height; supplied chunks keep their saved
 data. These terms do not change Legacy generation, the 186 terrain ceiling or S1b's surface

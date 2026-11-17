@@ -54,10 +54,14 @@ internal static class TerrainCanyons
         var cut = (int)MathF.Floor(MathF.Max(0f, (height - target) * support));
         if (cut <= 0) return 0;
 
-        // A dry bank may stand above an elevated pond or ramp. Sampling its immediate
-        // neighbors' independently planned water levels prevents a canyon from opening a
-        // lower dry wall into that water, while the existing weight/guard supplies the fade.
+        // A dry bank may stand above an elevated pond or ramp. Every face-adjacent
+        // planned water level bounds the cut, so it cannot open a lower wall directly
+        // into that water. The wider samples and existing weight/guard preserve banks.
         var water = waterLevel;
+        water = Math.Max(water, WaterBodies.WaterLevelAt(x - 1, z));
+        water = Math.Max(water, WaterBodies.WaterLevelAt(x + 1, z));
+        water = Math.Max(water, WaterBodies.WaterLevelAt(x, z - 1));
+        water = Math.Max(water, WaterBodies.WaterLevelAt(x, z + 1));
         var radius = WorldGenerationConfig.CanyonWaterGuardRadius;
         water = Math.Max(water, WaterBodies.WaterLevelAt(x - radius, z));
         water = Math.Max(water, WaterBodies.WaterLevelAt(x + radius, z));
