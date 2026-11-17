@@ -16,6 +16,7 @@ using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Entities.Wildlife;
+using VoxelEngine.Interaction;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
@@ -78,6 +79,131 @@ public sealed partial class WorldLifecycleTests : IDisposable
         catch (UnauthorizedAccessException)
         {
         }
+    }
+
+    [Fact]
+    public void SuccessfulSavedConsumableInstanceUseSpendsTheSelectedInstance()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        const string rawPlayer = """
+            {"Position":[0,1000000,0],"Health":100,"Inventory":{"Tools":[
+              {"InstanceId":101,"Name":"item/bandage"},
+              {"InstanceId":200,"Name":"item/copper_pickaxe"}],
+              "Hotbar":[
+                {"IsTool":true,"ToolInstance":101},
+                {"IsTool":true,"ToolInstance":101},
+                {"IsTool":true,"ToolInstance":200}],
+              "Offhand":{"IsTool":true,"ToolInstance":101},
+              "SelectedIndex":0,"NextToolInstance":201}}
+            """;
+        var parsed = PlayerSaveCodec.TryParse(Encoding.UTF8.GetBytes(rawPlayer));
+        Assert.NotNull(parsed);
+        Assert.NotNull(parsed!.Inventory);
+        WriteRawPlayerFile(rawPlayer);
+
+        ChunkSaveStore? store = new(_dir);
+        World? world = null;
+        bool? closed = null;
+        var primaryConsumed = false;
+        var primaryAliasesCleared = false;
+        var unrelatedInstancePreserved = false;
+        var normalStackConsumed = false;
+        try
+        {
+            world = NewWorld(store);
+            store = null; // the World owns the store from here
+            Assert.Equal(WorldPhase.Loading, world.Phase);
+            Assert.True(RunUntil(world, () => world.IsPlaying, LoadWallSeconds), "the saved-player world did not start playing");
+            Assert.False(world.LoadTimedOut, "the world started playing on timeout rather than readiness");
+            Assert.Equal(100, world.Health);
+
+            // A full-health refusal must leave this saved instance and both aliases alone.
+            Assert.False(world.RightClick.TryUseSelected(World.InteractionReach, out _));
+            var bandage = ContentRegistry.RequireItem("bandage").Id;
+            Assert.Equal(bandage, world.Inventory.ToolItemId(101));
+            Assert.Equal(101, world.Inventory.SlotAt(0).ToolInstance);
+            Assert.Equal(101, world.Inventory.Offhand.ToolInstance);
+
+            world.LocalPlayer.DamagePlayer(5);
+            var before = world.Health;
+            Assert.True(world.RightClick.TryUseSelected(World.InteractionReach, out var outcome));
+            Assert.Equal(RightClickOutcome.ItemUse, outcome);
+            Assert.True(world.Health > before, "the successful use did not heal the player");
+            primaryConsumed = world.Inventory.ToolItemId(101) == 0;
+            primaryAliasesCleared = world.Inventory.SlotAt(0).IsEmpty && world.Inventory.SlotAt(1).IsEmpty
+                                    && world.Inventory.Offhand.IsEmpty;
+            unrelatedInstancePreserved = world.Inventory.ToolItemId(200) == ContentRegistry.RequireItem("copper_pickaxe").Id;
+
+            // The ordinary stack path still consumes one and clears the final stack slot.
+            Assert.True(world.Inventory.Add(bandage));
+            world.Inventory.EquipStackable(3, bandage);
+            world.Inventory.Select(3);
+            world.LocalPlayer.DamagePlayer(5);
+            Assert.Equal(1, world.Inventory.CountFor(bandage));
+            Assert.True(world.RightClick.TryUseSelected(World.InteractionReach, out outcome));
+            Assert.Equal(RightClickOutcome.ItemUse, outcome);
+            Assert.Equal(0, world.Inventory.CountFor(bandage));
+            normalStackConsumed = world.Inventory.SlotAt(3).IsEmpty;
+        }
+        finally
+        {
+            if (world != null)
+                closed = world.SaveAndDispose();
+            else if (store != null)
+                closed = store.Shutdown(TimeSpan.FromSeconds(10));
+        }
+
+        Assert.True(closed, "the test world/store did not close cleanly");
+        Assert.Equal(WorldPhase.Disposed, world!.Phase);
+        Assert.False(WorldSeed.WorldIsLive);
+        Assert.True(unrelatedInstancePreserved, "spending the consumable changed an unrelated tool instance");
+        Assert.True(normalStackConsumed, "the ordinary stack-backed consumable path failed to consume its final unit");
+        Assert.True(primaryConsumed && primaryAliasesCleared,
+            $"successful bandage use did not consume saved instance 101 and clear all hotbar/offhand aliases " +
+            $"(instance id={world.Inventory.ToolItemId(101)}, main slot={world.Inventory.SlotAt(0)}, offhand={world.Inventory.Offhand})");
+    }
+
+    [Fact]
+    public void CreativeSuccessfulSavedConsumableInstanceUseRemainsFree()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        const string rawPlayer = """
+            {"Position":[0,1000000,0],"Health":50,"Creative":true,"Inventory":{"Tools":[
+              {"InstanceId":301,"Name":"item/bandage"}],
+              "Hotbar":[{"IsTool":true,"ToolInstance":301}],"SelectedIndex":0,"NextToolInstance":302}}
+            """;
+        WriteRawPlayerFile(rawPlayer);
+
+        ChunkSaveStore? store = new(_dir);
+        World? world = null;
+        bool? closed = null;
+        var effectApplied = false;
+        var instanceRetained = false;
+        try
+        {
+            world = NewWorld(store);
+            store = null;
+            Assert.True(RunUntil(world, () => world.IsPlaying, LoadWallSeconds), "the saved-player world did not start playing");
+            Assert.False(world.LoadTimedOut, "the world started playing on timeout rather than readiness");
+            Assert.True(world.Camera.IsCreative);
+            var before = world.Health;
+            effectApplied = world.RightClick.TryUseSelected(World.InteractionReach, out var outcome);
+            Assert.Equal(RightClickOutcome.ItemUse, outcome);
+            Assert.True(world.Health > before);
+            instanceRetained = world.Inventory.ToolItemId(301) == ContentRegistry.RequireItem("bandage").Id;
+        }
+        finally
+        {
+            if (world != null)
+                closed = world.SaveAndDispose();
+            else if (store != null)
+                closed = store.Shutdown(TimeSpan.FromSeconds(10));
+        }
+
+        Assert.True(closed, "the test world/store did not close cleanly");
+        Assert.Equal(WorldPhase.Disposed, world!.Phase);
+        Assert.False(WorldSeed.WorldIsLive);
+        Assert.True(effectApplied && instanceRetained, "creative use spent the saved consumable instance");
     }
 
     [Fact]

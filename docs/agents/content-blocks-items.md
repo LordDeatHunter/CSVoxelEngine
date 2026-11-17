@@ -575,6 +575,9 @@ Both names resolve like a loot entry (`block/` / `item/` prefixes pin the namesp
 if the fluid is not a fluid block or the result is not an item. A successful use goes through
 `Inventory.MorphTool`, which turns the tool instance into its result in place, so every hotbar
 slot holding that bucket flips with it and scooping and pouring alternate on the same button.
+Other item actions request input spending only after their effect succeeds: a selected stack loses
+one unit, while a saved selected instance is removed with its hotbar and offhand references; a
+refused effect and a creative use spend nothing.
 A `pickup_fluid` item scoops the fluid it names into its `result`, but an empty bucket also
 scoops any other fluid that has its own full bucket (lava becomes `item/lava_bucket`) — the
 pour side is what decides the pairing, so new fluids only need a `place_fluid` item to be scoopable.
