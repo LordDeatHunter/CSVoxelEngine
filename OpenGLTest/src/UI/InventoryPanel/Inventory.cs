@@ -269,15 +269,17 @@ public class Inventory
     }
 
     /// <summary>
-    /// Takes in a tool or piece of gear that lives elsewhere (a chest slot) as a new instance of this inventory, keeping
-    /// every component it carries. Ground pickups pass autoEquip to equip lanterns into an empty hotbar slot.
-    /// False, changing nothing, when its pool is full or it is not an instance item.
+    /// Takes in a tool, piece of gear or restored misc instance that lives elsewhere (such as a chest slot), keeping
+    /// every component it carries. Misc instances use the tools pool. Ground pickups pass autoEquip to equip lanterns
+    /// into an empty hotbar slot. False, changing nothing, when its pool is full or its category cannot be an instance.
     /// </summary>
     public bool AddInstance(ItemStack template, bool autoEquip = false)
     {
         var category = CategoryOf(template.DefinitionId);
-        if (category is not (InventoryCategory.Tools or InventoryCategory.Gear)
-            || UsedOf(category.Value) >= CapacityOf(category.Value))
+        if (category is not (InventoryCategory.Tools or InventoryCategory.Misc or InventoryCategory.Gear))
+            return false;
+        var pool = category == InventoryCategory.Gear ? InventoryCategory.Gear : InventoryCategory.Tools;
+        if (UsedOf(pool) >= CapacityOf(pool))
             return false;
         _known.Add(template.DefinitionId);
         _tools.Add(template.CloneAs(_nextToolInstance++));

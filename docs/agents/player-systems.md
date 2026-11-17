@@ -260,7 +260,8 @@ saved. An optional `chest.tiers` list of loot tables instead of `loot` (validate
 bits 0-1 being the facing) and `ChestProfile.TableFor(state)` picks the table, clamped to the last entry.
 `ChestLoot.Materialize(profile, state, cell, seed)` and `ChestManager.NotifyBlockRemoved(..., removedState, ...)` take the
 cell's state (`BlockEditor` passes `brokenState`, `Open` reads it), so opening and breaking unopened agree. A slot is a
-stackable or one tool/gear instance with every component (`ChestSlot`, `ItemStack.CloneAs`); moves are
+stackable or one component-preserving instance (`ChestSlot`, `ItemStack.CloneAs`); accepted restored misc instances use
+the Tools pool capacity, while ordinary misc items remain stackable. Moves are
 `ChestTransfer` (conserving, merging up to `ChestConfig.MaxStack`) behind `ChestAccess.Apply`, the same in singleplayer and on
 the server. A break and the stale sweep spill the contents as drops (instances retain their components there). Over the wire
 (protocol 20) the client sends `ChestOpen`/`ChestMove`/`ChestClose` and gets a per-player `ChestContents`; `ChestSessions`

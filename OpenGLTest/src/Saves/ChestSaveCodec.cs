@@ -55,10 +55,8 @@ public static class ChestSaveCodec
             if (entry.Instance != null)
             {
                 var stack = InventorySaveCodec.ImportInstance(0, entry.Instance, dropped);
-                if (stack != null && ChestTransfer.IsInstance(stack.DefinitionId))
+                if (stack != null)
                     chest.Set(index, new ChestSlot(stack.DefinitionId, 1, stack));
-                else if (stack != null)
-                    dropped.Add(entry.Name ?? "(no name)");
                 continue;
             }
             if (!SaveNames.TryResolve(entry.Name, out var id) || (ChestTransfer.IsInstance(id) && !Simulation.Lanterns.LanternState.IsLantern(id))

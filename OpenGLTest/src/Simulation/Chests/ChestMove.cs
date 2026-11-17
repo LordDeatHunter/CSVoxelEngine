@@ -6,7 +6,7 @@ public enum ChestMoveKind : byte
     /// <summary>Move units of a stackable from the inventory into the chest (<see cref="ChestMove.Id"/>, <see cref="ChestMove.Count"/>).</summary>
     DepositStack = 0,
 
-    /// <summary>Move one tool or piece of gear from the inventory into the chest (<see cref="ChestMove.Id"/> is its instance id).</summary>
+    /// <summary>Move one inventory instance from the inventory into the chest (<see cref="ChestMove.Id"/> is its instance id).</summary>
     DepositInstance = 1,
 
     /// <summary>Move units out of a chest slot into the inventory (<see cref="ChestMove.Slot"/>, <see cref="ChestMove.Count"/>).</summary>
