@@ -22,7 +22,11 @@ steps back one page and does nothing on the main page. SETTINGS and EXIT are the
 (the settings page is shared: the one `MenuInput.SettingsPageOpen` predicate drives the slider drag
 and its save on both menus). PLAY / CREATE never block inside the click: the click records the
 pending work, `OnRender` presents one loading-screen frame, and the next update runs
-`WorldSeed.Apply(seed)` -> `new ChunkSaveStore(dir)` -> `new World(..., store)`. The world then
+`WorldSeed.Apply(seed)` -> `new ChunkSaveStore(dir)` -> `new World(..., store)`. The World owns
+the supplied store from construction onward: if construction fails, it stops any started workers
+before shutting the writer and releasing `session.lock`. A timed-out worker keeps the store and
+seed locked; a timed-out writer keeps the folder locked until it exits. The original exception
+propagates, and no fallback player snapshot is queued. The world then
 streams in `WorldPhase.Loading` behind an animated loading screen (`LoadingScreenView` /
 `LoadingScreenRenderer.DrawLoadingScreen`: a progress bar eased monotonically toward `World.LoadProgress`, a
 wall-clock spinner, the world name and `Generating terrain...` for a new world vs `Loading

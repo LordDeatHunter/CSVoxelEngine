@@ -1321,12 +1321,23 @@ public sealed partial class WorldLifecycleTests : IDisposable
         var original = """{"Inventory":{"Tools":[{"InstanceId":2147483647,"Name":"block/lantern"}],"Blocks":[{"Name":"block/lantern","Count":1}]}}"""u8.ToArray();
         File.WriteAllBytes(file, original);
         var store = new ChunkSaveStore(_dir);
-
-        Assert.Throws<InvalidDataException>(() => NewWorld(store));
-
-        Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
-        Assert.Equal(original, File.ReadAllBytes(file));
-        Assert.False(File.Exists(file + ".bad"));
+        World? opened = null;
+        ChunkSaveStore? reopened = null;
+        try
+        {
+            Assert.Throws<InvalidDataException>(() => opened = NewWorld(store));
+            Assert.False(WorldSeed.WorldIsLive);
+            // The failed constructor, not this test, must close the transferred store.
+            reopened = new ChunkSaveStore(_dir);
+            Assert.Equal(original, reopened.ReadFile(PlayerSaveCodec.FileName));
+            Assert.False(File.Exists(file + ".bad"));
+        }
+        finally
+        {
+            if (opened != null) opened.SaveAndDispose();
+            else if (reopened == null) store.Shutdown(TimeSpan.FromSeconds(10));
+            reopened?.Shutdown(TimeSpan.FromSeconds(10));
+        }
     }
 
     [Fact]
