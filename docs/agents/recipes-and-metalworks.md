@@ -17,6 +17,8 @@ blocks and items are interchangeable as ingredients, results, inputs and outputs
 named by their result, cook files by their input, and a reverse recipe by
 `<result>_from_<ingredient>`.
 
+A successful survival interaction transfers one accepted station input from the active hand into station state. Refused insertions and creative interactions do not spend it. The transfer also consumes a restored item instance and clears its hand references.
+
 **Cast molds** are the worked example. `mold_pickaxe` / `mold_axe` are pressed from three mudballs
 (`recipes/mold_pickaxe.json`, `mold_axe.json`), uncraft back into three
 (`recipes/mudball_from_mold_*.json`) and fire into `fired_mold_pickaxe` / `fired_mold_axe` by
