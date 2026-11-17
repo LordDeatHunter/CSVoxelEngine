@@ -3,7 +3,6 @@
   // From OpenGLTest/: VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/dynamic-canyons-s2a.json
   // Storeless seed 1337 selects Dynamic. S2aTerrainTests' bounded finder found
   // canyon (-4000,5000): bed 155, dry floor 85, X rims about 153-158.
-  // Shelf near (2100,-3608): lower at z=-3612 y=73, upper at z=-3608 y=84.
   // Actual floor camera cell (-4001,5000) is Y86 under eye88.5. The radius-16
   // ring's lowest forward channel cells lie at yaws 56.2 and 67.5, so aim 62.
   // Escarpment at (528,6600)->(524,6600) rises Y143 to Y154 with an 11-block
