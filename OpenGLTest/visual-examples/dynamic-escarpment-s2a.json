@@ -1,0 +1,18 @@
+{
+  // S2a shelf-only follow-up after the first original faced a close dirt wall.
+  // From OpenGLTest/: VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/dynamic-escarpment-s2a.json
+  // Storeless default seed 1337 selects Dynamic. Measured local profile:
+  // x2100 z=-3632 Y71, -3612 Y73, -3608 Y84; x2092 z=-3608 Y85.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [2100.5, 77.5, -3631.5], "yaw": 90, "pitch": 4 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [2100.5, 77.5, -3631.5], "yaw": 90, "pitch": 4 },
+    { "op": "screenshot", "name": "escarpment_wide_setback", "hideHud": true },
+
+    { "op": "teleport", "pos": [2108.5, 77.5, -3627.5], "yaw": 129, "pitch": 5 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "teleport", "pos": [2108.5, 77.5, -3627.5], "yaw": 129, "pitch": 5 },
+    { "op": "screenshot", "name": "escarpment_oblique", "hideHud": true }
+  ]
+}
