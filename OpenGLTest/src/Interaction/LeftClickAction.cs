@@ -291,6 +291,7 @@ internal sealed class LeftClickAction
         {
             ResetCombos();
             StopBreaking();
+            _strikeCell = null;
             _attackWasPressed = false;
             return;
         }
@@ -299,6 +300,7 @@ internal sealed class LeftClickAction
         _workCooldown = MathF.Max(0f, _workCooldown - (float)deltaTime);
         _stumpCooldown = MathF.Max(0f, _stumpCooldown - (float)deltaTime);
         UpdateSplit((float)deltaTime);
+        UpdateStrike((float)deltaTime);
         // A button still held after a split is spent: it must not go on to mine the stump the log stood on
         if (_awaitRelease)
         {
@@ -511,6 +513,19 @@ internal sealed class LeftClickAction
         }
     }
 
+    // Glowing sparks thrown off the work lying on the station at the cell, more of them on the blow that finishes it:
+    // a spread of orange ones and half as many small, faster, pale-hot ones from the middle
+    private void ForgeSparks(Vector3 cell, ushort stationId, bool finishes)
+    {
+        var surface = BlockType.ById[stationId]?.WorkStation?.SurfaceY ?? 1f;
+        var at = cell + new Vector3(0.5f, surface + ParticleConfig.ForgeSparkLift, 0.5f);
+        var count = finishes ? ParticleConfig.ForgeSparksOnFinish : ParticleConfig.ForgeSparksPerHit;
+        _debris.Spark(at, ParticleConfig.ForgeSparkColor, ParticleConfig.ForgeSparkRadius, count,
+            ParticleConfig.ForgeSparkSpeed, ParticleConfig.ForgeSparkSize);
+        _debris.Spark(at, ParticleConfig.ForgeSparkHotColor, ParticleConfig.ForgeSparkRadius * 0.5f, count / 2,
+            ParticleConfig.ForgeSparkSpeed * 1.5f, ParticleConfig.ForgeSparkSize * 0.6f);
+    }
+
     // Seconds until the next tool hit on a work station may land: the tool's own gap, counted down whether or not the button is
     // held, so releasing and pressing again never skips it
     private float _workCooldown;
@@ -524,30 +539,90 @@ internal sealed class LeftClickAction
     /// </summary>
     private void UpdateWorkStationHit(Item held)
     {
-        if (_workCooldown > 0f) return;
+        if (_strikeCell != null) return;
 
         var cell = _selectedBlockPosition;
-        var gap = Mining.HitGapSeconds(held,
-            (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
+        if (Mining.IsHammer(held))
+        {
+            // A hammer winds up ahead of the hit: its blow starts early enough to come down as the gap runs out
+            // (the first one a wind-up after the press), and only over a station with a recipe to work
+            var seconds = MathF.Min(BloomeryConfig.HammerSwingSeconds, WorkGapSeconds(held));
+            var lead = seconds * PlayerModel.SwordImpactProgress(SwordSwing.HammerStrike);
+            if (_workCooldown > lead) return;
+            _world.Interactions.TryTrackWorkStationAt(cell, out _);
+            if (_world.Smithing.WorkStations.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z) is not { Working: not null })
+                return;
+            _strikeCell = cell;
+            _strikeImpactIn = lead;
+            Camera.NotifyPlayerAction();
+            Player.StartHammerStrike(seconds);
+            Camera.PunchFov(-1.2f);
+            return;
+        }
+
+        if (_workCooldown > 0f || !LandWorkStationHit(held, cell)) return;
+        LocalPlayer.PunchSwing();
+    }
+
+    /// <summary>
+    /// Runs the hammer blow started by <see cref="UpdateWorkStationHit"/> to its hit, whether or not the button is still
+    /// held: when the hammer comes down (and the hit gap has run out) the hit lands and the swing holds on the work for
+    /// a beat. A blow whose aim left the station meanwhile, or whose station is gone, comes down on nothing.
+    /// </summary>
+    private void UpdateStrike(float deltaTime)
+    {
+        if (_strikeCell is not { } cell) return;
+        _strikeImpactIn -= deltaTime;
+        if (_strikeImpactIn > 0f || _workCooldown > 0f) return;
+        _strikeCell = null;
+
+        var held = HeldItem();
+        if (!_hasSelectedBlock || _selectedBlockPosition != cell
+            || !Mining.IsStationTool(held, BlockType.ById[Edits.BlockIdAt(cell)]?.WorkStation))
+            return;
+        if (LandWorkStationHit(held!, cell))
+            Player.HitStop(SwingHitStop.SecondsFor(1f));
+    }
+
+    // The held tool's gap between two hits on a work station, with the player's attack and mining factors
+    private float WorkGapSeconds(Item held) =>
+        Mining.HitGapSeconds(held, (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
+
+    // The station the hammer blow in flight is aimed at (null when none) and the seconds until it comes down
+    private Vector3? _strikeCell;
+    private float _strikeImpactIn;
+
+    // Lands one tool hit on the work station at the cell and starts the tool's gap: the station counts it (a connected
+    // client only predicts it from its mirror and raises the intent), with the knock, the chips and the view kick.
+    // A hammer strikes sparks off the work instead of chipping the station. False when the station refuses it.
+    private bool LandWorkStationHit(Item held, Vector3 cell)
+    {
+        var gap = WorkGapSeconds(held);
+        // Read before the hit counts: the last hit of a recipe clears the pick
+        var worked = _world.Smithing.WorkStations.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z);
+        var finishes = worked?.Working is { } recipe && worked.Hits + 1 >= recipe.Hits;
         if (_clientMode)
         {
             _world.Interactions.TryTrackWorkStationAt(cell, out _);
             if (_world.Smithing.WorkStations.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z) is not { Working: not null })
-                return;
+                return false;
         }
         else if (_world.WorkStationHitFor(cell, gap, 0f).Kind == WorkHitKind.Refused)
         {
-            return;
+            return false;
         }
 
         _workCooldown = gap;
         Camera.NotifyPlayerAction();
-        LocalPlayer.PunchSwing();
         var stationId = Edits.BlockIdAt(cell);
         PlayHitSfx(stationId, cell);
-        _debris.Burst(cell, stationId, ParticleConfig.BlockDebrisPerHit, columns: _chunkManager.ColumnSource);
-        Camera.AddHitKick(Vector3.Zero, BreakKick.Strength(WorkKickHardness, false));
+        if (Mining.IsHammer(held))
+            ForgeSparks(cell, stationId, finishes);
+        else
+            _debris.Burst(cell, stationId, ParticleConfig.BlockDebrisPerHit, columns: _chunkManager.ColumnSource);
+        Camera.AddHitKick(Vector3.Zero, BreakKick.Strength(finishes ? WorkKickHardness * 2f : WorkKickHardness, false));
         _world.RaiseIntent(WorldIntent.Hammer(Camera.Position, _selectedAimDirection, cell));
+        return true;
     }
 
     /// <summary>
@@ -619,10 +694,10 @@ internal sealed class LeftClickAction
     private float _splitImpactIn;
 
     /// <summary>
-    /// Whether an axe split swing is in flight. The hotbar selection is locked meanwhile, so the axe cannot be swapped
-    /// out mid-swing (the blow would land with another item in hand).
+    /// Whether a wound-up blow (an axe's split swing, a hammer's strike) is in flight. The hotbar selection is locked
+    /// meanwhile, so the tool cannot be swapped out mid-swing (the blow would land with another item in hand).
     /// </summary>
-    internal bool IsSplitting => _splitCell != null;
+    internal bool IsBlowInFlight => _splitCell != null || _strikeCell != null;
     private bool _awaitRelease;
 
     private float _stumpCooldown;

@@ -42,6 +42,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public const string Chop = "chop";
     public const string Axe = "axe";
     public const string AxeSplit = "axe split";
+    public const string Hammer = "hammer";
     public const string Throw = "throw";
     public const string Use = "use";
     public const string Bow = "bow";
@@ -54,7 +55,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public static readonly IReadOnlyList<string> AllModes =
     [
         Idle, Walk, Run, Sneak, Jump, SprintJump, Land, Swim, SwimIdle, Surface, Fly,
-        Punch, HeavyPunch, Slice, SliceBack, Cut, BackCut, Chop, Axe, AxeSplit, Throw, Use, Bow, Cast, Hurt, Equip, Death,
+        Punch, HeavyPunch, Slice, SliceBack, Cut, BackCut, Chop, Axe, AxeSplit, Hammer, Throw, Use, Bow, Cast, Hurt, Equip, Death,
     ];
 
     /// <summary>Seconds a one-shot rests between the end of one play and the next.</summary>
@@ -152,6 +153,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
         Chop => PlayerModel.SwordDuration(SwordSwing.Chop) + 0.1f,
         Axe => PlayerModel.SwordDuration(SwordSwing.AxeChop) + 0.1f,
         AxeSplit => PlayerModel.SwordDuration(SwordSwing.AxeSplit) + 0.1f,
+        Hammer => PlayerModel.SwordDuration(SwordSwing.HammerStrike) + 0.1f,
         Throw => ThrowChargeSeconds + ThrowHoldSeconds + PlayerModel.ThrowDuration + 0.1f,
         Use => UseChargeSeconds + UseHoldSeconds + 0.4f,
         Bow => UseChargeSeconds + BowHoldSeconds + BowPose.ReleaseSeconds + 0.5f,
@@ -179,7 +181,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public float Elapsed => _clock;
 
     /// <summary>True for the modes that replay a swing or reaction (everything after the swim poses).</summary>
-    public bool IsOneShot => Mode is Punch or HeavyPunch or Slice or SliceBack or Cut or BackCut or Chop or Axe or AxeSplit or Throw or Cast or Hurt or Equip or Death or Land;
+    public bool IsOneShot => Mode is Punch or HeavyPunch or Slice or SliceBack or Cut or BackCut or Chop or Axe or AxeSplit or Hammer or Throw or Cast or Hurt or Equip or Death or Land;
 
     /// <summary>Switches to <paramref name="mode"/> (any case); false when there is no such mode.</summary>
     public bool SetMode(string mode)
@@ -262,6 +264,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
             case Chop:
             case Axe:
             case AxeSplit:
+            case Hammer:
             case Cast:
             case Hurt:
             case Equip:
@@ -394,7 +397,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     {
         Punch or HeavyPunch => _model.MineT < 1f,
         Slice or SliceBack => _model.IsSlicing,
-        Cut or BackCut or Chop or Axe or AxeSplit => _model.IsSwordSwinging,
+        Cut or BackCut or Chop or Axe or AxeSplit or Hammer => _model.IsSwordSwinging,
         Cast => _model.IsCasting,
         Hurt => MathF.Abs(_model.Flinch) > 0.02f,
         Equip => MathF.Abs(_model.EquipLowering) > 0.02f,
@@ -414,6 +417,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
             case Chop: _model.StartSword(SwordSwing.Chop); break;
             case Axe: _model.StartAxeChop(PlayerModel.SwordDuration(SwordSwing.AxeChop)); break;
             case AxeSplit: _model.StartAxeSplit(); break;
+            case Hammer: _model.StartHammerStrike(PlayerModel.SwordDuration(SwordSwing.HammerStrike)); break;
             case Cast: _model.Cast(); break;
             case Hurt: _model.Hurt(1f); break;
             case Equip: _model.NotifyEquip(); break;

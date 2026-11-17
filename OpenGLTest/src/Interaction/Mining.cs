@@ -51,6 +51,10 @@ public static class Mining
     /// overhead chop at what it mines instead of a punch.</summary>
     public static bool IsAxe(Item? held) => held != null && ContentRegistry.IsInTag("axe", held.Id);
 
+    /// <summary>Whether <paramref name="held"/> is a smithing hammer: a member of the <c>hammer</c> tag, which works a
+    /// station with a wound-up overhead blow instead of a punch.</summary>
+    public static bool IsHammer(Item? held) => held != null && ContentRegistry.IsInTag("hammer", held.Id);
+
     /// <summary>Whether <paramref name="held"/> is the tool of <paramref name="station"/>: a member of the station's tool
     /// tag (a hammer on an anvil, a knife on a fleshing beam), which picks and works its recipes
     /// (<see cref="Simulation.WorkStations.WorkStationManager"/>) instead of mining it. False with no station.</summary>

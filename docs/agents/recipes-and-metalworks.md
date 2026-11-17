@@ -371,7 +371,8 @@ optional `"collectWith"` item, and one result is made by one recipe across all f
   `ForgeRenderer` under the block's name: one card per recipe `WorkStationManager.Offered` gives the stack, that input's
   and no more than it holds). A card **picks** (`SmithingStations.Select` -> `TrySelect`; nothing leaves the stack yet),
   and the list closes on a pick, CLOSE, E, Escape, the pause menu, death, another item in hand, leaving reach or the stack
-  running out. The tool's left button then works it (`LeftClickAction.UpdateWorkStationHit`, `Mining.IsStationTool`):
+  running out. The tool's left button then works it (`LeftClickAction.UpdateWorkStationHit`, `Mining.IsStationTool`; a hammer winds
+  its blow up first and the hit lands as it comes down, see "Hammer strike" in `animation.md`):
   `TryHit` needs a recipe to work (`State.Working`: the pick, or the only recipe offered, which the first hit picks, so a
   fleshing beam needs no list) and the gap since the last hit run down (`State.CooldownLeft`, ticked in `Update`, with
   `BloomeryConfig.HammerSlackSeconds` of jitter allowed on a server); the hit that reaches `hits` takes the input off the

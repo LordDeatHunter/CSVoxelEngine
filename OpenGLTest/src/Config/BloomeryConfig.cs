@@ -57,6 +57,11 @@ public static class BloomeryConfig
     /// bounds a corrupt save.</summary>
     public const int MaxStoredOutput = 64;
 
+    /// <summary>Seconds a hammer's blow on the anvil takes from the lift to the hammer back at rest
+    /// (<c>SwordSwing.HammerStrike</c>), or the hammer's hit gap when that is shorter; the hit lands at its impact
+    /// share, and the rest (the hammer lying on the work, then drawn back) fills most of the gap to the next blow.</summary>
+    public const float HammerSwingSeconds = 2f;
+
     /// <summary>Slack in seconds a server allows on the anvil's hit gap, for network jitter.</summary>
     public const float HammerSlackSeconds = 0.3f;
 }

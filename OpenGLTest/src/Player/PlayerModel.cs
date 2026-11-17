@@ -602,6 +602,16 @@ public class PlayerModel
         _swordSeconds = MathF.Max(seconds, 0.05f);
     }
 
+    /// <summary>
+    /// Starts a hammer's blow on a work station (<see cref="SwordSwing.HammerStrike"/>) lasting
+    /// <paramref name="seconds"/>: its own length, or the hammer's hit gap when that is shorter.
+    /// </summary>
+    public void StartHammerStrike(float seconds)
+    {
+        StartSword(SwordSwing.HammerStrike);
+        _swordSeconds = MathF.Max(seconds, 0.05f);
+    }
+
     /// <summary>Starts the slow overhead blow of an axe splitting a log on a stump (<see cref="SwordSwing.AxeSplit"/>).</summary>
     public void StartAxeSplit() => StartSword(SwordSwing.AxeSplit);
 

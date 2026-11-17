@@ -4,6 +4,7 @@ using VoxelEngine.Content.Stations;
 using VoxelEngine.Entities;
 using VoxelEngine.Graphics;
 using VoxelEngine.Items;
+using VoxelEngine.Juice;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation.Leatherwork;
 using VoxelEngine.Simulation.Smithing;
@@ -30,6 +31,9 @@ internal sealed class SmithingPasses(RenderManager owner, StationPasses stations
     // Radians each piece of a pile turns against the one below, so the pile reads as separate pieces
     private const float StackTwist = 0.18f;
 
+    // When each work station was last hit, for the jolt of its stack
+    private readonly WorkHitPulses _hitPulses = new();
+
     /// <summary>
     /// Draws every bloomery's props and every work station's stack. Nothing is drawn for the station or the shaft
     /// themselves: they are the block's own model.
@@ -48,8 +52,10 @@ internal sealed class SmithingPasses(RenderManager owner, StationPasses stations
         foreach (var (anchor, facing, state) in smithing.Bloomeries.View())
             DrawBloomery(anchor, facing, state, viewProj, ref atlasBound);
 
+        var now = owner.Lighting.Time;
         foreach (var (cell, state) in smithing.WorkStations.View())
-            DrawWorkStation(cell, state, viewProj, ref atlasBound);
+            DrawWorkStation(cell, state, now, viewProj, ref atlasBound);
+        _hitPulses.Sweep(now);
 
         foreach (var (cell, state) in smithing.Vats.View())
             DrawVat(cell, state, viewProj, ref atlasBound);
@@ -128,15 +134,17 @@ internal sealed class SmithingPasses(RenderManager owner, StationPasses stations
     // against it, and the top one is drawn at `topScale` of its size (the unit a bloomery is smelting away). An
     // item is a face-up sprite, a block a cube.
     // A work station's stack on its surface, and beside it the finished results waiting for their collect item
-    private void DrawWorkStation(Vector3 cell, WorkStationManager.State state, Matrix4x4 viewProj, ref bool atlasBound)
+    private void DrawWorkStation(Vector3 cell, WorkStationManager.State state, float now, Matrix4x4 viewProj,
+        ref bool atlasBound)
     {
         if (state.IsEmpty || BlockType.ById[state.BlockId]?.WorkStation is not { } profile) return;
+        var sinceHit = _hitPulses.Observe(cell, state, now);
         var light = owner.LightAt(cell + new Vector3(0.5f, 1.2f, 0.5f));
         var spread = state.InputCount > 0 && state.FinishedCount > 0 ? WorkPileSpread : 0f;
         var surface = cell + new Vector3(0.5f, profile.SurfaceY, 0.5f);
         if (state.InputCount > 0)
             DrawPile(state.InputId, state.InputCount, 1f, surface + new Vector3(spread, 0f, 0f), 0f, WorkPieceSize, light,
-                viewProj, ref atlasBound);
+                viewProj, ref atlasBound, sinceHit);
         if (state.FinishedCount > 0)
             DrawPile(state.FinishedId, state.FinishedCount, 1f, surface - new Vector3(spread, 0f, 0f), 0f, WorkPieceSize,
                 light, viewProj, ref atlasBound);
@@ -163,7 +171,7 @@ internal sealed class SmithingPasses(RenderManager owner, StationPasses stations
     }
 
     private void DrawPile(ushort id, int count, float topScale, Vector3 foot, float yaw, float pieceSize,
-        EntityLightSample light, Matrix4x4 viewProj, ref bool atlasBound)
+        EntityLightSample light, Matrix4x4 viewProj, ref bool atlasBound, float sinceHit = float.PositiveInfinity)
     {
         if (count <= 0 || id == 0 || stations.BindStationMesh(id, ref atlasBound) is not { } mesh) return;
 
@@ -173,14 +181,19 @@ internal sealed class SmithingPasses(RenderManager owner, StationPasses stations
         {
             var size = pieceSize * (i == count - 1 ? topScale : 1f);
             if (size <= 0f) break;
-            var twist = yaw + (i % 2 == 0 ? 1f : -1f) * StackTwist * (i % 3);
+            // A tool's hit jolts the pile: each piece jumps, spread flat by the blow and knocked askew
+            var jolt = WorkHitJolt.At(sinceHit, i);
+            var twist = yaw + (i % 2 == 0 ? 1f : -1f) * StackTwist * (i % 3) + jolt.Twist;
+            var across = size * (1f + jolt.Spread);
+            var height = size * (1f - jolt.Spread);
             var placed = isItem
-                ? Matrix4x4.CreateScale(size)
+                ? Matrix4x4.CreateScale(across)
                   * SpritePose.LyingFaceUp(twist)
-                  * Matrix4x4.CreateTranslation(foot + new Vector3(0f, rise + SpritePose.RestingLift(size), 0f))
-                : Matrix4x4.CreateScale(size)
+                  * Matrix4x4.CreateTranslation(
+                      foot + new Vector3(0f, rise + jolt.Lift + SpritePose.RestingLift(size), 0f))
+                : Matrix4x4.CreateScale(across, height, across)
                   * Matrix4x4.CreateRotationY(twist)
-                  * Matrix4x4.CreateTranslation(foot + new Vector3(0f, rise + size * 0.5f, 0f));
+                  * Matrix4x4.CreateTranslation(foot + new Vector3(0f, rise + jolt.Lift + height * 0.5f, 0f));
             owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
             mesh.Render();
             rise += isItem

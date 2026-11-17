@@ -119,6 +119,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       SwingHitStop.cs          # GL-free hit-stop of one swing clock (PlayerModel's punch or slice)
       ThrowZoom.cs             # GL-free throw charge zoom: the FOV target from the charge and its spring step
       ToolShatter.cs           # GL-free rules of a tool that ran out of durability
+      WorkHitJolt.cs           # GL-free twin of the jolt a tool's hit gives the pile on a work station (SmithingPasses.DrawPile)
     Lod/                       # far-terrain LOD: region builds, the manager, sky exposure, surface overrides
       LodBuildOutcome.cs       # what one LodGen worker spin did (Built / Idle / Throttled), which picks its back-off
       LodColumnCaps.cs         # the process-global mined-column LOD caps (MIN semantics): LowerColumnBelow, export/import for

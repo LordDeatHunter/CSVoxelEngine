@@ -66,6 +66,36 @@ public sealed class WorkStationManagerTests
         return anvils;
     }
 
+    [Fact]
+    public void TheHitPulseSeesEveryHitIncludingTheFinishingOneButNotAPickOrATake()
+    {
+        var recipe = RecipesOf(Metal).First(r => r.Hits > 1);
+        var anvils = Stacked(recipe.InputCount + 1);
+        var state = anvils.StateAt((int)Cell.X, (int)Cell.Y, (int)Cell.Z)!;
+        var pulses = new WorkHitPulses();
+        var now = 10f;
+        float Seen() => pulses.Observe(Cell, state, now += 1f);
+
+        // First sighting, a pick and a take off the stack: nothing was struck
+        Assert.Equal(float.PositiveInfinity, Seen());
+        Assert.True(anvils.TrySelect(Cell, recipe.ResultId));
+        Assert.Equal(float.PositiveInfinity, Seen());
+        Assert.True(anvils.TryTake(Cell, all: false, out _, out _));
+        Assert.Equal(float.PositiveInfinity, Seen());
+
+        // Every hit, the last one too (it clears the pick and its count), is seen the moment it lands
+        for (var hit = 1; hit <= recipe.Hits; hit++)
+        {
+            Assert.NotEqual(WorkHitKind.Refused, anvils.TryHit(Cell, 0f, 0f).Kind);
+            Assert.Equal(0f, Seen());
+            Assert.Equal(1f, Seen());
+        }
+
+        // A station no longer drawn is forgotten: seen again it starts unstruck
+        pulses.Sweep(now + 1f);
+        Assert.Equal(float.PositiveInfinity, Seen());
+    }
+
     // Lands hits until one finishes, clearing the gap between them; returns the finishing hit and how many it took
     private static (WorkHit Hit, int Hits) HammerOut(WorkStationManager anvils)
     {

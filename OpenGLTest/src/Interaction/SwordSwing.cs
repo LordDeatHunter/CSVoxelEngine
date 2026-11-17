@@ -27,4 +27,9 @@ public enum SwordSwing : byte
     /// <summary>An axe splitting a log stood on a stump: the finisher's slow overhead blow straight down, at the pace of
     /// <see cref="Config.StumpConfig.SplitSwingSeconds"/>. Not part of the sword's chain either.</summary>
     AxeSplit = 4,
+
+    /// <summary>A smithing hammer's blow on an anvil: the hammer raised overhead, held a beat and brought straight down
+    /// onto the work, lasting <see cref="Config.BloomeryConfig.HammerSwingSeconds"/>; the hit lands as it comes down
+    /// (<see cref="LeftClickAction"/>). Not part of the sword's chain either.</summary>
+    HammerStrike = 5,
 }

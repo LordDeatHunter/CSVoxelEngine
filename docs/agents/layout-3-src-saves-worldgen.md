@@ -128,6 +128,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         WorkStationManager.cs  # anvils, fleshing beams and leather tables keyed by cell: a stack of one input (stack, take
                                #   back, the recipes Offered), the picked recipe (TrySelect, or the only one offered) and its
                                #   tool hits (gated by the tool's gap), results waiting for their collect item, save and wire
+        WorkHitPulses.cs       # cosmetic: when each station was last hit, read off its state as it is drawn (the stack's jolt)
       LeafDecay/               # leaf decay and the orphaned-wood crumble, namespace VoxelEngine.Simulation.LeafDecay
         LeafDecayManager.cs    # the composition root and facade: the scheduled cells, the tick and its slicing,
                                #   ScheduleAround/ScheduleBox from every edit path, TickLeaf/TickWood and the removal

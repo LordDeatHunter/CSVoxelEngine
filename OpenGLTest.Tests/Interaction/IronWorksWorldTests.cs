@@ -3,6 +3,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Interaction;
+using VoxelEngine.Player;
 using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.Simulation.WorkStations;
 using Xunit;
@@ -121,6 +122,72 @@ public sealed class IronWorksWorldTests : IDisposable
         Assert.Equal(recipe.ByproductCount, _world.World.Drops.Count(d => d.BlockId == recipe.ByproductId));
         Assert.All(_world.World.Drops, d => Assert.True(d.Position.Y > cell.Y + 0.5f));
         Assert.True(anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!.IsEmpty);
+    }
+
+    // An anvil with a recipe picked, the hammer in hand and the eye looking at it from two blocks off
+    private (Vector3 Cell, WorkStationManager.State State) AnvilUnderTheHammer()
+    {
+        _world = new SupportTestWorld();
+        var cell = new Vector3(2, _world.Top + 1, 2);
+        _world.Load(3, _world.Top + 2, 5);
+        _world.Set((int)cell.X, (int)cell.Y, (int)cell.Z, ContentRegistry.RequireBlock("anvil").Id);
+
+        var recipe = ContentRegistry.WorkRecipes.First(r => r.InputId == Bloomery.Bloomery!.BloomId && r.Hits > 1);
+        var world = _world.World;
+        Assert.True(world.Interactions.TryTrackWorkStationAt(cell, out _));
+        for (var i = 0; i < recipe.InputCount; i++)
+            Assert.True(world.Smithing.WorkStations.TryStack(cell, recipe.InputId));
+        Assert.True(world.Smithing.Select(cell, recipe.ResultId));
+
+        var hammer = ContentRegistry.RequireItem("bronze_hammer").Id;
+        Assert.True(world.Inventory.Add(hammer));
+        Assert.True(world.Inventory.PickBlock(hammer));
+        world.Camera.TestTeleport(cell + new Vector3(0.5f, 0.5f, 2.5f), yaw: -90f, pitch: 0f);
+        return (cell, world.Smithing.WorkStations.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!);
+    }
+
+    private void Swing(int frames, bool holding)
+    {
+        for (var i = 0; i < frames; i++)
+        {
+            _world!.World.LeftClick.UpdateSelection();
+            _world.World.LeftClick.UpdateBlockBreaking(1f / 60f, holding);
+        }
+    }
+
+    [Fact]
+    public void AHammerBlowWindsUpAndLandsItsHitWhenTheHammerComesDownEvenWithTheButtonReleased()
+    {
+        var (_, state) = AnvilUnderTheHammer();
+        var model = _world!.World.Player;
+        var lead = PlayerModel.SwordDuration(SwordSwing.HammerStrike) * PlayerModel.SwordImpactProgress(SwordSwing.HammerStrike);
+
+        // The press starts the blow, and nothing is struck while the hammer is still on its way up
+        Swing(1, holding: true);
+        Assert.True(model.IsSwordSwinging);
+        Assert.Equal(SwordSwing.HammerStrike, model.ActiveSwordSwing);
+        Swing((int)(lead * 60f) - 3, holding: false);
+        Assert.Equal(0, state.Hits);
+        Assert.True(_world.World.LeftClick.IsBlowInFlight);
+
+        // It comes down on its own: one hit, and the blow is spent
+        Swing(6, holding: false);
+        Assert.Equal(1, state.Hits);
+        Assert.False(_world.World.LeftClick.IsBlowInFlight);
+    }
+
+    [Fact]
+    public void AHammerBlowWhoseAimLeftTheAnvilComesDownOnNothing()
+    {
+        var (cell, state) = AnvilUnderTheHammer();
+        Swing(1, holding: true);
+        Assert.True(_world!.World.LeftClick.IsBlowInFlight);
+
+        // Looking straight up while the hammer is raised
+        _world.World.Camera.TestTeleport(cell + new Vector3(0.5f, 0.5f, 2.5f), yaw: -90f, pitch: 89f);
+        Swing(120, holding: false);
+        Assert.False(_world.World.LeftClick.IsBlowInFlight);
+        Assert.Equal(0, state.Hits);
     }
 
     [Fact]
