@@ -601,7 +601,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int KnollCacheGenerations = 4;
 
     // Dynamic S2a heightmap shelves and dry canyons. Off-profile and off-mask paths leave the
-    // earlier terrain unchanged; later S2 materials will give exposed walls their own strata.
+    // earlier terrain unchanged; exposed arid bare rock receives S2 material strata.
     public const float ShelfFrequency = 1f / 500f;
     public const float ShelfMaskStart = -0.4f;
     public const float ShelfMaskEnd = 0.1f;
@@ -622,6 +622,10 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int CanyonMinFloorAboveSea = 4;
     public const int CanyonWaterGuardRadius = 8;
     public const int CanyonWaterBankMargin = 2;
+    public const float StrataFrequency = 1f / 240f;
+    public const float StrataWobbleBlocks = 2f;
+    public const int StrataBandBlocks = 6;
+    public const int StrataMaxDepth = 72;
 
     // --- Relief: massifs and lone peaks (BIOMEGEN §6, phase B) ---
     // Hashed sites (TerrainSites, TerrainPeaks) summed into the forest profile after the ranges.

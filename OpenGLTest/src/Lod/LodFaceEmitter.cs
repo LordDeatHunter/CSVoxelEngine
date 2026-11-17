@@ -36,6 +36,11 @@ internal ref struct LodFaceEmitter
     private readonly int _cells;
     private readonly int _heightGrid;
     private readonly int _regionChunkSpan;
+    private readonly int _regionChunkX;
+    private readonly int _regionChunkZ;
+    private readonly int _chunkSpan;
+    private readonly bool[] _supplied;
+    private readonly ColumnData[] _columns;
     private readonly int _latticeSpan;
     private readonly Vector3[] _grassTint;
     private readonly Vector3[] _foliageTint;
@@ -72,6 +77,11 @@ internal ref struct LodFaceEmitter
         _cells = cells;
         _heightGrid = heightGrid;
         _regionChunkSpan = regionChunkSpan;
+        _regionChunkX = regionChunkX;
+        _regionChunkZ = regionChunkZ;
+        _chunkSpan = chunkSpan;
+        _supplied = supplied;
+        _columns = columns;
         _latticeSpan = latticeSpan;
         _grassTint = grassTint;
         _foliageTint = foliageTint;
@@ -313,6 +323,12 @@ internal ref struct LodFaceEmitter
         var edited = _hasRegionOverrides && _topBlockGrid[gi * _heightGrid + gj] is var eb and not 0
             ? BlockType.ById[eb]
             : null;
+        var strataColumn = StrataColumn(i, j);
+        var strataTop = strataColumn is { } site && !isSeaCell && stripped && !beach && !snowCell
+            && TerrainStrata.Admits(site.column, site.index, (ground + 1) * _cellSize - 1)
+            ? BlockType.ById[TerrainStrata.BlockAt(site.x, (ground + 1) * _cellSize - 1, site.z,
+                site.column.Biomes[site.index])]
+            : null;
 
         // The block the cell's drawn surface wears: the canopy bump's leaves above the
         // ground, else the edited block, else the generated material chain.
@@ -322,6 +338,7 @@ internal ref struct LodFaceEmitter
             // Dynamic's snow stamp covers rock and scree too. Legacy keeps its earlier
             // rock-before-snow LOD precedence; supplied rock/snow classifications never overlap.
             : WorldSeed.Profile == WorldGenProfile.Dynamic && rock && snowCell ? _snow
+            : strataTop is not null ? strataTop
             : rock ? (_gravelTop[gi * _heightGrid + gj] ? _gravel : _stone)
             : snowCell ? _snow
             : biome == Biome.Desert ? _sand
@@ -396,7 +413,14 @@ internal ref struct LodFaceEmitter
                 {
                     // The soil/stone band below the top cell never tints. The frozen biome's band is
                     // its permafrost, or stone where the column's soil was stripped.
-                    var tile = (ground - cy) * _cellSize <= WorldGenerationConfig.NominalDirtDepth
+                    var wallY = cy * _cellSize + _cellSize / 2;
+                    var strataWall = strataColumn is { } wallSite && stripped && !isSeaCell && !beach
+                        && TerrainStrata.Admits(wallSite.column, wallSite.index, wallY)
+                        ? BlockType.ById[TerrainStrata.BlockAt(wallSite.x, wallY, wallSite.z,
+                            wallSite.column.Biomes[wallSite.index])]
+                        : null;
+                    var tile = strataWall is not null ? strataWall.FaceTiles[f]
+                        : (ground - cy) * _cellSize <= WorldGenerationConfig.NominalDirtDepth
                         ? (biome == Biome.Desert ? _sandstone.FaceTiles[f]
                             : isSeaCell || rock ? _stone.FaceTiles[f]
                             : biome == Biome.Frozen ? (stripped ? _stone : _permafrost).FaceTiles[f]
@@ -406,6 +430,18 @@ internal ref struct LodFaceEmitter
                 }
             }
         }
+    }
+
+    private (ColumnData column, int index, int x, int z)? StrataColumn(int i, int j)
+    {
+        if (WorldSeed.Profile != WorldGenProfile.Dynamic) return null;
+        var x = _regionChunkX * Chunk.Size + i * _cellSize + _cellSize / 2;
+        var z = _regionChunkZ * Chunk.Size + j * _cellSize + _cellSize / 2;
+        var chunkIndex = ((x >> Chunk.SizeShift) - _regionChunkX + 1) * _chunkSpan
+            + (z >> Chunk.SizeShift) - _regionChunkZ + 1;
+        if (_supplied[chunkIndex]) return null;
+        var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+        return (_columns[chunkIndex], local, x, z);
     }
 
     internal LodMeshData ToMeshData(int level, int rx, int rz, int[] columnCyMin, int[] columnCyMax) =>

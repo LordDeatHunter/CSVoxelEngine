@@ -1,0 +1,8 @@
+{
+  "name": "Red Sandstone",
+  "model": { "parent": "block/cube_all", "textures": { "all": "red_sandstone" } },
+  "pebbleWeight": 0,
+  "sfx": "hit_rock",
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 }
+}

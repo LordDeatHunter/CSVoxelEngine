@@ -204,10 +204,15 @@ or coast line. The existing lake/river guard and ocean-shore fade protect water 
 banks; face-adjacent and nearby shared-water levels also bound a dry cut above elevated water.
 The separate oasis and hot-spring discs and their face banks refuse an additional canyon
 cut because those features assign their own pond levels outside the shared water query. Deep cuts
-reuse the ravine soil-stripping rule, exposing the existing rock/sand palette. `ColumnCache`,
+reuse the ravine soil-stripping rule, exposing rock. Dynamic bare Desert, Steppe and Savanna
+columns then receive seeded, slightly wobbled sandstone, red sandstone, ochre clay and stone
+bands in their upper 72 blocks. The fill replaces only original plain rock before carvers,
+ores, fluids and features; cave-biome cells and soil keep their own palette. Generated far LOD
+samples the same band selector for bare arid faces, while supplied columns keep saved material.
+`ColumnCache`,
 generated chunks and far LOD read the same final height; supplied chunks keep their saved
 data. These terms do not change Legacy generation, the 186 terrain ceiling or S1b's surface
-writer clearance gates. S2 wall strata/materials, optional undercuts and later issue #64
+writer clearance gates. Optional undercuts and later issue #64
 content stages are still separate. `visual-examples/dynamic-canyons-s2a.json` records
 candidate views for a later Release visual review.
 

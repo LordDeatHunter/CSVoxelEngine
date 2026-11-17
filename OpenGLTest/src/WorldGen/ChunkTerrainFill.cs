@@ -133,6 +133,12 @@ internal static class ChunkTerrainFill
         }
         timer?.Mark(Stage.CaveBiomeMap);
 
+        // Dress only original plain rock in bare arid columns. Later carvers, ores,
+        // water and structures keep their established ownership of those cells.
+        if (WorldSeed.Profile == WorldGenProfile.Dynamic)
+            TerrainStrata.Stamp(blocks, column, caves, (int)chunk.Position.X * Size,
+                lowerBoundY, (int)chunk.Position.Z * Size);
+
         // Both carvers only ever clear blocks at or below their own column's terrain top:
         // NoiseCaves breaks each column at `depth < 0` before it reads a block or a sample, and
         // WormCarver skips every y at `depth < margin`, margin = WormSurfaceMargin * (1 - EntranceWeight)
