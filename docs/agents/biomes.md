@@ -194,6 +194,19 @@ This S1b stage changes relief only; cliffs, dunes, new flora, volcanoes and habi
 later issue #64 stages. `visual-examples/dynamic-relief-s1b.json` frames the bounded
 representative range, high summit, rock/snow/scree flanks, LOD vista, spawn horizon and valley knoll.
 
+S2a adds Dynamic-only escarpments and dry, roofless canyons. `TerrainShelves` terraces a
+broad highland plateau lift before valley compression and the whole-profile ceiling; its
+smooth support and spawn fade return exactly zero outside the selected region. After water
+planning, `TerrainCanyons` cuts a warped ridged channel from the final heightmap beside
+ravines. The existing lake/river guard and ocean-shore fade protect water footprints and
+banks; nearby planned water levels also bound a dry cut above elevated water. Deep cuts
+reuse the ravine soil-stripping rule, exposing the existing rock/sand palette. `ColumnCache`,
+generated chunks and far LOD read the same final height; supplied chunks keep their saved
+data. These terms do not change Legacy generation, the 186 terrain ceiling or S1b's surface
+writer clearance gates. S2 wall strata/materials, optional undercuts and later issue #64
+content stages are still separate. `visual-examples/dynamic-canyons-s2a.json` records
+candidate views for a later Release visual review.
+
 **openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
 forest alternates between rolling woodland and open grass instead of one uniform canopy
 (`TreeGenerator.TryGetTree` reads `TerrainGenerator.ForestOpenness`, scaled per species by its

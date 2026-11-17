@@ -1,0 +1,34 @@
+{
+  // S2a candidate Release capture; run only after root's visual grant.
+  // From OpenGLTest/: VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/dynamic-canyons-s2a.json
+  // Storeless seed 1337 selects Dynamic. S2aTerrainTests' bounded finder found
+  // canyon (-4000,5000): bed 155, dry floor 85, X rims about 153-158.
+  // Shelf near (2100,-3608): lower at z=-3612 y=73, upper at z=-3608 y=84.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-4014.5, 163.5, 5000.5], "yaw": 0, "pitch": -24 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-4014.5, 163.5, 5000.5], "yaw": 0, "pitch": -24 },
+    { "op": "screenshot", "name": "canyon_rim_vista", "hideHud": true },
+
+    { "op": "teleport", "pos": [-4000.5, 88.5, 5000.5], "yaw": 90, "pitch": -3 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-4000.5, 88.5, 5000.5], "yaw": 90, "pitch": -3 },
+    { "op": "screenshot", "name": "dry_floor_along_channel", "hideHud": true },
+
+    { "op": "teleport", "pos": [-4005.5, 121.5, 5000.5], "yaw": 0, "pitch": -18 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [-4005.5, 121.5, 5000.5], "yaw": 0, "pitch": -18 },
+    { "op": "screenshot", "name": "terraced_wall", "hideHud": true },
+
+    { "op": "teleport", "pos": [2100.5, 76.5, -3612.5], "yaw": 90, "pitch": 8 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [2100.5, 76.5, -3612.5], "yaw": 90, "pitch": 8 },
+    { "op": "screenshot", "name": "escarpment_from_below", "hideHud": true },
+
+    { "op": "teleport", "pos": [-4020.5, 177.5, 5000.5], "yaw": 18, "pitch": -30 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-4020.5, 177.5, 5000.5], "yaw": 18, "pitch": -30 },
+    { "op": "screenshot", "name": "canyon_near_to_far_lod", "hideHud": true }
+  ]
+}

@@ -600,6 +600,29 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int KnollCacheCapacity = 2048;
     public const int KnollCacheGenerations = 4;
 
+    // Dynamic S2a heightmap shelves and dry canyons. Off-profile and off-mask paths leave the
+    // earlier terrain unchanged; later S2 materials will give exposed walls their own strata.
+    public const float ShelfFrequency = 1f / 500f;
+    public const float ShelfMaskStart = -0.4f;
+    public const float ShelfMaskEnd = 0.1f;
+    public const float ShelfPlateauLift = 64f;
+    public const float ShelfStepHeight = 12f;
+    public const float ShelfRiserShare = 0.1f;
+    public const float CanyonFrequency = 1f / 900f;
+    public const float CanyonWarpFrequency = 1f / 400f;
+    public const float CanyonWarpAmplitude = 100f;
+    public const float CanyonMaskFrequency = 1f / 2400f;
+    public const float CanyonMaskStart = -0.25f;
+    public const float CanyonMaskEnd = 0.05f;
+    public const float CanyonFloorRidge = 0.012f;
+    public const float CanyonOuterRidge = 0.07f;
+    public const float CanyonWallStepHeight = 10f;
+    public const float CanyonWallRiserShare = 0.12f;
+    public const int CanyonMaxDepth = 70;
+    public const int CanyonMinFloorAboveSea = 4;
+    public const int CanyonWaterGuardRadius = 8;
+    public const int CanyonWaterBankMargin = 2;
+
     // --- Relief: massifs and lone peaks (BIOMEGEN §6, phase B) ---
     // Hashed sites (TerrainSites, TerrainPeaks) summed into the forest profile after the ranges.
     // A massif is a rare, large mountain: each accepted site rolls an absolute summit height and

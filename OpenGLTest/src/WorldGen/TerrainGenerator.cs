@@ -302,6 +302,7 @@ public static class TerrainGenerator
         if (WorldSeed.Profile == WorldGenProfile.Dynamic)
         {
             reliefForest += TerrainRelief.CordilleraHeight(worldX, worldZ);
+            reliefForest += TerrainShelves.HeightDelta(worldX, worldZ, highland, lift);
             reliefForest = TerrainRelief.FlattenValley(worldX, worldZ, reliefForest);
             reliefForest = TerrainPeaks.DynamicSoftCeiling(reliefForest);
         }
@@ -489,9 +490,14 @@ public static class TerrainGenerator
                 var ravineDepth = WorldGenerationConfig.RavinesEnabled
                     ? (int)(RavineDepthAt(worldX, worldZ) * RavineCutFade(oceanWeight, surfaceWater))
                     : 0;
+                var canyonDepth = WorldSeed.Profile == WorldGenProfile.Dynamic
+                    ? TerrainCanyons.CutDepth((int)worldX, (int)worldZ, height - ravineDepth, waterLevel[i],
+                        biome, oceanWeight, RavineCutFade(oceanWeight, surfaceWater))
+                    : 0;
+                var totalCut = ravineDepth + canyonDepth;
 
                 bed[i] = height;
-                heights[i] = height - ravineDepth;
+                heights[i] = height - totalCut;
 
                 var dirt = WorldGenerationConfig.DirtDepthBase
                            + WorldGenerationConfig.DirtDepthVariation * TerrainNoise.DirtNoise.GetNoise(worldX, worldZ);
@@ -501,10 +507,10 @@ public static class TerrainGenerator
                 // entirely once the column is cut deep enough, and thin it toward the rim so the
                 // transition fades in. Above the cutoff this stays >= 1, so 0 only ever means
                 // "bare stone column" to Chunk.GenerateColumn.
-                if (ravineDepth >= WorldGenerationConfig.RavineBareStoneDepth)
+                if (totalCut >= WorldGenerationConfig.RavineBareStoneDepth)
                     soil = 0;
-                else if (ravineDepth > 0)
-                    soil = Math.Min(soil, WorldGenerationConfig.RavineBareStoneDepth - ravineDepth);
+                else if (totalCut > 0)
+                    soil = Math.Min(soil, WorldGenerationConfig.RavineBareStoneDepth - totalCut);
 
                 // A grass-biome peak above the rock line is bare stone too, so a high crest reads as
                 // a rocky mountain instead of another tree-covered hill. Read off the final heightmap
