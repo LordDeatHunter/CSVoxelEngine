@@ -120,10 +120,12 @@ public class DropManager
     /// Puts back a stuck drop exactly where a save or a server snapshot recorded it (<paramref name="center"/> is
     /// <see cref="ItemDrop.Position"/>, not the impact): in the terrain, or (<paramref name="inBody"/>) a client's
     /// hostless mirror of one riding a mob. False for an unknown id.
+    /// <paramref name="pickupDelaySeconds"/> is the saved grace threshold; null keeps the legacy default.
     /// </summary>
-    public bool SpawnRestoredStuck(ushort itemId, Vector3 center, Vector3 heading, bool inBody, float age)
+    public bool SpawnRestoredStuck(ushort itemId, Vector3 center, Vector3 heading, bool inBody, float age,
+        float? pickupDelaySeconds = null)
     {
-        if (!SpawnRestored(itemId, center, Vector3.Zero, age)) return false;
+        if (!SpawnRestored(itemId, center, Vector3.Zero, age, pickupDelaySeconds: pickupDelaySeconds)) return false;
         var drop = _drops[^1];
         if (heading.LengthSquared() < 1e-8f) return true;
         heading = Vector3.Normalize(heading);
@@ -153,14 +155,16 @@ public class DropManager
 
     /// <summary>
     /// Puts back a drop a save recorded, with its exact position, velocity and age and no pop.
+    /// A null <paramref name="pickupDelaySeconds"/> keeps the legacy default.
     /// False (and nothing added) for an id that is neither a block nor an item, the same guard
     /// as <see cref="SpawnAt"/>.
     /// </summary>
-    public bool SpawnRestored(ushort blockId, Vector3 position, Vector3 velocity, float age, UI.InventoryPanel.ItemStack? instance = null)
+    public bool SpawnRestored(ushort blockId, Vector3 position, Vector3 velocity, float age,
+        UI.InventoryPanel.ItemStack? instance = null, float? pickupDelaySeconds = null)
     {
         if (BlockType.ById[blockId] == null && !ItemRegistry.IsItem(blockId)) return false;
 
-        _drops.Add(new ItemDrop(blockId, position, velocity, age) { Instance = instance });
+        _drops.Add(new ItemDrop(blockId, position, velocity, age, pickupDelaySeconds) { Instance = instance });
         return true;
     }
 
