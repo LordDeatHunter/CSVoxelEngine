@@ -13,7 +13,9 @@ report failed root listings with the saves-folder notice instead of presenting t
 dedicated-server prompt also reports a failed listing without offering to create a world from that
 empty result. CREATE opens a name field
 (placeholder `Unnamed World`, which is what an empty field becomes; the store makes a taken name
-unique with the smallest free numeric suffix, `WorldNames.Unique`) and a seed field (empty =
+unique with the smallest free numeric suffix, `WorldNames.Unique`); create and rename require a
+successful world listing and report a saves-folder error if it fails. A missing root is still an
+empty listing. The form also has a seed field (empty =
 random, an integer is used verbatim, any other text is FNV-1a-hashed by `WorldSeedParser`).
 Enter confirms the create and edit pages (never the delete popup), Tab switches field, and ESC
 steps back one page and does nothing on the main page. SETTINGS and EXIT are the pause menu's

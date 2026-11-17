@@ -308,6 +308,78 @@ public sealed class MainMenuControllerTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void CreateDoesNotRequestPlayOrHostWhenWorldNamesCannotBeListed(bool host)
+    {
+        _store.Create("Home", 1);
+        var controller = NewController(() => 42);
+        if (host)
+            controller.OpenHost();
+        else
+            controller.OpenWorlds();
+        controller.Click(Hit(MainMenuHitKind.Create));
+        TypeText(controller, "Home");
+
+        var failNext = true;
+        _store.EnumerateDirectories = path =>
+        {
+            if (!failNext) return Directory.GetDirectories(path);
+            failNext = false;
+            throw new IOException("injected enumeration failure");
+        };
+
+        var action = controller.Key(MenuKey.Enter);
+        var playRequest = controller.TakePlayRequest();
+        var hostRequest = controller.TakeHostRequest();
+        var worlds = _store.List();
+        var namesUnique = worlds.Select(world => world.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Count() == worlds.Count;
+
+        Assert.True(action == MainMenuAction.None && playRequest == null && hostRequest == null
+                    && controller.View.Notice == MainMenuController.StoreErrorNotice && namesUnique,
+            $"host={host}; action={action}; play={playRequest?.Name ?? "none"}; " +
+            $"hostRequest={hostRequest?.World.Name ?? "none"}; notice={controller.View.Notice ?? "none"}; " +
+            $"names=[{string.Join(",", worlds.Select(world => world.Name))}]");
+    }
+
+    [Fact]
+    public void RenameShowsStoreErrorAndKeepsTheExistingWorldWhenNameListFails()
+    {
+        _store.Create("A", 1);
+        _store.Create("B", 2);
+        var controller = NewController();
+        controller.OpenWorlds();
+        var row = controller.View.Worlds.FindIndex(world => world.Name == "B");
+        var selected = controller.View.Worlds[row];
+        var metadataPath = Path.Combine(selected.Directory, WorldStore.MetadataFileName);
+        var metadataBefore = File.ReadAllBytes(metadataPath);
+        controller.Click(Hit(MainMenuHitKind.Edit, row));
+        controller.View.Name.Clear();
+        TypeText(controller, "A");
+
+        var failNext = true;
+        _store.EnumerateDirectories = path =>
+        {
+            if (!failNext) return Directory.GetDirectories(path);
+            failNext = false;
+            throw new IOException("injected enumeration failure");
+        };
+
+        var action = controller.Key(MenuKey.Enter);
+        var worlds = _store.List();
+        var metadataUnchanged = File.ReadAllBytes(metadataPath).SequenceEqual(metadataBefore);
+        var namesUnique = worlds.Select(world => world.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase).Count() == worlds.Count;
+
+        Assert.True(action == MainMenuAction.None && selected.Name == "B" && metadataUnchanged
+                    && namesUnique && controller.View.Page == MainMenuPage.Worlds
+                    && controller.View.Notice == MainMenuController.StoreErrorNotice,
+            $"action={action}; inMemoryName={selected.Name}; metadataUnchanged={metadataUnchanged}; " +
+            $"names=[{string.Join(",", worlds.Select(world => world.Name))}]; notice={controller.View.Notice ?? "none"}");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void FailedWorldEnumerationIsShownOnWorldAndHostPages(bool host)
     {
         _store.Create("One", 1);
