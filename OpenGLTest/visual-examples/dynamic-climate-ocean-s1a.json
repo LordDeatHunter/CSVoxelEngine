@@ -1,7 +1,7 @@
 {
   // S1a visual handoff. Run from OpenGLTest/ on a fresh storeless Dynamic world:
   //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/dynamic-climate-ocean-s1a.json
-  // The visual window remains pending. Time 147 gives a high morning sun after startup.
+  // Time 147 gives a high morning sun after startup.
   // Finder: DynamicClimateOceanTests, seed 1337. The first non-desert ecotone flip is
   // (-1728, 1824); the first wet shelf is (-3648, -768); the sampled default-seed
   // basin floor is about -120 at (-1200, -3000). These are coverage sites, not
