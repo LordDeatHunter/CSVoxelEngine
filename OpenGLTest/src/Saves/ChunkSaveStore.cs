@@ -128,8 +128,8 @@ public sealed class ChunkSaveStore
     /// <summary>The folder the chunk files live in.</summary>
     public string ChunksDirectory { get; }
 
-    /// <summary>Moves a finished temp file over its final name. A fault-injection seam for the
-    /// tests; the writer retries it on <see cref="IOException"/>.</summary>
+    /// <summary>Moves a finished temp file over its final name or archives an unreadable file.
+    /// A fault-injection seam for the tests; replacement moves retry on <see cref="IOException"/>.</summary>
     internal Action<string, string> MoveFile { get; set; } = (tmp, final) => File.Move(tmp, final, overwrite: true);
 
     /// <summary>Chunk snapshots enqueued but not yet (successfully) on disk.</summary>
@@ -506,13 +506,13 @@ public sealed class ChunkSaveStore
 
     // Keeps a file a read gave up on as <final>.bad (the previous .bad, if any, is replaced), so the
     // write about to replace it never destroys the only copy of what the player had.
-    private static bool SetAsideUnreadable(string final)
+    private bool SetAsideUnreadable(string final)
     {
         if (!File.Exists(final))
             return true;
         try
         {
-            File.Move(final, final + UnreadableExtension, overwrite: true);
+            MoveFile(final, final + UnreadableExtension);
             Log.Warn($"Kept the unreadable save file as '{final}{UnreadableExtension}'");
             return true;
         }

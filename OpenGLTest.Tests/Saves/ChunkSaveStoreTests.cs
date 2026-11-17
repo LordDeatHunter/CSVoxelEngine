@@ -763,21 +763,36 @@ public sealed class ChunkSaveStoreTests : IDisposable
         File.WriteAllBytes(final, original);
         var backupBlocker = final + ".bad";
         var barrier = Path.Combine(_world, "archive-shutdown-barrier.bin");
-        using var atBarrier = new ManualResetEventSlim(false);
-        using var releaseBarrier = new ManualResetEventSlim(false);
+        using var archiveAttempt = new ManualResetEventSlim(false);
+        using var releaseArchive = new ManualResetEventSlim(false);
+        using var afterFailure = new ManualResetEventSlim(false);
+        using var releaseAfterFailure = new ManualResetEventSlim(false);
         var acceptedSnapshot = Snapshot("stone", seed: 81);
         var rejectedSnapshot = Snapshot("dirt", seed: 82);
         byte[] acceptedBytes = [4, 3, 2, 1];
         byte[] rejectedBytes = [1, 2, 3, 4];
+        var archiveMoves = 0;
         var store = new ChunkSaveStore(_world);
-        store.MoveFile = (tmp, destination) =>
+        store.MoveFile = (source, destination) =>
         {
-            File.Move(tmp, destination, overwrite: true);
-            if (!string.Equals(destination, barrier, StringComparison.Ordinal))
+            if (string.Equals(destination, backupBlocker, StringComparison.Ordinal) &&
+                Interlocked.Increment(ref archiveMoves) == 1)
+            {
+                archiveAttempt.Set();
+                if (!releaseArchive.Wait(ShutdownTimeout))
+                    throw new TimeoutException("test did not release the archive move");
+            }
+
+            if (string.Equals(destination, barrier, StringComparison.Ordinal))
+            {
+                File.Move(source, destination, overwrite: true);
+                afterFailure.Set();
+                if (!releaseAfterFailure.Wait(ShutdownTimeout))
+                    throw new TimeoutException("test did not release the post-failure barrier");
                 return;
-            atBarrier.Set();
-            if (!releaseBarrier.Wait(ShutdownTimeout))
-                throw new TimeoutException("test did not release the writer barrier");
+            }
+
+            File.Move(source, destination, overwrite: true);
         };
         Thread? shutdown = null;
         var shutdownResult = false;
@@ -787,26 +802,26 @@ public sealed class ChunkSaveStoreTests : IDisposable
             {
                 using var exclusive = new FileStream(final, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
                 Assert.Null(store.ReadFile(fileName));
-                store.EnqueueFile(fileName, acceptedBytes);
             }
             else
             {
                 Assert.False(store.TryLoad(key, out _));
-                store.Enqueue(key, acceptedSnapshot);
             }
-            Directory.CreateDirectory(backupBlocker);
+
+            if (wholeFile)
+                store.EnqueueFile(fileName, acceptedBytes);
+            else
+                store.Enqueue(key, acceptedSnapshot);
             store.EnqueueFile("archive-shutdown-barrier.bin", [8]);
-            Assert.True(atBarrier.Wait(ShutdownTimeout), "writer did not reach the barrier after archive failure");
-            Assert.Equal(1, store.FailedCount);
-            Assert.Equal(original, File.ReadAllBytes(final));
+            Assert.True(archiveAttempt.Wait(ShutdownTimeout), "writer did not reach the archive move");
 
             shutdown = new Thread(() => shutdownResult = store.Shutdown(ShutdownTimeout));
             shutdown.Start();
             Assert.True(SpinWait.SpinUntil(() => store.IsAddingCompletedForTests, ShutdownTimeout),
-                "shutdown did not close admission while the writer was blocked");
+                "shutdown did not close admission while the accepted archive move was paused");
 
-            // Enqueue publishes to memory before admission rejects its job; the close-time retry
-            // must still use the exact payload from the accepted attempt above.
+            // The writer has captured the accepted argument and paused in its archive move.
+            // This enqueue updates memory but shutdown rejects its job.
             if (wholeFile)
             {
                 store.EnqueueFile(fileName, rejectedBytes);
@@ -819,12 +834,20 @@ public sealed class ChunkSaveStoreTests : IDisposable
                 AssertSameData(rejectedSnapshot, pending);
             }
 
+            Directory.CreateDirectory(backupBlocker);
+            releaseArchive.Set();
+            Assert.True(afterFailure.Wait(ShutdownTimeout), "writer did not pass the failed archive attempt");
+            Assert.Equal(1, store.FailedCount);
+            Assert.Equal(original, File.ReadAllBytes(final));
+            Assert.True(Directory.Exists(backupBlocker), "the original archive obstacle was not preserved");
+
             Directory.Delete(backupBlocker);
-            releaseBarrier.Set();
+            releaseAfterFailure.Set();
         }
         finally
         {
-            releaseBarrier.Set();
+            releaseArchive.Set();
+            releaseAfterFailure.Set();
             if (Directory.Exists(backupBlocker))
                 Directory.Delete(backupBlocker, recursive: true);
             if (shutdown == null)
@@ -835,20 +858,21 @@ public sealed class ChunkSaveStoreTests : IDisposable
 
         Assert.True(shutdownResult, "writer should join after the final accepted-payload retry");
         Assert.Equal(original, File.ReadAllBytes(final + ".bad"));
-        if (wholeFile)
-            Assert.Equal(acceptedBytes, File.ReadAllBytes(final));
-        else
+        Assert.Equal(0, store.FailedCount);
+        var reopened = new ChunkSaveStore(_world);
+        try
         {
-            var reopened = new ChunkSaveStore(_world);
-            try
+            if (wholeFile)
+                Assert.Equal(acceptedBytes, reopened.ReadFile(fileName));
+            else
             {
                 Assert.True(reopened.TryLoad(key, out var persisted));
                 AssertSameData(acceptedSnapshot, persisted);
             }
-            finally
-            {
-                ShutdownOrFail(reopened);
-            }
+        }
+        finally
+        {
+            ShutdownOrFail(reopened);
         }
     }
 
