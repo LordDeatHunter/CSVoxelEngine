@@ -14,6 +14,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   (heights, bed, water levels, biomes, dirt depth, corner climate)
       EntitySaveCodec.cs       # reads/writes entities.json
       EntitySaveData.cs        # the entities.json shape: mobs (health/facing/velocity/ammo) and drops
+      EntitySaveReader.cs      # marks rejected entity JSON for preservation
       ImportedMapWriter.cs     # writes an imported map (columns/*.col + chunks/*.bin); ExportGenerated seeds
                                #   one from any IWorldSource (tool/test use)
       LodEditState.cs          # lod-edits.bin: export/import of the LOD caps, surface overrides, canopy markers
