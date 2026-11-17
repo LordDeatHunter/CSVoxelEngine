@@ -21,6 +21,8 @@ public enum ServerLaunchFailure
     Locked,
     /// <summary>The port could not be listened on, most often because it is in use.</summary>
     PortInUse,
+    /// <summary>Parsed saved world data cannot be restored safely.</summary>
+    InvalidSave,
 }
 
 /// <summary>A started server and its headless world, or why none started (<see cref="Message"/> says it for a
@@ -94,8 +96,18 @@ public static class ServerLaunch
         launchOperators.AddAll(OperatorList.Parse(save.ReadFile(OperatorList.FileName)));
 
         WorldSeed.Apply(world.Seed);
-        var gameWorld = new World(null!, null!, null!, null!, null!, null!, null, save, serverMode: true,
-            worldSource: source);
+        World gameWorld;
+        try
+        {
+            gameWorld = new World(null!, null!, null!, null!, null!, null!, null, save, serverMode: true,
+                worldSource: source);
+        }
+        catch (InvalidDataException e)
+        {
+            // World owns and closes the transferred store on construction failure.
+            return Fail(ServerLaunchFailure.InvalidSave,
+                $"Cannot host '{world.Name}': saved world data cannot be restored ({e.Message})");
+        }
         var server = new GameServer(gameWorld, world.Name, world.Seed, port)
         {
             Operators = launchOperators,
