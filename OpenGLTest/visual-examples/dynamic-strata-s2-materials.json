@@ -1,0 +1,23 @@
+{
+  // S2 materials: run only in the separately granted Release visual window.
+  // From OpenGLTest/: VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/dynamic-strata-s2-materials.json
+  // Storeless default seed 1337 uses Dynamic. A bounded real fill diagnostic proved
+  // red_sandstone at (-4007,125,5000) with clear east cells -4006..-4004 and
+  // the air eye (-4003.5,125.5,5000.5). Yaw 180 faces the colored +X wall.
+  // The floor and far poses are S2a context candidates; their current materials
+  // and framing still require inspection of the original PNGs.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-4003.5, 125.5, 5000.5], "yaw": 180, "pitch": 0 },
+    { "op": "wait", "seconds": 18 },
+    { "op": "screenshot", "name": "strata_red_wall_detail", "hideHud": true },
+
+    { "op": "teleport", "pos": [-4000.5, 88.5, 5000.5], "yaw": 180, "pitch": 12 },
+    { "op": "wait", "seconds": 18 },
+    { "op": "screenshot", "name": "strata_arid_floor_context", "hideHud": true },
+
+    { "op": "teleport", "pos": [-4020.5, 177.5, 5000.5], "yaw": 18, "pitch": -30 },
+    { "op": "wait", "seconds": 18 },
+    { "op": "screenshot", "name": "strata_canyon_near_far", "hideHud": true }
+  ]
+}
