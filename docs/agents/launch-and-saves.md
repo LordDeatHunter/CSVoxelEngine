@@ -22,7 +22,11 @@ steps back one page and does nothing on the main page. SETTINGS and EXIT are the
 (the settings page is shared: the one `MenuInput.SettingsPageOpen` predicate drives the slider drag
 and its save on both menus). PLAY / CREATE never block inside the click: the click records the
 pending work, `OnRender` presents one loading-screen frame, and the next update runs
-`WorldSeed.Apply(seed, saved terrain profile)` -> `new ChunkSaveStore(dir)` -> `new World(..., store)`. The world then
+`WorldSeed.Apply(seed, saved terrain profile)` -> `new ChunkSaveStore(dir)` -> `new World(..., store)`. The World owns
+the supplied store from the start of construction. If construction fails, it stops any started
+workers first; only after successful joins does it shut down the writer and release `session.lock`.
+A timed-out worker leaves the store and seed locked. A timed-out writer keeps the folder locked
+until it exits. The original exception propagates, and no fallback player snapshot is queued. The world then
 streams in `WorldPhase.Loading` behind an animated loading screen (`LoadingScreenView` /
 `LoadingScreenRenderer.DrawLoadingScreen`: a progress bar eased monotonically toward `World.LoadProgress`, a
 wall-clock spinner, the world name and `Generating terrain...` for a new world vs `Loading
@@ -238,6 +242,11 @@ store-failure notice without escaping the input handler, while DELETE remains av
   remain withdrawable counts until taken into the instance inventory. Unknown lantern versions or invalid fuel
   fail explicitly before an existing player inventory is cleared. Instance drops are retained beyond the ordinary
   loose-block save limit and pending-restore timeout so a lantern's contents are never silently discarded.
+  Tool and gear instance IDs remain positive and are never reused. `InventoryData.NextToolInstance` stores
+  `Int32.MinValue` after the final positive ID is allocated; this exhaustion marker survives removal and reload.
+  Instance pickups and transfers then refuse ownership while stackable pickups still work. A legacy block-pool
+  lantern migration that needs more IDs than remain fails before replacing the inventory; opening that save
+  fails without queuing a replacement `player.json`, so the original file remains available.
 - **Not persisted** (tracked as `M-12` in `plans/TODO.md`): primed TNT, falling blocks, projectiles
   in flight, spell bolts in flight, toppling trees and the sapling clock (a half-grown sapling stands where it is until it
   is grown again).
