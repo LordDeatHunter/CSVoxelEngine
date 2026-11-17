@@ -70,7 +70,7 @@ internal sealed class BlockInteractions
             && _campfires.TryPlaceFood(hx, hy, hz, selected))
         {
             if (!player.IsCreative)
-                inventory.ConsumeSelected();
+                SpendStationInput(inventory);
             return true;
         }
 
@@ -171,7 +171,7 @@ internal sealed class BlockInteractions
             && _querns.TryInsert(hx, hy, hz, selected))
         {
             if (!player.IsCreative)
-                inventory.ConsumeSelected();
+                SpendStationInput(inventory);
             return true;
         }
 
@@ -245,13 +245,13 @@ internal sealed class BlockInteractions
         if (ContentRegistry.MeltRecipeForInput(held.Id) != null && _kilns.TryInsertMelt(anchor, held.Id))
         {
             if (!player.IsCreative)
-                inventory.ConsumeSelected();
+                SpendStationInput(inventory);
             return true;
         }
 
         if (held is not { FuelSeconds: > 0f } || !_kilns.TryAddFuel(anchor, held)) return held is not BlockItem;
         if (!player.IsCreative)
-            inventory.ConsumeSelected();
+            SpendStationInput(inventory);
 
         return true;
     }
@@ -332,7 +332,7 @@ internal sealed class BlockInteractions
         if (bloomeries.TryAddOre(anchor, held.Id) || (held.FuelSeconds > 0f && bloomeries.TryAddFuel(anchor, held)))
         {
             if (!player.IsCreative)
-                inventory.ConsumeSelected();
+                SpendStationInput(inventory);
             return true;
         }
         return held is not BlockItem;
@@ -357,7 +357,7 @@ internal sealed class BlockInteractions
         if (metal && anvils.TryStack(cell, held!.Id))
         {
             if (!player.IsCreative)
-                inventory.ConsumeSelected();
+                SpendStationInput(inventory);
             return true;
         }
         // A forge metal that does not stack (a full stack, another metal) takes nothing back
@@ -559,6 +559,19 @@ internal sealed class BlockInteractions
         if (id != TowerPalette.AltarBlock) return false;
         cell = new Vector3((int)hit.X, (int)hit.Y, (int)hit.Z);
         return true;
+    }
+
+    // Station acceptance transfers one input; stack-only consumption cannot remove an instance.
+    private static void SpendStationInput(Inventory inventory)
+    {
+        var instance = inventory.SelectedToolInstance;
+        if (instance > 0)
+        {
+            inventory.RemoveTool(instance);
+            return;
+        }
+
+        inventory.ConsumeSelected();
     }
 
     /// <summary>Writes an openable cell's new <paramref name="state"/> and runs the hooks every
