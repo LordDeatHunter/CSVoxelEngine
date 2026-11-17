@@ -1,0 +1,9 @@
+{
+  "name": "Tuna",
+  // A fast, heavy open-water fish, nearly two blocks long; shares the cod's rig and clips.
+  // Model and clips only so far; nothing spawns or drives it yet (plans/TODO.md F-19)
+  "blood": { "color": [150, 40, 40] },
+  "attitude": "neutral",
+  "hp": 10,
+  "model": "assets/models/entity/tuna.bbmodel"
+}

@@ -290,6 +290,14 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   still not, `plans/TODO.md` `P-61`); the group and clip names they ask for are in `docs/agents/entities.md`.
   No rest rotations anywhere (the loader has none): the legs, petals, antennae and tail prongs lie flat along an
   axis and the `idle` clip poses them.
+- [ ] **Shark, Cod, Salmon, Tuna and Jellyfish** — `shark.bbmodel` (a slate-backed, white-bellied shark about 3.5
+  blocks long, 128x64 skin), `cod.bbmodel` (olive-brown, speckled, a chin barbel, 32x16), `salmon.bbmodel` (silver with
+  a pink flank band, 32x32), `tuna.bbmodel` (navy back, yellow finlets, a crescent tail, 64x32) and
+  `jellyfish.bbmodel` (a violet bell, pink oral arms, banded tentacles, 64x32). Built and saved in Blockbench 5
+  through its MCP plugin (no generator, the skin embedded, flat speckled colors packed face by face): edit them in
+  Blockbench. None is wired yet (`plans/TODO.md` `F-19`); the group and clip names to keep are in
+  `docs/agents/entities.md` "Modeled, not wired" (the three fish share one contract). No rest rotations anywhere:
+  the pectoral fins lie flat along X and the clips pose them, swept fins are stepped cubes, and per-face UVs.
 - [ ] **Boar and Dire Boar** — `boar.bbmodel` (a wild boar, 64x64 skin) and `dire_boar.bbmodel` (the oversized
   miniboss: charcoal hide, scars, bone spikes, red eyes, 128x128 skin). Built and saved in Blockbench 5 through its
   MCP plugin, so there is **no generator and no PNG beside them** (the skin is embedded): edit them in Blockbench.

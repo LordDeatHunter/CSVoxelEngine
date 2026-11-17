@@ -301,8 +301,9 @@ target stands lower (`LedgeCautionTests`).
 
 ### Modeled, not wired
 
-Three entities have an entity file, a Blockbench model and clips but **no class, spawn rule, loot or wire kind**: they
-load and show in DevStudio's ENTITIES tab, and nothing in the game raises them. All three were built in
+Some entities have an entity file, a Blockbench model and clips but **no class, spawn rule, loot or wire kind**: they
+load and show in DevStudio's ENTITIES tab, and nothing in the game raises them (the crab and the sea life below; the
+corpse bloom and the centipede have since been wired). The first three were built in
 Blockbench through its MCP plugin (no generator, the skin embedded; `USER_TODO.md`), face -Z, stand on y = 0 and have
 no rest rotations, so parts the clips fold lie flat along an axis.
 - **Crab** (`crab.json`, hp 14; `plans/TODO.md` `P-61`): the beach's neutral mob, about one block across. `Body`
@@ -330,6 +331,25 @@ no rest rotations, so parts the clips fold lie flat along an axis.
   owns one leg pair as children, `LegR<n>` and `LegL<n>` with a `...Lower`, shaped like a crawler leg (along X,
   the knee straight out from the hip) for `LegIk`; a clip-driven centipede plays `walk`, a traveling wave whose
   pairs step 0.14 of a cycle apart. Clips: `idle`, `walk`, `bite` with `impact`, `hurt` and `death`.
+
+**Sea life** (`plans/TODO.md` `F-19`) is modeled the same way and not wired at all: five entity files with a model and
+clips, no class, spawn rule, loot or wire kind. Built in Blockbench through its MCP plugin, facing -Z, the lowest fin or
+tentacle on y = 0, no rest rotations; the pectoral fins lie flat along X and every locomotion clip keys their droop and
+sweep. A body wave is a yaw (rotation y) that travels down the chain with a phase lag per joint.
+- **Shark** (`shark.json`, hostile, hp 60), about 3.5 blocks long. `Body` > `Head` > `Jaw`; under `Body` also
+  `DorsalFin`, `PectoralFinL/R` and `Tail1` > `Tail2` > `TailFin`, with `PelvicFinL/R` under `Tail1`. Clips: `idle`
+  (a slow hover), `swim`, `charge` (a fast, wide wave with the jaw open), `bite` with `impact` (a lunge, the snap and
+  a head shake), `hurt`, `death` (it rolls belly-up) and `spawn` (a scale pop on `Body`).
+- **Cod, Salmon, Tuna** (`cod.json`, `salmon.json` hp 4, `tuna.json` hp 10, all neutral): three models with their own
+  proportions and skins over **one fish contract**, so one class can drive them all. `Body` > `Head` > `Jaw`; under
+  `Body` also `DorsalFin`, `FinL/R` and `Tail` > `TailFin`. Clips: `idle`, `swim`, `dart` (the flee burst, a short
+  loop), `flop` (a loop: on its side out of water, `Body` rolled 90 degrees and dropped onto its flank), `hurt` and
+  `death` (belly-up).
+- **Jellyfish** (`jellyfish.json`, neutral, hp 6): `Bell` > `BellRim`; under `Bell` the four oral arms `Arm1..4` and
+  the eight tentacles `Tentacle1..8` (clockwise from the front), each with a `...Lower` child, all hanging straight
+  down. Clips: `idle` (a drift), `swim` (the bell pulse, a scale track on `Bell` and `BellRim`, the tentacles trailing
+  in and flaring out), `sting` with `impact` (the tentacles whip outward), `hurt` and `death` (the bell deflates and
+  tips over). Its skin is opaque: translucency is a wiring decision.
 
 ### Wildlife
 

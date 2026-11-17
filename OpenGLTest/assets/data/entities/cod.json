@@ -1,0 +1,9 @@
+{
+  "name": "Cod",
+  // A small speckled sea fish that schools in the shallows and darts away from a swimmer.
+  // Model and clips only so far; nothing spawns or drives it yet (plans/TODO.md F-19)
+  "blood": { "color": [150, 40, 40] },
+  "attitude": "neutral",
+  "hp": 4,
+  "model": "assets/models/entity/cod.bbmodel"
+}
