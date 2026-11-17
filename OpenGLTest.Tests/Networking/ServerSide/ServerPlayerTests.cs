@@ -93,6 +93,72 @@ public sealed class ServerPlayerTests : IDisposable
     }
 
     [Fact]
+    public void ACorruptHostedPlayerFileIsPreservedWhenThePlayerIsSaved()
+    {
+        var fileName = ServerPlayerSaves.FileNameFor("Alice");
+        var file = Path.Combine(_dir, fileName.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        byte[] original = "{\"Inventory\":"u8.ToArray();
+        File.WriteAllBytes(file, original);
+
+        var store = new ChunkSaveStore(_dir);
+        try
+        {
+            var saved = ServerPlayerSaves.Load(store, "Alice");
+            Assert.Null(saved);
+            var player = new ServerPlayer(1, "Alice", Vector3.Zero);
+            Assert.False(player.Restore(saved, allowCreative: false));
+            ServerPlayerSaves.Save(store, player);
+            Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+
+            var backup = file + ".bad";
+            Assert.True(File.Exists(backup), "a rejected hosted player file should be archived before replacement");
+            Assert.Equal(original, File.ReadAllBytes(backup));
+            Assert.NotNull(PlayerSaveCodec.TryParse(File.ReadAllBytes(file)));
+        }
+        finally
+        {
+            store.Shutdown(TimeSpan.FromSeconds(10));
+        }
+    }
+
+    [Fact]
+    public void MissingNullAndValidPlayerInputsDoNotMarkFilesUnreadable()
+    {
+        AssertNotArchivedAfterReplacement("missing", null, expectPlayer: false);
+        AssertNotArchivedAfterReplacement("literal-null", "null"u8.ToArray(), expectPlayer: false);
+        AssertNotArchivedAfterReplacement("valid-object", "{}"u8.ToArray(), expectPlayer: true);
+        AssertNotArchivedAfterReplacement("finite-field-degraded", "{\"Position\":[1e1000,2,3]}"u8.ToArray(), expectPlayer: true);
+    }
+
+    private void AssertNotArchivedAfterReplacement(string name, byte[]? original, bool expectPlayer)
+    {
+        var folder = Path.Combine(_dir, name);
+        var fileName = ServerPlayerSaves.FileNameFor("Alice");
+        var file = Path.Combine(folder, fileName.Replace('/', Path.DirectorySeparatorChar));
+        if (original != null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllBytes(file, original);
+        }
+
+        var store = new ChunkSaveStore(folder);
+        try
+        {
+            var saved = ServerPlayerSaves.Load(store, "Alice");
+            Assert.Equal(expectPlayer, saved != null);
+            ServerPlayerSaves.Save(store, new ServerPlayer(2, "Alice", Vector3.Zero));
+            Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+            Assert.False(File.Exists(file + ".bad"), $"{name} must not be classified as a rejected JSON file");
+            Assert.NotNull(PlayerSaveCodec.TryParse(File.ReadAllBytes(file)));
+        }
+        finally
+        {
+            store.Shutdown(TimeSpan.FromSeconds(10));
+        }
+    }
+
+    [Fact]
     public void DistinctNamesGetDistinctFilesInsideThePlayersFolder()
     {
         var alice = ServerPlayerSaves.FileNameFor("Alice");

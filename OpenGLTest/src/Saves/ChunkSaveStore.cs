@@ -258,6 +258,13 @@ public sealed class ChunkSaveStore
         }
     }
 
+    /// <summary>Marks a successfully read sidecar whose format parser rejected its bytes.</summary>
+    internal void MarkUnreadableFile(string fileName)
+    {
+        ValidateFileName(fileName);
+        _unreadableFiles.TryAdd(fileName, 0);
+    }
+
     /// <summary>
     /// Re-queues every write whose last attempt failed (its newest pending snapshot or bytes), so a
     /// file that was briefly locked gets another try without the chunk having to be edited again.

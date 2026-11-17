@@ -19,6 +19,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       LodEditState.cs          # lod-edits.bin: export/import of the LOD caps, surface overrides, canopy markers
       MobSaveCodec.cs          # a live Mob -> its EntitySaveData form (per-kind ammo)
       PlayerSaveCodec.cs       # reads/writes player.json
+      PlayerSaveReader.cs      # marks rejected player JSON for .bad preservation before replacement
       PlayerSaveData.cs        # the player.json shape: pose, modes, health, clock, inventory + hotbar, quests
       QuestSaveData.cs, QuestViewData.cs  # quest progress by id (completed, counts) and the quest book's pan and zoom
       SaveNames.cs             # block/ and item/ namespaced content names, so saves never store raw ids

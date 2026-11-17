@@ -177,6 +177,9 @@ pure function of the seed: only **deltas** and the seed are written.
   may pass the natural mob cap but a mob waits while the hard cap (`MobHardCap`, which sizes the
   healthbar buffers) is full; an entry that waits stays pending and is saved again, and is
   discarded only after `EntityRestoreTimeoutSeconds` of play.
+- **Malformed player saves.** A local `player.json` or hosted `players/<slug>.json` rejected by the
+  parser is marked for `.bad` preservation before a later replacement; missing files, JSON `null`,
+  and valid partial objects retain their ordinary load behavior.
 - **The explored map** (`map.bin`, `MapSaveCodec`: "CVMP", a version byte, then a Deflate body of the surface and
   sky `MapTile`s, each its layer kind, chunk column, 256 texels and 256 heights; a cave slice is never kept). Only a
   world that drew a HUD has a map (`WorldRenderer.EnsureMap`, which imports the file when it builds the tracker), so a
