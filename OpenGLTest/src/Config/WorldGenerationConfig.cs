@@ -363,6 +363,17 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float DuneAmplitude = 8f;
     // Sandstone strata: sand on top, this many sandstone blocks under it, then stone.
     public const int SandstoneDepth = 4;
+    public const float ErgFrequency = 1f / 1100f;
+    public const float ErgStart = 0f;
+    public const float ErgFull = 0.6f;
+    public const float ErgCoreThreshold = 0.75f;
+    public const float ErgRidgeFrequency = 1f / 320f;
+    public const float ErgRidgeWarp = 58f;
+    public const float ErgDuneWavelength = 120f;
+    public const float ErgStossShare = 0.78f;
+    public const float ErgDuneAmplitude = 22f;
+    public const int ErgCoreCacheCapacity = 4096;
+    public const int ErgCoreCacheGenerations = 4;
     // Width of the grass/desert blend band where the surface material dithers, 0 disables it.
     public const float BiomeBorderDither = 0.16f;
     // Wavelength of the coherent border dither, in blocks. The material flip follows this noise,

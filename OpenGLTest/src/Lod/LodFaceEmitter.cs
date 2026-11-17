@@ -414,6 +414,10 @@ internal ref struct LodFaceEmitter
                             wallSite.column.Biomes[wallSite.index])]
                         : null;
                     var tile = strataWall is not null ? strataWall.FaceTiles[f]
+                        : strataColumn is { } sandSite
+                            && TerrainErg.IsCore(sandSite.x >> Chunk.SizeShift, sandSite.z >> Chunk.SizeShift)
+                            && (ground - cy) * _cellSize <= WorldGenerationConfig.SandstoneDepth + 6
+                        ? _sand.FaceTiles[f]
                         : (ground - cy) * _cellSize <= WorldGenerationConfig.NominalDirtDepth
                         ? (biome == Biome.Desert ? _sandstone.FaceTiles[f]
                             : isSeaCell || rock ? _stone.FaceTiles[f]

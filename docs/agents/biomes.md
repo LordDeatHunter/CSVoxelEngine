@@ -222,6 +222,18 @@ content stages are still separate. `visual-examples/dynamic-canyons-s2a.json` re
 candidate shape views; `visual-examples/dynamic-strata-s2-materials.json` records the
 bounded arid-band views for a separate Release visual review.
 
+Dynamic deserts add a low-frequency erg field only where desert weight is positive. In its
+support, wind-aligned dunes have a long gentle stoss rise and a shorter steep slip face;
+outside support the earlier dune calculation is unchanged. A hard sand-sea core is an entire
+chunk column whose center has strong erg weight and whose 256 stored, dithered biomes are all
+Desert. Its pure classifier verdict is cached per chunk column and reset on a quiescent seed or
+profile change. No site may put even part of a tree, log, boulder, well, ruin, waystone, tower,
+oasis disc or other surface scenery into a core. Core ground is sand through the usual
+sandstone depth plus six cells, with caves and ores retaining their existing ownership;
+generated far LOD shows its sand cap and exposed upper sides. Imported columns remain
+authoritative. Legacy terrain and saved-world profile selection are unchanged. Small desert
+flowers and cactus variants, richer vegetation, volcanoes and ocean habitats are later stages.
+
 **openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
 forest alternates between rolling woodland and open grass instead of one uniform canopy
 (`TreeGenerator.TryGetTree` reads `TerrainGenerator.ForestOpenness`, scaled per species by its

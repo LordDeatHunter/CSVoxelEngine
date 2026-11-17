@@ -53,6 +53,7 @@ public static class FoliageGenerator
     /// <summary>Whether the forest, steppe or savanna surface column (x, z) grows a grass tuft.</summary>
     public static bool TryGetGrassTuft(int x, int z)
     {
+        if (TerrainErg.Intersects(x, z, x, z)) return false;
         // An oasis disc is a dense meadow whatever the patch noise says
         if (OasisGenerator.IsDisc(x, z)) return true;
         if (TerrainGenerator.FloraBiomeAt(x, z) is not (Biome.Forest or Biome.Steppe or Biome.Savanna or Biome.Jungle)) return false;
@@ -71,7 +72,8 @@ public static class FoliageGenerator
 
     /// <summary>Whether the desert or frozen surface column (x, z) grows a dead shrub.</summary>
     public static bool TryGetDeadShrub(int x, int z) =>
-        TerrainGenerator.FloraBiomeAt(x, z) is Biome.Desert or Biome.Frozen && ShrubRoll(x, z);
+        !TerrainErg.Intersects(x, z, x, z)
+        && TerrainGenerator.FloraBiomeAt(x, z) is Biome.Desert or Biome.Frozen && ShrubRoll(x, z);
 
     /// <summary>
     /// Whether a dead shrub grows over <paramref name="ground"/> at (x, z): sand only in a desert
@@ -83,7 +85,8 @@ public static class FoliageGenerator
         if (ground == SandGroundBlock) biome = Biome.Desert;
         else if (ground == PermafrostGroundBlock) biome = Biome.Frozen;
         else return false;
-        return TerrainGenerator.FloraBiomeAt(x, z) == biome && ShrubRoll(x, z);
+        return !TerrainErg.Intersects(x, z, x, z)
+            && TerrainGenerator.FloraBiomeAt(x, z) == biome && ShrubRoll(x, z);
     }
 
     /// <summary>The shrub scatter inside its biome: a low-frequency patch, then a density roll.</summary>

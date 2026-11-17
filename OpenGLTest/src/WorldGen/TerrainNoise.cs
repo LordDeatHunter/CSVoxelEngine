@@ -18,6 +18,8 @@ internal static class TerrainNoise
     private const int CanyonMaskSeedOffset = 195;
     private const int ShelfSeedOffset = 196;
     private const int StrataSeedOffset = 197;
+    private const int ErgSeedOffset = 198;
+    private const int ErgRidgeSeedOffset = 201;
     internal static FastNoiseLite ForestSwellNoise;
     internal static FastNoiseLite HillNoise;
     internal static FastNoiseLite HillMaskNoise;
@@ -56,6 +58,8 @@ internal static class TerrainNoise
     internal static FastNoiseLite CanyonMaskNoise;
     internal static FastNoiseLite ShelfNoise;
     internal static FastNoiseLite StrataNoise;
+    internal static FastNoiseLite ErgNoise;
+    internal static FastNoiseLite ErgRidgeNoise;
     internal static FastNoiseLite LakeShapeNoise;
 
     /// <summary>The pack-ice floe field, read only by <see cref="Features.SnowGenerator.IsFrozenWater"/>.</summary>
@@ -171,6 +175,8 @@ internal static class TerrainNoise
         CanyonMaskNoise = MakeNoise(CanyonMaskSeedOffset, WorldGenerationConfig.CanyonMaskFrequency);
         ShelfNoise = MakeNoise(ShelfSeedOffset, WorldGenerationConfig.ShelfFrequency);
         StrataNoise = MakeNoise(StrataSeedOffset, WorldGenerationConfig.StrataFrequency);
+        ErgNoise = MakeNoise(ErgSeedOffset, WorldGenerationConfig.ErgFrequency);
+        ErgRidgeNoise = MakeNoise(ErgRidgeSeedOffset, WorldGenerationConfig.ErgRidgeFrequency);
         LakeShapeNoise = MakeNoise(90, WorldGenerationConfig.LakeShapeFrequency);
         // Offset 152 was unused (ClimateWarp took 151, the feature generators stop at 142)
         PackIceNoise = MakeNoise(152, WorldGenerationConfig.PackIceFrequency, octaves: 2);

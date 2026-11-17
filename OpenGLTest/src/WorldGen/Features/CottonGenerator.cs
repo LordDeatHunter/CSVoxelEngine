@@ -52,7 +52,8 @@ public static class CottonGenerator
 
     /// <summary>Whether the surface column (x, z) is a cotton clump member, before the terrain checks.</summary>
     public static bool TryGetCotton(int x, int z) =>
-        PlantClumps.TryGetMember(Clumps, WorldGenerationConfig.Seed, x, z, ClimateGate, out _, out _);
+        !TerrainErg.Intersects(x, z, x, z)
+        && PlantClumps.TryGetMember(Clumps, WorldGenerationConfig.Seed, x, z, ClimateGate, out _, out _);
 
     /// <summary>
     /// Stamps cotton onto the surface: one block above the heightmap, into air only, and only over

@@ -85,6 +85,11 @@ public static class ColumnCache
                 topBlock = TerrainGenerator.SandBlock;
                 soilBlock = TerrainGenerator.SandstoneBlock;
                 soilDepth = dirtDepth == 0 ? 0 : WorldGenerationConfig.SandstoneDepth;
+                if (TerrainErg.IsCore(chunkX, chunkZ))
+                {
+                    soilBlock = TerrainGenerator.SandBlock;
+                    soilDepth = WorldGenerationConfig.SandstoneDepth + 6;
+                }
                 break;
 
             case Biome.Ocean:

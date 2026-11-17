@@ -64,6 +64,9 @@ public static class TowerPlacement
             WorldGenerationConfig.TowerMinRadius
             + (int)(SplitMix64.Unit(hash, 4) * (WorldGenerationConfig.TowerMaxRadius - WorldGenerationConfig.TowerMinRadius + 1)),
             WorldGenerationConfig.TowerMinRadius, WorldGenerationConfig.TowerMaxRadius);
+        var outer = radius + WorldGenerationConfig.TowerApronDepth;
+        if (TerrainErg.Intersects(centerX - outer, centerZ - outer,
+                centerX + outer, centerZ + outer)) return false;
         return true;
     }
 

@@ -58,6 +58,8 @@ public static class BoulderGenerator
         var counts = WorldFeatureConfig.BoulderMaxBlocks - WorldFeatureConfig.BoulderMinBlocks + 1;
         count = WorldFeatureConfig.BoulderMinBlocks + (int)(SplitMix64.Mix(h + CountStream) % (ulong)counts);
         blockId = (SplitMix64.Mix(h + MaterialStream) & 1) == 0 ? StoneBlock : CobblestoneBlock;
+        if (TerrainErg.Intersects(centerX - HorizontalReach, centerZ - HorizontalReach,
+                centerX + HorizontalReach, centerZ + HorizontalReach)) return false;
         return true;
     }
 

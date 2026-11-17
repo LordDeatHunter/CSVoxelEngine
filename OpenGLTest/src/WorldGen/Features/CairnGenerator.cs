@@ -42,6 +42,7 @@ public static class CairnGenerator
         var span = (ulong)(1 << WorldFeatureConfig.CairnCellShift);
         x = (cellX << WorldFeatureConfig.CairnCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
         z = (cellZ << WorldFeatureConfig.CairnCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        if (TerrainErg.Intersects(x, z, x, z)) return false;
         return true;
     }
 

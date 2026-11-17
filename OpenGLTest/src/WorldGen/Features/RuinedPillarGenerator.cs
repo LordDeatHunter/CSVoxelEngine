@@ -37,6 +37,7 @@ public static class RuinedPillarGenerator
         var heights = WorldFeatureConfig.PillarMaxHeight - WorldFeatureConfig.PillarMinHeight + 1;
         height = WorldFeatureConfig.PillarMinHeight + (int)(SplitMix64.Mix(h + 3) % (ulong)heights);
         gaps = (uint)(SplitMix64.Mix(h + 4) & 0xF);
+        if (TerrainErg.Intersects(x, z, x, z)) return false;
         return true;
     }
 

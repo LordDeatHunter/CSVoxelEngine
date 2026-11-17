@@ -156,6 +156,9 @@ public static class TreeGenerator
         var found = SpeciesAt(x, z);
         if (found?.Worldgen == null)
             return false;
+        var reach = TreeRasterizer.ReachOf(found).Horizontal;
+        if (TerrainErg.Intersects(x - reach, z - reach, x + reach, z + reach))
+            return false;
         var rules = found.Worldgen;
 
         // Keep the origin spawn in the open (see TreeSpawnClearRadius)

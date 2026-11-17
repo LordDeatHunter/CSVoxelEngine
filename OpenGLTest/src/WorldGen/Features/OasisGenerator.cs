@@ -27,6 +27,9 @@ public static class OasisGenerator
         var span = (ulong)(1 << WorldFeatureConfig.OasisCellShift);
         centerX = (cellX << WorldFeatureConfig.OasisCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
         centerZ = (cellZ << WorldFeatureConfig.OasisCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        var radius = WorldFeatureConfig.OasisRadius;
+        if (TerrainErg.IntersectsDisc(centerX, centerZ, radius))
+            return false;
 
         // The deep desert only: where SurfaceWaterGate keeps ordinary lakes out, so an oasis is
         // the one body of water there

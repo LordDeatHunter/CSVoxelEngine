@@ -53,6 +53,8 @@ public static class FlowerGenerator
 
     /// <summary>Whether the surface column (x, z) grows a flower, before the terrain checks.</summary>
     public static bool TryGetFlower(int x, int z) =>
+        !TerrainErg.Intersects(x, z, x, z)
+        &&
         // The spread hash runs first: it rejects most columns before any clump or oasis lookup
         IsSpreadSpot(x, z)
         // An oasis disc is a full meadow whatever the clump rule says

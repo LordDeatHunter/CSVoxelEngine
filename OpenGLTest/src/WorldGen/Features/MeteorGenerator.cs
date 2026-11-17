@@ -36,6 +36,7 @@ public static class MeteorGenerator
         z = (cellZ << WorldFeatureConfig.MeteorCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
         var radii = WorldFeatureConfig.MeteorMaxRadius - WorldFeatureConfig.MeteorMinRadius + 1;
         radius = WorldFeatureConfig.MeteorMinRadius + (int)(SplitMix64.Mix(h + 3) % (ulong)radii);
+        if (TerrainErg.IntersectsDisc(x, z, radius)) return false;
         return true;
     }
 
