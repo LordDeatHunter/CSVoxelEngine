@@ -5,6 +5,11 @@
   // 35x35 x 3 grid and its local 5x5 follow-up, not a claim over all coordinates.
   "steps": [
     { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [0.5, 85.5, 0.5], "yaw": 45, "pitch": -26 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [0.5, 85.5, 0.5], "yaw": 45, "pitch": -26 },
+    { "op": "screenshot", "name": "spawn_horizon", "hideHud": true },
+
     { "op": "teleport", "pos": [600.5, 43.5, 6000.5], "yaw": 45, "pitch": 8 },
     { "op": "wait", "seconds": 25 },
     { "op": "teleport", "pos": [600.5, 43.5, 6000.5], "yaw": 45, "pitch": 8 },
@@ -23,6 +28,11 @@
     { "op": "wait", "seconds": 25 },
     { "op": "teleport", "pos": [1500.5, 151.5, 6000.5], "yaw": -25, "pitch": -35 },
     { "op": "screenshot", "name": "rock_snow_flank_and_far_lod", "hideHud": true },
+
+    { "op": "teleport", "pos": [-6500.5, 115.5, -3500.5], "yaw": 60, "pitch": -40 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [-6500.5, 115.5, -3500.5], "yaw": 60, "pitch": -40 },
+    { "op": "screenshot", "name": "scree_flank", "hideHud": true },
 
     { "op": "teleport", "pos": [-4494.5, 72.5, -1584.5], "yaw": 35, "pitch": -50 },
     { "op": "wait", "seconds": 25 },

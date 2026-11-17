@@ -188,7 +188,7 @@ gravel scree appears from 96 through 120, and snow reaches full altitude weight 
 `ColumnCache`, `SnowGenerator`, and generated far LOD use these same profile rules.
 This S1b stage changes relief only; cliffs, dunes, new flora, volcanoes and habitats remain
 later issue #64 stages. `visual-examples/dynamic-relief-s1b.json` frames the bounded
-representative range, high summit, rock/snow flank, LOD vista and valley knoll.
+representative range, high summit, rock/snow/scree flanks, LOD vista, spawn horizon and valley knoll.
 
 **openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
 forest alternates between rolling woodland and open grass instead of one uniform canopy
