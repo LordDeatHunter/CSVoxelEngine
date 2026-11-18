@@ -9,6 +9,8 @@ using VoxelEngine.Interaction;
 using VoxelEngine.Networking;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using Xunit;
 
 namespace VoxelEngine.Tests.Interaction;
@@ -76,7 +78,7 @@ public sealed class DesertFloraSupportTests : IDisposable
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var cell = new Vector3(6, 4, 6);
         center.SetBlockRaw((int)cell.X, (int)cell.Y, (int)cell.Z, cactus, 0);
-        var beside = new Vector3(6.5f, 4f, 6.5f);
+        var beside = new Vector3(6.5f, MeshTestWorld.HighAbove.Y * Chunk.Size + 4f, 6.5f);
         Assert.True(ContactDamage.Touches(manager, beside, PlayerPhysics.PlayerRadius,
             PlayerPhysics.PlayerHeight, out var damage));
         Assert.True(damage > 0);
@@ -94,6 +96,42 @@ public sealed class DesertFloraSupportTests : IDisposable
             Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
                 links.Resolve(new Dictionary<ushort, BlockType>(BlockType.Types))).Message);
         }
+
+        var fullFace = new BlockLinkResolver();
+        fullFace.Queue(Id("torch"), new BlockDefinition { SupportBlock = "small_cactus" }, path);
+        Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
+            fullFace.Resolve(new Dictionary<ushort, BlockType>(BlockType.Types))).Message);
+
+        var wall = new BlockLinkResolver();
+        Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
+            wall.Queue(owner, new BlockDefinition { SupportBlock = "small_cactus", WallBlock = "torch" }, path)).Message);
+    }
+
+    [Fact]
+    public void FlowingWaterGoesAroundTheFloweredCactusWithoutStrandingItsBlossom()
+    {
+        var (chunks, center) = MeshTestWorld.WalledArea();
+        var stone = Id("stone");
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var z = 0; z < Chunk.Size; z++)
+            center.SetBlockRaw(x, 0, z, stone, 0);
+
+        var water = Id("water");
+        var cactus = Id("small_cactus");
+        var blossom = Id("cactus_flower");
+        center.SetBlockRaw(8, 1, 8, water, FluidState.Source);
+        center.SetBlockRaw(9, 1, 8, cactus, 0);
+        center.SetBlockRaw(9, 2, 8, blossom, 0);
+        Assert.False(FluidWakeRules.IsFlowTarget(cactus));
+
+        var fluids = new FluidManager();
+        fluids.ScheduleAround(8, 1, 8);
+        for (var i = 0; i < 8; i++)
+            fluids.Update(1f, chunks, new DropManager());
+
+        Assert.Equal(water, chunks.GetBlockGlobal(7, 1, 8));
+        Assert.Equal(cactus, chunks.GetBlockGlobal(9, 1, 8));
+        Assert.Equal(blossom, chunks.GetBlockGlobal(9, 2, 8));
     }
 
     [Fact]
