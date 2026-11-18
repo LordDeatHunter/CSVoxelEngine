@@ -1,8 +1,10 @@
 using System;
 using System.Numerics;
+using System.Threading;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace VoxelEngine.Tests.WorldGen.Features;
 
@@ -10,6 +12,9 @@ namespace VoxelEngine.Tests.WorldGen.Features;
 [Collection("Worldgen seed")]
 public sealed class DesertFloraTests : IDisposable
 {
+    private readonly ITestOutputHelper _output;
+    private readonly (long Builds, long Biomes) _coreStart;
+    private static int _siteWindowReads;
     // A S3a photographed desert fringe, used as a bounded candidate window rather than a
     // claim that any particular final S3b flower already exists at the camera coordinate.
     private const int WindowX = -7789;
@@ -17,13 +22,22 @@ public sealed class DesertFloraTests : IDisposable
     // One shared pass bounds the candidate window to 2048 entries across all tests.
     private static readonly Lazy<((int X, int Z) Small, (int X, int Z) Bloom, (int X, int Z) Flower)> Sites = new(FindSites);
 
-    public DesertFloraTests()
+    public DesertFloraTests(ITestOutputHelper output)
     {
+        _output = output;
         TestContent.EnsureLoaded();
         WorldSeed.Apply(1337, WorldGenProfile.Dynamic);
+        _coreStart = TerrainErg.CoreReadCounts;
+        TerrainErg.ReadCountsEnabled = true;
     }
 
-    public void Dispose() => WorldSeed.Apply(WorldSeed.Default);
+    public void Dispose()
+    {
+        var (builds, biomes) = TerrainErg.CoreReadCounts;
+        _output.WriteLine($"S3b cumulative site_window_reads={Volatile.Read(ref _siteWindowReads)} core_builds={builds - _coreStart.Builds} stored_biome_reads={biomes - _coreStart.Biomes}");
+        TerrainErg.ReadCountsEnabled = false;
+        WorldSeed.Apply(WorldSeed.Default);
+    }
 
     private static (int X, int Z) Site(ushort wanted, bool blossom = false) =>
         wanted == DesertFloraGenerator.DesertFlowerBlock ? Sites.Value.Flower
@@ -37,6 +51,7 @@ public sealed class DesertFloraTests : IDisposable
         for (var x = WindowX; x < WindowX + 64; x++)
         for (var z = WindowZ; z < WindowZ + 32; z++)
         {
+            Interlocked.Increment(ref _siteWindowReads);
             var candidate = DesertFloraGenerator.CandidateAt(x, z);
             if (candidate != DesertFloraGenerator.SmallCactusBlock
                 && candidate != DesertFloraGenerator.DesertFlowerBlock) continue;
