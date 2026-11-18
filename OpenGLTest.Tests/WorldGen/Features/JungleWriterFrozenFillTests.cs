@@ -42,6 +42,7 @@ public sealed class JungleWriterFrozenFillTests(ITestOutputHelper output) : IDis
         var bandSkipped = 0;
         var blockReads = 0;
         var stateReads = 0;
+        var waterLevelReads = 0;
         var rootMembers = 0;
         var cover = 0;
         var tallPairs = 0;
@@ -57,7 +58,7 @@ public sealed class JungleWriterFrozenFillTests(ITestOutputHelper output) : IDis
         }
         finally
         {
-            output.WriteLine($"S4a Jungle writer partial ledger columnAttempts={columnAttempts}/2 normalAttempts={normalAttempts}/2 plannerProbeAttempts={probeAttempts}/2 surfaceSites={surfaceSites}/512 bandSkipped={bandSkipped} rootMembers={rootMembers}/9 blockReads={blockReads}/3126 stateReads={stateReads}/2084 cover={cover} tallPairs={tallPairs} completeClusters={completeClusters}/4");
+            output.WriteLine($"S4a Jungle writer partial ledger columnAttempts={columnAttempts}/2 normalAttempts={normalAttempts}/2 plannerProbeAttempts={probeAttempts}/2 surfaceSites={surfaceSites}/512 bandSkipped={bandSkipped} rootMembers={rootMembers}/9 blockReads={blockReads}/3126 stateReads={stateReads}/2084 waterLevelReads={waterLevelReads}/512 cover={cover} tallPairs={tallPairs} completeClusters={completeClusters}/4");
             WorldSeed.Apply(WorldSeed.Default);
         }
 
@@ -108,10 +109,13 @@ public sealed class JungleWriterFrozenFillTests(ITestOutputHelper output) : IDis
                 var actual = Read(normal, lx, ly, lz);
                 if (actual.Base != fern && actual.Base != tallFern && actual.Base != bush) continue;
                 var planned = Read(probe, lx, ly, lz);
+                waterLevelReads++;
+                var waterLevel = column.WaterLevel[ci];
                 var x = worldX0 + lx;
                 var z = worldZ0 + lz;
-                output.WriteLine($"S4a Jungle cover x={x} z={z} h={height} stored={column.Biomes[ci]} ground={actual.Ground} base={actual.Base} top={actual.Top} state={actual.State} topState={actual.TopState} probeGround={planned.Ground} probeBase={planned.Base} probeTop={planned.Top} probeState={planned.State} probeTopState={planned.TopState}");
+                output.WriteLine($"S4a Jungle cover x={x} z={z} h={height} waterLevel={waterLevel} stored={column.Biomes[ci]} ground={actual.Ground} base={actual.Base} top={actual.Top} state={actual.State} topState={actual.TopState} probeGround={planned.Ground} probeBase={planned.Base} probeTop={planned.Top} probeState={planned.State} probeTopState={planned.TopState}");
                 Assert.Equal(Biome.Jungle, column.Biomes[ci]);
+                Assert.True(height >= waterLevel, "real Jungle ground cover lies below the column water level");
                 Assert.True(actual.Ground == grass || actual.Ground == jungleMud);
                 Assert.Equal(actual, planned);
                 Assert.True(foliageBand.Contains(height + 1));
