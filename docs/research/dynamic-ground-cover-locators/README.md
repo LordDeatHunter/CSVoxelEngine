@@ -176,3 +176,82 @@ UTC bounds, exits, stdout/stderr, TRX and executed DLL copies/hashes. Archive
 the temporary inclusion and confirm its removal restores default membership
 and the committed branch. This paragraph authorizes no build, test, query,
 column read or cleanup now.
+
+## Opt-in two-dimensional Taiga admission observation
+
+`TaigaRegionalAdmissionDiagnosticTests.cs` is a separate **unrun** research
+source outside the default test project. It preserves the complete 31-point
+line and its finite miss. At seed 1337 Dynamic, that line's first eight
+Taiga points were all snowed; its first snow-free point was Steppe. The
+coherent ecotone support fell below Taiga before snow disappeared on that
+diagonal, so refining it would repeat the observed correlation.
+
+The fixed grid uses `normal=-12..12` outside, `tangent=-32..32` inside, and
+exactly **1,625** points in numeric loop order:
+
+```text
+x = -7181 + 2*normal + 12*tangent
+z =  8819 + 2*normal - 12*tangent
+```
+
+The `2*normal` term follows the observed cold gradient through the narrow
+possible raw-cold band near the measured `.5735` center. The `12*tangent`
+term crosses it in the independent direction over `±384` in each horizontal
+coordinate. This covers multiple ecotone phases (frequency 1/96, seed
+offset 204) and pack-ice snow phases (frequency 1/36, two octaves, offset
+152), with three or more tangent samples per nominal pack-ice scale.
+Temperature and humidity are much broader (Dynamic frequencies 1/9000 and
+1/3200) and share a 1/1400 domain warp; some outer points may leave the
+cold band. The retained 231-point grid used spacing 64 in a nearby region,
+larger than the pack-ice scale, so this fixed orientation and spacing provide
+different evidence. The scale comparison does **not** predict a hit or turn a
+finite scan into a global proof. There is no adaptive refinement, second
+region, seed change, or early stop when a candidate appears.
+
+Each of the 1,625 rows logs base/ocean and actual dithered flora, raw
+climate, classifier ramps, actual ecotone and shifted gates, climate
+`HasSnow`, conditional tuft/variant and a specific rejection reason. In the
+necessary middle cold band it also makes one direct pack-ice noise read at
+the actual snow offset `(x+4096,z-4096)` and logs its smoothstep threshold;
+`HasSnow` performs its own internal read. The source counts **before** each
+direct call, retains every row, prints a partial ledger in `finally`, and
+treats zero pure Taiga/no-snow/tuft/fern candidates as a valid observation.
+
+Direct point ceilings: exactly 1,625 calls each to `FloraBiomeAt`,
+`BiomeWeights`, `SampleClimate`, `ColdOf`, `DryOf`, `WarmOf`, `SemiDryOf`,
+`JungleOf`, `EcotoneNoise.GetNoise` and `HasSnow`; at most 1,625 each to
+`Classify`, conditional `PackIceNoise.GetNoise`, `TryGetGrassTuft` and
+`CandidateAt`. The direct coordinate-visit ceiling is 1,625, below the
+root's 8,192 source ceiling. These are **not** total noise/feature operations:
+`FloraBiomeAt` and `BiomeWeights` resample climate/continent/island,
+Dynamic dither resamples climate/ecotone, `TryGetGrassTuft` rereads core,
+oasis, flora, patch, climate and hash, and `HasSnow` rereads pack ice in the
+middle band. Their transitive counts remain unmeasured until a separate
+execution grant defines treatment.
+
+After all rows, only the **first** actual Taiga/no-climate-snow/tuft/fern
+candidate may make one negative-coordinate-safe `ColumnCache.Get`. If none,
+zero columns; if its metadata fails, no fallback. The optional work is five
+indexed fields in one selected column, one each `ColdWeightAt`, `DepthAt`,
+core, beach and clearance, two `IsWaterColumn` calls (height and bed) and
+three `FloorDiv` calls. A cache miss constructs 256 metadata entries through
+the existing terrain/feature/noise graph. That indirect work is not measured
+by the direct ledger and must be accepted or separately instrumented by root
+before execution. The diagnostic does no chunk fill, mesh, block-ID read,
+World, game or GL work. Its likely grass value is a source prediction only;
+actual ground/air/occupancy/final natural stamp remain unobserved.
+
+**Proposed future inclusion only, requiring a separate root grant:** copy
+the file by name into `OpenGLTest.Tests/WorldGen/Features/`, record source
+and project identities, Release build and discover exactly the filter below,
+then run only that filter with `--no-build --no-restore` and an owned TRX:
+
+```text
+FullyQualifiedName=VoxelEngine.Tests.WorldGen.Features.TaigaRegionalAdmissionDiagnosticTests.FixedRegionalGridReportsPureGatesAndAtMostOneMetadataColumn
+```
+
+Record argv/cwd/scoped environment/UTC bounds/exits/raw output/TRX and
+actual executed DLL copies/hashes. Archive the temporary source and raw
+evidence before removing only that inclusion; prove the clean branch and
+default test membership afterward. This source preparation authorizes no
+build, test, discovery, query, column generation or cleanup.
