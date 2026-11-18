@@ -118,3 +118,61 @@ GL, two eyes × (nine target rays + one full 10-block center ray) = at most
 20 rays × 32 visits = 640 ray-cell reads plus three target and two eye checks
 = at most 645 explicit ID reads. The generated chunk's dependent cache/noise,
 feature and voxel passes are transitive **unmeasured** work, not zero.
+
+## Opt-in Taiga warm-edge admission diagnostic
+
+`TaigaWarmEdgeAdmissionDiagnosticTests.cs` is new, unrun research source outside
+the default test project. It is a separate child of the clean S4a candidate
+`40433894ff9feb4ce0cacdfba0d54f161fce45de`. The earlier retained
+seed-1337, 78-point transect (`tf3cfa6398132d73ff`) found Taiga with snow at
+`(-7192,8808)` (climate cold `.60435545`), followed by Steppe without snow at
+`(-7160,8840)` (cold `.51548576`). That observation motivates exactly the 31
+intermediate integer points `(-7192+i,8808+i)`, `i=1..31`; it does not promise
+that dither, pack-ice snow, tuft and fern selection overlap there. All points
+are logged in order, even after an early pure candidate. Zero candidates is a
+valid diagnostic result. Only the first actual Taiga/no-climate-snow/tuft/fern
+point may spend one same-region metadata column read. There is no fallback to
+a second point if that metadata fails.
+
+The direct point ledger has exactly 31 calls each to `FloraBiomeAt`,
+`BiomeWeights`, `SampleClimate`, `ColdOf`, `DryOf`, `WarmOf`, `SemiDryOf`,
+`JungleOf`, `EcotoneNoise.GetNoise` and `HasSnow`; at most 31 calls to
+`Classify`, and at most 31 conditional calls each to `TryGetGrassTuft` and
+`CandidateAt`. Each counter increments **before** its call. The one optional
+`ColumnCache.Get` reads one selected column's height, stored biome, dirt
+depth, bed and water level (five indexed metadata reads), with at most one
+direct call each to `ColdWeightAt`, `DepthAt`, `TerrainErg.Intersects`,
+`IsBeachHeight`, `SurfaceClearance.Allows` and two `IsWaterColumn` calls
+(height and bed), plus three `FloorDiv` calls. The test reports partial
+counters in `finally` even on failure and checks normal completion budgets.
+
+Those direct counts **do not** count the repeated underlying noise and helper
+work: `FloraBiomeAt` and the separate `BiomeWeights` each compute continental,
+island and climate weights; Dynamic dither resamples climate and ecotone;
+`TryGetGrassTuft` rereads core/oasis, flora, grass-patch noise, climate and a
+density hash; `CandidateAt` hashes and selects a weighted row; `HasSnow` reads
+the pack-ice field only in its intermediate cold band. An uncached
+`ColumnCache.Get` computes 256 metadata entries through `TerrainGenerator.Compute`,
+including height/water/feature/noise dependencies and corner climate; its
+transitive invocation count must be instrumented and recorded before any
+later run. `DepthAt` also rereads core, cold/snow and drift noise. The source
+performs no chunk fill, mesh, block-ID read, World, game or GL work. Metadata
+can only predict likely grass; cave/feature edits, actual ground, air and
+final stamp remain unobserved.
+
+**Future procedure, requiring a separate root execution grant:** copy this
+file by name into `OpenGLTest.Tests/WorldGen/Features/`, record exact source
+and both project identities, build the Release solution with installed SDK 10
+and scoped `DOTNET_ROLL_FORWARD=LatestMajor`, discover the exact filter below,
+then run only that filter with `--no-build --no-restore` and an owned TRX path:
+
+```text
+FullyQualifiedName=VoxelEngine.Tests.WorldGen.Features.TaigaWarmEdgeAdmissionDiagnosticTests.FixedWarmEdgeReportsEveryPureGateAndOneConditionalMetadataColumn
+```
+
+Before execution, freeze the complete transitive column/helper counter
+instrumentation and cumulative budget. Preserve raw argv, cwd, scoped env,
+UTC bounds, exits, stdout/stderr, TRX and executed DLL copies/hashes. Archive
+the temporary inclusion and confirm its removal restores default membership
+and the committed branch. This paragraph authorizes no build, test, query,
+column read or cleanup now.
