@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
 using Xunit;
 

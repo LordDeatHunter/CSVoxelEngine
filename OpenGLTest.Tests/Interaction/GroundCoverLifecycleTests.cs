@@ -7,6 +7,7 @@ using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.LeafDecay;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
 namespace VoxelEngine.Tests.Interaction;
