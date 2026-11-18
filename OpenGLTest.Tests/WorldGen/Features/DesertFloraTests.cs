@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Saves;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
 using Xunit;
@@ -186,7 +187,7 @@ public sealed class DesertFloraTests : IDisposable
             DesertFloraGenerator.CactusFlowerBlock);
         AssertGenerated(flowerX, flowerZ, DesertFloraGenerator.DesertFlowerBlock, BlockType.Air);
 
-        static void AssertGenerated(int x, int z, ushort plant, ushort blossom)
+        void AssertGenerated(int x, int z, ushort plant, ushort blossom)
         {
             var cx = x >> Chunk.SizeShift;
             var cz = z >> Chunk.SizeShift;
@@ -198,6 +199,10 @@ public sealed class DesertFloraTests : IDisposable
             var ly = height + 1 - (cy << Chunk.SizeShift);
             var lx = x & Chunk.SizeMask;
             var lz = z & Chunk.SizeMask;
+            var actualGround = chunk.GetLocalBlock(lx, ly - 1, lz);
+            var actualPlant = chunk.GetLocalBlock(lx, ly, lz);
+            var actualUpper = ly + 1 < Chunk.Size ? chunk.GetLocalBlock(lx, ly + 1, lz) : BlockType.Air;
+            _output.WriteLine($"S3b selected seed={WorldGenerationConfig.Seed} profile={WorldSeed.Profile} x={x} z={z} cx={cx} cy={cy} cz={cz} height={height} ground={SaveNames.NameOf(actualGround)} plant={SaveNames.NameOf(actualPlant)} upper={SaveNames.NameOf(actualUpper)}");
             Assert.Equal(ContentRegistry.RequireBlock("sand").Id, chunk.GetLocalBlock(lx, ly - 1, lz));
             Assert.Equal(plant, chunk.GetLocalBlock(lx, ly, lz));
             if (blossom != BlockType.Air)
