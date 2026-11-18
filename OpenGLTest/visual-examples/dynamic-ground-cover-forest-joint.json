@@ -1,0 +1,9 @@
+{
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [13.5, 11.4, 2.5], "yaw": 158, "pitch": 8 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "natural_forest_fern_joint_off_axis", "hideHud": true }
+  ]
+}
