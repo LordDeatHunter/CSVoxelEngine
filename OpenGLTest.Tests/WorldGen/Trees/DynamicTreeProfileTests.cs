@@ -10,7 +10,7 @@ using Xunit;
 namespace VoxelEngine.Tests.WorldGen.Trees;
 
 /// <summary>The profile tree tables, deterministic species roll and distinct emergent ownership.</summary>
-[Collection("Worldgen shape cache")]
+[Collection("Worldgen seed")]
 public sealed class DynamicTreeProfileTests
 {
     public DynamicTreeProfileTests() => TestContent.EnsureLoaded();
