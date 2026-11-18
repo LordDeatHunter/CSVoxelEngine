@@ -165,6 +165,7 @@ public sealed class GroundCoverLifecycleTests : IDisposable
         using var hello = new PacketWriter(NetMessage.ServerHello);
         WireIds.WriteTables(hello);
         using var reader = new PacketReader(hello.ToArray());
+        Assert.Equal(NetMessage.ServerHello, reader.Message);
         var wire = WireIds.Read(reader);
         Assert.Empty(wire.Missing);
         foreach (var name in new[] { "fern", "tall_fern", "tall_fern_top", "bush" })
