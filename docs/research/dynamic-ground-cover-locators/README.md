@@ -199,7 +199,9 @@ possible raw-cold band near the measured `.5735` center. The `12*tangent`
 term crosses it in the independent direction over `±384` in each horizontal
 coordinate. This covers multiple ecotone phases (frequency 1/96, seed
 offset 204) and pack-ice snow phases (frequency 1/36, two octaves, offset
-152), with three or more tangent samples per nominal pack-ice scale.
+152). Tangent steps are (12,-12), length about 16.97 world units;
+frequency constants are not periodic wavelengths and do not guarantee
+independent phases or resolution of higher octaves.
 Temperature and humidity are much broader (Dynamic frequencies 1/9000 and
 1/3200) and share a 1/1400 domain warp; some outer points may leave the
 cold band. The retained 231-point grid used spacing 64 in a nearby region,
