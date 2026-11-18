@@ -182,20 +182,45 @@ public sealed class DesertFloraTests : IDisposable
     [Fact]
     public void HardCoreRejectsAnOtherwiseRetainedPlantOnActualGeneratedSand()
     {
-        // Search only the S3a proven core's 9x9 neighborhood. Higher center retention
-        // gives a retained plant a better chance while the fixed key and cell caps stay intact.
-        const int anchorCx = -8184 >> Chunk.SizeShift;
-        const int anchorCz = 2312 >> Chunk.SizeShift;
+        // The endpoints are independently observed core and flowering-fringe columns.
+        // Keep each midpoint's actual verdict as an endpoint; no monotone-core assumption.
+        var trueCx = -8184 >> Chunk.SizeShift;
+        var trueCz = 2312 >> Chunk.SizeShift;
+        var falseCx = -7754 >> Chunk.SizeShift;
+        var falseCz = -7791 >> Chunk.SizeShift;
         var coreKeys = 0;
         var centerQueries = 0;
         var inspected = 0;
         (int X, int Z, int Height, ushort Plant)? chosen = null;
-        var keys = new List<(int Cx, int Cz, float Retention)>(81);
-        for (var dx = -4; dx <= 4; dx++)
-        for (var dz = -4; dz <= 4; dz++)
+        coreKeys++;
+        var actualTrue = TerrainErg.IsCore(trueCx, trueCz);
+        coreKeys++;
+        var actualFalse = TerrainErg.IsCore(falseCx, falseCz);
+        _output.WriteLine($"S3b core bracket start true=({trueCx},{trueCz}) verdict={actualTrue} false=({falseCx},{falseCz}) verdict={actualFalse}");
+        Assert.True(actualTrue && !actualFalse, "The observed core/fringe endpoint verdict changed; this is a selection precondition miss.");
+
+        var steps = 0;
+        while (Math.Max(Math.Abs(falseCx - trueCx), Math.Abs(falseCz - trueCz)) > 1 && steps < 12)
         {
-            var cx = anchorCx + dx;
-            var cz = anchorCz + dz;
+            var middleCx = trueCx + (falseCx - trueCx) / 2;
+            var middleCz = trueCz + (falseCz - trueCz) / 2;
+            coreKeys++;
+            if (TerrainErg.IsCore(middleCx, middleCz))
+                (trueCx, trueCz) = (middleCx, middleCz);
+            else
+                (falseCx, falseCz) = (middleCx, middleCz);
+            steps++;
+        }
+        _output.WriteLine($"S3b core bracket end true=({trueCx},{trueCz}) false=({falseCx},{falseCz}) steps={steps}");
+        Assert.True(Math.Max(Math.Abs(falseCx - trueCx), Math.Abs(falseCz - trueCz)) <= 1,
+            "The 12-step actual-verdict bracket did not reach adjacent columns; this is a selection miss.");
+
+        var keys = new List<(int Cx, int Cz, float Retention)>(25);
+        for (var dx = -2; dx <= 2; dx++)
+        for (var dz = -2; dz <= 2; dz++)
+        {
+            var cx = trueCx + dx;
+            var cz = trueCz + dz;
             coreKeys++;
             if (!TerrainErg.IsCore(cx, cz)) continue;
             centerQueries++;
@@ -209,6 +234,7 @@ public sealed class DesertFloraTests : IDisposable
             var byX = a.Cx.CompareTo(b.Cx);
             return byX != 0 ? byX : a.Cz.CompareTo(b.Cz);
         });
+        _output.WriteLine($"S3b edge true_core_columns={keys.Count} center_retention_min={(keys.Count == 0 ? 0f : keys[^1].Retention):F4} max={(keys.Count == 0 ? 0f : keys[0].Retention):F4}");
 
         foreach (var (cx, cz, _) in keys)
         {
