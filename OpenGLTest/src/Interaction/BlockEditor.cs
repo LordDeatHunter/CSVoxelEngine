@@ -389,7 +389,7 @@ internal sealed class BlockEditor
         if (!_clientMode)
         {
             if (TreeGenerator.IsTreeBlock(brokenId))
-                TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z, TreeGenerator.FellPoisonRadius);
+                TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z, TreeGenerator.FellPoisonRadiusFor(brokenId));
             foreach (var ((lx, lz), _) in lowestY)
                 _lodManager.MarkEditedColumn(lx, lz);
         }

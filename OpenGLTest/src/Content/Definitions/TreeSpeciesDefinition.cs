@@ -140,11 +140,20 @@ public sealed class TreeSpeciesDefinition
     /// <summary>The <c>worldgen</c> object.</summary>
     public sealed class WorldgenDefinition
     {
+        /// <summary>Eligible world profiles; omitted admits both existing profiles.</summary>
+        public string[]? Profiles { get; set; }
+
         /// <summary><see cref="Biome"/> names the species grows in; non-empty, no duplicates. Required.</summary>
         public string[]? Biomes { get; set; }
 
         /// <summary>Chance per candidate column, 0..1. Required.</summary>
         public float? Density { get; set; }
+
+        /// <summary>Dynamic-only density override; omitted keeps density.</summary>
+        public float? DynamicDensity { get; set; }
+
+        /// <summary>Positive share of a biome's Dynamic species choice; omitted means one.</summary>
+        public float? DynamicWeight { get; set; }
 
         /// <summary>Whether the species is planted only inside an oasis disc (an oasis palm), the
         /// biomes list then only naming the climate it belongs to. Default false.</summary>

@@ -81,9 +81,21 @@ internal static class TreeBatches
         // Timed for WorldgenStats' `grow` figures: this is the miss path, shared by the
         // generation workers and the far-LOD canopy sweep on the LOD builder thread
         var start = System.Diagnostics.Stopwatch.GetTimestamp();
-        var species = TreeGenerator.SpeciesByBiome[(int)TerrainGenerator.FloraBiomeAt(key.X, key.Z)]
+        TreeSpecies species;
+        int baseY;
+        if (WorldSeed.Profile == WorldGenProfile.Dynamic)
+        {
+            // The solo obstacle must be the same weighted (or oasis) species the batch stamps.
+            if (!TreeGenerator.TryGetTree(key.X, key.Z, out species, out baseY))
+                throw new InvalidOperationException($"No Dynamic tree roots at ({key.X}, {key.Z}).");
+        }
+        else
+        {
+            // Keep the historical Legacy solo recipe, including its oasis/biome mismatch.
+            species = TreeGenerator.SpeciesByBiome[(int)TerrainGenerator.FloraBiomeAt(key.X, key.Z)]
                       ?? throw new InvalidOperationException($"No tree species grows at ({key.X}, {key.Z}).");
-        var baseY = TreeGenerator.HeightAt(key.X, key.Z) + 1;
+            baseY = TreeGenerator.HeightAt(key.X, key.Z) + 1;
+        }
         var space = new VirtualTreeSpace(GrowthGround);
         var graph = TreeGrower.GrowToMaturity(species, key.X, baseY, key.Z, space);
         var cells = TreeRasterizer.Rasterize(graph, species, space, out var woodCount).ToArray();

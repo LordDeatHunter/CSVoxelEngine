@@ -28,6 +28,7 @@ public static class TreeGenerator
     // One placement stream for every species, so spacing compares like with like across a biome
     // border and the gate order is identical for all of them.
     private const int PlacementSalt = 0x7E5715;
+    private const ulong DynamicSpeciesSalt = 0xD1A0C5EEC15UL;
 
     /// <summary>Poison radius for a single mined or blasted canopy cell: its own column and the
     /// ring the far-LOD cell sampling can straddle.</summary>
@@ -35,6 +36,14 @@ public static class TreeGenerator
 
     /// <summary>Poison radius for a felled tree: everything any tree can reach from its trunk.</summary>
     public static int FellPoisonRadius => ReachHorizontal;
+
+    /// <summary>Fell radius for an explicitly present species, including a manually placed
+    /// Dynamic-only giant in a Legacy world; ordinary Legacy trees retain their old bound.</summary>
+    public static int FellPoisonRadiusFor(ushort woodId)
+    {
+        var species = TreeSpeciesRegistry.ForBlock(woodId);
+        return species == null ? FellPoisonRadius : Math.Max(FellPoisonRadius, TreeRasterizer.ReachOf(species).Horizontal);
+    }
 
     /// <summary>Every registered species in ordinal name order (never dictionary order).</summary>
     private static readonly TreeSpecies[] Species;
@@ -46,13 +55,53 @@ public static class TreeGenerator
     /// <c>worldgen.oasis</c>.</summary>
     private static readonly TreeSpecies? OasisSpecies;
 
-    /// <summary>The species planted at a column: an oasis' own palm inside a disc, else the
-    /// biome's ordinary tree. The one rule the placement, the shape cache and the batch all read,
-    /// so they never disagree about what grows in a column.</summary>
-    private static TreeSpecies? SpeciesAt(int x, int z) =>
-        OasisSpecies != null && OasisGenerator.IsDisc(x, z)
-            ? OasisSpecies
-            : SpeciesByBiome[(int)TerrainGenerator.FloraBiomeAt(x, z)];
+    private sealed class ProfileTable
+    {
+        internal required TreeSpecies?[] Primary { get; init; }
+        internal required TreeSpecies[][] Choices { get; init; }
+        internal required TreeSpecies? Oasis { get; init; }
+        internal required float MaxDensity { get; init; }
+        internal required int ReachHorizontal { get; init; }
+        internal required int ReachUp { get; init; }
+        internal required int ReachChunkRadius { get; init; }
+        internal required int ProxyReach { get; init; }
+    }
+
+    private static readonly ProfileTable LegacyTable;
+    private static readonly ProfileTable DynamicTable;
+    private static ProfileTable ActiveTable => WorldSeed.Profile == WorldGenProfile.Dynamic ? DynamicTable : LegacyTable;
+
+    /// <summary>The species planted at a column: an oasis palm inside its disc, otherwise the
+    /// Legacy first biome member or a separately rolled Dynamic eligible member.</summary>
+    private static TreeSpecies? SpeciesAt(int x, int z)
+    {
+        if (WorldSeed.Profile != WorldGenProfile.Dynamic)
+            return OasisSpecies != null && OasisGenerator.IsDisc(x, z)
+                ? OasisSpecies
+                : SpeciesByBiome[(int)TerrainGenerator.FloraBiomeAt(x, z)];
+
+        var table = DynamicTable;
+        if (table.Oasis != null && OasisGenerator.IsDisc(x, z)) return table.Oasis;
+        var choices = table.Choices[(int)TerrainGenerator.FloraBiomeAt(x, z)];
+        if (choices.Length == 0) return null;
+        return ChooseDynamicSpecies(choices, x, z);
+    }
+
+    /// <summary>The separately salted root choice, before any picked-species placement gate.</summary>
+    internal static TreeSpecies ChooseDynamicSpecies(TreeSpecies[] choices, int x, int z)
+    {
+        if (choices.Length == 0) throw new ArgumentException("Need at least one eligible tree species.", nameof(choices));
+        if (choices.Length == 1) return choices[0];
+        double total = 0;
+        foreach (var species in choices) total += species.Worldgen!.DynamicWeight;
+        var roll = (SplitMix64.Mix(PlacementBits(x, z) ^ DynamicSpeciesSalt) >> 11) * (1.0 / (1UL << 53)) * total;
+        foreach (var species in choices)
+        {
+            roll -= species.Worldgen!.DynamicWeight;
+            if (roll < 0) return species;
+        }
+        return choices[^1];
+    }
 
     // Leaves of every species, by id. Sized once at first touch (see the static constructor), so
     // a read must go through IsLeaf unless the id is known to be loaded content.
@@ -64,16 +113,16 @@ public static class TreeGenerator
 
     // The highest worldgen density: a column whose placement hash is at or above it can never
     // root anything, so it is rejected before any noise is read.
-    private static readonly float MaxDensity;
+    private static float MaxDensity => ActiveTable.MaxDensity;
 
     /// <summary>How far horizontally any worldgen tree reaches from its trunk (<see cref="TreeRasterizer.ReachOf"/>).</summary>
-    public static readonly int ReachHorizontal;
+    public static int ReachHorizontal => ActiveTable.ReachHorizontal;
 
     /// <summary>How far above its base cell any worldgen tree reaches.</summary>
-    public static readonly int ReachUp;
+    public static int ReachUp => ActiveTable.ReachUp;
 
     /// <summary><see cref="ReachHorizontal"/> in whole chunks, rounded up.</summary>
-    public static readonly int ReachChunkRadius;
+    public static int ReachChunkRadius => ActiveTable.ReachChunkRadius;
 
     /// <summary>Leaf block the far LOD falls back to: the first leafy worldgen species' leaves (a species
     /// kept out of worldgen never sets it, so adding one leaves the far LOD unchanged).</summary>
@@ -81,7 +130,7 @@ public static class TreeGenerator
 
     // The widest LOD crown proxy of any leafy worldgen species: how far outside a chunk column
     // the proxy sweep looks for trunks whose crown can overhang it.
-    internal static readonly int ProxyReach;
+    internal static int ProxyReach => ActiveTable.ProxyReach;
 
     // Explicit so the tables are built the first time anything touches this class, not at
     // whatever point beforefieldinit would allow; RequireLoaded enforces that this is after
@@ -94,14 +143,10 @@ public static class TreeGenerator
 
         Species = TreeSpeciesRegistry.All.OrderBy(s => s.Name, StringComparer.Ordinal).ToArray();
 
-        var biomes = Enum.GetValues<Biome>();
-        SpeciesByBiome = new TreeSpecies?[biomes.Max(b => (int)b) + 1];
-        foreach (var biome in biomes)
-            // An oasis species is never the biome's ordinary tree: it is admitted inside a disc
-            // instead (OasisSpecies below)
-            SpeciesByBiome[(int)biome] = Species.FirstOrDefault(s =>
-                s.Worldgen?.GrowsIn(biome) == true && s.Worldgen.Oasis == false);
-        OasisSpecies = Species.FirstOrDefault(s => s.Worldgen?.Oasis == true);
+        LegacyTable = BuildTable(WorldGenProfile.Legacy);
+        DynamicTable = BuildTable(WorldGenProfile.Dynamic);
+        SpeciesByBiome = LegacyTable.Primary;
+        OasisSpecies = LegacyTable.Oasis;
 
         foreach (var species in Species)
         {
@@ -109,28 +154,57 @@ public static class TreeGenerator
             LeafById[species.LeavesId] = true;
             CanopyBlockById[species.LeavesId] = true;
             CanopyBlockById[species.WoodId] = true;
-            if (LeavesBlock == BlockType.Air && species.Worldgen != null) LeavesBlock = species.LeavesId;
+            if (LeavesBlock == BlockType.Air && species.Worldgen?.Allows(WorldGenProfile.Legacy) == true)
+                LeavesBlock = species.LeavesId;
         }
+    }
 
-        foreach (var species in Species)
+    private static ProfileTable BuildTable(WorldGenProfile profile)
+    {
+        var biomes = Enum.GetValues<Biome>();
+        var primary = new TreeSpecies?[biomes.Max(b => (int)b) + 1];
+        var choices = new TreeSpecies[primary.Length][];
+        foreach (var biome in biomes)
         {
-            if (species.Worldgen == null) continue;
-            MaxDensity = Math.Max(MaxDensity, species.Worldgen.Density);
-            var (horizontal, up, _) = TreeRasterizer.ReachOf(species);
-            ReachHorizontal = Math.Max(ReachHorizontal, horizontal);
-            ReachUp = Math.Max(ReachUp, up);
+            var members = Species.Where(s => s.Worldgen?.Allows(profile) == true
+                && s.Worldgen.GrowsIn(biome) && !s.Worldgen.Oasis).ToArray();
+            primary[(int)biome] = members.FirstOrDefault();
+            choices[(int)biome] = members;
+            if (profile == WorldGenProfile.Dynamic && members.Length > 1)
+            {
+                var spacing = members[0].Worldgen!.Spacing;
+                if (members.Any(s => s.Worldgen!.Spacing != spacing))
+                    throw new InvalidOperationException($"Dynamic {biome} tree species need the same spacing.");
+            }
         }
 
-        ReachChunkRadius = (ReachHorizontal + Chunk.Size - 1) / Chunk.Size;
-
-        foreach (var species in Species)
-            if (species.HasLeaves && species.Worldgen != null)
-                ProxyReach = Math.Max(ProxyReach, species.CrownRadius);
-
-        if (2 * ReachHorizontal > WorldGenerationConfig.TreeCellBlocks)
+        var eligible = Species.Where(s => s.Worldgen?.Allows(profile) == true).ToArray();
+        var reachHorizontal = 0;
+        var reachUp = 0;
+        var proxyReach = 0;
+        var maxDensity = 0f;
+        foreach (var species in eligible)
+        {
+            maxDensity = Math.Max(maxDensity, species.Worldgen!.DensityFor(profile));
+            var (horizontal, up, _) = TreeRasterizer.ReachOf(species);
+            reachHorizontal = Math.Max(reachHorizontal, horizontal);
+            reachUp = Math.Max(reachUp, up);
+            if (species.HasLeaves) proxyReach = Math.Max(proxyReach, species.CrownRadius);
+        }
+        if (2 * reachHorizontal > WorldGenerationConfig.TreeCellBlocks)
             throw new InvalidOperationException(
-                $"Tree reach {ReachHorizontal} x 2 exceeds the {WorldGenerationConfig.TreeCellBlocks}-block batch cell; " +
-                "a batch's neighbor obstacles must come from the 8 adjacent cells only.");
+                $"{profile} tree reach {reachHorizontal} x 2 exceeds the {WorldGenerationConfig.TreeCellBlocks}-block batch cell.");
+        return new ProfileTable
+        {
+            Primary = primary,
+            Choices = choices,
+            Oasis = eligible.FirstOrDefault(s => s.Worldgen!.Oasis),
+            MaxDensity = maxDensity,
+            ReachHorizontal = reachHorizontal,
+            ReachUp = reachUp,
+            ReachChunkRadius = (reachHorizontal + Chunk.Size - 1) / Chunk.Size,
+            ProxyReach = proxyReach,
+        };
     }
 
     /// <summary>Stamps every tree whose volume can intersect the chunk at (worldX0, worldY0, worldZ0) (<see cref="TreeStamper.Stamp"/>).</summary>
@@ -140,8 +214,8 @@ public static class TreeGenerator
     /// <summary>
     /// Whether (x, z) roots a tree, of which species and at which base cell (the air cell over
     /// the column's ground). The gates run cheapest first and are side-effect free: the
-    /// placement hash against the highest density, the biome's species, the spawn clearing, the
-    /// species' density and openness thinning, lowest-hash spacing, then water, soil, ground
+    /// placement hash against the profile's highest density, species choice, the spawn clearing,
+    /// species density and openness thinning, lowest-hash spacing, then water, soil, ground
     /// height and slope.
     /// </summary>
     public static bool TryGetTree(int x, int z, out TreeSpecies species, out int baseY)
@@ -167,16 +241,17 @@ public static class TreeGenerator
             && Math.Abs(z) <= WorldGenerationConfig.TreeSpawnClearRadius)
             return false;
 
-        if (own >= rules.Density)
+        var density = rules.DensityFor(WorldSeed.Profile);
+        if (own >= density)
             return false;
-        if (own >= rules.Density * TerrainErg.Retention(x, z))
+        if (own >= density * TerrainErg.Retention(x, z))
             return false;
 
         // Open regions thin the trees (see TerrainGenerator.ForestOpenness), each species by its
         // own share of it. The mask is read only for the few columns that already pass the raw
         // density, so the common case never pays for the noise.
         if (rules.Openness > 0f
-            && own >= rules.Density * (1f - rules.Openness * TerrainGenerator.ForestOpenness(x, z)))
+            && own >= density * (1f - rules.Openness * TerrainGenerator.ForestOpenness(x, z)))
             return false;
 
         var s = rules.Spacing;
