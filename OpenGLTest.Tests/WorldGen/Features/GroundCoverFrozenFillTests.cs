@@ -104,14 +104,16 @@ public sealed class GroundCoverFrozenFillTests : IDisposable
                 Assert.Equal(baseId, probeBase);
                 Assert.Equal(topId, probeTop);
                 Assert.Equal(normal.GetLocalState(lx, ly, lz), probe.GetLocalState(lx, ly, lz));
+                Assert.Equal(normal.GetLocalState(lx, ly + 1, lz), probe.GetLocalState(lx, ly + 1, lz));
                 if (column.Biomes[ci] != wanted || !tuft || candidate != expected
                     || ground != grass || baseId != candidate) continue;
                 var band = FoliageGenerator.WriteBand(column);
                 Assert.True(band.Contains(height + 1), "real new-cover base lies outside the foliage write band");
                 if (wanted == Biome.Forest) forestWrites++;
                 else steppeWrites++;
-                if (baseId == ContentRegistry.RequireBlock("tall_fern").Id && topId == tallTop)
+                if (baseId == ContentRegistry.RequireBlock("tall_fern").Id)
                 {
+                    Assert.Equal(tallTop, topId);
                     Assert.True(band.Contains(height + 2), "real tall-fern top lies outside the foliage write band");
                     tallPairs++;
                 }
