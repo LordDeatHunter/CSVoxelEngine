@@ -67,8 +67,10 @@ public sealed class GroundCoverLifecycleTests : IDisposable
         for (var tick = 0; tick < 3; tick++)
         {
             decay.Update(SimulationConfig.LeafDecayTickSeconds, chunks, drops);
-            while (decay.TickInProgress)
+            var maxSlices = SimulationConfig.MaxLeafDecayBacklogCells / SimulationConfig.MaxLeafDecayCellsPerFrame + 2;
+            for (var slice = 0; decay.TickInProgress && slice < maxSlices; slice++)
                 decay.Update(0f, chunks, drops);
+            Assert.False(decay.TickInProgress, "the bounded decay tick did not drain");
         }
         Assert.Equal(bush, chunks.GetBlockGlobal(8, 8, 8));
         Assert.Equal(BlockType.Air, chunks.GetBlockGlobal(9, 8, 8));
