@@ -19,7 +19,7 @@
     // All three cells of the Jungle shrub rooted at (-8800,10401) were actual
     // bush at y70 and air at y71; a southward view may include the understory.
     { "op": "teleport", "pos": [-8799.5, 71.4, 10401.5], "yaw": 90, "pitch": -14 },
-    { "op": "wait", "seconds": 7 },
+    { "op": "wait", "seconds": 20 },
     { "op": "screenshot", "name": "natural_jungle_cluster", "hideHud": true },
     // The second shrub rooted at (-8799,10410) has air at y70; the recorded
     // tall-fern pair at (-8799,10408) stands two cells north on actual mud.
