@@ -171,7 +171,9 @@ public sealed class JungleTallFernVisibilityDiagnosticTests(ITestOutputHelper ou
         var tx = BoundaryDistance(origin.X, cell.X, direction.X, step.X);
         var ty = BoundaryDistance(origin.Y, cell.Y, direction.Y, step.Y);
         var tz = BoundaryDistance(origin.Z, cell.Z, direction.Z, step.Z);
-        var dx = StepDistance(direction.X), dy = StepDistance(direction.Y), dz = StepDistance(direction.Z);
+        var dx = StepDistance(direction.X);
+        var dy = StepDistance(direction.Y);
+        var dz = StepDistance(direction.Z);
         var visited = 0;
 
         string? Inspect((int X, int Y, int Z) current)
