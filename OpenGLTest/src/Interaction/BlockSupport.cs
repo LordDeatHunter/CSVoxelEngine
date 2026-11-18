@@ -48,7 +48,9 @@ public static class BlockSupport
     /// newly placed support-fragile <paramref name="blockId"/>: any solid block, or only a full block face for a
     /// <see cref="BlockType.SupportFullFace"/> block (a torch).</summary>
     public static bool CanHold(ushort blockId, ushort holderId, byte holderState) =>
-        BlockType.ById[blockId] is { SupportFullFace: true }
+        BlockType.ById[blockId] is { SupportBlockId: not 0 } named
+            ? holderId == named.SupportBlockId
+            : BlockType.ById[blockId] is { SupportFullFace: true }
             ? BlockType.HoldsFullFace(holderId, holderState)
             : BlockType.IsSolid(holderId);
 }

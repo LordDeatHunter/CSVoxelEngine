@@ -20,6 +20,7 @@ internal sealed class BlockLinkResolver
     private readonly List<(ushort Id, string Upper, string Path)> _upper = [];
     private readonly List<(ushort Id, string Target, string Path)> _pick = [];
     private readonly List<(ushort Id, string Stump, string Path)> _stump = [];
+    private readonly List<(ushort Id, string Holder, string Path)> _support = [];
 
     /// <summary>Queues the references one block's definition declares (contact hardening, freezesTo / meltsTo, multiblock, wall block, upper half, pickAs).</summary>
     internal void Queue(ushort id, BlockDefinition definition, string path)
@@ -41,6 +42,13 @@ internal sealed class BlockLinkResolver
             _stump.Add((id, definition.Wood.Stump, path));
         if (definition.PickAs != null)
             _pick.Add((id, definition.PickAs, path));
+        if (definition.SupportBlock != null)
+        {
+            if (definition.WallBlock != null || definition.UpperHalf != null)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets supportBlock with a wallBlock or upperHalf link; the named holder is only for a single floor block.");
+            _support.Add((id, definition.SupportBlock, path));
+        }
     }
 
     /// <summary>Resolves every queued reference against the loaded <paramref name="types"/>, writing the target ids onto them and the per-id tables.</summary>
@@ -115,6 +123,22 @@ internal sealed class BlockLinkResolver
         // already made a wall block or an upper half is refused.
         foreach (var (pendingId, target, pendingPath) in _pick)
             types[pendingId].ItemBlockId = ResolvePickAs(target, pendingPath, pendingId);
+
+        foreach (var (pendingId, holder, pendingPath) in _support)
+        {
+            var owner = types[pendingId];
+            if (!owner.NeedsSupport || owner.SupportAttached || owner.SupportAbove || owner.SupportFullFace
+                || owner.HasHorizontalFacing || owner.Lantern || owner.Fluid || owner.StackMax != 0)
+                throw new InvalidOperationException(
+                    $"Block '{pendingPath}' sets supportBlock but is not a plain floor-supported fragile block.");
+            if (!ContentFiles.TryResolve(holder, out var holderId) || holderId == BlockType.Air
+                || ItemRegistry.IsItem(holderId) || !types.ContainsKey(holderId))
+                throw new InvalidOperationException(
+                    $"Block '{pendingPath}' names '{holder}' in supportBlock, which is not a registered block.");
+            if (holderId == pendingId)
+                throw new InvalidOperationException($"Block '{pendingPath}' names itself in supportBlock.");
+            owner.SupportBlockId = holderId;
+        }
     }
 
     /// <summary>

@@ -1,0 +1,32 @@
+{
+  "name": "Cactus Flower",
+  "model": {
+    "parent": "block/cross",
+    "textures": { "cross": "cactus_flower" },
+    "elements": [
+      {
+        "from": [2, 0, 8], "to": [14, 12, 8],
+        "rotation": { "origin": [8, 6, 8], "axis": "y", "angle": 45, "rescale": true },
+        "shade": false,
+        "faces": { "north": { "uv": [0, 0, 16, 16], "texture": "#cross" } }
+      },
+      {
+        "from": [2, 0, 8], "to": [14, 12, 8],
+        "rotation": { "origin": [8, 6, 8], "axis": "y", "angle": -45, "rescale": true },
+        "shade": false,
+        "faces": { "north": { "uv": [0, 0, 16, 16], "texture": "#cross" } }
+      }
+    ]
+  },
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "light": { "passes": true },
+  "needsSupport": true,
+  "supportBlock": "small_cactus",
+  "blocksSight": false,
+  "replaceableByPlacement": true,
+  "hitbox": { "min": [0.32, 0, 0.32], "max": [0.68, 0.5, 0.68] }
+}

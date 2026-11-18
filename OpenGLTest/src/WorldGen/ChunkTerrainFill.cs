@@ -374,6 +374,11 @@ internal static class ChunkTerrainFill
             CottonGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Cotton);
 
+        if (WorldFeatureConfig.DesertFloraEnabled
+            && Admits(stampGates, DesertFloraGenerator.WriteBand(column), lowerBoundY))
+            DesertFloraGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.DesertFlora);
+
         if (WorldFeatureConfig.FlowersEnabled && Admits(stampGates, FlowerGenerator.WriteBand(column), lowerBoundY))
             FlowerGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Flowers);

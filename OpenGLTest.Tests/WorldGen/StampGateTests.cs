@@ -98,6 +98,8 @@ public sealed class StampGateTests
             (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => PebbleGenerator.Stamp(b, c, x, y, z), true),
         new("Cotton", Stage.Cotton, (c, _) => CottonGenerator.WriteBand(c),
             (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => CottonGenerator.Stamp(b, c, x, y, z), false),
+        new("DesertFlora", Stage.DesertFlora, (c, _) => DesertFloraGenerator.WriteBand(c),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => DesertFloraGenerator.Stamp(b, c, x, y, z), false),
         new("Flowers", Stage.Flowers, (c, _) => FlowerGenerator.WriteBand(c),
             (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => FlowerGenerator.Stamp(b, c, x, y, z), true),
         new("Foliage", Stage.Foliage, (c, _) => FoliageGenerator.WriteBand(c),
