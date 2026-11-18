@@ -46,7 +46,7 @@ public sealed class DynamicJungleGiantLocator
                 return;
             }
 
-            Assert.True(false, "No naturally admitted jungle_giant in the four frozen columns; retain all 1024 observations as a bounded miss.");
+            Assert.Fail("No naturally admitted jungle_giant in the four frozen columns; retain all 1024 observations as a bounded miss.");
         }
         finally
         {
