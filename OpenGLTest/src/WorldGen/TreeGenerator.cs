@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
@@ -80,9 +81,18 @@ public static class TreeGenerator
                 ? OasisSpecies
                 : SpeciesByBiome[(int)TerrainGenerator.FloraBiomeAt(x, z)];
 
-        var table = DynamicTable;
-        if (table.Oasis != null && OasisGenerator.IsDisc(x, z)) return table.Oasis;
-        var choices = table.Choices[(int)TerrainGenerator.FloraBiomeAt(x, z)];
+        if (DynamicTable.Oasis != null && OasisGenerator.IsDisc(x, z)) return DynamicTable.Oasis;
+        return DynamicSpeciesFor(TerrainGenerator.FloraBiomeAt(x, z), x, z);
+    }
+
+    /// <summary>The immutable Dynamic row, exposed read-only for content contract checks.</summary>
+    internal static IReadOnlyList<TreeSpecies> DynamicRowFor(Biome biome) =>
+        Array.AsReadOnly(DynamicTable.Choices[(int)biome]);
+
+    /// <summary>The selected species of an actual Dynamic biome row, without a terrain query.</summary>
+    internal static TreeSpecies? DynamicSpeciesFor(Biome biome, int x, int z)
+    {
+        var choices = DynamicTable.Choices[(int)biome];
         if (choices.Length == 0) return null;
         return ChooseDynamicSpecies(choices, x, z);
     }
@@ -93,11 +103,11 @@ public static class TreeGenerator
         if (choices.Length == 0) throw new ArgumentException("Need at least one eligible tree species.", nameof(choices));
         if (choices.Length == 1) return choices[0];
         double total = 0;
-        foreach (var species in choices) total += species.Worldgen!.DynamicWeight;
+        foreach (var species in choices) total += species.Worldgen!.DynamicWeight!.Value;
         var roll = (SplitMix64.Mix(PlacementBits(x, z) ^ DynamicSpeciesSalt) >> 11) * (1.0 / (1UL << 53)) * total;
         foreach (var species in choices)
         {
-            roll -= species.Worldgen!.DynamicWeight;
+            roll -= species.Worldgen!.DynamicWeight!.Value;
             if (roll < 0) return species;
         }
         return choices[^1];
@@ -169,16 +179,24 @@ public static class TreeGenerator
             var members = Species.Where(s => s.Worldgen?.Allows(profile) == true
                 && s.Worldgen.GrowsIn(biome) && !s.Worldgen.Oasis).ToArray();
             primary[(int)biome] = members.FirstOrDefault();
-            choices[(int)biome] = members;
-            if (profile == WorldGenProfile.Dynamic && members.Length > 1)
+            var weighted = profile == WorldGenProfile.Dynamic
+                ? members.Where(s => s.Worldgen!.DynamicWeight.HasValue).ToArray()
+                : [];
+            choices[(int)biome] = profile == WorldGenProfile.Dynamic && weighted.Length > 0
+                ? weighted
+                : members.Take(1).ToArray();
+            if (weighted.Length > 1)
             {
-                var spacing = members[0].Worldgen!.Spacing;
-                if (members.Any(s => s.Worldgen!.Spacing != spacing))
+                var spacing = weighted[0].Worldgen!.Spacing;
+                if (weighted.Any(s => s.Worldgen!.Spacing != spacing))
                     throw new InvalidOperationException($"Dynamic {biome} tree species need the same spacing.");
             }
         }
 
-        var eligible = Species.Where(s => s.Worldgen?.Allows(profile) == true).ToArray();
+        var eligible = profile == WorldGenProfile.Dynamic
+            ? choices.SelectMany(row => row ?? []).Concat(Species.Where(s => s.Worldgen?.Allows(profile) == true
+                && s.Worldgen.Oasis)).Distinct().ToArray()
+            : Species.Where(s => s.Worldgen?.Allows(profile) == true).ToArray();
         var reachHorizontal = 0;
         var reachUp = 0;
         var proxyReach = 0;

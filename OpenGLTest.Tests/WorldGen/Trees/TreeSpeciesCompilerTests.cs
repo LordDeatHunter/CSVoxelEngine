@@ -75,6 +75,7 @@ public sealed class TreeSpeciesCompilerTests
         Assert.True(baseline.Allows(WorldGenProfile.Legacy));
         Assert.True(baseline.Allows(WorldGenProfile.Dynamic));
         Assert.Equal(baseline.DensityFor(WorldGenProfile.Legacy), baseline.DensityFor(WorldGenProfile.Dynamic));
+        Assert.Null(baseline.DynamicWeight);
 
         dto.Worldgen.Profiles = ["dynamic"];
         dto.Worldgen.DynamicDensity = 0.75f;
@@ -83,6 +84,7 @@ public sealed class TreeSpeciesCompilerTests
         Assert.False(dynamicRules.Allows(WorldGenProfile.Legacy));
         Assert.True(dynamicRules.Allows(WorldGenProfile.Dynamic));
         Assert.NotEqual(dynamicRules.DensityFor(WorldGenProfile.Legacy), dynamicRules.DensityFor(WorldGenProfile.Dynamic));
+        Assert.Equal(2f, dynamicRules.DynamicWeight!.Value);
 
         Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Profiles = []; });
         Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Profiles = ["Legacy", "legacy"]; });

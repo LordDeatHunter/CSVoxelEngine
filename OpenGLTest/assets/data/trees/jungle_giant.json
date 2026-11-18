@@ -17,7 +17,7 @@
     "trunkShape": "circle",
     "rim": "block"
   },
-  "leafCluster": { "shape": "blob", "radius": 4, "hydration": 5, "tipMaxPx": 3, "minRadius": 1, "fullRadiusPx": 16 },
+  "leafCluster": { "shape": "blob", "radius": 3, "hydration": 5, "tipMaxPx": 3, "minRadius": 1, "fullRadiusPx": 16 },
   "features": [ { "type": "roots", "depth": 4 } ],
   "lod": { "crownHeight": [24, 30], "crownRadius": 10, "profile": "dome" },
   "worldgen": {

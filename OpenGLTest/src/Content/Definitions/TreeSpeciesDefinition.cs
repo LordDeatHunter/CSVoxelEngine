@@ -152,7 +152,7 @@ public sealed class TreeSpeciesDefinition
         /// <summary>Dynamic-only density override; omitted keeps density.</summary>
         public float? DynamicDensity { get; set; }
 
-        /// <summary>Positive share of a biome's Dynamic species choice; omitted means one.</summary>
+        /// <summary>Explicit positive share of a biome's Dynamic weighted choice; omitted keeps its first species.</summary>
         public float? DynamicWeight { get; set; }
 
         /// <summary>Whether the species is planted only inside an oasis disc (an oasis palm), the

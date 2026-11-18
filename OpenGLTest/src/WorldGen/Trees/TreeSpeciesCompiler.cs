@@ -225,8 +225,8 @@ internal static class TreeSpeciesCompiler
         var dynamicDensity = w.DynamicDensity ?? density;
         if (!float.IsFinite(dynamicDensity) || dynamicDensity < 0f || dynamicDensity > 1f)
             throw Fail(path, $"worldgen.dynamicDensity must be 0..1, got {dynamicDensity}.");
-        var dynamicWeight = w.DynamicWeight ?? 1f;
-        if (!float.IsFinite(dynamicWeight) || dynamicWeight <= 0f)
+        var dynamicWeight = w.DynamicWeight;
+        if (dynamicWeight is { } weight && (!float.IsFinite(weight) || weight <= 0f))
             throw Fail(path, $"worldgen.dynamicWeight must be finite and above 0, got {dynamicWeight}.");
         int spacing = Require(path, "worldgen.spacing", w.Spacing);
         if (spacing < 0)

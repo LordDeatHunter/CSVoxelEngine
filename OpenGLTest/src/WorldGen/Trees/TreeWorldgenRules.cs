@@ -24,8 +24,8 @@ public sealed class TreeWorldgenRules
     /// <summary>Dynamic-only density, leaving the Legacy density unchanged.</summary>
     public required float DynamicDensity { get; init; }
 
-    /// <summary>Positive relative weight in the Dynamic biome species choice.</summary>
-    public required float DynamicWeight { get; init; }
+    /// <summary>Explicit positive share in a Dynamic weighted row; null keeps the old primary choice.</summary>
+    public float? DynamicWeight { get; init; }
 
     /// <summary>Minimum gap to another trunk in blocks.</summary>
     public required int Spacing { get; init; }
