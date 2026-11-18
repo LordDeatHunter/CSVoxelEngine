@@ -1,6 +1,7 @@
 using System;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
+using VoxelEngine.WorldGen.Features;
 
 namespace VoxelEngine.WorldGen.Volcanoes;
 
