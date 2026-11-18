@@ -14,9 +14,8 @@ public sealed class DesertFloraTests : IDisposable
     // claim that any particular final S3b flower already exists at the camera coordinate.
     private const int WindowX = -7789;
     private const int WindowZ = -7815;
-    private static readonly Lazy<(int X, int Z)> SmallSite = new(() => FindSite(DesertFloraGenerator.SmallCactusBlock, false));
-    private static readonly Lazy<(int X, int Z)> BloomSite = new(() => FindSite(DesertFloraGenerator.SmallCactusBlock, true));
-    private static readonly Lazy<(int X, int Z)> FlowerSite = new(() => FindSite(DesertFloraGenerator.DesertFlowerBlock, false));
+    // One shared pass bounds the candidate window to 2048 entries across all tests.
+    private static readonly Lazy<((int X, int Z) Small, (int X, int Z) Bloom, (int X, int Z) Flower)> Sites = new(FindSites);
 
     public DesertFloraTests()
     {
@@ -27,27 +26,40 @@ public sealed class DesertFloraTests : IDisposable
     public void Dispose() => WorldSeed.Apply(WorldSeed.Default);
 
     private static (int X, int Z) Site(ushort wanted, bool blossom = false) =>
-        wanted == DesertFloraGenerator.DesertFlowerBlock ? FlowerSite.Value
-        : blossom ? BloomSite.Value : SmallSite.Value;
+        wanted == DesertFloraGenerator.DesertFlowerBlock ? Sites.Value.Flower
+        : blossom ? Sites.Value.Bloom : Sites.Value.Small;
 
-    private static (int X, int Z) FindSite(ushort wanted, bool blossom)
+    private static ((int X, int Z) Small, (int X, int Z) Bloom, (int X, int Z) Flower) FindSites()
     {
+        (int X, int Z)? small = null;
+        (int X, int Z)? bloom = null;
+        (int X, int Z)? flower = null;
         for (var x = WindowX; x < WindowX + 64; x++)
         for (var z = WindowZ; z < WindowZ + 32; z++)
         {
-            if (DesertFloraGenerator.CandidateAt(x, z) != wanted) continue;
-            if (blossom && !DesertFloraGenerator.BlossomsAt(x, z)) continue;
+            var candidate = DesertFloraGenerator.CandidateAt(x, z);
+            if (candidate != DesertFloraGenerator.SmallCactusBlock
+                && candidate != DesertFloraGenerator.DesertFlowerBlock) continue;
             var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
             var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
             if (column.Biomes[local] != Biome.Desert || column.DirtDepth[local] == 0
                 || TerrainErg.IsCore(x >> Chunk.SizeShift, z >> Chunk.SizeShift))
                 continue;
             var height = column.Heights[local];
-            if ((height & Chunk.SizeMask) >= (blossom ? Chunk.Size - 2 : Chunk.Size - 1)) continue;
             if (TerrainGenerator.IsBeachHeight(height) || TerrainGenerator.IsWaterColumn(x, z, height)) continue;
-            return (x, z);
+            if (candidate == DesertFloraGenerator.DesertFlowerBlock
+                && (height & Chunk.SizeMask) < Chunk.Size - 1)
+                flower ??= (x, z);
+            else if ((height & Chunk.SizeMask) < Chunk.Size - 1)
+            {
+                small ??= (x, z);
+                if ((height & Chunk.SizeMask) < Chunk.Size - 2 && DesertFloraGenerator.BlossomsAt(x, z))
+                    bloom ??= (x, z);
+            }
+            if (small.HasValue && bloom.HasValue && flower.HasValue)
+                return (small.Value, bloom.Value, flower.Value);
         }
-        throw new InvalidOperationException($"No {wanted} Dynamic dry desert site in the frozen 64x32 fringe window.");
+        throw new InvalidOperationException("The frozen 64x32 fringe lacks a grounded small cactus, blossom, or desert flower site.");
     }
 
     private static (ushort[] Blocks, ColumnData Column, int WorldY0, int LocalY) SandAt(int x, int z, int groundY)
@@ -176,5 +188,27 @@ public sealed class DesertFloraTests : IDisposable
             if (blossom != BlockType.Air)
                 Assert.Equal(blossom, chunk.GetLocalBlock(lx, ly + 1, lz));
         }
+    }
+
+    [Fact]
+    public void DynamicDesertFloraBandAdmitsTheRealPlantChunkAndMatchesUngatedFill()
+    {
+        var (x, z) = Site(DesertFloraGenerator.SmallCactusBlock);
+        var cx = x >> Chunk.SizeShift;
+        var cz = z >> Chunk.SizeShift;
+        var column = ColumnCache.Get(cx, cz);
+        var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+        var cy = (column.Heights[local] + 1) >> Chunk.SizeShift;
+        var band = DesertFloraGenerator.WriteBand(column);
+        Assert.True(band.Reaches(cy << Chunk.SizeShift));
+
+        var position = new Vector3(cx, cy, cz);
+        var gated = new Chunk(null!, position, generateBlockData: false);
+        ChunkTerrainFill.GenerateBlockData(gated, stampGates: true);
+        var ungated = new Chunk(null!, position, generateBlockData: false);
+        ChunkTerrainFill.GenerateBlockData(ungated, stampGates: false);
+        Assert.Equal(DesertFloraGenerator.SmallCactusBlock,
+            gated.GetLocalBlock(x & Chunk.SizeMask, (column.Heights[local] + 1) & Chunk.SizeMask, z & Chunk.SizeMask));
+        Assert.True(gated.Storage.ToDense().AsSpan().SequenceEqual(ungated.Storage.ToDense()));
     }
 }
