@@ -317,15 +317,12 @@ public static class TerrainGenerator
         }
         // Massifs (TerrainPeaks) rise from the forest profile alone, after the ranges. WithMassif is
         // the exact identity outside every site's disc, so land outside them is bit-identical. The
-        // desert and ocean lerps below would dilute a massif, which is why a site is accepted only
-        // where its center and rim carry zero desert and ocean weight.
+        // desert and ocean lerps below dilute a massif or cone continuously. Volcano admission
+        // proves zero blend weights for its owned crater, not its whole outer flank.
         forestHeight = massifs ? TerrainPeaks.WithMassif(worldX, worldZ, reliefForest) : reliefForest;
         // Q0 never asks for a volcano: its site factory reads Q0. Q2 and Q3 both see the cone.
-        // A site's center and rim are context samples, not proof for its whole cone.
-        // Compose locally only on unblended land so an old ocean/desert dune column
-        // retains its exact height even when a cone disc crosses that boundary.
-        if (massifs && WorldSeed.Profile == WorldGenProfile.Dynamic
-            && oceanWeight == 0f && desertWeight == 0f)
+        // The existing desert/ocean lerps smoothly dilute a flank crossing their boundaries.
+        if (massifs && WorldSeed.Profile == WorldGenProfile.Dynamic)
             forestHeight = VolcanoShape.HeightAt(VolcanoSites.At(worldX, worldZ),
                 worldX, worldZ, forestHeight);
         // Lone peaks rise last, on top of the massifs, with the same exact identity outside their discs

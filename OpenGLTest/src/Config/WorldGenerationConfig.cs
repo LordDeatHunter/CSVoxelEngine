@@ -384,6 +384,8 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float DynamicEcotoneFrequency = 1f / 96f;
     // The orthogonal volcanic province changes Dynamic biome material, not climate or relief.
     public const float VolcanicProvinceFrequency = 1f / 9000f;
+    // Reuse the province field at a finer sampling scale for rocky/ash surface patches only.
+    public const float CharredMaterialSampleMultiplier = 48f;
     public const float VolcanicProvinceStart = 0.16f;
     public const float VolcanicProvinceEnd = 0.34f;
     public const float VolcanicClassifyThreshold = 0.5f;

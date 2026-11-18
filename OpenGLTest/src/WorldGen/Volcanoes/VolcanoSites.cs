@@ -46,7 +46,8 @@ internal static class VolcanoSites
 
         // The nine outer points establish the intended setting, not a whole-disc theorem.
         // The caldera is the owned volume: inspect every integer column of its guard disc.
-        // This is deliberately a cold cache-factory cost, bounded by (2*ceil(Rc+guard)+1)^2.
+        // This is deliberately a cold cache-factory cost: the fractional center and
+        // inclusive floor/ceil loop need at most 118^2 bounding-square visits.
         var guard = crater + WorldGenerationConfig.VolcanoGuard;
         for (var ix = (int)MathF.Floor(x - guard); ix <= (int)MathF.Ceiling(x + guard); ix++)
         for (var iz = (int)MathF.Floor(z - guard); iz <= (int)MathF.Ceiling(z + guard); iz++)

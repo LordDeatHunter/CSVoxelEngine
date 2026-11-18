@@ -115,7 +115,9 @@ public static class ColumnCache
             case Biome.Charred:
                 // Dark rock dominates the province; ash pockets and shallow cinder give it
                 // variation without replacing deep stone hosts for caves and ores.
-                topBlock = TerrainNoise.VolcanicProvinceNoise.GetNoise(worldX * 3f, worldZ * 3f) > 0f
+                topBlock = TerrainNoise.VolcanicProvinceNoise.GetNoise(
+                    worldX * WorldGenerationConfig.CharredMaterialSampleMultiplier,
+                    worldZ * WorldGenerationConfig.CharredMaterialSampleMultiplier) > 0f
                     ? TerrainGenerator.CharredStoneBlock : TerrainGenerator.AshBlock;
                 soilBlock = TerrainGenerator.CinderSoilBlock;
                 soilDepth = dirtDepth == 0 ? 0 : Math.Min(dirtDepth, 2);

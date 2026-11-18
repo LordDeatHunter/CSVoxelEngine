@@ -38,6 +38,29 @@ public sealed class VolcanoShapeTests
     }
 
     [Fact]
+    public void CraterWallAndOuterDiscJoinWithoutAStep()
+    {
+        const float oldHeight = 73.125f;
+        const float delta = 0.001f;
+        var boundaries = new[] { Site.CraterRadius,
+            Site.CraterRadius + WorldGenerationConfig.VolcanoWallWidth, Site.Radius };
+        foreach (var (dx, dz) in new[] { (1f, 0f), (0f, 1f), (-1f, 0f), (0f, -1f) })
+        foreach (var boundary in boundaries)
+        {
+            var inside = VolcanoShape.HeightAt(Site, dx * (boundary - delta),
+                dz * (boundary - delta), oldHeight);
+            var outside = VolcanoShape.HeightAt(Site, dx * (boundary + delta),
+                dz * (boundary + delta), oldHeight);
+            Assert.True(float.IsFinite(inside) && float.IsFinite(outside));
+            Assert.InRange(inside, 0f, WorldGenerationConfig.DynamicReliefCeilingHeight);
+            Assert.InRange(outside, 0f, WorldGenerationConfig.DynamicReliefCeilingHeight);
+            Assert.True(MathF.Abs(inside - outside) < 0.2f,
+                $"cone step at radius {boundary}: {inside} to {outside}");
+            if (boundary == Site.Radius) Assert.Equal(oldHeight, outside);
+        }
+    }
+
+    [Fact]
     public void EveryLavaCellHasLinedBedAndFourHorizontalNeighbors()
     {
         var lavaCount = 0;
@@ -60,3 +83,4 @@ public sealed class VolcanoShapeTests
             VolcanoShape.Classify(Site, 0, Site.Floor, 0, Site.Floor - 1));
     }
 }
+using System;

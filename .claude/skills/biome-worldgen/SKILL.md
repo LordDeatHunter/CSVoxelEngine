@@ -31,7 +31,7 @@ description: Rules and checklist for changing CSVoxelEngine biome, climate, terr
 
 ## Checklist: adding a biome
 
-1. Append the `Biome` enum value (never reorder: ordinals ride `ColumnFileCodec`, the network column and `TreeGenerator.SpeciesByBiome`).
+1. Append the `Biome` enum value (never reorder: ordinals ride imported `ColumnFileCodec` and `TreeGenerator.SpeciesByBiome`; network columns send heights, water level and corner climate, not biome bytes).
 2. `BiomeClassifier.Classify` plus any new weight/ramp (read through `SampleClimate`); config in `WorldGenerationConfig`. Keep ramps smooth and exclusive where they share an axis, borders sloped, the desert line at 0.5. Decide whether `DitherBiome` touches it.
 3. `LandHeight` if it has its own profile (blend by a weight, don't switch).
 4. `ColumnCache.GenerateColumn` surface/soil, and `BiomeTraits` (`ShowsBareRock`, `RimsWaterWithSand`) if it shares the grass fill.

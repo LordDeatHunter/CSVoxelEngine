@@ -4,9 +4,10 @@ The climate grid, terrain shape, relief, water bodies, cold weather, vegetation,
 
 ## Biomes
 
-Seven biomes (`WorldGen/Biome.cs`; new values are appended, never inserted, since the ordinals ride
-`ColumnFileCodec` and the network column and index `TreeGenerator.SpeciesByBiome`). **Ocean** is a
-flooded basin ramping from a sandy shore down to bare stone. The six land biomes sit on a **3x3
+Nine biomes (`WorldGen/Biome.cs`; new values are appended, never inserted, since the ordinals ride
+`ColumnFileCodec` and index `TreeGenerator.SpeciesByBiome`; the network column sends heights,
+water level and corner climate, not biome bytes). **Ocean** is a
+flooded basin ramping from a sandy shore down to bare stone. The original land biomes sit on a **3x3
 climate grid** of temperature (cold / temperate / warm) and humidity (dry / semi-dry / wet),
 `BiomeClassifier.Classify`:
 
@@ -66,9 +67,11 @@ province alone does not promise a volcano. It has no new mob or cave-biome rule.
 biome/province and massif sites only; `WorldSeed.Apply` clears it. Center and eight rim samples
 judge setting, while every integer column of the crater plus guard is checked for zero ocean
 and desert weight, sufficient province and dithered Charred. This exact scan is a cold site
-cost, not a cheap nine-point proof. The cone changes Q2 pre-feature height and Q3 final height
-on locally unblended land only; outside its disc and on old ocean/desert blend columns it is
-the identity. Peaks, knolls, lakes, ponds, oasis and hot springs yield to accepted cone discs.
+cost, not a cheap nine-point proof. The cone changes Q2 pre-feature height and Q3 final height.
+Existing smooth desert and ocean lerps dilute its flanks where they cross those blends; dune/ocean
+heights inside an accepted disc may change, while classification and sand-only erg ownership do
+not. Outside its disc the cone is the exact identity. Peaks, knolls, lakes, ponds, oasis and hot
+springs yield to accepted cone discs.
 The crater floor is pinned after final water/bank composition, its guard blocks cuts and
 overlapping writers, and `VolcanoStamp` writes the floor's lava, surrounding side and bottom
 lining after terrain strata on normal and lake-probe fills. The stamp zeroes state bytes.
@@ -79,9 +82,13 @@ writer clearance at 186, while the nominal summit is not the final apex height.
 Generated far LOD uses the selected Charred rock/ash and approximates the actual cone height;
 only a generated cell with an owned caldera floor gets a lava tile. Supplied/imported columns
 retain their biome/height authority and never infer generated lava. Far LOD lava is an opaque,
-nonemissive approximation, not a voxel-level match. The older imported-column edge seam
-remains. `Biome` is a stored byte in column files and chunk-column packets, so appending value
-8 needs no packet or save-layout change; unknown values still follow their existing decoder
+nonemissive approximation, not a voxel-level match. Generated LOD omits snow at cell centers
+inside the caldera guard, as the near snow writer does; a coarse cell crossing the edge remains
+approximate. Rock/ash patches reuse the province field at a separate 48× sampling scale in
+both near fill and generated LOD, without changing the province verdict. The older imported-column edge seam
+remains. `Biome` is a stored byte in imported column files only; chunk-column packets send
+heights, water level, warmth and wetness. Appending value 8 needs no packet or save-layout
+change; unknown values still follow their existing decoder
 policy.
 The new `charred_stone.png` tile is original generated art, downscaled by nearest-neighbor
 from a retained 1254-square RGB source to an inspected 32-square RGBA atlas tile. The

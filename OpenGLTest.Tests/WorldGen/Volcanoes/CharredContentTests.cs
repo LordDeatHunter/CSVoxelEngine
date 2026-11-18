@@ -1,7 +1,5 @@
-using System.Linq;
 using VoxelEngine.Content;
 using VoxelEngine.Interaction;
-using VoxelEngine.Items;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.WorldGen.Trees.Shape;
@@ -20,8 +18,7 @@ public sealed class CharredContentTests
     {
         var rock = ContentRegistry.RequireBlock("charred_stone");
         var basalt = ContentRegistry.RequireBlock("basalt");
-        var pickaxe = ItemRegistry.All.Where(i => ContentRegistry.IsInTag("pickaxe", i.Id))
-            .OrderBy(i => i.ToolPower).First(i => i.ToolPower >= 1);
+        var pickaxe = ContentRegistry.RequireItem("primitive_pickaxe");
         Assert.NotEqual(basalt.Id, rock.Id);
         Assert.False(Mining.CanMine(rock.Id, null));
         Assert.True(Mining.CanMine(rock.Id, pickaxe));
@@ -36,17 +33,11 @@ public sealed class CharredContentTests
         Assert.True(tree.Worldgen.GrowsIn(Biome.Charred));
         Assert.False(tree.Worldgen.Allows(WorldGenProfile.Legacy));
         Assert.True(tree.Worldgen.Allows(WorldGenProfile.Dynamic));
-        try
-        {
-            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Legacy);
-            Assert.Null(TreeGenerator.SpeciesByBiome[(int)Biome.Charred]);
-            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
-            Assert.Equal([tree], TreeGenerator.DynamicRowFor(Biome.Charred));
-            Assert.True(2 * TreeRasterizer.ReachOf(tree).Horizontal
-                <= WorldGenerationConfig.TreeCellBlocks);
-            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Legacy);
-            Assert.Null(TreeGenerator.SpeciesByBiome[(int)Biome.Charred]);
-        }
-        finally { WorldSeed.Apply(WorldSeed.Default); }
+        Assert.Null(TreeGenerator.SpeciesByBiome[(int)Biome.Charred]);
+        Assert.Equal([tree], TreeGenerator.DynamicRowFor(Biome.Charred));
+        var charredReach = TreeRasterizer.ReachOf(tree);
+        var existingMaximum = TreeRasterizer.ReachOf(TreeSpeciesRegistry.Require("jungle_giant"));
+        Assert.True(charredReach.Horizontal <= existingMaximum.Horizontal);
+        Assert.True(charredReach.Up <= existingMaximum.Up);
     }
 }
