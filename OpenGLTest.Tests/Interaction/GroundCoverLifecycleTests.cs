@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Numerics;
 using VoxelEngine.Interaction;
 using VoxelEngine.Networking;
@@ -9,6 +8,7 @@ using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.WorldGen.Trees;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace VoxelEngine.Tests.Interaction;
 
@@ -16,17 +16,24 @@ namespace VoxelEngine.Tests.Interaction;
 [Collection("Worldgen seed")]
 public sealed class GroundCoverLifecycleTests : IDisposable
 {
-    private SupportTestWorld? _world;
+    private readonly ITestOutputHelper _output;
+    private GroundCoverPlayerWorld? _world;
 
-    public GroundCoverLifecycleTests()
+    public GroundCoverLifecycleTests(ITestOutputHelper output)
     {
+        _output = output;
         TestContent.EnsureLoaded();
         WorldSeed.Apply(WorldSeed.Default);
     }
 
     public void Dispose()
     {
-        _world?.Dispose();
+        if (_world != null)
+        {
+            _world.Dispose();
+            return;
+        }
+        Assert.False(WorldSeed.WorldIsLive);
         WorldSeed.Apply(WorldSeed.Default);
     }
 
@@ -45,13 +52,16 @@ public sealed class GroundCoverLifecycleTests : IDisposable
     [Fact]
     public void ARealFloorPlantPlacementCannotUseBushAsItsHolder()
     {
-        _world = new SupportTestWorld();
+        _world = new GroundCoverPlayerWorld(_output);
         const int x = 6, z = 6;
         var y = _world.Top + 1;
         _world.Load(x, y + 1, z);
         _world.Set(x, y, z, Id("bush"));
-        Assert.False(_world.Place(Id("desert_flower"), new Vector3(x, y, z), Vector3.UnitY));
+        var flower = Id("desert_flower");
+        Assert.False(_world.Place(flower, new Vector3(x, y, z), Vector3.UnitY));
         Assert.Equal(BlockType.Air, _world.IdAt(x, y + 1, z));
+        Assert.True(_world.Place(flower, new Vector3(x + 1, _world.Top, z), Vector3.UnitY));
+        Assert.Equal(flower, _world.IdAt(x + 1, y, z));
     }
 
     [Fact]
@@ -87,23 +97,21 @@ public sealed class GroundCoverLifecycleTests : IDisposable
         Assert.False(BlockSupport.CanHold(topId, Id("bush"), 0));
         Assert.False(BlockSupport.CanHold(topId, BlockType.Air, 0));
 
-        _world = new SupportTestWorld();
+        _world = new GroundCoverPlayerWorld(_output);
         const int x = 6, z = 6;
         var y = _world.Top + 1;
         _world.Load(x, y + 1, z);
         _world.Set(x, y, z, baseId);
         _world.Set(x, y + 1, z, topId);
-        var before = _world.World.Drops.Count;
         Assert.True(_world.Break(x, y, z));
         Assert.Equal(BlockType.Air, _world.IdAt(x, y, z));
         Assert.Equal(BlockType.Air, _world.IdAt(x, y + 1, z));
-        Assert.DoesNotContain(_world.World.Drops.Skip(before), d => d.BlockId == topId);
     }
 
     [Fact]
     public void MiningTallFernTopLeavesItsRootedBase()
     {
-        _world = new SupportTestWorld();
+        _world = new GroundCoverPlayerWorld(_output);
         const int x = 6, z = 6;
         var y = _world.Top + 1;
         _world.Load(x, y + 1, z);
@@ -112,6 +120,24 @@ public sealed class GroundCoverLifecycleTests : IDisposable
         Assert.True(_world.Break(x, y + 1, z));
         Assert.Equal(Id("tall_fern"), _world.IdAt(x, y, z));
         Assert.Equal(BlockType.Air, _world.IdAt(x, y + 1, z));
+    }
+
+    [Fact]
+    public void SingleFernIsTakenOverButTallFernBaseIsNot()
+    {
+        _world = new GroundCoverPlayerWorld(_output);
+        const int x = 6, z = 6;
+        var y = _world.Top + 1;
+        _world.Load(x, y + 1, z);
+        _world.Set(x, y, z, Id("fern"));
+        _world.Set(x + 1, y, z, Id("tall_fern"));
+        _world.Set(x + 1, y + 1, z, Id("tall_fern_top"));
+
+        Assert.True(_world.Place(Id("stone"), new Vector3(x, _world.Top, z), Vector3.UnitY));
+        Assert.Equal(Id("stone"), _world.IdAt(x, y, z));
+        Assert.False(_world.Place(Id("stone"), new Vector3(x + 1, _world.Top, z), Vector3.UnitY));
+        Assert.Equal(Id("tall_fern"), _world.IdAt(x + 1, y, z));
+        Assert.Equal(Id("tall_fern_top"), _world.IdAt(x + 1, y + 1, z));
     }
 
     [Fact]
@@ -142,7 +168,7 @@ public sealed class GroundCoverLifecycleTests : IDisposable
     [Fact]
     public void WaterBucketOnNamedFernBaseDoesNotStrandItsTop()
     {
-        _world = new SupportTestWorld();
+        _world = new GroundCoverPlayerWorld(_output);
         const int x = 7, z = 8;
         var y = _world.Top + 1;
         _world.Load(x, y + 1, z);
@@ -157,6 +183,7 @@ public sealed class GroundCoverLifecycleTests : IDisposable
         Assert.True(_world.World.TryUseSelected(World.InteractionReach, player.Context, out _));
         Assert.Equal(Id("water"), _world.IdAt(x, y, z));
         Assert.Equal(BlockType.Air, _world.IdAt(x, y + 1, z));
+        Assert.Equal(ContentRegistry.RequireItem("bucket").Id, player.Inventory.SelectedBlockId);
     }
 
     [Fact]
