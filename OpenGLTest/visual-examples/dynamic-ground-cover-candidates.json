@@ -1,0 +1,18 @@
+{
+  // Candidate poses only: the bounded Dynamic finder must confirm biome, real ground cover,
+  // camera clearance and look angles before any visual grant. No capture has been run.
+  // Run later from OpenGLTest/ with VOXEL_TIME=147 and VOXEL_SCRIPT pointing here.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [0.5, 25.5, 0.5], "yaw": 25, "pitch": -20 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "forest_floor_candidate", "hideHud": true },
+    { "op": "teleport", "pos": [16.5, 22.5, 144.5], "yaw": 40, "pitch": -18 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "screenshot", "name": "steppe_candidate", "hideHud": true },
+    { "op": "teleport", "pos": [432.5, 14.5, 816.5], "yaw": 90, "pitch": -12 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "jungle_understory_candidate", "hideHud": true }
+  ]
+}

@@ -61,6 +61,9 @@ public static class WorldFeatureConfig
     // The tuft density runs from the dry end to the wet end of the climate's wetness
     public const float GrassDensityDry = 0.15f;
     public const float GrassDensityWet = 0.5f;
+    // Dynamic ground cover is denser in wet regions; the Legacy endpoints stay unchanged.
+    public const float DynamicGrassDensityDry = 0.22f;
+    public const float DynamicGrassDensityWet = 0.68f;
     public const float ShrubPatchFrequency = 1f / 64f;
     public const float ShrubPatchThreshold = 0.2f;
     public const float ShrubDensity = 0.04f;

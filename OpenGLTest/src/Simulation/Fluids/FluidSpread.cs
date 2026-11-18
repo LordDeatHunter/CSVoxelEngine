@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Simulation.LeafDecay;
 
 namespace VoxelEngine.Simulation.Fluids;
 
@@ -10,6 +11,9 @@ internal sealed class FluidSpread
     private readonly FluidSchedule _schedule;
     private readonly FluidNeighborhood _neighborhood;
     private readonly List<Vector3> _hardened;
+
+    // Bound to the current authoritative fluid frame; null in isolated fluid tests.
+    internal LeafDecayManager? LeafDecay { get; set; }
 
     internal FluidSpread(FluidCells cells, FluidSchedule schedule, FluidNeighborhood neighborhood, List<Vector3> hardened)
     {
@@ -207,7 +211,23 @@ internal sealed class FluidSpread
             _cells.Chunks.UnmarkPlayerPlaced(x, y, z);
         }
 
+        // The new tall fern is a two-cell named-supported plant. A flow replacing its lower
+        // cell must remove the loaded top through the same journal-aware writer, before the
+        // holder changes. This intentionally handles one actual dependent, not arbitrary chains.
+        if (previous != 0 && _cells.TryGetCell(x, y + 1, z, out var top, out var topState)
+            && top != 0 && BlockType.ById[top]?.SupportBlockId == previous)
+        {
+            drops.SpawnLoot(top, new Vector3(x, y + 1, z),
+                DropManager.PileCount(top, topState),
+                DropManager.PileSecondary(top, topState), topState);
+            _cells.Chunks.UnmarkPlayerPlaced(x, y + 1, z);
+            _cells.Write(x, y + 1, z, 0, 0);
+            _schedule.ScheduleAround(x, y + 1, z);
+            LeafDecay?.ScheduleAround(new Vector3(x, y + 1, z));
+        }
+
         _cells.Write(x, y, z, writeId, writeState);
+        LeafDecay?.ScheduleAround(new Vector3(x, y, z));
         if (writeId != fluid)
             _hardened.Add(new Vector3(x, y, z));
         _schedule.ScheduleAround(x, y, z);

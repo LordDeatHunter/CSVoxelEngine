@@ -100,6 +100,8 @@ public sealed class StampGateTests
             (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => CottonGenerator.Stamp(b, c, x, y, z), false),
         new("DesertFlora", Stage.DesertFlora, (c, _) => DesertFloraGenerator.WriteBand(c),
             (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => DesertFloraGenerator.Stamp(b, c, x, y, z), false),
+        new("JungleBushes", Stage.JungleBushes, (c, _) => JungleBushGenerator.WriteBand(c),
+            (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => JungleBushGenerator.Stamp(b, c, x, y, z), false),
         new("Flowers", Stage.Flowers, (c, _) => FlowerGenerator.WriteBand(c),
             (ushort[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => FlowerGenerator.Stamp(b, c, x, y, z), true),
         new("Foliage", Stage.Foliage, (c, _) => FoliageGenerator.WriteBand(c),
@@ -168,6 +170,21 @@ public sealed class StampGateTests
             var hellOnly = Features[f].Name.EndsWith("Hell") && (WorldGenerationConfig.HellTopY + 1) % Chunk.Size == 0;
             if (hellOnly) continue;
             Assert.True(admitted[f], $"{Features[f].Name}: its gate never admitted a filled sample chunk");
+        }
+    }
+
+    [Fact]
+    public void DynamicGroundCoverGatesMatchUngatedFixedForestAndJungleColumns()
+    {
+        try
+        {
+            WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
+            var positions = new List<Vector3> { new(0, 2, 0), new(27, 2, 51) };
+            CompareGatedWithUngated(positions, new bool[Features.Length], new bool[Features.Length]);
+        }
+        finally
+        {
+            WorldSeed.Apply(WorldSeed.Default);
         }
     }
 

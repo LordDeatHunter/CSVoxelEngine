@@ -1,0 +1,18 @@
+{
+  "name": "Bush",
+  "model": { "parent": "block/cube_all", "textures": { "all": "bush" } },
+  "hardness": 0,
+  "flammable": true,
+  "movementSpeed": 0.5,
+  "cutout": true,
+  "sway": true,
+  "biomeTint": { "palette": "foliage", "faces": { "all": { "tile": "bush_textureless" } } },
+  "occludes": false,
+  "castsAO": false,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "loot": "dead_shrub",
+  "sfx": "hit_grass",
+  "stepSfx": "step_grass"
+}

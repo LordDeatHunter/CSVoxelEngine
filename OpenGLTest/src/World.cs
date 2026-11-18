@@ -1400,7 +1400,7 @@ public class World
 
         // Runs after every path that can edit a block this frame, so the cells they scheduled
         // are all in the same tick
-        _fluidManager.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
+        _fluidManager.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager, _leafDecay);
         // Lava that hardened this frame gives off steam; cosmetic, so never on a server
         if (!_serverMode)
             Ambient.PuffSteam(_fluidManager.HardenedCells);

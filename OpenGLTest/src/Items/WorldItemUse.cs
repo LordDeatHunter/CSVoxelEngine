@@ -178,6 +178,16 @@ internal sealed class WorldItemUse : IItemUseWorld
 
     bool IItemUseWorld.PourFluidCell(Vector3 pos, ushort fluidId)
     {
+        // A bucket bypasses the fluid tick. Pop a loaded named-dependent top through the
+        // ordinary authoritative edit path before its lower holder becomes a source.
+        var x = (int)pos.X;
+        var y = (int)pos.Y;
+        var z = (int)pos.Z;
+        if (_chunkManager.TryGetCell(x, y, z, out var holder, out _) && holder != 0
+            && _chunkManager.TryGetCell(x, y + 1, z, out var top, out _)
+            && top != 0 && BlockType.ById[top]?.SupportBlockId == holder)
+            Edits.RemoveBlock(new Vector3(x, y + 1, z), ActiveContext);
+
         var changed = _fluidManager.SetCellImmediate(pos, fluidId, FluidState.Source, _chunkManager);
         // Scheduled for uniformity with every other edit path; a flow itself never overwrites a
         // leaf, since leaves are not replaceable
