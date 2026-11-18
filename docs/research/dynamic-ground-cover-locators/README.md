@@ -81,3 +81,40 @@ internal neighbor-key lookups), dependent pure queries and writes are
 transitive work and are **not** covered by the 1,290-read figure or claimed
 to be zero. No independent new column-key query or coordinate search is
 requested.
+
+## Opt-in Forest tall-fern joint preflight
+
+`ForestTallFernVisibilityDiagnosticTests.cs` is a **separate, unrun** research
+source outside the default test project. The retained aa52 normal/probe row
+records the Forest tall fern at `(10,10/11/12,2)` (grass/lower/top) in the
+already known seed-1337 Dynamic chunk `(0,0,0)`. The F1 eye
+`(13.5,11.4,2.5)` lies in recorded air at `(13,11,2)`; the F2 eye
+`(14.5,11.4,2.5)` lies in `(14,11,2)`, whose occupancy was **not** recorded.
+Both poses are frozen at yaw 158°, pitch +8°. An actually occupied F2 eye
+rejects only F2, retaining F1's result. No new coordinate or adaptive angle
+search is involved.
+
+The same nine fixed target points and conservative supercover/all-air center
+criteria as the Jungle diagnostic apply. Pure source-derived 16:9/FOV60°
+projection arithmetic gives F1 target horizontal angles 17.84–25.33° and
+vertical angles -16.59–19.53°, F2 horizontal 18.91–24.56° and vertical
+-14.46–13.36°. Each stays within the diagnostic's 10° FOV edge margin;
+these calculations do **not** establish a clear sightline. Any foreign
+nonair, out-of-chunk or 32-visit cap marks a ray unsafe. Zero viable remains
+a camera observation rather than a terrain regression or visual acceptance.
+
+**Only if separately granted:** temporarily copy the committed Forest source
+by name into `OpenGLTest.Tests/WorldGen/Features/`, then build the Release
+solution and discover/run the single filter
+`FullyQualifiedName=VoxelEngine.Tests.WorldGen.Features.ForestTallFernVisibilityDiagnosticTests.FixedForestEyesReportConservativeAirCorridors`
+with `--no-build --no-restore` on the two test commands. Preserve exact argv,
+scoped environment, raw output, TRX, executed DLL copies and source identity
+before removing that sole temporary copy; verify default membership and clean
+tracked status afterward. This is a future procedure, not an action taken now.
+
+Future reservation is one normal fill of existing chunk `(0,0,0)`, zero
+explicit separate column lookup, no planner/Legacy fill, World, mesh, game or
+GL, two eyes × (nine target rays + one full 10-block center ray) = at most
+20 rays × 32 visits = 640 ray-cell reads plus three target and two eye checks
+= at most 645 explicit ID reads. The generated chunk's dependent cache/noise,
+feature and voxel passes are transitive **unmeasured** work, not zero.
