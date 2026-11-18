@@ -178,9 +178,13 @@ public sealed class GroundCoverLifecycleTests : IDisposable
         var bucket = ContentRegistry.RequireItem("water_bucket").Id;
         Assert.True(player.Inventory.Add(bucket));
         Assert.True(player.Inventory.PickBlock(bucket));
-        var target = new Vector3(x + 0.5f, _world.Top + 0.9f, z + 0.5f);
+        var target = new Vector3(x + 0.95f, _world.Top + 0.9f, z + 0.5f);
         player.Aim(player.Context.Eye, Vector3.Normalize(target - player.Context.Eye));
-        Assert.True(_world.World.TryUseSelected(World.InteractionReach, player.Context, out _));
+        Assert.True(player.Context.Raycast(World.InteractionReach, _world.Manager, out var hit, out var normal));
+        Assert.Equal(new Vector3(x, _world.Top, z), hit);
+        Assert.Equal(Vector3.UnitY, normal);
+        Assert.True(_world.World.TryUseSelected(World.InteractionReach, player.Context, out var outcome));
+        Assert.Equal(RightClickOutcome.ItemUse, outcome);
         Assert.Equal(Id("water"), _world.IdAt(x, y, z));
         Assert.Equal(BlockType.Air, _world.IdAt(x, y + 1, z));
         Assert.Equal(ContentRegistry.RequireItem("bucket").Id, player.Inventory.SelectedBlockId);
