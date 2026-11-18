@@ -50,18 +50,27 @@ public sealed class TaigaFernFrozenFillTests(ITestOutputHelper output)
                 columnAttempts++;
                 var column = ColumnCache.Get(site.Cx, site.Cz);
                 var ci = (site.Lx << Chunk.SizeShift) | site.Lz;
-                siteMembers += 5;
-                Assert.Equal(height, column.Heights[ci]);
-                Assert.Equal(Biome.Taiga, column.Biomes[ci]);
-                Assert.True(column.DirtDepth[ci] > 0);
-                Assert.Equal(TerrainGenerator.NoWater, column.WaterLevel[ci]);
-                Assert.False(column.Oasis[ci]);
+                siteMembers++;
+                var observedHeight = column.Heights[ci];
+                siteMembers++;
+                var stored = column.Biomes[ci];
+                siteMembers++;
+                var dirtDepth = column.DirtDepth[ci];
+                siteMembers++;
+                var waterLevel = column.WaterLevel[ci];
+                siteMembers++;
+                var oasis = column.Oasis[ci];
+                Assert.Equal(height, observedHeight);
+                Assert.Equal(Biome.Taiga, stored);
+                Assert.True(dirtDepth > 0);
+                Assert.Equal(TerrainGenerator.NoWater, waterLevel);
+                Assert.False(oasis);
                 Assert.Equal(Biome.Taiga, TerrainGenerator.FloraBiomeAt(site.X, site.Z));
                 Assert.Equal(0, SnowGenerator.DepthAt(site.X, site.Z, height));
                 Assert.False(TerrainGenerator.IsWaterColumn(site.X, site.Z, height));
                 Assert.True(SurfaceClearance.Allows(height, 1));
                 Assert.True(FoliageGenerator.TryGetGrassTuft(site.X, site.Z));
-                Assert.Equal(fern, DynamicGroundCover.CandidateAt(site.X, site.Z, column.Biomes[ci]));
+                Assert.Equal(fern, DynamicGroundCover.CandidateAt(site.X, site.Z, stored));
                 Assert.True(FoliageGenerator.WriteBand(column).Contains(worldY));
 
                 var key = new Vector3(site.Cx, cy, site.Cz);
@@ -74,7 +83,7 @@ public sealed class TaigaFernFrozenFillTests(ITestOutputHelper output)
 
                 var actual = Read(normal, site.Lx, localY, site.Lz);
                 var planned = Read(probe, site.Lx, localY, site.Lz);
-                output.WriteLine($"S4a Taiga fixedsite x={site.X} z={site.Z} key=({site.Cx},{cy},{site.Cz}) local=({site.Lx},{localY},{site.Lz}) stored={column.Biomes[ci]} height={column.Heights[ci]} normalGround={actual.Ground} normalBase={actual.Base} normalAbove={actual.Above} normalGroundState={actual.GroundState} normalBaseState={actual.BaseState} normalAboveState={actual.AboveState} probeGround={planned.Ground} probeBase={planned.Base} probeAbove={planned.Above} probeGroundState={planned.GroundState} probeBaseState={planned.BaseState} probeAboveState={planned.AboveState}");
+                output.WriteLine($"S4a Taiga fixedsite x={site.X} z={site.Z} key=({site.Cx},{cy},{site.Cz}) local=({site.Lx},{localY},{site.Lz}) stored={stored} height={observedHeight} normalGround={actual.Ground} normalBase={actual.Base} normalAbove={actual.Above} normalGroundState={actual.GroundState} normalBaseState={actual.BaseState} normalAboveState={actual.AboveState} probeGround={planned.Ground} probeBase={planned.Base} probeAbove={planned.Above} probeGroundState={planned.GroundState} probeBaseState={planned.BaseState} probeAboveState={planned.AboveState}");
                 Assert.Equal(grass, actual.Ground);
                 Assert.Equal(fern, actual.Base);
                 Assert.Equal((byte)0, actual.BaseState);
