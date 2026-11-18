@@ -1,18 +1,30 @@
 {
-  // Candidate poses only: the bounded Dynamic finder must confirm biome, real ground cover,
-  // camera clearance and look angles before any visual grant. No capture has been run.
-  // Run later from OpenGLTest/ with VOXEL_TIME=147 and VOXEL_SCRIPT pointing here.
+  // Source-only S4a review poses. Program's VOXEL_SCRIPT path applies seed 1337 Dynamic
+  // before constructing a storeless world. Named plants and adjacent air cells came
+  // from fixed normal/probe fills; camera rays and rendered visibility remain unverified.
+  // Run later from OpenGLTest/ with VOXEL_TIME=147 and this VOXEL_SCRIPT path.
   "steps": [
     { "op": "creative", "on": true },
     { "op": "fly", "on": true },
-    { "op": "teleport", "pos": [0.5, 25.5, 0.5], "yaw": 25, "pitch": -20 },
+    // (12,1) is a natural Forest bush at y11; its y12 cell was air. Look toward
+    // the known tall-fern top at (10,12,2) and nearby ferns, without planting.
+    { "op": "teleport", "pos": [12.5, 12.4, 1.5], "yaw": 153, "pitch": -12 },
     { "op": "wait", "seconds": 20 },
-    { "op": "screenshot", "name": "forest_floor_candidate", "hideHud": true },
-    { "op": "teleport", "pos": [16.5, 22.5, 144.5], "yaw": 40, "pitch": -18 },
+    { "op": "screenshot", "name": "natural_forest_floor_and_fern_joint", "hideHud": true },
+    // (19,158) is a natural Steppe bush at y9, with air at y10. Other
+    // recorded bushes sit toward (24,151); line of sight still needs review.
+    { "op": "teleport", "pos": [19.5, 10.4, 158.5], "yaw": -55, "pitch": -10 },
     { "op": "wait", "seconds": 5 },
-    { "op": "screenshot", "name": "steppe_candidate", "hideHud": true },
-    { "op": "teleport", "pos": [432.5, 14.5, 816.5], "yaw": 90, "pitch": -12 },
-    { "op": "wait", "seconds": 6 },
-    { "op": "screenshot", "name": "jungle_understory_candidate", "hideHud": true }
+    { "op": "screenshot", "name": "natural_steppe_bushes", "hideHud": true },
+    // All three cells of the Jungle shrub rooted at (-8800,10401) were actual
+    // bush at y70 and air at y71; a southward view may include the understory.
+    { "op": "teleport", "pos": [-8799.5, 71.4, 10401.5], "yaw": 90, "pitch": -14 },
+    { "op": "wait", "seconds": 7 },
+    { "op": "screenshot", "name": "natural_jungle_cluster", "hideHud": true },
+    // The second shrub rooted at (-8799,10410) has air at y70; the recorded
+    // tall-fern pair at (-8799,10408) stands two cells north on actual mud.
+    { "op": "teleport", "pos": [-8798.5, 70.4, 10410.5], "yaw": -90, "pitch": -12 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "screenshot", "name": "natural_jungle_tall_fern_joint", "hideHud": true }
   ]
 }
