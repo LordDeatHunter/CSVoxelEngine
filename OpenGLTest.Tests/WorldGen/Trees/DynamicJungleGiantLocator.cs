@@ -50,8 +50,14 @@ public sealed class DynamicJungleGiantLocator
         }
         finally
         {
-            log.WriteLine($"S4B_GIANT_SUMMARY attempted={attempted} rejected={rejected} ordinary={ordinary} giant={giant} stopped={stopped} miss={!stopped}");
-            WorldSeed.Apply(WorldSeed.Default);
+            try
+            {
+                log.WriteLine($"S4B_GIANT_SUMMARY attempted={attempted} rejected={rejected} ordinary={ordinary} giant={giant} stopped={stopped} miss={!stopped}");
+            }
+            finally
+            {
+                WorldSeed.Apply(WorldSeed.Default);
+            }
         }
     }
 
