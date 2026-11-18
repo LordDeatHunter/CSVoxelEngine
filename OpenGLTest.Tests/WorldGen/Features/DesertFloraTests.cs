@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
 using VoxelEngine.Saves;
@@ -181,22 +182,37 @@ public sealed class DesertFloraTests : IDisposable
     [Fact]
     public void HardCoreRejectsAnOtherwiseRetainedPlantOnActualGeneratedSand()
     {
-        // Start at the S3a proven core and expand in rings. This is a finite site selection,
-        // not a claim about every seed; a missing site is a selection miss, not behavioral red.
+        // Search only the S3a proven core's 9x9 neighborhood. Higher center retention
+        // gives a retained plant a better chance while the fixed key and cell caps stay intact.
         const int anchorCx = -8184 >> Chunk.SizeShift;
         const int anchorCz = 2312 >> Chunk.SizeShift;
         var coreKeys = 0;
+        var centerQueries = 0;
         var inspected = 0;
         (int X, int Z, int Height, ushort Plant)? chosen = null;
-        for (var radius = 0; radius <= 4 && !chosen.HasValue && inspected < 2048; radius++)
-        for (var dx = -radius; dx <= radius && !chosen.HasValue && inspected < 2048; dx++)
-        for (var dz = -radius; dz <= radius && !chosen.HasValue && inspected < 2048; dz++)
+        var keys = new List<(int Cx, int Cz, float Retention)>(81);
+        for (var dx = -4; dx <= 4; dx++)
+        for (var dz = -4; dz <= 4; dz++)
         {
-            if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != radius) continue;
             var cx = anchorCx + dx;
             var cz = anchorCz + dz;
             coreKeys++;
             if (!TerrainErg.IsCore(cx, cz)) continue;
+            centerQueries++;
+            keys.Add((cx, cz, TerrainErg.Retention(cx * Chunk.Size + Chunk.Size / 2,
+                cz * Chunk.Size + Chunk.Size / 2)));
+        }
+        keys.Sort(static (a, b) =>
+        {
+            var byRetention = b.Retention.CompareTo(a.Retention);
+            if (byRetention != 0) return byRetention;
+            var byX = a.Cx.CompareTo(b.Cx);
+            return byX != 0 ? byX : a.Cz.CompareTo(b.Cz);
+        });
+
+        foreach (var (cx, cz, _) in keys)
+        {
+            if (chosen.HasValue || inspected == 2048) break;
             var column = ColumnCache.Get(cx, cz);
             for (var lx = 0; lx < Chunk.Size && !chosen.HasValue && inspected < 2048; lx++)
             for (var lz = 0; lz < Chunk.Size && !chosen.HasValue && inspected < 2048; lz++)
@@ -217,12 +233,11 @@ public sealed class DesertFloraTests : IDisposable
             }
         }
 
-        _output.WriteLine($"S3b core selection keys={coreKeys} point_entries={inspected}");
+        _output.WriteLine($"S3b core selection keys={coreKeys} center_retention_queries={centerQueries} point_entries={inspected}");
         Assert.True(chosen.HasValue, "No otherwise retained core plant in the bounded 81-key/2048-point selection; this is a site miss.");
         var (siteX, siteZ, siteHeight, retainedPlant) = chosen.Value;
         Assert.True(TerrainErg.IsCore(siteX >> Chunk.SizeShift, siteZ >> Chunk.SizeShift));
         Assert.NotEqual(BlockType.Air, retainedPlant);
-        Assert.Equal(BlockType.Air, DesertFloraGenerator.CandidateAt(siteX, siteZ));
 
         var cy = (siteHeight + 1) >> Chunk.SizeShift;
         var chunk = new Chunk(null!, new Vector3(siteX >> Chunk.SizeShift, cy, siteZ >> Chunk.SizeShift),
@@ -232,9 +247,10 @@ public sealed class DesertFloraTests : IDisposable
         var baseY = (siteHeight + 1) & Chunk.SizeMask;
         var ground = chunk.GetLocalBlock(localX, baseY - 1, localZ);
         var baseBlock = chunk.GetLocalBlock(localX, baseY, localZ);
-        _output.WriteLine($"S3b core site x={siteX} z={siteZ} height={siteHeight} retained={SaveNames.NameOf(retainedPlant)} ground={SaveNames.NameOf(ground)} base={SaveNames.NameOf(baseBlock)}");
+        _output.WriteLine($"S3b core site x={siteX} z={siteZ} cx={siteX >> Chunk.SizeShift} cy={cy} cz={siteZ >> Chunk.SizeShift} height={siteHeight} retained={SaveNames.NameOf(retainedPlant)}({retainedPlant}) ground={SaveNames.NameOf(ground)}({ground}) base={SaveNames.NameOf(baseBlock)}({baseBlock})");
         Assert.Equal(ContentRegistry.RequireBlock("sand").Id, ground);
         Assert.Equal(BlockType.Air, baseBlock);
+        Assert.Equal(BlockType.Air, DesertFloraGenerator.CandidateAt(siteX, siteZ));
     }
 
     [Fact]
