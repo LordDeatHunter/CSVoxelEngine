@@ -11,24 +11,23 @@ using Xunit;
 
 namespace VoxelEngine.Tests.WorldGen.Trees;
 
-/// <summary>Opt-in normal-block visibility diagnosis of four fixed rays around the verified giant.</summary>
+/// <summary>Opt-in normal-block visibility diagnosis of five close fixed rays around the verified giant.</summary>
 [Collection("Worldgen seed")]
 public sealed class DynamicJungleCameraVisibilityDiagnostic
 {
     private const string OptInVariable = "VOXEL_S4B_CAMERA_VISIBILITY_DIAGNOSTIC";
     private const int RayCellCap = 128;
     private const int TotalCellCap = 512;
-    private const int ChunkCap = 20;
+    private const int ChunkCap = 12;
     private readonly record struct Cell(int X, int Y, int Z);
     private readonly record struct Key(int X, int Y, int Z);
     private sealed record Ray(string Name, Vector3 Eye, Vector3 Target, ushort ExpectedTarget, List<Cell> Cells);
 
     [OptInCameraFact]
     [Trait("Purpose", "S4bFixedCameraPreflight")]
-    public void ReportsFourFixedNaturalCameraRaysThroughNormalChunks()
+    public void ReportsFiveCloseNaturalGiantCameraRaysThroughNormalChunks()
     {
         var phase = "setup";
-        var directColumns = 0;
         var plannedCells = 0;
         var plannedKeys = 0;
         var normalFills = 0;
@@ -36,41 +35,27 @@ public sealed class DynamicJungleCameraVisibilityDiagnostic
         var blockedRays = 0;
         var eyeChecks = 0;
         var targetChecks = 0;
-        var waterRaised = false;
         long growsBefore = 0;
         using var log = new StreamWriter(Console.OpenStandardError()) { AutoFlush = true };
         try
         {
             TestContent.EnsureLoaded();
             var giant = TreeSpeciesRegistry.Require("jungle_giant");
-            var ordinary = TreeSpeciesRegistry.Require("jungle_tree");
             WorldSeed.Apply(1337, WorldGenProfile.Dynamic);
             growsBefore = TreeBatches.GrowsOnThisThread;
-
-            phase = "one-under-eye-column";
-            const int groundX = 4023;
-            const int groundZ = 782;
-            directColumns++;
-            var column = ColumnCache.Get(groundX >> Chunk.SizeShift, groundZ >> Chunk.SizeShift);
-            var ci = ((groundX & Chunk.SizeMask) << Chunk.SizeShift) | (groundZ & Chunk.SizeMask);
-            var height = column.Heights[ci];
-            var bed = column.Bed[ci];
-            var water = column.WaterLevel[ci];
-            waterRaised = WorldGenerationConfig.WaterEnabled && bed < water;
-            var support = waterRaised ? Math.Max(height, water) : height;
-            var underEye = new Vector3(4023.5f, support + 3.5f, 782.5f);
-            log.WriteLine($"S4B_CAMERA_UNDER_COLUMN at={groundX},{groundZ} height={height} bed={bed} water={water} waterRaised={waterRaised} support={support} eye={underEye}");
 
             phase = "plan-rays";
             var rays = new[]
             {
-                MakeRay("under-to-ordinary-bare-trunk", underEye,
-                    new Vector3(4014.5f, 49.5f, 777.5f), ordinary.WoodId),
-                MakeRay("side-to-giant-highest-leaf", new Vector3(3993.5f, 78.5f, 778.5f),
+                MakeRay("north-to-giant-highest-leaf", new Vector3(4026.5f, 70.5f, 754.5f),
                     new Vector3(4026.5f, 73.5f, 779.5f), giant.LeavesId),
-                MakeRay("side-to-giant-bare-trunk", new Vector3(3993.5f, 78.5f, 778.5f),
+                MakeRay("north-to-giant-bare-trunk", new Vector3(4026.5f, 70.5f, 754.5f),
                     new Vector3(4026.5f, 58.5f, 778.5f), giant.WoodId),
-                MakeRay("above-to-giant-highest-leaf", new Vector3(4026.5f, 104.5f, 735.5f),
+                MakeRay("east-to-giant-highest-leaf", new Vector3(4045.5f, 61.5f, 778.5f),
+                    new Vector3(4026.5f, 73.5f, 779.5f), giant.LeavesId),
+                MakeRay("east-to-giant-bare-trunk", new Vector3(4045.5f, 61.5f, 778.5f),
+                    new Vector3(4026.5f, 58.5f, 778.5f), giant.WoodId),
+                MakeRay("close-above-to-giant-highest-leaf", new Vector3(4026.5f, 84.5f, 760.5f),
                     new Vector3(4026.5f, 73.5f, 779.5f), giant.LeavesId),
             };
             var keys = new HashSet<Key>();
@@ -136,7 +121,7 @@ public sealed class DynamicJungleCameraVisibilityDiagnostic
         {
             try
             {
-                log.WriteLine($"S4B_CAMERA_LEDGER phase={phase} directColumnGets={directColumns} plannedCells={plannedCells} plannedKeys={plannedKeys} normalFills={normalFills} probeFills=0 eyeChecks={eyeChecks} targetChecks={targetChecks} observedRays={observedRays} blockedRays={blockedRays} waterRaised={waterRaised} growsOnThreadBefore={growsBefore} growsOnThreadAfter={TreeBatches.GrowsOnThisThread} growDelta={TreeBatches.GrowsOnThisThread - growsBefore}");
+                log.WriteLine($"S4B_CAMERA_LEDGER phase={phase} directColumnGets=0 plannedCells={plannedCells} plannedKeys={plannedKeys} normalFills={normalFills} probeFills=0 eyeChecks={eyeChecks} targetChecks={targetChecks} observedRays={observedRays} blockedRays={blockedRays} growsOnThreadBefore={growsBefore} growsOnThreadAfter={TreeBatches.GrowsOnThisThread} growDelta={TreeBatches.GrowsOnThisThread - growsBefore}");
             }
             finally
             {
@@ -211,13 +196,13 @@ public sealed class DynamicJungleCameraVisibilityDiagnostic
     private static string Describe(ushort id) =>
         $"{id}:{SaveNames.NameOf(id) ?? "air/unknown"}:{TreeSpeciesRegistry.ForBlock(id)?.Name ?? "none"}";
 
-    /// <summary>Default discovery skips this fixed natural-camera diagnostic.</summary>
+    /// <summary>Default discovery skips this fixed close-camera diagnostic.</summary>
     public sealed class OptInCameraFactAttribute : FactAttribute
     {
         public OptInCameraFactAttribute()
         {
             if (Environment.GetEnvironmentVariable(OptInVariable) != "1")
-                Skip = $"Set {OptInVariable}=1 for four fixed S4b camera rays.";
+                Skip = $"Set {OptInVariable}=1 for five fixed S4b close-camera rays.";
         }
     }
 }
