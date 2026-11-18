@@ -1,0 +1,30 @@
+{
+  // S5a natural volcano, seed 1337 Dynamic through Program's storeless VOXEL_SCRIPT path.
+  // Accepted SiteAt(-8,-4): center (-15056.497,-7804.5435), radius 358.11472,
+  // crater radius 34.471203, floor 151, lake depth 6. The only observed flank
+  // column is dry Charred at (-14966,-7804), final height/bed 156, dirt depth 4.
+  // Poses are source geometry, not verified air rays or visual acceptance.
+  // Start at the first eye with VOXEL_SPAWN/LOOK; VOXEL_TIME=147 is morning light.
+  // Screenshots go to a private scratch path, never the repository.
+  "output": "/tmp/s5a-e79ada7e-natural-visuals",
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    // East exterior: 600 blocks from center, showing a near full-detail flank
+    // and farther LOD cone. Target approximately center at y160.
+    { "op": "teleport", "pos": [-14456.5, 245, -7804.5], "yaw": 180, "pitch": -8.1 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "screenshot", "name": "natural_charred_cone_exterior", "hideHud": true },
+    // Look down over the east rim toward the real owned lava at floor 151.
+    // At the near crater rim, the center ray is above the Dynamic terrain cap;
+    // trees and structure occlusion have not been checked.
+    { "op": "teleport", "pos": [-14986.5, 250, -7804.5], "yaw": 180, "pitch": -54.6 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "natural_caldera_lava_and_rim", "hideHud": true },
+    // The accepted dry Charred point is on the cone flank, not a proven flat
+    // plain. Its actual ash/charred-stone pixels need review in the game.
+    { "op": "teleport", "pos": [-14938, 205, -7804], "yaw": 180, "pitch": -59.7 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "screenshot", "name": "natural_rocky_charred_flank_surface", "hideHud": true }
+  ]
+}
