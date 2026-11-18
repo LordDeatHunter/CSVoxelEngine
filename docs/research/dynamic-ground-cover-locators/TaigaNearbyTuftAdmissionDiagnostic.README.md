@@ -24,9 +24,9 @@ j = 0..63   inner; z =  8761 + 2*j   ([8761,8887])
 ```
 
 There are **8,192 distinct ordered coordinate visits**. Root's data-only
-comparison found 352 already-observed aligned-run coordinates on this
-lattice (54 Taiga, 269 Steppe, 29 Forest), including eight snow-free Taiga
-observations in the rejected pocket. The lattice covers the three observed
+comparison found 352 distinct coordinates from the combined aligned and local runs on this
+lattice (312 aligned, 45 local, five shared; 54 Taiga, 269 Steppe, 29 Forest),
+including eight snow-free Taiga observations in the rejected pocket. The lattice covers the three observed
 groups but does not guarantee an admitted tuft, independent noise phases,
 higher-octave coverage, a complete boundary search or eligible metadata.
 No alternate seed/grid, early stop, adaptive refinement or second region is
