@@ -6,6 +6,7 @@ using VoxelEngine.Networking;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
+using VoxelEngine.Simulation.LeafDecay;
 using Xunit;
 
 namespace VoxelEngine.Tests.Interaction;
@@ -31,6 +32,49 @@ public sealed class GroundCoverLifecycleTests : IDisposable
     private static ushort Id(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
+    public void GroundedBushIsNeitherASolidHolderNorAFullFaceSupport()
+    {
+        var bush = Id("bush");
+        Assert.False(BlockType.IsSolid(bush));
+        Assert.False(BlockType.HoldsFullFace(bush, 0));
+        Assert.False(BlockSupport.CanHold(Id("desert_flower"), bush, 0));
+        Assert.False(BlockSupport.CanHold(Id("tall_fern_top"), bush, 0));
+    }
+
+    [Fact]
+    public void ARealFloorPlantPlacementCannotUseBushAsItsHolder()
+    {
+        _world = new SupportTestWorld();
+        const int x = 6, z = 6;
+        var y = _world.Top + 1;
+        _world.Load(x, y + 1, z);
+        _world.Set(x, y, z, Id("bush"));
+        Assert.False(_world.Place(Id("desert_flower"), new Vector3(x, y, z), Vector3.UnitY));
+        Assert.Equal(BlockType.Air, _world.IdAt(x, y + 1, z));
+    }
+
+    [Fact]
+    public void IsolatedBushSurvivesDecayTicksThatRemoveAnOwnedTiplessLeaf()
+    {
+        var (chunks, center) = MeshTestWorld.WalledArea();
+        var bush = Id("bush");
+        var leaf = Id("jungle_leaves");
+        center.SetBlockRaw(8, 8, 8, bush, 0);
+        center.SetBlockRaw(9, 8, 8, leaf, LeafState.Encode(0, false));
+        var decay = new LeafDecayManager();
+        decay.ScheduleAround(8, 8, 8);
+        var drops = new DropManager();
+        for (var tick = 0; tick < 3; tick++)
+        {
+            decay.Update(SimulationConfig.LeafDecayTickSeconds, chunks, drops);
+            while (decay.TickInProgress)
+                decay.Update(0f, chunks, drops);
+        }
+        Assert.Equal(bush, chunks.GetBlockGlobal(8, 8, 8));
+        Assert.Equal(BlockType.Air, chunks.GetBlockGlobal(9, 8, 8));
+    }
+
+    [Fact]
     public void TallFernTopAcceptsOnlyItsNamedBaseAndMiningBasePopsTopOnce()
     {
         var baseId = Id("tall_fern");
@@ -51,6 +95,20 @@ public sealed class GroundCoverLifecycleTests : IDisposable
         Assert.Equal(BlockType.Air, _world.IdAt(x, y, z));
         Assert.Equal(BlockType.Air, _world.IdAt(x, y + 1, z));
         Assert.DoesNotContain(_world.World.Drops.Skip(before), d => d.BlockId == topId);
+    }
+
+    [Fact]
+    public void MiningTallFernTopLeavesItsRootedBase()
+    {
+        _world = new SupportTestWorld();
+        const int x = 6, z = 6;
+        var y = _world.Top + 1;
+        _world.Load(x, y + 1, z);
+        _world.Set(x, y, z, Id("tall_fern"));
+        _world.Set(x, y + 1, z, Id("tall_fern_top"));
+        Assert.True(_world.Break(x, y + 1, z));
+        Assert.Equal(Id("tall_fern"), _world.IdAt(x, y, z));
+        Assert.Equal(BlockType.Air, _world.IdAt(x, y + 1, z));
     }
 
     [Fact]

@@ -18,17 +18,21 @@ public sealed class DynamicGroundCoverTests : IDisposable
     public void Dispose() => WorldSeed.Apply(WorldSeed.Default);
 
     [Fact]
-    public void WeightedSelectorNeverChoosesZeroWeightAndIgnoresUniformScale()
+    public void WeightedSelectorReachesEachPositiveMemberAtItsExactCumulativeEdge()
     {
-        float[] weights = [2f, 0f, 3f, 0f];
-        float[] scaled = [20f, 0f, 30f, 0f];
-        for (var i = 0; i < 100; i++)
+        float[] weights = [2f, 0f, 3f, 1f];
+        float[] scaled = [20f, 0f, 30f, 10f];
+        var edges = new (float Roll, int Member)[]
         {
-            var roll = i / 100f;
-            var selected = DynamicGroundCover.WeightedPick(roll, weights);
-            Assert.True(selected is 0 or 2);
-            Assert.Equal(selected, DynamicGroundCover.WeightedPick(roll, scaled));
+            (0f, 0), (MathF.BitDecrement(2f / 6f), 0), (2f / 6f, 2),
+            (MathF.BitDecrement(5f / 6f), 2), (5f / 6f, 3), (1f, 3),
+        };
+        foreach (var (roll, member) in edges)
+        {
+            Assert.Equal(member, DynamicGroundCover.WeightedPick(roll, weights));
+            Assert.Equal(member, DynamicGroundCover.WeightedPick(roll, scaled));
         }
+        Assert.Equal(-1, DynamicGroundCover.WeightedPick(0.5f, [0f, 0f, 0f]));
     }
 
     [Fact]

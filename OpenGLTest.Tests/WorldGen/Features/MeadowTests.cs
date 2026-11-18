@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using VoxelEngine.WorldGen.Features;
 using Xunit;
@@ -8,9 +9,16 @@ namespace VoxelEngine.Tests.WorldGen.Features;
 /// Climate-scaled grass and flower meadows: the tuft density runs from the dry end of the climate
 /// to the wet end, and every flower stands in a clump whose center is open forest.
 /// </summary>
-public sealed class MeadowTests
+[Collection("Worldgen seed")]
+public sealed class MeadowTests : IDisposable
 {
-    public MeadowTests() => TestContent.EnsureLoaded();
+    public MeadowTests()
+    {
+        TestContent.EnsureLoaded();
+        WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Legacy);
+    }
+
+    public void Dispose() => WorldSeed.Apply(WorldSeed.Default);
 
     [Fact]
     public void TheTuftDensityRisesWithWetness()
@@ -21,6 +29,14 @@ public sealed class MeadowTests
         Assert.True(FoliageGenerator.GrassDensityAt(0.5f) > FoliageGenerator.GrassDensityAt(0.25f));
 
         // Out-of-range wetness clamps to the ends
+        Assert.Equal(FoliageGenerator.GrassDensityAt(0f), FoliageGenerator.GrassDensityAt(-1f));
+        Assert.Equal(FoliageGenerator.GrassDensityAt(1f), FoliageGenerator.GrassDensityAt(2f));
+
+        WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
+        Assert.Equal(WorldFeatureConfig.DynamicGrassDensityDry, FoliageGenerator.GrassDensityAt(0f), 4);
+        Assert.Equal(WorldFeatureConfig.DynamicGrassDensityWet, FoliageGenerator.GrassDensityAt(1f), 4);
+        Assert.True(FoliageGenerator.GrassDensityAt(1f) > FoliageGenerator.GrassDensityAt(0f));
+        Assert.True(FoliageGenerator.GrassDensityAt(0.5f) > FoliageGenerator.GrassDensityAt(0.25f));
         Assert.Equal(FoliageGenerator.GrassDensityAt(0f), FoliageGenerator.GrassDensityAt(-1f));
         Assert.Equal(FoliageGenerator.GrassDensityAt(1f), FoliageGenerator.GrassDensityAt(2f));
     }

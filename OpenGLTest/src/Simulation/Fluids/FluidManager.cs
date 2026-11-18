@@ -117,10 +117,8 @@ public class FluidManager
     /// Leftover time past the tick budget is dropped, so a hitch can never leave the simulation
     /// spiraling to catch up.
     /// </summary>
-    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, LodManager? lod = null,
-        LeafDecayManager? leafDecay = null)
+    public void Update(float deltaTime, ChunkManager chunks, DropManager drops, LodManager? lod = null)
     {
-        _spread.LeafDecay = leafDecay;
         _hardened.Clear();
         if (!Enabled) return;
         _accumulator += deltaTime;

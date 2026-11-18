@@ -4,6 +4,7 @@
   "hardness": 0,
   "flammable": true,
   "movementSpeed": 0.5,
+  "solid": false,
   "cutout": true,
   "sway": true,
   "biomeTint": { "palette": "foliage", "faces": { "all": { "tile": "bush_textureless" } } },

@@ -179,7 +179,9 @@ internal sealed class WorldItemUse : IItemUseWorld
     bool IItemUseWorld.PourFluidCell(Vector3 pos, ushort fluidId)
     {
         // A bucket bypasses the fluid tick. Pop a loaded named-dependent top through the
-        // ordinary authoritative edit path before its lower holder becomes a source.
+        // ordinary authoritative edit path before its lower holder becomes a source. The
+        // loaded holder was accepted for replacement, and a support-needing holder cannot
+        // be unbreakable, so SetCellImmediate cannot refuse after this top is removed.
         var x = (int)pos.X;
         var y = (int)pos.Y;
         var z = (int)pos.Z;

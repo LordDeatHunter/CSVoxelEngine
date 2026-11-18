@@ -330,6 +330,8 @@ grass, with Jungle mud admitted in Jungle only. Snow-covered Taiga remains bare.
 rigid lower half holds a swaying named-supported top in the same y chunk; at the top boundary it
 falls back to a single fern. `JungleBushGenerator` admits sparse horizontal two- or three-cell
 bushes on equally high grounded grass or Jungle mud, all-or-nothing inside one chunk column.
+Bushes are non-solid, slow movement and cannot hold another block or a full-face attachment;
+they are not species leaves, so a fluid washing them away does not schedule tree leaf decay.
 Hard erg-core intersections, occupied cells, water and insufficient cloud clearance reject whole
 plants. Legacy's former tuft and shrub decisions are unchanged; generated far LOD has no
 individual ground-cover proxy.

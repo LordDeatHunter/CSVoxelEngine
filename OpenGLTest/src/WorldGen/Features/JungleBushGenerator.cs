@@ -38,24 +38,34 @@ internal static class JungleBushGenerator
             var wx = worldX0 + x;
             var wz = worldZ0 + z;
             if (!CandidateAt(wx, wz, out var third)) continue;
-            // A footprint crossing the chunk edge is suppressed, never clipped.
-            if (x + 1 >= Chunk.Size || (third && z + 1 >= Chunk.Size)) continue;
-            if (TerrainErg.Intersects(wx, wz, wx + 1, wz + (third ? 1 : 0))) continue;
-            var ci = (x << Chunk.SizeShift) | z;
-            var height = column.Heights[ci];
-            var ly = height + 1 - worldY0;
-            if (ly < 1 || ly >= Chunk.Size || TerrainGenerator.IsBeachHeight(height)
-                || !SurfaceClearance.Allows(height, 1)) continue;
-            var biome = column.Biomes[ci];
-            if (biome is not (Biome.Jungle or Biome.Forest)) continue;
-            if (!Eligible(x, z, height, ly, biome, blocks, column, wx, wz)
-                || !Eligible(x + 1, z, height, ly, biome, blocks, column, wx + 1, wz)
-                || (third && !Eligible(x, z + 1, height, ly, biome, blocks, column, wx, wz + 1)))
-                continue;
-            blocks[Chunk.Idx(x, ly, z)] = Bush;
-            blocks[Chunk.Idx(x + 1, ly, z)] = Bush;
-            if (third) blocks[Chunk.Idx(x, ly, z + 1)] = Bush;
+            TryStampFootprint(blocks, column, worldX0, worldY0, worldZ0, x, z, third);
         }
+    }
+
+    /// <summary>Admit a previously selected site only when its entire grounded footprint fits.</summary>
+    internal static bool TryStampFootprint(ushort[] blocks, ColumnData column,
+        int worldX0, int worldY0, int worldZ0, int x, int z, bool third)
+    {
+        // A footprint crossing the chunk edge is suppressed, never clipped.
+        if (x + 1 >= Chunk.Size || (third && z + 1 >= Chunk.Size)) return false;
+        var wx = worldX0 + x;
+        var wz = worldZ0 + z;
+        if (TerrainErg.Intersects(wx, wz, wx + 1, wz + (third ? 1 : 0))) return false;
+        var ci = (x << Chunk.SizeShift) | z;
+        var height = column.Heights[ci];
+        var ly = height + 1 - worldY0;
+        if (ly < 1 || ly >= Chunk.Size || TerrainGenerator.IsBeachHeight(height)
+            || !SurfaceClearance.Allows(height, 1)) return false;
+        var biome = column.Biomes[ci];
+        if (biome is not (Biome.Jungle or Biome.Forest)) return false;
+        if (!Eligible(x, z, height, ly, biome, blocks, column, wx, wz)
+            || !Eligible(x + 1, z, height, ly, biome, blocks, column, wx + 1, wz)
+            || (third && !Eligible(x, z + 1, height, ly, biome, blocks, column, wx, wz + 1)))
+            return false;
+        blocks[Chunk.Idx(x, ly, z)] = Bush;
+        blocks[Chunk.Idx(x + 1, ly, z)] = Bush;
+        if (third) blocks[Chunk.Idx(x, ly, z + 1)] = Bush;
+        return true;
     }
 
     private static bool Eligible(int x, int z, int height, int ly, Biome biome,
