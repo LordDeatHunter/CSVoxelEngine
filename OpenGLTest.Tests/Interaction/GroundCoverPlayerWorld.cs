@@ -9,6 +9,7 @@ using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Chunks.Streaming;
 using VoxelEngine.Data;
 using VoxelEngine.Networking.ServerSide;
+using VoxelEngine.Player;
 using VoxelEngine.WorldGen;
 using Xunit;
 using Xunit.Abstractions;
