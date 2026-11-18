@@ -5,6 +5,7 @@ using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Ingots;
 using VoxelEngine.Simulation.Lanterns;
 using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.WorkStations;
 using VoxelEngine.Simulation.Stumps;
 using Xunit;
 
@@ -166,11 +167,11 @@ public sealed class StationNullRecordTests
         {
             Anvils = [new StationSaveData.AnvilData { Cell = [4, 2, 4], Block = "block/anvil", Metal = metal, Count = 1, Cooldown = 0f }],
         };
-        var control = new AnvilManager();
+        var control = new WorkStationManager();
         Assert.Equal(0, control.Restore(Parse(StationSaveCodec.ToBytes(saved)).Anvils));
         Assert.Equal(1, Assert.Single(control.Capture()).Count);
 
-        var restored = new AnvilManager();
+        var restored = new WorkStationManager();
         Assert.Equal(1, restored.Restore(Parse(WithNullFirst("Anvils", saved)).Anvils));
         var row = Assert.Single(restored.Capture());
         Assert.Equal(metal, row.Metal);

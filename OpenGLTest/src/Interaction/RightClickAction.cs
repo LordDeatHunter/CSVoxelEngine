@@ -170,7 +170,8 @@ internal sealed class RightClickAction
         if (Interactions.TryCookOrCollect(maxDistance, player) || Interactions.TryQuernInteract(maxDistance, player)
                                                   || Interactions.TryTakeStandingCrucible(maxDistance, player) || Interactions.TryTakeIngot(maxDistance, player)
                                                   || Interactions.TryKilnInteract(maxDistance, player) || Interactions.TryBloomeryInteract(maxDistance, player)
-                                                  || Interactions.TryAnvilInteract(maxDistance, player) || Interactions.TryCastInteract(maxDistance, player)
+                                                  || Interactions.TryWorkStationInteract(maxDistance, player) || Interactions.TryVatInteract(maxDistance, player)
+                                                  || Interactions.TryCastInteract(maxDistance, player)
                                                   || Interactions.TryStandCrucible(maxDistance, player)
                                                   || Interactions.TryConvertMultiblockByHand(maxDistance, player)
                                                   || Interactions.TryToggleOpenable(maxDistance, player))
@@ -199,8 +200,8 @@ internal sealed class RightClickAction
             outcome = RightClickOutcome.Waystone;
             return true;
         }
-        // A hammer on an anvil holding a metal stack claims it the same way: the local player opens the recipe list
-        if (Interactions.TryOpenForge(maxDistance, player, out var forgeCell))
+        // A station's tool on a work station holding a stack claims it the same way: the local player opens the recipe list
+        if (Interactions.TryOpenWorkList(maxDistance, player, out var forgeCell))
         {
             LastForgeCell = forgeCell;
             outcome = RightClickOutcome.Forge;
@@ -250,7 +251,7 @@ internal sealed class RightClickAction
     /// <summary>The cell of the waystone the newest <see cref="RightClickOutcome.Waystone"/> claim named.</summary>
     internal System.Numerics.Vector3 LastWaystoneCell { get; private set; }
 
-    /// <summary>The cell of the anvil the newest <see cref="RightClickOutcome.Forge"/> claim named.</summary>
+    /// <summary>The cell of the work station the newest <see cref="RightClickOutcome.Forge"/> claim named.</summary>
     internal System.Numerics.Vector3 LastForgeCell { get; private set; }
 
     /// <summary>The cell of the altar the newest <see cref="RightClickOutcome.Altar"/> claim named.</summary>

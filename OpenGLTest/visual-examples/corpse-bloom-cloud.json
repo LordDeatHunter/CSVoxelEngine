@@ -1,0 +1,32 @@
+{
+  // The corpse bloom's poison cloud: run with VOXEL_SCRIPT=visual-examples/corpse-bloom-cloud.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/corpse-bloom-cloud/. The jungle floor of jungle.json near (432, 816). The
+  // player lands in survival (a flying or creative one is immune and the bloom would never spew) three blocks from a
+  // bloom, with a deer and a dragonfly beside it: the bloom opens and spews, the purple cloud hangs over it and
+  // tints the deer poisoned. The player then backs out of the bloom's wake range and films the cloud thinning away.
+  "steps": [
+    { "op": "teleport", "pos": [432.5, 14.5, 816.5], "yaw": 0, "pitch": -12 },
+    { "op": "creative" },
+    { "op": "fly" },
+    { "op": "wait", "seconds": 20 },
+    { "op": "spawn", "entity": "corpse_bloom", "pos": [435.5, 816.5] },
+    { "op": "spawn", "entity": "deer", "pos": [436.5, 818.5] },
+    { "op": "spawn", "entity": "dragonfly", "pos": [436.5, 814.5] },
+    { "op": "fly", "on": false },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "creative", "on": false },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "spew", "hideHud": true },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "cloud-thick", "hideHud": true },
+    { "op": "creative" },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [423.5, 15.5, 816.5], "yaw": 0, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "cloud-from-afar", "hideHud": true },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "cloud-thinning", "hideHud": true },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "cloud-gone", "hideHud": true }
+  ]
+}

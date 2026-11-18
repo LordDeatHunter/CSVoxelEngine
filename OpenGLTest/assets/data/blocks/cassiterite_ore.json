@@ -1,0 +1,9 @@
+{
+  "name": "Cassiterite Ore",
+  "model": { "parent": "block/cube_all", "textures": { "all": "cassiterite_ore" } },
+  "sfx": "hit_rock",
+  "hardness": 6,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "loot": "cassiterite_ore"
+}

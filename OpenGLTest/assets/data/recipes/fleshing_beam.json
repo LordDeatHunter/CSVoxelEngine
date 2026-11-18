@@ -1,0 +1,8 @@
+{
+  "result": "block/fleshing_beam",
+  "count": 1,
+  "ingredients": [
+    { "item": "block/oak_log", "count": 1 },
+    { "item": "block/oak_planks", "count": 2 }
+  ]
+}

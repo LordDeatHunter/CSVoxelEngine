@@ -1,0 +1,18 @@
+{
+  // The fish itself, now and then a bone.
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/raw_salmon", "weight": 1, "count": 1 }
+      ]
+    },
+    {
+      "rolls": 1,
+      "chance": 0.25,
+      "entries": [
+        { "item": "item/bone", "weight": 1, "count": 1 }
+      ]
+    }
+  ]
+}

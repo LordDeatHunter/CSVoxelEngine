@@ -1,0 +1,55 @@
+{
+  // The centipede's body chain: run with VOXEL_SCRIPT=visual-examples/centipede-turn.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/centipede-turn/. A hovering camera looks down on a centipede wandering in goblins.json's
+  // flat forest clearing (a flying player is not prey, so it strolls and turns): through a turn the body must curve
+  // from the head back, with no gaps between the plates and every leg pair on its segment, and lie straight after a
+  // straight run.
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 23.5, 62.5], "yaw": -90, "pitch": -52 },
+    { "op": "fly" },
+    { "op": "wait", "seconds": 6 },
+    { "op": "spawn", "entity": "centipede", "pos": [-43.5, 52.5] },
+    { "op": "wait", "seconds": 1 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn01", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn02", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn03", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn04", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn05", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn06", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn07", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn08", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn09", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn10", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn11", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn12", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn13", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn14", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn15", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn16", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn17", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn18", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn19", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "turn20", "hideHud": true },
+    { "op": "wait", "seconds": 1 }
+  ]
+}

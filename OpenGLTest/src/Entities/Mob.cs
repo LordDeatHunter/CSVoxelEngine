@@ -268,7 +268,12 @@ public abstract class Mob
         return _wanderGoal;
     }
 
-    // A 3D wander point in an air cell, rerolled a few times; hovering in place when every roll hits a block
+    /// <summary>Whether this flyer's medium is water (a fish, a shark, a jellyfish) rather than air: its wander
+    /// goals lie in fluid cells and <see cref="RiggedMob.Fly"/> keeps it under the surface. False by default.</summary>
+    public virtual bool Swims => false;
+
+    // A 3D wander point in an open cell (air, or fluid for a swimmer), rerolled a few times; hovering in place
+    // when every roll hits a block
     private Vector3 FlyingWanderGoal(ChunkManager? chunks)
     {
         for (var i = 0; i < MobConfig.MobFlightWanderTries; i++)
@@ -276,8 +281,9 @@ public abstract class Mob
             var point = MobInterest.FlyingWanderPoint(Position, Random.Shared.NextSingle(),
                 Random.Shared.NextSingle(), Random.Shared.NextSingle());
             var cell = point.BlockCell();
-            if (chunks == null || chunks.GetBlockGlobal(cell.X, cell.Y, cell.Z) == 0)
-                return point;
+            if (chunks == null) return point;
+            var id = chunks.GetBlockGlobal(cell.X, cell.Y, cell.Z);
+            if (Swims ? BlockType.IsFluid(id) : id == 0) return point;
         }
         return Position;
     }

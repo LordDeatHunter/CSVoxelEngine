@@ -4,7 +4,7 @@ using System.Text;
 using VoxelEngine.Interaction;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Saves;
-using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.WorkStations;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen;
 using Xunit;
@@ -36,7 +36,7 @@ public sealed class StationInstanceInputTests
         var creativeInstanceRetained = false;
         var cleanupCompleted = false;
         var bloom = ContentRegistry.RequireItem("bloom").Id;
-        var anvilStackCap = AnvilManager.StackCap(bloom);
+        var anvilStackCap = WorkStationManager.StackCap("forge", bloom);
 
         try
         {
@@ -47,7 +47,7 @@ public sealed class StationInstanceInputTests
             var creativeAnvil = new Vector3(10, world.Top + 1, 6);
             world.Load((int)firstAnvil.X, (int)firstAnvil.Y, (int)firstAnvil.Z);
             world.Load((int)creativeAnvil.X, (int)creativeAnvil.Y, (int)creativeAnvil.Z);
-            var anvilBlock = BlockType.Types.Values.First(block => block.IsAnvil);
+            var anvilBlock = BlockType.Types.Values.First(block => block.WorkStation?.Recipes == "forge");
             world.Set((int)firstAnvil.X, (int)firstAnvil.Y, (int)firstAnvil.Z, anvilBlock.Id);
             world.Set((int)creativeAnvil.X, (int)creativeAnvil.Y, (int)creativeAnvil.Z, anvilBlock.Id);
 
@@ -57,10 +57,10 @@ public sealed class StationInstanceInputTests
             Assert.Equal(701, inventory.SelectedToolInstance);
             Assert.True(ClickAnvil(world, player, firstAnvil));
 
-            var acceptedState = world.World.Smithing.Anvils.StateAt(
+            var acceptedState = world.World.Smithing.WorkStations.StateAt(
                 (int)firstAnvil.X, (int)firstAnvil.Y, (int)firstAnvil.Z);
             Assert.NotNull(acceptedState);
-            acceptedMetalCount = acceptedState.MetalCount;
+            acceptedMetalCount = acceptedState.InputCount;
             acceptedInstance = inventory.GetToolStack(701) != null;
             acceptedAliasesCleared = inventory.SlotAt(0) == HotbarSlot.Empty
                 && inventory.SlotAt(1) == HotbarSlot.Empty
@@ -81,10 +81,10 @@ public sealed class StationInstanceInputTests
             refusedClickAccepted = ClickAnvil(world, player, firstAnvil);
             refusedInstanceRetained = inventory.GetToolStack(703) != null
                 && inventory.SelectedToolInstance == 703;
-            var fullState = world.World.Smithing.Anvils.StateAt(
+            var fullState = world.World.Smithing.WorkStations.StateAt(
                 (int)firstAnvil.X, (int)firstAnvil.Y, (int)firstAnvil.Z);
             Assert.NotNull(fullState);
-            Assert.Equal(anvilStackCap, fullState.MetalCount);
+            Assert.Equal(anvilStackCap, fullState.InputCount);
 
             player.Creative = true;
             inventory.Import(ParseSavedInstances(705, 706));
@@ -142,6 +142,6 @@ public sealed class StationInstanceInputTests
         var eye = player.Context.Eye;
         var target = cell + new Vector3(0.5f, 0.9f, 0.5f);
         player.Aim(eye, Vector3.Normalize(target - eye));
-        return world.World.Interactions.TryAnvilInteract(World.InteractionReach, player.Context);
+        return world.World.Interactions.TryWorkStationInteract(World.InteractionReach, player.Context);
     }
 }

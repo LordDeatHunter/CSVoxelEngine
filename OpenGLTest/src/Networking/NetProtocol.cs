@@ -309,8 +309,21 @@ public static class NetFraming
     /// forge. An older peer would misread the station frames.
     /// 62: a drop entry of <see cref="NetMessage.EntityList"/> carries a stuck throw (a landed javelin): its
     /// <see cref="NetEntity.Ammo"/> is what it is stuck in (<c>DropStick</c>, 0 for a loose drop) and its velocity field
-    /// then holds the heading of its tip. An older client would draw it as a loose drop sliding along that heading.</summary>
-    public const int ProtocolVersion = 62;
+    /// then holds the heading of its tip. An older client would draw it as a loose drop sliding along that heading.
+    /// 63: the anvil became the work station (anvils, fleshing beams, leather tables). Each work station entry of
+    /// <see cref="NetMessage.StationState"/> also carries the finished result waiting on it for its collect item (id and
+    /// count, after the cooldown). An older peer would misread the station frames.
+    /// 64: <see cref="NetMessage.StationState"/> ends with the tanning vats (cell, block id, water, bark, hides, progress,
+    /// leather) after the work stations. An older peer would misread the station frames.
+    /// 65: a <see cref="NetEntityKind.CorpseBloom"/>'s posture byte carries, above its open bit, how much of its poison
+    /// cloud is left; an older client would read a shut bloom under a cloud as open and draw no cloud.
+    /// 66: the sea's animals, <see cref="NetEntityKind.Cod"/>, <see cref="NetEntityKind.Salmon"/>,
+    /// <see cref="NetEntityKind.Tuna"/>, <see cref="NetEntityKind.Shark"/> and <see cref="NetEntityKind.Jellyfish"/>, in
+    /// <see cref="NetMessage.EntityList"/> (their posture byte says darting or beached); an older client would not draw them.
+    /// 67: a <see cref="NetEntityKind.Centipede"/> crawls over walls and ceilings: its posture byte is the face it
+    /// holds (<c>CrawlDrive.SurfaceIndex</c>, 0 = airborne) and its yaw the heading's angle on that face; an older
+    /// client would draw it lying on a floor.</summary>
+    public const int ProtocolVersion = 67;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

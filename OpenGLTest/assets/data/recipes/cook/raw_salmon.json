@@ -1,0 +1,6 @@
+{
+  "input": "item/raw_salmon",
+  "result": "item/cooked_salmon",
+  "count": 1,
+  "cookSeconds": 12
+}

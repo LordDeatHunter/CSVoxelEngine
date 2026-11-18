@@ -264,14 +264,15 @@ single-arc player.
   sand, a hermit variant.
   *Hook:* `Entities/Wildlife/` (`WildlifeSpecies`, `WildlifeManager`), `Boar` for the aggro rule.
 - [ ] **`P-63` · Giant centipede, the physical body** — P3, L.
-  The centipede ships (`Entities/Wildlife/Centipede.cs`) as one rigid body that plays its authored `walk` clip: a jungle
-  hunter that runs a player down and bites with venom, spawned by the jungle's wildlife rule. Still open: the body as a
-  chain (each segment trails the one ahead along the head's path, like the sandworm's, but on the ground and over
-  steps), per-segment hit testing on one health pool, inverse kinematics for twenty legs (`LegIk.Solve` and the hold
-  probing of `CrawlerLegs`, generalized from four legs a side on one body to one pair per segment, in the segment's
-  space), the metachronal stepping order the `walk` clip shows, whether it climbs like the crawlers, and the wire for a
-  chain (more than one pose, see the sandworm). Also open: a lingering-cloud particle for the corpse bloom (its cloud
-  poisons server-side with no particles yet), a rearing threat clip and length variants (the segments are identical).
+  The centipede ships (`Entities/Wildlife/Centipede.cs`): a jungle hunter that runs a player down and bites with
+  venom, spawned by the jungle's wildlife rule. Its head is the one simulated body and crawls every surface like the
+  spiders (`CrawlDrive`); the body is a chain that trails the head's path (`CentipedeSpine`), so it turns and climbs
+  segment by segment, and a blow lands on any segment.
+  Still open: the segments as collision bodies (they pass through blocks the head went round), inverse kinematics
+  for twenty legs (`LegIk.Solve` and the hold probing of `CrawlerLegs`, generalized from four legs a side on one
+  body to one pair per segment, in the segment's space), the metachronal stepping order the `walk` clip shows, and
+  the chain on the wire (a mirror rebuilds it from the head it is sent). Also open: a rearing threat clip and length variants (the segments
+  are identical).
   *Hook:* `Entities/Crawlers/` (`CrawlerRig`, `CrawlerLegs`, `LegIk`), the sandworm's chain (`plans/SANDWORM.md`).
 - [ ] **`P-56` · Ocean & island content** — P3, M.
   Islands, shipwrecks, reefs, deep-sea POIs; makes the ocean a destination rather than a border.
@@ -333,7 +334,10 @@ single-arc player.
 - [ ] **`F-18` · Village raids & defense** — P3, L.
   Hostile waves against player bases/villages; gives `P-54` wards and `F-3` a purpose.
 - [ ] **`F-19` · Ocean life & hazards** — P3, M.
-  Fish schools, hostile sea mobs, currents, drowning depth (`P-13`); pairs `P-56`.
+  The sea's animals are wired (`docs/agents/entities.md` "Sea life": cod, salmon, tuna, shark, jellyfish: swimming,
+  schools, spawn, loot, wire kinds). Still to build: currents, drowning depth (`P-13`) and sea hazards, a boat to
+  meet them from (pairs `P-56`), the jellyfish drawing translucent, drops and a use for the shark tooth and the
+  jellyfish gel, and fish items tying `F-9` (a fishing rod; today they are only cooked and eaten).
 
 ### 3. UI
 

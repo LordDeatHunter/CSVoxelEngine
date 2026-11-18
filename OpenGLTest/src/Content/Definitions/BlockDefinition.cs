@@ -337,9 +337,58 @@ public sealed class BlockDefinition
     /// <see cref="Kiln"/>.</summary>
     public BloomeryDefinition? Bloomery { get; set; }
 
-    /// <summary>Marks the block as an anvil: forge metal (blooms, vulcanite) stacks on it and a smithing hammer
-    /// forges the picked recipe out of the stack (<c>recipes/forge/</c>). Only legal on a plain model block.</summary>
-    public bool? Anvil { get; set; }
+    /// <summary>Marks the block as a work station (an anvil, a fleshing beam, a leather table): a stack of one input
+    /// lies on it and its tool works a recipe from its folder out of the stack. Only legal on a plain model block.</summary>
+    public WorkStationDefinition? Workstation { get; set; }
+
+    /// <summary>Marks the block as a tanning vat: filled with water and tannin it tans a batch of its input into its
+    /// result over time. Only legal on a plain model block.</summary>
+    public TanningDefinition? Tanning { get; set; }
+
+    /// <summary>The <c>"tanning"</c> object: <c>{"input": "item/salted_hide", "result": "item/leather", "count": 2,
+    /// "tannin": "item/bark", "water": "item/water_bucket", "capacity": 4, "seconds": 75, "liquid": 0.75}</c>.</summary>
+    public sealed class TanningDefinition
+    {
+        /// <summary>The item it tans; required.</summary>
+        public string? Input { get; set; }
+
+        /// <summary>What a tanned input becomes; required.</summary>
+        public string? Result { get; set; }
+
+        /// <summary>How many of the result one input makes; default 1.</summary>
+        public int? Count { get; set; }
+
+        /// <summary>The item that tans, one unit per input; required.</summary>
+        public string? Tannin { get; set; }
+
+        /// <summary>The item that fills the vat with water; required.</summary>
+        public string? Water { get; set; }
+
+        /// <summary>Inputs one batch holds and tannin units the vat holds, 1..16; default 4.</summary>
+        public int? Capacity { get; set; }
+
+        /// <summary>Seconds a batch takes; required, above 0.</summary>
+        public float? Seconds { get; set; }
+
+        /// <summary>Height of the liquid's surface in the cell, 0..1; default 0.75.</summary>
+        public float? Liquid { get; set; }
+    }
+
+    /// <summary>The <c>"workstation"</c> object: <c>{"tool": "hammer", "recipes": "forge", "surface": 0.9375}</c>.</summary>
+    public sealed class WorkStationDefinition
+    {
+        /// <summary>The item tag whose members pick and hit on it; required.</summary>
+        public string? Tool { get; set; }
+
+        /// <summary>The folder under <c>recipes/</c> its work recipes live in; required.</summary>
+        public string? Recipes { get; set; }
+
+        /// <summary>Height of the work surface in the cell, 0..1, where the stack is drawn; default 1.</summary>
+        public float? Surface { get; set; }
+
+        /// <summary>The most of one input it stacks, 1..64, when more than its largest recipe takes; optional.</summary>
+        public int? Stack { get; set; }
+    }
 
     /// <summary>Marks the block as a bloomery's bellows: a body landing on it beside one of a lit bloomery's
     /// tuyeres heats that bloomery, more the farther it fell. Default false.</summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Entities.Posing;
 
 namespace VoxelEngine.Entities.Sandworms;
 
@@ -20,6 +21,8 @@ public enum SandwormSegmentKind
 /// </summary>
 public sealed class SandwormChain
 {
+    private static readonly float[] Links = BuildLinks();
+
     private readonly Vector3[] _points;
     private readonly float _maxBendRadians = SandwormConfig.MaxBendDegrees * MathF.PI / 180f;
 
@@ -27,7 +30,7 @@ public sealed class SandwormChain
     public SandwormChain(Vector3 head, Vector3 forward)
     {
         _points = new Vector3[SandwormConfig.SegmentCount];
-        var back = -Normalized(forward, -Vector3.UnitZ);
+        var back = -ChainFollow.Direction(forward, -Vector3.UnitZ);
         _points[0] = head;
         for (var i = 1; i < _points.Length; i++)
             _points[i] = _points[i - 1] + back * LinkLength(i);
@@ -71,7 +74,7 @@ public sealed class SandwormChain
     public Vector3 Forward(int index)
     {
         var toward = index == 0 ? _points[0] - _points[1] : _points[index - 1] - _points[index];
-        return Normalized(toward, -Vector3.UnitZ);
+        return ChainFollow.Direction(toward, -Vector3.UnitZ);
     }
 
     /// <summary>
@@ -81,32 +84,13 @@ public sealed class SandwormChain
     public void Follow(Vector3 head)
     {
         _points[0] = head;
-        for (var i = 1; i < _points.Length; i++)
-        {
-            var parent = _points[i - 1];
-            var link = LinkLength(i);
-            var dir = Normalized(_points[i] - parent, Vector3.UnitZ);
-            if (i >= 2)
-                dir = LimitBend(dir, Normalized(parent - _points[i - 2], Vector3.UnitZ));
-            _points[i] = parent + dir * link;
-        }
+        ChainFollow.Follow(_points, Links, _maxBendRadians);
     }
 
-    // The direction a link may take: dir itself, or the nearest direction to it within the bend limit of
-    // `previous`, the direction of the link ahead of it (both point from the front of the chain toward its end).
-    private Vector3 LimitBend(Vector3 dir, Vector3 previous)
+    private static float[] BuildLinks()
     {
-        var cos = Math.Clamp(Vector3.Dot(dir, previous), -1f, 1f);
-        if (MathF.Acos(cos) <= _maxBendRadians) return dir;
-        var side = dir - previous * cos;
-        if (side.LengthSquared() < 1e-8f) return previous;
-        side = Vector3.Normalize(side);
-        return previous * MathF.Cos(_maxBendRadians) + side * MathF.Sin(_maxBendRadians);
-    }
-
-    private static Vector3 Normalized(Vector3 v, Vector3 fallback)
-    {
-        var lengthSquared = v.LengthSquared();
-        return lengthSquared < 1e-10f ? fallback : v / MathF.Sqrt(lengthSquared);
+        var links = new float[SandwormConfig.SegmentCount];
+        for (var i = 1; i < links.Length; i++) links[i] = LinkLength(i);
+        return links;
     }
 }

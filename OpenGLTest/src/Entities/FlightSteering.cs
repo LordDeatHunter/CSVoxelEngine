@@ -20,11 +20,13 @@ public static class FlightSteering
 
     /// <summary>
     /// How far the floor lies under <paramref name="bottomY"/> (the body's base) in the column of
-    /// <paramref name="center"/>: the gap down to the top of the first solid or fluid cell (a flyer hovers
-    /// over water, never in it), 0 when the base already touches it; null when there is none within
+    /// <paramref name="center"/>: the gap down to the top of the first solid cell, or of the first fluid cell too
+    /// while <paramref name="fluidIsFloor"/> (a flyer hovers over water, never in it; a swimmer's floor is the
+    /// seabed), 0 when the base already touches it; null when there is none within
     /// <paramref name="maxDepth"/> (open sky, or unloaded cells, which read as air).
     /// </summary>
-    public static float? GroundBelow(ChunkManager chunks, Vector3 center, float bottomY, float maxDepth)
+    public static float? GroundBelow(ChunkManager chunks, Vector3 center, float bottomY, float maxDepth,
+        bool fluidIsFloor = true)
     {
         var x = (int)MathF.Floor(center.X);
         var z = (int)MathF.Floor(center.Z);
@@ -33,7 +35,7 @@ public static class FlightSteering
         for (var y = top; y >= bottom; y--)
         {
             var id = chunks.GetBlockGlobal(x, y, z);
-            if (BlockType.IsSolid(id) || BlockType.IsFluid(id))
+            if (BlockType.IsSolid(id) || (fluidIsFloor && BlockType.IsFluid(id)))
                 return MathF.Max(0f, bottomY - (y + 1));
         }
         return null;
@@ -51,6 +53,40 @@ public static class FlightSteering
         var lowest = ground + halfHeight + (overGround ? flight.HoverMinBlocks : flight.MinClearanceBlocks);
         if (goalY < lowest) return lowest;
         return overGround ? MathF.Min(goalY, ground + halfHeight + flight.HoverMaxBlocks) : goalY;
+    }
+
+    /// <summary>
+    /// A swimmer's goal height <paramref name="goalY"/> held under the water surface of the column it is in: no
+    /// higher than <see cref="MobConfig.MobSwimSurfaceMarginBlocks"/> below it for the body's
+    /// <paramref name="halfHeight"/>, so it cruises just under the waves and never breaks out. Unchanged when the
+    /// body's center is not in loaded fluid (the caller then does not steer it at all).
+    /// </summary>
+    public static float KeepUnderSurface(float goalY, Vector3 center, float halfHeight, ChunkManager chunks)
+    {
+        var (x, y, z) = center.BlockCell();
+        var top = chunks.GetFluidColumnTopGlobal(x, y, z);
+        return float.IsNegativeInfinity(top) ? goalY : MathF.Min(goalY, top - halfHeight - MobConfig.MobSwimSurfaceMarginBlocks);
+    }
+
+    /// <summary>
+    /// A swimmer's horizontal move with every component that would carry the body's center into a cell that
+    /// holds no fluid (the shore, a ledge above the waterline) dropped, <see cref="MobConfig.MobFlightProbeBlocks"/>
+    /// ahead along that axis, so it presses along the shore instead of leaving the water. The vertical component
+    /// is left to <see cref="KeepUnderSurface"/>.
+    /// </summary>
+    public static Vector3 AvoidDry(Vector3 position, Vector3 desired, ChunkManager chunks)
+    {
+        if (Dry(position, 0, desired.X, chunks)) desired.X = 0f;
+        if (Dry(position, 2, desired.Z, chunks)) desired.Z = 0f;
+        return desired;
+    }
+
+    private static bool Dry(Vector3 position, int axis, float component, ChunkManager chunks)
+    {
+        if (MathF.Abs(component) <= 1e-4f) return false;
+        var (x, y, z) = BoxSweep.OffsetAxis(position, axis, MathF.Sign(component) * MobConfig.MobFlightProbeBlocks)
+            .BlockCell();
+        return !BlockType.IsFluid(chunks.GetBlockGlobal(x, y, z));
     }
 
     /// <summary>The gentle hover bob added to the goal height at <paramref name="time"/> seconds, offset by

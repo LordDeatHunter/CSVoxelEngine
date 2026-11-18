@@ -176,8 +176,11 @@ that started (`GameSettings.HostPort`/`HostUpnp`, restored by `HostSession.Resto
 **Hosting from the game.** The game hosts in process, the way both reference Godot projects run a listen server: the
 same `GameServer` over the same headless server-mode `World` the dedicated server runs, opened by the one shared
 launch (`Networking/Hosting/ServerLaunch.Start`: the save-format gate, the world source, the save store's lock, the
-operators, `WorldSeed.Apply`, the World and the listening server, each failure typed as a `ServerLaunchFailure` and
-leaving nothing live or locked; `ServerProgram` uses it too). Program defers the HOST click like a world open
+operators, `WorldSeed.Apply`, the World and the listening server, each expected failure typed as a
+`ServerLaunchFailure`; `ServerProgram` uses it too). A parsed player save that cannot restore its
+legacy lanterns returns `InvalidSave` before listening, with the original file unchanged. Failed
+World construction closes its store after stopping workers; a timed-out worker or writer can still
+keep the seed or folder locked. Program defers the HOST click like a world open
 (`PendingWork.Host`, a "Starting the server..." frame), then `HostSession.TryStart` builds the `HostedServer` and the
 host's own client connects to it over loopback (`HostedServer.LoopbackAddress`) through the normal connect path, so
 the host plays by the server's rules like everyone else. A refused start (`Port N is unavailable`, the world open
@@ -291,14 +294,14 @@ mob fields only: a flyer's whole position and velocity ride the entry and its fl
 mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
 them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
 mob fields only: a mirror's layer, and so its pool, follows from where it is first seen); an older client would not
-draw them. Version 16 makes a crucible carry one entry per metal (the alloy kiln): a `StationState` kiln entry writes a metal count (at most `CrucibleComponent.MaxMetals`; `StationNetCodec.ReadCrucible` refuses more, a material 0, a repeat or a negative amount) and each metal's id, molten and pending ml, and the `InventoryState` crucible a `Metals` list; an older peer would misread the station frames. Version 13 ends every `EntityList` entry, of every kind, with a status-effect byte mask (`NetEntity.Effects`: a mob's `StatusEffect.Bit`s, 0 for a drop, primed TNT, or falling block) and ends `PlayerStatus` with the player's own effect mask (`PlayerStatusData.EffectMask`); both codecs carry the mask raw and the client drops unknown bits when it mirrors them, and an older peer would misread every frame after the first entry. Version 8 is reserved (an entity kind since removed). Version 60 adds the `CreativeQuest` inventory intent (the quest id, then an earn byte): the server applies it to a creative player's own quest log (`InventoryIntentRules.ApplyQuest`, `QuestLog.ForceEarn`/`ForceUnearn`) and the changed log goes back as its `QuestState`; an older peer would refuse it as malformed. Version 58 adds the offhand slot: the inventory snapshot carries `InventoryData.Offhand`, `NetInventoryAction.SwapHands` is new, the equip, move and clear intents name the offhand by slot index `Inventory.OffhandIndex`, and each `PlayerList` entry ends with the offhand's held item id and lit flag. Version 57 retires `NetEntityKind` 6. A
+draw them. Version 16 makes a crucible carry one entry per metal (the alloy kiln): a `StationState` kiln entry writes a metal count (at most `CrucibleComponent.MaxMetals`; `StationNetCodec.ReadCrucible` refuses more, a material 0, a repeat or a negative amount) and each metal's id, molten and pending ml, and the `InventoryState` crucible a `Metals` list; an older peer would misread the station frames. Version 13 ends every `EntityList` entry, of every kind, with a status-effect byte mask (`NetEntity.Effects`: a mob's `StatusEffect.Bit`s, 0 for a drop, primed TNT, or falling block) and ends `PlayerStatus` with the player's own effect mask (`PlayerStatusData.EffectMask`); both codecs carry the mask raw and the client drops unknown bits when it mirrors them, and an older peer would misread every frame after the first entry. Version 8 is reserved (an entity kind since removed). Version 64 ends `StationState` with the tanning vats (cell, block id, water, bark, hides, progress, leather; see "Leatherworking"). Version 63 turns the anvil into the work station (anvils, fleshing beams, leather tables): each entry also carries the finished result waiting on it for its collect item (id and count; see "Work stations"). Version 60 adds the `CreativeQuest` inventory intent (the quest id, then an earn byte): the server applies it to a creative player's own quest log (`InventoryIntentRules.ApplyQuest`, `QuestLog.ForceEarn`/`ForceUnearn`) and the changed log goes back as its `QuestState`; an older peer would refuse it as malformed. Version 58 adds the offhand slot: the inventory snapshot carries `InventoryData.Offhand`, `NetInventoryAction.SwapHands` is new, the equip, move and clear intents name the offhand by slot index `Inventory.OffhandIndex`, and each `PlayerList` entry ends with the offhand's held item id and lit flag. Version 57 retires `NetEntityKind` 6. A
 `WorldIntent` is the sequence id, a `NetIntentKind` byte, the eye and the unit aim the action was
 made from, then that kind's fields (`WorldIntent`): `BreakStart`/`BreakComplete(cell)`,
 `Place(hit cell, face normal)`, `Use(cell under the crosshair, optional)`, `Throw(charge 0..1)`,
 `Attack(punch | slice | slice return)`, `Respawn` (nothing more; never rate-limited, edits no
-cell), `Cast(slot)` (a held staff's spell slot as one byte; never edits a cell, rate-limited) , `Hammer(cell)` (one hammer hit on an anvil; never edits a cell, rate-limited), `Waystone(cell)` (a trip to the
+cell), `Cast(slot)` (a held staff's spell slot as one byte; never edits a cell, rate-limited) , `Hammer(cell)` (one tool hit on a work station: a hammer on an anvil, a knife on a fleshing beam or leather table; never edits a cell, rate-limited), `Waystone(cell)` (a trip to the
 discovered waystone at that cell from the one the player last activated; never edits a cell, rate-limited) and
-`Forge(cell, recipe)` (a pick from an anvil's recipe list, the recipe named by its result id byte; never edits a cell,
+`Forge(cell, recipe)` (a pick from a work station's recipe list, the recipe named by its result id; never edits a cell,
 rate-limited, answered with the inventory). `StumpHit(cell)` (a left-click blow on a tree stump holding a log: the server judges its own ray and wobbles the log; never edits a cell, rate-limited; the stump logs ride the station snapshot, after the lanterns). Its
 reader refuses an unknown kind or attack, a cast slot at or past `SpellConfig.StaffMaxSlots`, a
 non-finite or far-out eye, an aim that is not close to a unit vector and a normal component
@@ -463,14 +466,16 @@ empty. Then, by kind:
   `NetPlayerAction.Cast` (8, no protocol bump: the player-list action byte is read unchecked, so an older
   client just shows no gesture). A client runs the same seam to predict only: it
   checks and paces, never spends and never fires the effect, then raises the intent.
-- **Hammer** — `IntentReplay.HammerFor` -> `World.HammerFor`: a smithing hammer (the `hammer` tag) in hand, the player's own
-  ray landing on the anvil's cell, and the anvil's own hit gap run down (the hammer's pace less
-  `BloomeryConfig.HammerSlackSeconds`); the anvil manager counts the hit and, on the last, drops the result and slag.
-- **Forge** — `IntentReplay.ForgeFor` -> `SmithingStations.Forge`: a smithing hammer in hand, the player's own ray landing
-  on the anvil's cell, the recipe offered for the metal stacked there (`AnvilManager.Offered`: that metal, no more than
-  the stack holds) and room for its result; the metal leaves the stack and the result goes into the player's inventory,
-  which the snapshot answering the intent carries, and the stack rides the station broadcast. The client predicted the
-  same call on its mirror. Stacking metal on an anvil and taking it back are plain `Use` intents (the right-click chain);
+- **Hammer** — `IntentReplay.HammerFor` -> `World.WorkStationHitFor`: the work station's tool (its `workstation.tool`
+  tag: a hammer on an anvil, a knife on a fleshing beam or leather table) in hand, the player's own ray landing on the
+  station's cell, and the station's own hit gap run down (the tool's pace less `BloomeryConfig.HammerSlackSeconds`); the
+  station manager counts the hit and, on the last, drops the result and byproduct (or keeps a result that waits for its
+  collect item).
+- **Forge** — `IntentReplay.ForgeFor` -> `SmithingStations.Select`: the station's tool in hand, the player's own ray
+  landing on the station's cell, and the recipe offered for the input stacked there (`WorkStationManager.Offered`: that
+  input, no more than the stack holds); the pick rides the station broadcast. The client predicted the same call on its
+  mirror. Stacking on a work station, taking back, collecting a waiting result with its item and every tanning vat
+  click are plain `Use` intents (the right-click chain);
   `ServerPlayer.Aim` copies the player's reported sneaking flag into `PlayerContext.RemoteSneaking`, so a crouched
   right-click takes the whole stack back on the server too.
 - **Waystone** — `WaystoneSessions.TripFor`: standing at the waystone the player last activated, no trip already waiting,

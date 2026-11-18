@@ -1,14 +1,15 @@
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Recipes;
-using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.WorkStations;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.UI.Forge;
 
 /// <summary>
-/// The anvil's recipe list, GL-free: whether it is up, the anvil it was opened on, the metal stack that anvil holds and
-/// the recipes offered for it (<see cref="AnvilManager.Offered"/>: only that metal's, and only those the stack covers),
+/// A work station's recipe list (the anvil's forge list, the leather table's patterns), GL-free: whether it is up, the
+/// station it was opened on, the stack that station holds and the recipes offered for it
+/// (<see cref="WorkStationManager.Offered"/>: only that input's, and only those the stack covers),
 /// and the pointer for the hover look. What a click does to the world is <c>ForgeInput</c>, what is drawn
 /// <c>ForgeRenderer</c>. Owned by <c>ForgeInput</c>; main thread only.
 /// </summary>
@@ -20,20 +21,26 @@ public sealed class ForgeView
     /// <summary>Whether the list is up (it owns the mouse while it is).</summary>
     public bool IsOpen { get; private set; }
 
-    /// <summary>The anvil it was opened on.</summary>
+    /// <summary>The station it was opened on.</summary>
     public (int X, int Y, int Z) Cell { get; private set; }
 
-    /// <summary>The metal stacked on that anvil, 0 for none.</summary>
-    public ushort MetalId { get; private set; }
+    /// <summary>The station's recipe folder, null until <see cref="Show"/>.</summary>
+    public string? Station { get; private set; }
 
-    /// <summary>How many of <see cref="MetalId"/> are stacked.</summary>
-    public int MetalCount { get; private set; }
+    /// <summary>The station block's display name, for the title.</summary>
+    public string Title { get; private set; } = "";
 
-    /// <summary>The result of the recipe already picked on the anvil, 0 for none; its card is marked.</summary>
+    /// <summary>The input stacked on that station, 0 for none.</summary>
+    public ushort InputId { get; private set; }
+
+    /// <summary>How many of <see cref="InputId"/> are stacked.</summary>
+    public int InputCount { get; private set; }
+
+    /// <summary>The result of the recipe already picked on the station, 0 for none; its card is marked.</summary>
     public ushort SelectedResultId { get; private set; }
 
     /// <summary>The recipes the stack can make, in the order the cards show them.</summary>
-    public IReadOnlyList<ForgeRecipe> Recipes { get; private set; } = [];
+    public IReadOnlyList<WorkRecipe> Recipes { get; private set; } = [];
 
     /// <summary>The pointer in canvas units, for the hover look; null when there is none.</summary>
     public Vector2? Hover { get; set; }
@@ -41,27 +48,31 @@ public sealed class ForgeView
     /// <summary>The list's open and close easing, stepped by the UI pass.</summary>
     public PanelTransition Transition { get; } = new();
 
-    /// <summary>Opens the list on the anvil at <paramref name="cell"/>; its stack arrives with <see cref="Show"/>.</summary>
+    /// <summary>Opens the list on the station at <paramref name="cell"/>; its stack arrives with <see cref="Show"/>.</summary>
     public void Open((int X, int Y, int Z) cell)
     {
         IsOpen = true;
         Cell = cell;
-        MetalId = 0;
-        MetalCount = 0;
+        InputId = 0;
+        InputCount = 0;
+        Station = null;
+        Title = "";
         SelectedResultId = 0;
         Recipes = [];
         _shown = false;
     }
 
-    /// <summary>Shows the anvil's current stack and pick; the cards are rebuilt only when the stack changed.</summary>
-    public void Show(ushort metalId, int count, ushort selectedResultId)
+    /// <summary>Shows the station's current stack and pick; the cards are rebuilt only when the stack changed.</summary>
+    public void Show(string? station, string title, ushort inputId, int count, ushort selectedResultId)
     {
         SelectedResultId = selectedResultId;
-        if (_shown && metalId == MetalId && count == MetalCount) return;
+        Title = title;
+        if (_shown && station == Station && inputId == InputId && count == InputCount) return;
         _shown = true;
-        MetalId = metalId;
-        MetalCount = count;
-        Recipes = AnvilManager.Offered(metalId, count);
+        Station = station;
+        InputId = inputId;
+        InputCount = count;
+        Recipes = WorkStationManager.Offered(station, inputId, count);
     }
 
     /// <summary>Puts the list down.</summary>

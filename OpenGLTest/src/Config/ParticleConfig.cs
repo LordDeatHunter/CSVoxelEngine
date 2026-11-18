@@ -1,3 +1,4 @@
+using System.Numerics;
 using VoxelEngine.Data;
 
 namespace VoxelEngine.Config;
@@ -86,6 +87,20 @@ public static class ParticleConfig
     public const float FlueSpread = 0.3f;
     /// <summary>Smallest heat rise (0..1) between two frames that counts as a blast.</summary>
     public const float BellowsBlastMinRise = 0.03f;
+    // --- Forge sparks: a hammer's hit on a work station throws glowing sparks off the work
+    // (LeftClickAction.ForgeSparks). ---
+    public const int ForgeSparksPerHit = 20;
+    /// <summary>Sparks of the hit that finishes the recipe.</summary>
+    public const int ForgeSparksOnFinish = 48;
+    /// <summary>Blocks per second the sparks fly out at.</summary>
+    public const float ForgeSparkSpeed = 4.4f;
+    public const float ForgeSparkSize = 0.03f;
+    /// <summary>How wide (blocks) the patch of the work is that they fly from, and how far above the surface.</summary>
+    public const float ForgeSparkRadius = 0.2f;
+    public const float ForgeSparkLift = 0.06f;
+    public static readonly Vector3 ForgeSparkColor = new(1f, 0.55f, 0.12f);
+    public static readonly Vector3 ForgeSparkHotColor = new(1f, 0.93f, 0.6f);
+
     /// <summary>Sparks per unit of heat a blast adds.</summary>
     public const float BellowsBlastSparksPerHeat = 90f;
     public const int BellowsBlastMaxSparks = 40;
@@ -282,4 +297,19 @@ public static class ParticleConfig
 
     /// <summary>Cave motes per second in the magma deep (embers).</summary>
     public const float CaveMoteMagmaDeepPerSecond = 6f;
+
+    // --- Corpse bloom miasma (AmbientEffects.UpdateBloomClouds, FireParticleKind.Miasma) ---
+    /// <summary>Miasma puffs per second a corpse bloom's cloud sheds at full strength; the rate falls with the
+    /// cloud's strength, which is how it fades.</summary>
+    public const float MiasmaPerSecond = 40f;
+
+    /// <summary>Most miasma puffs one cloud spawns in a frame, however long the frame was.</summary>
+    public const int MiasmaMaxPerFrame = 6;
+
+    public const float MiasmaLifetime = 3f;
+    public const float MiasmaRise = 0.12f;
+    public const float MiasmaDrift = 0.25f;
+    public const float MiasmaSize = 0.7f;
+    public const float MiasmaGrow = 0.25f;
+    public const float MiasmaAlpha = 0.4f;
 }

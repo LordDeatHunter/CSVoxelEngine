@@ -27,7 +27,7 @@ public static class TinGenerator
     static TinGenerator()
     {
         Reseed();
-        OreBlock = ContentRegistry.RequireBlock("tin_ore").Id;
+        OreBlock = ContentRegistry.RequireBlock("cassiterite_ore").Id;
         RockBlock = ContentRegistry.RequireBlock("stone").Id;
     }
 

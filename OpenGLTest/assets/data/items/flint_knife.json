@@ -1,0 +1,11 @@
+{
+  // Flint Knife: the first knife, knapped from flint on a branch (recipes/flint_knife.json). A knife (tags/knife.json)
+  // scrapes hides on a fleshing beam and cuts leather on a leather table; as a weapon it is a weak slice. The sprite is
+  // placeholder art.
+  "name": "Flint Knife",
+  "texture": "assets/textures/items/flint_knife.png",
+  "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.2 },
+  "attack": "slice",
+  "trail": { "color": [200, 200, 190] },
+  "entityDamage": 4
+}

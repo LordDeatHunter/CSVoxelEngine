@@ -11,7 +11,7 @@ namespace VoxelEngine.Entities.Crawlers;
 
 /// <summary>
 /// A cave mob that walks on every surface on solved legs (the <see cref="Spider"/>, the <see cref="Scorpion"/>).
-/// Its body clings to floors, walls and ceilings through a <see cref="SurfaceCrawler"/>, so it climbs straight at
+/// Its body clings to floors, walls and ceilings (<see cref="CrawlDrive"/>), so it climbs straight at
 /// its target, rounds ledges and drops off a ceiling onto whoever stands under it. Its eight legs are not
 /// keyframed: <see cref="CrawlerLegs"/> plants each foot on the blocks around it and solves the leg to reach it,
 /// on the eye's side only (<see cref="AnimateCosmetics"/>). A blow knocks it off a wall or a ceiling, and it never
@@ -23,13 +23,10 @@ public abstract class CrawlerMob : CaveMob
     private const float DeathRollShare = 0.5f;
     private const float DeathShrinkFrom = 0.75f;
 
-    private readonly SurfaceCrawler _crawler = new();
-    private readonly CrawlerNavigator _navigator = new();
+    private readonly CrawlDrive _drive;
     private readonly AimTracker _aim = new();
     private readonly float _bodySize;
     private readonly float _crawlSpeed;
-    private float _leapCooldown;
-    private bool _acquired;
     private Quaternion _orientation = Quaternion.Identity;
     private bool _oriented;
 
@@ -40,6 +37,7 @@ public abstract class CrawlerMob : CaveMob
     {
         _bodySize = bodySize;
         _crawlSpeed = crawlSpeed;
+        _drive = new CrawlDrive(bodySize * 0.5f, SeesTarget);
         Legs = new CrawlerLegs(CrawlerRig.For(type));
     }
 
@@ -83,14 +81,14 @@ public abstract class CrawlerMob : CaveMob
     protected virtual float DeathRollRadians => 0f;
 
     /// <summary>The outward normal of the surface the crawler clings to; the world's up while it falls.</summary>
-    public Vector3 SurfaceNormal => _crawler.Up;
+    public Vector3 SurfaceNormal => _drive.Surface.Up;
 
     /// <summary>Whether the crawler holds a surface (false while it falls or floats).</summary>
-    public bool IsClinging => _crawler.Attached;
+    public bool IsClinging => _drive.Surface.Attached;
 
     /// <summary>The surface as a server sends it: <see cref="CrawlFrame.Airborne"/>, or the held face's index. With
     /// <see cref="Mob.Facing"/>, the heading's angle on that face, it is the whole stance.</summary>
-    public int SurfaceIndex => _crawler.Attached ? CrawlFrame.IndexOf(_crawler.Normal) : CrawlFrame.Airborne;
+    public int SurfaceIndex => _drive.SurfaceIndex;
 
     /// <summary>What a server sends in the entry's item field: the depth tier in the low byte (as every cave mob),
     /// the <see cref="SurfaceIndex"/> above it.</summary>
@@ -100,12 +98,7 @@ public abstract class CrawlerMob : CaveMob
     public static int SurfaceOf(ushort packed) => packed >> 8;
 
     /// <summary>A client's mirror takes the surface a snapshot reports; its facing was set just before.</summary>
-    public void MirrorSurface(int index)
-    {
-        var normal = CrawlFrame.NormalOf(index);
-        _crawler.Mirror(normal, CrawlFrame.HeadingOf(normal == Vector3.Zero ? Vector3.UnitY : normal, Facing));
-        _acquired = true;
-    }
+    public void MirrorSurface(int index) => _drive.Mirror(index, Facing);
 
     /// <summary>Whether a body centered at <paramref name="center"/> has the chest of a player whose eye is at
     /// <paramref name="eye"/> within <paramref name="reach"/>, from any side (a crawler attacks off walls too).</summary>
@@ -129,13 +122,13 @@ public abstract class CrawlerMob : CaveMob
     }
 
     /// <summary>Where a ranged attack leaves the body: a little off the held surface over the body's center.</summary>
-    public Vector3 ShotOrigin => Position + _crawler.Up * (BodyHalfWidth * 0.5f);
+    public Vector3 ShotOrigin => Position + _drive.Surface.Up * (BodyHalfWidth * 0.5f);
 
     /// <inheritdoc />
     /// <remarks>Also counts the leap down and keeps a ranged attack's aim on its target through the wind-up.</remarks>
     protected sealed override void TickCooldowns(float scaledDelta)
     {
-        _leapCooldown = MathF.Max(0f, _leapCooldown - scaledDelta);
+        _drive.TickCooldowns(scaledDelta);
         _aim.Track(scaledDelta, Animation.IsActionPlaying);
         TickAttackCooldowns(scaledDelta);
     }
@@ -174,96 +167,28 @@ public abstract class CrawlerMob : CaveMob
     protected static float Jittered(float seconds, float jitter) =>
         seconds + (Random.Shared.NextSingle() - 0.5f) * 2f * jitter;
 
-    /// <summary>
-    /// What <see cref="RealmMob.Decide"/> answers for a target still out of attack <paramref name="reach"/>: zero
-    /// (wait) once inside the standoff share of it, which is where a target behind a thin wall leaves the crawler,
-    /// else a unit move. The crawl itself aims at the target (<see cref="Locomote"/>); this only says "move".
-    /// </summary>
-    protected Vector3 Approach(Vector3 toward, IMobTarget target, float reach)
-    {
-        var standoff = reach * CrawlerConfig.StandoffShare;
-        if (ReachesChest(Position, target.Eye, standoff)) return Vector3.Zero;
-        return toward == Vector3.Zero ? Vector3.UnitY : toward;
-    }
+    /// <summary>What <see cref="RealmMob.Decide"/> answers for a target still out of attack
+    /// <paramref name="reach"/> (<see cref="CrawlDrive.Approach"/>).</summary>
+    protected Vector3 Approach(Vector3 toward, IMobTarget target, float reach) =>
+        CrawlDrive.Approach(Position, toward, target.Eye, reach);
 
     /// <summary>
-    /// Crawls one frame: toward the chased target's chest or the wander point along whatever surface it holds, or
-    /// holding still for no move. A chase that stalls is helped along (<see cref="CrawlerNavigator"/>): a leap at
-    /// the target when one is in reach, else a path over the block faces. A dying crawler lets go of a wall or a
-    /// ceiling; one on a ceiling over its target lets go to land on it.
+    /// Crawls one frame (<see cref="CrawlDrive.Step"/>): toward the chased target's chest or the wander point along
+    /// whatever surface it holds, or holding still for no move.
     /// </summary>
     protected override void Locomote(Vector3 move, IMobTarget? target, Vector3? wander, float deltaTime,
         ChunkManager chunks)
     {
-        var half = BodyHalfWidth;
-        if (!_acquired)
-        {
-            _acquired = true;
-            _crawler.Acquire(Position, half, Facing, chunks);
-        }
-
-        Vector3? goal = null;
-        var speed = _crawlSpeed * MoveFactor;
-        if (IsDying)
-        {
-            if (_crawler.Attached && !_crawler.OnFloor) _crawler.Detach();
-        }
-        else if (move != Vector3.Zero)
-        {
-            var to = (target != null ? Chase(target, deltaTime, chunks) : wander ?? Position) - Position;
-            if (to.LengthSquared() > 1e-6f) goal = Vector3.Normalize(to);
-            // A stroll hands in a fraction of a unit move
-            if (target == null) speed *= MathF.Min(1f, move.Length());
-            var below = target != null ? ChestOf(target.Eye) - Position : Vector3.Zero;
-            if (_crawler.OnCeiling && below.Y < 0f
-                && below.X * below.X + below.Z * below.Z < CrawlerConfig.CeilingDropRadiusBlocks * CrawlerConfig.CeilingDropRadiusBlocks)
-                _crawler.Detach();
-        }
-
-        if (target == null || move == Vector3.Zero) _navigator.Reset();
-
         var position = Position;
         var velocity = Velocity;
-        var impact = _crawler.Step(ref position, ref velocity, goal, speed, half, deltaTime, chunks, mayGrab: !IsDying);
+        var order = new CrawlOrder(move, target, wander, IsDying, _crawlSpeed * MoveFactor, MeleeReach, Facing);
+        var impact = _drive.Step(ref position, ref velocity, order, deltaTime, chunks);
         Position = position;
         SetVelocity(velocity);
-        if (impact > 0f) NoteLanding(impact, BodyMotion.Gravity, _crawler.InWater);
-        IsGrounded = _crawler.OnFloor;
-        Facing = CrawlFrame.AngleOf(_crawler.Up, _crawler.Heading);
+        if (impact > 0f) NoteLanding(impact, BodyMotion.Gravity, _drive.Surface.InWater);
+        IsGrounded = _drive.Surface.OnFloor;
+        Facing = _drive.Facing;
         Animation.Update(deltaTime, LocomotionSpeed);
-    }
-
-    // The point the chase aims at this frame: the target's chest, or the next foothold of a path round what keeps it
-    // from closing in. A stalled chase leaps when it can and plans a path when it cannot.
-    private Vector3 Chase(IMobTarget target, float deltaTime, ChunkManager chunks)
-    {
-        var chest = ChestOf(target.Eye);
-        var aim = _navigator.Aim(Position, BodyHalfWidth, chest, _crawler, deltaTime, out var stalled, out var letGo);
-        if (letGo) _crawler.Detach();
-        if (stalled && !TryLeap(target, chunks)
-            && _navigator.Plan(Position, BodyHalfWidth, chest, MeleeReach, _crawler, chunks))
-            aim = _navigator.Aim(Position, BodyHalfWidth, chest, _crawler, 0f, out _, out _);
-        return aim;
-    }
-
-    // A leap onto the target's feet: off its cooldown, from a held surface and away from it, the feet within leaping
-    // distance in a clear line, on an arc no faster than a leap may launch
-    private bool TryLeap(IMobTarget target, ChunkManager chunks)
-    {
-        if (_leapCooldown > 0f || !_crawler.Attached) return false;
-        var landing = target.Eye - Vector3.UnitY * (Camera.EyeHeight - BodyHalfWidth);
-        var distance = Vector3.Distance(Position, landing);
-        if (distance < CrawlerConfig.LeapMinBlocks || distance > CrawlerConfig.LeapMaxBlocks) return false;
-
-        var velocity = SurfaceCrawler.LeapVelocity(Position, landing, CrawlerConfig.LeapHorizontalSpeed);
-        if (velocity.LengthSquared() > CrawlerConfig.LeapMaxSpeed * CrawlerConfig.LeapMaxSpeed
-            || Vector3.Dot(velocity, _crawler.Normal) <= 0f || !SeesTarget(Position, target, chunks))
-            return false;
-
-        _crawler.Detach();
-        SetVelocity(velocity);
-        _leapCooldown = CrawlerConfig.LeapCooldownSeconds;
-        return true;
     }
 
     /// <summary>How far from the target's chest the kind's melee lands, where a path may end.</summary>
@@ -274,15 +199,9 @@ public abstract class CrawlerMob : CaveMob
     /// and falls with the shove.</remarks>
     public override void Shove(Vector3 direction, float speed)
     {
-        if (!_crawler.Attached || _crawler.OnFloor)
-        {
-            base.Shove(direction, speed);
-            return;
-        }
-
-        if (direction.LengthSquared() < 1e-6f) return;
-        _crawler.Detach();
-        SetVelocity(Vector3.Normalize(direction) * speed);
+        var velocity = Velocity;
+        if (_drive.KnockLoose(direction, speed, ref velocity)) SetVelocity(velocity);
+        else base.Shove(direction, speed);
     }
 
     /// <summary>
@@ -293,10 +212,10 @@ public abstract class CrawlerMob : CaveMob
     /// </summary>
     public override void AnimateCosmetics(float deltaTime, ChunkManager? chunks)
     {
-        var up = _crawler.Up;
-        if (_crawler.Attached && !IsDying)
+        var up = _drive.Surface.Up;
+        if (_drive.Surface.Attached && !IsDying)
             up = Vector3.Normalize(Vector3.Lerp(up, Legs.FeetNormal(up), CrawlerConfig.FeetNormalWeight));
-        var target = CrawlFrame.Orientation(up, _crawler.Heading);
+        var target = CrawlFrame.Orientation(up, _drive.Surface.Heading);
         _orientation = _oriented
             ? Quaternion.Slerp(_orientation, target, 1f - MathF.Exp(-CrawlerConfig.BodyTurnRate * deltaTime))
             : target;
@@ -323,15 +242,24 @@ public abstract class CrawlerMob : CaveMob
     /// <inheritdoc />
     /// <remarks>A crawler has no lean: its pop-in, and its death (the kind's roll about its own length,
     /// <see cref="DeathRollRadians"/>, before it shrinks away), both about the body center.</remarks>
-    public override Matrix4x4 BodyEffect(Vector3 feet)
+    public override Matrix4x4 BodyEffect(Vector3 feet) =>
+        PopAndRoll(Position, Vector3.Transform(-Vector3.UnitZ, _orientation), SpawnProgress, DeathProgress,
+            DeathRollRadians);
+
+    /// <summary>
+    /// The body effect of a mob that stands on any surface, about <paramref name="center"/>: the spawn pop
+    /// (<paramref name="spawnProgress"/>), and over the death (<paramref name="deathProgress"/>) a roll of
+    /// <paramref name="deathRoll"/> radians about <paramref name="forward"/> before the body shrinks away.
+    /// </summary>
+    public static Matrix4x4 PopAndRoll(Vector3 center, Vector3 forward, float spawnProgress, float deathProgress,
+        float deathRoll)
     {
-        var scale = MathUtils.EaseOutBack(SpawnProgress)
-                    * (1f - MathUtils.EaseInCubic(MathUtils.InverseLerp(DeathShrinkFrom, 1f, DeathProgress)));
-        var roll = DeathRollRadians * MathUtils.SmoothStep(MathUtils.InverseLerp(0f, DeathRollShare, DeathProgress));
-        var forward = Vector3.Transform(-Vector3.UnitZ, _orientation);
-        return Matrix4x4.CreateTranslation(-Position)
+        var scale = MathUtils.EaseOutBack(spawnProgress)
+                    * (1f - MathUtils.EaseInCubic(MathUtils.InverseLerp(DeathShrinkFrom, 1f, deathProgress)));
+        var roll = deathRoll * MathUtils.SmoothStep(MathUtils.InverseLerp(0f, DeathRollShare, deathProgress));
+        return Matrix4x4.CreateTranslation(-center)
                * Matrix4x4.CreateScale(MathF.Max(scale, 0.001f))
                * Matrix4x4.CreateFromAxisAngle(forward, roll)
-               * Matrix4x4.CreateTranslation(Position);
+               * Matrix4x4.CreateTranslation(center);
     }
 }

@@ -1,0 +1,71 @@
+{
+  // A tanning vat: an open plank tub, a 2 px floor inside four 1 px walls 14 px high, so the liquid
+  // (blocks/tanning_vat.json "liquid") shows inside it. Symmetric, so it needs no facing.
+  "textures": {
+    "staves": "oak_planks",
+    "bands": "oak_log_side",
+    "particle": "#staves"
+  },
+  "elements": [
+    {
+      "from": [2, 0, 2],
+      "to": [14, 2, 14],
+      "faces": {
+        "down": { "texture": "#staves", "cullface": "down" },
+        "up": { "texture": "#staves" },
+        "north": { "texture": "#staves" },
+        "south": { "texture": "#staves" },
+        "west": { "texture": "#staves" },
+        "east": { "texture": "#staves" }
+      }
+    },
+    {
+      "from": [1, 0, 1],
+      "to": [15, 14, 2],
+      "faces": {
+        "down": { "texture": "#staves", "cullface": "down" },
+        "up": { "texture": "#staves" },
+        "north": { "texture": "#staves" },
+        "south": { "texture": "#staves" },
+        "west": { "texture": "#staves" },
+        "east": { "texture": "#staves" }
+      }
+    },
+    {
+      "from": [1, 0, 14],
+      "to": [15, 14, 15],
+      "faces": {
+        "down": { "texture": "#staves", "cullface": "down" },
+        "up": { "texture": "#staves" },
+        "north": { "texture": "#staves" },
+        "south": { "texture": "#staves" },
+        "west": { "texture": "#staves" },
+        "east": { "texture": "#staves" }
+      }
+    },
+    {
+      "from": [1, 0, 2],
+      "to": [2, 14, 14],
+      "faces": {
+        "down": { "texture": "#staves", "cullface": "down" },
+        "up": { "texture": "#staves" },
+        "north": { "texture": "#staves" },
+        "south": { "texture": "#staves" },
+        "west": { "texture": "#staves" },
+        "east": { "texture": "#staves" }
+      }
+    },
+    {
+      "from": [14, 0, 2],
+      "to": [15, 14, 14],
+      "faces": {
+        "down": { "texture": "#staves", "cullface": "down" },
+        "up": { "texture": "#staves" },
+        "north": { "texture": "#staves" },
+        "south": { "texture": "#staves" },
+        "west": { "texture": "#staves" },
+        "east": { "texture": "#staves" }
+      }
+    }
+  ]
+}

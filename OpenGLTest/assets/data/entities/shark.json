@@ -1,0 +1,8 @@
+{
+  "name": "Shark",
+  // The open sea's hunter, about three and a half blocks long: cruises, then charges a swimmer and bites.
+  "blood": { "color": [120, 20, 28] },
+  "hp": 60,
+  "loot": "shark",
+  "model": "assets/models/entity/shark.bbmodel"
+}

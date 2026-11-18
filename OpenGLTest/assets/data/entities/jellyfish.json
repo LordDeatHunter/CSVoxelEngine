@@ -1,0 +1,9 @@
+{
+  "name": "Jellyfish",
+  // A drifting bell with stinging tentacles: harmless until touched.
+  "blood": { "color": [200, 170, 240] },
+  "attitude": "neutral",
+  "hp": 6,
+  "loot": "jellyfish",
+  "model": "assets/models/entity/jellyfish.bbmodel"
+}

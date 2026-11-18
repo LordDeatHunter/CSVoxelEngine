@@ -116,6 +116,60 @@ public sealed class ChestMiscInstanceTransferTests
         Assert.Null(chest[0].Instance);
     }
 
+    [Fact]
+    public void ExhaustedIdsRefuseRestoredMiscWithdrawalWithoutChangingEitherOwner()
+    {
+        var item = ItemRegistry.All.First(candidate => Inventory.CategoryOf(candidate.Id) == InventoryCategory.Misc);
+        var name = SaveNames.NameOf(item.Id)!;
+        var json = "{\"Inventory\":{\"Tools\":[{\"InstanceId\":481,\"Name\":\"" + name
+            + "\",\"CustomName\":\"Saved chest copy\",\"Enchantments\":{\"preserved\":3}}],"
+            + "\"Hotbar\":[{\"IsTool\":true,\"ToolInstance\":481}],"
+            + "\"Offhand\":{\"IsTool\":true,\"ToolInstance\":481},"
+            + "\"NextToolInstance\":-2147483648}}";
+        var saved = PlayerSaveCodec.TryParse(Encoding.UTF8.GetBytes(json));
+        Assert.NotNull(saved?.Inventory);
+        var inventory = Inventory.Empty();
+        inventory.Import(saved!.Inventory!);
+        var template = inventory.GetToolStack(481)!;
+        Assert.Equal("Saved chest copy", template.ResolvedName);
+        Assert.Equal(3, template.EnchantmentLevel("preserved"));
+        Assert.Equal(Inventory.ExhaustedInstanceId, inventory.NextToolInstance);
+
+        var chest = new ChestState(2);
+        Assert.Equal(1, ChestAccess.Apply(inventory, chest, ChestMove.DepositInstance(481)));
+        Assert.True(inventory.UsedOf(InventoryCategory.Tools) < Inventory.ToolCapacity);
+        var retained = chest[0].Instance!;
+        var chestVersion = chest.Version;
+        var inventoryBytes = PlayerSaveCodec.ToBytes(new PlayerSaveData { Inventory = inventory.Export() });
+        var chestBytes = StationSaveCodec.ToBytes(new StationSaveData
+            { Chests = [ChestSaveCodec.Export(1, 2, 3, chest)] });
+        var knownBefore = inventory.Known.ToHashSet();
+        var hotbarBefore = inventory.Hotbar.ToArray();
+        var gained = 0;
+        inventory.Gained += _ => gained++;
+
+        Assert.Equal(0, ChestAccess.Apply(inventory, chest, ChestMove.Withdraw(0, 0)));
+
+        Assert.Same(retained, chest[0].Instance);
+        Assert.Equal(item.Id, chest[0].Id);
+        Assert.Equal(chestVersion, chest.Version);
+        Assert.Equal("Saved chest copy", retained.ResolvedName);
+        Assert.Equal(3, retained.EnchantmentLevel("preserved"));
+        Assert.Equal(inventoryBytes, PlayerSaveCodec.ToBytes(new PlayerSaveData { Inventory = inventory.Export() }));
+        Assert.Equal(knownBefore, inventory.Known);
+        Assert.Equal(hotbarBefore, inventory.Hotbar);
+        Assert.Equal(0, gained);
+
+        var reloadedData = StationSaveCodec.TryParse(chestBytes);
+        Assert.NotNull(reloadedData?.Chests);
+        var dropped = new System.Collections.Generic.List<string>();
+        var reloaded = ChestSaveCodec.Import(reloadedData!.Chests![0], dropped)!;
+        Assert.Empty(dropped);
+        Assert.Equal(item.Id, reloaded[0].Id);
+        Assert.Equal("Saved chest copy", reloaded[0].Instance!.ResolvedName);
+        Assert.Equal(3, reloaded[0].Instance!.EnchantmentLevel("preserved"));
+    }
+
     private static (Inventory Inventory, ushort ItemId) ImportSavedMiscInstance()
     {
         var item = ItemRegistry.All.First(candidate => Inventory.CategoryOf(candidate.Id) == InventoryCategory.Misc);

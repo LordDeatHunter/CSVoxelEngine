@@ -109,6 +109,46 @@ public sealed class HostingTests : IDisposable
     }
 
     [Fact]
+    public void UnmigratablePlayerSaveRefusesHostAndServerWithoutKeepingTheFolderLocked()
+    {
+        var world = _store.Create("Exhausted lanterns", WorldSeed.Default);
+        var file = Path.Combine(world.Directory, PlayerSaveCodec.FileName);
+        var original = """{"Inventory":{"Tools":[{"InstanceId":2147483647,"Name":"block/lantern"}],"Blocks":[{"Name":"block/lantern","Count":1}]}}"""u8.ToArray();
+        File.WriteAllBytes(file, original);
+        HostedServer? hosted = null;
+        ServerLaunchResult? launch = null;
+        ChunkSaveStore? reopened = null;
+        try
+        {
+            hosted = HostedServer.TryStart(world, 0, "Host", upnp: false, out var error);
+            Assert.Null(hosted);
+            Assert.Contains("lantern", error, StringComparison.OrdinalIgnoreCase);
+            Assert.False(WorldSeed.WorldIsLive);
+            reopened = new ChunkSaveStore(world.Directory);
+            Assert.True(reopened.Shutdown(Budget));
+            reopened = null;
+
+            launch = ServerLaunch.Start(world, 0, new OperatorList());
+            Assert.False(launch.Started);
+            Assert.Equal(ServerLaunchFailure.InvalidSave, launch.Failure);
+            Assert.False(WorldSeed.WorldIsLive);
+            reopened = new ChunkSaveStore(world.Directory);
+            Assert.Equal(original, reopened.ReadFile(PlayerSaveCodec.FileName));
+            Assert.False(File.Exists(file + ".bad"));
+        }
+        finally
+        {
+            hosted?.Stop();
+            if (launch?.Started == true)
+            {
+                launch.Server!.Dispose();
+                launch.World!.SaveAndDispose();
+            }
+            reopened?.Shutdown(Budget);
+        }
+    }
+
+    [Fact]
     public void AHostedWorldServesItsHostOverLoopbackAndReleasesTheWorldWhenStopped()
     {
         var world = _store.Create("Hosted", WorldSeed.Default);

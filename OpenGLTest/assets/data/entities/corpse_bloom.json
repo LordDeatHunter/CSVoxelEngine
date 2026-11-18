@@ -4,6 +4,8 @@
   // comes near (CorpseBloom, WildlifeConfig)
   "blood": { "color": [120, 150, 60] },
   "hp": 45,
+  // Never hurt by its own cloud or a neighbor's
+  "immune": ["poison"],
   "loot": "corpse_bloom",
   "model": "assets/models/entity/corpse_bloom.bbmodel"
 }

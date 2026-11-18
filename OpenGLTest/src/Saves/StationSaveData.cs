@@ -20,8 +20,11 @@ public sealed class StationSaveData
     /// <summary>The bloomeries (iron smelters), keyed by anchor cell.</summary>
     public List<BloomeryData>? Bloomeries { get; set; }
 
-    /// <summary>The anvils with a piece lying on them.</summary>
+    /// <summary>The work stations (anvils, fleshing beams, leather tables) with something lying on them.</summary>
     public List<AnvilData>? Anvils { get; set; }
+
+    /// <summary>The tanning vats with something in them.</summary>
+    public List<VatData>? Vats { get; set; }
 
     /// <summary>The chests that have been used (a never-opened ruin chest is not here and re-rolls from its seed).</summary>
     public List<ChestData>? Chests { get; set; }
@@ -222,19 +225,27 @@ public sealed class StationSaveData
         public int Blooms { get; set; }
     }
 
-    /// <summary>One anvil with a stack of forge metal on it.</summary>
+    /// <summary>One work station (an anvil, a fleshing beam, a leather table) with something on it. The class and its
+    /// JSON names predate the beams and keep the anvil's, so older saves still load.</summary>
     public sealed class AnvilData
     {
         public int[]? Cell { get; set; }
         public string? Block { get; set; }
 
-        /// <summary>The forge metal stacked on the anvil, by content name.</summary>
+        /// <summary>The input stacked on the station, by content name; absent with no stack.</summary>
         public string? Metal { get; set; }
 
         /// <summary>How many of <see cref="Metal"/> are stacked.</summary>
         public int Count { get; set; }
 
-        /// <summary>The result of the forge recipe picked for the stack, by content name; absent when none is.</summary>
+        /// <summary>The finished result waiting on the station for its collect item, by content name; absent when none
+        /// waits.</summary>
+        public string? Finished { get; set; }
+
+        /// <summary>How many of <see cref="Finished"/> wait.</summary>
+        public int FinishedCount { get; set; }
+
+        /// <summary>The result of the recipe picked for the stack, by content name; absent when none is.</summary>
         public string? Selected { get; set; }
 
         /// <summary>Hammer hits the picked recipe has taken.</summary>
@@ -242,6 +253,28 @@ public sealed class StationSaveData
 
         /// <summary>Seconds until the next hit counts.</summary>
         public float Cooldown { get; set; }
+    }
+
+    /// <summary>One tanning vat with something in it.</summary>
+    public sealed class VatData
+    {
+        public int[]? Cell { get; set; }
+        public string? Block { get; set; }
+
+        /// <summary>Whether it holds water.</summary>
+        public bool Water { get; set; }
+
+        /// <summary>Tannin units in it.</summary>
+        public int Bark { get; set; }
+
+        /// <summary>Inputs in the batch.</summary>
+        public int Hides { get; set; }
+
+        /// <summary>Seconds the batch has tanned.</summary>
+        public float Progress { get; set; }
+
+        /// <summary>Finished result waiting to be collected.</summary>
+        public int Leather { get; set; }
     }
 
     /// <summary>One mold cell holding a pour, its recipe named by mold block and material.</summary>

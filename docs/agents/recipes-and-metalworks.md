@@ -1,6 +1,7 @@
 # Recipes, cast molds and metalworks
 
-Crafting, cook, crush, melt, cast, alloy and forge recipes, the kiln, casting, the bloomery and anvil, hell and the barrier.
+Crafting, cook, crush, melt, cast, alloy and work-station recipes, the kiln, casting, the bloomery and anvil, the work
+stations and leatherworking, hell and the barrier.
 
 ### Recipes, cast molds and metalworks
 
@@ -9,9 +10,11 @@ Crafting recipes live in `assets/data/recipes/<name>.json` as `{ "result", "coun
 `RecipeLoader.CompileRecipe` into a `CraftingRecipe`), campfire recipes in
 `recipes/cook/<name>.json` as `{ "input", "result", "count", "cookSeconds" }`
 (`CookRecipeDefinition.cs` -> `CookRecipe`, one recipe per input, enforced) and quern recipes in
-`recipes/crush/<name>.json` (`CrushRecipe`, likewise one per input) and anvil recipes in `recipes/forge/<result>.json` as
-`{ "metal", "metalCount", "result", "count", "hits", "byproduct": { "item", "count" } }` (`ForgeRecipeDefinition.cs` ->
-`ForgeRecipe`, one per result, `metalCount` and `hits` 1..64, `byproduct` optional; see "The bloomery and the anvil"). Every name resolves
+`recipes/crush/<name>.json` (`CrushRecipe`, likewise one per input) and work-station recipes in
+`recipes/<station>/<result>.json` (`forge` for the anvil, `scrape` for the fleshing beam, `cut` for the leather table) as
+`{ "input", "inputCount", "result", "count", "hits", "byproduct": { "item", "count" }, "collectWith" }`
+(`WorkRecipeDefinition.cs` -> `WorkRecipe`, one per result, `inputCount` and `hits` 1..64, `byproduct` and `collectWith`
+optional; see "Work stations"). Every name resolves
 like a loot entry, with `block/` and `item/` prefixes pinning the namespace (`ContentFiles.TryResolve`), so
 blocks and items are interchangeable as ingredients, results, inputs and outputs. Craft files are
 named by their result, cook files by their input, and a reverse recipe by
@@ -46,7 +49,7 @@ generic metal part for everything else made of copper, tin or bronze: the bronze
 gloves 4 rings), `bronze_chest` (8 rings and 4 planks), `clock` (4 copper rings and a mud brick), `lantern`,
 `crystal_staff`, `alloy_bricks` (a copper and a tin ring) and the `focus_ring` / `reserve_charm` (2 rings and a vine).
 
-**Tin** (`tin_ore`, `TinGenerator`) is the second, weaker metal: commoner than malachite, in the
+**Tin** (`cassiterite_ore`, `TinGenerator`) is the second, weaker metal: commoner than malachite, in the
 `TinMinY..TinMaxY` band, mined with any pickaxe; it crushes in the quern into `crushed_tin`, melts as `tin`
 (ingot and crushed 100 ml, axe, pickaxe, sword and ring 200 ml; the raw ore does not melt, only crushed ore does) and casts into the five molds. Tin and
 copper each have an axe, pickaxe and sword (`attack: "sword"`), the tool ladder runs primitive < tin < copper
@@ -316,43 +319,17 @@ is no wrought iron: the bloom is the forge metal.
   `ServerPlayerLandingTests`), and every non-flying mob's dry landing (`Mob.NoteLanding` keeps the fall for
   `Mob.TryTakeBellowsLanding`, taken in `World.Update` apart from the cosmetic landing dust). Item drops never press. A later
   automation (a mechanical bellows, automated feeding) is `P-59` in plans/TODO.md; `PressBellows` takes any source.
-- **The anvil** (`anvil`, a plain model block made of cobblestone so the chain can bootstrap) carries the
-  `"anvil": true` flag (`BlockType.IsAnvil`, only legal on a plain model block). An anvil holds a **stack of one forge
-  metal** (`AnvilManager.State`: `MetalId`/`MetalCount`) and the recipe picked for it with its hits
-  (`SelectedResultId`, `Hits`, `CooldownLeft`). Right-click (`BlockInteractions.TryAnvilInteract`): a forge metal in hand
-  (any item a forge recipe takes, `ContentRegistry.IsForgeMetal`: blooms, vulcanite shards and refined vulcanite) stacks
-  one more (`TryStack`, refused for another metal or at `AnvilManager.StackCap`, the largest recipe of that metal, so a
-  stack never holds metal no recipe could use), and anything else, an empty hand included, takes one back (the whole stack
-  while sneaking, `PlayerContext.IsSneaking`, `TryTake`; a pick the smaller stack no longer covers is forgotten with its
-  hits); a hammer never claims this click and a bare anvil none at all, so a block still places against it. An anvil whose
-  block is gone is swept and its stack drops.
-- **The forge.** A right-click with the smithing hammer on an anvil holding a stack (`BlockInteractions.TryOpenForge`,
-  `RightClickOutcome.Forge`; a bare anvil is not claimed) opens the anvil's recipe list (`App/ForgeInput`,
-  `UI/Forge/ForgeView` + `ForgeLayout`, drawn by `ForgeRenderer` in the craft card's dress: one card per recipe with the
-  result's icon, rarity-colored name, its hits and metal cost, the picked one framed in gold, and CLOSE). It lists **only**
-  the recipes `AnvilManager.Offered` gives for the stack: that metal's, taking no more than the stack holds. A click
-  **picks** (`SmithingStations.Select` -> `AnvilManager.TrySelect`: refused unless offered; a new pick starts from 0 hits,
-  re-picking the same keeps them; nothing leaves the stack yet), toasts the hit count and closes the list; it also closes
-  on CLOSE, E, Escape, the pause menu, the death screen, a non-hammer in hand, leaving reach or the stack running out. Then
-  the hammer works it: `TryHit` is refused without a pick or until the gap since the last hit has run down
-  (`State.CooldownLeft`, ticked in `Update`, so the pace is the simulation's and not a client's clock, with
-  `BloomeryConfig.HammerSlackSeconds` of jitter allowed on a server), and the hit that reaches the recipe's `hits` takes its
-  `metalCount` off the stack, clears the pick and drops its result and `byproduct` (a bloom's slag, one per bloom) on top
-  of the anvil (`BlockInteractions.HammerAnvil`). The hammer is any item in the `hammer` tag (`Mining.IsHammer`; the
-  `bronze_hammer`, bronze-headed, `tool.hitDelayMs` 2500, so there is no spamming): `LeftClickAction.UpdateAnvilHammer`
-  fires the first hit on press and the next after the hammer's own gap (`Mining.HitGapSeconds`), with the usual swing,
-  sound and chips, and never mines the anvil. Recipes are data (`recipes/forge/<result>.json`, see the top of this file),
-  so another solid metal plugs in with its own files. Connected, a pick is predicted on the mirror and sent as
-  `NetIntentKind.Forge(cell, result id)` (`IntentReplay.ForgeFor`: the hammer in hand and the player's own ray on the
-  anvil), and a hit only predicted (from the mirrored pick) and sent as `NetIntentKind.Hammer(cell)` (rate-limited, edits
-  no cell; `IntentReplay.HammerFor` also needs the anvil's gap run down); the drops and the station broadcast bring the
-  truth back. Stacking and taking back ride the right-click's `Use` intent like every station.
-- **Persistence and the wire.** Both registries save into `stations.json` (`Bloomeries`; `Anvils`, only an anvil holding a
-  stack: `Metal` (content name) and `Count`, clamped to the cap on load, and the pick as `Selected` (content name) with its
-  `Hits`/`Cooldown`, forgotten on load when it no longer resolves or is not offered) and ride the **end** of the
-  `StationState` frame, after the cast molds (`World.WriteStations`, `ClientMirror.ApplyNetworkStations`); an anvil is its
-  metal id and count, picked result id, hits and cooldown, a bloomery carries no overheat or slag: protocol **61**. A
-  client's copies are display-only mirrors that never tick.
+- **The anvil** (`anvil`, a plain model block made of cobblestone so the chain can bootstrap) is a **work station**
+  (see "Work stations" below) with `"workstation": {"tool": "hammer", "recipes": "forge", "surface": 0.9375}`: forge
+  metal (any item a `recipes/forge/` recipe takes, `ContentRegistry.IsWorkInput("forge", id)`: blooms, vulcanite shards and
+  refined vulcanite) stacks on it, a right-click with a member of the `hammer` tag (the `bronze_hammer`, bronze-headed,
+  `tool.hitDelayMs` 2500, so there is no spamming) opens its recipe list, and the hammer's hits forge the pick, dropping
+  its result and `byproduct` (a bloom's slag, one per bloom) on top of the anvil. Recipes are data
+  (`recipes/forge/<result>.json`, see the top of this file), so another solid metal plugs in with its own files.
+- **Persistence and the wire.** The bloomeries save into `stations.json` (`Bloomeries`) beside the work stations
+  (`Anvils`, see "Work stations") and ride the **end** of the `StationState` frame, after the cast molds
+  (`World.WriteStations`, `ClientMirror.ApplyNetworkStations`); a bloomery carries no overheat or slag. A client's copies
+  are display-only mirrors that never tick.
 - **Look and feel.** `RenderManager.Smithing.RenderSmithing` (`SmithingPasses`) draws the ore charge as a pile in the
   throat, its top piece shrinking as the unit smelts (`BloomeryLayout.ChargeStack`), the fuel as a bed on the hearth
   inside the arch, the finished blooms piled at the arch's front (self-lit while the fire still smelts), and an anvil's
@@ -363,18 +340,96 @@ is no wrought iron: the bloom is the forge metal.
   reads the heat alone, so a client's mirror plays it with nothing on the wire). A lit bloomery joins
   `AmbientEffects.FireCells`, so it throws embers and a point light.
   The look-at label shows a status line (`LookLabelState.Detail`, `SmithingReadout`): a lit bloomery's heat with
-  `too cold` / `good`, its ore and smelt percentage, a done run's blooms, or an anvil's `Forging <result> n/m` or its stack
-  (`Iron Bloom x3`); the station bar (`StationBars.Anvil`) fills with the picked recipe's hits.
+  `too cold` / `good`, its ore and smelt percentage, a done run's blooms, or a work station's line (see "Work
+  stations").
 - **Slag** (`slag`, the byproduct of every bloom hammered into a part) crafts into `slag_bricks`, a plain building block.
 - `IronChainTests` (the chain's relations, including that the anvil, hammer and bellows need no iron, that no crafting
   recipe takes a bloom and that every forge recipe is reachable), `BloomeryRulesTests`, `BloomeryManagerTests` (no
-  too-hot, the cold run-back, the tuyeres and their facing), `AnvilManagerTests` (the stack, take-back, offer, pick and
+  too-hot, the cold run-back, the tuyeres and their facing), `WorkStationManagerTests` (the stack, take-back, offer, pick and
   hit rules, every recipe finishing on its own hits), `IronWorksWorldTests` (a bellows landing, the last hit's drops and
   the right-clicks in a live world, sneaking included), `GameServerTests.APlayerLandingOnABellowsAtATuyereWorksItOnTheServer`;
   `visual-examples/bloomery.json` (`VOXEL_TIME=147`, the `bloomery` op's `bellows`, the `anvil` op's `select`/`hits`
   and the `hammer` op) films the tuyere hole, two landings blowing a cold fire good and a head hammered out;
   `visual-examples/anvil-forge.json` (`VOXEL_TIME=147`, the `anvil` op's `metal`/`count` and the `forge` op) films two
   bloom stacks, the recipe list on each, a pick and the hits that forge it.
+
+**Work stations** (`Simulation/WorkStations/WorkStationManager`, namespace `VoxelEngine.Simulation.WorkStations`) are
+one mechanic behind the anvil, the fleshing beam and the leather table: any plain model block with a `workstation` object
+`{"tool", "recipes", "surface"}` (`WorkStationProfile`, `BlockType.WorkStation`, parsed by
+`BlockSchemaParser.ParseWorkStation`; `tool` is an item tag, checked once tags load, `recipes` a folder under `recipes/`
+whose files `RecipeLoader.LoadWorkRecipes` loads for every folder some block names, `surface` the height its stack is
+drawn at). Every work recipe (`WorkRecipe`, `Station` = its folder) uses the schema at the top of this file plus an
+optional `"collectWith"` item, and one result is made by one recipe across all folders.
+- **The stack.** A station holds a stack of one input (`State.InputId`/`InputCount`) and the recipe picked for it with its
+  hits (`SelectedResultId`, `Hits`, `CooldownLeft`). Right-click (`BlockInteractions.TryWorkStationInteract`): an input of
+  the station's folder in hand stacks one more (`TryStack`, refused for another input or at `StackCap`, the largest recipe
+  of that input), and anything else, an empty hand included, takes one back (the whole stack while sneaking, `TryTake`; a
+  pick the smaller stack no longer covers is forgotten with its hits); the station's tool never claims this click and a
+  bare station none at all, so a block still places against it.
+- **The pick and the hits.** The tool's right-click on a stacked station (`BlockInteractions.TryOpenWorkList`,
+  `RightClickOutcome.Forge`) opens the recipe list (`App/ForgeInput`, `UI/Forge/ForgeView` + `ForgeLayout`, drawn by
+  `ForgeRenderer` under the block's name: one card per recipe `WorkStationManager.Offered` gives the stack, that input's
+  and no more than it holds). A card **picks** (`SmithingStations.Select` -> `TrySelect`; nothing leaves the stack yet),
+  and the list closes on a pick, CLOSE, E, Escape, the pause menu, death, another item in hand, leaving reach or the stack
+  running out. The tool's left button then works it (`LeftClickAction.UpdateWorkStationHit`, `Mining.IsStationTool`; a hammer winds
+  its blow up first and the hit lands as it comes down, see "Hammer strike" in `animation.md`):
+  `TryHit` needs a recipe to work (`State.Working`: the pick, or the only recipe offered, which the first hit picks, so a
+  fleshing beam needs no list) and the gap since the last hit run down (`State.CooldownLeft`, ticked in `Update`, with
+  `BloomeryConfig.HammerSlackSeconds` of jitter allowed on a server); the hit that reaches `hits` takes the input off the
+  stack and drops the result and byproduct on top (`BlockInteractions.WorkStationHit`, `World.WorkStationHitFor`).
+- **Waiting results.** A recipe with `collectWith` keeps its result on the station (`FinishedId`/`FinishedCount`, up to
+  `FinishedCap`; a hit that would mix two results or overflow is refused) until a right-click with that item spends one and
+  hands one over (`TryCollect`); nothing else takes it, and a station whose block is gone drops it back as its input.
+- **Persistence and the wire.** Saved in `stations.json` as `Anvils` (`AnvilData`, the anvil's old names kept so older
+  saves load: `Metal`/`Count` the stack, `Selected`/`Hits`/`Cooldown` the pick, `Finished`/`FinishedCount` the waiting
+  result), clamped on load and a pick or waiting result that no longer resolves forgotten; on the wire after the
+  bloomeries: block id, input id and count, pick, hits, cooldown, waiting result id and count (protocol **63**). Connected,
+  a pick is predicted on the mirror and sent as `NetIntentKind.Forge(cell, result id)` and a hit predicted (from the
+  mirrored `Working`) and sent as `NetIntentKind.Hammer(cell)` (`IntentReplay.ForgeFor`/`HammerFor`: the station's tool in
+  hand, the player's own ray on it, and for a hit its gap run down); stacking, taking back and collecting ride `Use`.
+- **Look.** `SmithingPasses` draws the stack on the station's surface as one face-up piece per unit, and a waiting result
+  as a second pile beside it; the look-at line (`SmithingReadout.WorkStation`) names the work and its hits, the stack, and
+  a waiting result with its collect item, and the station bar (`StationBars.WorkStation`) fills with the picked hits.
+- `WorkStationManagerTests` (stack, take-back, offer, pick, auto-pick, hits, every recipe finishing on its own hits on its
+  own station, waiting results, their drop-back, save and wire), `IronWorksWorldTests`, `LeatherWorksWorldTests`,
+  `GameServerTests.AHammerHitIsJudgedByTheHammersGapOnTheServer`.
+
+**Leatherworking** turns a hunted hide into the leather set in four quick, visible steps, the way the iron works do,
+with no long timers: **skin -> scrape and salt -> tan -> cut**.
+- **Skin.** Deer and boars drop `hide` (shown as Raw Hide; the id is kept for older saves) and the dire boar a pile of
+  them (`loot/<species>.json`).
+- **Scrape and salt** on the **fleshing beam** (`fleshing_beam`, a log on two legs, crafted from a log and planks), a work
+  station with `{"tool": "knife", "recipes": "scrape"}`. Raw hides stack on it; a knife (`tags/knife.json`: the
+  `flint_knife`, crafted from flint and a branch, and the copper and obsidian daggers) scrapes the one recipe
+  (`recipes/scrape/salted_hide.json`) in a few strokes, and its `collectWith: item/salt` keeps the scraped hide on the
+  beam until a right-click with **salt** takes it off as a `salted_hide`, one salt a hide.
+- **Salt** comes from **rock salt** (`rock_salt`, any pickaxe, drops 1-3 salt), which `WorldGen/Features/RockSaltGenerator`
+  lays in the top `WorldGenerationConfig.RockSaltDepth` cells of bare surface stone: the deep sea floor (an ocean column
+  below the gravel band) and every soil-stripped column (`DirtDepth` 0: bare-rock crests, ravine walls), in patches of a
+  2D noise (seed offset 189, `RockSaltFrequency`/`RockSaltThreshold`), replacing stone only so a carved cave stays open.
+  It runs after the cave ores and before the water (`Stage.RockSalt`); the far LOD draws those cells as plain stone.
+  Highlands start far from spawn, so early salt comes from the sea. `RockSaltTests`.
+- **Tan** in the **tanning vat** (`tanning_vat`, an open plank tub), declared by a `tanning` object
+  `{"input", "result", "count", "tannin", "water", "capacity", "seconds", "liquid"}` (`TanningProfile`,
+  `BlockType.Tanning`, `BlockSchemaParser.ParseTanning`). Right-click (`BlockInteractions.TryVatInteract` ->
+  `TanningVatManager.TryUse`): a water bucket fills a dry vat and turns back into a bucket, **bark** adds a tannin unit up
+  to the capacity, salted hides join the batch while nothing tans or waits, and anything else collects the leather or
+  takes back a batch that has not started. The batch tans (`TanningRules`) only with water and a bark unit per hide,
+  pausing without them and never losing progress, and after `seconds` every hide becomes `count` leather while its bark
+  and the water are spent. Bark is split off with the lumber when an axe splits a log on a stump (`loot/log_split.json`,
+  `hollow_log_split.json`) and burns as a little fuel. The vat ticks with the works (`SmithingStations.Vats`), saves as
+  `Vats` in `stations.json`, rides the `StationState` frame after the work stations (protocol **64**) and drops its
+  batch, bark and leather when broken. `SmithingPasses` draws its water (`StationPasses.VatLiquid`, the still-water tile,
+  brown once a batch tans), the hides floating in it and the leather on its floor; its look-at line is
+  `SmithingReadout.Vat` and its bar `StationBars.Vat`.
+- **Cut** on the **leather table** (`leather_table`, planks on four legs), a work station with
+  `{"tool": "knife", "recipes": "cut"}`: leather stacks on it, the knife's right-click lists the patterns
+  (`recipes/cut/leather_<piece>.json`) and its strokes cut the pick. No crafting recipe makes the leather set any more
+  (the cotton and raw-hide recipes are gone), and the `bellows` takes leather.
+- `LeatherChainTests` (each step feeds the next: hunting drops what the beam takes, rock salt drops what takes it off,
+  splitting drops the vat's tannin, every leather piece is cut from the vat's leather, no crafting recipe takes a hide at
+  any stage, and both leather stations' knife is crafted without iron), `TanningVatTests`, `LeatherWorksWorldTests`;
+  `IronChainTests.EveryWorkRecipeIsReachableFromTheRawWorld` covers every station folder.
 
 **The alloy furnace** (`alloy_furnace` / `alloy_furnace_part`, `multiblock.size` 3) is the second
 kiln: a 3x3x3 hollow shell of `alloy_bricks` (one mud brick block, a copper and a tin ring each,

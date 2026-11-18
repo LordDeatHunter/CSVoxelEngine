@@ -14,7 +14,8 @@ namespace VoxelEngine.Simulation;
 /// Owns the animals of the wild (<see cref="Animal"/>: <see cref="Deer"/>, <see cref="Boar"/>,
 /// <see cref="Crow"/>, <see cref="Dragonfly"/>): on the shared realm frame (<see cref="RealmMobManager{TMob}"/>)
 /// each animal reacts only to the players it heeds (<see cref="Animal.Heeds"/>) and wanders otherwise, an attack
-/// is billed at its impact to every target it still reaches (<see cref="Animal.TryTakeStrike"/>), and nothing
+/// is billed at its impact to every target it still reaches (<see cref="Animal.TryTakeStrike"/>), a
+/// <see cref="CorpseBloom"/>'s cloud poisons every player and mob standing in it, and nothing
 /// despawns for standing idle. It spawns herds and flocks on dry surface around the players (a flyer in the open
 /// air over its column)
 /// (<see cref="MobSpawner.TryFindSurfaceSpawn(ChunkManager, SpawnOrigin, float, float, int, out int, out int, out int)"/>),
@@ -26,13 +27,20 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
     // The registered species' content by WildlifeKind; null where a species' entity is not registered
     private readonly EntityType?[] _types = new EntityType?[WildlifeSpecies.Names.Length];
 
+    // Every live mob of the world, for the corpse bloom's cloud; null (tests) leaves only the animals
+    private readonly IReadOnlyList<Mob>? _bystanders;
+
     /// <summary>
     /// Takes every wild animal among <paramref name="types"/>, validating its content first so a model missing a
     /// part, clip or event fails at startup naming its file; any other entity is ignored. Joins
     /// <paramref name="caps"/> (the world's), or caps itself alone when none is given (tests).
+    /// <paramref name="bystanders"/> is every live mob of the world (<c>World.Mobs</c>), which a corpse bloom's
+    /// cloud poisons; without it only the animals themselves stand in a cloud.
     /// </summary>
-    public WildlifeManager(IEnumerable<EntityType> types, MobCaps? caps = null) : base(caps)
+    public WildlifeManager(IEnumerable<EntityType> types, MobCaps? caps = null, IReadOnlyList<Mob>? bystanders = null)
+        : base(caps)
     {
+        _bystanders = bystanders;
         foreach (var type in types)
         {
             if (WildlifeSpecies.KindOf(type.Name) is not { } kind) continue;
@@ -156,13 +164,22 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
     }
 
     // A corpse bloom's cloud lingers after its burst: each pulse poisons every target still standing in it
-    private static void PoisonInCloud(CorpseBloom bloom, IReadOnlyList<IMobTarget> targets)
+    // and every mob too; a kind immune to poison (the bloom itself, a dragonfly) refuses it in its effect set
+    private void PoisonInCloud(CorpseBloom bloom, IReadOnlyList<IMobTarget> targets)
     {
         if (!bloom.TakeCloudPulse()) return;
         for (var t = 0; t < targets.Count; t++)
         {
             var target = targets[t];
             if (!target.IsImmune && bloom.CloudReaches(target.Eye)) StatusEffects.Apply(target, CorpseBloom.PoisonEffect, 1f);
+        }
+
+        var bystanders = _bystanders ?? Mobs;
+        for (var i = 0; i < bystanders.Count; i++)
+        {
+            var mob = bystanders[i];
+            if (bloom.CloudHolds(mob.Position - new Vector3(0f, mob.BodyHalfHeight, 0f)))
+                StatusEffects.Apply(mob, CorpseBloom.PoisonEffect);
         }
     }
 
@@ -175,6 +192,7 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
     {
         if (!TryTakeSpawnTurn(deltaTime, targets, WildlifeConfig.SpawnIntervalSeconds, out var target)) return;
         if (MobSpawner.TargetUnderground(chunks, target.Eye)) return;
+        if (Random.Shared.NextSingle() < WildlifeConfig.SeaSpawnChance && TrySpawnSea(chunks, target)) return;
 
         if (!MobSpawner.TryFindSurfaceSpawn(chunks, SpawnOrigin.Of(target), WildlifeConfig.SpawnMinRadiusBlocks,
                 WildlifeConfig.SpawnMaxRadiusBlocks, WildlifeConfig.SpawnTries, out var x, out var groundY, out var z))
@@ -186,6 +204,57 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
         if (picked is not { } rule) return;
 
         Place(chunks, rule.Kind, x, groundY, z);
+    }
+
+    // A turn of the sea: when surface water lies near the target, one water column of the ring, the species its
+    // depth and biome allow (a fish arrives with a school); false when there was none to place, so the turn falls
+    // through to the land
+    private bool TrySpawnSea(ChunkManager chunks, IMobTarget target)
+    {
+        var (tx, _, tz) = target.Eye.BlockCell();
+        if (!MobSpawner.IsNearSurfaceWater(chunks, tx, tz, WildlifeConfig.SeaSpawnNearBlocks)) return false;
+        if (!MobSpawner.TryFindWaterSpawn(chunks, SpawnOrigin.Of(target), WildlifeConfig.SeaSpawnMinRadiusBlocks,
+                WildlifeConfig.SeaSpawnMaxRadiusBlocks, WildlifeConfig.SeaSpawnTries, out var x, out var bedY,
+                out var waterTopY, out var z, out var biome))
+            return false;
+
+        var depth = waterTopY - bedY;
+        if (WildlifeSpawnRules.PickSea(biome, depth, Random.Shared.NextSingle(), kind => _types[(int)kind] != null)
+            is not { } rule)
+            return false;
+
+        var first = PlaceInWater(chunks, rule.Kind, x + 0.5f, bedY, waterTopY, z + 0.5f);
+        if (first == null) return false;
+        if (first is not Fish leader) return true;
+
+        var school = Random.Shared.Next(WildlifeConfig.SchoolMinSize, WildlifeConfig.SchoolMaxSize + 1);
+        var spread = WildlifeConfig.SchoolSpreadBlocks;
+        for (var i = 1; i < school; i++)
+        {
+            var mate = PlaceInWater(chunks, rule.Kind, x + 0.5f + MathUtils.Lerp(-spread, spread, Random.Shared.NextSingle()),
+                bedY, waterTopY, z + 0.5f + MathUtils.Lerp(-spread, spread, Random.Shared.NextSingle()));
+            (mate as Fish)?.Follow(leader);
+        }
+        return true;
+    }
+
+    // One sea animal at a random height in the water of column (x, z) between its bed and its top water cell, kept
+    // off the bed and under the surface; null when that cell is not water, its body overlaps a block or the hard cap
+    // is full
+    private Animal? PlaceInWater(ChunkManager chunks, WildlifeKind kind, float x, int bedY, int waterTopY, float z)
+    {
+        var name = WildlifeSpecies.NameOf(kind);
+        var height = WildlifeSpecies.HeightOf(name);
+        var halfWidth = WildlifeSpecies.HalfExtentOf(name);
+        var lowest = bedY + 1f + height * 0.5f + 0.2f;
+        var highest = waterTopY + 0.5f - height * 0.5f;
+        if (highest < lowest) return null;
+
+        var center = new Vector3(x, MathUtils.Lerp(lowest, highest, Random.Shared.NextSingle()), z);
+        var (cx, cy, cz) = center.BlockCell();
+        if (!chunks.TryGetCell(cx, cy, cz, out var id, out _) || !BlockType.IsFluid(id)) return null;
+        if (BoxSweep.IsColliding(center, new Vector3(halfWidth, height * 0.5f, halfWidth), chunks)) return null;
+        return Spawn(name, center);
     }
 
     // One animal of the species over ground cell (x, y, z): standing on it, or for a flyer in the air a few

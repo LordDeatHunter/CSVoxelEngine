@@ -20,6 +20,10 @@ public enum FireParticleKind : byte
     /// <summary>A tongue of flame: drawn additively like an ember but as a tall soft teardrop, short lived,
     /// rising while it shrinks and cools from white-yellow through orange to red.</summary>
     Flame,
+
+    /// <summary>A puff of a corpse bloom's poison cloud: drawn like smoke but purple, large, slow to swell and
+    /// barely rising, so the puffs hang as one cloud while each fades.</summary>
+    Miasma,
 }
 
 /// <summary>
@@ -41,6 +45,9 @@ public sealed class FireParticle
         FireParticleKind.Steam => JuiceConfig.SteamAlpha * (1f - MathUtils.Clamp01(_age / _lifetime)),
         FireParticleKind.Spark => 0.9f * (1f - MathUtils.Clamp01(_age / _lifetime)),
         FireParticleKind.Flame => 0.5f * (1f - MathUtils.Clamp01(_age / _lifetime) * MathUtils.Clamp01(_age / _lifetime)),
+        // Swells in over its first tenth, so a puff never pops into the cloud, then fades out
+        FireParticleKind.Miasma => ParticleConfig.MiasmaAlpha * MathUtils.Clamp01(_age / (0.1f * _lifetime))
+                                   * (1f - MathUtils.Clamp01(_age / _lifetime)),
         _ => 0.45f * (1f - MathUtils.Clamp01(_age / _lifetime)),
     };
 
@@ -50,6 +57,7 @@ public sealed class FireParticle
         FireParticleKind.Steam => ((byte)236, (byte)238, (byte)242),
         FireParticleKind.Spark => ((byte)255, (byte)238, (byte)170),
         FireParticleKind.Flame => FlameColor(_age / _lifetime),
+        FireParticleKind.Miasma => ((byte)150, (byte)70, (byte)190),
         _ => ((byte)110, (byte)110, (byte)115),
     };
 
@@ -122,6 +130,16 @@ public sealed class FireParticle
                 (rng.NextSingle() * 2f - 1f) * 0.4f);
             Size = JuiceConfig.SparkSize * (0.8f + 0.4f * rng.NextSingle());
             _grow = 0f;
+        }
+        else if (kind == FireParticleKind.Miasma)
+        {
+            _lifetime = ParticleConfig.MiasmaLifetime * (0.7f + 0.6f * rng.NextSingle());
+            _velocity = new Vector3(
+                (rng.NextSingle() * 2f - 1f) * ParticleConfig.MiasmaDrift,
+                ParticleConfig.MiasmaRise * (0.5f + rng.NextSingle()),
+                (rng.NextSingle() * 2f - 1f) * ParticleConfig.MiasmaDrift);
+            Size = ParticleConfig.MiasmaSize * (0.7f + 0.6f * rng.NextSingle());
+            _grow = ParticleConfig.MiasmaGrow;
         }
         else
         {

@@ -400,9 +400,13 @@ public sealed record BlockType
     /// bloomery. Only ever set on a <see cref="BlockRenderer.Multiblock"/> block.</summary>
     public BloomeryProfile? Bloomery { get; init; }
 
-    /// <summary>Whether this block is an anvil (its <c>anvil</c> flag): forge metal stacks on it and a smithing hammer
-    /// forges it (<see cref="Simulation.Smithing.AnvilManager"/>).</summary>
-    public bool IsAnvil { get; init; }
+    /// <summary>The work station profile of this block (its <c>workstation</c> object: an anvil, a fleshing beam, a
+    /// leather table), or null when it is none (<see cref="Simulation.WorkStations.WorkStationManager"/>).</summary>
+    public WorkStationProfile? WorkStation { get; init; }
+
+    /// <summary>The tanning vat profile of this block (its <c>tanning</c> object), or null when it is no vat
+    /// (<see cref="Simulation.Leatherwork.TanningVatManager"/>).</summary>
+    public TanningProfile? Tanning { get; init; }
 
     /// <summary>Whether this block is a bloomery's bellows (its <c>bellows</c> flag): a body landing on it beside a
     /// lit bloomery's tuyere heats that bloomery (<see cref="Simulation.Smithing.BloomeryManager.PressBellows"/>).</summary>

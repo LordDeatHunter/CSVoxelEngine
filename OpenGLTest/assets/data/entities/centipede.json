@@ -1,7 +1,8 @@
 {
   "name": "Giant Centipede",
   // The jungle's many-legged hunter: runs a player down on its clip-driven walk and bites with venom (Centipede,
-  // WildlifeConfig). One body playing its authored segment clips; the chain and solved legs are plans/TODO.md P-63.
+  // WildlifeConfig). Its head crawls floors, walls and ceilings like a spider; the body is a chain that trails the
+  // head's path segment by segment (CentipedeSpine). Solved legs are plans/TODO.md P-63.
   "blood": { "color": [170, 200, 50] },
   "hp": 70,
   "loot": "centipede",

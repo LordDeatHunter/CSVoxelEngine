@@ -4,6 +4,6 @@
   "count": 1,
   "ingredients": [
     { "item": "block/oak_planks", "count": 2 },
-    { "item": "item/hide", "count": 2 }
+    { "item": "item/leather", "count": 2 }
   ]
 }

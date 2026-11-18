@@ -1,0 +1,19 @@
+{
+  // A leather table: a plank top on four legs (models/block/leather_table.json), where leather is cut into the leather
+  // set. Leather stacked on it is worked with a knife: its right-click picks a pattern (recipes/cut/), its strokes cut
+  // it (WorkStationManager). Crafted from planks and logs.
+  "name": "Leather Table",
+  "model": "block/leather_table",
+  "hardness": 3,
+  "sfx": "hit_wood",
+  "workstation": { "tool": "knife", "recipes": "cut", "surface": 0.875 },
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": [
+    { "min": [0, 0.75, 0], "max": [1, 0.875, 1] },
+    { "min": [0.0625, 0, 0.0625], "max": [0.1875, 0.75, 0.1875] },
+    { "min": [0.8125, 0, 0.0625], "max": [0.9375, 0.75, 0.1875] },
+    { "min": [0.0625, 0, 0.8125], "max": [0.1875, 0.75, 0.9375] },
+    { "min": [0.8125, 0, 0.8125], "max": [0.9375, 0.75, 0.9375] }
+  ]
+}

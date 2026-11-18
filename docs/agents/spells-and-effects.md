@@ -77,7 +77,7 @@ and every error names its file. Tests compile in-memory effects through the pure
 | `attackFactor` | 1 | in (0, 1]: slows the local player's hit gap (`Mining.HitGapSeconds(held, factor)` for the punch cadence, `Mining.BlockHitGapSeconds(held, factor)` for mining hits and the axe chop), a goblin's throw and melee cooldowns and a slime's contact cooldown |
 | `blocks.ignite` / `blocks.freeze` / `blocks.thaw` | false | what each pulse does to the cells around the body (`StatusEffectBlockAction`): burn `flammable` blocks to air, freeze a fluid source under the feet into its `freezesTo`, thaw a block into its `meltsTo` fluid source |
 | `tint` | none | sRGB `[r, g, b]`, 0..255 each: the mob tint (`uStatusTint`, decoded to linear) |
-| `particle` | none | a `FireParticleKind` name (`ember`, `smoke`, `steam`, ...), matched case-insensitively: what an affected mob sheds |
+| `particle` | none | a `FireParticleKind` name (`ember`, `smoke`, `steam`, `miasma`, ...), matched case-insensitively: what an affected mob sheds |
 | `icon` | none | a `.png` path under `assets/`: the player's HUD icon |
 | `deathMessage` | none | the phrase after the player's name in a death line ("burned to death") |
 

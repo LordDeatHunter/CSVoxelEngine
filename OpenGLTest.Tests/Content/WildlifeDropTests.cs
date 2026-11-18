@@ -9,8 +9,8 @@ namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// What hunting the wild animals pays: every species drops something, and only items; meat is food only
-/// once a campfire has cooked it; a hide makes the same gear as cotton with fewer units; and a feather
-/// fletches more arrows than a bone.
+/// once a campfire has cooked it; and a feather fletches more arrows than a bone (what a hide becomes is
+/// <see cref="LeatherChainTests"/>).
 /// </summary>
 public sealed class WildlifeDropTests
 {
@@ -46,24 +46,6 @@ public sealed class WildlifeDropTests
             Assert.Null(ContentRegistry.CookRecipeForInput(recipe.ResultId));
         }
         Assert.True(cooked > 0, "no animal drops anything a campfire cooks");
-    }
-
-    [Fact]
-    public void AHideMakesTheSameGearAsCottonWithFewerUnits()
-    {
-        var hide = ContentRegistry.RequireItem("hide").Id;
-        var fromHide = ContentRegistry.CraftingRecipes
-            .Where(r => r.Ingredients.Length == 1 && !r.Ingredients[0].IsTag && r.Ingredients[0].Id == hide).ToArray();
-        Assert.NotEmpty(fromHide);
-
-        foreach (var recipe in fromHide)
-        {
-            var plain = ContentRegistry.RecipeForResult(recipe.ResultId)!;
-            Assert.NotSame(recipe, plain);
-            Assert.Equal(plain.ResultCount, recipe.ResultCount);
-            Assert.True(recipe.Ingredients[0].Count < plain.Ingredients.Sum(i => i.Count),
-                $"{recipe.Name} should take fewer hides than {plain.Name} takes units");
-        }
     }
 
     [Fact]

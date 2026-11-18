@@ -232,6 +232,7 @@ internal sealed class InputEvents
                     if (wheel.Y != 0f) gameplay.RequestCycleStaff(-Math.Sign(wheel.Y));
                     break;
                 }
+                if (w.LeftClick.IsBlowInFlight) break;
                 w.Inventory.Scroll(wheel.Y);
                 // While connected the server owns the selection: mirror the step as an intent, or
                 // the next inventory sync would put the slot straight back.

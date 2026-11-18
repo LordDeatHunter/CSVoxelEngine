@@ -19,17 +19,22 @@ public sealed class IronChainTests
 
     private static BlockType Bloomery => ContentRegistry.RequireBlock("bloomery");
 
-    private static BlockType AnvilBlock => BlockType.Types.Values.First(b => b.IsAnvil);
-
     private static BlockType BellowsBlock => BlockType.Types.Values.First(b => b.IsBellows);
 
     private static ushort Bloom => Bloomery.Bloomery!.BloomId;
+
+    // The anvil's recipe folder: what "a forge recipe" and "a forge metal" mean here
+    private const string Forge = "forge";
+
+    private static IEnumerable<WorkRecipe> ForgeRecipes => ContentRegistry.WorkRecipes.Where(r => r.Station == Forge);
+
+    private static bool IsForgeMetal(ushort id) => ContentRegistry.IsWorkInput(Forge, id);
 
     [Fact]
     public void WhatTheBloomeryMakesIsWhatTheAnvilForgesAndTheOreComesFromTheQuern()
     {
         var bloomery = Bloomery.Bloomery!;
-        Assert.True(ContentRegistry.IsForgeMetal(bloomery.BloomId));
+        Assert.True(IsForgeMetal(bloomery.BloomId));
         Assert.NotEqual(bloomery.BloomId, bloomery.OreId);
         Assert.True(Enumerable.Range(1, BlockType.ById.Length - 1).Any(i => ContentRegistry.CrushRecipeForInput((ushort)i)?.ResultId == bloomery.OreId),
             "the ore the bloomery smelts has to be something the quern makes");
@@ -53,21 +58,20 @@ public sealed class IronChainTests
         Assert.DoesNotContain(ExceptCinderSword, r => r.Ingredients.Any(i => i.Accepts(Bloom)));
         // No other forge metal is crafted with either: a solid metal is worked only on the anvil (bar the cinder sword)
         Assert.DoesNotContain(ExceptCinderSword,
-            r => r.Ingredients.Any(i => i.AcceptedIds.Any(ContentRegistry.IsForgeMetal)));
+            r => r.Ingredients.Any(i => i.AcceptedIds.Any(IsForgeMetal)));
     }
 
     [Fact]
-    public void EveryForgeRecipeIsReachableFromTheRawWorld()
+    public void EveryWorkRecipeIsReachableFromTheRawWorld()
     {
-        var anvil = AnvilBlock;
-        // What the iron works themselves make: the bloom, and every forge recipe's byproduct
-        var stationMade = new HashSet<ushort>(ContentRegistry.ForgeRecipes.Where(r => r.ByproductId != 0)
+        // What the works themselves make: the bloom, and every work recipe's byproduct
+        var stationMade = new HashSet<ushort>(ContentRegistry.WorkRecipes.Where(r => r.ByproductId != 0)
             .Select(r => r.ByproductId)) { Bloom };
 
-        // Raw: every item with no crafting or forge recipe, except what the iron works themselves make
+        // Raw: every item with no crafting or work recipe, except what the works themselves make
         var obtainable = new HashSet<ushort>(ItemRegistry.All
             .Select(i => i.Id)
-            .Where(id => ContentRegistry.RecipeForResult(id) == null && ContentRegistry.ForgeRecipeForResult(id) == null
+            .Where(id => ContentRegistry.RecipeForResult(id) == null && ContentRegistry.WorkRecipeForResult(id) == null
                          && !stationMade.Contains(id)));
 
         bool Have(CraftingRecipe.Ingredient ingredient) => ingredient.AcceptedIds.Any(obtainable.Contains);
@@ -86,10 +90,11 @@ public sealed class IronChainTests
                 && ItemRegistry.All.Any(i => i.FuelSeconds > 0f && obtainable.Contains(i.Id)))
                 grew |= obtainable.Add(Bloom);
 
-            // The anvil and the hammer forge a stack of the metal into its recipes, and squeeze out their byproducts
-            var hammer = ItemRegistry.All.Any(i => obtainable.Contains(i.Id) && ContentRegistry.IsInTag("hammer", i.Id));
-            foreach (var recipe in ContentRegistry.ForgeRecipes)
-                if (hammer && obtainable.Contains(recipe.MetalId) && obtainable.Contains(anvil.Id))
+            // A work station and its tool work a stack of the input into its recipes and leave their byproducts; a
+            // result that waits on the station also needs the item that takes it off
+            foreach (var recipe in ContentRegistry.WorkRecipes)
+                if (obtainable.Contains(recipe.InputId) && HasStation(recipe.Station)
+                    && (recipe.CollectWithId == 0 || obtainable.Contains(recipe.CollectWithId)))
                 {
                     grew |= obtainable.Add(recipe.ResultId);
                     if (recipe.ByproductId != 0)
@@ -98,14 +103,19 @@ public sealed class IronChainTests
         }
 
         Assert.Contains(Bloom, obtainable);
-        Assert.Contains(ContentRegistry.ForgeRecipes, r => r.MetalId == Bloom);
-        // Every metal's recipes, the bloom's and the vulcanite chain's alike
-        var forged = ContentRegistry.ForgeRecipes;
+        Assert.Contains(ForgeRecipes, r => r.InputId == Bloom);
+        // Every station's recipes, the bloom's, the vulcanite chain's and the leather's alike
+        var forged = ContentRegistry.WorkRecipes;
         Assert.All(forged, r => Assert.True(obtainable.Contains(r.ResultId),
-            $"{r.Name} is a forge recipe but cannot be reached"));
-        // ...and so is everything crafted from what the anvil forges (the hafted tools)
+            $"{r.Name} is a work recipe but cannot be reached"));
+        // ...and so is everything crafted from what the stations make (the hafted tools)
         Assert.All(ContentRegistry.CraftingRecipes.Where(r => r.Ingredients.Any(i => forged.Any(f => i.Accepts(f.ResultId)))),
             r => Assert.True(obtainable.Contains(r.ResultId), $"{r.Name} needs a forged part but cannot be reached"));
+
+        // A station of that recipe folder whose block and tool are both obtainable
+        bool HasStation(string station) => BlockType.Types.Values.Any(b => b.WorkStation is { } profile
+            && profile.Recipes == station && obtainable.Contains(b.Id)
+            && ItemRegistry.All.Any(i => obtainable.Contains(i.Id) && ContentRegistry.IsInTag(profile.ToolTag, i.Id)));
     }
 
     [Fact]
@@ -113,7 +123,7 @@ public sealed class IronChainTests
     {
         var ore = ContentRegistry.RequireBlock("vulcanite_ore");
         var shards = ore.LootTable.AllEntries()
-            .Where(e => e.Nested == null && !e.IsEmpty && ContentRegistry.IsForgeMetal(e.Item))
+            .Where(e => e.Nested == null && !e.IsEmpty && IsForgeMetal(e.Item))
             .Select(e => e.Item).Distinct().ToList();
         Assert.NotEmpty(shards);
 
@@ -121,14 +131,14 @@ public sealed class IronChainTests
         {
             // Only mined: no recipe makes a shard
             Assert.Null(ContentRegistry.RecipeForResult(shard));
-            Assert.Null(ContentRegistry.ForgeRecipeForResult(shard));
+            Assert.Null(ContentRegistry.WorkRecipeForResult(shard));
 
             // The shard forges nothing but a refined metal, and the refined metal forges the parts
-            var refining = ContentRegistry.ForgeRecipes.Where(r => r.MetalId == shard).ToList();
+            var refining = ForgeRecipes.Where(r => r.InputId == shard).ToList();
             Assert.NotEmpty(refining);
-            Assert.All(refining, r => Assert.True(ContentRegistry.IsForgeMetal(r.ResultId),
+            Assert.All(refining, r => Assert.True(IsForgeMetal(r.ResultId),
                 $"{r.Name} forges shards straight into a part"));
-            var parts = ContentRegistry.ForgeRecipes.Where(r => refining.Any(f => f.ResultId == r.MetalId)).ToList();
+            var parts = ForgeRecipes.Where(r => refining.Any(f => f.ResultId == r.InputId)).ToList();
             Assert.NotEmpty(parts);
 
             // Every part is hafted into a tool, and no crafting recipe takes the shard or the refined metal
@@ -147,9 +157,9 @@ public sealed class IronChainTests
         Assert.NotEmpty(iron);
         foreach (var piece in iron)
         {
-            var recipe = ContentRegistry.ForgeRecipeForResult(piece.Id);
+            var recipe = ContentRegistry.WorkRecipeForResult(piece.Id);
             Assert.NotNull(recipe);
-            Assert.Equal(Bloom, recipe!.MetalId);
+            Assert.Equal(Bloom, recipe!.InputId);
         }
     }
 }

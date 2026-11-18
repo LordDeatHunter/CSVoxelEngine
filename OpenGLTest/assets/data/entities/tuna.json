@@ -1,0 +1,9 @@
+{
+  "name": "Tuna",
+  // A fast, heavy open-water fish, nearly two blocks long; shares the cod's rig and clips.
+  "blood": { "color": [150, 40, 40] },
+  "attitude": "neutral",
+  "hp": 10,
+  "loot": "tuna",
+  "model": "assets/models/entity/tuna.bbmodel"
+}

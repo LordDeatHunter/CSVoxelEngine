@@ -1,0 +1,9 @@
+{
+  "name": "Cod",
+  // A small speckled sea fish that schools in the shallows and darts away from a swimmer.
+  "blood": { "color": [150, 40, 40] },
+  "attitude": "neutral",
+  "hp": 4,
+  "loot": "cod",
+  "model": "assets/models/entity/cod.bbmodel"
+}

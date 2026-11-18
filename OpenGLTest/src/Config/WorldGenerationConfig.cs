@@ -452,6 +452,15 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int TinMinY = -96;
     public const int TinMaxY = 64;
 
+    // --- Rock salt (RockSaltGenerator) ---
+    // Salt patches in the top cells of bare surface stone (the deep sea floor and soil-stripped columns: bare-rock
+    // crests, ravine walls), on a 2D noise of its own (seed offset 189). First guesses: patches a few blocks across,
+    // a few per stretch of sea floor.
+    public const bool RockSaltEnabled = true;
+    public const float RockSaltFrequency = 1f / 12f;
+    public const float RockSaltThreshold = 0.45f;
+    public const int RockSaltDepth = 3;
+
     // --- Vulcanite ore (VulcaniteGenerator) ---
     // The tier above iron: the same OreNoiseLattice deposits on a noise of its own (seed offset 186), hosted
     // by basalt alone (the barrier band and the Magma Caverns' skin), so nothing is written above BarrierTopY.

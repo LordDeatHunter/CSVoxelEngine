@@ -1,0 +1,11 @@
+{
+  // A little gel.
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/jellyfish_gel", "weight": 1, "count": { "min": 1, "max": 2 } }
+      ]
+    }
+  ]
+}

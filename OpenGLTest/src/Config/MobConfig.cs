@@ -138,6 +138,10 @@ public static class MobConfig
     public const float MobFlightWanderRiseBlocks = 3f;
     public const int MobFlightWanderTries = 6;
 
+    // A swimmer (Mob.Swims) flies the same rules through water: its goal height stays MobSwimSurfaceMarginBlocks
+    // below the surface for its body's half height (FlightSteering.KeepUnderSurface), and out of water it falls.
+    public const float MobSwimSurfaceMarginBlocks = 0.15f;
+
     // --- Slimes (SlimeManager) ---
     // Forest mobs that hop at the player. Natural spawns appear on dry forest surface in a ring
     // around the player and are culled when they stray too far. Damage only lands while a slime

@@ -47,7 +47,7 @@ public sealed class StationBarsTests
     {
         Assert.Null(StationBars.Kiln(null));
         Assert.Null(StationBars.Bloomery(null));
-        Assert.Null(StationBars.Anvil(null));
+        Assert.Null(StationBars.WorkStation(null));
         Assert.Null(StationBars.Mold(BlockType.Air, null));
         Assert.Null(StationBars.Quern(null));
     }

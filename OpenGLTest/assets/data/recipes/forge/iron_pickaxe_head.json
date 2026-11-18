@@ -1,8 +1,8 @@
 {
   // A pickaxe head, drawn out of three blooms on the anvil; hafted in recipes/iron_pickaxe.json.
   // Picked on an anvil holding blooms, then hammered out with a smithing hammer (see AnvilManager).
-  "metal": "item/bloom",
-  "metalCount": 3,
+  "input": "item/bloom",
+  "inputCount": 3,
   "result": "item/iron_pickaxe_head",
   "count": 1,
   "hits": 5,

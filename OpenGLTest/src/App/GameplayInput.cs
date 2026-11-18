@@ -183,6 +183,7 @@ internal sealed class GameplayInput
     /// <summary>Selects a hotbar slot: a server intent while connected, a local select otherwise.</summary>
     private void RequestSelectHotbar(int index)
     {
+        if (ActiveWorld!.LeftClick.IsBlowInFlight) return;
         if (!session.SendInventoryIntent(InventoryIntent.Select(index)))
             ActiveWorld!.Inventory.Select(index);
     }

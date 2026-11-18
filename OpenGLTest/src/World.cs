@@ -45,6 +45,7 @@ using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Simulation.Waystones;
+using VoxelEngine.Simulation.WorkStations;
 using VoxelEngine.Status;
 using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.Hud;
@@ -415,6 +416,8 @@ public class World
     /// as soon as its chunk is loaded (<see cref="WorldPersistence.RestorePendingEntities"/>). A
     /// world with a store starts <see cref="WorldPhase.Loading"/>; null (the default) keeps the old
     /// regenerate-and-forget behavior and starts <see cref="WorldPhase.Playing"/> at once.
+    /// The World owns a supplied store from construction onward: failed construction stops its
+    /// workers before shutting the store down, without writing a replacement player save.
     /// </summary>
     /// <remarks>
     /// Passing null for <paramref name="gl"/>, the three pools, <paramref name="window"/> and
@@ -425,7 +428,7 @@ public class World
     /// <see cref="WorldSeed.Apply"/> refuses to run from here on: its worker threads read the
     /// worldgen statics unsynchronized. <see cref="SaveAndDispose"/> is the teardown; it stops the
     /// workers and calls <see cref="WorldSeed.EndWorld"/> last. A constructor that throws stops what
-    /// it started and ends the world itself.
+    /// it started, closes its store and ends the world itself when workers joined.
     /// </para>
     /// <para>
     /// <paramref name="spawn"/> is the eye to start at, which a multiplayer client passes from the
@@ -446,11 +449,13 @@ public class World
         ChunkSaveStore? saveStore = null, bool serverMode = false, bool clientMode = false,
         Vector3? spawn = null, IWorldSource? worldSource = null)
     {
-        WorldSeed.BeginWorld();
         ChunkGenerationWorker? generationWorker = null;
         LodManager? lodManager = null;
+        var worldBegan = false;
         try
         {
+            WorldSeed.BeginWorld();
+            worldBegan = true;
             _window = window;
             _saveStore = saveStore;
             Sounds = new WorldSounds(sfx, serverMode);
@@ -536,7 +541,7 @@ public class World
             foreach (var name in WildlifeSpecies.Names)
                 if (EntityRegistry.TryGet(name) is { } animalType) animalTypes.Add(animalType);
             if (animalTypes.Count > 0)
-                _wildlife = new WildlifeManager(animalTypes, _mobCaps);
+                _wildlife = new WildlifeManager(animalTypes, _mobCaps, _mobs);
             var shardlingType = EntityRegistry.TryGet(Shardling.EntityName);
             var sporelingType = EntityRegistry.TryGet(Sporeling.EntityName);
             var magmabornType = EntityRegistry.TryGet(Magmaborn.EntityName);
@@ -660,9 +665,20 @@ public class World
             var joined = (generationWorker?.Stop() ?? true) & (lodManager?.Stop() ?? true);
             Camera?.Detach();
             if (joined)
-                WorldSeed.EndWorld();
+            {
+                try
+                {
+                    if (saveStore?.Shutdown(TimeSpan.FromSeconds(SaveConfig.SaveWriterShutdownTimeoutSeconds)) == false)
+                        Log.Warn("World construction failed: the save writer remains live and its folder stays locked");
+                }
+                catch (Exception cleanupError)
+                {
+                    Log.Warn($"World construction failed: could not close its save store: {cleanupError.Message}");
+                }
+                if (worldBegan) WorldSeed.EndWorld();
+            }
             else
-                Log.Warn("World construction failed with a worker still running; the seed can no longer be changed in this process");
+                Log.Warn("World construction failed with a worker still running; its store stays open and the seed cannot be changed in this process");
             throw;
         }
     }
@@ -1059,12 +1075,12 @@ public class World
         !_clientMode && BellowsProbe.TryFind(_chunkManager, feet, halfWidth, out var cell)
         && _smithing.Bloomeries.PressBellows(cell, fallBlocks);
 
-    /// <summary>One hammer hit on the anvil at <paramref name="cell"/> (the server replaying a
-    /// <see cref="NetIntentKind.Hammer"/> intent): the hit counts when a piece lies on it and its gap has run down to
-    /// within <paramref name="slackSeconds"/>; the hammer's own pace is <paramref name="gapSeconds"/>. A finished
-    /// piece drops its result and slag on top of the anvil.</summary>
-    public AnvilHit HammerFor(Vector3 cell, float gapSeconds, float slackSeconds) =>
-        Interactions.HammerAnvil(cell, gapSeconds, slackSeconds);
+    /// <summary>One tool hit on the work station at <paramref name="cell"/> (singleplayer's stroke, or the server
+    /// replaying a <see cref="NetIntentKind.Hammer"/> intent): the hit counts when there is a recipe to work on it and
+    /// its gap has run down to within <paramref name="slackSeconds"/>; the tool's own pace is
+    /// <paramref name="gapSeconds"/>. A finished work drops its result and byproduct on top of the station.</summary>
+    public WorkHit WorkStationHitFor(Vector3 cell, float gapSeconds, float slackSeconds) =>
+        Interactions.WorkStationHit(cell, gapSeconds, slackSeconds);
 
     /// <summary>One left-click blow on the tree stump at <paramref name="cell"/> (a <see cref="NetIntentKind.StumpHit"/> intent):
     /// splits the log standing on it when <paramref name="split"/> (an axe's blow), wobbles it otherwise. False when the
@@ -1164,6 +1180,7 @@ public class World
         _sandworms?.AnimateMirrors((float)deltaTime, _chunkManager);
         _tntManager.AnimateMirrors((float)deltaTime);
         Ambient.UpdateStatusParticles((float)deltaTime);
+        Ambient.UpdateBloomClouds((float)deltaTime);
         Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
         Ambient.UpdateKingEffects((float)deltaTime);
         WormEffects?.Update((float)deltaTime, Sandworms);
@@ -1350,6 +1367,7 @@ public class World
         {
             _dust.TakeMobLandings(_mobs, _chunkManager, _debris);
             Ambient.UpdateStatusParticles((float)deltaTime);
+            Ambient.UpdateBloomClouds((float)deltaTime);
             Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
             Ambient.UpdateKingEffects((float)deltaTime);
             WormEffects?.Update((float)deltaTime, Sandworms);

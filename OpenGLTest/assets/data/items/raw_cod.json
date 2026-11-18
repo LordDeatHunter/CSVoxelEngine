@@ -1,0 +1,6 @@
+{
+  // A cod off the sea (loot/cod.json). Inedible raw: a lit campfire cooks it (recipes/cook/raw_cod.json).
+  // The sprite is placeholder art.
+  "name": "Raw Cod",
+  "texture": "assets/textures/items/raw_cod.png"
+}

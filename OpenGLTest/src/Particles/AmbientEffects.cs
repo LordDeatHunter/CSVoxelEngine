@@ -8,6 +8,7 @@ using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.TowerMobs;
+using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Juice;
 using VoxelEngine.Particles.Heave;
 using VoxelEngine.Player;
@@ -19,7 +20,7 @@ namespace VoxelEngine.Particles;
 /// <summary>
 /// The world's ambient effects: the burning cells the fire particles and the warm point lights
 /// share (<see cref="FireCells"/>), steam off hardening lava and hot springs, the embers over
-/// lava vents, the torch flames, the particles of the mobs' status effects, the cave biome motes, the local player's
+/// lava vents, the torch flames, the particles of the mobs' status effects, the corpse blooms' miasma, the cave biome motes, the local player's
 /// bubbles, the water splashes of every body and the camera shake of a blast. Never gameplay: nothing here changes the simulation. The fire-cell
 /// and lava-vent gathers run on a headless server too, while the splashes, bubbles and torch flames
 /// skip it. Owned by <see cref="World"/>, which keeps the particle systems it feeds and draws them;
@@ -220,6 +221,41 @@ internal sealed class AmbientEffects
                 if (StatusEffectRegistry.ById(id)?.Particle is not { } kind) continue;
                 if (Random.Shared.NextSingle() >= chance) continue;
                 _fire.Puff(mob.Position, 1, mob.BodyHalfExtent * 2f, kind);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sheds the purple miasma of every corpse bloom whose cloud hangs (<see cref="CorpseBloom.CloudStrength"/>, the
+    /// server's mirror on a client) within <see cref="ParticleConfig.FireParticleRadius"/> of the eye: puffs across
+    /// the cloud's reach at <see cref="ParticleConfig.MiasmaPerSecond"/> times its strength, so the cloud is thick at
+    /// the burst and thins to nothing as it fades. Cosmetic: singleplayer and a client, never a headless server.
+    /// </summary>
+    internal void UpdateBloomClouds(float deltaTime)
+    {
+        if (_serverMode || deltaTime <= 0f)
+            return;
+        var eye = Camera.RenderEye;
+        const float reach = ParticleConfig.FireParticleRadius * ParticleConfig.FireParticleRadius;
+        const float radius = WildlifeConfig.BloomBurstRadiusBlocks;
+        for (var i = 0; i < _mobs.Count; i++)
+        {
+            if (_mobs[i] is not CorpseBloom { CloudActive: true } bloom) continue;
+            if (Vector3.DistanceSquared(bloom.Position, eye) > reach) continue;
+
+            // A whole puff per whole count owed, and the fraction as a chance, so the rate holds at any frame rate
+            var owed = ParticleConfig.MiasmaPerSecond * bloom.CloudStrength * deltaTime;
+            var count = (int)owed;
+            if (Random.Shared.NextSingle() < owed - count) count++;
+            count = Math.Min(count, ParticleConfig.MiasmaMaxPerFrame);
+            for (var n = 0; n < count; n++)
+            {
+                // Uniform over the cloud's disc, anywhere up its height
+                var angle = Random.Shared.NextSingle() * MathF.Tau;
+                var distance = radius * MathF.Sqrt(Random.Shared.NextSingle());
+                var point = bloom.Feet + new Vector3(MathF.Cos(angle) * distance,
+                    Random.Shared.NextSingle() * WildlifeConfig.BloomBurstHeightBlocks, MathF.Sin(angle) * distance);
+                _fire.Puff(point, 1, 0f, FireParticleKind.Miasma);
             }
         }
     }

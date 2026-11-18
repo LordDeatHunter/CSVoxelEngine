@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -6,6 +7,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Simulation;
 using VoxelEngine.Status;
+using VoxelEngine.Tests.Entities.Crawlers;
 using Xunit;
 
 namespace VoxelEngine.Tests.Entities.Wildlife;
@@ -92,9 +94,54 @@ public sealed class JungleWildlifeTests
         Assert.True(bloom.CloudReaches(player.Eye));
         Assert.False(bloom.CloudReaches(player.Eye + new Vector3(WildlifeConfig.BloomBurstRadiusBlocks + 2f, 0f, 0f)));
 
-        // The cloud thins out: with nobody awake to spew again it ends
+        // A mirror given its posture is open like it and knows the cloud hangs
+        var mirror = new CorpseBloom(bloom.Type, bloom.Position, spawnIn: false);
+        mirror.MirrorPosture(bloom.Posture);
+        Assert.Equal(bloom.IsOpen, mirror.IsOpen);
+        Assert.True(mirror.CloudActive);
+
+        // The cloud thins out: with nobody awake to spew again it only fades, and ends
         var gone = PlayerAt(8f + WildlifeConfig.BloomWakeRangeBlocks + 10f, 8f);
-        Assert.True(RunUntil(manager, chunks, [gone], WildlifeConfig.BloomCloudSeconds + 2f, () => !bloom.CloudActive));
+        var strength = bloom.CloudStrength;
+        var grew = false;
+        Assert.True(RunUntil(manager, chunks, [gone], WildlifeConfig.BloomCloudSeconds + 2f, () =>
+        {
+            grew |= bloom.CloudStrength > strength;
+            strength = bloom.CloudStrength;
+            return !bloom.CloudActive;
+        }));
+        Assert.False(grew, "a fading cloud grew thicker");
+        Assert.Equal(0f, bloom.CloudStrength);
+        Assert.False(bloom.CloudHolds(bloom.Feet));
+
+        mirror.MirrorPosture(bloom.Posture);
+        Assert.False(mirror.CloudActive);
+    }
+
+    [Fact]
+    public void ABloomsCloudPoisonsTheMobsStandingInItExceptTheImmune()
+    {
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
+        var manager = NewManager();
+        var bloom = Standing<CorpseBloom>(manager, CorpseBloom.EntityName, 8f, 8f);
+        var player = PlayerAt(8f + 1.5f, 8f);
+        var poison = StatusEffectRegistry.Require(CorpseBloom.PoisonEffect);
+
+        Assert.True(RunUntil(manager, chunks, [player], 20f, () => bloom.CloudActive), "no cloud after the burst");
+
+        // The reach is a body's feet: inside the cloud's radius, not beyond it
+        Assert.True(bloom.CloudHolds(bloom.Feet + new Vector3(WildlifeConfig.BloomBurstRadiusBlocks * 0.5f, 0f, 0f)));
+        Assert.False(bloom.CloudHolds(bloom.Feet + new Vector3(WildlifeConfig.BloomBurstRadiusBlocks + 1f, 0f, 0f)));
+
+        // A centipede hunting the player through the cloud is poisoned by it; a second bloom rooted in the cloud is
+        // poisoned exactly when its kind is not immune to poison
+        var hunter = Standing<Centipede>(manager, Centipede.EntityName, 8f - 1.5f, 8f);
+        var neighbor = Standing<CorpseBloom>(manager, CorpseBloom.EntityName, 8f, 8f + 2f);
+        Assert.True(RunUntil(manager, chunks, [player], WildlifeConfig.BloomCloudPulseSeconds * 3f,
+            () => hunter.Effects.IsActive(poison)), "the cloud never poisoned the mob in it");
+        RunUntil(manager, chunks, [player], WildlifeConfig.BloomCloudPulseSeconds * 3f, () => false);
+        Assert.Equal(!neighbor.Type.Immune.Contains(CorpseBloom.PoisonEffect), neighbor.Effects.IsActive(poison));
+        Assert.Equal(!bloom.Type.Immune.Contains(CorpseBloom.PoisonEffect), bloom.Effects.IsActive(poison));
     }
 
     [Fact]
@@ -115,6 +162,73 @@ public sealed class JungleWildlifeTests
         Assert.False(Centipede.InBiteReach(centipede.Position,
             centipede.Position + new Vector3(WildlifeConfig.CentipedeBiteReach + 3f, 0f, 0f)));
         Assert.False(centipede.Heeds([new StubTarget(player.Eye) { IsFlying = true }]));
+    }
+
+    [Fact]
+    public void ACentipedeClimbsTheCliffBetweenItAndItsPreyWithItsBodyTrailingUpTheFace()
+    {
+        var chunks = SpiderTests.Cliff();
+        var manager = NewManager();
+        var centipede = Standing<Centipede>(manager, Centipede.EntityName, 3.5f, 8.5f);
+        var top = SpiderTests.PlateauTop + 1f;
+        var player = new StubTarget(StubTarget.EyeAt(new Vector3(SpiderTests.PlateauX + 4.5f, top, 8.5f)))
+        {
+            Effects = new StatusEffectSet(),
+        };
+
+        // On the face the head is well above a tail still down on the floor
+        var draped = false;
+        var bitten = RunUntil(manager, chunks, [player], 40f, () =>
+        {
+            var spine = centipede.Spine;
+            draped |= MathF.Abs(centipede.SurfaceNormal.Y) < 0.5f && spine[0].Y > spine[spine.Count - 1].Y + 1f;
+            return player.DamageTaken > 0;
+        });
+
+        Assert.True(draped, "the centipede never took to the cliff face with its body trailing below");
+        Assert.True(bitten, "the centipede never reached the player on the cliff");
+        Assert.True(centipede.Position.Y > top, "the centipede is not up on the plateau");
+    }
+
+    [Fact]
+    public void ABlowLandsOnAnySegmentOfACentipedeAndOnNothingOffItsBody()
+    {
+        var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
+        var manager = NewManager();
+        var centipede = Standing<Centipede>(manager, Centipede.EntityName, 8f, 8f);
+        RunUntil(manager, chunks, [], 0.5f, () => false);
+
+        var spine = centipede.Spine;
+        var tail = spine[spine.Count - 1];
+        var above = tail + Vector3.UnitY * 3f;
+        Assert.True(Vector3.Distance(tail, centipede.Position) > centipede.BodyHalfWidth * 4f,
+            "the tail lies inside the head's own box");
+        Assert.True(centipede.OverlapsBox(tail, 0.1f), "a blow on the tail missed");
+        Assert.False(centipede.OverlapsBox(above, 0.1f), "a blow well over the tail landed");
+        Assert.True(Vector3.Distance(tail, centipede.AimPointFrom(above)!.Value) < 1e-3f,
+            "a swing from over the tail is not aimed at the tail");
+    }
+
+    [Fact]
+    public void ACentipedesStanceOnAWallSurvivesTheWire()
+    {
+        var chunks = SpiderTests.Cliff();
+        var manager = NewManager();
+        var centipede = Standing<Centipede>(manager, Centipede.EntityName, 5.5f, 8.5f);
+        var player = PlayerAt(SpiderTests.PlateauX + 4.5f, 8.5f);
+        player.Eye = StubTarget.EyeAt(new Vector3(SpiderTests.PlateauX + 4.5f, SpiderTests.PlateauTop + 1f, 8.5f));
+        Assert.True(RunUntil(manager, chunks, [player], 20f, () => MathF.Abs(centipede.SurfaceNormal.Y) < 0.5f),
+            "the centipede never took to the cliff face");
+
+        var mirror = new Centipede(centipede.Type, centipede.Position, spawnIn: false);
+        mirror.NetworkSetState(centipede.Position, centipede.Facing, centipede.Health, centipede.Velocity);
+        mirror.MirrorPosture(centipede.Posture);
+        mirror.AnimateMirror(Dt);
+
+        Assert.Equal(centipede.SurfaceNormal, mirror.SurfaceNormal);
+        Assert.Equal(centipede.Spine.UpAt(0), mirror.Spine.UpAt(0));
+        Assert.True(Vector3.Distance(mirror.Spine[1], mirror.Spine[0] - Vector3.UnitY * CentipedeRig.For(mirror.Type).Links[1]) < 1e-3f,
+            "the mirror's body does not lie down the wall behind its head");
     }
 
     [Fact]

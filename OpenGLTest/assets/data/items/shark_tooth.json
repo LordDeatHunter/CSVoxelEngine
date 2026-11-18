@@ -1,0 +1,5 @@
+{
+  // A shark's serrated tooth (loot/shark.json), a trophy for now. The sprite is placeholder art.
+  "name": "Shark Tooth",
+  "texture": "assets/textures/items/shark_tooth.png"
+}

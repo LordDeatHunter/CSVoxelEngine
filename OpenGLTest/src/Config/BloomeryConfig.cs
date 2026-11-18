@@ -3,7 +3,7 @@ namespace VoxelEngine.Config;
 /// <summary>
 /// Iron smelting tuning: the bloomery's heat model (<see cref="VoxelEngine.Simulation.Smithing.BloomeryRules"/>), its
 /// bellows (a block a body lands on) and the anvil the blooms are forged on
-/// (<see cref="VoxelEngine.Simulation.Smithing.AnvilManager"/>). What a particular bloomery holds comes from its block
+/// (<see cref="VoxelEngine.Simulation.Smithing.WorkStationManager"/>). What a particular bloomery holds comes from its block
 /// JSON (<c>bloomery</c> object) and what a forge takes from its recipe; these numbers are shared by all of them.
 /// </summary>
 public static class BloomeryConfig
@@ -56,6 +56,11 @@ public static class BloomeryConfig
     /// <summary>Most blooms a saved bloomery may claim to hold: its output never exceeds its ore cap, so this only
     /// bounds a corrupt save.</summary>
     public const int MaxStoredOutput = 64;
+
+    /// <summary>Seconds a hammer's blow on the anvil takes from the lift to the hammer back at rest
+    /// (<c>SwordSwing.HammerStrike</c>), or the hammer's hit gap when that is shorter; the hit lands at its impact
+    /// share, and the rest (the hammer lying on the work, then drawn back) fills most of the gap to the next blow.</summary>
+    public const float HammerSwingSeconds = 2f;
 
     /// <summary>Slack in seconds a server allows on the anvil's hit gap, for network jitter.</summary>
     public const float HammerSlackSeconds = 0.3f;

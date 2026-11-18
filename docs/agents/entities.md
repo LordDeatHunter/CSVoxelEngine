@@ -302,8 +302,9 @@ target stands lower (`LedgeCautionTests`).
 
 ### Modeled, not wired
 
-Three entities have an entity file, a Blockbench model and clips but **no class, spawn rule, loot or wire kind**: they
-load and show in DevStudio's ENTITIES tab, and nothing in the game raises them. All three were built in
+Some entities have an entity file, a Blockbench model and clips but **no class, spawn rule, loot or wire kind**: they
+load and show in DevStudio's ENTITIES tab, and nothing in the game raises them (the crab; the
+corpse bloom, the centipede and the sea life have since been wired). The first three were built in
 Blockbench through its MCP plugin (no generator, the skin embedded; `USER_TODO.md`), face -Z, stand on y = 0 and have
 no rest rotations, so parts the clips fold lie flat along an axis.
 - **Crab** (`crab.json`, hp 14; `plans/TODO.md` `P-61`): the beach's neutral mob, about one block across. `Body`
@@ -316,18 +317,39 @@ no rest rotations, so parts the clips fold lie flat along an axis.
   moves. Shut on its `closed` loop until a player is within `BloomWakeRangeBlocks` (it opens to `idle`, and shuts again
   `BloomCloseDelaySeconds` after the last one left; the open bit rides `Animal.Posture` so a mirror matches); with a clear
   line within `BloomTriggerRadiusBlocks` and off its cooldown it plays `spew`, and at `impact` a burst hits every target in
-  `BloomBurstRadiusBlocks` for `BloomBurstDamage` and the `poison` effect and leaves a **cloud** (`CloudActive`) that
-  `WildlifeManager` re-poisons every `BloomCloudPulseSeconds` for `BloomCloudSeconds`, server-side only (no cloud particles
-  yet, `P-63`); the immune are never billed and the bloom is never hurt by its own cloud. Model: `Base` > `Bulb` >
+  `BloomBurstRadiusBlocks` for `BloomBurstDamage` and the `poison` effect and leaves a **cloud** (`CloudActive`) in
+  which `WildlifeManager.PoisonInCloud` re-poisons, every `BloomCloudPulseSeconds` for `BloomCloudSeconds`, every
+  player (`CloudReaches`) and every mob of the world (`CloudHolds`, over `World.Mobs`), authoritative only. Immunity is
+  data: an immune player is never billed, and a kind whose entity file lists `poison` under `immune` (the bloom itself,
+  the dragonfly) refuses it in its effect set. The cloud is drawn as purple `FireParticleKind.Miasma` puffs
+  (`AmbientEffects.UpdateBloomClouds`, never on a server) shed across its reach at `ParticleConfig.MiasmaPerSecond`
+  times `CloudStrength` (1 at the burst, falling to 0), so it thins as it fades; the poison keeps its full reach until
+  the cloud ends, and the cloud ends with a dying bloom. `Posture` carries the open bit and, above it, the strength
+  in 7 steps, so a client's mirror sheds the same cloud. Framed in `visual-examples/corpse-bloom-cloud.json`. Model: `Base` > `Bulb` >
   `Spadix` > `SpadixTip`, and under `Bulb` the petals `PetalN/S/E/W`, each with a `...Tip`, lying flat outward.
   Clips: `idle` (open), `closed` (a loop: the bud shut, the ambush pose), `spew` with `impact` (the petals gulp
   shut, the bulb swells, the burst is the `impact`), `hurt` and `death`. The bulb's swelling is a scale track.
 - **Giant Centipede** (`Centipede`, `centipede.json`, hp 70): a wildlife species that runs a player within
-  `CentipedeNoticeRangeBlocks` down on `walk` and bites within `CentipedeBiteReach` at the `bite` clip's `impact` for
-  `CentipedeBiteDamage` and `venom`. It is one rigid body playing its authored clips (legs clip-driven, the segments a pose,
-  not a chain: the physical chain and solved legs are `P-63`). Model: `Head` (with `MandibleL/R`, `AntennaL/R` > `...Tip`),
+  `CentipedeNoticeRangeBlocks` down on `walk` and bites, with their chest within `CentipedeBiteReach` of its head
+  (from any side), at the `bite` clip's `impact` for `CentipedeBiteDamage` and `venom`. **The one simulated body is
+  its head**, a cube of `CentipedeBodySize` that **crawls like the spiders** through the shared `CrawlDrive` (see
+  "Spiders" in `realm-mobs.md`): it climbs what it walks into instead of jumping, rounds ledges, walks walls and
+  ceilings, leaps and plans a path when the chase stalls, is knocked off a wall by a blow and never takes fall
+  damage. At full speed the head turns no tighter than `CentipedeTurnRadiusBlocks` (`SurfaceCrawler.MaxTurnSpeed`).
+  **The body trails the head's path**: `CentipedeSpine` remembers where the head has been and the up it had there
+  (a sample every `CentipedeTrailSpacingBlocks`) and stands each joint (`CentipedeRig`: `Head`, every `Segment<n>`,
+  `Tail`, read from the model) its link distance further back along that trail, so the body bends through a turn and
+  drapes over a ledge and up a wall segment by segment; `Centipede.PartMatrix` poses every part on its joint's root,
+  and a straight body is exactly the rigid pose. The chain follows on the simulation (`Locomote`) and on a client's
+  mirror (`AnimateMirror`) alike, each from its own head, so nothing about it is saved; a head that jumps farther
+  than the body is long lays it out straight again. The segments do not collide with blocks, but **a blow lands on
+  any of them** (`OverlapsBox`, `AimPointFrom` test every joint), on the one health pool. On the wire its posture
+  byte is the face the head holds (`CrawlDrive.SurfaceIndex`) and its yaw the heading's angle on that face
+  (protocol 67). DevStudio shows the clips on the straight body. Legs are clip-driven; solved legs are `P-63`.
+  Tests: `CentipedeSpineTests`, `JungleWildlifeTests`. `visual-examples/centipede-turn.json` films the body through
+  a turn, `centipede-climb.json` a climb up a pillar (both `VOXEL_TIME=147`). Model: `Head` (with `MandibleL/R`, `AntennaL/R` > `...Tip`),
   `Segment1..10` front to back and `Tail` (with `TailProngL/R`), all top-level, each group's origin on the body's
-  axis at the part's joint or center, 6 units apart, so a chain can place every part by its origin. Each segment
+  axis at the part's joint or center, 6 units apart, so the chain places every part by its origin. Each segment
   owns one leg pair as children, `LegR<n>` and `LegL<n>` with a `...Lower`, shaped like a crawler leg (along X,
   the knee straight out from the hip) for `LegIk`; a clip-driven centipede plays `walk`, a traveling wave whose
   pairs step 0.14 of a cycle apart. Clips: `idle`, `walk`, `bite` with `impact`, `hurt` and `death`.
@@ -387,7 +409,8 @@ take a new species from it instead of naming it; adding one means a class, a row
   Its hits and kills play `crow_hit` and `crow_death` clips (`Mob.HitSoundGroup`/`DeathSoundGroup`). Separately, `WildlifeCalls`
   (`src/Entities/Wildlife/`, built by `WildlifeCallSet`, ticked by `World`) plays a random `crow_caw` clip every `CrowCawMinSeconds`..`Max` (`AudioConfig`)
   from the nearest live crow within `CrowCawRangeBlocks` of the camera, positionally.
-- **Dragonfly** (`Dragonfly`): the man-sized hunter of the waterside. A player within `DragonflyNoticeRangeBlocks` is
+- **Dragonfly** (`Dragonfly`): the man-sized hunter of the waterside, immune to `poison` (its entity file's `immune`),
+  so it flies through a corpse bloom's cloud unharmed. A player within `DragonflyNoticeRangeBlocks` is
   prey: it holds itself over their head and darts in its `bite` clip, biting whoever is within `DragonflyBiteReach`
   at the impact. On the ground it plays `perch`. Riding one is a later task (`plans/TODO.md`).
 - **Deer** (`Deer`): watches a player inside `DeerAlertRangeBlocks` (its `alert` clip once), bolts from one inside
@@ -403,7 +426,8 @@ take a new species from it instead of naming it; adding one means a class, a row
 - **Drops.** Each species has a loot table of its own name (`WildlifeDropTests`): raw venison and hide from the
   deer; raw boar meat, hide and sometimes a tusk from the boar; a pile of all three plus its trophy `dire_tusk`
   from the dire boar; feathers from the crow; a wing from the dragonfly. The meats cook on a campfire into food
-  that heals (`heals`), a hide makes leather gear with fewer units than cotton (`recipes/leather_*_from_hide.json`),
+  that heals (`heals`), a hide is scraped, salted and tanned into the leather that cuts the leather set (see
+  "Leatherworking"),
   a feather fletches six arrows where a bone makes four, and a tusk splits into bone.
 - **Health bars.** An animal shows its bar only once hurt (`Animal.ShowsHealthbar`); a provoked boar and the dire
   boar always do.
@@ -413,3 +437,53 @@ take a new species from it instead of naming it; adding one means a class, a row
   sky mobs and restore them settled. `WildlifeTests` drives the rules headless and
   `visual-examples/wildlife.json` (`VOXEL_TIME=147`) films a herd calm, then reacting to a player on foot, and
   `visual-examples/wildlife-flyers.json` the crows aloft and resting and a dragonfly coming in.
+
+### Sea life
+
+The sea's animals (`plans/TODO.md` `F-19`) are `AquaticAnimal`s (`Entities/Wildlife/`), wildlife species like the rest
+(`WildlifeKind.Cod..Jellyfish`, wire kinds 25..29, the same `WildlifeManager`, budget and saves). Built in Blockbench
+through its MCP plugin, facing -Z, the lowest fin or tentacle on y = 0, no rest rotations; the pectoral fins lie flat
+along X and every locomotion clip keys their droop and sweep. A body wave is a yaw (rotation y) that travels down the
+chain with a phase lag per joint.
+
+- **Swimming.** A swimmer is a flyer whose medium is water (`Mob.Swims`; `RiggedMob.Fly` is the one steering): the
+  seabed is its floor (`FlightSteering.GroundBelow` with `fluidIsFloor` off, so the kind's hover band is the height it
+  keeps over the bed), the goal height is held under the surface (`FlightSteering.KeepUnderSurface`, `MobSwimSurfaceMarginBlocks`),
+  a horizontal step into a cell with no fluid is dropped (`FlightSteering.AvoidDry`, so it presses along the shore), and
+  its wander goals lie in fluid cells (`Mob.FlyingWanderGoal`). Its locomotion clip is `swim` (`RiggedMob.MoveClip`). With no
+  fluid in the cell of its body it is **beached**: a walker under gravity that plays its `flop` (a fish hops about,
+  `Flop*` in `WildlifeConfig`) and loses `BeachedDamage` every `BeachedDamageIntervalSeconds`; a dying swimmer is a
+  walker too, so it floats belly-up. `Animal.Posture` carries a darting bit and a beached bit (`SeaLifeTests`).
+- **Spawning.** `WildlifeManager.UpdateSpawning` rolls `SeaSpawnChance` of its turns for the sea first when surface water
+  lies within `SeaSpawnNearBlocks` of the target: `MobSpawner.TryFindWaterSpawn` takes a ring column whose terrain lies under
+  its water level, `WildlifeSpawnRules.PickSea` picks by the column's water depth and biome (`SeaSpawnRule.LivesIn`:
+  cod and tuna, the shark and the jellyfish only in the ocean, each from its `...MinWaterDepthBlocks`, the salmon in any
+  water), and `PlaceInWater` puts the body at a random height between the bed and the surface. A fish arrives with a school of
+  `SchoolMinSize..MaxSize`, the rest following the first (`Fish.Follow`). Sea animals count in the wildlife budget.
+- **Fish** (`Fish`, one class over `Cod`/`Salmon`/`Tuna`, per-kind numbers in `WildlifeConfig`): neutral. A threat within
+  `FishDartRangeBlocks` (`FishAlarmFactor` times that for `FishAlarmSeconds` after a blow) sends it fleeing straight away on its
+  `dart` clip at `FishDartSpeedFactor` of its cruise; calm, it wanders, or swims to its place beside its school leader.
+- **Shark** (`Shark`, hostile): a player within `SharkNoticeRangeBlocks` is charged on `charge` at `SharkChargeSpeedFactor`; within
+  `SharkBiteReach` of their chest in 3D and off its cooldown it plays `bite`, lunging, and at the `impact` event lands
+  `SharkBiteDamage`. It never leaves the water, so a player ashore is only bitten at the water's edge.
+- **Jellyfish** (`Jellyfish`, neutral): never chases, it drifts at `JellyfishDriftSpeed`; a player within `JellyfishStingReach`
+  of its bell makes it play `sting`, and at `impact` everyone still in reach takes `JellyfishStingDamage` and `venom`.
+- **Loot.** Fish drop their raw item (`raw_cod`, `raw_salmon`, `raw_tuna`, cooked on a campfire into `cooked_*` that heal) and
+  now and then a bone; the shark drops `shark_tooth`, the jellyfish `jellyfish_gel` (trophies for now). The sprites are placeholder
+  art from `tools/generate-sea-item-sprites.py` (`USER_TODO.md`). `visual-examples/sea-life.json` films them.
+
+The model contracts:
+- **Shark** (`shark.json`, hostile, hp 60), about 3.5 blocks long. `Body` > `Head` > `Jaw`; under `Body` also
+  `DorsalFin`, `PectoralFinL/R` and `Tail1` > `Tail2` > `TailFin`, with `PelvicFinL/R` under `Tail1`. Clips: `idle`
+  (a slow hover), `swim`, `charge` (a fast, wide wave with the jaw open), `bite` with `impact` (a lunge, the snap and
+  a head shake), `hurt`, `death` (it rolls belly-up) and `spawn` (a scale pop on `Body`).
+- **Cod, Salmon, Tuna** (`cod.json`, `salmon.json` hp 4, `tuna.json` hp 10, all neutral): three models with their own
+  proportions and skins over **one fish contract**, so one class can drive them all. `Body` > `Head` > `Jaw`; under
+  `Body` also `DorsalFin`, `FinL/R` and `Tail` > `TailFin`. Clips: `idle`, `swim`, `dart` (the flee burst, a short
+  loop), `flop` (a loop: on its side out of water, `Body` rolled 90 degrees and dropped onto its flank), `hurt` and
+  `death` (belly-up).
+- **Jellyfish** (`jellyfish.json`, neutral, hp 6): `Bell` > `BellRim`; under `Bell` the four oral arms `Arm1..4` and
+  the eight tentacles `Tentacle1..8` (clockwise from the front), each with a `...Lower` child, all hanging straight
+  down. Clips: `idle` (a drift), `swim` (the bell pulse, a scale track on `Bell` and `BellRim`, the tentacles trailing
+  in and flaring out), `sting` with `impact` (the tentacles whip outward), `hurt` and `death` (the bell deflates and
+  tips over). Its skin is opaque: translucency is a wiring decision.

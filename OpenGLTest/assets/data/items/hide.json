@@ -1,6 +1,6 @@
 {
-  // A deer's or a boar's pelt: leather gear takes fewer hides than cotton (recipes/leather_*_from_hide.json).
-  // The sprite is placeholder art.
-  "name": "Hide",
+  // A raw hide, a deer's or a boar's pelt: scraped on a fleshing beam and salted (recipes/scrape/), then tanned into
+  // leather in a tanning vat. The id stays "hide" so older saves keep theirs. The sprite is placeholder art.
+  "name": "Raw Hide",
   "texture": "assets/textures/items/hide.png"
 }

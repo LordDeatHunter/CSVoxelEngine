@@ -133,7 +133,7 @@ Environment variables for scripted captures:
 - `DEV_STUDIO_ANIM=<clip|hurt|hop|spawn|death|...>` picks the entity mode. An unknown mode logs a
   warning listing the valid ones.
 - `DEV_STUDIO_PLAYER_ANIM=<mode>` picks the player animation (`idle`, `walk`, `run`, `sneak`, `jump`,
-  `sprint jump`, `land`, `swim`, `swim idle`, `surface`, `fly`, `punch`, `heavy punch`, `slice`, `slice back`, `cut`, `back cut`, `chop`, `axe`, `axe split`, `throw`,
+  `sprint jump`, `land`, `swim`, `swim idle`, `surface`, `fly`, `punch`, `heavy punch`, `slice`, `slice back`, `cut`, `back cut`, `chop`, `axe`, `axe split`, `hammer`, `throw`,
   `hurt`, `equip`, `death`, `cast`) and selects the ITEMS tab. An unknown mode logs a warning listing them.
 - `DEV_STUDIO_SPEED=<0..4>` and `DEV_STUDIO_LOOP=<0|1>` set the timeline's speed and loop at startup.
 - `DEV_STUDIO_SHOT=<png path>` saves one screenshot and closes. Without `DEV_STUDIO_SHOT_AT` it

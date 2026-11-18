@@ -50,6 +50,12 @@ internal sealed class StationPasses : IDisposable
     // alloy furnace and a bloomery (SmithingPasses) all draw it, scaled to their hearth.
     private Mesh? _emberQuad;
 
+    // A tanning vat's liquid: the still-water tile (plain water) and the mud tile (the brown tanning liquor, once a
+    // batch tans; tinting the blue water brown only darkens it to black), each one flat quad built on first sight.
+    // SmithingPasses draws them.
+    private Mesh? _vatWater;
+    private Mesh? _vatLiquor;
+
     private TextureUnits Units => _owner.Units;
 
     /// <summary>
@@ -542,14 +548,28 @@ internal sealed class StationPasses : IDisposable
         _owner.WorldShader.SetUniform(_owner.LocAlpha, 1f);
     }
 
-    /// <summary>Frees the quern top, the crucible bowl, the ember quad and every molten quad built so far, in
-    /// the order the renderer always freed them.</summary>
+    /// <summary>The flat liquid quad of a tanning vat: plain water, or the brown tanning liquor once its batch tans.
+    /// Built on first sight and kept for the run; the world atlas must be bound.</summary>
+    internal Mesh VatLiquid(bool liquor)
+    {
+        if (liquor)
+            return _vatLiquor ??= LiquidQuad("mud");
+        return _vatWater ??= LiquidQuad("water_still");
+    }
+
+    private Mesh LiquidQuad(string tile) =>
+        Primitives.CreateFlatQuad(_gl, Rgba.FromFloat(1f, 1f, 1f, 1f), UvRect.Tile(TextureAtlas.TileOf(tile)));
+
+    /// <summary>Frees the quern top, the crucible bowl, the ember quad, the vat liquids and every molten quad built so
+    /// far, in the order the renderer always freed them.</summary>
     public void Dispose()
     {
         _quernTop?.Dispose();
         _crucibleMesh?.Dispose();
         _bonePileMesh?.Dispose();
         _emberQuad?.Dispose();
+        _vatWater?.Dispose();
+        _vatLiquor?.Dispose();
         foreach (var quad in _moltenQuads.Values)
             quad.Dispose();
         _moltenQuads.Clear();

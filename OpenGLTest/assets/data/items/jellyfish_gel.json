@@ -1,0 +1,5 @@
+{
+  // A blob of a jellyfish's gel (loot/jellyfish.json), a keepsake for now. The sprite is placeholder art.
+  "name": "Jellyfish Gel",
+  "texture": "assets/textures/items/jellyfish_gel.png"
+}

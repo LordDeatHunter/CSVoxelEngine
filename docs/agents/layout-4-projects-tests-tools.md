@@ -159,6 +159,9 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   and felling, saplings, the stations, drops, the mob managers and spawning
     Camps/                     # goblin camps: the fire first, torch-bearing goblins round it, one a dark night
     Caves/                     # the cave spawn filter and rules, the cave mob manager (spawns by biome, tier, caps, attacks)
+    Leatherwork/               # the tanning vat: water, bark and batch rules, the pause, the finish, collect, sweep, save, wire
+    WorkStations/              # the work station on the anvil and the fleshing beam: stack, offer, pick or auto-pick, hits,
+                               #   a result waiting for its collect item, sweep, save, wire
     Chests/                    # chests, tower chests, the underground ruin chests' cave biome tables (CaveChestTests) and
                                #   the lid: open while viewed, the wobble, the model's facing, no chunk quads (ChestLidTests)
     Tower/                     # the skeleton manager: forced spawn and the hard cap, no natural spawn, rake, arrows,
@@ -252,7 +255,11 @@ tools/                                # asset generators: models, animation clip
                                       #   stinger); --check
   generate-wildlife-item-sprites.py   # deterministic placeholder sprites of the wild animals' drops (meats raw and cooked,
                                       #   hide, feather, tusks, dragonfly wing); --check
+  generate-sea-item-sprites.py        # deterministic placeholder sprites of the sea animals' drops (raw and cooked cod, salmon
+                                      #   and tuna, shark tooth, jellyfish gel); --check
   generate-lumber-sprite.py           # deterministic placeholder sprite of the lumber item (a stack of boards); --check
+  generate-leather-sprites.py         # deterministic placeholder sprites of the leather works (flint knife, salt, salted
+                                      #   hide, leather, bark) and the rock salt tile; --check
   generate-wiki-shots.mjs             # the wiki's screenshot scenarios (visual-examples/wiki-*.json) and wiki/data/screenshots.json from one spec of poses and captions
   scroll-sprite.py                    # utility: lays one sprite out as a scrolling animation sheet (frames wrapped toward a direction,
                                       #   N px/frame, vertical/horizontal/square), PNG in and out, stdlib only

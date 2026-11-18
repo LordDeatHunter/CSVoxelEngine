@@ -1,0 +1,7 @@
+{
+  // Salmon off the campfire (use.action "heal" with heals; HealItem). The sprite is placeholder art.
+  "name": "Cooked Salmon",
+  "texture": "assets/textures/items/cooked_salmon.png",
+  "use": { "action": "heal", "seconds": 1.2 },
+  "heals": 34
+}

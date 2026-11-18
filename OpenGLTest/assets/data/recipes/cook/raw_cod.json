@@ -1,0 +1,6 @@
+{
+  "input": "item/raw_cod",
+  "result": "item/cooked_cod",
+  "count": 1,
+  "cookSeconds": 12
+}

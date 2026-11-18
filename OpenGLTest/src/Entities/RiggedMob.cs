@@ -71,11 +71,14 @@ public abstract class RiggedMob : Mob
             _bobPhase = Random.Shared.NextSingle() * MathF.Tau;
         }
 
-        Animation = new EntityAnimator(type.Model.Animations, walkReferenceSpeed,
-            flight == null ? EntityAnimator.WalkClip : EntityAnimator.FlyClip);
+        Animation = new EntityAnimator(type.Model.Animations, walkReferenceSpeed, MoveClip);
         if (spawnIn) Animation.Play(SpawnClip);
         else FinishSpawn();
     }
+
+    /// <summary>The locomotion clip the animator starts on: walk for a walker, fly for a flyer, and a swimmer's own
+    /// (<c>swim</c>). A constant per kind, since the constructor reads it.</summary>
+    protected virtual string MoveClip => Flight == null ? EntityAnimator.WalkClip : EntityAnimator.FlyClip;
 
     /// <summary>The mob's own animation state, driven by its speed and actions.</summary>
     public EntityAnimator Animation { get; }
@@ -322,7 +325,11 @@ public abstract class RiggedMob : Mob
     /// <paramref name="glide"/> replaces the height steering: the flyer falls under its <c>Gravity</c> down to a
     /// steady descent at its <c>Sink</c> speed (a calm crow gliding, which flaps itself back up to
     /// <see cref="FlightAimHeight"/>, so a flap's lift is a hop that arcs over rather than a nudge the steering
-    /// swallows); the wall probe's climb, the floor and the body sweep still apply.
+    /// swallows); the wall probe's climb, the floor and the body sweep still apply. A swimmer
+    /// (<see cref="Mob.Swims"/>) flies the same way through water: the seabed is its floor
+    /// (<see cref="FlightSteering.GroundBelow"/>), its goal height stays under the surface
+    /// (<see cref="FlightSteering.KeepUnderSurface"/>) and it never steers into a dry cell
+    /// (<see cref="FlightSteering.AvoidDry"/>).
     /// </summary>
     protected void Fly(Vector3? goal, bool chasing, float speedFactor, float deltaTime, ChunkManager chunks,
         (float Sink, float Gravity)? glide = null)
@@ -341,15 +348,17 @@ public abstract class RiggedMob : Mob
             var half = HalfExtents;
             var bottom = Position.Y - half.Y;
             float? groundTop = FlightSteering.GroundBelow(chunks, Position, bottom,
-                MobConfig.MobFlightGroundProbeBlocks) is { } depth ? bottom - depth : null;
+                MobConfig.MobFlightGroundProbeBlocks, fluidIsFloor: !Swims) is { } depth ? bottom - depth : null;
             var aim = goal ?? Position with { Y = groundTop is { } floor ? floor + half.Y + HoverHeight : Position.Y };
             aim.Y = FlightSteering.GoalHeight(aim.Y + FlightSteering.BobOffset(_flightClock, _bobPhase, flight),
                 groundTop, half.Y, flight, overGround: !chasing);
+            if (Swims) aim.Y = FlightSteering.KeepUnderSurface(aim.Y, Position, half.Y, chunks);
             FlightAimHeight = aim.Y;
 
             var desired = FlightSteering.DesiredVelocity(Position, aim, flight, speedFactor);
             if (glide is { } g) desired.Y = -g.Sink;
             desired = FlightSteering.AvoidSolids(Position, half, desired, flight.VerticalSpeed * speedFactor, chunks);
+            if (Swims) desired = FlightSteering.AvoidDry(Position, desired, chunks);
             var steered = BodyMotion.Steer(_velocity, desired, flight.Acceleration, deltaTime);
             // Gliding with no wall to climb, it falls under its own weight until it sinks at the glide speed
             if (glide is { } fall && desired.Y <= -fall.Sink && _velocity.Y > -fall.Sink)

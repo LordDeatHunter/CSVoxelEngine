@@ -110,8 +110,22 @@ internal static class SwordMotion
     // part a log in one go.
     private static readonly Shape AxeSplit = Chop with { Duration = StumpConfig.SplitSwingSeconds };
 
+    // The hammer's blow on an anvil: the chop's overhead shape with a smith's timing. The hammer is lifted over the
+    // first quarter and hangs at the top, comes down in a short hard strike, lies dead on the work for a good beat
+    // (the lag after the hit: it does not follow through) and is drawn back slowly over the second half, so the whole
+    // swing nearly fills the hammer's long hit gap. Its length is cut to the gap at play time when that is shorter,
+    // so only the shares matter. The work lies at waist height right in front, so the body folds and drops less
+    // than over a sword's chop.
+    private static readonly Shape HammerStrike = Chop with
+    {
+        Duration = BloomeryConfig.HammerSwingSeconds,
+        WindupEnd = 0.25f, WindupReach = 0.72f, Impact = 0.285f, StrikeEnd = 0.3f, HoldEnd = 0.52f,
+        LeanWindup = 0.15f, LeanFar = -0.18f, DipDepth = 0.9f,
+    };
+
     private static Shape Of(SwordSwing swing) => swing switch
     {
+        SwordSwing.HammerStrike => HammerStrike,
         SwordSwing.BackCut => BackCut,
         SwordSwing.Chop => Chop,
         SwordSwing.AxeChop => AxeChop,

@@ -1,0 +1,24 @@
+{
+  // A tanning vat: an open plank tub (models/block/tanning_vat.json) that tans salted hides into leather
+  // (TanningVatManager). Fill it with a water bucket, add bark (one unit per hide) and up to four salted hides; it tans
+  // the batch while it has water and bark enough, and an empty hand collects the leather.
+  "name": "Tanning Vat",
+  "model": "block/tanning_vat",
+  "hardness": 3,
+  "sfx": "hit_wood",
+  "tanning": {
+    "input": "item/salted_hide",
+    "result": "item/leather",
+    "count": 2,
+    "tannin": "item/bark",
+    "water": "item/water_bucket",
+    "capacity": 4,
+    "seconds": 75,
+    "liquid": 0.75
+  },
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": [
+    { "min": [0.0625, 0, 0.0625], "max": [0.9375, 0.875, 0.9375] }
+  ]
+}

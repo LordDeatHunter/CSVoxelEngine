@@ -29,9 +29,9 @@ OpenGLTest/
       LocalCommandPlayer.cs    # singleplayer's ICommandPlayer: the camera, the world's inventory and LocalPlayer.Kill
       DevDiagnostics.cs        # the startup build line, the VOXEL_TIME read, the live debug flag (X, VOXEL_DEBUG), the X debug line
                                #   and the HUD's frame counter (CountFrame, ShownFps)
-      ForgeInput.cs            # the anvil's recipe list input (built by GameplayInput): open on a hammer's right-click on a stacked
-                               #   anvil, cursor and look capture, card clicks forge, the close rules; connected, predicts and
-                               #   sends the Forge intent
+      ForgeInput.cs            # a work station's recipe list input (built by GameplayInput): open on its tool's right-click on a
+                               #   stacked station (anvil, leather table), cursor and look capture, card clicks pick, the close
+                               #   rules; connected, predicts and sends the Forge intent
       GameplayInput.cs         # a playing world's per-frame polled input: key edges, hotbar, right-click chain, pause-gated world update, mining, middle pick;
                                #   frees the cursor while the chat is open (SyncChatCursor); saves a due F2 or scripted screenshot
                                #   (CaptureScreenshotIfDue)
@@ -296,7 +296,8 @@ OpenGLTest/
         CookRecipeDefinition.cs # JSON shape of assets/data/recipes/cook/<name>.json
         CrushRecipeDefinition.cs # JSON shape of assets/data/recipes/crush/<name>.json
         EntityDefinition.cs    # JSON shape of assets/data/entities/<name>.json
-        ForgeRecipeDefinition.cs # JSON shape of assets/data/recipes/forge/<result>.json: metal + metalCount -> result + count
+        WorkRecipeDefinition.cs # JSON shape of assets/data/recipes/<station>/<result>.json (forge, scrape, cut): input +
+                               #   inputCount -> result + count in hits, optional byproduct and collectWith
         MeltRecipeDefinition.cs # block/item -> (material, ml)
         MoltenMaterialDefinition.cs # a molten metal: id, tile, tint
         RecipeDefinition.cs    # JSON shape of assets/data/recipes/<name>.json
@@ -330,9 +331,11 @@ OpenGLTest/
         CookRecipe.cs          # one compiled campfire recipe: raw input, cooked result and seconds on the fire
         CraftingRecipe.cs      # one compiled crafting recipe: what it makes and what one craft consumes
         CrushRecipe.cs         # one compiled quern recipe: crushable input and the crushed result
-        ForgeRecipe.cs         # one anvil recipe: so many of a solid metal stacked on an anvil -> the result (one per result)
+        WorkRecipe.cs          # one work-station recipe of a station folder: so many of an input stacked on the station ->
+                               #   the result in hits (one per result), its byproduct and the item a waiting result needs
         MeltRecipe.cs          # block/item -> (material, ml)
-        RecipeLoader.cs        # data/recipes (craft, cook, crush, melt, cast, alloy, forge) and data/molten -> the compiled lists
+        RecipeLoader.cs        # data/recipes (craft, cook, crush, melt, cast, alloy, and every work station folder the blocks
+                               #   name: forge, scrape, cut) and data/molten -> the compiled lists
       Shapes/                  # hitboxes and the shape resolvers (pane, multiblock, tree wood, snow, facing, break overlay)
         BlockHitbox.cs         # one axis-aligned selection box in cell-local 0..1 space
         BlockShape.cs          # the one live-world box resolver (raycast, outline, pop,
@@ -400,6 +403,9 @@ OpenGLTest/
         KilnProfile.cs         # a kiln anchor's compiled `kiln` object: fuel cap, melt speed (MeltSeconds), can-alloy,
                                #   and the Layout of its multiblock size
         MoltenMaterial.cs      # a molten metal: id, tile, tint
+        TanningProfile.cs      # a tanning vat's compiled `tanning` object: input, result per input, tannin, water item,
+                               #   capacity, seconds, liquid height
+        WorkStationProfile.cs  # a work station's compiled `workstation` object: tool tag, recipe folder, surface height
         SpritePose.cs          # the face-up pose and size-dependent resting lift
                                #   shared by every item sprite lying on a station
                                #   (the cooled cast, kiln fuel)
@@ -510,7 +516,7 @@ OpenGLTest/
       EntityType.cs            # one entity kind loaded from assets/data/entities/<name>.json: its display name, health pool
       FallingBlock.cs          # a gravity-affected block (sand, gravel) in flight
       FallingBlockLanding.cs   # a falling cube written back as a block: cell, block, fall, submerged (its dust)
-      FlightSteering.cs        # GL-free flight rules: chase goal, floor probe, hover/clearance height, bob, steered
+      FlightSteering.cs        # GL-free flight rules (a swimmer too: under-surface goal, dry-cell probe): chase goal, floor probe, hover/clearance height, bob, steered
                                #   velocity, the wall probe that slides or lifts a flyer (RiggedMob.Fly)
       FlightTuning.cs          # one flying kind's speeds, acceleration, hover band, clearance and bob (Validate)
       MobCaps.cs, IMobPopulation.cs  # the natural and hard mob caps every kind shares, over the
@@ -559,6 +565,7 @@ OpenGLTest/
         IBonePose.cs           # a pose of a Blockbench rig: each bone's animated local transform
         RigPose.cs             # GL-free: composes a pose down the rig's parent chain into a part's world matrix
         ClipPose.cs            # one clip sampled at one time as a pose, no layers (a chest's lid); default = rest
+        ChainFollow.cs         # GL-free: the follow-the-leader step of a body chain with its bend limit (sandworm)
       SkyMobs/                 # the sky islands' mobs (see "Sky mobs"): the shared base, the two kinds, the zone difficulty
       Wildlife/                # the animals of the wild (see "Wildlife"): Animal (heeding, idle habits, gaits), the
                                #   WildlifeSpecies table, Deer (watches, bolts, grazes), Boar (neutral until crowded or
@@ -566,7 +573,9 @@ OpenGLTest/
                                #   (lands, rests, takes off; posture for mirrors), Crow (flock pest: swoops, pecks, caws),
                                #   WildlifeCalls (one species' ambient call on a randomized timer, played when one is in earshot), WildlifeCallSet (the crow's caw and the boar and dire boar grunts),
                                #   Dragonfly (waterside hunter: darts and bites),
-                               #   CorpseBloom (rooted jungle ambusher: poison burst and a lingering cloud), Centipede (jungle hunter: runs down and bites with venom)
+                               #   CorpseBloom (rooted jungle ambusher: poison burst and a lingering cloud), Centipede (jungle hunter: its head crawls every surface on a CrawlDrive, bites with venom),
+                               #   CentipedeRig (the model's joints front to back and their link lengths), CentipedeSpine (its body chain: the joints trail the head's path round turns and up walls),
+                               #   AquaticAnimal (a swimmer: kept under the surface, beached it flops and suffocates; posture bits), Fish (cod, salmon, tuna: a school, darts from a threat), Shark (charges and bites), Jellyfish (drifts, stings what touches it)
         SkyMob.cs              # abstract sky mob (a RealmMob): the zone tier it spawned in and its tier-scaled pool
         Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event
         Cloudgolem.cs          # the ground bruiser: walk with ledge caution, the slam clip's impact event, the shockwave
@@ -605,9 +614,11 @@ OpenGLTest/
         SandwormChain.cs       # GL-free follow-the-leader chain of segments: fixed link lengths, a bend limit, the taper
         SandwormPose.cs        # GL-free world matrices of the model parts: a segment's, the lower jaw's
       Crawlers/                # the mobs that walk every surface on solved legs (see "Spiders", "Scorpion")
-        CrawlerMob.cs          # abstract crawler (a CaveMob): the crawl toward its target, the leap and the path when
-                               #   it stalls, the ceiling drop, the knock off a wall, the ranged shot's aim and release,
+        CrawlerMob.cs          # abstract crawler (a CaveMob) on a CrawlDrive: the ranged shot's aim and release,
                                #   the drawn orientation, its part matrices, wire stance and model contract
+        CrawlDrive.cs          # the crawl of a mob on any surface (crawlers, the centipede's head): toward its target,
+                               #   the leap and the path when it stalls, the ceiling drop, the knock off a wall
+        CrawlOrder.cs          # what a mob asks of its CrawlDrive for one frame
         CrawlerNavigator.cs    # GL-free: notices a stalled chase, follows a planned path foothold by foothold
         CrawlerPathfinder.cs   # GL-free A* over block faces: along a face, climb, wrap an edge, let go and fall
         CrawlerFoothold.cs     # one path step: an air cell and the face held there, its body center, a fall marker

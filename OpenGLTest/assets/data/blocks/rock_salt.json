@@ -1,0 +1,12 @@
+{
+  // Rock salt: patches in the top few blocks of bare surface stone, the deep sea floor and soil-stripped mountain rock
+  // (RockSaltGenerator). Softer than stone; mined with any pickaxe for salt (loot/rock_salt.json), which the fleshing
+  // beam needs to take a scraped hide off. The tile is placeholder art (tools/generate-leather-sprites.py).
+  "name": "Rock Salt",
+  "model": { "parent": "block/cube_all", "textures": { "all": "rock_salt" } },
+  "sfx": "hit_rock",
+  "hardness": 4,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "loot": "rock_salt"
+}

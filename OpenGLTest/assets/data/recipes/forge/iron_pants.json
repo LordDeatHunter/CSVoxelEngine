@@ -1,8 +1,8 @@
 {
   // The iron pants: bronze's ring count in blooms.
   // Picked on an anvil holding blooms, then hammered out with a smithing hammer (see AnvilManager).
-  "metal": "item/bloom",
-  "metalCount": 7,
+  "input": "item/bloom",
+  "inputCount": 7,
   "result": "item/iron_pants",
   "count": 1,
   "hits": 9,

@@ -1,0 +1,6 @@
+{
+  // A hide scraped clean on a fleshing beam and cured with salt: what the tanning vat tans into leather. The sprite is
+  // placeholder art.
+  "name": "Salted Hide",
+  "texture": "assets/textures/items/salted_hide.png"
+}

@@ -29,6 +29,9 @@ public sealed class EntityAnimator : IBonePose
     /// <summary>Name of the looping clip a flyer plays while moving, in place of <see cref="WalkClip"/>.</summary>
     public const string FlyClip = "fly";
 
+    /// <summary>Name of the looping clip a swimmer plays while moving, in place of <see cref="WalkClip"/>.</summary>
+    public const string SwimClip = "swim";
+
     /// <summary><see cref="MathUtils.Damp"/> rate of the idle/walk crossfade, per second.</summary>
     public const float WalkBlendRate = 8f;
 

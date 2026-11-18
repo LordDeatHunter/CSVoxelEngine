@@ -1142,12 +1142,12 @@ public sealed class GameServerTests : IDisposable
         var anvil = ContentRegistry.RequireBlock("anvil");
         var cell = arena.Front;
         SetCell(cell, anvil.Id);
-        Assert.True(_world.Interactions.TryTrackAnvilAt(cell));
-        var recipe = ContentRegistry.ForgeRecipes.First(r => r.Hits > 2);
-        for (var i = 0; i < recipe.MetalCount; i++)
-            Assert.True(_world.Smithing.Anvils.TryStack(cell, recipe.MetalId));
+        Assert.True(_world.Interactions.TryTrackWorkStationAt(cell, out _));
+        var recipe = ContentRegistry.WorkRecipes.First(r => r.Hits > 2 && r.Station == anvil.WorkStation!.Recipes);
+        for (var i = 0; i < recipe.InputCount; i++)
+            Assert.True(_world.Smithing.WorkStations.TryStack(cell, recipe.InputId));
         Assert.True(_world.Smithing.Select(cell, recipe.ResultId));
-        var state = _world.Smithing.Anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!;
+        var state = _world.Smithing.WorkStations.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!;
 
         // Bare-handed, the hit is refused and counts for nothing
         var bare = SendWorld(client, WorldIntent.Hammer(arena.Eye, arena.AimAtFront, cell));
