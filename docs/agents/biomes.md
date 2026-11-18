@@ -228,8 +228,10 @@ outside support the earlier dune calculation is unchanged. A hard sand-sea core 
 chunk column whose center has strong erg weight and whose 256 stored, dithered biomes are all
 Desert. Its pure classifier verdict is cached per chunk column and reset on a quiescent seed or
 profile change. Outside the hard core, existing deterministic density rolls for trees,
-dead shrubs, pebbles, flowers and surface scenery retain a share of `1 - ergWeight`; this
-is exactly the old admission when erg weight is zero or the profile is Legacy. No site may
+dead shrubs, pebbles, flowers, boulders, wells, pillars, cairns, meteors and surface
+ruins retain a share of `1 - ergWeight`; this is exactly the old admission when erg weight
+is zero or the profile is Legacy. Oasis water planning and tower rolls keep their original
+chance outside hard cores; their complete footprints are still excluded from cores. No site may
 put even part of a tree, log, boulder, well, ruin, waystone, tower, oasis disc or other
 surface scenery into a core. Core ground is sand through the usual sandstone depth plus
 six cells (eleven cells including the top), with caves and ores retaining their existing

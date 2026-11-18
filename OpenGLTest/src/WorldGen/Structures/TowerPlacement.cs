@@ -61,7 +61,6 @@ public static class TowerPlacement
         var span = (ulong)(Cell - 2 * Margin);
         centerX = cellX * Cell + Margin + (int)(SplitMix64.Mix(hash + 1) % span);
         centerZ = cellZ * Cell + Margin + (int)(SplitMix64.Mix(hash + 2) % span);
-        if (roll >= WorldGenerationConfig.TowerChance * TerrainErg.Retention(centerX, centerZ)) return false;
         radius = Math.Clamp(
             WorldGenerationConfig.TowerMinRadius
             + (int)(SplitMix64.Unit(hash, 4) * (WorldGenerationConfig.TowerMaxRadius - WorldGenerationConfig.TowerMinRadius + 1)),

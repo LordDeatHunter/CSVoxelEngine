@@ -28,7 +28,6 @@ public static class OasisGenerator
         var span = (ulong)(1 << WorldFeatureConfig.OasisCellShift);
         centerX = (cellX << WorldFeatureConfig.OasisCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
         centerZ = (cellZ << WorldFeatureConfig.OasisCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
-        if (roll >= WorldFeatureConfig.OasisChance * TerrainErg.Retention(centerX, centerZ)) return false;
         var radius = WorldFeatureConfig.OasisRadius;
         if (TerrainErg.IntersectsDisc(centerX, centerZ, radius))
             return false;

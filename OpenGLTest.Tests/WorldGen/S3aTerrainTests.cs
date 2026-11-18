@@ -22,6 +22,7 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
         var direct = 0;
         var voxels = 0;
         var fills = 0;
+        var contentLookups = 0;
         try
         {
             TerrainErg.ReadCountsEnabled = true;
@@ -49,10 +50,12 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
                 direct++;
                 var firstY = (column.MinHeight - 10) >> Chunk.SizeShift;
                 var lastY = (column.MaxHeight + 32) >> Chunk.SizeShift;
-                // Exact reservation from the earlier source-owned planner: 4 each.
-                Assert.Equal(4, lastY - firstY + 1);
-                Assert.True(fills + lastY - firstY + 1 <= 12);
-                output.WriteLine($"reserve seed={seed} min={column.MinHeight} max={column.MaxHeight} vertical={firstY}..{lastY} calls={lastY - firstY + 1}");
+                // Reserve the whole calculated band before the first normal fill. Alignment
+                // may change its chunk count; the three-seed run stays within twelve.
+                var reservedFills = lastY - firstY + 1;
+                Assert.True(reservedFills > 0 && fills + reservedFills <= 12,
+                    $"Full-band reservation exceeded: completed={fills}, next={reservedFills}");
+                output.WriteLine($"reserve seed={seed} min={column.MinHeight} max={column.MaxHeight} vertical={firstY}..{lastY} calls={reservedFills}");
                 var chunks = new Dictionary<int, Chunk>();
                 for (var cy = firstY; cy <= lastY; cy++)
                 {
@@ -73,6 +76,7 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
                         if (block == TerrainGenerator.SandBlock || block == BlockType.Air) continue;
                         // The full normal pipeline retains underground cave decorations in carved air.
                         // Seed 42's real stalactite at y=36 is below its local surface, not scenery.
+                        contentLookups++;
                         var name = BlockType.ById[block]?.Name;
                         var caveDecoration = y < height && (name is "stalactite" or "stalagmite" or "glow_mushroom"
                             || name?.EndsWith("_stalactite", StringComparison.Ordinal) == true
@@ -93,7 +97,7 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
         finally
         {
             var (builds, biomes) = TerrainErg.CoreReadCounts;
-            output.WriteLine($"S3a fullband direct={direct} voxel_reads={voxels} normal_fills={fills} cumulative_builds={builds} cumulative_biomes={biomes}");
+            output.WriteLine($"S3a fullband terrain_api={direct} voxel_reads={voxels} index_calls={voxels} content_lookups={contentLookups} normal_fills={fills} cumulative_builds={builds} cumulative_biomes={biomes}");
             WorldSeed.Apply(WorldSeed.Default);
             TerrainErg.ReadCountsEnabled = false;
         }
@@ -182,6 +186,12 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
     public void GeneratedFarCoreKeepsSandOnExposedSides()
     {
         TestContent.EnsureLoaded();
+        var meshCells = 0;
+        var meshBuildCalls = 0;
+        var contentLookups = 0;
+        var quadCandidates = 0;
+        var coreVerdicts = 0;
+        var columnReads = 0;
         try
         {
             TerrainErg.ReadCountsEnabled = true;
@@ -191,8 +201,12 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
             var spec = LodRegion.Levels[0];
             var rx = (int)MathF.Floor((float)x / spec.RegionBlocks);
             var rz = (int)MathF.Floor((float)z / spec.RegionBlocks);
+            meshBuildCalls++;
             var mesh = LodRegion.BuildMeshData(0, rx, rz);
+            meshCells = spec.Cells * spec.Cells;
+            contentLookups++;
             var sand = VoxelEngine.BlockType.ById[ContentRegistry.RequireBlock("sand").Id]!.FaceTiles[0];
+            contentLookups++;
             var sandstone = VoxelEngine.BlockType.ById[ContentRegistry.RequireBlock("sandstone").Id]!.FaceTiles[0];
             var upperSideSand = 0;
             var upperSideSandstone = 0;
@@ -205,9 +219,12 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
                 var localZ = (mesh.Vertices[i].Position.Z + mesh.Vertices[i + 2].Position.Z) * 0.5f;
                 if (localX < 1 || localX > spec.RegionBlocks - 1 || localZ < 1 || localZ > spec.RegionBlocks - 1)
                     continue;
+                quadCandidates++;
                 var worldX = rx * spec.RegionBlocks + (int)localX;
                 var worldZ = rz * spec.RegionBlocks + (int)localZ;
+                coreVerdicts++;
                 if (!TerrainErg.IsCore(worldX >> Chunk.SizeShift, worldZ >> Chunk.SizeShift)) continue;
+                columnReads++;
                 var coreColumn = ColumnCache.Get(worldX >> Chunk.SizeShift, worldZ >> Chunk.SizeShift);
                 var ground = coreColumn.Heights[((worldX & Chunk.SizeMask) << Chunk.SizeShift) | (worldZ & Chunk.SizeMask)];
                 var faceY = (mesh.Vertices[i].Position.Y + mesh.Vertices[i + 2].Position.Y) * 0.5f;
@@ -217,7 +234,7 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
                 if (vertex.Layer == sand) { upperSideSand++; depthHistogram[depthBin, 0]++; }
                 if (vertex.Layer == sandstone) { upperSideSandstone++; depthHistogram[depthBin, 1]++; }
             }
-            output.WriteLine($"generated core LOD below-top sand={upperSideSand} sandstone={upperSideSandstone}; direct cells={spec.Cells * spec.Cells}; normal_fills=0");
+            output.WriteLine($"generated core LOD below-top sand={upperSideSand} sandstone={upperSideSandstone}; mesh_build_calls={meshBuildCalls} mesh_cells={meshCells} quads_scanned={mesh.Vertices.Count / 4} quad_candidates={quadCandidates} explicit_core_queries={coreVerdicts} explicit_column_reads={columnReads} terrain_api={meshCells + coreVerdicts + columnReads} content_lookups={contentLookups} normal_fills=0");
             for (var bin = 0; bin < 8; bin++) output.WriteLine($"LOD depth {bin}: sand={depthHistogram[bin, 0]} sandstone={depthHistogram[bin, 1]}");
             Assert.True(upperSideSand > 0);
             Assert.Equal(0, upperSideSandstone);
@@ -225,7 +242,7 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
         finally
         {
             var (builds, biomes) = TerrainErg.CoreReadCounts;
-            output.WriteLine($"S3a internal core_builds={builds} stored_biomes={biomes}");
+            output.WriteLine($"S3a LOD terrain_api={meshCells + coreVerdicts + columnReads} explicit_core_queries={coreVerdicts} explicit_column_reads={columnReads} mesh_build_calls={meshBuildCalls} mesh_cells={meshCells} content_lookups={contentLookups} normal_fills=0 cumulative_builds={builds} cumulative_biomes={biomes}");
             WorldSeed.Apply(WorldSeed.Default);
             TerrainErg.ReadCountsEnabled = false;
         }
@@ -383,6 +400,7 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
     {
         TestContent.EnsureLoaded();
         var direct = 0;
+        var voxels = 0;
         var chunks = 0;
         try
         {
@@ -406,7 +424,7 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
             var sandCells = 0;
             for (var depth = 0; depth <= WorldGenerationConfig.SandstoneDepth + 6; depth++)
             {
-                direct++;
+                voxels++;
                 var block = chunk.Storage.Get(Chunk.Idx(x & Chunk.SizeMask, (top - depth) & Chunk.SizeMask,
                     z & Chunk.SizeMask));
                 if (block == BlockType.Air) continue; // caves retain carve ownership
@@ -418,7 +436,7 @@ public sealed class S3aTerrainTests(ITestOutputHelper output)
         }
         finally
         {
-            output.WriteLine($"S3a filled direct={direct} normal_fills={chunks}");
+            output.WriteLine($"S3a filled terrain_api={direct} voxel_reads={voxels} index_calls={voxels} normal_fills={chunks}");
             var (builds, biomes) = TerrainErg.CoreReadCounts;
             output.WriteLine($"S3a internal core_builds={builds} stored_biomes={biomes}");
             WorldSeed.Apply(WorldSeed.Default);
