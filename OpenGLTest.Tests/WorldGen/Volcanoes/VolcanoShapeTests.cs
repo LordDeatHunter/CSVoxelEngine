@@ -1,3 +1,4 @@
+using System;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Volcanoes;
 using Xunit;
@@ -83,4 +84,3 @@ public sealed class VolcanoShapeTests
             VolcanoShape.Classify(Site, 0, Site.Floor, 0, Site.Floor - 1));
     }
 }
-using System;
