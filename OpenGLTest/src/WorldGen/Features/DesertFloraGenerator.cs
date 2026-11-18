@@ -32,6 +32,14 @@ public static class DesertFloraGenerator
     {
         if (WorldSeed.Profile != WorldGenProfile.Dynamic || TerrainErg.Intersects(x, z, x, z))
             return BlockType.Air;
+        return RetainedCandidateAt(x, z);
+    }
+
+    /// <summary>The clump and thinned roll after the separate hard-core gate. Pure, but not
+    /// a complete placement verdict: the stamp still checks actual biome, ground, air and water.</summary>
+    internal static ushort RetainedCandidateAt(int x, int z)
+    {
+        if (WorldSeed.Profile != WorldGenProfile.Dynamic) return BlockType.Air;
         if (!PlantClumps.TryGetMember(Clumps, WorldGenerationConfig.Seed, x, z, DesertCenter, out _, out _))
             return BlockType.Air;
 
