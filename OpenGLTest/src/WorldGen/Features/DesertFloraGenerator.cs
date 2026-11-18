@@ -30,7 +30,7 @@ public static class DesertFloraGenerator
     /// <summary>Candidate kind before the actual generated biome, ground, air and water checks.</summary>
     internal static ushort CandidateAt(int x, int z)
     {
-        if (WorldSeed.Profile != WorldGenProfile.Dynamic || TerrainErg.Intersects(x, z, x, z))
+        if (WorldSeed.Profile != WorldGenProfile.Dynamic || FeatureExclusion.Intersects(x, z, x, z))
             return BlockType.Air;
         return RetainedCandidateAt(x, z);
     }

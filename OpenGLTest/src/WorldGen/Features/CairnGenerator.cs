@@ -44,7 +44,7 @@ public static class CairnGenerator
         x = (cellX << WorldFeatureConfig.CairnCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
         z = (cellZ << WorldFeatureConfig.CairnCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
         if (roll >= WorldFeatureConfig.CairnChance * TerrainErg.Retention(x, z)) return false;
-        if (TerrainErg.Intersects(x, z, x, z)) return false;
+        if (FeatureExclusion.Intersects(x, z, x, z)) return false;
         return true;
     }
 

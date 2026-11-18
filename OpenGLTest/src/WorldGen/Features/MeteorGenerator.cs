@@ -38,7 +38,7 @@ public static class MeteorGenerator
         if (roll >= WorldFeatureConfig.MeteorChance * TerrainErg.Retention(x, z)) return false;
         var radii = WorldFeatureConfig.MeteorMaxRadius - WorldFeatureConfig.MeteorMinRadius + 1;
         radius = WorldFeatureConfig.MeteorMinRadius + (int)(SplitMix64.Mix(h + 3) % (ulong)radii);
-        if (TerrainErg.IntersectsDisc(x, z, radius)) return false;
+        if (FeatureExclusion.IntersectsDisc(x, z, radius)) return false;
         return true;
     }
 

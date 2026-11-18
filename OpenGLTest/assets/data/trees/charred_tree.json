@@ -18,5 +18,15 @@
     "rim": "block"
   },
   // leafless: the crown proxy only has to stay valid (hell has no far LOD)
-  "lod": { "crownHeight": [3, 6], "crownRadius": 1, "profile": "column" }
+  "lod": { "crownHeight": [3, 6], "crownRadius": 1, "profile": "column" },
+  "worldgen": {
+    "profiles": ["Dynamic"],
+    "biomes": ["charred"],
+    "density": 0.007,
+    "spacing": 4,
+    "maxSlope": 3,
+    "minSoil": 0,
+    "minGround": 1,
+    "maxGround": 90
+  }
 }

@@ -107,7 +107,18 @@ internal static class BiomeClassifier
         var jungle = JungleOf(temperature, humidity);
         jungleWeight = jungle * (1f - oceanWeight) * gate;
 
-        return gate < 0.5f ? Biome.Forest : Classify(oceanWeight, cold, warm, dry, semiDry, jungle);
+        return gate < 0.5f ? Biome.Forest : Classify(oceanWeight, cold, warm, dry, semiDry, jungle,
+            VolcanicProvince(x, z, oceanWeight));
+    }
+
+    /// <summary>An independent Dynamic province field; it never changes the climate sample or
+    /// the ocean, desert, arid and jungle height weights.</summary>
+    internal static float VolcanicProvince(float x, float z, float oceanWeight)
+    {
+        if (WorldSeed.Profile != WorldGenProfile.Dynamic) return 0f;
+        return MathUtils.SmoothStep(WorldGenerationConfig.VolcanicProvinceStart,
+            WorldGenerationConfig.VolcanicProvinceEnd, TerrainNoise.VolcanicProvinceNoise.GetNoise(x, z))
+            * (1f - oceanWeight) * TerrainRelief.DynamicSpawnClear(x, z);
     }
 
     /// <summary>
@@ -121,13 +132,19 @@ internal static class BiomeClassifier
     /// surface-water fade are keyed to.
     /// </summary>
     internal static Biome Classify(float oceanWeight, float cold, float warm, float dry, float semiDry,
-        float jungle = 0f) =>
-        oceanWeight >= WorldGenerationConfig.OceanShoreWeight ? Biome.Ocean
-        : cold >= WorldGenerationConfig.ColdBiomeMinCold ? dry >= 0.5f ? Biome.Frozen : Biome.Taiga
-        : warm >= 0.5f ? dry >= 0.5f ? Biome.Desert : semiDry >= 0.5f ? Biome.Savanna
-            : jungle >= 0.5f ? Biome.Jungle : Biome.Forest
-        : semiDry >= 0.5f || dry >= 0.5f ? Biome.Steppe
-        : Biome.Forest;
+        float jungle = 0f, float province = 0f)
+    {
+        if (oceanWeight >= WorldGenerationConfig.OceanShoreWeight) return Biome.Ocean;
+        // The old Desert decision wins before the province, including after Dynamic dither.
+        if (cold < WorldGenerationConfig.ColdBiomeMinCold && warm >= 0.5f && dry >= 0.5f)
+            return Biome.Desert;
+        if (province >= WorldGenerationConfig.VolcanicClassifyThreshold) return Biome.Charred;
+        return cold >= WorldGenerationConfig.ColdBiomeMinCold ? dry >= 0.5f ? Biome.Frozen : Biome.Taiga
+            : warm >= 0.5f ? semiDry >= 0.5f ? Biome.Savanna
+                : jungle >= 0.5f ? Biome.Jungle : Biome.Forest
+            : semiDry >= 0.5f || dry >= 0.5f ? Biome.Steppe
+            : Biome.Forest;
+    }
 
     /// <summary>The jungle weight: min(hot, soak), the same min-of-two-ramps shape as the desert weight,
     /// so it is exactly 0.5 on the jungle line. Scaled by the land share by its callers.</summary>
@@ -231,8 +248,9 @@ internal static class BiomeClassifier
             var semiDry = SemiDryOf(dynamicHumidity);
             var jungle = JungleOf(dynamicTemperature, dynamicHumidity);
             var shift = TerrainNoise.EcotoneNoise.GetNoise(x, z) * WorldGenerationConfig.DynamicEcotoneBand;
+            var province = VolcanicProvince(x, z, oceanWeight);
             return Classify(oceanWeight, cold + shift, warm + shift, dry + shift,
-                semiDry + shift, jungle + shift);
+                semiDry + shift, jungle + shift, province + shift);
         }
 
         if (biome is not (Biome.Savanna or Biome.Desert)) return biome;

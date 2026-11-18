@@ -1,4 +1,5 @@
 using System;
+using VoxelEngine.WorldGen.Volcanoes;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Effects.Climate;
@@ -56,6 +57,11 @@ public static class TerrainGenerator
     /// <summary>Layered snow block; the snow accumulation pass stamps it.</summary>
     public static readonly ushort SnowBlock;
 
+    /// <summary>Dynamic Charred province surface rock, ash and shallow cinder.</summary>
+    public static readonly ushort CharredStoneBlock;
+    public static readonly ushort AshBlock;
+    public static readonly ushort CinderSoilBlock;
+
     static TerrainGenerator()
     {
         SurfaceBlock = ContentRegistry.RequireBlock("grass").Id;
@@ -69,6 +75,9 @@ public static class TerrainGenerator
         SandstoneBlock = ContentRegistry.RequireBlock("sandstone").Id;
         IceBlock = ContentRegistry.RequireBlock("ice").Id;
         SnowBlock = ContentRegistry.RequireBlock("snow").Id;
+        CharredStoneBlock = ContentRegistry.RequireBlock("charred_stone").Id;
+        AshBlock = ContentRegistry.RequireBlock("ash").Id;
+        CinderSoilBlock = ContentRegistry.RequireBlock("cinder_soil").Id;
     }
 
     /// <summary>
@@ -311,6 +320,14 @@ public static class TerrainGenerator
         // desert and ocean lerps below would dilute a massif, which is why a site is accepted only
         // where its center and rim carry zero desert and ocean weight.
         forestHeight = massifs ? TerrainPeaks.WithMassif(worldX, worldZ, reliefForest) : reliefForest;
+        // Q0 never asks for a volcano: its site factory reads Q0. Q2 and Q3 both see the cone.
+        // A site's center and rim are context samples, not proof for its whole cone.
+        // Compose locally only on unblended land so an old ocean/desert dune column
+        // retains its exact height even when a cone disc crosses that boundary.
+        if (massifs && WorldSeed.Profile == WorldGenProfile.Dynamic
+            && oceanWeight == 0f && desertWeight == 0f)
+            forestHeight = VolcanoShape.HeightAt(VolcanoSites.At(worldX, worldZ),
+                worldX, worldZ, forestHeight);
         // Lone peaks rise last, on top of the massifs, with the same exact identity outside their discs
         if (lonePeaks) forestHeight = TerrainPeaks.WithLonePeak(worldX, worldZ, forestHeight);
         if (knolls && WorldSeed.Profile == WorldGenProfile.Dynamic)
@@ -395,6 +412,9 @@ public static class TerrainGenerator
 
                 var heightF = LandHeight(worldX, worldZ, out var biome, out var oceanWeight,
                     out var desertWeight, out var forestHeight);
+                var volcano = WorldSeed.Profile == WorldGenProfile.Dynamic
+                    ? VolcanoSites.At(worldX, worldZ) : default;
+                var calderaGuard = VolcanoShape.InGuard(volcano, worldX, worldZ);
 
                 // Surface water: a lake is a bowl around its own water level and a river a channel
                 // down to its own level, each returning to un-carved ground at its edge, so the
@@ -465,6 +485,18 @@ public static class TerrainGenerator
                     waterLevel[i] = springLevel;
                 }
 
+                // Exact integer-column admission makes every owned caldera column non-ocean,
+                // non-desert and Charred. Pin its *final* surface after ordinary lake, bank,
+                // oasis and spring composition; the stamp uses this stored height, not a
+                // nominal pre-blend summit. The guard is wider than the owned lake.
+                if (VolcanoShape.InCrater(volcano, worldX, worldZ))
+                {
+                    heightF = volcano.Floor;
+                    waterLevel[i] = NoWater;
+                    oasis[i] = false;
+                    biome = Biome.Charred;
+                }
+
                 var height = (int)heightF;
 
                 // A sea stack: a hashed site in the shallow ocean raises the column into a tapered
@@ -486,6 +518,7 @@ public static class TerrainGenerator
                 var surfaceWater = MathF.Max(lakeWeight, riverWeight) * gate;
                 var guarded = ravineGuard * WorldGenerationConfig.WaterBodyThreshold;
                 if (guarded > surfaceWater) surfaceWater = guarded;
+                if (calderaGuard) surfaceWater = WorldGenerationConfig.WaterBodyThreshold;
 
                 // Sampled once and reused: the same value cuts the ravine into the heightmap and
                 // decides how much soil is left on the column.
@@ -521,6 +554,7 @@ public static class TerrainGenerator
                     soil = 0;
                 // The entire accepted erg column owns its sand cover, including canyon cuts.
                 if (TerrainErg.IsCore(chunkX, chunkZ)) soil = Math.Max(soil, 1);
+                if (biome == Biome.Charred && VolcanoShape.InCrater(volcano, worldX, worldZ)) soil = 0;
 
                 dirtDepth[i] = (byte)soil;
 

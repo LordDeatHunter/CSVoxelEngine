@@ -52,7 +52,7 @@ public static class CottonGenerator
 
     /// <summary>Whether the surface column (x, z) is a cotton clump member, before the terrain checks.</summary>
     public static bool TryGetCotton(int x, int z) =>
-        !TerrainErg.Intersects(x, z, x, z)
+        !FeatureExclusion.Intersects(x, z, x, z)
         && PlantClumps.TryGetMember(Clumps, WorldGenerationConfig.Seed, x, z, ClimateGate, out _, out _);
 
     /// <summary>

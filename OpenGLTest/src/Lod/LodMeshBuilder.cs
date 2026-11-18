@@ -5,6 +5,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Volcanoes;
 using VoxelEngine.WorldGen.Features;
 
 namespace VoxelEngine.Lod;
@@ -493,8 +494,17 @@ internal sealed class LodMeshBuilder
             if (OasisGenerator.IsPond(centerX, centerZ)) cellLevel = oasisSurface;
         }
         _waterLevels[(i + 1) * _heightGrid + (j + 1)] = cellLevel;
-        _seaFloor[(i + 1) * _heightGrid + (j + 1)] =
-            FloorMaterial(maxOwn, cellLevel, cellBiome, _soilStripped[(i + 1) * _heightGrid + (j + 1)]);
+        var material = FloorMaterial(maxOwn, cellLevel, cellBiome,
+            _soilStripped[(i + 1) * _heightGrid + (j + 1)]);
+        if (cellBiome == Biome.Charred && material == 5
+            && TerrainNoise.VolcanicProvinceNoise.GetNoise(centerX * 3f, centerZ * 3f) > 0f)
+            material = 7;
+        // Only the generated path knows about a real owned lava volume. Supplied columns
+        // carry biome and height but no generated-lava ownership field.
+        var volcano = VolcanoSites.At(centerX, centerZ);
+        if (VolcanoShape.InLavaDisc(volcano, centerX, centerZ) && maxOwn == volcano.Floor)
+            material = 6;
+        _seaFloor[(i + 1) * _heightGrid + (j + 1)] = material;
 
         // Sand rings ocean shores and lake/river rims, not every column in the height
         // band. Every grass-fill biome (the near fill's default branch) wears sand on
@@ -624,10 +634,11 @@ internal sealed class LodMeshBuilder
     }
 
     // The bed material code LodFaceEmitter.FloorBlock draws: 0 sand, 1 gravel, 2 stone by the
-    // ocean depth band, 3 a land biome's soil (dirt), 4 the frozen biome's permafrost (stone
-    // where the column's soil was stripped), matching the near column fill.
+    // ocean depth band, 3 dirt, 4 permafrost, 5 ash, 6 owned generated lava,
+    // 7 exposed Charred rock. Supplied columns never receive code 6.
     private static byte FloorMaterial(int height, int level, Biome biome, bool stripped) =>
         biome == Biome.Frozen ? (stripped ? (byte)2 : (byte)4)
+        : biome == Biome.Charred ? (stripped ? (byte)7 : (byte)5)
         : biome == Biome.Ocean || level <= WorldGenerationConfig.SeaLevel
             ? height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanSandDepth ? (byte)0
             : height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanGravelDepth ? (byte)1

@@ -1,4 +1,5 @@
 using System;
+using VoxelEngine.WorldGen.Volcanoes;
 
 namespace VoxelEngine.WorldGen;
 
@@ -64,6 +65,17 @@ internal static class WaterBodies
     internal static void SampleSurfaceWater(float x, float z, out float lakeWeight, out int lakeSurface,
         out int lakeFloor, out float riverWeight, out int riverLevel, out int riverBank, out float ravineGuard)
     {
+        if (VolcanoSites.InGuard(x, z))
+        {
+            lakeWeight = 0f;
+            lakeSurface = NoWater;
+            lakeFloor = 0;
+            riverWeight = 0f;
+            riverLevel = WorldGenerationConfig.SeaLevel;
+            riverBank = NoWater;
+            ravineGuard = 1f;
+            return;
+        }
         lakeWeight = LakeSample(x, z, out lakeSurface, out lakeFloor);
         riverWeight = RiverWeight(x, z);
         var great = GreatLakes.Sample(x, z, out var greatSurface, out var greatFloor, out ravineGuard,
@@ -248,6 +260,12 @@ internal static class WaterBodies
     private static bool TryLakeSite(float centerX, float centerZ, float radius, float size,
         out int surface, out int floor)
     {
+        if (VolcanoSites.IntersectsConeDisc(centerX, centerZ, radius))
+        {
+            surface = 0;
+            floor = 0;
+            return false;
+        }
         // A pond yields to a great lake, so no column belongs to both and no surface is split.
         // Tested first, which also skips the rim samples near a lake.
         if (GreatLakes.NearAnyFootprint(centerX, centerZ, radius + WorldGenerationConfig.GreatLakePondClearance))

@@ -54,6 +54,43 @@ wet corner, so the jungle needed no palette row of its own. Its animals are the 
 Centipede" in `entities.md`) beside the dragonfly; the centipede's physical body is `P-63`.
 Framed in `visual-examples/jungle.json` (canopy, mud floor, a bloom and a centipede; the first roomy jungle of the default seed is near (432, 816)).
 
+**Charred** (`Biome.Charred = 8`, Dynamic only) is a volcanic province independent of the
+temperature/humidity sample. `TerrainNoise.VolcanicProvinceNoise` uses seed offset 199 and
+`BiomeClassifier.VolcanicProvince` applies the land and spawn masks; `Classify` keeps Ocean and
+the old Desert decision ahead of Charred, including after ecotone dither. It has charred stone,
+ash patches and shallow cinder rather than a grass/beach fallback. The existing leafless
+`charred_tree` is eligible on Dynamic Charred ground; its hell ownership is unchanged. This
+province alone does not promise a volcano. It has no new mob or cave-biome rule.
+
+`WorldGen/Volcanoes/` adds rare hashed cone sites. The cached verdict reads Q0 relief,
+biome/province and massif sites only; `WorldSeed.Apply` clears it. Center and eight rim samples
+judge setting, while every integer column of the crater plus guard is checked for zero ocean
+and desert weight, sufficient province and dithered Charred. This exact scan is a cold site
+cost, not a cheap nine-point proof. The cone changes Q2 pre-feature height and Q3 final height
+on locally unblended land only; outside its disc and on old ocean/desert blend columns it is
+the identity. Peaks, knolls, lakes, ponds, oasis and hot springs yield to accepted cone discs.
+The crater floor is pinned after final water/bank composition, its guard blocks cuts and
+overlapping writers, and `VolcanoStamp` writes the floor's lava, surrounding side and bottom
+lining after terrain strata on normal and lake-probe fills. The stamp zeroes state bytes.
+The caldera is a bounded S5a volume; a later deep conduit can extend its classifier without
+making the S5a lake depend on deep generation. The soft ceiling bounds the cone below the
+writer clearance at 186, while the nominal summit is not the final apex height.
+
+Generated far LOD uses the selected Charred rock/ash and approximates the actual cone height;
+only a generated cell with an owned caldera floor gets a lava tile. Supplied/imported columns
+retain their biome/height authority and never infer generated lava. Far LOD lava is an opaque,
+nonemissive approximation, not a voxel-level match. The older imported-column edge seam
+remains. `Biome` is a stored byte in column files and chunk-column packets, so appending value
+8 needs no packet or save-layout change; unknown values still follow their existing decoder
+policy.
+The new `charred_stone.png` tile is original generated art, downscaled by nearest-neighbor
+from a retained 1254-square RGB source to an inspected 32-square RGBA atlas tile. The
+prompt specified matte charcoal angular volcanic chips with restrained rust flecks, flat
+orthographic seamless pixel art, and no glow or shadows. Source SHA-256:
+`92d0779405158fe1f21f62de5ec7c87b1fbbe5309d9431a8f67e9a1b9772a481`;
+shipped tile SHA-256:
+`6b857e4c91c5ef03220d142da0fbe15f0fbc094cadde292389209df3ef4e20b4`.
+
 Temperature is a **three-band axis**: the cold ramp (`TemperatureColdStart/End`, read by
 `ColdWeight`: snow, ice, and taiga/frozen at `ColdBiomeMinCold`), a temperate band, and the warm
 ramp (`TemperatureWarmStart/End`, read by `WarmWeight`; desert and savanna begin at its midpoint).

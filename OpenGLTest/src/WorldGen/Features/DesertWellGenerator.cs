@@ -42,7 +42,7 @@ public static class DesertWellGenerator
         x = (cellX << WorldFeatureConfig.WellCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
         z = (cellZ << WorldFeatureConfig.WellCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
         if (roll >= WorldFeatureConfig.WellChance * TerrainErg.Retention(x, z)) return false;
-        if (TerrainErg.Intersects(x - FootprintRadius, z - FootprintRadius,
+        if (FeatureExclusion.Intersects(x - FootprintRadius, z - FootprintRadius,
                 x + FootprintRadius, z + FootprintRadius)) return false;
         return true;
     }

@@ -382,6 +382,29 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Coherent land-biome patches inside a narrow climate boundary band, Dynamic only.
     public const float DynamicEcotoneBand = 0.18f;
     public const float DynamicEcotoneFrequency = 1f / 96f;
+    // The orthogonal volcanic province changes Dynamic biome material, not climate or relief.
+    public const float VolcanicProvinceFrequency = 1f / 9000f;
+    public const float VolcanicProvinceStart = 0.16f;
+    public const float VolcanicProvinceEnd = 0.34f;
+    public const float VolcanicClassifyThreshold = 0.5f;
+    public const float VolcanoSiteProvinceMin = 0.75f;
+    public const int VolcanoCellBlocks = 2048;
+    public const float VolcanoChance = 0.35f;
+    public const float VolcanoSizeSkew = 1.2f;
+    public const float VolcanoMinRadius = 220f;
+    public const float VolcanoMaxRadius = 420f;
+    public const float VolcanoMinSpacing = 1400f;
+    public const float VolcanoMinSummit = 150f;
+    public const float VolcanoMaxSummit = 184f;
+    public const float VolcanoMinCraterRadius = 32f;
+    public const float VolcanoMaxCraterRadius = 54f;
+    public const int VolcanoCraterDrop = 28;
+    public const int VolcanoLakeDepth = 6;
+    public const int VolcanoLiningThickness = 2;
+    public const int VolcanoGuard = 4;
+    public const float VolcanoWallWidth = 12f;
+    public const int VolcanoSiteCacheCapacity = 128;
+    public const int VolcanoSiteCacheGenerations = 4;
 
     // --- Mud ---
     // Dirt with water directly above it and at least this many water cells in its

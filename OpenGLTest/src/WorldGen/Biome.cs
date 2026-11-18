@@ -9,7 +9,7 @@ namespace VoxelEngine.WorldGen;
 /// and snags and occasional ice, and Steppe and Savanna are the dry grasslands between them. Every
 /// selection comes from low-frequency noise fields, so regions are large and contiguous, and the
 /// height and surface material blend across their borders rather than stepping. The ordinals
-/// persist (ColumnFileCodec, the network column) and index per-biome tables, so a new biome is
+/// persist in imported column files (ColumnFileCodec) and index per-biome tables, so a new biome is
 /// appended, never inserted.
 /// </summary>
 public enum Biome : byte
@@ -32,4 +32,7 @@ public enum Biome : byte
     /// and heavy undergrowth over mud and shallow pools. Carved out of the warm, wet forest, so it
     /// borders forest, savanna and ocean, never desert or snow.</summary>
     Jungle = 7,
+
+    /// <summary>Dynamic volcanic province: rocky ash and cinder around rare owned calderas.</summary>
+    Charred = 8,
 }
