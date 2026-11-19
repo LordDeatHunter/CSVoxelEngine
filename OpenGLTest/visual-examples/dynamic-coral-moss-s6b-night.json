@@ -1,0 +1,10 @@
+{
+  "output": "/tmp/s6b-ad8492f8-natural-night-b613b406",
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-3516.5, -66.5, 3659.5], "yaw": 180, "pitch": -45 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "screenshot", "name": "glow_moss_night", "hideHud": true }
+  ]
+}

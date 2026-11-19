@@ -16,6 +16,13 @@ entry once real art is in. If a `tools/` generator wrote the file, remove or rep
 in the same change, or a re-run puts the placeholder back. Sound is not tracked there: a feature
 that needs audio waits in `plans/TODO.md` (`M-26`).
 
+The Dynamic ocean S6b source candidate adds three mineable opaque coral cubes and two opaque
+floor moss cubes from named JSON, loot and five genuine original texture artworks. Coral takes
+an early pickaxe; moss is softer and drops itself. `glow_moss` reuses the existing teal
+`[70,240,190]` natural light color, with no new palette slot; its opaque cube does not
+claim to pass light. Content load, mining, emitted-light propagation and natural visuals
+remain unrun until separately reviewed Release windows.
+
 Ids are `ushort` and chunk storage is palette-compressed (`Chunks/ChunkBlocks`: one id, a palette of up
 to 256 ids with an index byte per cell, or a `ushort` per cell; the per-block state byte stays a `byte`): id 0 is air (it has no definition file, and a block may not be named `air`), then blocks
 sorted by file name, then items sorted by file name. Blocks and items share one id space of up to

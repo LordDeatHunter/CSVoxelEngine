@@ -9,6 +9,7 @@ using VoxelEngine.Effects.Climate;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Ocean;
 
 namespace VoxelEngine.Lod;
 
@@ -35,6 +36,9 @@ internal ref struct LodFaceEmitter
     private readonly BlockType _cinder;
     private readonly BlockType _charredStone;
     private readonly BlockType _lava;
+    private readonly BlockType _coral;
+    private readonly BlockType _seaMoss;
+    private readonly BlockType _glowMoss;
     private readonly LodLevelSpec _spec;
     private readonly int _cellSize;
     private readonly int _cells;
@@ -118,6 +122,18 @@ internal ref struct LodFaceEmitter
         _cinder = BlockType.ById[TerrainGenerator.CinderSoilBlock]!;
         _charredStone = BlockType.ById[TerrainGenerator.CharredStoneBlock]!;
         _lava = BlockType.ById[VoxelEngine.WorldGen.Volcanoes.VolcanoStamp.LavaBlock]!;
+        if (WorldSeed.Profile == WorldGenProfile.Dynamic)
+        {
+            _coral = BlockType.ById[OceanHabitatBlocks.Coral]!;
+            _seaMoss = BlockType.ById[OceanHabitatBlocks.SeaMoss]!;
+            _glowMoss = BlockType.ById[OceanHabitatBlocks.GlowMoss]!;
+        }
+        else
+        {
+            _coral = _stone;
+            _seaMoss = _stone;
+            _glowMoss = _stone;
+        }
 
         // Fill the tint lattice: one climate evaluation per point gives both palettes. Lattice
         // point (li, lj) is the minimum corner of chunk column (regionChunkX + li, regionChunkZ + lj),
@@ -163,6 +179,9 @@ internal ref struct LodFaceEmitter
         5 => _ash,
         6 => _lava,
         7 => _charredStone,
+        8 => _coral,
+        9 => _seaMoss,
+        10 => _glowMoss,
         _ => _stone,
     };
 

@@ -19,29 +19,9 @@ internal static class OceanRockFields
 
     /// <summary>The only generated-column caller; never requested by Compute or a source import.</summary>
     internal static void Stamp(ushort[] blocks, byte[]? state, ColumnData column,
-        int worldX0, int worldY0, int worldZ0)
+        int worldX0, int worldY0, int worldZ0, in OceanHabitatField field)
     {
         if (WorldSeed.Profile != WorldGenProfile.Dynamic || !WorldGenerationConfig.WaterEnabled) return;
-        var relevant = false;
-        for (var i = 0; i < column.Biomes.Length; i++)
-        {
-            if (column.Biomes[i] != Biome.Ocean
-                || column.WaterLevel[i] != WorldGenerationConfig.SeaLevel
-                || WorldGenerationConfig.SeaLevel - column.Heights[i] < 3) continue;
-            relevant = true;
-            break;
-        }
-        if (!relevant) return;
-
-        // Four generated cache reads after the caller's neighborhood scan. Hits are usual, not
-        // guaranteed: eviction or concurrency can recompute a corner. No read returns to Compute.
-        var cx = worldX0 >> Chunk.SizeShift;
-        var cz = worldZ0 >> Chunk.SizeShift;
-        var field = new OceanHabitatField(
-            ColumnCache.Get(cx, cz).CornerWarmth,
-            ColumnCache.Get(cx + 1, cz).CornerWarmth,
-            ColumnCache.Get(cx, cz + 1).CornerWarmth,
-            ColumnCache.Get(cx + 1, cz + 1).CornerWarmth);
         var water = TerrainGenerator.SeaBlock;
         var stone = TerrainGenerator.RockBlock;
         var darkRock = TerrainGenerator.CharredStoneBlock;

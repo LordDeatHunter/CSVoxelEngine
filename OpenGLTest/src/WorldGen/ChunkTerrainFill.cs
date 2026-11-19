@@ -329,11 +329,25 @@ internal static class ChunkTerrainFill
             VolcanoStamp.Stamp(blocks, chunk.StateArray, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Volcano);
 
-        // Generated sea-floor rock is placed after the owned volcano volume, but before sealed
-        // underground writers. The same pass runs in normal and cave-lake probe generation.
-        if (Admits(stampGates, OceanRockFields.WriteBand(), lowerBoundY))
-            OceanRockFields.Stamp(blocks, chunk.StateArray, column, worldX0, lowerBoundY, worldZ0);
+        // Four generated warmth corners are shared by both ocean stages, and read only after
+        // profile, own-column and Y-band admission. A Get may miss under eviction/concurrency.
+        var rockBand = Admits(stampGates, OceanRockFields.WriteBand(), lowerBoundY);
+        var habitatBand = Admits(stampGates, OceanHabitats.WriteBand(), lowerBoundY);
+        var oceanFieldNeeded = (rockBand || habitatBand)
+            && WorldSeed.Profile == WorldGenProfile.Dynamic && WorldGenerationConfig.WaterEnabled
+            && OceanHabitatField.HasRelevantOcean(column);
+        OceanHabitatField oceanField = default;
+        if (oceanFieldNeeded)
+        {
+            oceanField = OceanHabitatField.ReadGeneratedCorners(worldX0 >> SizeShift, worldZ0 >> SizeShift);
+            // Rocks keep their original first-write choice; later coral never removes their support.
+            if (rockBand)
+                OceanRockFields.Stamp(blocks, chunk.StateArray, column, worldX0, lowerBoundY, worldZ0, oceanField);
+        }
         timer?.Mark(Stage.OceanRockFields);
+        if (oceanFieldNeeded && habitatBand)
+            OceanHabitats.Stamp(blocks, chunk.StateArray, column, worldX0, lowerBoundY, worldZ0, oceanField);
+        timer?.Mark(Stage.OceanHabitats);
 
         // Sealed underground rooms and their waystone chambers, after the deep features and the cave life, so no
         // geode, mushroom, formation, gravel pocket or pool is left inside a room. A room's loot chests take their
