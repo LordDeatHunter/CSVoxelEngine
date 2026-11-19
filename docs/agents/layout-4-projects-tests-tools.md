@@ -73,7 +73,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   column cache, fluid surfaces, lava vents, EntityLight; the replay probes
     MeshApplyRecoveryTests.cs  # interrupted applies preserve queued tails and return each owned buffer once
     Meshing/                   # greedy and per-voxel meshing, smooth light, the light volume,
-                               #   opaque-roof edit and restore lighting, plant sway, cell batches; the mesh-cost probe
+                               #   opaque-roof edit and restore lighting, plant sway, cell batches; the mesh-cost probe;
+                               #   controlled registered glow-moss block-light propagation through a sealed water channel
     Sources/                   # the generated and imported world sources
     Streaming/                 # the generation workers, the scan frontier, the streaming foci
   Content/                     # the registry and its baked tables: blocks, models, shapes (panes,
@@ -216,7 +217,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   opt-in frozen S5a fill retains off-axis bed and asserts the S5b pierce;
                                #   opt-in frozen S5b deep pipeline compares bounded normal/probe owned chunks;
                                #   real cave-lake fluid rejection/cache lifecycle and opt-in single deep normal Plan control
-    Ocean/                     # S6a pure/natural rock controls; S6b pure floor/site, opt-in metadata and fixed salt/coral normal-probe companions
+    Ocean/                     # S6a pure/natural rock controls; S6b pure floor/site, opt-in metadata and fixed salt/coral normal-probe companions;
+                               #   controlled real-ID reef/meadow/glow floor stamps and first coral mound
 USER_TODO.md                          # placeholder art list: every stand-in asset an agent added, its generator and
                                       #   what a replacement must keep (see "Placeholder art" under "Content")
 tools/                                # asset generators: models, animation clips, sounds and the wiki scenarios, each
