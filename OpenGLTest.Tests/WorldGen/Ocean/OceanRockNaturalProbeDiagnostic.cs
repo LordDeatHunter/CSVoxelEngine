@@ -80,7 +80,7 @@ public sealed class OceanRockNaturalProbeDiagnostic(ITestOutputHelper output)
 
                     var expectedRock = habitat == OceanHabitat.Abyss ? darkRock : stone;
                     var maxInspectableHeight = Math.Min(WorldFeatureConfig.OceanRockColumnMaxHeight,
-                        Chunk.Size - localFloor - 2);
+                        Chunk.Size - localFloor - 1);
                     var support = ReadBlock(normal, x, localFloor, z);
                     var probeSupport = ReadBlock(probe, x, localFloor, z);
                     var first = ReadBlock(normal, x, localFloor + 1, z);
@@ -99,6 +99,14 @@ public sealed class OceanRockNaturalProbeDiagnostic(ITestOutputHelper output)
                         || support != stone || probeSupport != support || probeFirst != first
                         || floorY + height > WorldGenerationConfig.SeaLevel - 2)
                         continue;
+
+                    // The complete rock body may end at the chunk top; its water cap then
+                    // belongs to the next Y chunk and cannot be verified by this observation.
+                    if (localFloor + height + 1 >= Chunk.Size)
+                    {
+                        output.WriteLine($"S6a boundary candidate skipped x={cx * Chunk.Size + x} z={cz * Chunk.Size + z} observedHeight={height} capOutsideChosenChunk=true");
+                        continue;
+                    }
 
                     for (var step = 1; step <= height; step++)
                     {
