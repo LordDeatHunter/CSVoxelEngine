@@ -31,6 +31,7 @@ public sealed class OceanS6bPureTests
         const int x = 6, z = 7, floorY = -20, chunkY0 = -32;
         var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         var states = new byte[blocks.Length];
+        var heights = new int[Chunk.Size * Chunk.Size];
         var expectedBlocks = new ushort[blocks.Length];
         var expectedStates = new byte[states.Length];
         var ly = floorY - chunkY0;
@@ -51,6 +52,7 @@ public sealed class OceanS6bPureTests
         {
             System.Array.Clear(blocks);
             System.Array.Clear(states);
+            System.Array.Fill(heights, floorY);
             blocks[0] = ore;
             states[0] = 3;
             for (var dx = -1; dx <= 1; dx++)
@@ -77,11 +79,13 @@ public sealed class OceanS6bPureTests
             Assert.Equal<ushort>(expectedBlocks, blocks);
             Assert.Equal<byte>(expectedStates, states);
         }
-        void RejectMound(int candidateX = x, int candidateZ = z, int candidateWorldY0 = chunkY0)
+        void RejectMound(int candidateX = x, int candidateZ = z, int candidateWorldY0 = chunkY0,
+            int[]? candidateHeights = null)
         {
             Snapshot();
             Assert.False(OceanHabitats.TryWriteCoralMound(blocks, states,
-                candidateX, candidateZ, floorY, candidateWorldY0, host, water, rose));
+                candidateHeights ?? heights, candidateX, candidateZ, floorY,
+                candidateWorldY0, host, water, rose));
             AssertWholeBuffers();
         }
         void RejectFloor()
@@ -105,7 +109,7 @@ public sealed class OceanS6bPureTests
 
         Prepare(); Snapshot();
         Assert.True(OceanHabitats.TryWriteCoralMound(blocks, states,
-            x, z, floorY, chunkY0, host, water, rose));
+            heights, x, z, floorY, chunkY0, host, water, rose));
         foreach (var target in moundTargets)
         {
             expectedBlocks[target] = rose;
@@ -115,9 +119,48 @@ public sealed class OceanS6bPureTests
 
         Prepare(); Snapshot();
         Assert.True(OceanHabitats.TryWriteCoralMound(blocks, null,
-            x, z, floorY, chunkY0, host, water, rose));
+            heights, x, z, floorY, chunkY0, host, water, rose));
         foreach (var target in moundTargets) expectedBlocks[target] = rose;
         AssertWholeBuffers();
+
+        // The east floor rises one cell; its target rises with it and joins center step 2.
+        var eastHeightIndex = ((x + 1) << Chunk.SizeShift) | z;
+        var raisedSupport = Chunk.Idx(x + 1, ly + 1, z);
+        var raisedTarget = Chunk.Idx(x + 1, ly + 2, z);
+        void PrepareStep()
+        {
+            Prepare();
+            heights[eastHeightIndex] = floorY + 1;
+            blocks[sideSupport] = ore;
+            blocks[raisedSupport] = host;
+            blocks[raisedTarget] = water;
+        }
+        PrepareStep(); Snapshot();
+        Assert.True(OceanHabitats.TryWriteCoralMound(blocks, states,
+            heights, x, z, floorY, chunkY0, host, water, rose));
+        foreach (var target in moundTargets)
+            if (target != Chunk.Idx(x + 1, ly + 1, z)) expectedBlocks[target] = rose;
+        expectedBlocks[raisedTarget] = rose;
+        AssertWholeBuffers();
+        Assert.Equal(host, blocks[raisedSupport]);
+        Assert.Equal(rose, blocks[Chunk.Idx(x, ly + 2, z)]);
+
+        PrepareStep(); Snapshot();
+        Assert.True(OceanHabitats.TryWriteCoralMound(blocks, null,
+            heights, x, z, floorY, chunkY0, host, water, rose));
+        foreach (var target in moundTargets)
+            if (target != Chunk.Idx(x + 1, ly + 1, z)) expectedBlocks[target] = rose;
+        expectedBlocks[raisedTarget] = rose;
+        AssertWholeBuffers();
+
+        PrepareStep(); heights[eastHeightIndex] = floorY - 1; RejectMound();
+        PrepareStep(); heights[eastHeightIndex] = floorY + 2; RejectMound();
+        PrepareStep(); heights[(x << Chunk.SizeShift) | z] = floorY + 1; RejectMound();
+        PrepareStep(); RejectMound(candidateHeights: new int[1]);
+        PrepareStep(); blocks[raisedSupport] = ore; RejectMound();
+        PrepareStep(); states[raisedSupport] = 1; RejectMound();
+        PrepareStep(); blocks[raisedTarget] = lava; RejectMound();
+        PrepareStep(); states[raisedTarget] = 1; RejectMound();
 
         Prepare(); blocks[firstTarget] = lava; RejectFloor();
         Prepare(); states[firstTarget] = 1; RejectFloor();

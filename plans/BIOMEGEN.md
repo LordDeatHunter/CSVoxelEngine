@@ -22,9 +22,10 @@ Last updated 2026-11-19.
 
 ## In progress
 
-- [ ] S6b Dynamic coral, sea moss and glow moss: source/content/art and unrun controls are
-  prepared on published S6a PR78; Release validation, natural visuals and publication await
-  separate root review.
+- [ ] S6b Dynamic coral, sea moss and glow moss: source/content/art and one-step coral
+  support correction with unrun controls are prepared on published S6a PR78. The earlier
+  same-height natural cohort found no mounds; corrected placement, natural visuals and
+  publication await separate Release validation and root review.
 
 ## Open
 

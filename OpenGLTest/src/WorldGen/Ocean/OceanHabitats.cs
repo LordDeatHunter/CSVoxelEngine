@@ -61,7 +61,8 @@ internal static class OceanHabitats
                 WorldGenerationConfig.Seed ^ CoralSiteSalt);
             if (SplitMix64.Unit(hash, 0) >= WorldFeatureConfig.OceanCoralMoundChance) continue;
             var color = SplitMix64.Unit(hash, 1) < 0.5f ? rose : blue;
-            TryWriteCoralMound(blocks, state, x, z, floorY, worldY0, coral, water, color);
+            TryWriteCoralMound(blocks, state, column.Heights, x, z, floorY, worldY0,
+                coral, water, color);
         }
     }
 
@@ -82,41 +83,54 @@ internal static class OceanHabitats
         return true;
     }
 
-    /// <summary>Preflights all five supports and seven source-water targets before any write.</summary>
-    internal static bool TryWriteCoralMound(ushort[] blocks, byte[]? state, int x, int z,
+    /// <summary>Preflights five actual floor supports and seven source-water targets before any write.</summary>
+    internal static bool TryWriteCoralMound(ushort[] blocks, byte[]? state,
+        ReadOnlySpan<int> heights, int x, int z,
         int floorY, int worldY0, ushort coralHost, ushort water, ushort color)
     {
         var ly = floorY - worldY0;
-        if (x <= 0 || x >= Chunk.Size - 1 || z <= 0 || z >= Chunk.Size - 1
+        if (heights.Length != Chunk.Size * Chunk.Size
+            || x <= 0 || x >= Chunk.Size - 1 || z <= 0 || z >= Chunk.Size - 1
             || ly < 0 || ly + 3 >= Chunk.Size || floorY < WriteBand().Min
             || floorY + 3 > WorldGenerationConfig.SeaLevel - 2) return false;
-        for (var dx = -1; dx <= 1; dx++)
-        for (var dz = -1; dz <= 1; dz++)
+        if (heights[(x << Chunk.SizeShift) | z] != floorY) return false;
+
+        Span<int> sideTargets = stackalloc int[4];
+        Span<int> sideLevels = stackalloc int[4];
+        for (var side = 0; side < 4; side++)
         {
-            if (System.Math.Abs(dx) + System.Math.Abs(dz) > 1) continue;
-            var support = Chunk.Idx(x + dx, ly, z + dz);
-            var target = Chunk.Idx(x + dx, ly + 1, z + dz);
+            var sx = x + (side == 0 ? -1 : side == 1 ? 1 : 0);
+            var sz = z + (side == 2 ? -1 : side == 3 ? 1 : 0);
+            var sideY = heights[(sx << Chunk.SizeShift) | sz];
+            if (sideY != floorY && sideY != floorY + 1) return false;
+            var support = Chunk.Idx(sx, sideY - worldY0, sz);
+            var target = Chunk.Idx(sx, sideY - worldY0 + 1, sz);
             if (blocks[support] != coralHost || state is not null && state[support] != 0
                 || blocks[target] != water || state is not null && state[target] != 0) return false;
+            sideTargets[side] = target;
+            sideLevels[side] = sideY - floorY;
         }
-        for (var step = 2; step <= 3; step++)
+        var centerSupport = Chunk.Idx(x, ly, z);
+        if (blocks[centerSupport] != coralHost || state is not null && state[centerSupport] != 0)
+            return false;
+        for (var step = 1; step <= 3; step++)
         {
             var target = Chunk.Idx(x, ly + step, z);
             if (blocks[target] != water || state is not null && state[target] != 0) return false;
         }
+        // All seven targets passed before this point; write each layer from low to high.
         for (var step = 1; step <= 3; step++)
         {
             var center = Chunk.Idx(x, ly + step, z);
             blocks[center] = color;
             if (state is not null) state[center] = 0;
-            if (step != 1) continue;
-            for (var dx = -1; dx <= 1; dx++)
-            for (var dz = -1; dz <= 1; dz++)
+            if (step == 3) continue;
+            for (var side = 0; side < 4; side++)
             {
-                if (System.Math.Abs(dx) + System.Math.Abs(dz) != 1) continue;
-                var side = Chunk.Idx(x + dx, ly + 1, z + dz);
-                blocks[side] = color;
-                if (state is not null) state[side] = 0;
+                if (sideLevels[side] != step - 1) continue;
+                var target = sideTargets[side];
+                blocks[target] = color;
+                if (state is not null) state[target] = 0;
             }
         }
         return true;

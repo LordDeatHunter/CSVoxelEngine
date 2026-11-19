@@ -218,7 +218,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   opt-in frozen S5b deep pipeline compares bounded normal/probe owned chunks;
                                #   real cave-lake fluid rejection/cache lifecycle and opt-in single deep normal Plan control
     Ocean/                     # S6a pure/natural rock controls; S6b pure floor/site, opt-in metadata and fixed salt/coral normal-probe companions;
-                               #   controlled real-ID reef/meadow/glow floor stamps and first coral mound;
+                               #   controlled real-ID reef/meadow/glow floor stamps, flat and stepped coral mound facts;
                                #   opt-in frozen 130-key raw climate/biome moss preflight (no generated columns);
                                #   opt-in eight-key generated moss metadata and guarded rock-salt prediction (no block fill);
                                #   fixed sea/glow moss normal and planner-probe floor observations
