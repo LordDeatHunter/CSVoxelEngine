@@ -81,7 +81,8 @@ internal static class VolcanoSites
         var rise = summit - TerrainGenerator.ReliefLandHeight(x, z);
         if (rise <= 0f) return default;
         return new VolcanoSite(true, x, z, radius, crater, floor,
-            WorldGenerationConfig.VolcanoLakeDepth, rise);
+            WorldGenerationConfig.VolcanoLakeDepth, rise,
+            new VolcanoDeep(true, (int)MathF.Floor(x), (int)MathF.Floor(z)));
     }
 
     private static bool EligibleSample(float x, float z, int floor)
@@ -211,12 +212,37 @@ internal static class VolcanoSites
 
     internal static bool IntersectsOwnedBox(int minX, int minY, int minZ, int maxX, int maxY, int maxZ)
     {
-        if (!IntersectsGuard(minX, minZ, maxX, maxZ)) return false;
-        // The S5a owned band is never below the lowest possible floor and never above the
-        // highest; the XZ guard is conservative. S5b will extend the vertical predicate.
+        if (WorldSeed.Profile != WorldGenProfile.Dynamic) return false;
+        // Preserve the S5a surface guard, but a chamber may reach beyond a small crater's
+        // guard. Its independent test must never be hidden by a guard miss.
         var lowest = (int)WorldGenerationConfig.VolcanoMinSummit - WorldGenerationConfig.VolcanoCraterDrop
             - WorldGenerationConfig.VolcanoLakeDepth - WorldGenerationConfig.VolcanoLiningThickness;
         var highest = (int)WorldGenerationConfig.VolcanoMaxSummit - WorldGenerationConfig.VolcanoCraterDrop;
-        return maxY >= lowest && minY <= highest;
+        if (maxY >= lowest && minY <= highest
+            && IntersectsGuard(minX, minZ, maxX, maxZ)) return true;
+        if (maxY < VolcanoShape.ChamberBottom || minY > highest) return false;
+
+        TerrainSites.CellRange(minX, WorldGenerationConfig.VolcanoCellBlocks,
+            WorldGenerationConfig.VolcanoMaxRadius, out var gx0, out _);
+        TerrainSites.CellRange(maxX, WorldGenerationConfig.VolcanoCellBlocks,
+            WorldGenerationConfig.VolcanoMaxRadius, out _, out var gx1);
+        TerrainSites.CellRange(minZ, WorldGenerationConfig.VolcanoCellBlocks,
+            WorldGenerationConfig.VolcanoMaxRadius, out var gz0, out _);
+        TerrainSites.CellRange(maxZ, WorldGenerationConfig.VolcanoCellBlocks,
+            WorldGenerationConfig.VolcanoMaxRadius, out _, out var gz1);
+        var reach = WorldGenerationConfig.VolcanoMaxCraterRadius + WorldGenerationConfig.VolcanoGuard;
+        for (var gx = gx0; gx <= gx1; gx++)
+        for (var gz = gz0; gz <= gz1; gz++)
+        {
+            if (!TerrainSites.TryRoll(gx, gz, WorldGenerationConfig.VolcanoCellBlocks, Salt,
+                    WorldGenerationConfig.VolcanoChance, WorldGenerationConfig.VolcanoSizeSkew,
+                    out _, out var centerX, out var centerZ, out _)) continue;
+            var dx = MathF.Max(minX - centerX, MathF.Max(0f, centerX - maxX));
+            var dz = MathF.Max(minZ - centerZ, MathF.Max(0f, centerZ - maxZ));
+            if (dx * dx + dz * dz >= reach * reach) continue;
+            if (VolcanoShape.InDeepBox(SiteAt(gx, gz), minX, minY, minZ, maxX, maxY, maxZ))
+                return true;
+        }
+        return false;
     }
 }

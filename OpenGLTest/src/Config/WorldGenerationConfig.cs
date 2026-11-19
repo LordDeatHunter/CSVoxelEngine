@@ -405,6 +405,14 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int VolcanoLiningThickness = 2;
     public const int VolcanoGuard = 4;
     public const float VolcanoWallWidth = 12f;
+    // A straight source-lava shaft pierces the caldera bed into a sealed deep chamber.
+    public const int VolcanoConduitRadius = 4;
+    public const int VolcanoConduitLining = 2;
+    public const int VolcanoChamberCenterY = -208;
+    public const int VolcanoChamberRadius = 48;
+    public const int VolcanoChamberHalfHeight = 24;
+    public const int VolcanoChamberLavaSurfaceY = -214;
+    public const int VolcanoChamberLining = 3;
     public const int VolcanoSiteCacheCapacity = 128;
     public const int VolcanoSiteCacheGenerations = 4;
 

@@ -18,6 +18,9 @@ internal static class CaveLavaLakes
         WorldGenerationConfig.CaveLavaLakeCacheCapacity, WorldGenerationConfig.CaveLavaLakeCacheGenerations);
     private static readonly Func<(int X, int Y, int Z, int Seed), Lazy<CellPosition[]>> BuildFor = static key => new(() => Build(key));
 
+    /// <summary>Plans depend on the terrain profile as well as their seed-keyed coordinates.</summary>
+    internal static void ResetCache() => Plans.Clear();
+
     internal static float Chance(int y) => MathUtils.Lerp(WorldGenerationConfig.CaveLavaLakeChanceShallow,
         WorldGenerationConfig.CaveLavaLakeChanceDeep, Depth(y));
 
