@@ -222,6 +222,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   opt-in frozen 130-key raw climate/biome moss preflight (no generated columns);
                                #   opt-in eight-key generated moss metadata and guarded rock-salt prediction (no block fill);
                                #   fixed sea/glow moss normal and planner-probe floor observations
+                               #   opt-in fixed stepped coral mound normal and planner-probe 17-cell observation
 USER_TODO.md                          # placeholder art list: every stand-in asset an agent added, its generator and
                                       #   what a replacement must keep (see "Placeholder art" under "Content")
 tools/                                # asset generators: models, animation clips, sounds and the wiki scenarios, each
