@@ -6,6 +6,7 @@ using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
+using VoxelEngine.WorldGen.Ocean;
 using VoxelEngine.WorldGen.Sky;
 using VoxelEngine.WorldGen.Structures;
 using VoxelEngine.WorldGen.Volcanoes;
@@ -327,6 +328,12 @@ internal static class ChunkTerrainFill
         if (Admits(stampGates, VolcanoStamp.WriteBand(), lowerBoundY))
             VolcanoStamp.Stamp(blocks, chunk.StateArray, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Volcano);
+
+        // Generated sea-floor rock is placed after the owned volcano volume, but before sealed
+        // underground writers. The same pass runs in normal and cave-lake probe generation.
+        if (Admits(stampGates, OceanRockFields.WriteBand(), lowerBoundY))
+            OceanRockFields.Stamp(blocks, chunk.StateArray, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.OceanRockFields);
 
         // Sealed underground rooms and their waystone chambers, after the deep features and the cave life, so no
         // geode, mushroom, formation, gravel pocket or pool is left inside a room. A room's loot chests take their

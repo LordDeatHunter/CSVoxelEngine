@@ -7,6 +7,7 @@ using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
+using VoxelEngine.WorldGen.Ocean;
 using VoxelEngine.WorldGen.Sky;
 using VoxelEngine.WorldGen.Structures;
 using VoxelEngine.WorldGen.Volcanoes;
@@ -54,6 +55,9 @@ public sealed class StampGateTests
         new("Volcano", Stage.Volcano, (_, _) => VolcanoStamp.WriteBand(),
             (ushort[] b, ref byte[]? s, ColumnData c, int x, int y, int z) =>
                 VolcanoStamp.Stamp(b, s, c, x, y, z), false),
+        new("OceanRockFields", Stage.OceanRockFields, (_, _) => OceanRockFields.WriteBand(),
+            (ushort[] b, ref byte[]? s, ColumnData c, int x, int y, int z) =>
+                OceanRockFields.Stamp(b, s, c, x, y, z), false),
         new("FallenLogs", Stage.FallenLogs, (_, nb) => FallenLogGenerator.WriteBand(nb),
             (ushort[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => FallenLogGenerator.Stamp(b, ref s, x, y, z), true),
         new("Boulders", Stage.Boulders, (_, nb) => BoulderGenerator.WriteBand(nb),

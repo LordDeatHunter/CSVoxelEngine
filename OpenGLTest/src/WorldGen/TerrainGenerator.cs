@@ -5,6 +5,7 @@ using VoxelEngine.Content;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
+using VoxelEngine.WorldGen.Ocean;
 
 namespace VoxelEngine.WorldGen;
 
@@ -502,6 +503,16 @@ public static class TerrainGenerator
                 {
                     var stackTop = SeaStackGenerator.TopAt((int)worldX, (int)worldZ, height, biome);
                     if (stackTop > height) height = stackTop;
+                }
+
+                // Deep-ocean sites only lift the floor. Their weight/depth fades reach zero before
+                // the no-cut admission boundaries, and the final bed/height and generated LOD share
+                // this result. Legacy and every non-sea column return the incoming height exactly.
+                if (WorldSeed.Profile == WorldGenProfile.Dynamic)
+                {
+                    var pinnacleTop = OceanPinnacles.TopAt((int)worldX, (int)worldZ, height, biome,
+                        waterLevel[i], oceanWeight);
+                    if (pinnacleTop > height) height = (int)MathF.Floor(pinnacleTop);
                 }
 
                 // A ramp bank or a shallow-sea stack cannot lift a Dynamic column past the
