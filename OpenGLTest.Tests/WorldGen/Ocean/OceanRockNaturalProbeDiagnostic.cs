@@ -126,8 +126,14 @@ public sealed class OceanRockNaturalProbeDiagnostic(ITestOutputHelper output)
         }
         finally
         {
-            output.WriteLine($"S6a partial ledger seed=1337 profile=Dynamic columnGets={columnGets}/4 cornerGets={cornerGets}/16 inspected={inspected}/1024 normalFills={normalFills}/4 probeFills={probeFills}/4 directCellReads={cellReads} witnesses={witnesses}");
-            if (applied) WorldSeed.Apply(previousSeed, previousProfile);
+            try
+            {
+                output.WriteLine($"S6a partial ledger seed=1337 profile=Dynamic columnGets={columnGets}/4 cornerGets={cornerGets}/16 inspected={inspected}/1024 normalFills={normalFills}/4 probeFills={probeFills}/4 directCellReads={cellReads} witnesses={witnesses}");
+            }
+            finally
+            {
+                if (applied) WorldSeed.Apply(previousSeed, previousProfile);
+            }
         }
 
         float Corner(int x, int z)
