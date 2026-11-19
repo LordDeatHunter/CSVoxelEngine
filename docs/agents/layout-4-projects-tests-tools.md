@@ -214,7 +214,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Trees/                     # the tree growth engine, flat over src's Trees/Shape, Logics and Features
     Volcanoes/                 # pure Charred classifier, cone/caldera/deep-shaft/chamber geometry and content/profile controls;
                                #   opt-in frozen S5a fill retains off-axis bed and asserts the S5b pierce;
-                               #   opt-in frozen S5b deep pipeline compares bounded normal/probe owned chunks
+                               #   opt-in frozen S5b deep pipeline compares bounded normal/probe owned chunks;
+                               #   real cave-lake fluid rejection/cache lifecycle and opt-in single deep normal Plan control
 USER_TODO.md                          # placeholder art list: every stand-in asset an agent added, its generator and
                                       #   what a replacement must keep (see "Placeholder art" under "Content")
 tools/                                # asset generators: models, animation clips, sounds and the wiki scenarios, each

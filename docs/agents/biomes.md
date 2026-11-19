@@ -83,6 +83,8 @@ outside the shaft is unchanged. `VolcanoSites.IntersectsOwnedBox` independently 
 underground ruin and waystone boxes reaching the shaft or chamber, even outside a small
 surface crater guard. `CaveLavaLakes` plans are cleared at `WorldSeed.Apply` and quiesced
 final `EndWorld`, because its seed-only cache key does not carry the profile.
+`CaveLavaLakes.PlanCacheMisses` is a read-only, monotone factory-call diagnostic used to
+verify those resets; a miss alone does not say that the hashed plan admitted a pool.
 
 The deep owned box is within the accepted cone's minimum radius. Ponds, great-lake lobes,
 oases and hot springs that could touch it are refused by their cone overlap checks.

@@ -21,6 +21,9 @@ internal static class CaveLavaLakes
     /// <summary>Plans depend on the terrain profile as well as their seed-keyed coordinates.</summary>
     internal static void ResetCache() => Plans.Clear();
 
+    /// <summary>Monotone factory-call count for cache lifecycle diagnostics.</summary>
+    internal static long PlanCacheMisses => Plans.Misses;
+
     internal static float Chance(int y) => MathUtils.Lerp(WorldGenerationConfig.CaveLavaLakeChanceShallow,
         WorldGenerationConfig.CaveLavaLakeChanceDeep, Depth(y));
 
