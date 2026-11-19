@@ -1,0 +1,7 @@
+{
+  "name": "Sea Moss",
+  "model": { "parent": "block/cube_all", "textures": { "all": "sea_moss" } },
+  "sfx": "hit_grass",
+  "hardness": 2,
+  "loot": "sea_moss"
+}

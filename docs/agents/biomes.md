@@ -196,10 +196,21 @@ exact source-water targets, then it writes bottom-up with zero state. Any failed
 skips the whole site, so near a vertical boundary some candidate columns do not grow. The
 pass runs in normal and cave-lake probe fill; later structures may still overwrite it. It
 never writes below the floor or into the deep volcanic chamber (whose top is -182), and it
-does not assume every volcano flank is non-Ocean. Reef coral, sea moss, natural glow moss and
-their generated-only dominant-floor LOD remain required S6b work; these rock additions alone
-do not complete underwater habitats. Generated fallback beside imported terrain retains the
-existing seam limitation; supplied chunks and their LOD remain authoritative.
+does not assume every volcano flank is non-Ocean. Generated fallback beside imported terrain
+retains the existing seam limitation; supplied chunks and their LOD remain authoritative.
+The S6b source candidate shares those four fill-owned warmth corners after profile,
+sea-column and Y-band admission. Existing rock columns run first; eligible reef, meadow
+and warmer deep floors replace the visible solid top at h only when its expected host and
+overlying source-water:0 cell remain intact. An independent OCOR hash admits a small coral
+mound only when all five same-level supports and seven water:0 targets fit the own Y chunk
+and pass before any write. Failed sites leave all cells unchanged; writes reset state.
+Cold shelves and other deep floors keep their original material. Both normal and
+generateLakes:false probe fill stamp after volcano/rock and before underground rooms.
+Generated coarse floor codes represent coral, sea moss and glow moss from direct generated
+climate corners; supplied/imported floors and edit overrides retain authority. Small mounds,
+later host changes and propagated light remain absent from coarse LOD. Natural teal glow
+moss uses the existing colored block-light slot. Source and art are prepared; runtime and
+natural visuals are still unverified.
 The forest floor is a broad swell plus a positive-only
 hill field gated by a hill-region mask (`Hill*`/`ForestBaseHeight`), so hills rise in patches with
 flats between them. A **relief layer** (`WorldGen/TerrainRelief.cs`, BIOMEGEN §6) rides

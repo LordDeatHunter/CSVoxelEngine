@@ -254,6 +254,8 @@ public static class WorldFeatureConfig
     public const float OceanRockColumnChance = 0.22f;
     public const int OceanRockColumnMinHeight = 2;
     public const int OceanRockColumnMaxHeight = 8;
+    /// <summary>Independent OCOR-site chance on a supported reef substrate.</summary>
+    public const float OceanCoralMoundChance = 0.12f;
 
     // --- Oases (OasisGenerator): a green pocket deep in the desert, its own pond and palm ---
     public const bool OasesEnabled = true;

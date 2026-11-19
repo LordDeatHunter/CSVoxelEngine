@@ -90,6 +90,8 @@ internal sealed class WorldgenStageTimer
         Volcano,
         /// <summary>Dynamic submerged ocean rock columns after volcano ownership.</summary>
         OceanRockFields,
+        /// <summary>Dynamic source-water-closed coral mounds and dominant ocean floor materials.</summary>
+        OceanHabitats,
         /// <summary>RuinPlacement.StampUnderground.</summary>
         RuinsUnderground,
         /// <summary>WaystonePlacement.StampUnderground.</summary>

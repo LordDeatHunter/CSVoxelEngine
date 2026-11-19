@@ -1,0 +1,9 @@
+{
+  "name": "Amber Coral",
+  "model": { "parent": "block/cube_all", "textures": { "all": "coral_amber" } },
+  "sfx": "hit_rock",
+  "hardness": 4,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "loot": "coral_amber"
+}

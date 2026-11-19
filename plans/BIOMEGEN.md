@@ -22,10 +22,9 @@ Last updated 2026-11-19.
 
 ## In progress
 
-- [ ] S5b Dynamic deep caldera connection: source, proof and unrun controls are being
-  prepared on delivered S5a; runtime and deep visuals await separate review.
-
-Nothing.
+- [ ] S6b Dynamic coral, sea moss and glow moss: source/content/art and unrun controls are
+  prepared on published S6a PR78; Release validation, natural visuals and publication await
+  separate root review.
 
 ## Open
 
