@@ -80,6 +80,8 @@ public sealed class OceanRockNaturalStampGateDiagnostic(ITestOutputHelper output
 
             foreach (var chunk in new[] { gated, ungated })
             {
+                Assert.Equal(TerrainGenerator.RockBlock, ReadBlock(chunk, floor));
+                Assert.Equal((byte)0, ReadState(chunk, floor));
                 Assert.Equal(TerrainGenerator.CharredStoneBlock, ReadBlock(chunk, floor + 1));
                 Assert.Equal((byte)0, ReadState(chunk, floor + 1));
                 Assert.Equal(TerrainGenerator.CharredStoneBlock, ReadBlock(chunk, floor + 2));
@@ -94,7 +96,7 @@ public sealed class OceanRockNaturalStampGateDiagnostic(ITestOutputHelper output
         {
             try
             {
-                output.WriteLine($"S6a partial gate ledger seed=1337 profile=Dynamic key=({cx},{cy},{cz}) attemptedNormalFills={fills}/2 blockComparisons={blockComparisons}/4096 stateComparisons={stateComparisons}/4096 frontierComparisons={frontierComparisons} witnessCellReads={witnessCellReads}/12");
+                output.WriteLine($"S6a partial gate ledger seed=1337 profile=Dynamic key=({cx},{cy},{cz}) attemptedNormalFills={fills}/2 blockComparisons={blockComparisons}/4096 stateComparisons={stateComparisons}/4096 frontierComparisons={frontierComparisons} witnessCellReads={witnessCellReads}/16");
             }
             finally
             {
