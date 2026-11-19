@@ -13,14 +13,15 @@ public sealed class OceanHabitatNaturalMetadataDiagnostic(ITestOutputHelper outp
 {
     private const string OptInVariable = "VOXEL_S6B_HABITAT_METADATA";
 
-    // Seed-1337 S6a TRX proves Ocean at the first pinnacle and the last rock column.
-    // The middle three are frozen source-plan candidates, not observed Ocean or warmth facts.
+    // Historical S1a seed-1337 data found unfrozen open ocean at (-3000,3904) and a wet
+    // shelf at (-3000,4000). Current S6b biome, height, and warmth remain unobserved.
+    // The two adjacent keys are unobserved proposals; the last S6a key is a cold control.
     private static readonly (int Cx, int Cz, string Provenance)[] Columns =
     [
-        (-75, -192, "S6a accepted pinnacle (-1199,-3069), h=-12, Ocean; warmth unobserved"),
-        (-80, -184, "S6a proposed (-1271,-2936); Ocean/warmth unobserved"),
-        (-70, -181, "S6a proposed (-1110,-2890); Ocean/warmth unobserved"),
-        (-67, -197, "S6a proposed (-1060,-3143); Ocean/warmth unobserved"),
+        (-188, 244, "S1a historical open unfrozen ocean (-3000,3904), float h=-45.10973; current metadata unobserved"),
+        (-188, 245, "fixed +16Z neighbor (-3000,3920); wholly unobserved"),
+        (-188, 246, "fixed +32Z neighbor (-3000,3936); wholly unobserved"),
+        (-188, 250, "S1a historical wet unfrozen shelf (-3000,4000), float h=-3.3933728, oceanWeight=.4638545; stored Ocean unproven"),
         (-74, -188, "S6a accepted rock (-1179,-2996), h=-119, Ocean/Abyss, corners 0"),
     ];
     private static readonly (int Dx, int Dz)[] MoundSupports =
