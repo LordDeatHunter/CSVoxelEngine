@@ -1,0 +1,19 @@
+{
+  "output": "/tmp/s6b-ad8492f8-natural-day-b613b406",
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-2618.5, -8.5, 3786.5], "yaw": 180, "pitch": -36.87 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "screenshot", "name": "blue_coral_mound_main", "hideHud": true },
+    { "op": "teleport", "pos": [-2622.5, -8.5, 3791.5], "yaw": -90, "pitch": -30.96 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "screenshot", "name": "blue_coral_mound_alternate", "hideHud": true },
+    { "op": "teleport", "pos": [-3000.5, -0.5, 3535.5], "yaw": 180, "pitch": -33.69 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "sea_moss_floor", "hideHud": true },
+    { "op": "teleport", "pos": [-3516.5, -66.5, 3659.5], "yaw": 180, "pitch": -45 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "screenshot", "name": "glow_moss_day", "hideHud": true }
+  ]
+}
