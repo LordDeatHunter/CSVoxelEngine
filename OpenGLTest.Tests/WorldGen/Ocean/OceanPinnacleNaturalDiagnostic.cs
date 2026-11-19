@@ -14,14 +14,11 @@ public sealed class OceanPinnacleNaturalDiagnostic(ITestOutputHelper output)
 {
     private const string OptInVariable = "VOXEL_S6A_NATURAL_PINNACLE";
 
-    // Hash-admitted sites around the already observed seed-1337 Dynamic basin. Admission to
-    // real Ocean, sea water and deep floor remains unknown until this diagnostic executes.
+    // The canonical seed-1337 first-site witness is frozen here; no other natural slope
+    // may substitute for the observed pinnacle when its height application is omitted.
     private static readonly (int Cx, int Cz, int X, int Z, int Peak)[] Sites =
     [
         (-10, -24, -1199, -3069, -12),
-        (-10, -23, -1271, -2936, -11),
-        (-9, -23, -1110, -2890, -14),
-        (-9, -25, -1060, -3143, -10),
     ];
 
     private static readonly (int Dx, int Dz)[] Stencil =
@@ -68,6 +65,8 @@ public sealed class OceanPinnacleNaturalDiagnostic(ITestOutputHelper output)
                 }
 
                 var center = rows[0];
+                // The -12 floor is the recorded canonical witness, not a substitute-site predicate.
+                Assert.Equal(configuredPeak, center.Height);
                 if (!SeaFloor(center) || center.Height > WorldGenerationConfig.SeaLevel - 4)
                 {
                     output.WriteLine($"S6a site=({siteCx},{siteCz}) miss=center-admission");
@@ -150,14 +149,14 @@ public sealed class OceanPinnacleNaturalDiagnostic(ITestOutputHelper output)
                 return;
             }
 
-            Assert.Fail("No positive submerged pinnacle in the four frozen hash sites; retain the complete miss ledger.");
+            Assert.Fail("The frozen pinnacle did not satisfy its recorded admission/shape; retain the fixed-site ledger.");
         }
         finally
         {
             try
             {
-                output.WriteLine($"S6a partial ledger seed=1337 profile=Dynamic sites={inspectedSites}/4 "
-                    + $"metadataGets={metadataGets}/36 normalFills={normalFills}/1 "
+                output.WriteLine($"S6a partial ledger seed=1337 profile=Dynamic sites={inspectedSites}/1 "
+                    + $"metadataGets={metadataGets}/9 normalFills={normalFills}/1 "
                     + $"lodMeshes={lodMeshes}/1 directCellReads={directCellReads}/4");
             }
             finally
