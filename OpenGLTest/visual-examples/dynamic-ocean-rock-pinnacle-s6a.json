@@ -1,0 +1,27 @@
+{
+  // UNRUN S6a natural views. From OpenGLTest/ use the storeless VOXEL_SCRIPT path:
+  // DOTNET_ROLL_FORWARD=LatestMajor VOXEL_TIME=147 \
+  // VOXEL_SPAWN=-1175.5,-114.5,-2995.5 VOXEL_LOOK=180,-45 \
+  // VOXEL_SCRIPT=visual-examples/dynamic-ocean-rock-pinnacle-s6a.json dotnet run --no-build -c Release
+  // Program applies WorldSeed.Default (1337) + Dynamic before creating this storeless world.
+  // These source-derived camera poses are not verified clear rays or accepted visuals.
+  // Original PNGs go to private scratch, never into the repository.
+  "output": "/tmp/s6a-532343e4-natural-visuals",
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    // Rock eye (-1175.5,-114.5,-2995.5), target (-1179.5,-118.5,-2995.5).
+    // The known rock is y=-119..-118 and source-water cap y=-117 at target;
+    // the eye is above that cap, while its separate camera column is unobserved.
+    { "op": "teleport", "pos": [-1175.5, -114.5, -2995.5], "yaw": 180, "pitch": -45 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "screenshot", "name": "natural_dark_rock_column", "hideHud": true },
+    // Pinnacle eye at observed west shoulder x=-1213.5, floor -66; eye y=-45.5
+    // clears that known floor by 20.5 blocks. Target center (-1199.5,-12.5,-3069.5),
+    // yaw 0 faces +X; atan((33)/(14)) gives pitch about 67 degrees.
+    // The intervening water, entities, and ray occlusion remain unobserved.
+    { "op": "teleport", "pos": [-1213.5, -45.5, -3069.5], "yaw": 0, "pitch": 67 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "natural_submerged_pinnacle_side", "hideHud": true }
+  ]
+}
