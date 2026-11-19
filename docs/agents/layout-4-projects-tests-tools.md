@@ -219,7 +219,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   real cave-lake fluid rejection/cache lifecycle and opt-in single deep normal Plan control
     Ocean/                     # S6a pure/natural rock controls; S6b pure floor/site, opt-in metadata and fixed salt/coral normal-probe companions;
                                #   controlled real-ID reef/meadow/glow floor stamps and first coral mound;
-                               #   opt-in frozen 130-key raw climate/biome moss preflight (no generated columns)
+                               #   opt-in frozen 130-key raw climate/biome moss preflight (no generated columns);
+                               #   opt-in eight-key generated moss metadata and guarded rock-salt prediction (no block fill)
 USER_TODO.md                          # placeholder art list: every stand-in asset an agent added, its generator and
                                       #   what a replacement must keep (see "Placeholder art" under "Content")
 tools/                                # asset generators: models, animation clips, sounds and the wiki scenarios, each
