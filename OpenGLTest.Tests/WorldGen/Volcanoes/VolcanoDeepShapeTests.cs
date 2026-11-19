@@ -44,11 +44,15 @@ public sealed class VolcanoDeepShapeTests
         Assert.Equal(VolcanoCell.Air, At(47, -208, 0));
         Assert.Equal(VolcanoCell.Lining, At(50, -208, 0));
         Assert.Equal(VolcanoCell.None, At(51, -208, 0));
+        Assert.Equal(VolcanoCell.Air, At(13, WorldGenerationConfig.VolcanoChamberCenterY
+            + WorldGenerationConfig.VolcanoChamberHalfHeight - 1, 0));
+        Assert.Equal(VolcanoCell.Lining, At(13, WorldGenerationConfig.VolcanoChamberCenterY
+            + WorldGenerationConfig.VolcanoChamberHalfHeight, 0));
 
         // The proof in the owning doc covers all integer points. These independent
         // boundary slices guard the classifier's shell and wake-neighbor priority.
         foreach (var y in new[] { -230, -226, -214, -208, -185, -182 })
-        foreach (var (x, z) in new[] { (0, 0), (4, 0), (5, 0), (22, 22), (44, 0), (47, 0), (50, 0) })
+        foreach (var (x, z) in new[] { (0, 0), (4, 0), (5, 0), (13, 0), (22, 22), (44, 0), (47, 0), (50, 0) })
         {
             var cell = At(x, y, z);
             if (cell == VolcanoCell.Air)
@@ -71,5 +75,22 @@ public sealed class VolcanoDeepShapeTests
         Assert.False(VolcanoShape.InDeepBox(Deep, 48, 0, 0, 50, 0, 0));
         Assert.False(VolcanoShape.InDeepBox(SurfaceOnly, -50, -208, -50, 50, -208, 50));
         Assert.Equal(VolcanoCell.None, VolcanoShape.Classify(SurfaceOnly, 0, -208, 0, 120));
+    }
+
+    [Fact]
+    public void DeepVolumeRespectsConfigRelations()
+    {
+        Assert.True(VolcanoShape.ChamberTop < WorldGenerationConfig.DynamicOceanFloorHeight
+            - WorldGenerationConfig.DynamicTrenchDepth - WorldGenerationConfig.DynamicAbyssDepth);
+        Assert.True(VolcanoShape.ChamberBottom > WorldGenerationConfig.CaveDeepTopY
+            + WorldGenerationConfig.CaveDeepDriftBlocks);
+        Assert.True(VolcanoShape.ChamberBottom > WorldGenerationConfig.BarrierTopY + 1);
+        Assert.True(VolcanoShape.ConduitReach + 2 < WorldGenerationConfig.VolcanoMinCraterRadius
+            - WorldGenerationConfig.VolcanoLiningThickness);
+        Assert.True(VolcanoShape.ChamberReach + 2 + 11 < WorldGenerationConfig.VolcanoMinRadius);
+        Assert.True(WorldGenerationConfig.VolcanoChamberLavaSurfaceY >
+            WorldGenerationConfig.VolcanoChamberCenterY - WorldGenerationConfig.VolcanoChamberHalfHeight + 1);
+        Assert.True(WorldGenerationConfig.VolcanoChamberLavaSurfaceY
+            < WorldGenerationConfig.VolcanoChamberCenterY);
     }
 }

@@ -84,9 +84,11 @@ underground ruin and waystone boxes reaching the shaft or chamber, even outside 
 surface crater guard. `CaveLavaLakes` plans are cleared at `WorldSeed.Apply` and quiesced
 final `EndWorld`, because its seed-only cache key does not carry the profile.
 
-The deep owned box is within the accepted cone's minimum radius. At every such column,
-pond, great lake, oasis and hot-spring sites that could touch it are refused by their cone
-overlap checks. The Dynamic ocean profile is at least -180 before cuts; at ocean weight
+The deep owned box is within the accepted cone's minimum radius. Ponds, great-lake lobes,
+oases and hot springs that could touch it are refused by their cone overlap checks.
+Great-lake ramps and outflows can cross the cone, but their river level is clamped at sea
+level; they and ordinary rivers carve no lower than sea level minus RiverBedDepth (-3).
+Ramp banks only raise ground. The Dynamic ocean profile is at least -180 before cuts; at ocean weight
 at least 0.5, ravine fade is zero. In the [0.35,0.5) shore band, the land profile is
 at least -13 and ocean blending is under one half, so a 26-block ravine cannot reach -182.
 Below ocean weight 0.35 the shore clamp gives land height at least 1; the remaining river
