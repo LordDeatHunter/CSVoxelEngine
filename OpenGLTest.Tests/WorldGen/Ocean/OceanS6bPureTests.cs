@@ -31,10 +31,28 @@ public sealed class OceanS6bPureTests
         const int x = 6, z = 7, floorY = -20, chunkY0 = -32;
         var blocks = new ushort[Chunk.Size * Chunk.Size * Chunk.Size];
         var states = new byte[blocks.Length];
+        var expectedBlocks = new ushort[blocks.Length];
+        var expectedStates = new byte[states.Length];
         var ly = floorY - chunkY0;
+        var floor = Chunk.Idx(x, ly, z);
+        var farTarget = Chunk.Idx(x, ly + 3, z);
+        var firstTarget = Chunk.Idx(x, ly + 1, z);
+        var sideSupport = Chunk.Idx(x + 1, ly, z);
+        // The independent intended shape is one horizontal cross plus two cells above its center.
+        int[] moundTargets =
+        [
+            firstTarget,
+            Chunk.Idx(x - 1, ly + 1, z), Chunk.Idx(x + 1, ly + 1, z),
+            Chunk.Idx(x, ly + 1, z - 1), Chunk.Idx(x, ly + 1, z + 1),
+            Chunk.Idx(x, ly + 2, z), farTarget,
+        ];
 
         void Prepare()
         {
+            System.Array.Clear(blocks);
+            System.Array.Clear(states);
+            blocks[0] = ore;
+            states[0] = 3;
             for (var dx = -1; dx <= 1; dx++)
             for (var dz = -1; dz <= 1; dz++)
             {
@@ -49,52 +67,75 @@ public sealed class OceanS6bPureTests
             states[Chunk.Idx(x, ly + 2, z)] = 0;
             states[Chunk.Idx(x, ly + 3, z)] = 0;
         }
-        bool Mound() => OceanHabitats.TryWriteCoralMound(blocks, states, x, z,
-            floorY, chunkY0, host, water, rose);
-        var farTarget = Chunk.Idx(x, ly + 3, z);
-        var firstTarget = Chunk.Idx(x, ly + 1, z);
-        var sideSupport = Chunk.Idx(x + 1, ly, z);
+        void Snapshot()
+        {
+            blocks.CopyTo(expectedBlocks, 0);
+            states.CopyTo(expectedStates, 0);
+        }
+        void AssertWholeBuffers() // Each failed site leaves every own-chunk cell untouched.
+        {
+            Assert.Equal<ushort>(expectedBlocks, blocks);
+            Assert.Equal<byte>(expectedStates, states);
+        }
+        void RejectMound(int candidateX = x, int candidateZ = z, int candidateWorldY0 = chunkY0)
+        {
+            Snapshot();
+            Assert.False(OceanHabitats.TryWriteCoralMound(blocks, states,
+                candidateX, candidateZ, floorY, candidateWorldY0, host, water, rose));
+            AssertWholeBuffers();
+        }
+        void RejectFloor()
+        {
+            Snapshot();
+            Assert.False(OceanHabitats.TryDressFloor(blocks, states, x, z,
+                floorY, chunkY0, host, water, moss));
+            AssertWholeBuffers();
+        }
 
-        Prepare(); blocks[farTarget] = lava;
-        Assert.False(Mound()); Assert.Equal(water, blocks[firstTarget]);
-        Prepare(); blocks[farTarget] = 0;
-        Assert.False(Mound()); Assert.Equal(water, blocks[firstTarget]);
-        Prepare(); blocks[farTarget] = ore;
-        Assert.False(Mound()); Assert.Equal(water, blocks[firstTarget]);
-        Prepare(); states[farTarget] = 1;
-        Assert.False(Mound()); Assert.Equal(water, blocks[firstTarget]);
-        Prepare(); blocks[sideSupport] = ore;
-        Assert.False(Mound()); Assert.Equal(water, blocks[firstTarget]);
-        Prepare(); states[sideSupport] = 1;
-        Assert.False(Mound()); Assert.Equal(water, blocks[firstTarget]);
-        Prepare();
-        Assert.False(OceanHabitats.TryWriteCoralMound(blocks, states, 0, z,
-            floorY, chunkY0, host, water, rose));
-        Assert.Equal(water, blocks[firstTarget]);
-        Prepare();
-        Assert.True(Mound());
-        Assert.Equal(rose, blocks[farTarget]);
-        Assert.Equal(rose, blocks[Chunk.Idx(x + 1, ly + 1, z)]);
-        Assert.Equal(0, states[farTarget]);
-        Assert.Equal(0, states[firstTarget]);
+        Prepare(); blocks[farTarget] = lava; RejectMound();
+        Prepare(); blocks[farTarget] = 0; RejectMound();
+        Prepare(); blocks[farTarget] = ore; RejectMound();
+        Prepare(); states[farTarget] = 1; RejectMound();
+        Prepare(); blocks[sideSupport] = ore; RejectMound();
+        Prepare(); states[sideSupport] = 1; RejectMound();
+        Prepare(); RejectMound(candidateX: 0);
+        Prepare(); RejectMound(candidateZ: 0);
+        Prepare(); RejectMound(candidateWorldY0: floorY - (Chunk.Size - 3));
+        Prepare(); RejectMound(candidateWorldY0: floorY + 1);
 
-        Prepare(); blocks[firstTarget] = lava;
-        Assert.False(OceanHabitats.TryDressFloor(blocks, states, x, z,
-            floorY, chunkY0, host, water, moss));
-        Assert.Equal(host, blocks[Chunk.Idx(x, ly, z)]);
-        Prepare(); states[firstTarget] = 1;
-        Assert.False(OceanHabitats.TryDressFloor(blocks, states, x, z,
-            floorY, chunkY0, host, water, moss));
-        Assert.Equal(host, blocks[Chunk.Idx(x, ly, z)]);
-        Prepare(); blocks[Chunk.Idx(x, ly, z)] = ore;
-        Assert.False(OceanHabitats.TryDressFloor(blocks, states, x, z,
-            floorY, chunkY0, host, water, moss));
-        Assert.Equal(water, blocks[firstTarget]);
-        Prepare();
-        Assert.True(OceanHabitats.TryDressFloor(blocks, states, x, z,
-            floorY, chunkY0, host, water, moss));
-        Assert.Equal(moss, blocks[Chunk.Idx(x, ly, z)]);
-        Assert.Equal(0, states[Chunk.Idx(x, ly, z)]);
+        Prepare(); Snapshot();
+        Assert.True(OceanHabitats.TryWriteCoralMound(blocks, states,
+            x, z, floorY, chunkY0, host, water, rose));
+        foreach (var target in moundTargets)
+        {
+            expectedBlocks[target] = rose;
+            Assert.Equal((byte)0, states[target]);
+        }
+        AssertWholeBuffers(); // Includes every support and every outside cell.
+
+        Prepare(); Snapshot();
+        Assert.True(OceanHabitats.TryWriteCoralMound(blocks, null,
+            x, z, floorY, chunkY0, host, water, rose));
+        foreach (var target in moundTargets) expectedBlocks[target] = rose;
+        AssertWholeBuffers();
+
+        Prepare(); blocks[firstTarget] = lava; RejectFloor();
+        Prepare(); states[firstTarget] = 1; RejectFloor();
+        Prepare(); blocks[floor] = ore; RejectFloor();
+        Prepare(); states[floor] = 1; RejectFloor();
+
+        Prepare(); Snapshot();
+        Assert.True(OceanHabitats.TryDressFloor(blocks, states,
+            x, z, floorY, chunkY0, host, water, moss));
+        expectedBlocks[floor] = moss;
+        Assert.Equal((byte)0, states[floor]);
+        AssertWholeBuffers();
+
+        Prepare(); Snapshot();
+        Assert.True(OceanHabitats.TryDressFloor(blocks, null,
+            x, z, floorY, chunkY0, host, water, moss));
+        expectedBlocks[floor] = moss;
+        AssertWholeBuffers();
     }
 
     [Fact]
@@ -105,13 +146,23 @@ public sealed class OceanS6bPureTests
         Assert.Equal(OceanFloorMaterial.SeaMoss,
             OceanFloorMaterials.Select(OceanHabitat.MeadowFloor, 0.4f, 20));
         Assert.Equal(OceanFloorMaterial.GlowMoss,
-            OceanFloorMaterials.Select(OceanHabitat.DeepPlain, 0.7f, 60));
+            OceanFloorMaterials.Select(OceanHabitat.DeepPlain,
+                WorldFeatureConfig.OceanGlowMossMinWarmth, WorldFeatureConfig.OceanGlowMossMinDepth));
         Assert.Equal(OceanFloorMaterial.None,
             OceanFloorMaterials.Select(OceanHabitat.ColdShelf, 0.1f, 20));
         Assert.Equal(OceanFloorMaterial.None,
             OceanFloorMaterials.Select(OceanHabitat.DeepPlain, 0.4f, 60));
-        Assert.Equal((byte)8, OceanFloorMaterials.LodCode(OceanFloorMaterial.Coral));
-        Assert.Equal((byte)9, OceanFloorMaterials.LodCode(OceanFloorMaterial.SeaMoss));
-        Assert.Equal((byte)10, OceanFloorMaterials.LodCode(OceanFloorMaterial.GlowMoss));
+        Assert.Equal(OceanFloorMaterial.None,
+            OceanFloorMaterials.Select(OceanHabitat.DeepPlain,
+                WorldFeatureConfig.OceanGlowMossMinWarmth, WorldFeatureConfig.OceanGlowMossMinDepth - 1));
+        var coral = OceanFloorMaterials.LodCode(OceanFloorMaterial.Coral);
+        var meadow = OceanFloorMaterials.LodCode(OceanFloorMaterial.SeaMoss);
+        var glow = OceanFloorMaterials.LodCode(OceanFloorMaterial.GlowMoss);
+        Assert.NotEqual(coral, meadow);
+        Assert.NotEqual(coral, glow);
+        Assert.NotEqual(meadow, glow);
+        Assert.NotEqual(OceanFloorMaterials.LodCode(OceanFloorMaterial.None), coral);
+        Assert.NotEqual(OceanFloorMaterials.LodCode(OceanFloorMaterial.None), meadow);
+        Assert.NotEqual(OceanFloorMaterials.LodCode(OceanFloorMaterial.None), glow);
     }
 }

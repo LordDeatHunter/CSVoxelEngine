@@ -204,8 +204,9 @@ and warmer deep floors replace the visible solid top at h only when its expected
 overlying source-water:0 cell remain intact. An independent OCOR hash admits a small coral
 mound only when all five same-level supports and seven water:0 targets fit the own Y chunk
 and pass before any write. Failed sites leave all cells unchanged; writes reset state.
-Cold shelves and other deep floors keep their original material. Both normal and
-generateLakes:false probe fill stamp after volcano/rock and before underground rooms.
+The deeper warm glow threshold is `OceanGlowMossMinWarmth`/`OceanGlowMossMinDepth` in
+`WorldFeatureConfig`; cold shelves and other deep floors keep their original material.
+Both normal and generateLakes:false probe fill stamp after volcano/rock and before underground rooms.
 Generated coarse floor codes represent coral, sea moss and glow moss from direct generated
 climate corners; supplied/imported floors and edit overrides retain authority. Small mounds,
 later host changes and propagated light remain absent from coarse LOD. Natural teal glow

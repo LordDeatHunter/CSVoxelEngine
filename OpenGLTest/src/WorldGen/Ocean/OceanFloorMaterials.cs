@@ -8,7 +8,9 @@ internal static class OceanFloorMaterials
         {
             OceanHabitat.Reef => OceanFloorMaterial.Coral,
             OceanHabitat.MeadowFloor => OceanFloorMaterial.SeaMoss,
-            OceanHabitat.DeepPlain or OceanHabitat.Abyss when warmth >= 0.53f && depth >= 40
+            OceanHabitat.DeepPlain or OceanHabitat.Abyss
+                when warmth >= WorldFeatureConfig.OceanGlowMossMinWarmth
+                     && depth >= WorldFeatureConfig.OceanGlowMossMinDepth
                 => OceanFloorMaterial.GlowMoss,
             _ => OceanFloorMaterial.None,
         };
