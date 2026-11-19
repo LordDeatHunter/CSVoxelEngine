@@ -6,6 +6,7 @@ using Xunit;
 namespace VoxelEngine.Tests.WorldGen.Ocean;
 
 /// <summary>Controlled registered-block stamp facts; no generated columns or chunk fills.</summary>
+[Collection("Worldgen seed")]
 public sealed class OceanHabitatStampFacts
 {
     [Fact]
