@@ -1,0 +1,12 @@
+{
+  "output": "/tmp/s5b-5e4c78c6-natural-deep-99e5e24e",
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-15036.5, -205.5, -7804.5], "yaw": 90, "pitch": -12 },
+    { "op": "wait", "seconds": 35 },
+    { "op": "screenshot", "name": "natural_deep_chamber_lava_wall", "hideHud": true },
+    { "op": "teleport", "pos": [-15021.5, -205.5, -7804.5], "yaw": 180, "pitch": 7 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "screenshot", "name": "natural_lined_conduit_junction", "hideHud": true }
+  ]
+}
