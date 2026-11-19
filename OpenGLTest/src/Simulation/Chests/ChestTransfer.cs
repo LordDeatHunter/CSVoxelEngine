@@ -31,8 +31,8 @@ public static class ChestTransfer
     }
 
     /// <summary>
-    /// Moves one tool or piece of gear from the inventory into an empty chest slot, components and all (a worn piece
-    /// comes off first). False when the player does not hold it or the chest is full.
+    /// Moves one inventory instance into an empty chest slot, components and all (a worn piece of gear comes off
+    /// first). False when the player does not hold it or the chest is full.
     /// </summary>
     public static bool DepositInstance(Inventory inventory, ChestState chest, int instanceId)
     {
