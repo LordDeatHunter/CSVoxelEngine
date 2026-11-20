@@ -7,6 +7,8 @@ using VoxelEngine.Content.Blocks;
 using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Saves;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
 namespace VoxelEngine.Tests.Content.Blocks;
@@ -23,6 +25,26 @@ namespace VoxelEngine.Tests.Content.Blocks;
 public sealed class WideIdRegistryTests
 {
     private const int SyntheticBlocks = 300;
+
+    [Fact]
+    public void RestoringSyntheticContentKeepsCachedTreeOwners()
+    {
+        TestContent.EnsureLoaded();
+        // The generator deliberately snapshots species once; the test-only registry swap must
+        // return the exact owners already held by both of its profile tables.
+        var legacy = TreeGenerator.SpeciesByBiome[(int)Biome.Forest]
+            ?? throw new InvalidOperationException("Forest has no cached Legacy tree owner.");
+        var dynamicRow = TreeGenerator.DynamicRowFor(Biome.Jungle);
+        Assert.NotEmpty(dynamicRow);
+        var cached = dynamicRow.Append(legacy).Distinct().ToArray();
+        foreach (var owner in cached)
+            Assert.Same(owner, TreeSpeciesRegistry.Require(owner.Name));
+
+        UnderSyntheticContent(_ => { });
+
+        foreach (var owner in cached)
+            Assert.Same(owner, TreeSpeciesRegistry.Require(owner.Name));
+    }
 
     [Fact]
     public void RegistryPastTheByteRangeResolvesEveryId()
