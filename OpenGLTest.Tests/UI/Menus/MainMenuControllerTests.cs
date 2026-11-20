@@ -287,6 +287,49 @@ public sealed class MainMenuControllerTests : IDisposable
     }
 
     [Fact]
+    public void PlayAndHostRefuseUnknownSavedTerrainBeforeRequestingAWorld()
+    {
+        var created = _store.Create("Unknown terrain", 17);
+        var path = Path.Combine(created.Directory, WorldStore.MetadataFileName);
+        var original = """{"Name":"Unknown terrain","Seed":17,"Version":2,"terrain":99}""";
+        File.WriteAllText(path, original);
+        var controller = NewController();
+
+        controller.OpenWorlds();
+        Assert.Equal(MainMenuAction.None, controller.Click(Hit(MainMenuHitKind.Play, 0)));
+        Assert.Null(controller.PlayRequest);
+        Assert.Contains("terrain", controller.View.Notice!, StringComparison.OrdinalIgnoreCase);
+
+        controller.OpenHost();
+        Assert.Equal(MainMenuAction.None, controller.Click(Hit(MainMenuHitKind.HostWorld, 0)));
+        Assert.Null(controller.HostRequest);
+        Assert.Contains("terrain", controller.View.Notice!, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(original, File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void EditOfUnknownTerrainShowsFailureWithoutRewritingMetadata()
+    {
+        var created = _store.Create("Unknown terrain", 17);
+        var path = Path.Combine(created.Directory, WorldStore.MetadataFileName);
+        var original = """{"Name":"Unknown terrain","Seed":17,"Version":2,"terrain":99}""";
+        File.WriteAllText(path, original);
+        var controller = NewController();
+
+        controller.OpenWorlds();
+        Assert.Equal(MainMenuAction.None, controller.Click(Hit(MainMenuHitKind.Edit, 0)));
+        Assert.Equal(MainMenuPage.Edit, controller.View.Page);
+        controller.View.Name.Clear();
+        TypeText(controller, "Changed");
+        Assert.Equal(MainMenuAction.None, controller.Key(MenuKey.Enter));
+
+        Assert.Equal(MainMenuPage.Worlds, controller.View.Page);
+        Assert.NotNull(controller.View.Notice);
+        Assert.Equal(original, File.ReadAllText(path));
+        Assert.Equal("Unknown terrain", Assert.Single(_store.List()).Name);
+    }
+
+    [Fact]
     public void AStoreErrorShowsANoticeInsteadOfThrowing()
     {
         _store.Create("One", 1);

@@ -307,7 +307,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
                 if (View.WorldsLocked)
                     return MainMenuAction.None;
                 var world = View.Worlds[hit.Row];
-                if (RefusesOldFormat(world))
+                if (RefusesUnsupportedWorld(world))
                     return MainMenuAction.None;
                 PlayRequest = world;
                 PlayRequestIsNew = false;
@@ -438,7 +438,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
                 if (View.WorldsLocked)
                     return MainMenuAction.None;
                 var world = View.Worlds[hit.Row];
-                return RefusesOldFormat(world) ? MainMenuAction.None : RequestHost(world);
+                return RefusesUnsupportedWorld(world) ? MainMenuAction.None : RequestHost(world);
             }
 
             case MainMenuHitKind.PortField: View.Focus = MenuField.Port; return MainMenuAction.None;
@@ -474,14 +474,18 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
         return int.TryParse(text, out port) && port is >= ServerAddress.MinPort and <= ServerAddress.MaxPort;
     }
 
-    // A world written by another save format is refused where a world is opened (PLAY) or hosted, rather than
-    // half-loaded; EDIT and DELETE stay available so the player can wipe it.
-    private bool RefusesOldFormat(WorldInfo world)
+    // Refuse unsupported metadata before a PLAY/HOST request can change seed or take the folder lock.
+    // DELETE remains available, and a valid old-profile world keeps its terrain identity.
+    private bool RefusesUnsupportedWorld(WorldInfo world)
     {
-        if (world.Version == WorldStore.CurrentVersion)
-            return false;
-        ShowNotice($"'{world.Name}' was saved by an older version (format {world.Version}, " +
-                   $"this build reads {WorldStore.CurrentVersion}); delete it to make room.");
+        if (world.Version != WorldStore.CurrentVersion)
+        {
+            ShowNotice($"'{world.Name}' was saved by an older version (format {world.Version}, " +
+                       $"this build reads {WorldStore.CurrentVersion}); delete it to make room.");
+            return true;
+        }
+        if (world.TryGetTerrainProfile(out _, out var error)) return false;
+        ShowNotice(error);
         return true;
     }
 
@@ -638,7 +642,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
             call();
             return true;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
         {
             Log.Warn($"Worlds: {e.Message}");
             SetErrorNotice();

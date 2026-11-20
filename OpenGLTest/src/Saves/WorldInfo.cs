@@ -1,4 +1,6 @@
+using System.IO;
 using VoxelEngine.Chunks.Sources;
+using VoxelEngine.WorldGen;
 
 namespace VoxelEngine.Saves;
 
@@ -9,8 +11,11 @@ namespace VoxelEngine.Saves;
 /// </summary>
 public sealed class WorldInfo(
     string slug, string name, int seed, long createdUnixMs, long lastPlayedUnixMs, int version, string directory,
-    string? sourceName = null)
+    string? sourceName = null, int? terrainValue = null, bool terrainInvalid = false)
 {
+    private readonly int? _terrainValue = terrainValue;
+    private readonly bool _terrainInvalid = terrainInvalid;
+
     /// <summary>The folder name under the saves root, derived from the name at creation.</summary>
     public string Slug { get; } = slug;
 
@@ -40,4 +45,34 @@ public sealed class WorldInfo(
     /// (<see cref="WorldSources"/>): <see cref="SourceName"/>, or <see cref="WorldSources.Generated"/>
     /// when the file names none. The game's main menu ignores it and always generates.</summary>
     public string Source => SourceName ?? WorldSources.Generated;
+
+    /// <summary>The optional value saved in world.json, absent for a legacy world.</summary>
+    internal int? TerrainValue => _terrainValue;
+
+    /// <summary>Resolves saved terrain without guessing when the field is malformed or unknown.</summary>
+    public bool TryGetTerrainProfile(out WorldGenProfile profile, out string error)
+    {
+        if (!_terrainInvalid && (_terrainValue == null || _terrainValue == (int)WorldGenProfile.Legacy))
+        {
+            profile = WorldGenProfile.Legacy;
+            error = "";
+            return true;
+        }
+        if (!_terrainInvalid && _terrainValue == (int)WorldGenProfile.Dynamic)
+        {
+            profile = WorldGenProfile.Dynamic;
+            error = "";
+            return true;
+        }
+
+        profile = default;
+        error = _terrainInvalid
+            ? $"'{Name}' has an invalid terrain profile in world.json (expected 1 or 2)."
+            : $"'{Name}' has unsupported terrain profile {_terrainValue} in world.json (expected 1 or 2).";
+        return false;
+    }
+
+    /// <summary>The accepted profile, or an explicit refusal for invalid saved metadata.</summary>
+    public WorldGenProfile TerrainProfile => TryGetTerrainProfile(out var profile, out var error)
+        ? profile : throw new InvalidDataException(error);
 }

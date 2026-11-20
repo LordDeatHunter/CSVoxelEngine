@@ -31,10 +31,14 @@ public static class WorldSeed
     public const int Default = 1337;
 
     private static int _value = Default;
+    private static WorldGenProfile _profile = WorldGenProfile.Legacy;
     private static int _liveWorlds;
 
     /// <summary>The current world seed.</summary>
     public static int Value => _value;
+
+    /// <summary>The generation recipe published to the next world's workers by <see cref="Apply(int, WorldGenProfile)"/>.</summary>
+    public static WorldGenProfile Profile => _profile;
 
     /// <summary>Registers a live world; <see cref="Apply"/> refuses to run until it ends.</summary>
     internal static void BeginWorld() => Interlocked.Increment(ref _liveWorlds);
@@ -68,7 +72,15 @@ public static class WorldSeed
     /// thrown away.
     /// </summary>
     /// <exception cref="InvalidOperationException">A world is live.</exception>
-    public static void Apply(int seed)
+    public static void Apply(int seed) => Apply(seed, WorldGenProfile.Legacy);
+
+    /// <summary>
+    /// Selects a seed and generation profile together while no world is live. The full reseed and
+    /// cache reset runs even when both values match the previous world, so no derived data leaks.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">A world is live.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The profile is not supported.</exception>
+    public static void Apply(int seed, WorldGenProfile profile)
     {
         if (WorldIsLive)
             throw new InvalidOperationException(
@@ -76,7 +88,11 @@ public static class WorldSeed
                 "and LOD workers and drain the mesh runners first (worldgen statics are read " +
                 "unsynchronized on those threads)");
 
+        if (profile is not (WorldGenProfile.Legacy or WorldGenProfile.Dynamic))
+            throw new ArgumentOutOfRangeException(nameof(profile), profile, "Unsupported world generation profile");
+
         _value = seed;
+        _profile = profile;
 
         TerrainNoise.Reseed();
         NoiseCaves.Reseed();
@@ -102,7 +118,7 @@ public static class WorldSeed
         JungleMud.Reseed();
         GravelPocketGenerator.Reseed();
 
-        // Every cached value is a function of (key, seed), so all of them are wrong now.
+        // Every cached value is a function of (key, seed, profile), so all of them are wrong now.
         ColumnCache.Reset();
         WormCarver.ResetCellCache();
         TreeGenerator.ResetCaches();

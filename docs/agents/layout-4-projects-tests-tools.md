@@ -190,7 +190,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   VisualTest/                  # scenario parsing and ops, PNG capture
   WorldGen/                    # terrain, biomes, lakes, ravines, clouds, the generational
                                #   cache, the tree front end and batches, worldgen stats,
-                               #   the worldgen cost probe and the stage-timer tests
+                               #   the worldgen cost probe and the stage-timer tests; WorldGenProfileIdentityTests
+                               #   compare real column/chunk output to frozen EA identity fixture
     Features/                  # every feature generator (mirrors src/WorldGen/Features)
       Underground/             # coal, malachite, hematite, tin, vulcanite, the barrier, gravel pockets, cave life (mirrors src/WorldGen/Features/Underground)
     Caves/                     # the cave biomes: point query equals stamp, the map, bands, determinism, safe palettes,

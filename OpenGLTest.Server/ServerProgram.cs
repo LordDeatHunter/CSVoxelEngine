@@ -185,7 +185,8 @@ public static class ServerProgram
             output.WriteLine(worlds.Count == 0 ? "No saved worlds yet." : "Saved worlds:");
             for (var i = 0; i < worlds.Count; i++)
                 output.WriteLine($"  {i + 1}. {worlds[i].Name} (seed {worlds[i].Seed})"
-                    + (ServerLaunch.IsHostable(worlds[i]) ? "" : " (old format, cannot be hosted)"));
+                    + (worlds[i].Version != WorldStore.CurrentVersion ? " (old format, cannot be hosted)"
+                        : worlds[i].TryGetTerrainProfile(out _, out _) ? "" : " (unsupported terrain, cannot be hosted)"));
             output.Write("Choose a world number, or N for a new world: ");
 
             var line = input.ReadLine();
@@ -200,10 +201,14 @@ public static class ServerProgram
                 var chosen = worlds[index - 1];
                 if (ServerLaunch.IsHostable(chosen))
                     return chosen;
-                // The same refusal the main menu makes: a world in another save format would be
-                // half-loaded and its chunks regenerated over, so it is never opened.
-                output.WriteLine($"'{chosen.Name}' was saved by an older version (format {chosen.Version}, " +
-                                  $"this build reads {WorldStore.CurrentVersion}); it cannot be hosted.");
+                if (chosen.Version != WorldStore.CurrentVersion)
+                    output.WriteLine($"'{chosen.Name}' was saved by an older version (format {chosen.Version}, " +
+                                      $"this build reads {WorldStore.CurrentVersion}); it cannot be hosted.");
+                else
+                {
+                    chosen.TryGetTerrainProfile(out _, out var reason);
+                    output.WriteLine(reason);
+                }
                 output.WriteLine();
                 continue;
             }
