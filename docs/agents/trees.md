@@ -206,6 +206,14 @@ retain their historical absence from canopy
 LOD because their `lod` fields do not define a wood height. The existing ushort mesh-index
 limit can still leave a partial proxy near capacity, and partially covered coarse regions can
 draw coincident crown geometry; those contracts need resolution before runtime acceptance.
+The source-only compact replacement foundation defines a canonical 64-byte signed tree instance,
+complete six-face base/tinted materials shared by block ID, a reusable trunk/crown/cap template,
+a source-corner grass/foliage vec4 tint lattice, and 16-block source/replacement visibility tiles. These types are not yet wired into the renderer,
+network codec, or generated LOD build. Their tests are unrun; the live path remains the baked
+opaque proxy above. A future instanced draw must keep the current 16-block biome-tint lattice,
+wood/leaf atlas remap, and matched color/reflection/shadow coverage while the old ground and
+water burial stays separate. Shader clipping of a proxy at tile edges would omit closure faces;
+that seam appearance needs visual acceptance before replacing the current clipped prisms.
 `TreeGenerator.TryGetCanopy` and the two column-top caches remain available for canopy queries/tests; the LOD no longer
 turns those tops into ground-to-crown leaf walls. The solo shapes, batches and canopy query
 tables remain `GenerationalCache` sites (`TreeShapeCache*`, `TreeBatchCache*`,

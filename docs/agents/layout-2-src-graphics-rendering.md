@@ -137,6 +137,12 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       LodTreeAnchor.cs         # region-independent source/edit-aware height lower bound and edit reach for tree trunks
       LodTreeProxy.cs          # reusable grown/far species crown and trunk bounds, separate from the terrain shell
       LodTreeProxyEmitter.cs   # one region's root enumeration, edit/source/region clipping, opaque proxy emission and burial bounds
+      LodTreeInstance.cs       # unintegrated canonical 64-byte signed tree descriptor and checked region-relative bounds
+      LodTreeMaterial.cs       # unintegrated complete base/tinted six-face 32-byte material and atlas remap contract
+      LodTreeMaterialTable.cs  # build-local sharing of tree face materials by ushort block identity
+      LodTreeTemplate.cs       # reusable bounded trunk/crown/cap unit topology and part-bound selector
+      LodTreeTintLattice.cs    # explicit source-corner grass/foliage vec4 lattice for compact proxy tint
+      LodTreeCoverage.cs       # pure 16-block source/replacement/full-detail tree visibility tiles
       LodMeshData.cs           # one finished region build (vertex/index lists, Y bounds, chunk-Y ranges) on its way to the main thread
       LodRegion.cs             # an uploaded far-LOD region: the Levels table, its pool slices, burial flags and per-column chunk-Y
                                #   ranges, the draw-order comparers; BuildMeshData forwards to LodMeshBuilder

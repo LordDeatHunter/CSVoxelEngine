@@ -146,7 +146,7 @@ internal sealed class LodTreeProxyEmitter
 
         if (trunkIntersects)
         {
-            // The anchor is a pure function of the root's generated height neighborhood,
+            // The anchor reads the root's authoritative source and edited height neighborhood,
             // independent of which adjacent region or LOD level clips this same trunk.
             tree = tree with { BaseY = Math.Min(tree.BaseY,
                 LodTreeAnchor.ForRoot(tree.RootX, tree.RootZ, _anchorColumnAt)) };
