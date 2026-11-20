@@ -133,6 +133,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       LodMeshBuilder.cs        # the body of LodRegion.BuildMeshData, one instance per build: prefetch, fine-height grid, per-cell
                                #   grids, burial ranges and clipped generated-only tree proxies
       LodProxyBox.cs           # finite inclusive-low/exclusive-high bounds and XZ clipping of one tree proxy prism
+      LodProxyOwnership.cs     # pure generated-column and supplied-root gates before distant tree placement work
+      LodTreeAnchor.cs         # region-independent generated-height lower bound for a tree trunk across LOD seams
       LodTreeProxy.cs          # reusable grown/far species crown and trunk bounds, separate from the terrain shell
       LodTreeProxyEmitter.cs   # one region's root enumeration, edit/source/region clipping, opaque proxy emission and burial bounds
       LodMeshData.cs           # one finished region build (vertex/index lists, Y bounds, chunk-Y ranges) on its way to the main thread

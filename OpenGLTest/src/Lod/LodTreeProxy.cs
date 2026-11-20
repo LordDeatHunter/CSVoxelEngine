@@ -43,6 +43,10 @@ internal readonly record struct LodTreeProxy(
 
     internal static LodTreeProxy FromFar(TreeSpecies species, int x, int z, int baseY)
     {
+        // Historical far canopy omitted leafless species. Their old lod values were
+        // never a wood-height contract (cactus explicitly used placeholder metadata).
+        if (!species.HasLeaves)
+            throw new ArgumentException("Leafless species have no far-tree proxy.", nameof(species));
         var height = TreeGenerator.CrownHeightOf(species, x, z);
         var top = baseY + height + 1;
         var bottom = Math.Max(baseY + 1, top - Math.Max(2, (height + 2) / 3));

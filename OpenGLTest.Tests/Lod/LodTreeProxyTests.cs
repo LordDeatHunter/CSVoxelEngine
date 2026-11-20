@@ -48,12 +48,38 @@ public sealed class LodTreeProxyTests
         Assert.False(crown.ClipXZ(128, 0, 192, 64).HasVolume);
     }
 
-    [Fact]
-    public void LeaflessTreeHasOnlyFiniteWood()
+    [Theory]
+    [InlineData(63, 0, 64)]
+    [InlineData(-1, -64, 0)]
+    public void WideTrunkKeepsOneWorldAnchorAcrossEitherRegionSeam(int rootX, int leftEdge, int rightEdge)
     {
-        var tree = new LodTreeProxy(0, 0, 30, 39, 39,
-            0, 1, 0, 1, 1, 11, 0, LodCrownProfile.Column);
-        Assert.False(tree.HasCrown);
-        Assert.Equal(39f, tree.Trunk().MaxY);
+        const int rootZ = 8;
+        var reads = 0;
+        int[] Heights(int cx, int cz)
+        {
+            reads++;
+            var map = new int[Chunk.Size * Chunk.Size];
+            Array.Fill(map, 30);
+            var lowX = rootX - 14;
+            if (cx == lowX >> Chunk.SizeShift && cz == rootZ >> Chunk.SizeShift)
+                map[((lowX & Chunk.SizeMask) << Chunk.SizeShift) | (rootZ & Chunk.SizeMask)] = 20;
+            return map;
+        }
+
+        var anchor = LodTreeAnchor.Compute(rootX, rootZ, Heights, LodRegion.Levels);
+        // An independently placed raw low cell at 20 under the maximum bias 6 floors to 8.
+        Assert.Equal(8, anchor);
+        Assert.InRange(reads, 1, 9);
+        var tree = new LodTreeProxy(rootX, rootZ, anchor, 60, 70,
+            rootX - 4, rootX + 5, rootZ - 4, rootZ + 5, 4, 11, 12, LodCrownProfile.Dome);
+        var left = tree.Trunk().ClipXZ(leftEdge, 0, rightEdge, 64);
+        var right = tree.Trunk().ClipXZ(rightEdge, 0, rightEdge + 64, 64);
+        Assert.True(left.HasVolume && right.HasVolume);
+        Assert.Equal(8f, left.MinY);
+        Assert.Equal(left.MinY, right.MinY);
+        Assert.Equal(left.MaxY, right.MaxY);
+        Assert.Equal(left.MaxX, right.MinX);
     }
 }
+using System;
+using VoxelEngine.Chunks;

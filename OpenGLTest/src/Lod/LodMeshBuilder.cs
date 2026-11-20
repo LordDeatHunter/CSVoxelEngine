@@ -668,8 +668,8 @@ internal sealed class LodMeshBuilder
             _topCell, _groundTop, _beachTop, _gravelTop, _rockTop, _soilStripped, _snowTop, _iceTop, _biomeGrid, _waterLevels, _seaFloor,
             _topBlockGrid);
         emitter.Emit();
-        var trees = new LodTreeProxyEmitter(_spec, _source, _supplied, _groundTop,
-            _heightGrid, _baseFineX, _baseFineZ, _baseChunkX, _baseChunkZ,
+        var trees = new LodTreeProxyEmitter(_spec, _source, _supplied,
+            _baseFineX, _baseFineZ, _baseChunkX, _baseChunkZ,
             _chunkSpan, _regionChunkX, _regionChunkZ, _regionChunkSpan);
         trees.Emit(ref emitter, columnCyMax);
         return emitter.ToMeshData(level, rx, rz, columnCyMin, columnCyMax);
