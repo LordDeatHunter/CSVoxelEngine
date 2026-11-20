@@ -74,6 +74,12 @@ public sealed class LodFarRootCacheTests
         Assert.Equal(0, scans);
 
         Array.Fill(supplied, false);
+        // A mixed-owned region can still have every candidate root supplied. The gate must
+        // precede even a cold cache lookup; the all-supplied early return alone is insufficient.
+        LodProxyOwnership.CollectFarCached(supplied, 4, 2, -16, -16, 32, 0,
+            (_, _) => true, cache, roots);
+        Assert.Empty(roots);
+        Assert.Equal(0, scans);
         LodProxyOwnership.CollectFarCached(supplied, 4, 2, -16, -16, 32, 0,
             (_, _) => false, cache, roots);
         Assert.NotEmpty(roots);
