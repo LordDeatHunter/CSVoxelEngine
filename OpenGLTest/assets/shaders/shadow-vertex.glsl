@@ -72,6 +72,7 @@ void LoadTree() {
     treeLayer = layer == 0 ? pair & 65535u : pair >> 16u;
     treePresent = material >= 0 && treeLayer != 65535u &&
         !(part == 2 && profile == 2) && all(greaterThan(hi, lo));
+    if (!treePresent) return;
     treeNormalBits = uint(face);
 }
 #define vPosition treePosition
@@ -82,6 +83,10 @@ void LoadTree() {
 void main() {
 #ifdef TREE_PROXY
     LoadTree();
+    if (!treePresent) {
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        return;
+    }
 #endif
     // Bit 5 flags a swaying vertex, whose alpha is then its sway weight: uniform on canopy
     // leaves, eased from nothing at a rooted plant's base to full at its tip (Vertex.SwayWeight).
@@ -116,7 +121,6 @@ void main() {
 #ifdef TREE_PROXY
     fTreeBase = treeBase;
     fTreeXZ = TO_WORLD(displaced).xz - chunkOrigin.xz;
-    if (!treePresent) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 #endif
 #else
     gl_Position = uLightMVP * vec4(displaced, 1.0);

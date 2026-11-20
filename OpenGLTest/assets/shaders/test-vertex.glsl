@@ -141,6 +141,7 @@ void LoadTree() {
     treeLayer = layer == 0 ? pair & 65535u : pair >> 16u;
     treePresent = material >= 0 && treeLayer != 65535u &&
         !(part == 2 && profile == 2) && all(greaterThan(hi, lo));
+    if (!treePresent) return;
     uint flags = treeWords[m + 6u];
     int palette = int(flags & 3u);
     float shade = face == 4 ? 1.0 : face == 5 ? 155.0 / 255.0 : 205.0 / 255.0;
@@ -186,6 +187,10 @@ float LavaWaveHeight(vec2 p, float t) {
 void main() {
 #ifdef TREE_PROXY
     LoadTree();
+    if (!treePresent) {
+        gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+        return;
+    }
 #endif
     // Bit 5 flags a swaying vertex, whose alpha is then its sway weight: uniform on canopy
     // leaves, eased from nothing at a rooted plant's base to full at its tip (Vertex.SwayWeight).
@@ -322,8 +327,5 @@ void main() {
     fNormal = mat3(uModel) * vNormal;
     fTangent = mat3(uModel) * vTangent;
     fBitangent = mat3(uModel) * vBitangent;
-#endif
-#ifdef TREE_PROXY
-    if (!treePresent) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 #endif
 }
