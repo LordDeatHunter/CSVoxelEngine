@@ -337,7 +337,7 @@ internal sealed class ReflectionPass
         _owner.ChunkDraws.BeginPass(Terrain.VisibleRegions.Count);
         foreach (var (region, _) in Terrain.VisibleRegions)
             if (region.HasVisibleTrees)
-                _owner.ChunkDraws.AddInstanced(_owner.LodTrees.Template,
+                _owner.ChunkDraws.AddInstanced(_owner.LodTrees.Template(region.TreeSlice),
                     new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks),
                     MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)),
                     (uint)region.TreeSlice.Count, region.TreeSlice.BaseInstance);

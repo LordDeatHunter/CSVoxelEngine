@@ -18,16 +18,17 @@ public sealed unsafe class LodTreeGpuPool : IDisposable
     private readonly GeometryAllocator _allocator = new(4096);
     private readonly ChunkGeometryPool _template;
     private readonly GeometrySlice _templateSlice;
+    private readonly GeometrySlice _singleLayerSlice;
     private uint _buffer;
     private int _drawSetChanges;
 
-    internal readonly record struct Slice(int Unit, int Units, int Count, int MaskOffset, int MaskBytes)
+    internal readonly record struct Slice(int Unit, int Units, int Count, int MaskOffset, int MaskBytes, bool SingleLayer)
     {
         internal uint BaseInstance => (uint)Unit;
     }
 
     internal uint Vao => _template.Vao;
-    internal GeometrySlice Template => _templateSlice;
+    internal GeometrySlice Template(in Slice slice) => slice.SingleLayer ? _singleLayerSlice : _templateSlice;
     internal int ContentVersion => unchecked(_allocator.ContentVersion + _drawSetChanges);
     internal void NoteDrawSetChange() => _drawSetChanges = unchecked(_drawSetChanges + 1);
     internal int UsedBytes => _allocator.UsedUnits * UnitBytes;
@@ -36,21 +37,26 @@ public sealed unsafe class LodTreeGpuPool : IDisposable
     internal LodTreeGpuPool(GL gl)
     {
         _gl = gl;
-        _template = new ChunkGeometryPool(gl, 4, "lod-tree-template");
-        var (shape, indices) = LodTreeTemplate.Build();
+        // The generic 3-unit and single-layer 2-unit templates fit in eight units.
+        _template = new ChunkGeometryPool(gl, 8, "lod-tree-template");
+        _templateSlice = UploadTemplate(singleLayer: false);
+        _singleLayerSlice = UploadTemplate(singleLayer: true);
+        _buffer = NewBuffer(_allocator.Capacity);
+    }
+
+    private GeometrySlice UploadTemplate(bool singleLayer)
+    {
+        var (shape, indices) = LodTreeTemplate.Build(singleLayer);
         var vertices = new Vertex[shape.Length];
         for (var i = 0; i < shape.Length; i++)
         {
             var source = shape[i];
             var normal = Chunk.CubeFaces[source.Face].normal;
-            var code = (ushort)((source.Part * LodTreeTemplate.Faces + source.Face) *
-                LodTreeTemplate.Layers + source.Layer);
             vertices[i] = new Vertex(source.UnitPosition, 255, 255, 255, 255,
                 ChunkFaceTables.CropUv(source.Face, source.UnitPosition),
-                code, 1f, 0f, normal);
+                LodTreeTemplate.LayerCode(source), 1f, 0f, normal);
         }
-        _templateSlice = _template.Upload(vertices, indices);
-        _buffer = NewBuffer(_allocator.Capacity);
+        return _template.Upload(vertices, indices);
     }
 
     internal Slice Upload(LodTreeBuild trees, int originX, int originZ)
@@ -66,7 +72,7 @@ public sealed unsafe class LodTreeGpuPool : IDisposable
         }
         try { _gl.NamedBufferSubData(_buffer, (nint)((long)unit * UnitBytes), payload.Bytes.AsSpan()); }
         catch { _allocator.Free(unit, units); throw; }
-        return new Slice(unit, units, trees.Count, payload.MaskOffset, payload.MaskBytes);
+        return new Slice(unit, units, trees.Count, payload.MaskOffset, payload.MaskBytes, payload.SingleLayer);
     }
 
     internal void SetCoverage(in Slice slice, ReadOnlySpan<ulong> mask)

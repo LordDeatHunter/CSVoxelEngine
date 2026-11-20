@@ -335,7 +335,7 @@ internal sealed class ShadowPass
                 var min = new Vector3(region.X * region.SizeBlocks, region.YMin, region.Z * region.SizeBlocks);
                 var max = new Vector3(min.X + region.SizeBlocks, region.YMax, min.Z + region.SizeBlocks);
                 if (!farFrustum.IntersectsAABB(min, max)) continue;
-                _owner.ChunkDraws.AddInstanced(_owner.LodTrees.Template,
+                _owner.ChunkDraws.AddInstanced(_owner.LodTrees.Template(region.TreeSlice),
                     new Vector3(min.X, 0f, min.Z), 1f,
                     (uint)region.TreeSlice.Count, region.TreeSlice.BaseInstance);
             }

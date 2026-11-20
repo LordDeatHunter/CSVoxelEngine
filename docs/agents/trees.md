@@ -205,8 +205,12 @@ stamped voxels, and the terrain remains a heightmap approximation.
 The live tree layer stores bounded 64-byte logical instances, shared six-face log/leaf
 materials, grass and foliage tint lattices, generated 16-block tiles and proxy-Y intervals.
 `LodTreeGpuPayload` packs its region-local signed coordinates and materials for a shared
-GPU buffer; `LodTreeGpuPool` uploads them. One reusable trunk/crown/cap box template is
-instanced in the opaque world, reflection and far-shadow passes. The terrain and water
+GPU buffer; `LodTreeGpuPool` uploads them. Its private GPU header marks a region
+single-layer only when every face of every table material has at most one tile. Such
+regions use a second reusable 72-vertex/108-index trunk/crown/cap template; a dual
+base+tint face anywhere retains the original 144-vertex/216-index template. Both
+modes retain original part/face decoding, per-face tint choice, order and coverage,
+and share one region draw in the opaque world, reflection and far-shadow passes. The terrain and water
 meshes keep their separate geometry. `LodTreeCoverPass` masks a proxy tile only after
 finer proxy or full-detail draw readiness covers its Y interval, while ground burial stays
 independent. The current LOD network format carries the logical tree layer and atlas

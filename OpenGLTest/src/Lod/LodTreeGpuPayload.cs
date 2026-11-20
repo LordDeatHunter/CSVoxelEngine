@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 namespace VoxelEngine.Lod;
 
 /// <summary>Pure std430 payload shared by the live GPU uploader and headless ABI tests.</summary>
-internal readonly record struct LodTreeGpuPayload(byte[] Bytes, int MaskOffset, int MaskBytes)
+internal readonly record struct LodTreeGpuPayload(byte[] Bytes, int MaskOffset, int MaskBytes, bool SingleLayer)
 {
     internal static LodTreeGpuPayload Pack(LodTreeBuild trees, int originX, int originZ)
     {
@@ -17,6 +17,12 @@ internal readonly record struct LodTreeGpuPayload(byte[] Bytes, int MaskOffset, 
         var total = checked(64 + instanceBytes + materialBytes + tintBytes + maskBytes);
         if (total > 12 * 1024 * 1024)
             throw new InvalidOperationException("One logical tree region exceeds the 12 MiB ceiling.");
+        // This is a render-only decision over the complete table, including unused materials.
+        // A single overlay face keeps the exact two-layer template for the entire region.
+        var singleLayer = true;
+        foreach (var material in trees.Materials)
+        for (var face = 0; face < LodTreeTemplate.Faces; face++)
+            if (material.HasOverlayAt(face)) singleLayer = false;
         var bytes = new byte[total];
         var instanceOffset = 64;
         var materialOffset = checked(instanceOffset + instanceBytes);
@@ -30,6 +36,8 @@ internal readonly record struct LodTreeGpuPayload(byte[] Bytes, int MaskOffset, 
         WriteWord(bytes, 5, trees.Materials.Length);
         WriteWord(bytes, 6, trees.Count);
         WriteWord(bytes, 7, trees.ProxyYMin.Length == 0 ? 0 : (int)MathF.Sqrt(trees.ProxyYMin.Length));
+        // Header word 8 was unused; the wire format carries only the logical build.
+        WriteWord(bytes, 8, singleLayer ? 1 : 0);
         for (var i = 0; i < trees.Count; i++)
             trees.Instances[i].WriteRegionLittleEndian(originX, originZ,
                 bytes.AsSpan(instanceOffset + i * LodTreeInstance.ByteSize, LodTreeInstance.ByteSize));
@@ -41,7 +49,7 @@ internal readonly record struct LodTreeGpuPayload(byte[] Bytes, int MaskOffset, 
         for (var i = 0; i < trees.GeneratedTiles.Length; i++)
             BinaryPrimitives.WriteUInt64LittleEndian(bytes.AsSpan(maskOffset + i * sizeof(ulong)),
                 trees.GeneratedTiles[i]);
-        return new LodTreeGpuPayload(bytes, maskOffset, maskBytes);
+        return new LodTreeGpuPayload(bytes, maskOffset, maskBytes, singleLayer);
     }
 
     private static void WriteWord(Span<byte> bytes, int word, int value) =>

@@ -5,9 +5,9 @@ using VoxelEngine.Chunks;
 namespace VoxelEngine.Lod;
 
 /// <summary>
-/// Reusable box topology for a trunk, broad crown and cap. Both base and tint layers
-/// exist once in this template; a future draw skips a layer whose material face is NoTile.
-/// Geometry is never copied per root. All actual bounds come from a validated instance.
+/// Reusable box topology for a trunk, broad crown and cap. The generic template
+/// includes both material layers; the regional single-layer template keeps one quad
+/// per face. Geometry is never copied per root. Bounds come from validated instances.
 /// </summary>
 internal static class LodTreeTemplate
 {
@@ -19,15 +19,16 @@ internal static class LodTreeTemplate
 
     internal readonly record struct Vertex(Vector3 UnitPosition, byte Part, byte Face, byte Layer);
 
-    internal static (Vertex[] Vertices, ushort[] Indices) Build()
+    internal static (Vertex[] Vertices, ushort[] Indices) Build(bool singleLayer = false)
     {
-        var vertices = new Vertex[Vertices];
-        var indices = new ushort[Indices];
+        var layerCount = singleLayer ? 1 : Layers;
+        var vertices = new Vertex[Parts * Faces * layerCount * 4];
+        var indices = new ushort[Parts * Faces * layerCount * 6];
         var v = 0;
         var n = 0;
         for (byte part = 0; part < Parts; part++)
         for (byte face = 0; face < Faces; face++)
-        for (byte layer = 0; layer < Layers; layer++)
+        for (byte layer = 0; layer < layerCount; layer++)
         {
             var corner = Chunk.CubeFaces[face].face;
             for (var k = 0; k < 4; k++) vertices[v + k] = new Vertex(corner[k], part, face, layer);
@@ -41,6 +42,11 @@ internal static class LodTreeTemplate
         }
         return (vertices, indices);
     }
+
+    // Keep the original two-layer stride even for a one-quad face. Both vertex shaders
+    // decode part/face from this code, then select the present logical layer from the payload.
+    internal static ushort LayerCode(Vertex source) => (ushort)
+        ((source.Part * Faces + source.Face) * Layers + source.Layer);
 
     /// <summary>Only fully materialized parts participate; absent caps/trunks do not leave fragments.</summary>
     internal static bool TryPart(LodTreeInstance instance, int part, int originX, int originZ,

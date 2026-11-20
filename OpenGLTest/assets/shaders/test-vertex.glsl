@@ -138,6 +138,10 @@ void LoadTree() {
     treePosition = mix(lo, hi, vPosition);
     uint m = treeBase + treeWords[treeBase + 1u] + uint(max(material, 0)) * 8u;
     uint pair = treeWords[m + uint(face)];
+    // Word 8 is a GPU-only region mode. In one-layer mode the template retains the
+    // original two-layer part/face stride but the present logical layer may be tint.
+    if (treeWords[treeBase + 8u] == 1u)
+        layer = (pair & 65535u) == 65535u ? 1 : 0;
     treeLayer = layer == 0 ? pair & 65535u : pair >> 16u;
     treePresent = material >= 0 && treeLayer != 65535u &&
         !(part == 2 && profile == 2) && all(greaterThan(hi, lo));
