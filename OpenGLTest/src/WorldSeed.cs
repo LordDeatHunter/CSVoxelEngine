@@ -60,6 +60,7 @@ public static class WorldSeed
         if (Interlocked.Decrement(ref _liveWorlds) == 0)
         {
             ColumnCache.Reset();
+            LodFarRootCache.Natural.Reset();
             TerrainErg.ResetCache();
             VolcanoSites.ResetCache();
             CaveLavaLakes.ResetCache();
@@ -129,6 +130,7 @@ public static class WorldSeed
         TerrainErg.ResetCache();
         WormCarver.ResetCellCache();
         TreeGenerator.ResetCaches();
+        LodFarRootCache.Natural.Reset();
         HellTrees.ResetCache();
         SkyTrees.ResetCache();
         TowerPlacement.ResetCache();

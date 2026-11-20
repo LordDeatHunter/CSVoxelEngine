@@ -967,6 +967,15 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int TreeProxyCanopyCacheCapacity = 4096;
     public const int TreeProxyCanopyCacheGenerations = 4;
 
+    // Far LOD natural roots only: sparse immutable proxy arrays per generated 16x16 chunk
+    // column. The 4096-entry/4-generation cap retains several repeat region working sets.
+    // Worst case is 256 proxies/column at about 48 bytes each: ~48 MiB payload, plus arrays,
+    // dictionary nodes and transient duplicate pure builds. Typical columns are much sparser.
+    // Every eviction reconstructs from the same seed/profile recipe; source ownership is checked
+    // before any cache read or miss. No edit, anchor, material or supplied-source state is stored.
+    public const int LodFarRootCacheCapacity = 4096;
+    public const int LodFarRootCacheGenerations = 4;
+
     // --- Layers (plans/LAYERS.md): the hell below and the sky above, as vertical bands of the one
     // world. Every Y range of the realms lives here (the visual cloud sea in SkyConfig), nowhere
     // else; LayerBandTests holds their ordering. World y, inclusive at both ends of each band.

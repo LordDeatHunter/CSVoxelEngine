@@ -11,9 +11,6 @@ namespace VoxelEngine.Lod;
 /// <summary>Collects whole compact trees, source-owned tiles, and finite tile Y bounds.</summary>
 internal sealed class LodTreeProxyEmitter
 {
-    private static readonly Func<int, int, LodTreeProxy?> ResolveFar = static (x, z) =>
-        TreeGenerator.TryGetTree(x, z, out var species, out var y) && species.HasLeaves
-            ? LodTreeProxy.FromFar(species, x, z, y) : null;
     private readonly LodLevelSpec _spec;
     private readonly IWorldSource _source;
     private readonly bool[] _supplied;
@@ -76,8 +73,8 @@ internal sealed class LodTreeProxyEmitter
             if (_spec.ProxyCanopy)
             {
                 var roots = new List<LodTreeProxy>();
-                LodProxyOwnership.CollectFar(_supplied, _prefetchSpan, _ownedSpan,
-                    _x0, _z0, _spec.RegionBlocks, reach, RootSupplied, ResolveFar, roots);
+                LodProxyOwnership.CollectFarCached(_supplied, _prefetchSpan, _ownedSpan,
+                    _x0, _z0, _spec.RegionBlocks, reach, RootSupplied, LodFarRootCache.Natural, roots);
                 foreach (var root in roots) TryAddNatural(root);
             }
             else
