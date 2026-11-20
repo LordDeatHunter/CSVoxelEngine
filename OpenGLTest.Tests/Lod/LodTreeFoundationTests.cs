@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Lod;
 using VoxelEngine.WorldGen.Trees.Shape;
+using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
 
 namespace VoxelEngine.Tests.Lod;
@@ -27,7 +28,8 @@ public sealed class LodTreeFoundationTests
         Assert.True(LodTreeInstance.TryReadLittleEndian(bytes, 2, out var decoded));
         Assert.Equal(tree.CrownBottom, decoded.CrownBottom);
         Assert.Equal(tree.MaxZ, decoded.MaxZ);
-        Assert.Equal(20, decoded.ToRegionProxy(int.MaxValue - 50, -16).RootX);
+        Assert.True(decoded.TryRegionProxy(int.MaxValue - 50, -16, out var local));
+        Assert.Equal(20, local.RootX);
         Assert.False(LodTreeInstance.TryCreate(tree, 0, 2, 2, added: false, out _));
         BinaryPrimitives.WriteInt32LittleEndian(bytes[60..], 1);
         Assert.False(LodTreeInstance.TryReadLittleEndian(bytes, 2, out _));
@@ -101,7 +103,8 @@ public sealed class LodTreeFoundationTests
         Assert.Equal(40f, crown.MinY);
         Assert.Equal(56f, cap.MaxY);
         Assert.True(cap.MinX > crown.MinX && cap.MaxX < crown.MaxX);
-        Assert.Equal(-1, instance.ToRegionProxy(64, 0).RootX);
+        Assert.True(instance.TryRegionProxy(64, 0, out var local));
+        Assert.Equal(-1, local.RootX);
     }
 
     [Fact]
@@ -153,5 +156,130 @@ public sealed class LodTreeFoundationTests
         Assert.Equal(a.Sample(BiomeTintPalette.Foliage, 16, 8),
             b.Sample(BiomeTintPalette.Foliage, 0, 8));
         Assert.Equal(low, a.Sample(BiomeTintPalette.Grass, 0, 0));
+    }
+
+    [Fact]
+    public void CanonicalInstanceRejectsAliasedProfilesAndUnsafePartArithmetic()
+    {
+        var tree = new LodTreeProxy(-1, 3, -20, 8, 30, -8, 9, -4, 11,
+            2, 1, 2, LodCrownProfile.Dome);
+        Assert.True(LodTreeInstance.TryCreate(tree, 0, 1, 2, added: false, out var instance));
+        Span<byte> bytes = stackalloc byte[LodTreeInstance.ByteSize];
+        instance.WriteLittleEndian(bytes);
+        foreach (var raw in new[] { -256, -1, 256, 257, 258 })
+        {
+            BinaryPrimitives.WriteInt32LittleEndian(bytes[48..], raw);
+            Assert.False(LodTreeInstance.TryReadLittleEndian(bytes, 2, out _));
+        }
+        instance.WriteLittleEndian(bytes);
+        Assert.False(LodTreeInstance.TryReadLittleEndian(bytes[..^1], 2, out _));
+        Span<byte> extra = stackalloc byte[LodTreeInstance.ByteSize + 1];
+        bytes.CopyTo(extra);
+        Assert.False(LodTreeInstance.TryReadLittleEndian(extra, 2, out _));
+        BinaryPrimitives.WriteInt32LittleEndian(bytes[8..], int.MaxValue);
+        Assert.False(LodTreeInstance.TryReadLittleEndian(bytes, 2, out _));
+        instance.WriteLittleEndian(bytes);
+        BinaryPrimitives.WriteInt32LittleEndian(bytes[20..], int.MinValue);
+        BinaryPrimitives.WriteInt32LittleEndian(bytes[24..], int.MaxValue);
+        Assert.False(LodTreeInstance.TryReadLittleEndian(bytes, 2, out _));
+        Assert.False(instance.TryRegionProxy(int.MaxValue, 0, out _));
+        Assert.False(LodTreeTemplate.TryPart(instance, 0, int.MaxValue, 0, out _, out _));
+        var nearLimit = new LodTreeProxy(int.MinValue + 50, int.MaxValue - 50,
+            -LodTreeInstance.MaxWorldY + 1, -LodTreeInstance.MaxWorldY + 2,
+            -LodTreeInstance.MaxWorldY + 4, int.MinValue + 40, int.MinValue + 60,
+            int.MaxValue - 60, int.MaxValue - 40, 2, 1, 2, LodCrownProfile.Cone);
+        Assert.True(LodTreeInstance.TryCreate(nearLimit, 0, 1, 2, added: false, out var safe));
+        Assert.True(LodTreeTemplate.TryPart(safe, 0, int.MinValue + 32, int.MaxValue - 64,
+            out var safeTrunk, out _));
+        Assert.True(safeTrunk.HasVolume && float.IsFinite(safeTrunk.MinX));
+    }
+
+    [Fact]
+    public void NaturalWoodOnlyInstanceKeepsCompleteTrunk()
+    {
+        var tree = new LodTreeProxy(0, -1, -18, 41, 41, 0, 1, -1, 0,
+            2, 12, 0, LodCrownProfile.Dome);
+        Assert.True(LodTreeInstance.TryCreate(tree, 0, LodTreeInstance.NoMaterial,
+            1, added: false, out var instance));
+        Span<byte> bytes = stackalloc byte[LodTreeInstance.ByteSize];
+        instance.WriteLittleEndian(bytes);
+        Assert.True(LodTreeInstance.TryReadLittleEndian(bytes, 1, out var restored));
+        Assert.True(restored.HasTrunk);
+        Assert.False(restored.HasCrown);
+        Assert.True(LodTreeTemplate.TryPart(restored, 0, 0, 0, out var trunk, out var wood));
+        Assert.Equal(0, wood);
+        Assert.Equal(-18f, trunk.MinY);
+        Assert.Equal(41f, trunk.MaxY);
+        Assert.False(LodTreeTemplate.TryPart(restored, 1, 0, 0, out _, out _));
+        Assert.False(LodTreeTemplate.TryPart(restored, 2, 0, 0, out _, out _));
+    }
+
+    [Fact]
+    public void AbsentMaterialFacesRemainAbsentAfterRemap()
+    {
+        ushort n = LodTreeMaterial.NoTile;
+        ushort[] bases = [n, n, 7, n, n, n];
+        ushort[] tinted = [n, n, n, n, 8, n];
+        Assert.True(LodTreeMaterial.TryCreate(bases, tinted, BiomeTintPalette.Grass, out var material));
+        var mappedCount = 0;
+        Assert.True(material.TryRemap(tile => { mappedCount++; return (ushort)(tile + 20); }, out var mapped));
+        Assert.Equal(2, mappedCount);
+        Assert.Equal(n, mapped.BaseAt(0));
+        Assert.Equal(n, mapped.TintedAt(0));
+        Assert.Equal((ushort)27, mapped.BaseAt(2));
+        Assert.Equal((ushort)28, mapped.TintedAt(4));
+        Span<byte> bytes = stackalloc byte[LodTreeMaterial.ByteSize];
+        mapped.WriteLittleEndian(bytes);
+        Assert.True(LodTreeMaterial.TryReadLittleEndian(bytes, out var restored));
+        Assert.Equal(n, restored.BaseAt(0));
+        ushort[] allAbsent = [n, n, n, n, n, n];
+        Assert.True(LodTreeMaterial.TryCreate(allAbsent, allAbsent, null, out var invisible));
+        Assert.True(invisible.TryRemap(_ => throw new InvalidOperationException(), out _));
+    }
+
+    [Fact]
+    public void TintLatticeRejectsNonFiniteCoordinatesAndCorners()
+    {
+        Vector3[] corners = [Vector3.One, Vector3.One, Vector3.One, Vector3.One];
+        var bad = (Vector3[])corners.Clone();
+        bad[2] = new Vector3(float.NaN, 0f, 0f);
+        Assert.Throws<ArgumentException>(() => new LodTreeTintLattice(1, bad, corners));
+        var lattice = new LodTreeTintLattice(1, corners, corners);
+        Assert.Throws<ArgumentOutOfRangeException>(() => lattice.Sample(BiomeTintPalette.Grass, float.NaN, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => lattice.Sample(BiomeTintPalette.Foliage, 0, float.PositiveInfinity));
+        Assert.Throws<ArgumentOutOfRangeException>(() => lattice.Sample((BiomeTintPalette)255, 0, 0));
+    }
+
+    [Fact]
+    public void FullDetailCoverageRequiresEveryProxyChunkY()
+    {
+        int[] ys = [-2, -1, 0];
+        bool[] ready = [true, true, true];
+        Assert.True(LodTreeCoverage.FullDetailYReady(-17, 16, ys, ready));
+        ready[1] = false;
+        Assert.False(LodTreeCoverage.FullDetailYReady(-17, 16, ys, ready));
+        var source = new bool[16];
+        var replacement = new bool[16];
+        var full = new bool[16];
+        full[0] = LodTreeCoverage.FullDetailYReady(-17, 16, ys, ready);
+        Assert.True(LodTreeCoverage.Build(64, 0, source, replacement, full).Visible(0, 0));
+        ready[1] = true;
+        full[0] = LodTreeCoverage.FullDetailYReady(-17, 16, ys, ready);
+        Assert.False(LodTreeCoverage.Build(64, 0, source, replacement, full).Visible(0, 0));
+        Assert.True(LodTreeCoverage.FullDetailYReady(16, 16, [], []));
+        Assert.False(LodTreeCoverage.FullDetailYReady(17, 16, ys, ready));
+        Assert.False(LodTreeCoverage.FullDetailYReady(int.MinValue, int.MaxValue, ys, ready));
+        Assert.False(LodTreeCoverage.FullDetailYReady(-17, 16, [-1, -2, 0], ready));
+    }
+
+    [Fact]
+    public void SupportedProxyReachCannotExceedTheGrownBatchEnvelope()
+    {
+        Assert.True(TreeProxyReach.FitsGrownReach(0, 0));
+        Assert.True(TreeProxyReach.FitsGrownReach(7, 21));
+        Assert.True(TreeProxyReach.FitsGrownReach(32, 32));
+        Assert.False(TreeProxyReach.FitsGrownReach(33, 32));
+        Assert.False(TreeProxyReach.FitsGrownReach(-1, 32));
+        Assert.False(TreeProxyReach.FitsGrownReach(1, -1));
     }
 }

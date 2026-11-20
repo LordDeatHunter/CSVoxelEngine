@@ -16,6 +16,10 @@ internal readonly struct LodTreeInstance
     internal const int ByteSize = 64;
     internal const int NoMaterial = -1;
     internal const int AddedCap = 1;
+    // Region-local floats retain block precision here; world XZ stays signed integer until
+    // the region origin is subtracted. These are representation limits, not worldgen tuning.
+    internal const int MaxLocalCoordinate = 1 << 20;
+    internal const int MaxWorldY = 1 << 20;
     private const int KnownFlags = AddedCap;
 
     [FieldOffset(0)] internal readonly int RootX;
@@ -62,10 +66,24 @@ internal readonly struct LodTreeInstance
         int materialCount, bool added, out LodTreeInstance value)
     {
         value = default;
+        var woodOnly = !added && leafMaterial == NoMaterial && tree.CrownBottom == tree.CrownTop;
         if (materialCount < 0 || tree.MinX >= tree.MaxX || tree.MinZ >= tree.MaxZ ||
             tree.CrownBottom > tree.CrownTop || tree.TrunkWidth < 1 ||
             !Enum.IsDefined(tree.Profile) ||
-            leafMaterial < 0 || leafMaterial >= materialCount ||
+            tree.BaseY > tree.CrownBottom ||
+            (tree.CrownBottom == tree.CrownTop && !woodOnly) ||
+            (tree.CrownBottom < tree.CrownTop && leafMaterial == NoMaterial) ||
+            (tree.LeavesId == 0 && !woodOnly) ||
+            !InWorldY(tree.BaseY) || !InWorldY(tree.CrownBottom) || !InWorldY(tree.CrownTop) ||
+            tree.BaseY == MaxWorldY ||
+            (long)tree.MaxX - tree.MinX > MaxLocalCoordinate ||
+            (long)tree.MaxZ - tree.MinZ > MaxLocalCoordinate ||
+            (long)tree.CrownTop - tree.BaseY > MaxLocalCoordinate ||
+            tree.TrunkWidth > MaxLocalCoordinate ||
+            (!woodOnly && (leafMaterial < 0 || leafMaterial >= materialCount)) ||
+            (woodOnly && tree.LeavesId != 0) ||
+            (added && (tree.Profile != LodCrownProfile.Column ||
+                (long)tree.CrownTop - tree.CrownBottom != 2)) ||
             (!added && (woodMaterial < 0 || woodMaterial >= materialCount)) ||
             (added && woodMaterial != NoMaterial))
             return false;
@@ -73,19 +91,31 @@ internal readonly struct LodTreeInstance
         return true;
     }
 
-    /// <summary>Subtract in 64-bit integer space before the proxy converts XZ to floats.</summary>
-    internal LodTreeProxy ToRegionProxy(int originX, int originZ) => new(
-        Relative(RootX, originX), Relative(RootZ, originZ), BaseY, CrownBottom, CrownTop,
-        Relative(MinX, originX), Relative(MaxX, originX), Relative(MinZ, originZ),
-        Relative(MaxZ, originZ), TrunkWidth, 0, HasCrown ? (ushort)1 : (ushort)0,
-        (LodCrownProfile)Profile);
+    /// <summary>Subtract in 64-bit integer space before any XZ value becomes a float.</summary>
+    internal bool TryRegionProxy(int originX, int originZ, out LodTreeProxy proxy)
+    {
+        proxy = default;
+        if (!Relative(RootX, originX, out var rootX) || !Relative(RootZ, originZ, out var rootZ) ||
+            !Relative(MinX, originX, out var minX) || !Relative(MaxX, originX, out var maxX) ||
+            !Relative(MinZ, originZ, out var minZ) || !Relative(MaxZ, originZ, out var maxZ))
+            return false;
+        if (HasTrunk && ((long)Math.Abs(rootX) + TrunkWidth > MaxLocalCoordinate ||
+                         (long)Math.Abs(rootZ) + TrunkWidth > MaxLocalCoordinate)) return false;
+        proxy = new LodTreeProxy(rootX, rootZ, BaseY, CrownBottom, CrownTop,
+            minX, maxX, minZ, maxZ, TrunkWidth, 0, HasCrown ? (ushort)1 : (ushort)0,
+            (LodCrownProfile)Profile);
+        return true;
+    }
 
-    private static int Relative(int world, int origin)
+    private static bool InWorldY(int y) => y >= -MaxWorldY && y <= MaxWorldY;
+
+    private static bool Relative(int world, int origin, out int local)
     {
         var difference = (long)world - origin;
-        if (difference < int.MinValue || difference > int.MaxValue)
-            throw new OverflowException("Tree proxy is too far from its region origin.");
-        return (int)difference;
+        local = 0;
+        if (difference < -MaxLocalCoordinate || difference > MaxLocalCoordinate) return false;
+        local = (int)difference;
+        return true;
     }
 
     internal void WriteLittleEndian(Span<byte> destination)
@@ -109,13 +139,14 @@ internal readonly struct LodTreeInstance
         for (var i = 0; i < w.Length; i++)
             w[i] = BinaryPrimitives.ReadInt32LittleEndian(source.Slice(i * sizeof(int), sizeof(int)));
         if (w[15] != 0 || (w[14] & ~KnownFlags) != 0 || w[13] is < 0 or > 1 ||
-            !Enum.IsDefined((LodCrownProfile)w[12]) || w[5] >= w[6] || w[7] >= w[8] ||
-            w[3] > w[4] || w[9] < 1 || w[11] < 0 || w[11] >= materialCount ||
+            w[12] is < 0 or > (int)LodCrownProfile.Column ||
+            w[5] >= w[6] || w[7] >= w[8] ||
+            w[3] > w[4] || w[9] < 1 ||
             ((w[14] & AddedCap) != 0 ? w[10] != NoMaterial : w[10] < 0 || w[10] >= materialCount) ||
             w[13] != ((w[0] ^ w[1]) & 1))
             return false;
         var tree = new LodTreeProxy(w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8],
-            w[9], 0, 1, (LodCrownProfile)w[12]);
+            w[9], 0, w[11] == NoMaterial ? (ushort)0 : (ushort)1, (LodCrownProfile)w[12]);
         return TryCreate(tree, w[10], w[11], materialCount, (w[14] & AddedCap) != 0, out value);
     }
 }

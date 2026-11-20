@@ -1,4 +1,5 @@
 using System;
+using VoxelEngine.Chunks;
 
 namespace VoxelEngine.Lod;
 
@@ -64,6 +65,32 @@ internal readonly struct LodTreeCoverage
         for (var x = childX * (side / 2); x < (childX + 1) * (side / 2); x++)
         for (var z = childZ * (side / 2); z < (childZ + 1) * (side / 2); z++)
             ready[x * side + z] = true;
+    }
+
+    /// <summary>
+    /// A complete half-open proxy Y interval is hidden only when every intersected chunk Y
+    /// is available and meshed. Inputs are sorted distinct chunk Ys; the finite 128-entry cap
+    /// prevents an extreme span or malformed stream from triggering an unbounded scan.
+    /// </summary>
+    internal static bool FullDetailYReady(int minY, int maxYExclusive,
+        ReadOnlySpan<int> availableChunkYs, ReadOnlySpan<bool> meshed)
+    {
+        if (availableChunkYs.Length != meshed.Length || availableChunkYs.Length > 128 ||
+            maxYExclusive < minY) return false;
+        if (maxYExclusive == minY) return true;
+        var first = minY >> Chunk.SizeShift;
+        var last = (maxYExclusive - 1) >> Chunk.SizeShift;
+        if ((long)last - first + 1 > 128) return false;
+        for (var i = 1; i < availableChunkYs.Length; i++)
+            if (availableChunkYs[i] <= availableChunkYs[i - 1]) return false;
+        var at = 0;
+        for (var cy = (long)first; cy <= last; cy++)
+        {
+            while (at < availableChunkYs.Length && availableChunkYs[at] < cy) at++;
+            if (at == availableChunkYs.Length || availableChunkYs[at] != cy || !meshed[at]) return false;
+            at++;
+        }
+        return true;
     }
 
     /// <summary>Half-open world XZ ownership; long subtraction makes negative/large seams safe.</summary>

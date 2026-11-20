@@ -66,7 +66,6 @@ internal readonly struct LodTreeMaterial
         uint flags = 0;
         for (var i = 0; i < 6; i++)
         {
-            if (bases[i] == NoTile && tinted[i] == NoTile) return false;
             if (tinted[i] != NoTile)
             {
                 if (palette == null) return false;

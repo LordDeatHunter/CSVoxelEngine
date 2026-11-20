@@ -208,8 +208,12 @@ limit can still leave a partial proxy near capacity, and partially covered coars
 draw coincident crown geometry; those contracts need resolution before runtime acceptance.
 The source-only compact replacement foundation defines a canonical 64-byte signed tree instance,
 complete six-face base/tinted materials shared by block ID, a reusable trunk/crown/cap template,
-a source-corner grass/foliage vec4 tint lattice, and 16-block source/replacement visibility tiles. These types are not yet wired into the renderer,
-network codec, or generated LOD build. Their tests are unrun; the live path remains the baked
+a source-corner grass/foliage vec4 tint lattice, and 16-block source/replacement visibility tiles.
+The profile table now rejects an eligible leafy far crown whose radius exceeds that species'
+grown horizontal reach; the existing 2×reach<=64 batch-cell rule then bounds either reach by 32.
+Compact descriptor validation preserves a natural grown wood-only shape, absent material faces,
+finite tint inputs and complete proxy-Y chunk readiness. These types are not yet wired into the renderer,
+network codec, or generated LOD build. Their new tests are unrun; the live path remains the baked
 opaque proxy above. A future instanced draw must keep the current 16-block biome-tint lattice,
 wood/leaf atlas remap, and matched color/reflection/shadow coverage while the old ground and
 water burial stays separate. Shader clipping of a proxy at tile edges would omit closure faces;

@@ -205,6 +205,9 @@ public static class TreeGenerator
         {
             maxDensity = Math.Max(maxDensity, species.Worldgen!.DensityFor(profile));
             var (horizontal, up, _) = TreeRasterizer.ReachOf(species);
+            if (species.HasLeaves && !TreeProxyReach.FitsGrownReach(species.CrownRadius, horizontal))
+                throw new InvalidOperationException(
+                    $"{profile} tree {species.Name} LOD crown radius {species.CrownRadius} exceeds grown horizontal reach {horizontal}.");
             reachHorizontal = Math.Max(reachHorizontal, horizontal);
             reachUp = Math.Max(reachUp, up);
             if (species.HasLeaves) proxyReach = Math.Max(proxyReach, species.CrownRadius);

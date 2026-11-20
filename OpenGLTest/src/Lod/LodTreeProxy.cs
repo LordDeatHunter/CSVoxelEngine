@@ -61,23 +61,24 @@ internal readonly record struct LodTreeProxy(
         var width = Math.Max(1, TrunkWidth);
         var half = width * 0.5f;
         return new LodProxyBox(RootX + 0.5f - half, BaseY, RootZ + 0.5f - half,
-            RootX + 0.5f + half, Math.Max(BaseY + 1, CrownBottom), RootZ + 0.5f + half);
+            RootX + 0.5f + half, Math.Max((long)BaseY + 1, CrownBottom), RootZ + 0.5f + half);
     }
 
     internal LodProxyBox Crown() => new(MinX, CrownBottom, MinZ, MaxX,
-        Profile == LodCrownProfile.Column ? CrownTop : CrownBottom + Math.Max(1, (CrownTop - CrownBottom) / 2), MaxZ);
+        Profile == LodCrownProfile.Column ? CrownTop
+            : (long)CrownBottom + Math.Max(1L, ((long)CrownTop - CrownBottom) / 2), MaxZ);
 
     // A second, narrower cap gives cones and domes a silhouette without growing far trees.
     // Root parity is a cheap stable two-variant choice; it does not consume a placement roll.
     internal LodProxyBox Cap()
     {
-        var middle = CrownBottom + Math.Max(1, (CrownTop - CrownBottom) / 2);
+        var middle = (long)CrownBottom + Math.Max(1L, ((long)CrownTop - CrownBottom) / 2);
         var inset = Profile == LodCrownProfile.Column ? 0f
             : Profile == LodCrownProfile.Cone ? 0.32f : 0.18f;
         if (Profile != LodCrownProfile.Column && ((RootX ^ RootZ) & 1) != 0)
             inset += 0.04f;
-        var dx = (MaxX - MinX) * inset;
-        var dz = (MaxZ - MinZ) * inset;
+        var dx = ((long)MaxX - MinX) * inset;
+        var dz = ((long)MaxZ - MinZ) * inset;
         return new LodProxyBox(MinX + dx, middle, MinZ + dz,
             MaxX - dx, CrownTop, MaxZ - dz);
     }

@@ -49,7 +49,7 @@ internal static class LodTreeTemplate
         box = default;
         material = LodTreeInstance.NoMaterial;
         if (part is < 0 or >= Parts) return false;
-        var tree = instance.ToRegionProxy(originX, originZ);
+        if (!instance.TryRegionProxy(originX, originZ, out var tree)) return false;
         switch (part)
         {
             case 0 when instance.HasTrunk:

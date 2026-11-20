@@ -29,6 +29,8 @@ internal sealed class LodTreeTintLattice
         _foliage = new Vector4[foliage.Length];
         for (var i = 0; i < grass.Length; i++)
         {
+            if (!Finite(grass[i]) || !Finite(foliage[i]))
+                throw new ArgumentException("Tint corners must be finite.");
             _grass[i] = new Vector4(grass[i], 0f);
             _foliage[i] = new Vector4(foliage[i], 0f);
         }
@@ -39,8 +41,10 @@ internal sealed class LodTreeTintLattice
 
     internal Vector3 Sample(BiomeTintPalette palette, float localX, float localZ)
     {
+        if (!Enum.IsDefined(palette)) throw new ArgumentOutOfRangeException(nameof(palette));
         var grid = palette == BiomeTintPalette.Foliage ? _foliage : _grass;
-        if (localX < 0 || localZ < 0 || localX > ChunkSpan * 16 || localZ > ChunkSpan * 16)
+        if (!float.IsFinite(localX) || !float.IsFinite(localZ) ||
+            localX < 0 || localZ < 0 || localX > ChunkSpan * 16 || localZ > ChunkSpan * 16)
             throw new ArgumentOutOfRangeException(nameof(localX));
         var cx = Math.Clamp((int)localX >> 4, 0, ChunkSpan - 1);
         var cz = Math.Clamp((int)localZ >> 4, 0, ChunkSpan - 1);
@@ -53,4 +57,6 @@ internal sealed class LodTreeTintLattice
     }
 
     private static Vector3 ToRgb(Vector4 value) => new(value.X, value.Y, value.Z);
+    private static bool Finite(Vector3 value) =>
+        float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
 }
