@@ -195,6 +195,8 @@ public sealed class LodBuildPoolTests
         public ConcurrentBag<string> Failures = new();
         public int MaxPendingObserved;
         public int MaxBatchObserved;
+        public int ThrottledWorkersMask;
+        public bool InitialPressureReached;
         public long ElapsedMs;
     }
 
@@ -209,13 +211,18 @@ public sealed class LodBuildPoolTests
     /// <para>Regions are never added to <c>Regions</c>, so the closest-needed scan keeps handing out
     /// fresh keys until every offset of every level has been claimed once — 591 in total. That is
     /// what makes "exactly once" checkable here: the claim, not an upload, is what retires a key.</para>
+    /// <para>For the cap fact only, wait for the real completed queue and all three distinct
+    /// producers to observe throttling before the first drain. A safety violation, worker failure
+    /// or deadline releases that hold through the ordinary cleanup.</para>
     /// </summary>
     private static StressResult RunStress(int targetBuilds, int drainSleepMs, int deadlineMs,
-        bool keepBuffers = false)
+        bool keepBuffers = false, bool holdInitialDrain = false)
     {
         var result = new StressResult { Manager = ClaimableManager() };
         var lods = result.Manager;
         var running = true;
+        var throttledWorkersMask = 0;
+        var initialPressureReleased = !holdInitialDrain;
         var clock = Stopwatch.StartNew();
         var threads = new Thread[StressWorkers];
 
@@ -236,6 +243,7 @@ public sealed class LodBuildPoolTests
                                 Thread.Yield();
                                 break;
                             case LodBuildOutcome.Throttled:
+                                if (holdInitialDrain) Interlocked.Or(ref throttledWorkersMask, 1 << id);
                                 Thread.Sleep(StreamingConfig.LodBuildThrottleDelayMs);
                                 break;
                         }
@@ -259,6 +267,23 @@ public sealed class LodBuildPoolTests
         {
             var pending = lods.PendingUploadCount;
             if (pending > result.MaxPendingObserved) result.MaxPendingObserved = pending;
+
+            if (!initialPressureReleased)
+            {
+                var allWorkersThrottled = Volatile.Read(ref throttledWorkersMask) == (1 << StressWorkers) - 1;
+                result.InitialPressureReached =
+                    pending >= StreamingConfig.MaxLodBuildsInFlight && allWorkersThrottled;
+                // A cap regression must release the consumer on a real safety violation,
+                // even though no worker would ever report Throttled in that case.
+                initialPressureReleased = result.InitialPressureReached ||
+                    pending > StreamingConfig.MaxLodBuildsInFlight + StressWorkers ||
+                    !result.Failures.IsEmpty;
+                if (!initialPressureReleased)
+                {
+                    Thread.Yield();
+                    continue;
+                }
+            }
 
             var batch = new List<LodMeshData>();
             while (lods.TryTakeCompletedMesh(out var data))
@@ -292,6 +317,7 @@ public sealed class LodBuildPoolTests
                 lods.MeshBuffers.Return(data.Vertices, data.Indices, data.WaterVertices, data.WaterIndices);
         }
 
+        result.ThrottledWorkersMask = Volatile.Read(ref throttledWorkersMask);
         result.ElapsedMs = clock.ElapsedMilliseconds;
         return result;
     }
@@ -362,7 +388,9 @@ public sealed class LodBuildPoolTests
         // xUnit happened to run it first; the order follows a hash of the namespace-qualified name, so it is not stable.
         RunStress(targetBuilds: 60, drainSleepMs: 0, deadlineMs: 30_000);
         var bound = StreamingConfig.MaxLodBuildsInFlight + StressWorkers;
-        var result = RunStress(targetBuilds: 60, drainSleepMs: 20, deadlineMs: 30_000);
+        // Hold only this measured run's first drain until each real builder has hit the cap.
+        var result = RunStress(targetBuilds: 60, drainSleepMs: 20, deadlineMs: 30_000,
+            holdInitialDrain: true);
 
         Assert.True(result.Failures.IsEmpty, string.Join(" | ", result.Failures));
         Assert.True(result.Drained.Count >= 40,
@@ -373,6 +401,9 @@ public sealed class LodBuildPoolTests
             $"the queue only ever reached {result.MaxPendingObserved}; the cap was never approached");
         Assert.True(result.MaxPendingObserved <= bound,
             $"the completed queue reached {result.MaxPendingObserved}, past the {bound} bound");
+        Assert.True(result.InitialPressureReached,
+            $"initial pressure never included all {StressWorkers} distinct throttled producers " +
+            $"(mask {result.ThrottledWorkersMask}, max pending {result.MaxPendingObserved})");
     }
 
     /// <summary>
