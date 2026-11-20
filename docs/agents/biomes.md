@@ -204,12 +204,23 @@ or coast line. The existing lake/river guard and ocean-shore fade protect water 
 banks; face-adjacent and nearby shared-water levels also bound a dry cut above elevated water.
 The separate oasis and hot-spring discs and their face banks refuse an additional canyon
 cut because those features assign their own pond levels outside the shared water query. Deep cuts
-reuse the ravine soil-stripping rule, exposing the existing rock/sand palette. `ColumnCache`,
+reuse the ravine soil-stripping rule, exposing rock. Dynamic bare Desert, Steppe and Savanna
+columns then receive seeded, slightly wobbled sandstone, red sandstone, ochre clay and stone
+bands under their bare top in the upper 72 blocks. This is a bounded geology slab, including
+unexposed rock below canyon floors, Plain cave walls and bare arid crests; mining yields the
+selected material's normal drop. The fill replaces only exact Plain-cave stone left after
+carvers, ores, cave features and the cave palette; air, fluids, ores, other cave palettes,
+soil and deeper rock keep their owners. Generated far LOD samples the same selector for
+bare arid wall sides, while supplied columns keep saved material. The far stripped top can
+still use its older grass/sand approximation below the rock line, and coarse, sea/beach and
+imported LOD material chains remain approximations rather than cell-for-cell near matches.
+`ColumnCache`,
 generated chunks and far LOD read the same final height; supplied chunks keep their saved
 data. These terms do not change Legacy generation, the 186 terrain ceiling or S1b's surface
-writer clearance gates. S2 wall strata/materials, optional undercuts and later issue #64
+writer clearance gates. Optional undercuts and later issue #64
 content stages are still separate. `visual-examples/dynamic-canyons-s2a.json` records
-candidate views for a later Release visual review.
+candidate shape views; `visual-examples/dynamic-strata-s2-materials.json` records the
+bounded arid-band views for a separate Release visual review.
 
 **openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
 forest alternates between rolling woodland and open grass instead of one uniform canopy

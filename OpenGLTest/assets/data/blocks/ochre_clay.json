@@ -1,0 +1,8 @@
+{
+  "name": "Ochre Clay",
+  "model": { "parent": "block/cube_all", "textures": { "all": "ochre_clay" } },
+  "pebbleWeight": 0,
+  "sfx": "hit_rock",
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 }
+}

@@ -317,6 +317,12 @@ internal static class ChunkTerrainFill
             CaveBiomes.Stamp(blocks, caves, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.CaveBiomes);
 
+        // Dress the natural plain rock left below an exposed arid wall after the carvers,
+        // ore and cave-feature host checks. Only that rock is replaced: air, fluids, ores,
+        // cave palettes and the surface features above the ground retain their cells.
+        if (WorldSeed.Profile == WorldGenProfile.Dynamic)
+            TerrainStrata.Stamp(blocks, column, caves, worldX0, lowerBoundY, worldZ0);
+
         // Sealed underground rooms and their waystone chambers, after the deep features and the cave life, so no
         // geode, mushroom, formation, gravel pocket or pool is left inside a room. A room's loot chests take their
         // own cells' cave biomes as their tiers from the same map

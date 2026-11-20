@@ -8,6 +8,8 @@
 
 ## Items
 
+- [ ] **Arid strata** — `blocks/red_sandstone.png` and `blocks/ochre_clay.png` are generated 32x32 opaque stand-ins. Replace with hand-drawn rust and warm ochre stone tiles; keep seamless cube faces, opaque pixels and distinct band colors.
+
 - [ ] **Lumber** — `items/lumber.png` is a generated stack of boards (`tools/generate-lumber-sprite.py`); replace with hand-drawn art and delete the generator.
 - [ ] **Stumps** — `blocks/<species>_stump.json` reuse each log's side and end tiles on `models/block/stump.json`; give them their own cut-wood tile if the ring should differ from a log's end.
 - [ ] **Jungle** — `blocks/jungle_mud.png` is the dirt tile darkened (generated once in PowerShell; no generator to remove), and `jungle_log`, `jungle_leaves` and `jungle_stump` reuse the oak log/leaf tiles; give them their own jungle art (a mossy mud, a darker bark, broad glossy leaves). Keep `jungle_mud.png` 32x32.
