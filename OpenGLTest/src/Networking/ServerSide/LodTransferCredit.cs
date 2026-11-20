@@ -12,6 +12,7 @@ internal sealed class LodTransferCredit
     internal int ActiveGeneration { get; private set; }
     internal (int Level, int Rx, int Rz)? AwaitingAck { get; private set; }
     internal double StartedAt { get; private set; }
+    internal bool OwnsRawBytes { get; private set; }
 
     internal bool Request((int Level, int Rx, int Rz) key, int nonce, int max)
     {
@@ -41,6 +42,7 @@ internal sealed class LodTransferCredit
         ActiveNonce = nonce;
         ActiveGeneration = generation;
         StartedAt = now;
+        OwnsRawBytes = true;
         return true;
     }
 
@@ -58,11 +60,19 @@ internal sealed class LodTransferCredit
 
     internal bool Expire(double now, double seconds)
     {
-        if (Available || now - StartedAt < seconds) return false;
-        if (AwaitingAck is { } key) { Queued.Remove(key); Nonces.Remove(key); }
-        Release();
+        if (!OwnsRawBytes || now - StartedAt < seconds) return false;
+        // The server can reuse its raw serialization slot, but the peer still owns one
+        // logical region until its matching ACK/cancel or disconnect arrives.
+        OwnsRawBytes = false;
         return true;
     }
+
+    internal void Progress(double now)
+    {
+        if (OwnsRawBytes) StartedAt = now;
+    }
+
+    internal void ReleaseRaw() => OwnsRawBytes = false;
 
     internal void Clear()
     {
@@ -75,5 +85,6 @@ internal sealed class LodTransferCredit
         AwaitingAck = null;
         ActiveNonce = ActiveGeneration = 0;
         StartedAt = 0;
+        OwnsRawBytes = false;
     }
 }

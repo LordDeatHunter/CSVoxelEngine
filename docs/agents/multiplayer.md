@@ -364,7 +364,10 @@ position goes through the movement rubberband (both below) — syncs the day clo
 mesher reads, encoded by `ChunkNetCodec.EncodeColumn`), queues `LodRegionRequest`s (`StreamRequests`, deduped
 per connection, `ClientConnection.LodLedger`) and holds only one serialized far region
 server-wide, emitting at most eight pages per `Pump` (`LodRegion.BuildMeshData`, skipping any
-whose client has gone), replays each
+whose client has gone). `LodTransferCredit` keeps a peer's one logical-region credit blocked
+until its matching ACK, cancellation or disconnect; a stalled send can release the raw server
+serialization slot after its progress timeout without granting that peer another region. Successful
+Begin/page sends refresh that timeout, while stale nonces cannot release credit. The server replays each
 `InventoryRequest` intent (`IntentReplay.OnInventoryRequest`) against **the sender's** inventory only — `InventoryIntentRules.Apply`
 (a slot must be on the hotbar; equip only what the player owns, or toggle off what the slot
 already shows; craft through `Inventory.TryCraft` with exactly the fed members, so a refused craft

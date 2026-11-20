@@ -112,10 +112,41 @@ public sealed class LodLiveIntegrationTests
         Assert.False(credit.Acknowledge((0, 1, 0), 2, 8, LodTransfer.Applied));
         Assert.False(credit.Expire(2, 3));
         Assert.True(credit.Expire(5, 3));
-        Assert.True(credit.Available);
+        Assert.False(credit.Available);
+        Assert.False(credit.Begin((0, 2, 0), 3, 10, 6));
+        Assert.True(credit.Acknowledge((0, 1, 0), 2, 9, LodTransfer.Rejected));
         Assert.True(credit.Begin((0, 2, 0), 3, 10, 6));
         Assert.True(credit.Acknowledge((0, 2, 0), 3, 10, LodTransfer.Rejected));
         credit.Clear();
+        Assert.Empty(credit.Queued);
+        Assert.Empty(credit.Nonces);
+    }
+
+    [Fact]
+    public void TimedOutPeerKeepsCreditUntilMatchingCancel()
+    {
+        var credit = new LodTransferCredit();
+        var first = (Level: 0, Rx: 3, Rz: -2);
+        var second = (Level: 0, Rx: 4, Rz: -2);
+        Assert.True(credit.Request(first, 11, 64));
+        Assert.True(credit.Request(second, 12, 64));
+        Assert.True(credit.Begin(first, 11, 6, 0));
+        credit.Progress(2);
+        Assert.False(credit.Expire(4, 3));
+        Assert.True(credit.Expire(6, 3));
+        Assert.False(credit.OwnsRawBytes);
+        Assert.False(credit.Available);
+        Assert.False(credit.Expire(20, 3)); // raw release happens only once
+        Assert.False(credit.Begin(second, 12, 7, 20));
+        Assert.False(credit.Acknowledge(first, 10, 0, LodTransfer.Canceled));
+        Assert.False(credit.Acknowledge(second, 12, 0, LodTransfer.Canceled));
+        Assert.False(credit.Available);
+        Assert.True(credit.Acknowledge(first, 11, 0, LodTransfer.Canceled));
+        Assert.True(credit.Available);
+        Assert.True(credit.Begin(second, 12, 7, 21));
+        credit.Clear(); // disconnect releases the active identity and queued metadata
+        Assert.True(credit.Available);
+        Assert.Null(credit.AwaitingAck);
         Assert.Empty(credit.Queued);
         Assert.Empty(credit.Nonces);
     }

@@ -164,6 +164,7 @@ internal sealed class StreamRequests
         if (_active is { Stale: true } stale)
         {
             SendComplete(stale.Client, stale.Header, LodTransfer.Rejected);
+            stale.Client.LodLedger.ReleaseRaw();
             _active = null;
         }
         foreach (var client in _state.Clients.Values)
@@ -238,6 +239,7 @@ internal sealed class StreamRequests
             LodTransfer.WriteBegin(begin, transfer.Header);
             transfer.Client.Send(begin.ToArray());
             transfer.Began = true;
+            transfer.Client.LodLedger.Progress(_state.Elapsed);
         }
         var budget = MaxPagesPerPump;
         while (budget-- > 0 && transfer.NextPage < transfer.Header.Pages)
@@ -247,9 +249,11 @@ internal sealed class StreamRequests
                 transfer.Bytes, transfer.Header.Generation);
             transfer.Client.Send(page.ToArray());
             transfer.NextPage++;
+            transfer.Client.LodLedger.Progress(_state.Elapsed);
         }
         if (transfer.NextPage != transfer.Header.Pages) return;
         SendComplete(transfer.Client, transfer.Header, LodTransfer.Applied);
+        transfer.Client.LodLedger.ReleaseRaw();
         _active = null; // raw logical bytes released; client credit still awaits its ACK
     }
 

@@ -66,16 +66,18 @@ public sealed class LodTreeCurtainRegressionTests
             Assert.Contains(crowns, crown => crown.RootX == rootX && crown.RootZ == rootZ);
 
             var mesh = LodRegion.BuildMeshData(0, rx, rz);
-            var leaves = mesh.Vertices.Where(v => (v.PackedColor >> 24) == 253u).ToArray();
-            Assert.NotEmpty(leaves);
+            var trees = mesh.Trees.Instances.Where(tree => tree.HasCrown && tree.HasTrunk).ToArray();
+            Assert.NotEmpty(trees);
+            Assert.Contains(trees, tree => tree.RootX == rootX && tree.RootZ == rootZ);
             Assert.Contains(mesh.Vertices, v => (v.PackedColor >> 24) == 255u);
-            foreach (var leaf in leaves)
+            Assert.DoesNotContain(mesh.Vertices, v => (v.PackedColor >> 24) == 253u);
+            foreach (var tree in trees)
             {
-                var x = leaf.Position.X + x0;
-                var z = leaf.Position.Z + z0;
-                Assert.Contains(crowns, crown => x >= crown.MinX && x <= crown.MaxX
-                    && z >= crown.MinZ && z <= crown.MaxZ
-                    && leaf.Position.Y >= crown.MinY && leaf.Position.Y <= crown.MaxY);
+                Assert.Contains(crowns, crown => tree.RootX == crown.RootX && tree.RootZ == crown.RootZ
+                    && tree.MinX == crown.MinX && tree.MaxX == crown.MaxX
+                    && tree.MinZ == crown.MinZ && tree.MaxZ == crown.MaxZ
+                    && tree.CrownBottom == crown.MinY && tree.CrownTop == crown.MaxY);
+                Assert.True(tree.CrownBottom > tree.BaseY, "the leaf volume descended to ground");
             }
         }
         finally
