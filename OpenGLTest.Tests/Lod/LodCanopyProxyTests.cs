@@ -17,7 +17,7 @@ namespace VoxelEngine.Tests.Lod;
 /// function of the column, and the rings that read the proxy never run tree growth. In the
 /// shape-cache collection because one fact resets the tree caches.
 /// </summary>
-[Collection("Worldgen shape cache")]
+[Collection("Worldgen seed")]
 public sealed class LodCanopyProxyTests
 {
     public LodCanopyProxyTests() => TestContent.EnsureLoaded();

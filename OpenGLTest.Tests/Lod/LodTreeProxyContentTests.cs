@@ -10,7 +10,7 @@ using Xunit;
 namespace VoxelEngine.Tests.Lod;
 
 /// <summary>Content-facing leafless contract, separate from the cheap pure proxy facts.</summary>
-[Collection("Worldgen shape cache")]
+[Collection("Worldgen seed")]
 public sealed class LodTreeProxyContentTests
 {
     [Fact]

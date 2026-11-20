@@ -8,7 +8,7 @@ using Xunit;
 namespace VoxelEngine.Tests.Lod;
 
 /// <summary>Fixed natural root regression for the old ground-to-leaf curtain recipe.</summary>
-[Collection("Worldgen shape cache")]
+[Collection("Worldgen seed")]
 public sealed class LodTreeCurtainRegressionTests
 {
     private readonly record struct LeafEnvelope(int RootX, int RootZ, int MinX, int MaxX,
