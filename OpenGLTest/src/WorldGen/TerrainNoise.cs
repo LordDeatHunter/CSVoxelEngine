@@ -8,6 +8,8 @@ namespace VoxelEngine.WorldGen;
 /// </summary>
 internal static class TerrainNoise
 {
+    private const int DynamicAbyssSeedOffset = 200;
+    private const int DynamicEcotoneSeedOffset = 204;
     internal static FastNoiseLite ForestSwellNoise;
     internal static FastNoiseLite HillNoise;
     internal static FastNoiseLite HillMaskNoise;
@@ -36,6 +38,8 @@ internal static class TerrainNoise
     internal static FastNoiseLite MountainWarp;
     internal static FastNoiseLite OpennessNoise;
     internal static FastNoiseLite BiomeDitherNoise;
+    internal static FastNoiseLite EcotoneNoise;
+    internal static FastNoiseLite AbyssNoise;
     internal static FastNoiseLite LakeShapeNoise;
 
     /// <summary>The pack-ice floe field, read only by <see cref="Features.SnowGenerator.IsFrozenWater"/>.</summary>
@@ -102,13 +106,17 @@ internal static class TerrainNoise
         EntranceNoise = MakeNoise(31, WorldGenerationConfig.EntranceFrequency);
         IntensityNoise = MakeNoise(41, WorldGenerationConfig.CaveIntensityFrequency);
         GravelNoise = MakeNoise(61, WorldGenerationConfig.GravelFrequency);
-        ContinentNoise = MakeNoise(70, WorldGenerationConfig.ContinentFrequency, octaves: 2);
+        var dynamic = WorldSeed.Profile == WorldGenProfile.Dynamic;
+        ContinentNoise = MakeNoise(70, dynamic ? WorldGenerationConfig.DynamicContinentFrequency
+            : WorldGenerationConfig.ContinentFrequency, octaves: 2);
         // Temperature is a single octave on purpose: the fine octave only steepened the gradient,
         // which is what squeezes the temperate band between snow and sand. Single-octave output
         // spans the raw [-1, 1] where two-octave FBm was scaled by 1/1.5, so this choice also set
         // the cold ramp's share (taiga, frozen, snow) and re-laid every temperature value.
-        TemperatureNoise = MakeNoise(71, WorldGenerationConfig.TemperatureFrequency);
-        HumidityNoise = MakeNoise(88, WorldGenerationConfig.HumidityFrequency, octaves: 2);
+        TemperatureNoise = MakeNoise(71, dynamic ? WorldGenerationConfig.DynamicTemperatureFrequency
+            : WorldGenerationConfig.TemperatureFrequency);
+        HumidityNoise = MakeNoise(88, dynamic ? WorldGenerationConfig.DynamicHumidityFrequency
+            : WorldGenerationConfig.HumidityFrequency, octaves: 2);
         // One displacement shared by both climate channels, so a border bends the same way in
         // temperature and humidity and the tint follows. Offset 151 is unused: this class uses at
         // most 90, the feature generators and caves at most 142.
@@ -134,6 +142,9 @@ internal static class TerrainNoise
         MountainNoise = MakeNoise(85, WorldGenerationConfig.MountainFrequency, octaves: 3);
         OpennessNoise = MakeNoise(86, WorldGenerationConfig.OpennessFrequency, octaves: 2);
         BiomeDitherNoise = MakeNoise(89, WorldGenerationConfig.BiomeDitherFrequency);
+        // Abyss uses 200; ecotones follow the reserved 190-203 future channels.
+        AbyssNoise = MakeNoise(DynamicAbyssSeedOffset, WorldGenerationConfig.DynamicAbyssFrequency);
+        EcotoneNoise = MakeNoise(DynamicEcotoneSeedOffset, WorldGenerationConfig.DynamicEcotoneFrequency);
         LakeShapeNoise = MakeNoise(90, WorldGenerationConfig.LakeShapeFrequency);
         // Offset 152 was unused (ClimateWarp took 151, the feature generators stop at 142)
         PackIceNoise = MakeNoise(152, WorldGenerationConfig.PackIceFrequency, octaves: 2);

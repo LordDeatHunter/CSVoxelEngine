@@ -52,7 +52,7 @@ public static class TreeGenerator
     private static TreeSpecies? SpeciesAt(int x, int z) =>
         OasisSpecies != null && OasisGenerator.IsDisc(x, z)
             ? OasisSpecies
-            : SpeciesByBiome[(int)TerrainGenerator.BiomeAt(x, z)];
+            : SpeciesByBiome[(int)TerrainGenerator.FloraBiomeAt(x, z)];
 
     // Leaves of every species, by id. Sized once at first touch (see the static constructor), so
     // a read must go through IsLeaf unless the id is known to be loaded content.

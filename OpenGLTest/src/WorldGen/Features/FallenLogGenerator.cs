@@ -106,7 +106,7 @@ public static class FallenLogGenerator
         log = BlockType.Air;
         if (!TryGetLog(cellX, cellZ, out startX, out startZ, out length, out alongX)) return false;
 
-        var biome = TerrainGenerator.BiomeAt(startX, startZ);
+        var biome = TerrainGenerator.FloraBiomeAt(startX, startZ);
         log = HollowLogFor(biome);
         if (log == BlockType.Air) return false;
 

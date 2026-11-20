@@ -238,6 +238,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float ContinentFrequency = 1f / 2800f;
     public const float ContinentOceanStart = -0.30f;   // at or below: full ocean
     public const float ContinentOceanEnd = -0.04f;     // at or above: full land
+    public const float DynamicContinentFrequency = 1f / 4200f;
 
     // Ocean weight at which the ocean biome, its water and its shore materials begin. The land
     // clamp fades out across [OceanShoreWeight, 0.5], so the coast is a continuous slope into the
@@ -260,6 +261,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // the climate warp below, which narrows the band wherever it squeezes the plane. Changing it
     // re-lays every temperature value except the origin's, which is exactly 0 at any frequency.
     public const float TemperatureFrequency = 1f / 5500f;
+    public const float DynamicTemperatureFrequency = 1f / 9000f;
     public const float TemperatureColdStart = -0.35f;  // at or below: fully cold
     public const float TemperatureColdEnd = -0.05f;    // at or above: no cold at all
     // The warm ramp must start at or after the cold ramp ends, so no column is ever both cold and
@@ -271,6 +273,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Humidity: a three-band axis like temperature. dry = 1 - smooth(HumidityDryStart, HumidityDryEnd,
     // humidity): dry land is desert (warm), steppe (temperate) or barren frozen (cold).
     public const float HumidityFrequency = 1f / 1700f;
+    public const float DynamicHumidityFrequency = 1f / 3200f;
     public const float HumidityDryStart = -0.35f;      // at or below: fully dry
     public const float HumidityDryEnd = -0.05f;        // at or above: no dryness at all
     // semiDry = 1 - smooth(HumiditySemiDryStart, HumiditySemiDryEnd, humidity): semi-dry land is
@@ -329,6 +332,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Ocean depth ramp: the shelf sits just over the waterline and the basin falls to the floor.
     public const float OceanShoreHeight = 3f;       // blocks, the shallowest shelf
     public const float OceanFloorHeight = -44f;     // blocks, the deepest basin center
+    public const float DynamicOceanFloorHeight = -70f;
     public const float OceanDepthExponent = 1.35f;  // >1 keeps a wide shelf and a steep drop
 
     // Ocean floor materials by depth below sea level: sand near the beach, gravel down the
@@ -345,6 +349,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float TrenchMaskEnd = 0.5f;
     public const float TrenchWidth = 0.05f;
     public const float TrenchDepth = 34f;
+    public const float DynamicTrenchDepth = 60f;
+    public const float DynamicAbyssFrequency = 1f / 1200f;
+    public const float DynamicAbyssStart = 0.1f;
+    public const float DynamicAbyssEnd = 0.45f;
+    public const float DynamicAbyssDepth = 50f;
+    public const float DynamicAbyssMaskStart = 0.75f;
+    public const float DynamicAbyssMaskEnd = 0.95f;
 
     // Desert dunes: smooth rolling sand hills over the base terrain, spaced well apart so the
     // dunes read as broad swells rather than choppy lumps.
@@ -357,6 +368,9 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Wavelength of the coherent border dither, in blocks. The material flip follows this noise,
     // so the grass/sand line is ragged in whole patches instead of a per-column checkerboard.
     public const float BiomeDitherFrequency = 1f / 28f;
+    // Coherent land-biome patches inside a narrow climate boundary band, Dynamic only.
+    public const float DynamicEcotoneBand = 0.18f;
+    public const float DynamicEcotoneFrequency = 1f / 96f;
 
     // --- Mud ---
     // Dirt with water directly above it and at least this many water cells in its

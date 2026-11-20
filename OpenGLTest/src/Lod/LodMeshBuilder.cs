@@ -475,7 +475,7 @@ internal sealed class LodMeshBuilder
 
     private void ClassifyGenerated(int i, int j, int centerX, int centerZ, int maxOwn, ref int canopyMax, ref ushort canopyId)
     {
-        var cellBiome = TerrainGenerator.BiomeAt(centerX, centerZ);
+        var cellBiome = TerrainGenerator.FloraBiomeAt(centerX, centerZ);
         _biomeGrid[(i + 1) * _heightGrid + (j + 1)] = cellBiome;
 
         // A cell holds water only where the chunk mesher would actually flood it: an

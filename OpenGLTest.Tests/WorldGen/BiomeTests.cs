@@ -18,6 +18,7 @@ namespace VoxelEngine.Tests.WorldGen;
 /// the undithered biome (<see cref="TerrainGenerator.BiomeAt"/>); only the dither test reads the
 /// dithered column biomes. The near-terrain and far-LOD views are checked separately.
 /// </summary>
+[Collection("Worldgen seed")]
 public sealed class BiomeTests
 {
     public BiomeTests() => TestContent.EnsureLoaded();
@@ -728,8 +729,17 @@ public sealed class BiomeTests
         Assert.True(inlandDesert > 0, "no inland desert column found in the scanned area");
     }
 
-    [Fact]
-    public void DesertAndSnowAreNeverNearAndTheDryCorridorIsSteppeOrTundra()
+    [Theory]
+    [InlineData(WorldGenProfile.Legacy)]
+    [InlineData(WorldGenProfile.Dynamic)]
+    public void DesertAndSnowAreNeverNearAndTheDryCorridorIsSteppeOrTundra(WorldGenProfile profile)
+    {
+        WorldSeed.Apply(WorldSeed.Default, profile);
+        try { AssertDesertSnowSeparation(profile); }
+        finally { WorldSeed.Apply(WorldSeed.Default); }
+    }
+
+    private static void AssertDesertSnowSeparation(WorldGenProfile profile)
     {
         // The temperate band must be at least the full-detail load radius wide, so a player standing
         // on the last dune never has snow loaded around them. Hot = would be desert if fully dry (the
@@ -757,8 +767,9 @@ public sealed class BiomeTests
             var x = Coord(gx);
             var z = Coord(gz);
             var k = gz * size + gx;
-            hot[k] = BiomeClassifier.Classify(0f, TerrainGenerator.ColdWeight(x, z),
-                TerrainGenerator.WarmWeight(x, z), 1f, 1f) == Biome.Desert;
+            var band = profile == WorldGenProfile.Dynamic ? WorldGenerationConfig.DynamicEcotoneBand : 0f;
+            hot[k] = BiomeClassifier.Classify(0f, TerrainGenerator.ColdWeight(x, z) - band,
+                TerrainGenerator.WarmWeight(x, z) + band, 1f, 1f) == Biome.Desert;
             if (InWindow(gx) && InWindow(gz))
             {
                 if (hot[k]) hotInWindow++;

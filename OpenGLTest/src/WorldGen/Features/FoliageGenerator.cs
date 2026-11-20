@@ -55,7 +55,7 @@ public static class FoliageGenerator
     {
         // An oasis disc is a dense meadow whatever the patch noise says
         if (OasisGenerator.IsDisc(x, z)) return true;
-        if (TerrainGenerator.BiomeAt(x, z) is not (Biome.Forest or Biome.Steppe or Biome.Savanna or Biome.Jungle)) return false;
+        if (TerrainGenerator.FloraBiomeAt(x, z) is not (Biome.Forest or Biome.Steppe or Biome.Savanna or Biome.Jungle)) return false;
         if (GrassPatchNoise.GetNoise(x, z) <= WorldFeatureConfig.GrassPatchThreshold) return false;
         // Denser where the climate is wetter (Climate's own wetness, the tint's input)
         TerrainGenerator.Climate(x, z, out _, out var wetness);
@@ -71,7 +71,7 @@ public static class FoliageGenerator
 
     /// <summary>Whether the desert or frozen surface column (x, z) grows a dead shrub.</summary>
     public static bool TryGetDeadShrub(int x, int z) =>
-        TerrainGenerator.BiomeAt(x, z) is Biome.Desert or Biome.Frozen && ShrubRoll(x, z);
+        TerrainGenerator.FloraBiomeAt(x, z) is Biome.Desert or Biome.Frozen && ShrubRoll(x, z);
 
     /// <summary>
     /// Whether a dead shrub grows over <paramref name="ground"/> at (x, z): sand only in a desert
@@ -83,7 +83,7 @@ public static class FoliageGenerator
         if (ground == SandGroundBlock) biome = Biome.Desert;
         else if (ground == PermafrostGroundBlock) biome = Biome.Frozen;
         else return false;
-        return TerrainGenerator.BiomeAt(x, z) == biome && ShrubRoll(x, z);
+        return TerrainGenerator.FloraBiomeAt(x, z) == biome && ShrubRoll(x, z);
     }
 
     /// <summary>The shrub scatter inside its biome: a low-frequency patch, then a density roll.</summary>

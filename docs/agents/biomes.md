@@ -97,7 +97,19 @@ fades the land's above-the-waterline clamp out across `[OceanShoreWeight, 0.5]` 
 while the biome was land put a hard step where the coast met the water, so the blended band is
 ocean biome and slopes below the waterline into the sea. The ocean ramp falls to
 `OceanFloorHeight` with rare warped **trenches** cut in, and its floor wears sand, gravel or stone by
-depth (`OceanSandDepth`/`OceanGravelDepth`). The forest floor is a broad swell plus a positive-only
+depth (`OceanSandDepth`/`OceanGravelDepth`). Under a saved Dynamic profile, the temperature,
+humidity and continent fields use broader frequencies, while Legacy retains the EA values and
+the same undithered `BiomeAt` and height ownership. Dynamic stores a coherent, low-frequency
+ecotone choice only in the column's surface biome: nearby land biomes interleave within a narrow
+decision band, while a column outside the band keeps its pure biome. Trees, grass cover, flowers
+and fallen logs select that Dynamic surface biome; Legacy retains their historical undithered
+selection. Generated far LOD uses the same Dynamic surface choice for its material, while supplied
+columns keep their supplied biome. Dynamic also lowers the ocean basin and trench profiles and
+adds a seed-owned abyss term only inside a broad-ocean mask. The existing shallow-shelf slope,
+water-level rule, sea-stack shallow-depth admission and depth-based sand/gravel/stone materials
+still apply; deeper water does not yet add underwater habitat content. A generated fallback beside
+an imported source still follows the world's profile without changing supplied chunks.
+The forest floor is a broad swell plus a positive-only
 hill field gated by a hill-region mask (`Hill*`/`ForestBaseHeight`), so hills rise in patches with
 flats between them. A **relief layer** (`WorldGen/TerrainRelief.cs`, BIOMEGEN §6) rides
 on top, orthogonal to the climate: a continent-scale **highland weight**
@@ -271,7 +283,9 @@ the gated `StampGround`) is never gated, since its leaves may come from neighbor
   species declares none gets no fallen logs (the desert's cactus, the dead tree of the tundra and
   steppe, the oasis palm), and neither does a start column whose stored, dithered surface biome
   differs from `TerrainGenerator.BiomeAt` (so no stone pine log lies on dithered desert sand) or a
-  water column. The hollow log is an ordinary `facing: "horizontal"` model block, not tree wood, so
+  water column. In Dynamic the start-column species follows the dithered biome, so the same
+  stored-biome check admits a matching log across an ecotone; Legacy keeps its original pure-biome
+  species choice. The hollow log is an ordinary `facing: "horizontal"` model block, not tree wood, so
   it never welds, fells or decays: the shared `block/hollow_log` model is a square tube authored
   along Z (3 px walls round a 10 px hole, open at both ends, each wall split at the cell's middle so
   no quad covers a whole side), its outside the species log's own side tile and its inside and end

@@ -162,7 +162,9 @@ slope, soil, ground band, water, openness, the spawn clearing). Every tree of a 
 in placement-hash order inside one `VirtualTreeSpace`, each grown tree's cells occupied before the
 next grows, so neighboring crowns grow around each other; the trees of the eight neighboring
 cells count as obstacles only as their cached **solo** shapes (`TreeBatches.ShapeOf`), which keeps a batch a
-pure function of (cell, seed) and independent of chunk order. `Stamp` writes wood with its state
+pure function of (cell, seed) and independent of chunk order. Dynamic ecotone columns use the
+same surface-biome species for a placed tree and its solo neighbor-obstacle shape; Legacy keeps
+the original pure-biome choice. `Stamp` writes wood with its state
 into air or leaves, then leaves into air, in a fixed scan order (the root walk extends the trunk
 down through cave air only inside the chunk holding the base). The far LOD's first rings read the
 stamped canopy (`TreeGenerator.TryGetCanopy`), while the coarse rings (`LodLevelSpec.ProxyCanopy`)

@@ -6,7 +6,7 @@ namespace VoxelEngine.WorldGen;
 /// The biome climate split of the 2D terrain half: continentalness, temperature and humidity turned into the smooth ocean,
 /// desert and arid weights and the biome they classify to (<see cref="BiomeWeights(float, float, out float, out float, out float)"/>,
 /// over the pure <see cref="Classify"/> / <see cref="ColdOf"/> / <see cref="WarmOf"/> / <see cref="DryOf"/> /
-/// <see cref="SemiDryOf"/> seams), the cold and warm ramps, and the ragged desert material line (<see cref="DitherBiome"/>).
+/// <see cref="SemiDryOf"/> seams), the cold and warm ramps, and stored surface ecotones (<see cref="DitherBiome"/>).
 /// <see cref="SampleClimate"/> is the one reader of the temperature and humidity noises, which it reads at a domain-warped
 /// position, so every consumer (the biome, the cold and warm weights, the tint climate) sees the same values. A pure function of (x, z) and the seed, read on any worker
 /// thread; <see cref="TerrainGenerator"/> forwards its public queries here.
@@ -196,7 +196,7 @@ internal static class BiomeClassifier
     }
 
     /// <summary>
-    /// Nudges a column's biome across the desert's material line inside the blend band, so the
+    /// Under Legacy, nudges a column's biome across the desert's material line inside the blend band, so the
     /// grass-to-sand edge reads as a ragged patchwork instead of a drawn contour. Only the surface
     /// material flips; the height already came from the smooth desert weight, so the ground stays
     /// continuous. A savanna column may take sand (it is always on the warm ramp, so sand never
@@ -204,9 +204,37 @@ internal static class BiomeClassifier
     /// column takes the grass biome across the line it actually borders: of the two ramps that bind
     /// desertWeight = min(warm, dry), a binding warmth means the temperate steppe, a binding dryness
     /// the savanna. Forest never borders the desert, so it and every other biome are left alone.
+    /// Dynamic uses a second, broader coherent field to interleave all neighboring land biomes
+    /// within a bounded climate decision band; the underlying biome and height remain pure.
     /// </summary>
     internal static Biome DitherBiome(float x, float z, Biome biome, float desertWeight)
     {
+        if (WorldSeed.Profile != WorldGenProfile.Dynamic)
+            return DitherBiome(x, z, biome, 0f, desertWeight);
+        BiomeWeights(x, z, out var oceanWeight, out _);
+        return DitherBiome(x, z, biome, oceanWeight, desertWeight);
+    }
+
+    /// <summary>Dither only the stored material/flora biome; never change the undithered height
+    /// and climate classification. Dynamic perturbs a land boundary with one coherent field.</summary>
+    internal static Biome DitherBiome(float x, float z, Biome biome, float oceanWeight, float desertWeight)
+    {
+        if (WorldSeed.Profile == WorldGenProfile.Dynamic)
+        {
+            var gate = WorldGenerationConfig.BiomesEnabled ? 1f : 0f;
+            if (gate < 0.5f) return biome;
+            if (biome == Biome.Ocean) return biome;
+            SampleClimate(x, z, out var dynamicTemperature, out var dynamicHumidity);
+            var cold = ColdOf(dynamicTemperature);
+            var warm = WarmOf(dynamicTemperature);
+            var dry = DryOf(dynamicHumidity);
+            var semiDry = SemiDryOf(dynamicHumidity);
+            var jungle = JungleOf(dynamicTemperature, dynamicHumidity);
+            var shift = TerrainNoise.EcotoneNoise.GetNoise(x, z) * WorldGenerationConfig.DynamicEcotoneBand;
+            return Classify(oceanWeight, cold + shift, warm + shift, dry + shift,
+                semiDry + shift, jungle + shift);
+        }
+
         if (biome is not (Biome.Savanna or Biome.Desert)) return biome;
         if (MathF.Abs(desertWeight - 0.5f) >= WorldGenerationConfig.BiomeBorderDither) return biome;
 

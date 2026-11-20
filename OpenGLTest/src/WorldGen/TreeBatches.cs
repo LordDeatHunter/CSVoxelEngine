@@ -74,14 +74,14 @@ internal static class TreeBatches
     // the caller has the species and baseY in hand by the time it reaches the cache -- but
     // capturing them would allocate a closure on EVERY call, hits included, on the four chunk-gen
     // threads and the LOD builder. Recomputing both from the key costs two cache-backed lookups on
-    // a MISS only (BiomeAt and HeightAt are pure, the same reads TryGetTree made), the same reason
+    // a MISS only (FloraBiomeAt and HeightAt are pure, the same reads TryGetTree made), the same reason
     // Chunk.ComputeColumn and WormCarver.BuildCellFor are static fields.
     private static readonly Func<(int X, int Z), TreeShape> BuildShapeFor = static key =>
     {
         // Timed for WorldgenStats' `grow` figures: this is the miss path, shared by the
         // generation workers and the far-LOD canopy sweep on the LOD builder thread
         var start = System.Diagnostics.Stopwatch.GetTimestamp();
-        var species = TreeGenerator.SpeciesByBiome[(int)TerrainGenerator.BiomeAt(key.X, key.Z)]
+        var species = TreeGenerator.SpeciesByBiome[(int)TerrainGenerator.FloraBiomeAt(key.X, key.Z)]
                       ?? throw new InvalidOperationException($"No tree species grows at ({key.X}, {key.Z}).");
         var baseY = TreeGenerator.HeightAt(key.X, key.Z) + 1;
         var space = new VirtualTreeSpace(GrowthGround);
