@@ -90,6 +90,15 @@ public static class TerrainGenerator
     public static bool IsGravelPatch(float x, float z) =>
         TerrainNoise.GravelNoise.GetNoise(x, z) > WorldGenerationConfig.GravelThreshold;
 
+    internal static float MountainRockHeight => WorldSeed.Profile == WorldGenProfile.Dynamic
+        ? WorldGenerationConfig.DynamicMountainRockHeight : WorldGenerationConfig.MountainRockHeight;
+
+    internal static bool IsScree(int x, int z, int height) =>
+        WorldSeed.Profile == WorldGenProfile.Dynamic
+        && height >= WorldGenerationConfig.DynamicMountainRockHeight
+        && height <= WorldGenerationConfig.DynamicScreeTopHeight
+        && IsGravelPatch(x, z);
+
     /// <summary>Biome at a world column; a pure function of (x, z) like the rest of the 2D half.</summary>
     public static Biome BiomeAt(float x, float z) => BiomeWeights(x, z, out _, out _);
 
@@ -196,7 +205,7 @@ public static class TerrainGenerator
     /// </summary>
     internal static float LandHeight(float worldX, float worldZ, out Biome biome,
         out float oceanWeight, out float desertWeight, out float forestHeight) =>
-        LandHeightCore(worldX, worldZ, massifs: true, lonePeaks: true,
+        LandHeightCore(worldX, worldZ, massifs: true, lonePeaks: true, knolls: true,
             out biome, out oceanWeight, out desertWeight, out forestHeight);
 
     /// <summary>
@@ -205,13 +214,13 @@ public static class TerrainGenerator
     /// never recurses into itself.
     /// </summary>
     internal static float ReliefLandHeight(float x, float z) =>
-        LandHeightCore(x, z, massifs: false, lonePeaks: false, out _, out _, out _, out _);
+        LandHeightCore(x, z, massifs: false, lonePeaks: false, knolls: false, out _, out _, out _, out _);
 
     /// <summary><see cref="ReliefLandHeight(float, float)"/> with the outs of <see cref="LandHeight"/>,
     /// so a caller can compare the two profiles out for out.</summary>
     internal static float ReliefLandHeight(float x, float z, out Biome biome, out float oceanWeight,
         out float desertWeight, out float forestHeight) =>
-        LandHeightCore(x, z, massifs: false, lonePeaks: false,
+        LandHeightCore(x, z, massifs: false, lonePeaks: false, knolls: false,
             out biome, out oceanWeight, out desertWeight, out forestHeight);
 
     /// <summary>
@@ -227,13 +236,13 @@ public static class TerrainGenerator
     /// cannot recurse into itself.
     /// </summary>
     internal static float PreFeatureLandHeight(float x, float z) =>
-        LandHeightCore(x, z, massifs: true, lonePeaks: false, out _, out _, out _, out _);
+        LandHeightCore(x, z, massifs: true, lonePeaks: false, knolls: false, out _, out _, out _, out _);
 
     /// <summary><see cref="PreFeatureLandHeight(float, float)"/> with the outs of <see cref="LandHeight"/>,
     /// so a caller can compare the two profiles out for out.</summary>
     internal static float PreFeatureLandHeight(float x, float z, out Biome biome, out float oceanWeight,
         out float desertWeight, out float forestHeight) =>
-        LandHeightCore(x, z, massifs: true, lonePeaks: false,
+        LandHeightCore(x, z, massifs: true, lonePeaks: false, knolls: false,
             out biome, out oceanWeight, out desertWeight, out forestHeight);
 
     /// <summary>
@@ -246,7 +255,7 @@ public static class TerrainGenerator
 
     /// <summary>The body of <see cref="LandHeight"/>, with the massif and lone-peak terms switchable for
     /// <see cref="ReliefLandHeight(float, float)"/> and <see cref="PreFeatureLandHeight(float, float)"/>.</summary>
-    private static float LandHeightCore(float worldX, float worldZ, bool massifs, bool lonePeaks, out Biome biome,
+    private static float LandHeightCore(float worldX, float worldZ, bool massifs, bool lonePeaks, bool knolls, out Biome biome,
         out float oceanWeight, out float desertWeight, out float forestHeight)
     {
         // Forest floor: a broad swell plus a hill mass (a positive-only field gated by the
@@ -290,6 +299,12 @@ public static class TerrainGenerator
             + hill * WorldGenerationConfig.HillAmplitude * hillMask * hillScale
             + rough
             + TerrainRelief.MountainHeight(worldX, worldZ, highland);
+        if (WorldSeed.Profile == WorldGenProfile.Dynamic)
+        {
+            reliefForest += TerrainRelief.CordilleraHeight(worldX, worldZ);
+            reliefForest = TerrainRelief.FlattenValley(worldX, worldZ, reliefForest);
+            reliefForest = TerrainPeaks.DynamicSoftCeiling(reliefForest);
+        }
         // Massifs (TerrainPeaks) rise from the forest profile alone, after the ranges. WithMassif is
         // the exact identity outside every site's disc, so land outside them is bit-identical. The
         // desert and ocean lerps below would dilute a massif, which is why a site is accepted only
@@ -297,6 +312,8 @@ public static class TerrainGenerator
         forestHeight = massifs ? TerrainPeaks.WithMassif(worldX, worldZ, reliefForest) : reliefForest;
         // Lone peaks rise last, on top of the massifs, with the same exact identity outside their discs
         if (lonePeaks) forestHeight = TerrainPeaks.WithLonePeak(worldX, worldZ, forestHeight);
+        if (knolls && WorldSeed.Profile == WorldGenProfile.Dynamic)
+            forestHeight = TerrainPeaks.WithKnoll(worldX, worldZ, forestHeight);
         var heightF = forestHeight;
 
         if (desertWeight > 0f)
@@ -338,7 +355,8 @@ public static class TerrainGenerator
             heightF = MathUtils.Lerp(heightF,
                 MathF.Max(heightF, WorldGenerationConfig.SeaLevel + 1f), shoreClamp);
 
-        return heightF;
+        return WorldSeed.Profile == WorldGenProfile.Dynamic
+            ? MathF.Min(heightF, WorldGenerationConfig.DynamicReliefCeilingHeight) : heightF;
     }
 
     /// <summary>
@@ -454,6 +472,11 @@ public static class TerrainGenerator
                     if (stackTop > height) height = stackTop;
                 }
 
+                // A ramp bank or a shallow-sea stack cannot lift a Dynamic column past the
+                // terrain ceiling after the forest profile has already been bounded.
+                if (WorldSeed.Profile == WorldGenProfile.Dynamic)
+                    height = Math.Min(height, (int)WorldGenerationConfig.DynamicReliefCeilingHeight);
+
                 // A great lake's guard 1 maps to the threshold, so a ravine has no cut at the lake's
                 // outline or across its river ramp's bank zone, and tapers in across the guard band
                 // instead of cutting a bank, a raised ramp bank or an island below the water.
@@ -486,7 +509,7 @@ public static class TerrainGenerator
                 // A grass-biome peak above the rock line is bare stone too, so a high crest reads as
                 // a rocky mountain instead of another tree-covered hill. Read off the final heightmap
                 // (heights[i], ravines included) so the far LOD's rock cap agrees.
-                if (BiomeTraits.ShowsBareRock(biome) && heights[i] >= WorldGenerationConfig.MountainRockHeight)
+                if (BiomeTraits.ShowsBareRock(biome) && heights[i] >= MountainRockHeight)
                     soil = 0;
 
                 dirtDepth[i] = (byte)soil;

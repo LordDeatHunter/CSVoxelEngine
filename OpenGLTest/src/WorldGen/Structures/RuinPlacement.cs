@@ -68,6 +68,7 @@ public static class RuinPlacement
     {
         ground = HeightAt(x, z);
         if (TerrainGenerator.IsWaterColumn(x, z, ground)) return false;
+        if (!SurfaceClearance.Allows(ground, template.Height - template.GroundLayer)) return false;
         var half = template.Half;
         if (WorldGenerationConfig.TowersEnabled && TowerPlacement.Meets(x - half - 1, z - half - 1, x + half + 1, z + half + 1))
             return false;

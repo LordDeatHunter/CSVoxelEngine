@@ -63,6 +63,7 @@ public static class DesertWellGenerator
             if (TerrainGenerator.BiomeAt(x, z) != Biome.Desert) continue;
             var ground = HeightAt(x, z);
             if (TerrainGenerator.IsWaterColumn(x, z, ground)) continue;
+            if (!SurfaceClearance.Allows(ground, 1)) continue;
             if (!IsFlatSite(x, z, ground)) continue;
             StampWell(blocks, worldX0, worldY0, worldZ0, x, z, ground);
         }

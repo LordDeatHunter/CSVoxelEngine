@@ -88,6 +88,7 @@ public static class TowerPlacement
         var ground = RuinPlacement.HeightAt(cx, cz);
         if (TerrainGenerator.IsWaterColumn(cx, cz, ground)) return null;
         if (ground + MaxHeightAboveGround >= WorldGenerationConfig.CloudSlabBottomY) return null;
+        if (!SurfaceClearance.Allows(ground, MaxHeightAboveGround)) return null;
         if (!GroundIsLevelAndDry(cx, cz, ground)) return null;
 
         var floors = Math.Clamp(

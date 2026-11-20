@@ -157,8 +157,10 @@ feed the raycast, the selection outline and `BodyCollision.BodyCollides`.
 **Worldgen** (`TreeGenerator`, a pure function of position like the rest of worldgen).
 `TreeGenerator.TryGetTree(x, z, ...)` keeps the placement gates per species from its `worldgen`
 block (one hash stream, biome -> species in ordinal name order, density, lowest-hash spacing,
-slope, soil, ground band, water, openness, the spawn clearing). Every tree of a 64x64 XZ cell
-(`TreeCellShift`/`TreeCellBlocks`, `TreeGenerator.CellOf`) then grows together as one `TreeBatch`
+slope, soil, ground band, water, openness, the spawn clearing). Dynamic placement also checks
+that species' actual raster reach against the cloud slab; Legacy placement and JSON ground
+bands are unchanged. Every tree of a 64x64 XZ cell (`TreeCellShift`/`TreeCellBlocks`,
+`TreeGenerator.CellOf`) then grows together as one `TreeBatch`
 in placement-hash order inside one `VirtualTreeSpace`, each grown tree's cells occupied before the
 next grows, so neighboring crowns grow around each other; the trees of the eight neighboring
 cells count as obstacles only as their cached **solo** shapes (`TreeBatches.ShapeOf`), which keeps a batch a

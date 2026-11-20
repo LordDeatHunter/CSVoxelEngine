@@ -295,7 +295,8 @@ public const float DayLengthSeconds = 2400f;
     // --- Clouds ---
     // One static field of CloudCellSize-block cells (CloudField) drawn 3x3 around the camera by
     // CloudRenderer. Cell levels come from periodic value noise, so the field tiles with no seam.
-    // Heights clear the tallest terrain (~112) plus trees.
+    // Drawn clouds cross Dynamic high summits by design; the solid slab starts above
+    // Dynamic's terrain cap and separately admitted surface writers.
     public const float CloudHeight = 160f;
     // Drawn as whole copies 3x3 around the camera, so this must be >= FogFarBlocks for the
     // field edge to stay hidden in fog. Must be a power-of-two multiple of CloudCellSize.

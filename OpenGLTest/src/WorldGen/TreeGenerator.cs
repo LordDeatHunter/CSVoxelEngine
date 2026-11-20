@@ -194,6 +194,8 @@ public static class TreeGenerator
             return false;
         if (height < rules.MinGround || height > rules.MaxGround)
             return false;
+        if (!SurfaceClearance.Allows(height, 1 + TreeRasterizer.ReachOf(found).Up))
+            return false;
 
         var slope = rules.MaxSlope;
         if (Math.Abs(HeightAt(x + 1, z) - height) > slope

@@ -560,8 +560,45 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // mountain instead of another tree-covered hill (trees also stop at each species'
     // worldgen.maxGround).
     public const float MountainRockHeight = 56f;
-    // Height at which a peak wears full snow whatever its climate (SnowGenerator.ColdWeightAt)
+    // Height at which a Legacy peak wears full snow whatever its climate.
     public const int MountainSnowFullHeight = 96;
+
+    // Dynamic S1b relief and altitude bands. Legacy readers keep the constants above.
+    public const float DynamicMountainRockHeight = 96f;
+    public const int DynamicMountainSnowFullHeight = 140;
+    public const int DynamicScreeTopHeight = 120;
+    public const float DynamicReliefCeilingHeight = 186f;
+    public const float DynamicReliefCeilingKnee = 22f;
+    public const float DynamicReliefSpawnClearStart = 384f;
+    public const float DynamicReliefSpawnClearEnd = 896f;
+    public const int DynamicSurfaceSlabAirMargin = 2;
+    public const float CordilleraFrequency = 1f / 7000f;
+    public const float CordilleraWarpFrequency = 1f / 3800f;
+    public const float CordilleraWarpAmplitude = 650f;
+    public const float CordilleraAmplitude = 110f;
+    public const float CordilleraRegionStart = -0.35f;
+    public const float CordilleraRegionEnd = 0.08f;
+    public const float CordilleraRidgeStart = 0.35f;
+    public const float CordilleraRidgeEnd = 0.78f;
+    public const float ValleyFlatFrequency = 1f / 3100f;
+    public const float ValleyFloor = 12f;
+    public const float ValleyKnee = 80f;
+    public const float ValleyFlatMaskStart = -0.18f;
+    public const float ValleyFlatMaskEnd = 0.35f;
+    public const float ValleyMaxCompression = 0.65f;
+    public const float DynamicMassifMinSummit = 150f;
+    public const float DynamicMassifMaxSummit = 186f;
+    public const float DynamicMassifOffSpineShare = 0.35f;
+    public const int KnollCellBlocks = 256;
+    public const float KnollChance = 0.28f;
+    public const float KnollMinRadius = 20f;
+    public const float KnollMaxRadius = 48f;
+    public const float KnollMinRise = 10f;
+    public const float KnollMaxRise = 24f;
+    public const float KnollMaxCordilleraSupport = 0.1f;
+    public const float KnollSiteFlatness = 4f;
+    public const int KnollCacheCapacity = 2048;
+    public const int KnollCacheGenerations = 4;
 
     // --- Relief: massifs and lone peaks (BIOMEGEN §6, phase B) ---
     // Hashed sites (TerrainSites, TerrainPeaks) summed into the forest profile after the ranges.

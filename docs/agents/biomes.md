@@ -173,6 +173,27 @@ across, an arid plateau, a highland border, a river wash, a range crossing a cel
 vista, a massif from afar, its flank and its crown, a lone peak and a massif in the far LOD, and an
 island from offshore, its beach, a sand knoll, an archipelago chain and islands in the far LOD
 (`island_far`, `island_beach`, `island_knoll`, `archipelago_chain`, `island_lod_vista`). A low-frequency
+For worlds saved with the **Dynamic** profile, S1b adds a warped low-frequency cordillera
+field on top of the earlier ranges, then a continuous flat-valley transfer, then a soft ceiling
+over the entire relief forest. Massifs favor the ridge and may reach the higher Dynamic summit
+band; sparse hashed knolls rise on flat low valley sites after the peaks. The query order is
+Q0 relief and valley (no sites), Q2 with massifs (no peaks or knolls), peak verdict from Q2,
+then knoll verdict from Q2 and the peak term, then final height. Cached site verdicts and
+the three new noise channels reset only between worlds with `WorldSeed.Apply`. A short
+Dynamic spawn fade leaves the new relief neutral at the origin. The final terrain height
+cannot exceed 186, while the separate surface writer gates keep their blocks below the
+cloud slab starting at Y 198. Legacy keeps the earlier terrain formula and the frozen EA
+identity fixture. Dynamic high grass land begins showing bare rock at Y 96, occasional
+gravel scree appears from 96 through 120, and snow reaches full altitude weight at Y 140;
+`ColumnCache`, `SnowGenerator`, and generated far LOD use these same profile rules.
+The valley transfer flattens its low band while returning continuously to the original
+height at its knee; that return can steepen the upper transition band by up to about 1.22×.
+Dynamic far LOD shows snow over rocky or gravelly tops when the near snow pass does;
+Legacy keeps its prior rock-before-snow far-cap precedence.
+This S1b stage changes relief only; cliffs, dunes, new flora, volcanoes and habitats remain
+later issue #64 stages. `visual-examples/dynamic-relief-s1b.json` frames the bounded
+representative range, high summit, rock/snow/scree flanks, LOD vista, spawn horizon and valley knoll.
+
 **openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
 forest alternates between rolling woodland and open grass instead of one uniform canopy
 (`TreeGenerator.TryGetTree` reads `TerrainGenerator.ForestOpenness`, scaled per species by its

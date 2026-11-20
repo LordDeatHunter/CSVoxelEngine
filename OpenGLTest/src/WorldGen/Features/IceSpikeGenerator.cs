@@ -88,6 +88,7 @@ public static class IceSpikeGenerator
         var h = SplitMix64.Hash(x, z, WorldGenerationConfig.Seed ^ ShapeSalt);
         var unit = (SplitMix64.Mix(h + 0x9E3779B97F4A7C15UL) >> 40) * (1f / (1 << 24));
         height = WorldGenerationConfig.IceSpikeMinHeight + (int)(unit * range);
+        if (!SurfaceClearance.Allows(ground, height)) return false;
         baseY = ground + 1;
         return true;
     }

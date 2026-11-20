@@ -13,8 +13,9 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   fungal or the magma-touched deep under a wavy line near `CaveDeepTopY` -264), down to the
   barrier band `BarrierTopY..BarrierBottomY` (-500..-600, a gapless core `BarrierFullTopY..BarrierFullBottomY`,
   -530..-570, between patchy ramps); hell from `HellTopY` (-601) down forever in `HellLayerPeriodBlocks` (96)
-  layers, each a cavern pocket over a 16-block hellrock slab; above every peak (`ReliefCeilingHeight` 148) and
-  the drawn cloud layer (160), the solid cloud slab `CloudSlabBottomY..CloudSlabTopY` (198..203); the cloud sea
+  layers, each a cavern pocket over a 16-block hellrock slab; above the Legacy peak ceiling
+  (`ReliefCeilingHeight` 148), the Dynamic terrain ceiling (186) and the drawn cloud layer (160),
+  the solid cloud slab `CloudSlabBottomY..CloudSlabTopY` (198..203); the cloud sea
   (`SkyConfig.SkyCloudSeaHeight`, `SkyCloudSeaThickness`: 290..301); the sky islands
   `SkyIslandBottomY..SkyIslandTopY` (320..420), tuned in `SkyIslandConfig`.
 - **Getting there**: dig down or build up. The barrier and hell's slabs (`basalt`, `hellrock`) need the
@@ -73,6 +74,16 @@ mapping (x, z) to (size - 1 - z, x) and turning a `facing` cell low two state bi
 north/south/west/east order is not cyclic). Ruin loot chests are ordinary palette entries (`ruin_chest_<kind>`), so there are
 no marker keys and no id cost. `StructureStamper.Stamp` writes a template part inside one chunk, clipped at the border and to a
 world-y window, so every chunk a footprint crosses agrees with no cross-chunk writes.
+
+For Dynamic surface sites, `SurfaceClearance` admits only a top cell at or below Y 195, leaving two
+air cells before the cloud slab at Y 198. Surface ruin and waystone templates use their actual
+`Height - GroundLayer` above the anchor; towers use `MaxHeightAboveGround`. Trees use each
+species' raster reach, ice spikes their rolled 4..9 height, and pillars their rolled 1..4
+height. Cairns need four cells, while wells, boulders and fallen logs need one. Snow and
+small flora reach only one cell above the terrain ceiling of 186. The gate is applied at
+the placement decision shared by each chunk crossing a footprint; Legacy admits sites by
+its previous rules. Future Dynamic surface writers must pass this same gate with their
+actual maximum reach.
 
 `RuinPlacement` (`WorldGen/Structures/`) decides where: a hashed cell of `RuinCellShift` blocks per kind rolls its chance, its
 site (jittered), its template and its turn from the hash, a pure function of (cell, seed). **Surface** ruins (stage

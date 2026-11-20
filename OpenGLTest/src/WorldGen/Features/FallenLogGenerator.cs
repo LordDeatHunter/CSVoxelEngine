@@ -114,7 +114,8 @@ public static class FallenLogGenerator
         var index = VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(startX), VoxelCoords.WorldToLocal(startZ));
         ground = column.Heights[index];
         if (column.Biomes[index] != biome) return false;
-        return !TerrainGenerator.IsWaterColumn(startX, startZ, ground);
+        return !TerrainGenerator.IsWaterColumn(startX, startZ, ground)
+            && SurfaceClearance.Allows(ground, 1);
     }
 
     /// <summary>
