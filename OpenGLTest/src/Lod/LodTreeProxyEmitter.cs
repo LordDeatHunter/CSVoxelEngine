@@ -74,7 +74,8 @@ internal sealed class LodTreeProxyEmitter
             {
                 var roots = new List<LodTreeProxy>();
                 LodProxyOwnership.CollectFarCached(_supplied, _prefetchSpan, _ownedSpan,
-                    _x0, _z0, _spec.RegionBlocks, reach, RootSupplied, LodFarRootCache.Natural, roots);
+                    _x0, _z0, _spec.RegionBlocks, reach, RootSupplied,
+                    LodFarRootCache.Natural.ReadColumn, roots);
                 foreach (var root in roots) TryAddNatural(root);
             }
             else

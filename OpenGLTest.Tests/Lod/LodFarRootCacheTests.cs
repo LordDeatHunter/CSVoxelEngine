@@ -28,7 +28,7 @@ public sealed class LodFarRootCacheTests
             LodProxyOwnership.CollectFar(supplied, 4, 2, x0, z0, size, reach,
                 Supplies, Root, original);
             LodProxyOwnership.CollectFarCached(supplied, 4, 2, x0, z0, size, reach,
-                Supplies, cache, cached);
+                Supplies, cache.ReadColumn, cached);
             Assert.Equal(original, cached);
         }
     }
@@ -65,29 +65,55 @@ public sealed class LodFarRootCacheTests
     {
         var supplied = new bool[4 * 4];
         var scans = 0;
+        var reads = new List<(int X, int Z)>();
         var cache = new LodFarRootCache((x, z) => { scans++; return Root(x, z); }, 8, 2);
+        LodTreeProxy[] ReadColumn(int cx, int cz)
+        {
+            reads.Add((cx, cz));
+            return cache.Column(cx, cz);
+        }
         var roots = new List<LodTreeProxy>();
         Array.Fill(supplied, true);
         LodProxyOwnership.CollectFarCached(supplied, 4, 2, -16, -16, 32, 0,
-            (_, _) => true, cache, roots);
+            (_, _) => true, ReadColumn, roots);
         Assert.Empty(roots);
+        Assert.Empty(reads);
         Assert.Equal(0, scans);
 
-        Array.Fill(supplied, false);
-        // A mixed-owned region can still have every candidate root supplied. The gate must
-        // precede even a cold cache lookup; the all-supplied early return alone is insufficient.
+        supplied[1 * 4 + 1] = false;
+        // A generated-owned tile exists, but every candidate root is currently supplied.
         LodProxyOwnership.CollectFarCached(supplied, 4, 2, -16, -16, 32, 0,
-            (_, _) => true, cache, roots);
+            (_, _) => true, ReadColumn, roots);
         Assert.Empty(roots);
+        Assert.Empty(reads);
         Assert.Equal(0, scans);
-        LodProxyOwnership.CollectFarCached(supplied, 4, 2, -16, -16, 32, 0,
-            (_, _) => false, cache, roots);
-        Assert.NotEmpty(roots);
-        roots.Clear();
+
+        // Warm all four columns explicitly, then measure provider reads, not factory scans.
+        for (var cx = -1; cx <= 0; cx++)
+        for (var cz = -1; cz <= 0; cz++) cache.Column(cx, cz);
         var warmScans = scans;
+        Array.Fill(supplied, true);
         LodProxyOwnership.CollectFarCached(supplied, 4, 2, -16, -16, 32, 0,
-            (x, z) => x < 0 || z < 0, cache, roots);
-        Assert.All(roots, root => Assert.True(root.RootX >= 0 && root.RootZ >= 0));
+            (_, _) => true, ReadColumn, roots);
+        Assert.Empty(roots);
+        Assert.Empty(reads);
+        Assert.Equal(warmScans, scans);
+
+        supplied[1 * 4 + 1] = false;
+        LodProxyOwnership.CollectFarCached(supplied, 4, 2, -16, -16, 32, 0,
+            (_, _) => true, ReadColumn, roots);
+        Assert.Empty(roots);
+        Assert.Empty(reads);
+        Assert.Equal(warmScans, scans);
+
+        bool Supplies(int x, int z) => x < 0 || z < 0;
+        var original = new List<LodTreeProxy>();
+        LodProxyOwnership.CollectFar(supplied, 4, 2, -16, -16, 32, 0,
+            Supplies, Root, original);
+        LodProxyOwnership.CollectFarCached(supplied, 4, 2, -16, -16, 32, 0,
+            Supplies, ReadColumn, roots);
+        Assert.Equal(original, roots);
+        Assert.Equal((0, 0), Assert.Single(reads));
         Assert.Equal(warmScans, scans);
     }
 }

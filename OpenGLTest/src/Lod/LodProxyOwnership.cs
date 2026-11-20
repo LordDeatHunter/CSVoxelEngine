@@ -17,7 +17,8 @@ internal static class LodProxyOwnership
 
     internal static void CollectFarCached(bool[] supplied, int chunkSpan, int ownedSpan,
         int x0, int z0, int regionBlocks, int reach,
-        Func<int, int, bool> supplies, LodFarRootCache cache, List<LodTreeProxy> output)
+        Func<int, int, bool> supplies, Func<int, int, LodTreeProxy[]> columnAt,
+        List<LodTreeProxy> output)
     {
         if (!HasGeneratedOwnedColumn(supplied, chunkSpan, ownedSpan)) return;
         // A build-local view amortizes the shared cache lookup without changing the original
@@ -30,7 +31,7 @@ internal static class LodProxyOwnership
             var key = (x >> Chunk.SizeShift, z >> Chunk.SizeShift);
             if (!columns.TryGetValue(key, out var roots))
             {
-                roots = cache.Column(key.Item1, key.Item2);
+                roots = columnAt(key.Item1, key.Item2);
                 columns.Add(key, roots);
             }
             if (LodFarRootCache.At(roots, x, z) is { } root) output.Add(root);

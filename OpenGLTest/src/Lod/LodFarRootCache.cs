@@ -15,17 +15,21 @@ internal sealed class LodFarRootCache
         WorldGenerationConfig.LodFarRootCacheGenerations);
 
     private readonly Func<int, int, LodTreeProxy?> _resolve;
+    private readonly Func<(int X, int Z), LodTreeProxy[]> _buildColumn;
     private readonly GenerationalCache<(int X, int Z), LodTreeProxy[]> _columns;
+    internal readonly Func<int, int, LodTreeProxy[]> ReadColumn;
 
     internal LodFarRootCache(Func<int, int, LodTreeProxy?> resolve, int capacity, int generations)
     {
         _resolve = resolve;
+        _buildColumn = BuildColumn;
         _columns = new GenerationalCache<(int X, int Z), LodTreeProxy[]>(capacity, generations);
+        ReadColumn = Column;
     }
 
     // Call only after source.Supplies has rejected the root chunk. A miss may inspect the
     // rest of that admitted generated column; the caller clips the returned roots to its window.
-    internal LodTreeProxy[] Column(int cx, int cz) => _columns.GetOrAdd((cx, cz), BuildColumn);
+    internal LodTreeProxy[] Column(int cx, int cz) => _columns.GetOrAdd((cx, cz), _buildColumn);
 
     internal void Reset() => _columns.Clear();
 
