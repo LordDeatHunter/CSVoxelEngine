@@ -6,7 +6,6 @@ using System.Runtime.InteropServices;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Lod;
 using VoxelEngine.WorldGen.Trees.Shape;
-using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
 
 namespace VoxelEngine.Tests.Lod;
