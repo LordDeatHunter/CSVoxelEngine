@@ -206,7 +206,9 @@ public sealed class WorldgenTests
         var mesh = LodRegion.BuildMeshData(level, tx / spec.RegionBlocks, tz / spec.RegionBlocks);
         var leaves = BlockType.ById[TreeGenerator.LeavesBlock]!;
         var leafTiles = TestContent.WorldTiles(leaves);
-        Assert.True(LodTreeMaterial.TryFromBlock(leaves, out var expectedLeafMaterial));
+        var tintFaces = leaves.BiomeTint;
+        var baseTiles = tintFaces?.Base ?? leaves.FaceTiles;
+        var tintedTiles = tintFaces?.Tinted;
         Assert.NotEmpty(mesh.Vertices); // the ground is still a separate opaque shell
         var originX = (tx / spec.RegionBlocks) * spec.RegionBlocks;
         var originZ = (tz / spec.RegionBlocks) * spec.RegionBlocks;
@@ -218,7 +220,14 @@ public sealed class WorldgenTests
                 !LodTreeTemplate.TryPart(tree, 1, originX, originZ, out _, out var materialIndex))
                 return false;
             var material = mesh.Trees.Materials[materialIndex];
-            return material.Equals(expectedLeafMaterial) && Enumerable.Range(0, 6).Any(face =>
+            if (material.Palette != tintFaces?.Palette) return false;
+            for (var face = 0; face < 6; face++)
+            {
+                if (material.BaseAt(face) != baseTiles[face] ||
+                    material.TintedAt(face) != (tintedTiles?[face] ?? LodTreeMaterial.NoTile))
+                    return false;
+            }
+            return Enumerable.Range(0, 6).Any(face =>
                 leafTiles.Contains(material.BaseAt(face)) ||
                 leafTiles.Contains(material.TintedAt(face)));
         });

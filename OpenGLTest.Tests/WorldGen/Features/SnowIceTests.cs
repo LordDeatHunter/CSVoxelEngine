@@ -138,7 +138,9 @@ public sealed class SnowIceTests
         var mesh = LodRegion.BuildMeshData(0, rx, rz);
         var leaves = BlockType.ById[taiga!.LeavesId]!;
         var leafTiles = TestContent.WorldTiles(leaves);
-        Assert.True(LodTreeMaterial.TryFromBlock(leaves, out var expectedLeafMaterial));
+        var tintFaces = leaves.BiomeTint;
+        var baseTiles = tintFaces?.Base ?? leaves.FaceTiles;
+        var tintedTiles = tintFaces?.Tinted;
         Assert.NotEmpty(mesh.Vertices); // the ground and tree draw data remain separate
         Assert.Contains(mesh.Trees.Instances, tree =>
         {
@@ -148,7 +150,13 @@ public sealed class SnowIceTests
                     out _, out var materialIndex))
                 return false;
             var material = mesh.Trees.Materials[materialIndex];
-            if (!material.Equals(expectedLeafMaterial)) return false;
+            if (material.Palette != tintFaces?.Palette) return false;
+            for (var face = 0; face < 6; face++)
+            {
+                if (material.BaseAt(face) != baseTiles[face] ||
+                    material.TintedAt(face) != (tintedTiles?[face] ?? LodTreeMaterial.NoTile))
+                    return false;
+            }
             for (var face = 0; face < 6; face++)
                 if (leafTiles.Contains(material.BaseAt(face)) || leafTiles.Contains(material.TintedAt(face)))
                     return true;
