@@ -286,10 +286,10 @@ internal ref struct LodFaceEmitter
         if (_vertices.Count > ushort.MaxValue - 24 * quadsPerFace) return false;
         var origin = new Vector3(box.MinX, box.MinY, box.MinZ);
         var size = new Vector3(box.MaxX - box.MinX, box.MaxY - box.MinY, box.MaxZ - box.MinZ);
+        Span<byte> shades = stackalloc byte[4];
+        Span<float> suns = stackalloc float[4];
         for (var face = 0; face < 6; face++)
         {
-            Span<byte> shades = stackalloc byte[4];
-            Span<float> suns = stackalloc float[4];
             var shade = face == 4 ? (byte)255 : face == 5 ? (byte)155 : (byte)205;
             shades.Fill(shade);
             suns.Fill(face == 4 ? 1f : face == 5 ? 0.55f : 0.8f);
