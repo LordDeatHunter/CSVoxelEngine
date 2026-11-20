@@ -188,39 +188,33 @@ outside Jungle; this extra work has not been timed. A manual giant felled in a L
 its actual species reach through `FellPoisonRadiusFor`, while ordinary Legacy trees retain the old
 poison bound. `Stamp` writes wood with its state
 into air or leaves, then leaves into air, in a fixed scan order (the root walk extends the trunk
-down through cave air only inside the chunk holding the base). The far LOD draws its terrain
-shell independently of trees. Its first ring derives bounded wood/crown prisms from the same
-batch-grown shapes the chunks stamp; farther rings scan accepted roots once per region and use
-the species' cheap `lod` height, radius and dome/cone/column profile without growing trees.
-Prisms are clipped to the region and generated chunk columns, then batched into the existing
-opaque LOD mesh with the species' own log/leaf tiles, foliage tint and fade flag (vertex alpha
-252 tags proxy wood for terrain-only checks; 253 remains the foliage shader flag). This is a
-render approximation, not a reduction of the final stamped voxels. A fully supplied region
-skips natural and saved-canopy proxy generation; a mixed region checks source ownership before
-far placement. One root-anchored source-height neighborhood, with shell overrides then caps,
-gives the trunk the same base across adjacent regions and levels. The region reuses prefetched
-source columns and memoizes outside columns for that build; each trunk examines 841 fine heights
-across up to nine columns. Ordinary height edits dirty regions through the anchor radius plus
-tree reach, and disturbed canopy retains its wider suppression reach. Natural proxy suppression
-tests its half-open footprint against the existing four-word disturbed-marker buckets per
-chunk column, including negative and cross-chunk rectangles, without scanning each fine column.
-Leafless far species
-retain their historical absence from canopy
-LOD because their `lod` fields do not define a wood height. The existing ushort mesh-index
-limit can still leave a partial proxy near capacity, and partially covered coarse regions can
-draw coincident crown geometry; those contracts need resolution before runtime acceptance.
-The source-only compact replacement foundation defines a canonical 64-byte signed tree instance,
-complete six-face base/tinted materials shared by block ID, a reusable trunk/crown/cap template,
-a source-corner grass/foliage vec4 tint lattice, and 16-block source/replacement visibility tiles.
-The profile table now rejects an eligible leafy far crown whose radius exceeds that species'
-grown horizontal reach; the existing 2×reach<=64 batch-cell rule then bounds either reach by 32.
-Compact descriptor validation preserves a natural grown wood-only shape, absent material faces,
-finite tint inputs and complete proxy-Y chunk readiness. These types are not yet wired into the renderer,
-network codec, or generated LOD build. Their new tests are unrun; the live path remains the baked
-opaque proxy above. A future instanced draw must keep the current 16-block biome-tint lattice,
-wood/leaf atlas remap, and matched color/reflection/shadow coverage while the old ground and
-water burial stays separate. Shader clipping of a proxy at tile edges would omit closure faces;
-that seam appearance needs visual acceptance before replacing the current clipped prisms.
+down through cave air only inside the chunk holding the base).
+The far LOD draws its terrain shell independently of trees (see "Render-only tree LOD" in
+`architecture-and-worldgen.md`). Its live tree path collects finite natural trunk/crown
+instances from batch-grown shapes in level 0 and accepted species proxy bounds in farther
+levels, without growing far roots. Leafless species retain their historical far omission.
+Saved added-canopy tops have no root or wood record, so they become two-block leaf caps.
+Natural proxy suppression tests each half-open footprint against the existing four-word
+per-chunk disturbed-marker buckets, including negative and cross-chunk rectangles, without
+scanning every fine column. A fully supplied region does no generated tree work; mixed
+regions check root and piece source ownership. Root anchors sample the source and edit
+height in a fixed neighborhood, applying shell overrides then caps; edits dirty regions
+through the anchor and tree reach. These are render approximations, not reductions of
+stamped voxels, and the terrain remains a heightmap approximation.
+
+The live tree layer stores bounded 64-byte logical instances, shared six-face log/leaf
+materials, grass and foliage tint lattices, generated 16-block tiles and proxy-Y intervals.
+`LodTreeGpuPayload` packs its region-local signed coordinates and materials for a shared
+GPU buffer; `LodTreeGpuPool` uploads them. One reusable trunk/crown/cap box template is
+instanced in the opaque world, reflection and far-shadow passes. The terrain and water
+meshes keep their separate geometry. `LodTreeCoverPass` masks a proxy tile only after
+finer proxy or full-detail draw readiness covers its Y interval, while ground burial stays
+independent. The current LOD network format carries the logical tree layer and atlas
+remapping to clients (protocol 69); no baked per-tree opaque-vertex tail is required.
+The shader box approximation and tile-edge clipping still require matched natural visual,
+multiplayer and measured build/draw acceptance; source integration alone does not establish
+those outcomes.
+
 `TreeGenerator.TryGetCanopy` and the two column-top caches remain available for canopy queries/tests; the LOD no longer
 turns those tops into ground-to-crown leaf walls. The solo shapes, batches and canopy query
 tables remain `GenerationalCache` sites (`TreeShapeCache*`, `TreeBatchCache*`,

@@ -75,6 +75,4 @@ public sealed class CanopyDisturbedTests
             TreeCanopy.ResetCanopyDisturbed();
         }
     }
-
-
 }
