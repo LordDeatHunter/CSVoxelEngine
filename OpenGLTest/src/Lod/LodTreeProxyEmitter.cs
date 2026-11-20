@@ -120,9 +120,7 @@ internal sealed class LodTreeProxyEmitter
     private void TryAddNatural(LodTreeProxy tree)
     {
         if (!Intersects(tree.Trunk()) && (!tree.HasCrown || !Intersects(tree.Crown()))) return;
-        for (var x = tree.MinX; x < tree.MaxX; x++)
-        for (var z = tree.MinZ; z < tree.MaxZ; z++)
-            if (TreeCanopy.IsDisturbed(x, z)) return;
+        if (TreeCanopy.AnyDisturbed(tree.MinX, tree.MinZ, tree.MaxX, tree.MaxZ)) return;
         tree = tree with { BaseY = Math.Min(tree.BaseY,
             LodTreeAnchor.ForRoot(tree.RootX, tree.RootZ, _anchorColumnAt)) };
         TryAdd(tree, false);

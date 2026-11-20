@@ -201,7 +201,10 @@ far placement. One root-anchored source-height neighborhood, with shell override
 gives the trunk the same base across adjacent regions and levels. The region reuses prefetched
 source columns and memoizes outside columns for that build; each trunk examines 841 fine heights
 across up to nine columns. Ordinary height edits dirty regions through the anchor radius plus
-tree reach, and disturbed canopy retains its wider suppression reach. Leafless far species
+tree reach, and disturbed canopy retains its wider suppression reach. Natural proxy suppression
+tests its half-open footprint against the existing four-word disturbed-marker buckets per
+chunk column, including negative and cross-chunk rectangles, without scanning each fine column.
+Leafless far species
 retain their historical absence from canopy
 LOD because their `lod` fields do not define a wood height. The existing ushort mesh-index
 limit can still leave a partial proxy near capacity, and partially covered coarse regions can

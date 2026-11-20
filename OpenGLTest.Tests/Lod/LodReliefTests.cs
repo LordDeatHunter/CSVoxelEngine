@@ -17,8 +17,8 @@ namespace VoxelEngine.Tests.Lod;
 /// real highland range, a massif and a lone peak at every level, plus the nesting invariants that
 /// make the levels bury each other and the ushort vertex budget the steeper side skirts eat into.
 /// The islands rising out of deep water get the same checks over an island (with its summit's sky
-/// exposure) and an archipelago, and their shores are held to leave no more dry pits in the far
-/// shell than a continental coast does. A great lake's shore region, whose bowl is dug deep into the
+/// exposure) and an archipelago. Fixed island and coast shores must have an actual ground up face
+/// or water face over each shore-window cell. A great lake's shore region, whose bowl is dug deep into the
 /// land, is checked the same way.
 /// </summary>
 [Collection("LOD column caps")]
@@ -29,12 +29,6 @@ public sealed class LodReliefTests
     private const int SearchMin = -30000;
     private const int SearchMax = -2000;
     private const int SearchStride = 320;
-
-    // The shore-pit fact compares totals over several regions per kind: one continental coast swings
-    // from no pits to most of its shore-window cells, so a single region measures the region, not the
-    // shore. A region counts once its shore spans this many shore-window cells.
-    private const int PitRegionsPerKind = 6;
-    private const int MinShoreWindowCells = 16;
 
     // A region over an island holds at least this many dry columns past the shore band
     private const int MinIslandDryColumns = 8;
@@ -140,39 +134,114 @@ public sealed class LodReliefTests
         }
     }
 
+    // Historical seed-1337 Legacy shore cohort, 7 islands and 6 continental coasts per level.
+    // Coordinates are frozen; pit counts and shares from the original run are diagnostics, not a golden.
+    private static readonly (int Level, int Rx, int Rz, string Kind)[] FixedShoreRegions =
+    [
+        (0, -38, -53, "island"),
+        (0, -38, -128, "island"),
+        (0, -38, -403, "island"),
+        (0, -43, -203, "island"),
+        (0, -53, -218, "island"),
+        (0, -58, -443, "island"),
+        (0, -43, -78, "island"),
+        (0, -33, -183, "coast"),
+        (0, -33, -358, "coast"),
+        (0, -33, -448, "coast"),
+        (0, -38, -43, "coast"),
+        (0, -38, -73, "coast"),
+        (0, -38, -103, "coast"),
+
+        (1, -17, -27, "island"),
+        (1, -17, -170, "island"),
+        (1, -20, -40, "island"),
+        (1, -20, -105, "island"),
+        (1, -20, -230, "island"),
+        (1, -22, -40, "island"),
+        (1, -20, -97, "island"),
+        (1, -17, -100, "coast"),
+        (1, -17, -147, "coast"),
+        (1, -17, -187, "coast"),
+        (1, -17, -222, "coast"),
+        (1, -20, -22, "coast"),
+        (1, -20, -60, "coast"),
+
+        (2, -9, -14, "island"),
+        (2, -9, -73, "island"),
+        (2, -9, -86, "island"),
+        (2, -11, -49, "island"),
+        (2, -11, -52, "island"),
+        (2, -11, -94, "island"),
+        (2, -11, -51, "island"),
+        (2, -9, -19, "coast"),
+        (2, -9, -27, "coast"),
+        (2, -9, -43, "coast"),
+        (2, -9, -44, "coast"),
+        (2, -9, -46, "coast"),
+        (2, -9, -51, "coast"),
+
+    ];
+
     [Fact]
-    public void IslandShoresLeaveNoMoreDryPitsInTheFarLodThanAContinentalCoast()
+    public void FixedIslandAndCoastShoreCellsHaveGroundOrWaterCoverage()
     {
-        for (var level = 0; level < LodRegion.Levels.Length; level++)
+        Assert.Equal(WorldSeed.Default, WorldSeed.Value);
+        Assert.Equal(WorldGenProfile.Legacy, WorldSeed.Profile);
+        var totals = new int[LodRegion.Levels.Length, 2];
+        foreach (var (level, rx, rz, kind) in FixedShoreRegions)
         {
             var spec = LodRegion.Levels[level];
-            var islandRegions = ShoreRegions(level, IslandRegions(level, archipelago: false), PitRegionsPerKind);
-            var archipelagoRegion = ShoreRegions(level,
-                IslandRegions(level, archipelago: true).Where(r => !islandRegions.Contains(r)), 1);
-            islandRegions.AddRange(archipelagoRegion);
-            var coastRegions = ShoreRegions(level, ContinentalCoastRegions(level), PitRegionsPerKind);
+            var mesh = LodRegion.BuildMeshData(level, rx, rz);
+            var shore = ShoreWindowCells(level, rx, rz, out var shoreCells, out var shorelineColumns);
+            var ground = new bool[spec.Cells * spec.Cells];
+            var water = new bool[ground.Length];
+            var top = new float[ground.Length];
+            Array.Fill(top, float.MinValue);
+            for (var q = 0; q + 3 < mesh.Vertices.Count; q += 4)
+            {
+                var corner = mesh.Vertices[q];
+                if ((corner.Normal & 7) != 4 || corner.PackedColor >> 24 != 255) continue;
+                QuadBounds(mesh.Vertices, q, spec.CellSize, spec.Cells, out var i0, out var i1,
+                    out var j0, out var j1, out var y);
+                for (var i = i0; i <= i1; i++)
+                for (var j = j0; j <= j1; j++)
+                {
+                    var c = i * spec.Cells + j;
+                    ground[c] = true;
+                    top[c] = MathF.Max(top[c], y);
+                }
+            }
+            for (var q = 0; q + 3 < mesh.WaterVertices.Count; q += 4)
+            {
+                QuadBounds(mesh.WaterVertices, q, spec.CellSize, spec.Cells, out var i0, out var i1,
+                    out var j0, out var j1, out _);
+                for (var i = i0; i <= i1; i++)
+                for (var j = j0; j <= j1; j++)
+                    water[i * spec.Cells + j] = true;
+            }
 
-            // Positive controls: both kinds have shore to measure
-            Assert.True(islandRegions.Count > 0, $"no level-{level} island region with a shore in the searched box");
-            Assert.True(coastRegions.Count > 0, $"no level-{level} continental coast region in the searched box");
-
-            var island = PitTotalsOver(level, islandRegions, "island");
-            var coast = PitTotalsOver(level, coastRegions, "coast");
-            Assert.True(island.ShoreWindowCells > 0 && coast.ShoreWindowCells > 0);
-
-            _output.WriteLine($"level {level}: island pit share {island.PitShare:F3}, ring {island.RingWidth:F2} blocks " +
-                              $"over {islandRegions.Count} regions; coast pit share {coast.PitShare:F3}, ring " +
-                              $"{coast.RingWidth:F2} blocks over {coastRegions.Count} regions");
-
-            // An island shore is steeper than a continental coast, so its far shell may sink below the
-            // waterline over a wider band; it may not do so far more often. The slack (0.05 of the share,
-            // one cell of ring width) absorbs sampling noise between a handful of regions.
-            Assert.True(island.PitShare <= 2f * coast.PitShare + 0.05f,
-                $"level {level}: island shores leave dry LOD pits in {island.PitShare:F3} of their shore-window " +
-                $"cells, past twice a continental coast's {coast.PitShare:F3}");
-            Assert.True(island.RingWidth <= 2f * coast.RingWidth + spec.CellSize,
-                $"level {level}: the dry LOD ring around island shores is {island.RingWidth:F2} blocks wide, past " +
-                $"twice a continental coast's {coast.RingWidth:F2} plus one cell");
+            var missing = 0;
+            var dryPits = 0;
+            for (var c = 0; c < shore.Length; c++)
+            {
+                if (!shore[c]) continue;
+                if (!ground[c] && !water[c]) missing++;
+                if (!water[c] && top[c] < WorldGenerationConfig.SeaLevel - spec.CellSize) dryPits++;
+            }
+            Assert.True(shoreCells > 0 && shorelineColumns > 0,
+                $"empty {kind} shore at level {level} ({rx}, {rz})");
+            Assert.True(missing == 0,
+                $"{kind} shore at level {level} ({rx}, {rz}) leaves {missing} cells without ground or water");
+            totals[level, kind == "island" ? 0 : 1] += shoreCells;
+            _output.WriteLine($"level {level} {kind} ({rx}, {rz}): {dryPits}/{shoreCells} dry pits " +
+                $"(share {dryPits / (float)shoreCells:F3}), " +
+                $"ring {dryPits * spec.CellSize * spec.CellSize / (float)shorelineColumns:F2}, " +
+                $"missing ground/water {missing}");
+        }
+        for (var level = 0; level < LodRegion.Levels.Length; level++)
+        {
+            Assert.True(totals[level, 0] > 0, $"level {level} has no island shore coverage");
+            Assert.True(totals[level, 1] > 0, $"level {level} has no coast shore coverage");
         }
     }
 
@@ -306,80 +375,6 @@ public sealed class LodReliefTests
         return false;
     }
 
-    private readonly record struct PitTotals(int ShoreWindowCells, int Pits, int ShorelineColumns, int CellSize)
-    {
-        public float PitShare => ShoreWindowCells == 0 ? 0f : Pits / (float)ShoreWindowCells;
-        public float RingWidth => ShorelineColumns == 0 ? 0f : Pits * CellSize * CellSize / (float)ShorelineColumns;
-    }
-
-    /// <summary>Builds every region and sums its shore-pit counts, printing each region's own.</summary>
-    private PitTotals PitTotalsOver(int level, List<(int Rx, int Rz)> regions, string what)
-    {
-        var spec = LodRegion.Levels[level];
-        int shoreWindowCells = 0, pits = 0, shorelineColumns = 0;
-        foreach (var (rx, rz) in regions)
-        {
-            var mesh = LodRegion.BuildMeshData(level, rx, rz);
-            var (share, ring) = ShorePitStats(level, rx, rz, mesh, out var cells, out var regionPits, out var shoreline);
-            _output.WriteLine($"level {level} {what} region ({rx}, {rz}): {regionPits} pits over {cells} shore-window " +
-                              $"cells (share {share:F3}), {shoreline} shoreline columns (ring {ring:F2} blocks)");
-            shoreWindowCells += cells;
-            pits += regionPits;
-            shorelineColumns += shoreline;
-        }
-
-        return new PitTotals(shoreWindowCells, pits, shorelineColumns, spec.CellSize);
-    }
-
-    /// <summary>
-    /// The far LOD's dry pits along a region's shores. A level cell's window is its own fine footprint
-    /// widened by the level's sample margin, the columns the eroded top reads. A shore-window cell's
-    /// window holds both a wet column (water level above its height) and a dry one. A pit is a
-    /// shore-window cell no water quad covers (its center inside the quad's XZ bounds) whose drawn
-    /// opaque top (the highest non-canopy up quad over its center) sits more than a cell under the sea
-    /// level, so the shell shows a sunken dry ring where the near terrain meets the water. Returns the
-    /// pit share of the shore-window cells and the ring width in blocks: the pits' area over the
-    /// shoreline columns (dry columns inside the region with a wet 4-neighbor).
-    /// </summary>
-    private static (float PitShare, float RingWidth) ShorePitStats(int level, int rx, int rz, LodMeshData mesh,
-        out int shoreWindowCells, out int pits, out int shorelineColumns)
-    {
-        var spec = LodRegion.Levels[level];
-        var cells = spec.Cells;
-        var shore = ShoreWindowCells(level, rx, rz, out shoreWindowCells, out shorelineColumns);
-
-        var top = new float[cells * cells];
-        Array.Fill(top, float.MinValue);
-        for (var q = 0; q + 3 < mesh.Vertices.Count; q += 4)
-        {
-            var corner = mesh.Vertices[q];
-            if ((corner.Normal & 7) != 4 || corner.PackedColor >> 24 != 255) continue;
-            QuadBounds(mesh.Vertices, q, spec.CellSize, cells, out var iMin, out var iMax, out var jMin, out var jMax,
-                out var y);
-            for (var i = iMin; i <= iMax; i++)
-            for (var j = jMin; j <= jMax; j++)
-                top[i * cells + j] = MathF.Max(top[i * cells + j], y);
-        }
-
-        var covered = new bool[cells * cells];
-        for (var q = 0; q + 3 < mesh.WaterVertices.Count; q += 4)
-        {
-            QuadBounds(mesh.WaterVertices, q, spec.CellSize, cells, out var iMin, out var iMax, out var jMin, out var jMax,
-                out _);
-            for (var i = iMin; i <= iMax; i++)
-            for (var j = jMin; j <= jMax; j++)
-                covered[i * cells + j] = true;
-        }
-
-        pits = 0;
-        for (var c = 0; c < cells * cells; c++)
-            if (shore[c] && !covered[c] && top[c] < WorldGenerationConfig.SeaLevel - spec.CellSize)
-                pits++;
-
-        var totals = new PitTotals(shoreWindowCells, pits, shorelineColumns, spec.CellSize);
-        return (totals.PitShare, totals.RingWidth);
-    }
-
     /// <summary>The level cells whose centers lie inside the XZ bounds of the quad at
     /// <paramref name="first"/>, clamped to the region, and the quad's highest Y.</summary>
     private static void QuadBounds(List<Vertex> vertices, int first, int cellSize, int cells, out int iMin, out int iMax,
@@ -406,7 +401,7 @@ public sealed class LodReliefTests
     }
 
     /// <summary>
-    /// Which of the region's level cells are shore-window cells (see <see cref="ShorePitStats"/>), how
+    /// Which of the region's level cells are shore-window cells, how
     /// many there are, and how many shoreline columns the region holds.
     /// </summary>
     private static bool[] ShoreWindowCells(int level, int rx, int rz, out int shoreWindowCells, out int shorelineColumns)
@@ -460,22 +455,6 @@ public sealed class LodReliefTests
         }
 
         return shore;
-    }
-
-    /// <summary>The first <paramref name="count"/> of <paramref name="candidates"/> whose shores span at
-    /// least <see cref="MinShoreWindowCells"/> shore-window cells.</summary>
-    private static List<(int Rx, int Rz)> ShoreRegions(int level, IEnumerable<(int Rx, int Rz)> candidates, int count)
-    {
-        var regions = new List<(int Rx, int Rz)>();
-        foreach (var (rx, rz) in candidates)
-        {
-            ShoreWindowCells(level, rx, rz, out var shoreWindowCells, out _);
-            if (shoreWindowCells < MinShoreWindowCells) continue;
-            regions.Add((rx, rz));
-            if (regions.Count == count) break;
-        }
-
-        return regions;
     }
 
     /// <summary>

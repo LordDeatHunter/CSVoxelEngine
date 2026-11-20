@@ -120,6 +120,31 @@ internal static class TreeCanopy
         return (Volatile.Read(ref words[i >> 6]) & (1UL << (i & 63))) != 0;
     }
 
+    /// <summary>Whether a disturbed fine column falls in the half-open rectangle. Reads only
+    /// the existing chunk buckets, including rectangles crossing negative chunk boundaries.</summary>
+    internal static bool AnyDisturbed(int minX, int minZ, int maxX, int maxZ)
+    {
+        if (minX >= maxX || minZ >= maxZ) return false;
+        var lastX = (maxX - 1) >> Chunk.SizeShift;
+        var lastZ = (maxZ - 1) >> Chunk.SizeShift;
+        for (var cx = minX >> Chunk.SizeShift; cx <= lastX; cx++)
+        for (var cz = minZ >> Chunk.SizeShift; cz <= lastZ; cz++)
+        {
+            if (!CanopyDisturbed.TryGetValue((cx, cz), out var words)) continue;
+            var x0 = cx == (minX >> Chunk.SizeShift) ? minX & Chunk.SizeMask : 0;
+            var x1 = cx == lastX ? ((maxX - 1) & Chunk.SizeMask) + 1 : Chunk.Size;
+            var z0 = cz == (minZ >> Chunk.SizeShift) ? minZ & Chunk.SizeMask : 0;
+            var z1 = cz == lastZ ? ((maxZ - 1) & Chunk.SizeMask) + 1 : Chunk.Size;
+            var zMask = ((1UL << (z1 - z0)) - 1) << z0;
+            for (var x = x0; x < x1; x++)
+            {
+                var first = x << Chunk.SizeShift;
+                if ((Volatile.Read(ref words[first >> 6]) & (zMask << (first & 63))) != 0) return true;
+            }
+        }
+        return false;
+    }
+
     private static void MarkDisturbed(int x, int z)
     {
         var words = CanopyDisturbed.GetOrAdd((x >> Chunk.SizeShift, z >> Chunk.SizeShift), NewDisturbedWords);
