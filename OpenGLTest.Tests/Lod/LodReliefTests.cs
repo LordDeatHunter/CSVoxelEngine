@@ -195,7 +195,7 @@ public sealed class LodReliefTests
         foreach (var v in mesh.Vertices)
         {
             if ((v.Normal & 7) != 4) continue;           // up faces only
-            if (v.PackedColor >> 24 == 253) continue;    // a canopy bump stands above the ground
+            if (v.PackedColor >> 24 != 255) continue;     // finite tree wood/leaves stand above ground
             var x = baseX + (int)v.Position.X;
             var z = baseZ + (int)v.Position.Z;
             if (!DryGroundMin(x, z, out var ground)) continue;
@@ -219,7 +219,7 @@ public sealed class LodReliefTests
     /// <summary>
     /// Nothing rises above a region's highest up face, so the sky exposure must not darken it: the
     /// up-face vertices at the greatest Y carry the brightest sun of every up face in the region. With
-    /// <paramref name="terrainOnly"/> the canopy bumps (alpha 253) are left out of both, so a tree on
+    /// <paramref name="terrainOnly"/> the finite tree prisms (alpha 252/253) are left out of both, so a tree on
     /// the summit neither becomes the summit nor sets the brightest sun, and a summit corner a crown
     /// above the summit touches is skipped, since that crown does rise above it, as is one on the
     /// region's edge, whose crowns past the edge this mesh does not hold.
@@ -245,7 +245,7 @@ public sealed class LodReliefTests
     /// <summary>
     /// The up-face vertices at the region's greatest up-face Y (<paramref name="topY"/>) that
     /// <see cref="AssertTheSummitIsFullyExposed"/> checks, and the brightest sun of every up face. With
-    /// <paramref name="terrainOnly"/> canopy bumps are left out, and so is a summit corner that a crown
+    /// <paramref name="terrainOnly"/> tree prisms are left out, and so is a summit corner that a crown
     /// above the summit touches or that sits on the region's edge.
     /// </summary>
     private static List<Vertex> OpenSummitCorners(int level, LodMeshData mesh, bool terrainOnly, out float topY,
@@ -275,7 +275,7 @@ public sealed class LodReliefTests
     }
 
     private static bool IsSummitCandidate(Vertex v, bool terrainOnly) =>
-        (v.Normal & 7) == 4 && (!terrainOnly || v.PackedColor >> 24 != 253);
+        (v.Normal & 7) == 4 && (!terrainOnly || v.PackedColor >> 24 == 255);
 
     private static bool OnRegionEdge(Vertex v, LodLevelSpec spec) =>
         v.Position.X <= 0f || v.Position.X >= spec.RegionBlocks || v.Position.Z <= 0f || v.Position.Z >= spec.RegionBlocks;
@@ -353,7 +353,7 @@ public sealed class LodReliefTests
         for (var q = 0; q + 3 < mesh.Vertices.Count; q += 4)
         {
             var corner = mesh.Vertices[q];
-            if ((corner.Normal & 7) != 4 || corner.PackedColor >> 24 == 253) continue;
+            if ((corner.Normal & 7) != 4 || corner.PackedColor >> 24 != 255) continue;
             QuadBounds(mesh.Vertices, q, spec.CellSize, cells, out var iMin, out var iMax, out var jMin, out var jMax,
                 out var y);
             for (var i = iMin; i <= iMax; i++)

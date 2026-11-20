@@ -31,8 +31,8 @@ public class LodRegion : IDisposable
     // Level 0 is full-detail chunks (radius 16 chunks = 256 blocks); these rings extend past it.
     // Nesting invariants: SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1
     //                     HeightBias(L+1)   >= HeightBias(L) + CellSize(L)
-    // The first ring reads the grown (batch) canopy the chunks stamp; the farther rings set
-    // ProxyCanopy and read the species' lod crown proxy, so their sweep never grows a tree.
+    // The first ring derives finite tree prisms from batch-grown shapes; farther rings use
+    // species LOD bounds, so their sweep never grows a tree. Ground remains a separate shell.
     public static readonly LodLevelSpec[] Levels =
     [
         new(CellSize: 2, RegionBlocks: 64, RegionRadius: 8, SampleMargin: 1, HeightBias: 0),   // to  512 blocks
@@ -62,14 +62,14 @@ public class LodRegion : IDisposable
     }
 
     // Rent sizes for a region build's output lists. Every level is 32x32 cells (64/2, 128/4,
-    // 256/8) and each cell emits a top quad plus a `top - neighborTop` side skirt per side, so
-    // the opaque pair is sized from the measured working set rather than a guess: over each
-    // level's full region ring the peak was 21476 vertices (L0), 18184 (L1), 11508 (L2), and over
+    // 256/8) and each cell emits a top quad plus a `top - neighborTop` side skirt per side.
+    // Historical terrain-plus-extruded-canopy peaks were 21476 vertices (L0), 18184 (L1), 11508 (L2), and over
     // ~250 highland regions per level (relief weight >= 0.5, most of them on mountain ranges)
     // the steeper side skirts peaked lower still, at 17580 (L0), 11812 (L1), 9548 (L2). At a
     // 24576 rent a list grows 24576 -> 49152 -> 98304 at worst, and AddQuad refuses past
     // ~65532 vertices, so a grown list never passes MeshBufferPool's capacity*4 ceiling and no
-    // real region is ever dropped instead of pooled. The sea sheet is one +Y quad per sea cell,
+    // real region was dropped instead of pooled. Finite tree prisms change that working set;
+    // the new peak must be measured before changing this rent size. The sea sheet is one +Y quad per sea cell,
     // so 1024 quads = 4096 vertices / 6144 indices is the exact water worst case.
     public const int MeshVertexCapacity = 24576;
     public const int MeshIndexCapacity = 36864;

@@ -125,14 +125,16 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   lod-edits.bin, the per-world reset
       LodCoverPass.cs          # the buried-flag pass: regions covered by loaded finer regions or meshed chunks, re-run only
                                #   when its inputs move, the level-0 cover tests spread over frames (IsCoveredByChunks)
-      LodFaceEmitter.cs        # a region build's face and water emission (ref struct): block palette, tint lattice, the output
-                               #   lists, AddQuad/AddBlockFace
+      LodFaceEmitter.cs        # a region build's terrain, water and finite tree-prism emission into existing mesh lists
       LodLevelSpec.cs          # one LOD ring's parameters (cell size, region size and radius, sample margin, height bias,
                                #   proxy canopy)
       LodManager.cs            # the far-LOD composition root: builds the components, unloads out-of-range regions, uploads
                                #   finished builds (ApplyCompletedMeshes), streamed regions, the camera; forwards the rest
       LodMeshBuilder.cs        # the body of LodRegion.BuildMeshData, one instance per build: prefetch, fine-height grid, per-cell
-                               #   grids, burial ranges
+                               #   grids, burial ranges and clipped generated-only tree proxies
+      LodProxyBox.cs           # finite inclusive-low/exclusive-high bounds and XZ clipping of one tree proxy prism
+      LodTreeProxy.cs          # reusable grown/far species crown and trunk bounds, separate from the terrain shell
+      LodTreeProxyEmitter.cs   # one region's root enumeration, edit/source/region clipping, opaque proxy emission and burial bounds
       LodMeshData.cs           # one finished region build (vertex/index lists, Y bounds, chunk-Y ranges) on its way to the main thread
       LodRegion.cs             # an uploaded far-LOD region: the Levels table, its pool slices, burial flags and per-column chunk-Y
                                #   ranges, the draw-order comparers; BuildMeshData forwards to LodMeshBuilder

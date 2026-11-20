@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
 using VoxelEngine.Chunks;
+using VoxelEngine.WorldGen;
 
 namespace VoxelEngine.Lod;
 
@@ -96,7 +97,12 @@ internal sealed class LodRegionClaims(LodManager owner)
         for (var level = 0; level < LodRegion.Levels.Length; level++)
         {
             var spec = LodRegion.Levels[level];
-            var reach = spec.SampleMargin + spec.CellSize;
+            // A poisoned leaf column can suppress the whole proxy of a tree rooted on
+            // the opposite edge: edit -> root -> far crown is at most 2*tree reach.
+            // Ordinary terrain edits keep the original narrow sampling window.
+            var reach = TreeCanopy.IsDisturbed(x, z)
+                ? Math.Max(spec.SampleMargin + spec.CellSize, 2 * TreeGenerator.ReachHorizontal)
+                : spec.SampleMargin + spec.CellSize;
 
             var rxMin = MathUtils.FloorDiv(x - reach, spec.RegionBlocks);
             var rxMax = MathUtils.FloorDiv(x + reach, spec.RegionBlocks);

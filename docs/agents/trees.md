@@ -188,12 +188,18 @@ outside Jungle; this extra work has not been timed. A manual giant felled in a L
 its actual species reach through `FellPoisonRadiusFor`, while ordinary Legacy trees retain the old
 poison bound. `Stamp` writes wood with its state
 into air or leaves, then leaves into air, in a fixed scan order (the root walk extends the trunk
-down through cave air only inside the chunk holding the base). The far LOD's first rings read the
-stamped canopy (`TreeGenerator.TryGetCanopy`), while the coarse rings (`LodLevelSpec.ProxyCanopy`)
-read a proxy rolled from the same placement: the species' `lod` crown height and radius through
-`LodCrownProxy.TopOffset`'s dome/cone/column silhouette, so the far sweep never grows a tree. The
-solo shapes, the batches and both canopy tables are `GenerationalCache` sites (`TreeShapeCache*`,
-`TreeBatchCache*`, `TreeCanopyCache*`, `TreeProxyCanopyCache*` in `WorldGenerationConfig`).
+down through cave air only inside the chunk holding the base). The far LOD draws its terrain
+shell independently of trees. Its first ring derives bounded wood/crown prisms from the same
+batch-grown shapes the chunks stamp; farther rings scan accepted roots once per region and use
+the species' cheap `lod` height, radius and dome/cone/column profile without growing trees.
+Prisms are clipped to the region and generated chunk columns, then batched into the existing
+opaque LOD mesh with the species' own log/leaf tiles, foliage tint and fade flag (vertex alpha
+252 tags proxy wood for terrain-only checks; 253 remains the foliage shader flag). This is a
+render approximation, not a reduction of the final stamped voxels. `TreeGenerator.TryGetCanopy`
+and the two column-top caches remain available for canopy queries/tests; the LOD no longer
+turns those tops into ground-to-crown leaf walls. The solo shapes, batches and canopy query
+tables remain `GenerationalCache` sites (`TreeShapeCache*`, `TreeBatchCache*`,
+`TreeCanopyCache*`, `TreeProxyCanopyCache*` in `WorldGenerationConfig`).
 
 **Leaf decay** (`Simulation/LeafDecay/LeafDecayManager.cs`, owned by `World`, main thread only, never while
 loading, the `leafDecay` profiler row) is a `FluidManager`-style scheduled-cell simulation. An edit
@@ -318,7 +324,11 @@ scans the loaded column for its highest leaf and records it through `TreeGenerat
 (`TreeCanopy.CanopyAdded`: packed top and leaf block per fine column, read before the disturbed
 marker and the generated canopy on every ring, cleared by any later `PoisonCanopy`, saved in
 `lod-edits.bin` (format version 3) with the leaf as a block name, reset by `WorldSeed.Apply`; never
-in a `GenerationalCache`). `CanopyAddedTests`, `AGrownCrownGoesBackToTheFarLod`.
+in a `GenerationalCache`). Since these records have no root, bottom or wood ID, the far LOD
+approximates each occupied coarse cell with a two-block-high leaf cap at its saved top. A mined,
+felled, blasted or decayed column suppresses any natural proxy whose crown footprint contains
+it; edit invalidation reaches two profile tree radii across region seams. The saved format stays
+unchanged. `CanopyAddedTests`, `AGrownCrownGoesBackToTheFarLod`.
 
 Known gap, open: the wide-trunk residue of `M-14` — a wide core cut while its shells stand leaves
 the crown unreachable for reactive growth.

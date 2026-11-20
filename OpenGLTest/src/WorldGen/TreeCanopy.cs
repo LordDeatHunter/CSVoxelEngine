@@ -29,10 +29,8 @@ internal static class TreeCanopy
         public readonly ushort[] LeafBlocks = leafBlocks;
     }
 
-    // Its one engine caller is the far LOD: LodRegion.BuildMeshData asks TryGetCanopy once per
-    // FINE column of a region, so a ring sweep walks far more distinct chunk columns than the cap
-    // holds. Sizing knobs live in WorldGenerationConfig; the safety argument lives in
-    // GenerationalCache.
+    // Retained for canopy queries and compatibility tests. The LOD mesh now derives separate
+    // per-tree prisms instead of raising its terrain shell to these column tops.
     private static readonly GenerationalCache<(int X, int Z), CanopyColumns> CanopyCache =
         new(WorldGenerationConfig.TreeCanopyCacheCapacity, WorldGenerationConfig.TreeCanopyCacheGenerations);
 
@@ -41,9 +39,7 @@ internal static class TreeCanopy
     private static readonly Func<(int X, int Z), CanopyColumns> BuildCanopyFor =
         static key => BuildCanopyTops(key.X, key.Z);
 
-    // The far rings' canopy (LodLevelSpec.ProxyCanopy): the species' lod crown proxies per chunk
-    // column, laid out like CanopyCache's entries. Cheap to rebuild and a pure function of the
-    // chunk column, read by the same per-fine-column sweep, so it is sized like the real one.
+    // The legacy column-query form of the species proxy, retained for API callers and tests.
     private static readonly GenerationalCache<(int X, int Z), CanopyColumns> ProxyCanopyCache =
         new(WorldGenerationConfig.TreeProxyCanopyCacheCapacity, WorldGenerationConfig.TreeProxyCanopyCacheGenerations);
 
@@ -88,7 +84,7 @@ internal static class TreeCanopy
 
     private static int FineIndex(int x, int z) => ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
 
-    private static bool TryGetAdded(int x, int z, out int top, out ushort leaf)
+    internal static bool TryGetAdded(int x, int z, out int top, out ushort leaf)
     {
         top = 0;
         leaf = BlockType.Air;
@@ -116,7 +112,7 @@ internal static class TreeCanopy
         Interlocked.Increment(ref _canopyAddedVersion);
     }
 
-    private static bool IsDisturbed(int x, int z)
+    internal static bool IsDisturbed(int x, int z)
     {
         if (!CanopyDisturbed.TryGetValue((x >> Chunk.SizeShift, z >> Chunk.SizeShift), out var words))
             return false;
@@ -130,6 +126,8 @@ internal static class TreeCanopy
         var i = FineIndex(x, z);
         Interlocked.Or(ref words[i >> 6], 1UL << (i & 63));
     }
+
+    internal static bool HasAdded => !CanopyAdded.IsEmpty;
 
     /// <summary>Drops the cached canopy tops (real and proxy); called by <see cref="TreeGenerator.ResetCaches"/> only.</summary>
     internal static void ResetCaches()

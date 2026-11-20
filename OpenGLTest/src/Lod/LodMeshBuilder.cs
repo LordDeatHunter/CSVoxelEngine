@@ -29,6 +29,7 @@ internal sealed class LodMeshBuilder
     private readonly int _chunkSpan;
     private readonly int _baseChunkX;
     private readonly int _baseChunkZ;
+    private readonly IWorldSource _source;
     private readonly int[][] _heightmaps;
     private readonly ColumnData[] _columns;
     private readonly bool[] _supplied;
@@ -54,7 +55,6 @@ internal sealed class LodMeshBuilder
     private readonly bool[] _soilStripped;
     private readonly Biome[] _biomeGrid;
     private readonly byte[] _seaFloor;
-    private readonly ushort[] _canopyLeaf;
     private readonly int[] _fine;
     private readonly int[] _xMin;
     private readonly int[] _fineGen;
@@ -88,6 +88,7 @@ internal sealed class LodMeshBuilder
     {
         _separableMin = separableMin;
         source ??= GeneratedWorldSource.Instance;
+        _source = source;
         _spec = LodRegion.Levels[level];
         _cellSize = _spec.CellSize;
         _cellShift = System.Numerics.BitOperations.TrailingZeroCount(_cellSize);
@@ -137,11 +138,8 @@ internal sealed class LodMeshBuilder
         _fineOriginZ = _baseFineZ - _fineMargin;
         _windowSpan = _cellSize + 2 * _margin;              // 4 / 10 / 22
 
-        // Top solid cell per LOD column (with 1-cell border): the eroded terrain below, the
-        // canopy above it, and their max — the shell actually drawn. Canopy is sampled over
-        // each cell's own footprint only (no erosion margin), so a tree lifts just its own
-        // column into a leaf-textured bump instead of a plateau. Rented: a region build would
-        // otherwise allocate five grids per region on the worker.
+        // Terrain alone owns this shell. Trees are finite prisms appended to the same opaque
+        // region mesh after the terrain faces, never a raised leaf-textured terrain column.
         var gridSize = _heightGrid * _heightGrid;
         _groundTop = ArrayPool<int>.Shared.Rent(gridSize);
         _topCell = ArrayPool<int>.Shared.Rent(gridSize);
@@ -167,7 +165,6 @@ internal sealed class LodMeshBuilder
         _soilStripped = ArrayPool<bool>.Shared.Rent(gridSize);
         _biomeGrid = ArrayPool<Biome>.Shared.Rent(gridSize);
         _seaFloor = ArrayPool<byte>.Shared.Rent(gridSize);
-        _canopyLeaf = ArrayPool<ushort>.Shared.Rent(gridSize);
         // Item C1: the fine heights every cell window reads (index fx * fineSpan + fz), and one row
         // of the separable min's horizontal half, rebuilt per cell row and reused by every column.
         // Level 2 is the largest at 81796 ints, well inside ArrayPool<int>.Shared's largest bucket.
@@ -383,23 +380,12 @@ internal sealed class LodMeshBuilder
         var ground = ((minHeight - _spec.HeightBias) >> _cellShift) - 1;
         _groundTop[(i + 1) * _heightGrid + (j + 1)] = ground;
 
-        // Canopy tops are always positive where present (trees need ground above the
-        // minimum height), so 0 unambiguously means open sky. It must not reach the
-        // cell formula: "no canopy" computes to cell -1, which would outrank deeply
-        // negative terrain and pave lowlands with phantom leaf pillars.
-        var top = ground;
-        var canopyMax = 0;
-        var canopyId = BlockType.Air;
-
         if (suppliedColumn == null)
-            ClassifyGenerated(i, j, centerX, centerZ, maxOwn, ref canopyMax, ref canopyId);
+            ClassifyGenerated(i, j, centerX, centerZ, maxOwn);
         else
             ClassifySupplied(i, j, suppliedColumn, centerLocal, maxOwn);
 
-        if (canopyMax > 0)
-            top = Math.Max(top, ((canopyMax - _spec.HeightBias) >> _cellShift) - 1);
-        _topCell[(i + 1) * _heightGrid + (j + 1)] = top;
-        _canopyLeaf[(i + 1) * _heightGrid + (j + 1)] = canopyId;
+        _topCell[(i + 1) * _heightGrid + (j + 1)] = ground;
     }
 
     private ushort SampleSeparable(int i, int j, out int minHeight, ref int maxOwn)
@@ -476,7 +462,7 @@ internal sealed class LodMeshBuilder
         return topBlock;
     }
 
-    private void ClassifyGenerated(int i, int j, int centerX, int centerZ, int maxOwn, ref int canopyMax, ref ushort canopyId)
+    private void ClassifyGenerated(int i, int j, int centerX, int centerZ, int maxOwn)
     {
         var cellBiome = TerrainGenerator.FloraBiomeAt(centerX, centerZ);
         _biomeGrid[(i + 1) * _heightGrid + (j + 1)] = cellBiome;
@@ -553,18 +539,6 @@ internal sealed class LodMeshBuilder
         _iceTop[(i + 1) * _heightGrid + (j + 1)] =
             cellLevel > TerrainGenerator.NoWater && SnowGenerator.IsFrozenWater(centerX, centerZ, cold);
 
-        for (var dx = 0; dx < _cellSize; dx++)
-        for (var dz = 0; dz < _cellSize; dz++)
-        {
-            if (!TreeGenerator.TryGetCanopy(_baseFineX + i * _cellSize + dx, _baseFineZ + j * _cellSize + dz,
-                    _spec.ProxyCanopy, out var t, out var leaf))
-                continue;
-            if (t > canopyMax)
-            {
-                canopyMax = t;
-                canopyId = leaf;
-            }
-        }
     }
 
     private void ClassifySupplied(int i, int j, ColumnData suppliedColumn, int centerLocal, int maxOwn)
@@ -598,9 +572,8 @@ internal sealed class LodMeshBuilder
     {
         // Which chunks must be drawn for a full-detail column to hide this shell: everything
         // from the lowest side face (set by the neighboring cells' tops, hence the 1-cell ring)
-        // up to the top face and the real terrain surface above it. The low end reads the
-        // ground grid (canopy bumps must not lift it, or shell sides would show with no chunk
-        // behind them); the high end reads the bumped grid so the canopy is covered too.
+        // up to the real terrain surface. LodTreeProxyEmitter then extends the high bound for every
+        // generated chunk column a clipped tree box occupies.
         var cellsPerChunk = Chunk.Size / _cellSize;
         columnCyMin = new int[_regionChunkSpan * _regionChunkSpan];
         columnCyMax = new int[_regionChunkSpan * _regionChunkSpan];
@@ -693,8 +666,12 @@ internal sealed class LodMeshBuilder
         var emitter = new LodFaceEmitter(buffers, _spec, _cellSize, _cells, _heightGrid, _regionChunkSpan, _chunkSpan,
             _latticeSpan, _regionChunkX, _regionChunkZ, _supplied, _columns, _grassTint, _foliageTint, _hasRegionOverrides,
             _topCell, _groundTop, _beachTop, _gravelTop, _rockTop, _soilStripped, _snowTop, _iceTop, _biomeGrid, _waterLevels, _seaFloor,
-            _canopyLeaf, _topBlockGrid);
+            _topBlockGrid);
         emitter.Emit();
+        var trees = new LodTreeProxyEmitter(_spec, _source, _supplied, _groundTop,
+            _heightGrid, _baseFineX, _baseFineZ, _baseChunkX, _baseChunkZ,
+            _chunkSpan, _regionChunkX, _regionChunkZ, _regionChunkSpan);
+        trees.Emit(ref emitter, columnCyMax);
         return emitter.ToMeshData(level, rx, rz, columnCyMin, columnCyMax);
     }
 
@@ -711,7 +688,6 @@ internal sealed class LodMeshBuilder
         ArrayPool<bool>.Shared.Return(_soilStripped);
         ArrayPool<Biome>.Shared.Return(_biomeGrid);
         ArrayPool<byte>.Shared.Return(_seaFloor);
-        ArrayPool<ushort>.Shared.Return(_canopyLeaf);
         ArrayPool<int>.Shared.Return(_fine);
         ArrayPool<int>.Shared.Return(_xMin);
         if (!ReferenceEquals(_fineGen, _fine)) ArrayPool<int>.Shared.Return(_fineGen);
