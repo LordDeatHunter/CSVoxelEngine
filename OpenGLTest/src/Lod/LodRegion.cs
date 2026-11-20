@@ -93,6 +93,7 @@ public class LodRegion : IDisposable
             if (_isBuried == value) return;
             _isBuried = value;
             _pool?.NoteDrawSetChange();
+            _treePool?.NoteDrawSetChange();
         }
     }
 
@@ -136,6 +137,23 @@ public class LodRegion : IDisposable
     /// blended, after everything opaque (see TerrainPasses.RenderWorldTranslucent).
     /// </summary>
     public GeometrySlice? WaterSlice { get; private set; }
+
+    internal LodTreeGpuPool.Slice TreeSlice { get; private set; }
+    private LodTreeGpuPool? _treePool;
+    internal readonly ulong[] TreeSourceTiles;
+    internal readonly int[] TreeYMin;
+    internal readonly int[] TreeYMax;
+    private readonly ulong[] _treeVisibleTiles;
+    internal bool HasTreeInstances => TreeSlice.Count > 0;
+    internal bool HasVisibleTrees
+    {
+        get
+        {
+            foreach (var word in _treeVisibleTiles)
+                if (word != 0) return true;
+            return false;
+        }
+    }
 
     // The pool both slices came from, so Dispose can hand the space back without an unload
     // having to thread a pool reference in. One pool covers both meshes: the pair is born from
@@ -182,7 +200,9 @@ public class LodRegion : IDisposable
     /// non-empty mesh with no pool throws, exactly as <c>Chunk.UpdateMesh</c> does.
     /// </param>
     /// <param name="data">A finished background build (see <see cref="BuildMeshData"/>).</param>
-    public LodRegion(ChunkGeometryPool? pool, LodMeshData data)
+    public LodRegion(ChunkGeometryPool? pool, LodMeshData data) : this(pool, null, data) { }
+
+    internal LodRegion(ChunkGeometryPool? pool, LodTreeGpuPool? treePool, LodMeshData data)
     {
         Level = data.Level;
         X = data.X;
@@ -192,24 +212,54 @@ public class LodRegion : IDisposable
         YMax = data.YMax;
         ColumnCyMin = data.ColumnCyMin;
         ColumnCyMax = data.ColumnCyMax;
+        TreeSourceTiles = data.Trees.GeneratedTiles;
+        TreeYMin = data.Trees.ProxyYMin;
+        TreeYMax = data.Trees.ProxyYMax;
+        _treeVisibleTiles = (ulong[])TreeSourceTiles.Clone();
 
-        if (data.Vertices.Count > 0)
+        try
         {
-            _pool = pool ?? throw new InvalidOperationException(
-                "non-empty LOD region mesh without a geometry pool");
-            OpaqueSlice = _pool.Upload(
-                System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.Vertices),
-                System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.Indices));
-        }
+            if (data.Vertices.Count > 0)
+            {
+                _pool = pool ?? throw new InvalidOperationException(
+                    "non-empty LOD region mesh without a geometry pool");
+                OpaqueSlice = _pool.Upload(
+                    System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.Vertices),
+                    System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.Indices));
+            }
 
-        if (data.WaterVertices.Count > 0)
-        {
-            _pool = pool ?? throw new InvalidOperationException(
-                "non-empty LOD region mesh without a geometry pool");
-            WaterSlice = _pool.Upload(
-                System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.WaterVertices),
-                System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.WaterIndices));
+            if (data.WaterVertices.Count > 0)
+            {
+                _pool = pool ?? throw new InvalidOperationException(
+                    "non-empty LOD region mesh without a geometry pool");
+                WaterSlice = _pool.Upload(
+                    System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.WaterVertices),
+                    System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.WaterIndices));
+            }
+            if (data.Trees.Count > 0)
+            {
+                _treePool = treePool ?? throw new InvalidOperationException(
+                    "non-empty LOD tree result without a tree pool");
+                TreeSlice = treePool.Upload(data.Trees, X * SizeBlocks, Z * SizeBlocks);
+            }
         }
+        catch
+        {
+            ReleaseSlices();
+            throw;
+        }
+    }
+
+    /// <summary>Publish a source/coverage mask once for all three draw passes.</summary>
+    internal void SetTreeCoverage(ReadOnlySpan<ulong> mask)
+    {
+        if (mask.Length != _treeVisibleTiles.Length)
+            throw new ArgumentException("Tree mask length changed.", nameof(mask));
+        if (mask.SequenceEqual(_treeVisibleTiles)) return;
+        mask.CopyTo(_treeVisibleTiles);
+        if (HasTreeInstances) _treePool?.SetCoverage(TreeSlice, mask);
+        _treePool?.NoteDrawSetChange();
+        _pool?.NoteDrawSetChange();
     }
 
     /// <summary>
@@ -229,6 +279,13 @@ public class LodRegion : IDisposable
             _pool?.Free(water);
             WaterSlice = null;
         }
+
+        if (TreeSlice.Units > 0)
+        {
+            _treePool?.Free(TreeSlice);
+            TreeSlice = default;
+        }
+        _treePool = null;
 
         _pool = null;
     }

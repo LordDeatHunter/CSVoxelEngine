@@ -290,6 +290,10 @@ public sealed class GameServer : IDisposable
                 _streaming.OnLodRegionRequest(client, reader);
                 break;
 
+            case NetMessage.LodRegionAck:
+                _streaming.OnLodAck(client, reader);
+                break;
+
             case NetMessage.InventoryRequest:
                 _intents.OnInventoryRequest(client, reader);
                 break;

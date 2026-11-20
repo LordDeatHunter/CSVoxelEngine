@@ -1,36 +1,28 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Chunks.Sources;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees.Shape;
 
 namespace VoxelEngine.Lod;
 
-/// <summary>
-/// One region build's finite generated-tree geometry, clipped to region and source ownership.
-/// It appends to the terrain emitter's existing opaque mesh and extends burial bounds.
-/// </summary>
+/// <summary>Collects whole compact trees, source-owned tiles, and finite tile Y bounds.</summary>
 internal sealed class LodTreeProxyEmitter
 {
-    private static readonly Func<int, int, LodTreeProxy?> ResolveFarProxy = static (x, z) =>
-        TreeGenerator.TryGetTree(x, z, out var species, out var baseY) && species.HasLeaves
-            ? LodTreeProxy.FromFar(species, x, z, baseY) : null;
-
+    private static readonly Func<int, int, LodTreeProxy?> ResolveFar = static (x, z) =>
+        TreeGenerator.TryGetTree(x, z, out var species, out var y) && species.HasLeaves
+            ? LodTreeProxy.FromFar(species, x, z, y) : null;
     private readonly LodLevelSpec _spec;
     private readonly IWorldSource _source;
     private readonly bool[] _supplied;
-    private readonly int _baseFineX;
-    private readonly int _baseFineZ;
-    private readonly int _baseChunkX;
-    private readonly int _baseChunkZ;
-    private readonly int _chunkSpan;
-    private readonly int _regionChunkX;
-    private readonly int _regionChunkZ;
-    private readonly int _regionChunkSpan;
-    private readonly int _cellSize;
-    private readonly int _cells;
-    private readonly Func<int, int, bool> _rootSupplied;
     private readonly Func<int, int, LodTreeAnchor.HeightColumn> _anchorColumnAt;
+    private readonly int _x0, _z0, _baseCx, _baseCz, _prefetchSpan, _ownedSpan;
+    private readonly ulong[] _generated;
+    private readonly int[] _yMin, _yMax;
+    private readonly LodTreeMaterialTable _materials = new();
+    private readonly List<LodTreeInstance> _instances = [];
     private Dictionary<(int X, int Z), bool>? _outsideSupply;
 
     internal LodTreeProxyEmitter(LodLevelSpec spec, IWorldSource source, bool[] supplied,
@@ -38,159 +30,147 @@ internal sealed class LodTreeProxyEmitter
         int baseFineX, int baseFineZ, int baseChunkX, int baseChunkZ,
         int chunkSpan, int regionChunkX, int regionChunkZ, int regionChunkSpan)
     {
-        _spec = spec;
-        _source = source;
-        _supplied = supplied;
-        _baseFineX = baseFineX;
-        _baseFineZ = baseFineZ;
-        _baseChunkX = baseChunkX;
-        _baseChunkZ = baseChunkZ;
-        _chunkSpan = chunkSpan;
-        _regionChunkX = regionChunkX;
-        _regionChunkZ = regionChunkZ;
-        _regionChunkSpan = regionChunkSpan;
-        _cellSize = spec.CellSize;
-        _cells = spec.Cells;
-        _rootSupplied = RootSupplied;
-        _anchorColumnAt = anchorColumnAt;
+        _spec = spec; _source = source; _supplied = supplied; _anchorColumnAt = anchorColumnAt;
+        _x0 = baseFineX; _z0 = baseFineZ; _baseCx = baseChunkX; _baseCz = baseChunkZ;
+        _prefetchSpan = chunkSpan; _ownedSpan = regionChunkSpan;
+        _yMin = new int[_ownedSpan * _ownedSpan];
+        _yMax = new int[_yMin.Length];
+        _generated = new ulong[(_yMin.Length + 63) / 64];
+        Array.Fill(_yMin, int.MaxValue);
+        Array.Fill(_yMax, int.MinValue);
+        for (var x = 0; x < _ownedSpan; x++)
+        for (var z = 0; z < _ownedSpan; z++)
+        {
+            var c = x * _ownedSpan + z;
+            if (!supplied[(x + 1) * chunkSpan + z + 1])
+                _generated[c >> 6] |= 1UL << (c & 63);
+        }
     }
 
-    internal void Emit(ref LodFaceEmitter emitter, int[] columnCyMax)
+    internal LodTreeBuild Build(ReadOnlySpan<Vector3> grass, ReadOnlySpan<Vector3> foliage,
+        out int minY, out int maxY)
     {
-        // A fully supplied region owns no generated tree or saved generated canopy.
-        // This precedes either batch growth or the far placement scan.
-        if (!LodProxyOwnership.HasGeneratedOwnedColumn(_supplied, _chunkSpan, _regionChunkSpan))
-            return;
-        var reach = _spec.ProxyCanopy ? TreeGenerator.ProxyReach : TreeGenerator.ReachHorizontal;
-        var x0 = _baseFineX;
-        var z0 = _baseFineZ;
-        var x1 = x0 + _spec.RegionBlocks;
-        var z1 = z0 + _spec.RegionBlocks;
-        // Saved reactive-growth records have only top+leaf per column, not a trunk or owner.
-        // Approximate each occupied coarse cell by a two-block-high cap. No file migration.
-        if (TreeCanopy.HasAdded)
+        minY = int.MaxValue; maxY = int.MinValue;
+        if (LodProxyOwnership.HasGeneratedOwnedColumn(_supplied, _prefetchSpan, _ownedSpan))
         {
-            for (var i = 0; i < _cells; i++)
-            for (var j = 0; j < _cells; j++)
+            var reach = _spec.ProxyCanopy ? TreeGenerator.ProxyReach : TreeGenerator.ReachHorizontal;
+            if (TreeCanopy.HasAdded)
             {
-                var bx = x0 + i * _cellSize;
-                var bz = z0 + j * _cellSize;
-                var top = int.MinValue;
-                var leaf = BlockType.Air;
-                for (var dx = 0; dx < _cellSize; dx++)
-                for (var dz = 0; dz < _cellSize; dz++)
-                    if (TreeCanopy.TryGetAdded(bx + dx, bz + dz, out var y, out var id) && y > top)
-                    {
-                        top = y;
-                        leaf = id;
-                    }
-                if (top == int.MinValue) continue;
-                EmitProxyBox(new LodProxyBox(bx, top - 1, bz, bx + _cellSize, top + 1, bz + _cellSize),
-                    leaf, true, ref emitter, columnCyMax);
+                for (var i = 0; i < _spec.Cells; i++)
+                for (var j = 0; j < _spec.Cells; j++)
+                {
+                    var bx = _x0 + i * _spec.CellSize;
+                    var bz = _z0 + j * _spec.CellSize;
+                    var top = int.MinValue;
+                    var leaf = BlockType.Air;
+                    for (var dx = 0; dx < _spec.CellSize; dx++)
+                    for (var dz = 0; dz < _spec.CellSize; dz++)
+                        if (TreeCanopy.TryGetAdded(bx + dx, bz + dz, out var y, out var id) && y > top)
+                        { top = y; leaf = id; }
+                    if (top != int.MinValue)
+                        TryAdd(new LodTreeProxy(bx, bz, top - 1, top - 1, top + 1,
+                            bx, bx + _spec.CellSize, bz, bz + _spec.CellSize, 1, 0, leaf,
+                            LodCrownProfile.Column), true);
+                }
+            }
+            if (_spec.ProxyCanopy)
+            {
+                var roots = new List<LodTreeProxy>();
+                LodProxyOwnership.CollectFar(_supplied, _prefetchSpan, _ownedSpan,
+                    _x0, _z0, _spec.RegionBlocks, reach, RootSupplied, ResolveFar, roots);
+                foreach (var root in roots) TryAddNatural(root);
+            }
+            else
+            {
+                for (var cx = TreeGenerator.CellOf(_x0 - reach);
+                     cx <= TreeGenerator.CellOf(_x0 + _spec.RegionBlocks - 1 + reach); cx++)
+                for (var cz = TreeGenerator.CellOf(_z0 - reach);
+                     cz <= TreeGenerator.CellOf(_z0 + _spec.RegionBlocks - 1 + reach); cz++)
+                foreach (var shape in TreeBatches.BatchOf(cx, cz).Trees)
+                    if (!RootSupplied(shape.X, shape.Z))
+                        TryAddNatural(LodTreeProxy.FromGrown(shape));
             }
         }
-
-        if (_spec.ProxyCanopy)
-        {
-            // One cheap placement scan for this region. Far rings never grow a tree.
-            var roots = new List<LodTreeProxy>();
-            LodProxyOwnership.CollectFar(_supplied, _chunkSpan, _regionChunkSpan,
-                x0, z0, _spec.RegionBlocks, reach,
-                _rootSupplied, ResolveFarProxy, roots);
-            foreach (var tree in roots)
-                EmitNaturalProxy(tree, ref emitter, columnCyMax);
-        }
-        else
-        {
-            // The near ring uses the same batch-grown shapes as the stamped chunks.
-            for (var cx = TreeGenerator.CellOf(x0 - reach); cx <= TreeGenerator.CellOf(x1 - 1 + reach); cx++)
-            for (var cz = TreeGenerator.CellOf(z0 - reach); cz <= TreeGenerator.CellOf(z1 - 1 + reach); cz++)
-            foreach (var shape in TreeBatches.BatchOf(cx, cz).Trees)
-                if (shape.Species.HasLeaves && !_rootSupplied(shape.X, shape.Z))
-                    EmitNaturalProxy(LodTreeProxy.FromGrown(shape), ref emitter, columnCyMax);
-        }
+        foreach (var instance in _instances)
+        { minY = Math.Min(minY, instance.BaseY); maxY = Math.Max(maxY, instance.CrownTop); }
+        var side = _ownedSpan + 1;
+        var tint = _instances.Count == 0 ? null : new LodTreeTintLattice(_ownedSpan,
+            grass[..(side * side)], foliage[..(side * side)]);
+        return new LodTreeBuild([.. _instances], [.. _materials.Materials], tint,
+            _generated, _yMin, _yMax);
     }
 
     private bool RootSupplied(int x, int z)
     {
-        var cx = x >> Chunk.SizeShift;
-        var cz = z >> Chunk.SizeShift;
-        var pi = cx - _baseChunkX;
-        var pj = cz - _baseChunkZ;
-        if ((uint)pi < (uint)_chunkSpan && (uint)pj < (uint)_chunkSpan)
-            return _supplied[pi * _chunkSpan + pj];
+        var cx = x >> Chunk.SizeShift; var cz = z >> Chunk.SizeShift;
+        var pi = cx - _baseCx; var pj = cz - _baseCz;
+        if ((uint)pi < (uint)_prefetchSpan && (uint)pj < (uint)_prefetchSpan)
+            return _supplied[pi * _prefetchSpan + pj];
         _outsideSupply ??= new Dictionary<(int X, int Z), bool>();
-        var key = (cx, cz);
-        if (_outsideSupply.TryGetValue(key, out var supplied)) return supplied;
+        if (_outsideSupply.TryGetValue((cx, cz), out var supplied)) return supplied;
         supplied = _source.Supplies(cx, cz);
-        _outsideSupply.Add(key, supplied);
+        _outsideSupply.Add((cx, cz), supplied);
         return supplied;
     }
 
-    private void EmitNaturalProxy(LodTreeProxy tree, ref LodFaceEmitter emitter, int[] columnCyMax)
-    {
-        var crown = tree.Crown();
-        var trunk = tree.Trunk();
-        var trunkIntersects = !(trunk.MaxX <= _baseFineX || trunk.MinX >= _baseFineX + _spec.RegionBlocks
-            || trunk.MaxZ <= _baseFineZ || trunk.MinZ >= _baseFineZ + _spec.RegionBlocks);
-        var crownIntersects = tree.HasCrown && !(crown.MaxX <= _baseFineX
-            || crown.MinX >= _baseFineX + _spec.RegionBlocks
-            || crown.MaxZ <= _baseFineZ || crown.MinZ >= _baseFineZ + _spec.RegionBlocks);
-        if (!trunkIntersects && !crownIntersects) return;
+    private bool Intersects(LodProxyBox box) => box.HasVolume &&
+        box.MaxX > _x0 && box.MinX < _x0 + _spec.RegionBlocks &&
+        box.MaxZ > _z0 && box.MinZ < _z0 + _spec.RegionBlocks;
 
-        // Any felled, blasted, mined or decayed canopy column suppresses the whole coarse
-        // approximation; it must not resurrect edited leaves in an adjacent LOD cell.
+    private void TryAddNatural(LodTreeProxy tree)
+    {
+        if (!Intersects(tree.Trunk()) && (!tree.HasCrown || !Intersects(tree.Crown()))) return;
         for (var x = tree.MinX; x < tree.MaxX; x++)
         for (var z = tree.MinZ; z < tree.MaxZ; z++)
             if (TreeCanopy.IsDisturbed(x, z)) return;
-
-        if (trunkIntersects)
-        {
-            // The anchor reads the root's authoritative source and edited height neighborhood,
-            // independent of which adjacent region or LOD level clips this same trunk.
-            tree = tree with { BaseY = Math.Min(tree.BaseY,
-                LodTreeAnchor.ForRoot(tree.RootX, tree.RootZ, _anchorColumnAt)) };
-            EmitProxyBox(tree.Trunk(), tree.WoodId, false, ref emitter, columnCyMax);
-        }
-        if (!tree.HasCrown) return;
-        EmitProxyBox(crown, tree.LeavesId, true, ref emitter, columnCyMax);
-        if (tree.Profile != VoxelEngine.WorldGen.Trees.Shape.LodCrownProfile.Column)
-            EmitProxyBox(tree.Cap(), tree.LeavesId, true, ref emitter, columnCyMax);
+        tree = tree with { BaseY = Math.Min(tree.BaseY,
+            LodTreeAnchor.ForRoot(tree.RootX, tree.RootZ, _anchorColumnAt)) };
+        TryAdd(tree, false);
     }
 
-    private void EmitProxyBox(LodProxyBox box, ushort blockId, bool leaves,
-        ref LodFaceEmitter emitter, int[] columnCyMax)
+    private void TryAdd(LodTreeProxy tree, bool added)
     {
-        if (!box.HasVolume) return;
-        var regionX1 = _baseFineX + _spec.RegionBlocks;
-        var regionZ1 = _baseFineZ + _spec.RegionBlocks;
-        box = box.ClipXZ(_baseFineX, _baseFineZ, regionX1, regionZ1);
-        if (!box.HasVolume) return;
-        var x0 = box.MinX;
-        var x1 = box.MaxX;
-        var z0 = box.MinZ;
-        var z1 = box.MaxZ;
-        var firstCx = (int)MathF.Floor(x0) >> Chunk.SizeShift;
-        var lastCx = ((int)MathF.Ceiling(x1) - 1) >> Chunk.SizeShift;
-        var firstCz = (int)MathF.Floor(z0) >> Chunk.SizeShift;
-        var lastCz = ((int)MathF.Ceiling(z1) - 1) >> Chunk.SizeShift;
-        for (var cx = firstCx; cx <= lastCx; cx++)
-        for (var cz = firstCz; cz <= lastCz; cz++)
+        if (!Intersects(tree.Trunk()) && (!tree.HasCrown || !Intersects(tree.Crown()))) return;
+        var wood = LodTreeInstance.NoMaterial;
+        var leaf = LodTreeInstance.NoMaterial;
+        if (!added)
         {
-            var k = (cx - _baseChunkX) * _chunkSpan + cz - _baseChunkZ;
-            if (_supplied[k]) continue;
-            var clipped = box.ClipXZ(cx * Chunk.Size, cz * Chunk.Size,
-                (cx + 1) * Chunk.Size, (cz + 1) * Chunk.Size);
-            if (!clipped.HasVolume) continue;
-            if (!emitter.EmitProxyBox(new LodProxyBox(clipped.MinX - _baseFineX, clipped.MinY,
-                clipped.MinZ - _baseFineZ, clipped.MaxX - _baseFineX, clipped.MaxY,
-                clipped.MaxZ - _baseFineZ), blockId, leaves))
-                continue;
-            var ci = cx - _regionChunkX;
-            var cj = cz - _regionChunkZ;
-            columnCyMax[ci * _regionChunkSpan + cj] = Math.Max(columnCyMax[ci * _regionChunkSpan + cj],
-                ((int)MathF.Ceiling(box.MaxY) - 1) >> Chunk.SizeShift);
+            if (tree.WoodId >= BlockType.ById.Length || BlockType.ById[tree.WoodId] is not { } woodBlock ||
+                !LodTreeMaterial.TryFromBlock(woodBlock, out var woodMaterial)) return;
+            wood = _materials.Add(tree.WoodId, woodMaterial);
+        }
+        if (tree.HasCrown)
+        {
+            if (tree.LeavesId >= BlockType.ById.Length || BlockType.ById[tree.LeavesId] is not { } leafBlock ||
+                !LodTreeMaterial.TryFromBlock(leafBlock, out var leafMaterial)) return;
+            leaf = _materials.Add(tree.LeavesId, leafMaterial);
+        }
+        if (!LodTreeInstance.TryCreate(tree, wood, leaf, _materials.Count, added, out var instance) ||
+            !instance.TryRegionProxy(_x0, _z0, out _))
+            throw new InvalidOperationException("Admitted tree exceeds the compact LOD contract.");
+        _instances.Add(instance);
+        if (!added) Mark(tree.Trunk());
+        if (tree.HasCrown)
+        {
+            Mark(tree.Crown());
+            if (tree.Profile != LodCrownProfile.Column) Mark(tree.Cap());
         }
     }
 
+    private void Mark(LodProxyBox box)
+    {
+        if (!Intersects(box)) return;
+        var x0 = Math.Clamp((int)MathF.Floor(box.MinX - _x0) >> Chunk.SizeShift, 0, _ownedSpan - 1);
+        var x1 = Math.Clamp(((int)MathF.Ceiling(box.MaxX - _x0) - 1) >> Chunk.SizeShift, 0, _ownedSpan - 1);
+        var z0 = Math.Clamp((int)MathF.Floor(box.MinZ - _z0) >> Chunk.SizeShift, 0, _ownedSpan - 1);
+        var z1 = Math.Clamp(((int)MathF.Ceiling(box.MaxZ - _z0) - 1) >> Chunk.SizeShift, 0, _ownedSpan - 1);
+        for (var x = x0; x <= x1; x++)
+        for (var z = z0; z <= z1; z++)
+        {
+            var c = x * _ownedSpan + z;
+            if ((_generated[c >> 6] & (1UL << (c & 63))) == 0) continue;
+            _yMin[c] = Math.Min(_yMin[c], (int)MathF.Floor(box.MinY));
+            _yMax[c] = Math.Max(_yMax[c], (int)MathF.Ceiling(box.MaxY));
+        }
+    }
 }

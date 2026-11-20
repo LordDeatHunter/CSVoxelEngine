@@ -34,6 +34,7 @@ public class LodManager
     /// Render thread only, like the two chunk pools.
     /// </summary>
     private readonly ChunkGeometryPool? _lodGeometry;
+    private readonly LodTreeGpuPool? _trees;
 
     /// <summary>
     /// Finished region builds <see cref="ApplyCompletedMeshes"/> uploads per frame. Defaults to
@@ -99,15 +100,21 @@ public class LodManager
     private Camera? _camera;
     private readonly LodRegionSet _regionSet;
     private readonly LodCoverPass _coverPass;
+    private readonly LodTreeCoverPass _treeCoverPass;
     private readonly LodRegionClaims _claims;
     private readonly LodWorkerPool _workers;
 
     /// <summary>Builds the manager's components. <paramref name="lodGeometry"/> is the shared LOD pool, or null headless (see <c>_lodGeometry</c>).</summary>
     public LodManager(ChunkGeometryPool? lodGeometry = null)
+        : this(lodGeometry, null) { }
+
+    internal LodManager(ChunkGeometryPool? lodGeometry, LodTreeGpuPool? trees)
     {
         _lodGeometry = lodGeometry;
+        _trees = trees;
         _regionSet = new LodRegionSet(Regions, RegionList);
         _coverPass = new LodCoverPass(_regionSet);
+        _treeCoverPass = new LodTreeCoverPass(_regionSet);
         _claims = new LodRegionClaims(this);
         _workers = new LodWorkerPool(this, _claims);
     }
@@ -145,6 +152,7 @@ public class LodManager
 
         _regionSet.BumpVersion();
         _coverPass.ResetCover();
+        _treeCoverPass.Reset();
     }
 
     /// <inheritdoc cref="LodRegionClaims.CompletedBuildCount"/>
@@ -221,6 +229,7 @@ public class LodManager
         // starts with IsBuried == false; the add bumps the region-set version, so the pass always runs
         // in the frame a region appears and never draws a shell for a frame it should not.
         UpdateCoverFlags(chunkManager, camChunk);
+        _treeCoverPass.Update(chunkManager);
     }
 
     /// <summary>
@@ -253,39 +262,24 @@ public class LodManager
             // The key stays in _queued so the builder does not spin on it. The LodRegion
             // constructor's throw for this case was unreachable in every headless test, and this
             // is what lets a headless World drive Update over real terrain.
-            if (_lodGeometry == null && (data.Vertices.Count > 0 || data.WaterVertices.Count > 0))
+            if (_lodGeometry == null && (data.Vertices.Count > 0 || data.WaterVertices.Count > 0 || data.Trees.Count > 0))
             {
                 MeshBuffers.Return(data.Vertices, data.Indices, data.WaterVertices, data.WaterIndices);
                 uploaded++;
                 continue;
             }
 
-            // A rebuild frees the region it replaces BEFORE uploading the new one, so a
-            // same-sized rebuild lands back in the exact hole it just vacated: the pool's free
-            // list comes out of a rebuild unchanged instead of gaining a fragment, and the two
-            // copies never occupy the pool at the same time. The fade state is the only thing
-            // the new region needs from the old one, so it is carried across by hand.
-            //
-            // The order does change one failure path, deliberately. LodRegion's constructor can
-            // throw out of ChunkGeometryPool.Upload, whose single reachable throw is "could not
-            // fit N units after growing"; after this reorder the replaced region is already out
-            // of Regions and RegionList when that happens, with nothing scheduled to rebuild it,
-            // where the old order left the stale region standing. Accepted: that throw means the
-            // pool could neither fit the slice nor grow to hold it, which is unrecoverable and
-            // already fatal in practice.
-            var carriedLifetime = 0.0;
+            // Construct the complete replacement first. A failed terrain/tree upload leaves
+            // the old resident and visible, with all newly allocated slices rolled back.
+            LodRegion region;
+            try { region = new LodRegion(_lodGeometry, _trees, data); }
+            finally { MeshBuffers.Return(data.Vertices, data.Indices, data.WaterVertices, data.WaterIndices); }
             if (Regions.TryRemove(key, out var replaced))
             {
-                carriedLifetime = replaced.Lifetime; // rebuilt region keeps its fade state
+                region.Lifetime = replaced.Lifetime;
                 RemoveRegion(replaced);
                 replaced.Dispose();
             }
-
-            var region = new LodRegion(_lodGeometry, data) { Lifetime = carriedLifetime };
-            // ChunkGeometryPool.Upload copies synchronously (glNamedBufferSubData), so the lists
-            // can be recycled at once.
-            MeshBuffers.Return(data.Vertices, data.Indices, data.WaterVertices, data.WaterIndices);
-
             AddRegion(key, region);
             uploaded++;
         }
@@ -309,9 +303,14 @@ public class LodManager
     public void AddStreamedRegion(LodMeshData data)
     {
         var key = (data.Level, data.X, data.Z);
-        if (Regions.ContainsKey(key))
-            return;
-        AddRegion(key, new LodRegion(_lodGeometry, data));
+        var region = new LodRegion(_lodGeometry, _trees, data);
+        if (Regions.TryRemove(key, out var replaced))
+        {
+            region.Lifetime = replaced.Lifetime;
+            RemoveRegion(replaced);
+            replaced.Dispose();
+        }
+        AddRegion(key, region);
     }
 
     /// <inheritdoc cref="LodRegionSet.AddRegion"/>

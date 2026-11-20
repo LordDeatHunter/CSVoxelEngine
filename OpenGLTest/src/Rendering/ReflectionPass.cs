@@ -304,7 +304,7 @@ internal sealed class ReflectionPass
         for (var i = 0; i < regions.Count; i++)
         {
             var region = regions[i];
-            if (!region.HasMesh || region.IsBuried) continue;
+            if ((!region.HasMesh || region.IsBuried) && !region.HasVisibleTrees) continue;
             // The mirror clips below RenderManager.WaterPlaneY, so geometry wholly under it draws no pixel.
             if (!ReflectionCull.MayReachPlane(region.YMax)) continue;
 
@@ -325,11 +325,23 @@ internal sealed class ReflectionPass
         // The mirror does not advance Lifetime; it reads the value TerrainPasses.RenderLod left
         // last frame.
         foreach (var (region, _) in Terrain.VisibleRegions)
-            _owner.ChunkDraws.Add(region.OpaqueSlice!.Value,
-                new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks),
-                MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
+            if (region.HasMesh && !region.IsBuried)
+                _owner.ChunkDraws.Add(region.OpaqueSlice!.Value,
+                    new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks),
+                    MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
 
         _owner.ChunkDraws.Draw(_owner.LodGeometry.Vao, _owner.ChunkShader, _owner.LocChunkDrawBase);
+        _owner.TreeShader.Use();
+        _owner.TreeShader.SetUniform(_owner.LocTreeViewProj, _reflViewProj);
+        _owner.LodTrees.Bind();
+        _owner.ChunkDraws.BeginPass(Terrain.VisibleRegions.Count);
+        foreach (var (region, _) in Terrain.VisibleRegions)
+            if (region.HasVisibleTrees)
+                _owner.ChunkDraws.AddInstanced(_owner.LodTrees.Template,
+                    new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks),
+                    MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)),
+                    (uint)region.TreeSlice.Count, region.TreeSlice.BaseInstance);
+        _owner.ChunkDraws.Draw(_owner.LodTrees.Vao, _owner.TreeShader, _owner.LocTreeDrawBase);
 
         // Entities, while blend is still off and Lighting.CameraPos/_owner.ClipY hold the mirrored
         // values (the clip drops anything below the plane). Invariant: unit 2 stays 0 for the

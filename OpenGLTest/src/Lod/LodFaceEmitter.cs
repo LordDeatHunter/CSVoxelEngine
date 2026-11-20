@@ -196,8 +196,7 @@ internal ref struct LodFaceEmitter
 
     private void AddQuad(List<Vertex> targetVertices, List<ushort> targetIndices,
         int faceIndex, Vector3 cellOrigin, ushort tile, scoped Span<byte> shades, scoped ReadOnlySpan<float> suns,
-        bool isWater = false, bool lodLeaves = false, bool lodTreeWood = false, BiomeTintPalette? tinted = null,
-        Vector3? dimensions = null)
+        bool isWater = false, BiomeTintPalette? tinted = null)
     {
         // Meshes are indexed with ushort; a region can't realistically exceed this,
         // but degrade gracefully instead of overflowing if terrain is extreme
@@ -218,7 +217,7 @@ internal ref struct LodFaceEmitter
         var indexOffset = (ushort)targetVertices.Count;
         for (var c = 0; c < 4; c++)
         {
-            var pos = cellOrigin + Vector3.Multiply(face[c], dimensions ?? new Vector3(_cellSize));
+            var pos = cellOrigin + face[c] * _cellSize;
             // The region AABB is what the frustum and the burial test use, so the sea
             // sheet has to widen it too
             if (pos.Y < _yMin) _yMin = pos.Y;
@@ -226,10 +225,8 @@ internal ref struct LodFaceEmitter
             var shade = shades[c];
             // Sun is the coarse height-derived sky exposure (LodSkyExposure); no lamp
             // light, real face normal.
-            // Vertex alpha flags water (254), LOD foliage (253) and proxy wood (252).
-            // The shader treats proxy wood as ordinary opaque material; the tag lets
-            // terrain-only mesh checks distinguish it from ground. 255 is ordinary ground.
-            var alpha = (byte)(isWater ? 254 : lodLeaves ? 253 : lodTreeWood ? 252 : 255);
+            // Terrain is opaque (255); the separate sea sheet is water (254).
+            var alpha = (byte)(isWater ? 254 : 255);
             if (tinted is { } palette)
             {
                 // A biome-tinted face bakes shade * tint into the rgb like the chunk mesher
@@ -257,46 +254,19 @@ internal ref struct LodFaceEmitter
     // the tinted quad coplanar over it, so Lequal lets the overlay win; a `tile` face is the
     // tinted quad alone. Every other block wears its plain face tile.
     private void AddBlockFace(int face, Vector3 origin, BlockType block, scoped Span<byte> faceShades,
-        scoped ReadOnlySpan<float> faceSuns, bool lodLeaves = false, bool lodTreeWood = false,
-        Vector3? dimensions = null)
+        scoped ReadOnlySpan<float> faceSuns)
     {
         if (block.BiomeTint is { } bt)
         {
             if (bt.Base[face] != BiomeTintFaces.NoTile)
-                AddQuad(_vertices, _indices, face, origin, bt.Base[face], faceShades, faceSuns,
-                    lodLeaves: lodLeaves, lodTreeWood: lodTreeWood,
-                    dimensions: dimensions);
+                AddQuad(_vertices, _indices, face, origin, bt.Base[face], faceShades, faceSuns);
             if (bt.Tinted[face] != BiomeTintFaces.NoTile)
                 AddQuad(_vertices, _indices, face, origin, bt.Tinted[face], faceShades, faceSuns,
-                    lodLeaves: lodLeaves, lodTreeWood: lodTreeWood, tinted: bt.Palette, dimensions: dimensions);
+                    tinted: bt.Palette);
             return;
         }
 
-        AddQuad(_vertices, _indices, face, origin, block.FaceTiles[face], faceShades, faceSuns,
-            lodLeaves: lodLeaves, lodTreeWood: lodTreeWood, dimensions: dimensions);
-    }
-
-    /// <summary>Appends one clipped tree prism to the same opaque region mesh as the ground.</summary>
-    internal bool EmitProxyBox(LodProxyBox box, ushort blockId, bool leaves)
-    {
-        if (!box.HasVolume || blockId >= BlockType.ById.Length || BlockType.ById[blockId] is not { } block)
-            return false;
-        // A box must not turn into a half-open crown when the ushort index range fills.
-        var quadsPerFace = block.BiomeTint is null ? 1 : 2;
-        if (_vertices.Count > ushort.MaxValue - 24 * quadsPerFace) return false;
-        var origin = new Vector3(box.MinX, box.MinY, box.MinZ);
-        var size = new Vector3(box.MaxX - box.MinX, box.MaxY - box.MinY, box.MaxZ - box.MinZ);
-        Span<byte> shades = stackalloc byte[4];
-        Span<float> suns = stackalloc float[4];
-        for (var face = 0; face < 6; face++)
-        {
-            var shade = face == 4 ? (byte)255 : face == 5 ? (byte)155 : (byte)205;
-            shades.Fill(shade);
-            suns.Fill(face == 4 ? 1f : face == 5 ? 0.55f : 0.8f);
-            AddBlockFace(face, origin, block, shades, suns, lodLeaves: leaves,
-                lodTreeWood: !leaves, dimensions: size);
-        }
-        return true;
+        AddQuad(_vertices, _indices, face, origin, block.FaceTiles[face], faceShades, faceSuns);
     }
 
     internal void Emit()

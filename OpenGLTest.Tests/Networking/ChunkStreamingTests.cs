@@ -189,10 +189,12 @@ public sealed class ChunkStreamingTests : IDisposable
                 request.Write(0);
                 request.Write(0);
                 request.Write(0);
+                request.Write(1);
                 client.Send(request.ToArray());
             }
 
             LodMeshData? region = null;
+            var transfer = new LodRegionTransferReader(client.Send);
             sw.Restart();
             while (region == null && sw.Elapsed.TotalSeconds < 10)
             {
@@ -200,12 +202,8 @@ public sealed class ChunkStreamingTests : IDisposable
                 while (client.Inbound.TryDequeue(out var payload))
                 {
                     using var reader = new PacketReader(payload);
-                    if (reader.Message != NetMessage.LodRegionData)
-                        continue;
-                    reader.ReadInt();
-                    reader.ReadInt();
-                    reader.ReadInt();
-                    region = LodNetCodec.Decode(reader.ReadBytes());
+                    var answer = transfer.Accept(reader.Message, reader);
+                    if (answer != null) region = answer;
                 }
 
                 Thread.Sleep(5);

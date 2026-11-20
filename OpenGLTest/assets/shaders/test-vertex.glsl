@@ -76,6 +76,94 @@ flat out float fWaterSurfaceY;
 // their corner codes (FluidFlow.Corner), so the interpolated flow is continuous across cells.
 out vec3 fWaterFlow;
 
+#ifdef TREE_PROXY
+// Binding 3 is a packed per-region payload. gl_BaseInstance is a 16-byte allocation
+// offset; header offsets are 32-bit words relative to that allocation.
+layout (std430, binding = 3) readonly buffer TreePayload { uint treeWords[]; };
+flat out uint fTreeBase;
+out vec2 fTreeXZ;
+bool treePresent;
+uint treeBase;
+vec3 treePosition;
+vec4 treeColor;
+uint treeLayer;
+uint treeNormalBits;
+float treeSun;
+float treeBlock;
+uint treeWaterSurface;
+
+vec3 TreeTint(uint start, int side, int palette, vec2 xz) {
+    vec2 grid = clamp(xz / 16.0, vec2(0.0), vec2(float(side - 1)));
+    ivec2 cell = min(ivec2(floor(grid)), ivec2(side - 2));
+    vec2 t = grid - vec2(cell);
+    uint p = start + uint(palette * side * side + cell.x * side + cell.y) * 4u;
+    uint row = uint(side) * 4u;
+    vec3 a = vec3(uintBitsToFloat(treeWords[p]), uintBitsToFloat(treeWords[p+1u]), uintBitsToFloat(treeWords[p+2u]));
+    vec3 b = vec3(uintBitsToFloat(treeWords[p+row]), uintBitsToFloat(treeWords[p+row+1u]), uintBitsToFloat(treeWords[p+row+2u]));
+    vec3 c = vec3(uintBitsToFloat(treeWords[p+4u]), uintBitsToFloat(treeWords[p+5u]), uintBitsToFloat(treeWords[p+6u]));
+    vec3 d = vec3(uintBitsToFloat(treeWords[p+row+4u]), uintBitsToFloat(treeWords[p+row+5u]), uintBitsToFloat(treeWords[p+row+6u]));
+    return mix(mix(a, b, t.x), mix(c, d, t.x), t.y);
+}
+
+void LoadTree() {
+    treeBase = uint(gl_BaseInstance) * 4u;
+    uint i = treeBase + treeWords[treeBase] + uint(gl_InstanceID) * 16u;
+    int rootX = int(treeWords[i]), rootZ = int(treeWords[i+1u]);
+    int baseY = int(treeWords[i+2u]), bottom = int(treeWords[i+3u]), top = int(treeWords[i+4u]);
+    int minX = int(treeWords[i+5u]), maxX = int(treeWords[i+6u]);
+    int minZ = int(treeWords[i+7u]), maxZ = int(treeWords[i+8u]);
+    int width = int(treeWords[i+9u]);
+    int part = int(uint(vLayer) / 12u);
+    int face = int((uint(vLayer) / 2u) % 6u);
+    int layer = int(uint(vLayer) % 2u);
+    int material = int(treeWords[i + (part == 0 ? 10u : 11u)]);
+    int profile = int(treeWords[i+12u]), variant = int(treeWords[i+13u]);
+    int middle = bottom + max(1, (top - bottom) / 2);
+    vec3 lo, hi;
+    if (part == 0) {
+        float halfWidth = float(width) * 0.5;
+        lo = vec3(float(rootX) + 0.5 - halfWidth, float(baseY), float(rootZ) + 0.5 - halfWidth);
+        hi = vec3(float(rootX) + 0.5 + halfWidth, float(max(baseY + 1, bottom)),
+            float(rootZ) + 0.5 + halfWidth);
+    } else if (part == 1) {
+        lo = vec3(float(minX), float(bottom), float(minZ));
+        hi = vec3(float(maxX), float(profile == 2 ? top : middle), float(maxZ));
+    } else {
+        float inset = (profile == 1 ? 0.32 : 0.18) + (variant != 0 ? 0.04 : 0.0);
+        lo = vec3(float(minX) + float(maxX - minX) * inset, float(middle),
+            float(minZ) + float(maxZ - minZ) * inset);
+        hi = vec3(float(maxX) - float(maxX - minX) * inset, float(top),
+            float(maxZ) - float(maxZ - minZ) * inset);
+    }
+    treePosition = mix(lo, hi, vPosition);
+    uint m = treeBase + treeWords[treeBase + 1u] + uint(max(material, 0)) * 8u;
+    uint pair = treeWords[m + uint(face)];
+    treeLayer = layer == 0 ? pair & 65535u : pair >> 16u;
+    treePresent = material >= 0 && treeLayer != 65535u &&
+        !(part == 2 && profile == 2) && all(greaterThan(hi, lo));
+    uint flags = treeWords[m + 6u];
+    int palette = int(flags & 3u);
+    float shade = face == 4 ? 1.0 : face == 5 ? 155.0 / 255.0 : 205.0 / 255.0;
+    treeColor = vec4(vec3(shade), part == 0 ? 1.0 : 253.0 / 255.0);
+    treeNormalBits = uint(face);
+    if (layer == 1 && palette != 0) {
+        treeColor.rgb *= TreeTint(treeBase + treeWords[treeBase + 2u],
+            int(treeWords[treeBase + 4u]), palette - 1, treePosition.xz);
+        treeNormalBits |= 16u;
+    }
+    treeSun = face == 4 ? 1.0 : face == 5 ? 0.55 : 0.8;
+    treeBlock = 0.0;
+    treeWaterSurface = 0u;
+}
+#define vPosition treePosition
+#define vColor treeColor
+#define vLayer treeLayer
+#define vNormalBits treeNormalBits
+#define vSun treeSun
+#define vBlock treeBlock
+#define vWaterSurface treeWaterSurface
+#endif
+
 // Four directional sines: the sum stays under 0.09 blocks so a full cell's surface (8/9) never
 // pokes out of its block. Duplicated verbatim in test-fragment.glsl's WaveSlope for the analytic normal.
 float WaveHeight(vec2 p, float t) {
@@ -96,6 +184,9 @@ float LavaWaveHeight(vec2 p, float t) {
 }
 
 void main() {
+#ifdef TREE_PROXY
+    LoadTree();
+#endif
     // Bit 5 flags a swaying vertex, whose alpha is then its sway weight: uniform on canopy
     // leaves, eased from nothing at a rooted plant's base to full at its tip (Vertex.SwayWeight).
     bool swaying = (vNormalBits & 32u) != 0u;
@@ -143,6 +234,10 @@ void main() {
             + vec3(uWind.x, 0.0, uWind.y)) * (vSway * uSwayStrength * gust);
     }
     fWorldPos = TO_WORLD(displaced);
+#ifdef TREE_PROXY
+    fTreeBase = treeBase;
+    fTreeXZ = fWorldPos.xz - chunkOrigin.xz;
+#endif
 #ifdef CHUNK_DRAW
     gl_Position = uViewProj * vec4(fWorldPos, 1.0);
 #else
@@ -227,5 +322,8 @@ void main() {
     fNormal = mat3(uModel) * vNormal;
     fTangent = mat3(uModel) * vTangent;
     fBitangent = mat3(uModel) * vBitangent;
+#endif
+#ifdef TREE_PROXY
+    if (!treePresent) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 #endif
 }

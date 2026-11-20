@@ -130,6 +130,20 @@ internal readonly struct LodTreeInstance
             BinaryPrimitives.WriteInt32LittleEndian(destination.Slice(i * sizeof(int), sizeof(int)), words[i]);
     }
 
+    /// <summary>GPU copy: region-local signed XZ, with the canonical wire instance unchanged.</summary>
+    internal void WriteRegionLittleEndian(int originX, int originZ, Span<byte> destination)
+    {
+        if (!TryRegionProxy(originX, originZ, out _))
+            throw new InvalidOperationException("Tree exceeds the region-local GPU coordinate bound.");
+        WriteLittleEndian(destination);
+        BinaryPrimitives.WriteInt32LittleEndian(destination[0..4], (int)((long)RootX - originX));
+        BinaryPrimitives.WriteInt32LittleEndian(destination[4..8], (int)((long)RootZ - originZ));
+        BinaryPrimitives.WriteInt32LittleEndian(destination[20..24], (int)((long)MinX - originX));
+        BinaryPrimitives.WriteInt32LittleEndian(destination[24..28], (int)((long)MaxX - originX));
+        BinaryPrimitives.WriteInt32LittleEndian(destination[28..32], (int)((long)MinZ - originZ));
+        BinaryPrimitives.WriteInt32LittleEndian(destination[32..36], (int)((long)MaxZ - originZ));
+    }
+
     internal static bool TryReadLittleEndian(ReadOnlySpan<byte> source, int materialCount,
         out LodTreeInstance value)
     {

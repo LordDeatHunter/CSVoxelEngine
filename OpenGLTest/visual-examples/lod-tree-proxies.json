@@ -1,0 +1,16 @@
+{
+  // SOURCE ONLY, UNRUN. Capture the identical path at the reviewed baseline and candidate,
+  // Release, VOXEL_TIME=20. A/B poses are the existing lod-horizon.json verified stands.
+  // The first wait allows the full-detail/L0 transition and the second reaches the far ring.
+  // Inspect whether leaves remain finite crowns, trunks stand on terrain, and partial finer
+  // coverage avoids a gap. Screenshots are originals; no pixel equality is asserted.
+  "steps": [
+    { "op": "creative" },
+    { "op": "teleport", "pos": [-191.5, 113.5, -147.5], "yaw": 90, "pitch": -10 },
+    { "op": "wait", "seconds": 40 },
+    { "op": "screenshot", "name": "lod_tree_a", "hideHud": true },
+    { "op": "teleport", "pos": [292.5, 84.5, 292.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 35 },
+    { "op": "screenshot", "name": "lod_tree_b", "hideHud": true }
+  ]
+}

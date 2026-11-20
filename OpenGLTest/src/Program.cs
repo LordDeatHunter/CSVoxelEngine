@@ -151,7 +151,8 @@ public static class Program
             WorldSeed.Apply(WorldSeed.Default, WorldGenProfile.Dynamic);
             var devWorld = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
                 renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,
-                windowManager.Window, inputManager.InputContext, sfx);
+                windowManager.Window, inputManager.InputContext, sfx,
+                lodTreePool: renderManager.LodTrees);
             world = devWorld;
             devWorld.TimeOffset = timeOffset;
             devWorld.Player.Rig = renderManager.Players.PlayerRig;
@@ -349,7 +350,8 @@ public static class Program
             var store = new ChunkSaveStore(info.Directory);
             opened = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
                 renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,
-                windowManager.Window, inputManager.InputContext, sfx, store);
+                windowManager.Window, inputManager.InputContext, sfx, store,
+                lodTreePool: renderManager.LodTrees);
         }
         catch (Exception e)
         {

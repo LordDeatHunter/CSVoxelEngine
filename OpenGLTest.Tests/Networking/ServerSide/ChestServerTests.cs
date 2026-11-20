@@ -249,6 +249,9 @@ public sealed class ChestServerTests : IDisposable
     [InlineData(44)] // Both published upstream audio and lantern/hotbar layouts.
     [InlineData(45)] // Historical bridge integration.
     [InlineData(47)] // Planned separate bridge integration.
+    [InlineData(66)] // Previous complete worldgen stack, before compact tree LOD.
+    [InlineData(67)] // Current master uses a different wire contract.
+    [InlineData(68)] // Separate PR15 uses a different wire contract.
     public void IncompatibleLayoutsAreRejectedBeforeJoining(int version)
     {
         using var raw = new TcpClient();

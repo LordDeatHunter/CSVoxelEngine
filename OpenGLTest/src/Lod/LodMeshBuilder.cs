@@ -696,8 +696,15 @@ internal sealed class LodMeshBuilder
         var trees = new LodTreeProxyEmitter(_spec, _source, _supplied, AnchorColumnAt,
             _baseFineX, _baseFineZ, _baseChunkX, _baseChunkZ,
             _chunkSpan, _regionChunkX, _regionChunkZ, _regionChunkSpan);
-        trees.Emit(ref emitter, columnCyMax);
-        return emitter.ToMeshData(level, rx, rz, columnCyMin, columnCyMax);
+        var treeBuild = trees.Build(_grassTint, _foliageTint, out var treeMinY, out var treeMaxY);
+        if (treeBuild.Count == 0) treeBuild = LodTreeBuild.Empty;
+        var ground = emitter.ToMeshData(level, rx, rz, columnCyMin, columnCyMax);
+        return ground with
+        {
+            Trees = treeBuild,
+            YMin = treeBuild.Count == 0 ? ground.YMin : Math.Min(ground.YMin, treeMinY),
+            YMax = treeBuild.Count == 0 ? ground.YMax : Math.Max(ground.YMax, treeMaxY)
+        };
     }
 
     private void ReturnRentals()
