@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Lod;
 using VoxelEngine.WorldGen;
@@ -179,20 +180,22 @@ public sealed class WorldgenTests
     [Fact]
     public void LodLeavesAreOpaque()
     {
-        // A canopy column's LOD cell must wear leaves flagged opaque (alpha 253), so
-        // magnified cutout texels fall back to solid leaf color instead of
-        // discarding to sky.
+        // A real canopy must enter the separate opaque tree draw payload. The terrain
+        // vertex list no longer carries leaves or the old alpha-253 leaf marker.
         var found = false;
         var tx = 0;
         var tz = 0;
+        var canopyY = 0;
         for (var x = 8; x < 1024 && !found; x++)
         for (var z = 8; z < 1024 && !found; z++)
         {
-            if (TreeGenerator.CanopyTop(x, z) > 0
+            var top = TreeGenerator.CanopyTop(x, z);
+            if (top > 0
                 && TreeGenerator.CanopyLeafBlock(x, z) == TreeGenerator.LeavesBlock)
             {
                 tx = x;
                 tz = z;
+                canopyY = top;
                 found = true;
             }
         }
@@ -203,8 +206,23 @@ public sealed class WorldgenTests
         var mesh = LodRegion.BuildMeshData(level, tx / spec.RegionBlocks, tz / spec.RegionBlocks);
         var leaves = BlockType.ById[TreeGenerator.LeavesBlock]!;
         var leafTiles = TestContent.WorldTiles(leaves);
-        Assert.Contains(mesh.Vertices,
-            v => (v.PackedColor >> 24) == 253u && leafTiles.Contains(v.Layer));
+        Assert.True(LodTreeMaterial.TryFromBlock(leaves, out var expectedLeafMaterial));
+        Assert.NotEmpty(mesh.Vertices); // the ground is still a separate opaque shell
+        var originX = (tx / spec.RegionBlocks) * spec.RegionBlocks;
+        var originZ = (tz / spec.RegionBlocks) * spec.RegionBlocks;
+        Assert.Contains(mesh.Trees.Instances, tree =>
+        {
+            if (!tree.HasCrown || tree.MinX > tx || tree.MaxX <= tx ||
+                tree.MinZ > tz || tree.MaxZ <= tz ||
+                tree.CrownBottom > canopyY || tree.CrownTop <= canopyY ||
+                !LodTreeTemplate.TryPart(tree, 1, originX, originZ, out _, out var materialIndex))
+                return false;
+            var material = mesh.Trees.Materials[materialIndex];
+            return material.Equals(expectedLeafMaterial) && Enumerable.Range(0, 6).Any(face =>
+                leafTiles.Contains(material.BaseAt(face)) ||
+                leafTiles.Contains(material.TintedAt(face)));
+        });
+        Assert.DoesNotContain(mesh.WaterVertices, v => leafTiles.Contains(v.Layer));
     }
 
     [Fact]

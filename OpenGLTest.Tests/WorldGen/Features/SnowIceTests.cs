@@ -92,6 +92,9 @@ public sealed class SnowIceTests
     {
         var columnX = 0;
         var columnZ = 0;
+        var rootX = 0;
+        var rootZ = 0;
+        var leafY = 0;
         TreeSpecies? taiga = null;
         for (var cx = -48; cx <= 48 && taiga == null; cx++)
         for (var cz = -48; cz <= 48 && taiga == null; cz++)
@@ -118,6 +121,9 @@ public sealed class SnowIceTests
                         continue;
                     columnX = cell.X;
                     columnZ = cell.Z;
+                    rootX = wx;
+                    rootZ = wz;
+                    leafY = cell.Y;
                     taiga = species;
                     break;
                 }
@@ -127,10 +133,27 @@ public sealed class SnowIceTests
 
         var spec = LodRegion.Levels[0];
         static int DivFloor(int a, int b) => a >= 0 ? a / b : (a - b + 1) / b;
-        var mesh = LodRegion.BuildMeshData(0, DivFloor(columnX, spec.RegionBlocks), DivFloor(columnZ, spec.RegionBlocks));
-        var leafTiles = TestContent.WorldTiles(BlockType.ById[taiga!.LeavesId]!);
-        Assert.Contains(mesh.Vertices,
-            v => (v.PackedColor >> 24) == 253u && leafTiles.Contains(v.Layer));
+        var rx = DivFloor(columnX, spec.RegionBlocks);
+        var rz = DivFloor(columnZ, spec.RegionBlocks);
+        var mesh = LodRegion.BuildMeshData(0, rx, rz);
+        var leaves = BlockType.ById[taiga!.LeavesId]!;
+        var leafTiles = TestContent.WorldTiles(leaves);
+        Assert.True(LodTreeMaterial.TryFromBlock(leaves, out var expectedLeafMaterial));
+        Assert.NotEmpty(mesh.Vertices); // the ground and tree draw data remain separate
+        Assert.Contains(mesh.Trees.Instances, tree =>
+        {
+            if (tree.RootX != rootX || tree.RootZ != rootZ || !tree.HasCrown ||
+                tree.CrownBottom > leafY || tree.CrownTop <= leafY ||
+                !LodTreeTemplate.TryPart(tree, 1, rx * spec.RegionBlocks, rz * spec.RegionBlocks,
+                    out _, out var materialIndex))
+                return false;
+            var material = mesh.Trees.Materials[materialIndex];
+            if (!material.Equals(expectedLeafMaterial)) return false;
+            for (var face = 0; face < 6; face++)
+                if (leafTiles.Contains(material.BaseAt(face)) || leafTiles.Contains(material.TintedAt(face)))
+                    return true;
+            return false;
+        });
     }
 
     [Fact]

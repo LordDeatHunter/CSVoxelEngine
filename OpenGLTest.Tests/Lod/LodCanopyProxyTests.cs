@@ -15,7 +15,7 @@ namespace VoxelEngine.Tests.Lod;
 /// one placement source the grown canopy shares), every crown profile peaks at the trunk and
 /// never climbs with distance, a crown never leaves its species' reach, the crown roll is a pure
 /// function of the column, and the rings that read the proxy never run tree growth. In the
-/// shape-cache collection because one fact resets the tree caches.
+/// worldgen-seed collection because one fact resets the tree caches.
 /// </summary>
 [Collection("Worldgen seed")]
 public sealed class LodCanopyProxyTests

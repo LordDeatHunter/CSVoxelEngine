@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using VoxelEngine.Lod;
 using Xunit;
@@ -67,10 +68,10 @@ public sealed class LodHeightSamplingTests
     }
 
     /// <summary>
-    /// Full-output equality: every buffer the build emits, not just the vertices. A min that
-    /// diverged only on a border cell would still move ColumnCyMin or the region AABB.
+    /// Terrain-only equality for a cap outside the min window. A tree's root anchor can
+    /// still read that column, so its independent proxy and the combined AABB may change.
     /// </summary>
-    private static void AssertSameMesh(LodMeshData expected, LodMeshData actual)
+    private static void AssertSameTerrain(LodMeshData expected, LodMeshData actual)
     {
         Assert.Equal(expected.Vertices.Count, actual.Vertices.Count);
         Assert.Equal(expected.Indices.Count, actual.Indices.Count);
@@ -87,8 +88,50 @@ public sealed class LodHeightSamplingTests
         Assert.True(expected.ColumnCyMin.SequenceEqual(actual.ColumnCyMin));
         Assert.True(expected.ColumnCyMax.SequenceEqual(actual.ColumnCyMax));
 
+        // These are the ground/water bounds, independent of the whole-tree proxy union.
+        Assert.Equal(GroundBounds(expected), GroundBounds(actual));
+    }
+
+    private static (float Min, float Max) GroundBounds(LodMeshData mesh)
+    {
+        var min = float.PositiveInfinity;
+        var max = float.NegativeInfinity;
+        foreach (var vertex in mesh.Vertices.Concat(mesh.WaterVertices))
+        {
+            min = MathF.Min(min, vertex.Position.Y);
+            max = MathF.Max(max, vertex.Position.Y);
+        }
+        return (min, max);
+    }
+
+    /// <summary>Full-output equality for nested versus separable min builds.</summary>
+    private static void AssertSameMesh(LodMeshData expected, LodMeshData actual)
+    {
+        AssertSameTerrain(expected, actual);
+        Assert.True(expected.Trees.Instances.SequenceEqual(actual.Trees.Instances));
+        Assert.True(expected.Trees.Materials.SequenceEqual(actual.Trees.Materials));
+        Assert.True(expected.Trees.GeneratedTiles.SequenceEqual(actual.Trees.GeneratedTiles));
+        Assert.True(expected.Trees.ProxyYMin.SequenceEqual(actual.Trees.ProxyYMin));
+        Assert.True(expected.Trees.ProxyYMax.SequenceEqual(actual.Trees.ProxyYMax));
+        Assert.Equal(expected.Trees.Tint?.ChunkSpan, actual.Trees.Tint?.ChunkSpan);
+        if (expected.Trees.Tint is { } tint)
+        {
+            Assert.True(tint.Grass.SequenceEqual(actual.Trees.Tint!.Grass));
+            Assert.True(tint.Foliage.SequenceEqual(actual.Trees.Tint.Foliage));
+        }
+
         Assert.Equal(expected.YMin, actual.YMin);
         Assert.Equal(expected.YMax, actual.YMax);
+    }
+
+    private static void AssertFiniteCombinedBounds(LodMeshData mesh)
+    {
+        var ground = GroundBounds(mesh);
+        Assert.True(float.IsFinite(ground.Min) && float.IsFinite(ground.Max));
+        Assert.True(float.IsFinite(mesh.YMin) && float.IsFinite(mesh.YMax));
+        Assert.True(mesh.YMin <= ground.Min && mesh.YMax >= ground.Max);
+        foreach (var tree in mesh.Trees.Instances)
+            Assert.True(mesh.YMin <= tree.BaseY && mesh.YMax >= tree.CrownTop);
     }
 
     [Fact]
@@ -178,11 +221,13 @@ public sealed class LodHeightSamplingTests
 
         var baseline = LodRegion.BuildMeshData(Level, rx, rz);
 
-        // One column short of the reach: outside every sample window, outside the grid, and the
-        // ColumnCyMin loop reads raw uncapped heightmaps, so this must change nothing at all.
+        // One column short of the terrain reach: outside every min window and the grid.
+        // The separate tree anchor may read it, so only ground/water and burial must match.
         Assert.True(LodColumnCaps.LowerColumnBelow(baseFineX - 4, floor - 32, baseFineZ + 32));
         var outside = LodRegion.BuildMeshData(Level, rx, rz);
-        AssertSameMesh(baseline, outside);
+        AssertSameTerrain(baseline, outside);
+        AssertFiniteCombinedBounds(baseline);
+        AssertFiniteCombinedBounds(outside);
 
         // The first column a window does reach. Its border groundTop drives the -X skirt and the
         // AO of the i = 0 column, so dropping that whole border line below the region floor must
