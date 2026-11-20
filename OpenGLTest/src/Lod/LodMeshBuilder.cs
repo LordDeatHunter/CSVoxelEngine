@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Chunks.Sources;
@@ -36,6 +37,7 @@ internal sealed class LodMeshBuilder
     private bool _anySupplied;
     private readonly int[][]? _capmaps;
     private readonly long[][]? _overrideMaps;
+    private Dictionary<(int X, int Z), LodTreeAnchor.HeightColumn>? _outsideAnchorColumns;
     private bool _hasRegionOverrides;
     private readonly int _baseFineX;
     private readonly int _baseFineZ;
@@ -216,6 +218,29 @@ internal sealed class LodMeshBuilder
                 _hasRegionOverrides = true;
             }
         }
+    }
+
+    // The root's anchor may reach past this region's one-chunk prefetch when the tree
+    // overhangs from outside. Resolve each such authoritative source column once per build.
+    // A new edit during a build is handled by the dirty-region rebuild, not an atomic
+    // snapshot; the nullable edit tables preserve this build's initial empty-table gate.
+    private LodTreeAnchor.HeightColumn AnchorColumnAt(int cx, int cz)
+    {
+        var i = cx - _baseChunkX;
+        var j = cz - _baseChunkZ;
+        if ((uint)i < (uint)_chunkSpan && (uint)j < (uint)_chunkSpan)
+        {
+            var k = i * _chunkSpan + j;
+            return new LodTreeAnchor.HeightColumn(_heightmaps[k], _overrideMaps?[k], _capmaps?[k]);
+        }
+
+        _outsideAnchorColumns ??= new Dictionary<(int X, int Z), LodTreeAnchor.HeightColumn>();
+        if (_outsideAnchorColumns.TryGetValue((cx, cz), out var cached)) return cached;
+        var column = new LodTreeAnchor.HeightColumn(_source.GetColumn(cx, cz).Heights,
+            _overrideMaps != null ? LodSurface.BucketOf(cx, cz) : null,
+            _capmaps != null ? LodColumnCaps.BucketOf(cx, cz) : null);
+        _outsideAnchorColumns.Add((cx, cz), column);
+        return column;
     }
 
     // The seam path's per-sample read of the EDITED height: the override replaces the generated
@@ -668,7 +693,7 @@ internal sealed class LodMeshBuilder
             _topCell, _groundTop, _beachTop, _gravelTop, _rockTop, _soilStripped, _snowTop, _iceTop, _biomeGrid, _waterLevels, _seaFloor,
             _topBlockGrid);
         emitter.Emit();
-        var trees = new LodTreeProxyEmitter(_spec, _source, _supplied,
+        var trees = new LodTreeProxyEmitter(_spec, _source, _supplied, AnchorColumnAt,
             _baseFineX, _baseFineZ, _baseChunkX, _baseChunkZ,
             _chunkSpan, _regionChunkX, _regionChunkZ, _regionChunkSpan);
         trees.Emit(ref emitter, columnCyMax);

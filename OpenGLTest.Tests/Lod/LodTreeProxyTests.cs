@@ -57,7 +57,7 @@ public sealed class LodTreeProxyTests
     {
         const int rootZ = 8;
         var reads = 0;
-        int[] Heights(int cx, int cz)
+        LodTreeAnchor.HeightColumn Heights(int cx, int cz)
         {
             reads++;
             var map = new int[Chunk.Size * Chunk.Size];
@@ -65,7 +65,7 @@ public sealed class LodTreeProxyTests
             var lowX = rootX - 14;
             if (cx == lowX >> Chunk.SizeShift && cz == rootZ >> Chunk.SizeShift)
                 map[((lowX & Chunk.SizeMask) << Chunk.SizeShift) | (rootZ & Chunk.SizeMask)] = 20;
-            return map;
+            return new LodTreeAnchor.HeightColumn(map, null, null);
         }
 
         var anchor = LodTreeAnchor.Compute(rootX, rootZ, Heights, LodRegion.Levels);

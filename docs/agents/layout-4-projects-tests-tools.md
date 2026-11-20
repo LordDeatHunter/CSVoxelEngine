@@ -123,7 +123,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Juice/                       # game-feel rules: blast shake, damage direction and fringe,
                                #   hit-stop, the vignette, pops, FOV and tilt, droplets, tool shatter
   Lod/                         # far-LOD regions, the manager, build pool and buffers, column caps, surface
-                               #   overrides and their save state, sky exposure; the build-cost probe
+                               #   overrides and their save state, sky exposure, source/edit-aware tree anchors;
+                               #   the build-cost probe
   Magic/                       # the cast rules, pacing and held-staff lookup, the spell effects (bolt flight,
                                #   impact rules, the element impacts on a server world), the sparks, the cast
                                #   feedback and a client's preview bolt; its own helper StaffFixture

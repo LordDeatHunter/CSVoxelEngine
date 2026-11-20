@@ -97,17 +97,13 @@ internal sealed class LodRegionClaims(LodManager owner)
         for (var level = 0; level < LodRegion.Levels.Length; level++)
         {
             var spec = LodRegion.Levels[level];
-            // A poisoned leaf column can suppress the whole proxy of a tree rooted on
-            // the opposite edge: edit -> root -> far crown is at most 2*tree reach.
-            // Ordinary terrain edits keep the original narrow sampling window.
-            var reach = TreeCanopy.IsDisturbed(x, z)
-                ? Math.Max(spec.SampleMargin + spec.CellSize, 2 * TreeGenerator.ReachHorizontal)
-                : spec.SampleMargin + spec.CellSize;
-
-            var rxMin = MathUtils.FloorDiv(x - reach, spec.RegionBlocks);
-            var rxMax = MathUtils.FloorDiv(x + reach, spec.RegionBlocks);
-            var rzMin = MathUtils.FloorDiv(z - reach, spec.RegionBlocks);
-            var rzMax = MathUtils.FloorDiv(z + reach, spec.RegionBlocks);
+            // Any effective-height edit can change a root anchor within its fixed window;
+            // that root's tree can then reach another region. Disturbed crowns also need
+            // the existing two-reach suppression footprint.
+            var reach = LodTreeAnchor.EditReach(spec, TreeGenerator.ReachHorizontal,
+                TreeCanopy.IsDisturbed(x, z));
+            var (rxMin, rxMax) = LodTreeAnchor.RegionRange(x, spec, reach);
+            var (rzMin, rzMax) = LodTreeAnchor.RegionRange(z, spec, reach);
 
             for (var rx = rxMin; rx <= rxMax; rx++)
             for (var rz = rzMin; rz <= rzMax; rz++)

@@ -30,9 +30,11 @@ internal sealed class LodTreeProxyEmitter
     private readonly int _cellSize;
     private readonly int _cells;
     private readonly Func<int, int, bool> _rootSupplied;
+    private readonly Func<int, int, LodTreeAnchor.HeightColumn> _anchorColumnAt;
     private Dictionary<(int X, int Z), bool>? _outsideSupply;
 
     internal LodTreeProxyEmitter(LodLevelSpec spec, IWorldSource source, bool[] supplied,
+        Func<int, int, LodTreeAnchor.HeightColumn> anchorColumnAt,
         int baseFineX, int baseFineZ, int baseChunkX, int baseChunkZ,
         int chunkSpan, int regionChunkX, int regionChunkZ, int regionChunkSpan)
     {
@@ -50,6 +52,7 @@ internal sealed class LodTreeProxyEmitter
         _cellSize = spec.CellSize;
         _cells = spec.Cells;
         _rootSupplied = RootSupplied;
+        _anchorColumnAt = anchorColumnAt;
     }
 
     internal void Emit(ref LodFaceEmitter emitter, int[] columnCyMax)
@@ -145,7 +148,8 @@ internal sealed class LodTreeProxyEmitter
         {
             // The anchor is a pure function of the root's generated height neighborhood,
             // independent of which adjacent region or LOD level clips this same trunk.
-            tree = tree with { BaseY = Math.Min(tree.BaseY, LodTreeAnchor.ForRoot(tree.RootX, tree.RootZ)) };
+            tree = tree with { BaseY = Math.Min(tree.BaseY,
+                LodTreeAnchor.ForRoot(tree.RootX, tree.RootZ, _anchorColumnAt)) };
             EmitProxyBox(tree.Trunk(), tree.WoodId, false, ref emitter, columnCyMax);
         }
         if (!tree.HasCrown) return;

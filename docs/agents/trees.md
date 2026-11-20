@@ -197,9 +197,12 @@ opaque LOD mesh with the species' own log/leaf tiles, foliage tint and fade flag
 252 tags proxy wood for terrain-only checks; 253 remains the foliage shader flag). This is a
 render approximation, not a reduction of the final stamped voxels. A fully supplied region
 skips natural and saved-canopy proxy generation; a mixed region checks source ownership before
-far placement. One root-anchored generated-height neighborhood gives the trunk the same base
-across adjacent regions and levels. This can read up to nine column-height arrays and 841 fine
-heights per emitted trunk. Leafless far species retain their historical absence from canopy
+far placement. One root-anchored source-height neighborhood, with shell overrides then caps,
+gives the trunk the same base across adjacent regions and levels. The region reuses prefetched
+source columns and memoizes outside columns for that build; each trunk examines 841 fine heights
+across up to nine columns. Ordinary height edits dirty regions through the anchor radius plus
+tree reach, and disturbed canopy retains its wider suppression reach. Leafless far species
+retain their historical absence from canopy
 LOD because their `lod` fields do not define a wood height. The existing ushort mesh-index
 limit can still leave a partial proxy near capacity, and partially covered coarse regions can
 draw coincident crown geometry; those contracts need resolution before runtime acceptance.
