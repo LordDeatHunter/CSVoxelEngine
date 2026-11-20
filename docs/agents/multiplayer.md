@@ -367,7 +367,10 @@ server-wide, emitting at most eight pages per `Pump` (`LodRegion.BuildMeshData`,
 whose client has gone). `LodTransferCredit` keeps a peer's one logical-region credit blocked
 until its matching ACK, cancellation or disconnect; a stalled send can release the raw server
 serialization slot after its progress timeout without granting that peer another region. Successful
-Begin/page sends refresh that timeout, while stale nonces cannot release credit. The server replays each
+Begin/page sends refresh that timeout, while stale nonces cannot release credit.
+The component's internal mesh-producer seam defaults to the same source-backed
+`LodRegion.BuildMeshData` call; headless loopback tests supply a bounded mesh without
+constructing a server `World` or starting its generation worker. The server replays each
 `InventoryRequest` intent (`IntentReplay.OnInventoryRequest`) against **the sender's** inventory only — `InventoryIntentRules.Apply`
 (a slot must be on the hotbar; equip only what the player owns, or toggle off what the slot
 already shows; craft through `Inventory.TryCraft` with exactly the fed members, so a refused craft
@@ -695,7 +698,10 @@ the client's one active assembly; its ACK or cancellation returns one client cre
 `LodNetCodec` payload carries the server's terrain vertices and compact, bounded tree instances,
 face-material table, tint corners and generated-source mask. Both are remapped to the client's
 atlas before upload; the client never reads `ColumnCache`
-or `TreeGenerator`; for the same reason `BlockEditor.NotifyLodEdit` and the inline
+or `TreeGenerator`. A narrowly internal apply callback lets headless component tests inspect
+the decoded terrain and tree payload before storing a geometry-free resident region; live
+connections still call `LodManager.AddStreamedRegion` and upload the full result.
+For the same reason `BlockEditor.NotifyLodEdit` and the inline
 `TreeGenerator.PoisonCanopy`/`LodManager.MarkEditedColumn` sites in `RemoveBlock` and `FellWood`
 return early in client mode, so a client edit never touches `LodSurface`, `LodColumnCaps`
 or `TreeCanopy.CanopyDisturbed`. Incoming and predicted cell edits mark nearby streamed regions
@@ -706,7 +712,8 @@ bounded `LodEditInvalidations` set; overflow sends one global invalidate, which 
 resident or pending client keys. `LodTransferCredit` owns one client transfer identity and
 bounded queued nonces. Begin, each page, Complete and ACK carry the server build generation;
 an edit before completion rejects that build, while an edit after completion dirties the
-resident key for replacement. A timeout or disconnect releases credit and raw bytes. The
+resident key for replacement. A timeout releases raw bytes; matching ACK/cancel or
+disconnect releases peer credit. The
 one raw server slot, eight-page Pump and 64-entry queue scan remain separate bounds;
 socket sends retain their finite synchronous timeout. Protocol 69 is unpublished at this stage.
 An unanswered request is retried after `NetLodResendSeconds`. `WorldgenReads` (off in production) is the counter

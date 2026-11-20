@@ -22,6 +22,7 @@ public sealed class ClientLodStreamer
     private readonly LodManager _lod;
     private readonly Action<int, int, int, int> _request;
     private readonly Action<int, LodTransfer.Key, int, byte> _ack;
+    private readonly Action<LodMeshData> _apply;
     // Outstanding requests and when each was sent; an answer removes its entry and an entry past
     // the resend age is dropped so the region is asked again.
     private readonly Dictionary<(int Level, int X, int Z), (double At, int Nonce, int Revision)> _asked = new();
@@ -33,14 +34,17 @@ public sealed class ClientLodStreamer
     private double _time;
     private readonly WireIds? _wire;
 
-    /// <summary><paramref name="wire"/> is the connection's id tables (null keeps the mesh's atlas layers as they came).</summary>
+    /// <summary><paramref name="wire"/> is the connection's id tables (null keeps the mesh's atlas layers as they came).
+    /// <paramref name="apply"/> is a headless-test sink; live clients use the LOD manager.</summary>
     internal ClientLodStreamer(LodManager lod, Action<int, int, int, int> request,
-        Action<int, LodTransfer.Key, int, byte> ack, WireIds? wire = null)
+        Action<int, LodTransfer.Key, int, byte> ack, WireIds? wire = null,
+        Action<LodMeshData>? apply = null)
     {
         _lod = lod;
         _wire = wire;
         _request = request;
         _ack = ack;
+        _apply = apply ?? lod.AddStreamedRegion;
     }
 
     internal ClientLodStreamer(LodManager lod, Action<int, int, int, int> request,
@@ -195,7 +199,7 @@ public sealed class ClientLodStreamer
                 throw new InvalidDataException("LOD reply no longer matches the requested region.");
             if (pending.Revision != _revisions.GetValueOrDefault(tuple))
                 throw new InvalidDataException("LOD reply was superseded by a newer edit.");
-            _lod.AddStreamedRegion(data);
+            _apply(data);
             _dirty.Remove(tuple);
             _asked.Remove(tuple);
             _ack(nonce, key, generation, LodTransfer.Applied);

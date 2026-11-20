@@ -11,6 +11,7 @@ namespace VoxelEngine.Networking.ServerSide;
 internal sealed class StreamRequests
 {
     private readonly ServerState _state;
+    private readonly Func<int, int, int, LodMeshData>? _meshProducer;
 
     // Far-LOD region requests waiting to be built, served NetLodBuildsPerPump per Pump. Each
     // connection's own set dedupes a region it re-asked for while still queued.
@@ -48,9 +49,10 @@ internal sealed class StreamRequests
                 client.LodFailedUntil = 0;
     }
 
-    internal StreamRequests(ServerState state)
+    internal StreamRequests(ServerState state, Func<int, int, int, LodMeshData>? meshProducer = null)
     {
         _state = state;
+        _meshProducer = meshProducer;
     }
 
     internal void OnChunkRequest(ClientConnection client, PacketReader reader)
@@ -206,8 +208,10 @@ internal sealed class StreamRequests
                 LodTransfer.Begin begin;
                 try
                 {
-                    var data = LodRegion.BuildMeshData(request.Level, request.Rx, request.Rz,
-                        source: _state.World.GetChunkManager().WorldSource);
+                    var data = _meshProducer is null
+                        ? LodRegion.BuildMeshData(request.Level, request.Rx, request.Rz,
+                            source: _state.World.GetChunkManager().WorldSource)
+                        : _meshProducer(request.Level, request.Rx, request.Rz);
                     bytes = LodNetCodec.Encode(data);
                     begin = LodTransfer.MakeBegin(nonce,
                         new LodTransfer.Key(request.Level, request.Rx, request.Rz), bytes,

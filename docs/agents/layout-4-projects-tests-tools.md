@@ -139,7 +139,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   locked, a hosted world serves its host over loopback and releases the world on Stop,
                                #   the LAN address pick (HostingTests)
     ServerSide/                # the server player and its status (the eye's cave biome: ServerPlayerCaveBiomeTests),
-                               #   movement and intent rules, operators, the loopback GameServer and the server-mode World
+                               #   movement and intent rules, operators, the loopback GameServer and the server-mode World;
+                               #   LodPagedEditLoopbackTests drives two framed LOD peers without a World or GL
   Particles/                   # every particle system and the dust, splash and pop emitters
     Collapse/                  # a defeated tower's collapse show: its rule, thrown blocks burst and never write a cell
                                #   (TowerCollapseEffectsTests)
