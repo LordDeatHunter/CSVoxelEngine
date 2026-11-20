@@ -192,7 +192,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   the screen's buttons, zoom about the pointer, pan-stops-following and CENTER
   VisualTest/                  # scenario parsing and ops, PNG capture
   WorldGen/                    # terrain, biomes, lakes, ravines, clouds, the generational
-                               #   cache, the tree front end and batches, worldgen stats,
+                               #   cache, the tree front end and batches (including sparse disturbed-canopy
+                               #   rectangle checks), worldgen stats,
                                #   the worldgen cost probe and the stage-timer tests; WorldGenProfileIdentityTests
                                #   compare real column/chunk output to frozen EA identity fixture;
                                #   DynamicClimateOceanTests cover bounded spatial scale, basin, shore and ecotones;
