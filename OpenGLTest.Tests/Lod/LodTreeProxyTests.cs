@@ -1,3 +1,5 @@
+using System;
+using VoxelEngine.Chunks;
 using VoxelEngine.Lod;
 using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
@@ -81,5 +83,3 @@ public sealed class LodTreeProxyTests
         Assert.Equal(left.MaxX, right.MinX);
     }
 }
-using System;
-using VoxelEngine.Chunks;
