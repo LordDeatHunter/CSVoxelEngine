@@ -1,0 +1,38 @@
+{
+  // S2a candidate Release capture; run only after root's visual grant.
+  // From OpenGLTest/: VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/dynamic-canyons-s2a.json
+  // Storeless seed 1337 selects Dynamic. S2aTerrainTests' bounded finder found
+  // canyon (-4000,5000): bed 155, dry floor 85, X rims about 153-158.
+  // Actual floor camera cell (-4001,5000) is Y86 under eye88.5. The radius-16
+  // ring's lowest forward channel cells lie at yaws 56.2 and 67.5, so aim 62.
+  // Escarpment at (528,6600)->(524,6600) rises Y143 to Y154 with an 11-block
+  // shelf contribution. Normal generated blocks leave the lower face and lip
+  // clear from the measured air eye (540.5,151.5,6600.5).
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-4014.5, 163.5, 5000.5], "yaw": 0, "pitch": -24 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-4014.5, 163.5, 5000.5], "yaw": 0, "pitch": -24 },
+    { "op": "screenshot", "name": "canyon_rim_vista", "hideHud": true },
+
+    { "op": "teleport", "pos": [-4000.5, 88.5, 5000.5], "yaw": 62, "pitch": -3 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-4000.5, 88.5, 5000.5], "yaw": 62, "pitch": -3 },
+    { "op": "screenshot", "name": "dry_floor_along_channel", "hideHud": true },
+
+    { "op": "teleport", "pos": [-4005.5, 121.5, 5000.5], "yaw": 0, "pitch": -18 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [-4005.5, 121.5, 5000.5], "yaw": 0, "pitch": -18 },
+    { "op": "screenshot", "name": "terraced_wall", "hideHud": true },
+
+    { "op": "teleport", "pos": [540.5, 151.5, 6600.5], "yaw": 180, "pitch": 0 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [540.5, 151.5, 6600.5], "yaw": 180, "pitch": 0 },
+    { "op": "screenshot", "name": "escarpment_from_below", "hideHud": true },
+
+    { "op": "teleport", "pos": [-4020.5, 177.5, 5000.5], "yaw": 18, "pitch": -30 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-4020.5, 177.5, 5000.5], "yaw": 18, "pitch": -30 },
+    { "op": "screenshot", "name": "canyon_near_to_far_lod", "hideHud": true }
+  ]
+}

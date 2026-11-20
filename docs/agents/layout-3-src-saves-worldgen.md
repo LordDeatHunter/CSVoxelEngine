@@ -521,6 +521,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         BoulderGenerator.cs    # a rare 2-4 cell stone or cobblestone blob on the forest/taiga floor
         BranchPileGenerator.cs # crossed-stick branch piles: up to 4 long thin logs sharing one air cell above the ground
         CairnGenerator.cs      # a 3-cell cobblestone stack with a pebble hat on a local summit
+        TerrainCanyons.cs      # Dynamic warped dry open-canyon cut after water planning, with shore and elevated-water guards
+        TerrainShelves.cs      # Dynamic highland plateau lift and continuous narrow escarpment risers
         CottonGenerator.cs     # wild cotton clumps in the savanna (PlantClumps + a climate gate)
         DesertWellGenerator.cs # the desert's ring-and-roof well, dug into sand over sandstone
         FallenLogGenerator.cs  # a rare 3-5 cell hollow log of the biome's tree species lying on the floor

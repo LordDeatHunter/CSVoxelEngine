@@ -1,0 +1,14 @@
+{
+  // S2a shelf-only natural alternate after the first forest views were obscured.
+  // From OpenGLTest/: VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/dynamic-escarpment-s2a.json
+  // Storeless default seed 1337 selects Dynamic. At z6600, x528 Y143 to x524
+  // Y154 includes 11 blocks of shelf contribution. Generated-block rays from
+  // the air eye below reach both the lower face and upper lip without foliage.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [540.5, 151.5, 6600.5], "yaw": 180, "pitch": 0 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [540.5, 151.5, 6600.5], "yaw": 180, "pitch": 0 },
+    { "op": "screenshot", "name": "escarpment_clear_rise", "hideHud": true }
+  ]
+}

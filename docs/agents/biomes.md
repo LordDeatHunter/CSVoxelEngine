@@ -194,6 +194,23 @@ This S1b stage changes relief only; cliffs, dunes, new flora, volcanoes and habi
 later issue #64 stages. `visual-examples/dynamic-relief-s1b.json` frames the bounded
 representative range, high summit, rock/snow/scree flanks, LOD vista, spawn horizon and valley knoll.
 
+S2a adds Dynamic-only escarpments and dry, roofless canyons. `TerrainShelves` terraces a
+broad highland plateau lift before valley compression and the whole-profile ceiling; its
+smooth support and spawn fade return exactly zero outside the selected region. After water
+planning, `TerrainCanyons` cuts a warped ridged channel from the final heightmap beside
+ravines. Its arid climate weight fades with coldness, while independent highland support and
+the shoreline fade return smoothly to zero instead of ending a canyon at a classified biome
+or coast line. The existing lake/river guard and ocean-shore fade protect water footprints and
+banks; face-adjacent and nearby shared-water levels also bound a dry cut above elevated water.
+The separate oasis and hot-spring discs and their face banks refuse an additional canyon
+cut because those features assign their own pond levels outside the shared water query. Deep cuts
+reuse the ravine soil-stripping rule, exposing the existing rock/sand palette. `ColumnCache`,
+generated chunks and far LOD read the same final height; supplied chunks keep their saved
+data. These terms do not change Legacy generation, the 186 terrain ceiling or S1b's surface
+writer clearance gates. S2 wall strata/materials, optional undercuts and later issue #64
+content stages are still separate. `visual-examples/dynamic-canyons-s2a.json` records
+candidate views for a later Release visual review.
+
 **openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
 forest alternates between rolling woodland and open grass instead of one uniform canopy
 (`TreeGenerator.TryGetTree` reads `TerrainGenerator.ForestOpenness`, scaled per species by its

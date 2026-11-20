@@ -13,6 +13,10 @@ internal static class TerrainNoise
     private const int CordilleraSeedOffset = 190;
     private const int CordilleraWarpSeedOffset = 191;
     private const int ValleyFlatSeedOffset = 192;
+    private const int CanyonRidgeSeedOffset = 193;
+    private const int CanyonWarpSeedOffset = 194;
+    private const int CanyonMaskSeedOffset = 195;
+    private const int ShelfSeedOffset = 196;
     internal static FastNoiseLite ForestSwellNoise;
     internal static FastNoiseLite HillNoise;
     internal static FastNoiseLite HillMaskNoise;
@@ -46,6 +50,10 @@ internal static class TerrainNoise
     internal static FastNoiseLite CordilleraNoise;
     internal static FastNoiseLite CordilleraWarp;
     internal static FastNoiseLite ValleyFlatNoise;
+    internal static FastNoiseLite CanyonRidgeNoise;
+    internal static FastNoiseLite CanyonWarp;
+    internal static FastNoiseLite CanyonMaskNoise;
+    internal static FastNoiseLite ShelfNoise;
     internal static FastNoiseLite LakeShapeNoise;
 
     /// <summary>The pack-ice floe field, read only by <see cref="Features.SnowGenerator.IsFrozenWater"/>.</summary>
@@ -155,6 +163,11 @@ internal static class TerrainNoise
         CordilleraWarp = MakeWarp(CordilleraWarpSeedOffset, WorldGenerationConfig.CordilleraWarpFrequency,
             WorldGenerationConfig.CordilleraWarpAmplitude);
         ValleyFlatNoise = MakeNoise(ValleyFlatSeedOffset, WorldGenerationConfig.ValleyFlatFrequency);
+        CanyonRidgeNoise = MakeNoise(CanyonRidgeSeedOffset, WorldGenerationConfig.CanyonFrequency);
+        CanyonWarp = MakeWarp(CanyonWarpSeedOffset, WorldGenerationConfig.CanyonWarpFrequency,
+            WorldGenerationConfig.CanyonWarpAmplitude);
+        CanyonMaskNoise = MakeNoise(CanyonMaskSeedOffset, WorldGenerationConfig.CanyonMaskFrequency);
+        ShelfNoise = MakeNoise(ShelfSeedOffset, WorldGenerationConfig.ShelfFrequency);
         LakeShapeNoise = MakeNoise(90, WorldGenerationConfig.LakeShapeFrequency);
         // Offset 152 was unused (ClimateWarp took 151, the feature generators stop at 142)
         PackIceNoise = MakeNoise(152, WorldGenerationConfig.PackIceFrequency, octaves: 2);
