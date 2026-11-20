@@ -273,10 +273,10 @@ public sealed class LodPagedEditLoopbackTests
         Assert.Equal((original.Level, original.X, original.Z), (data.Level, data.X, data.Z));
         Assert.Equal(20_000, data.Vertices.Count);
         Assert.Equal(30_000, data.Indices.Count);
-        Assert.Equal(original.Vertices[0], data.Vertices[0]);
-        Assert.Equal(original.Vertices[^1], data.Vertices[^1]);
-        Assert.Equal(original.Indices[0], data.Indices[0]);
-        Assert.Equal(original.Indices[^1], data.Indices[^1]);
+        for (var i = 0; i < original.Vertices.Count; i++)
+            Assert.Equal(original.Vertices[i], data.Vertices[i]);
+        for (var i = 0; i < original.Indices.Count; i++)
+            Assert.Equal(original.Indices[i], data.Indices[i]);
         Assert.Single(data.Trees.Instances);
         Assert.Equal(2, data.Trees.Materials.Length);
         Span<byte> actualInstance = stackalloc byte[LodTreeInstance.ByteSize];
@@ -298,8 +298,8 @@ public sealed class LodPagedEditLoopbackTests
         Assert.Equal(BiomeTintPalette.Foliage, data.Trees.Materials[1].Palette);
         Assert.NotNull(data.Trees.Tint);
         Assert.NotNull(original.Trees.Tint);
-        Assert.Equal(original.Trees.Tint!.Grass[0], data.Trees.Tint!.Grass[0]);
-        Assert.Equal(original.Trees.Tint.Foliage[^1], data.Trees.Tint.Foliage[^1]);
+        Assert.Equal(original.Trees.Tint!.Grass, data.Trees.Tint!.Grass);
+        Assert.Equal(original.Trees.Tint.Foliage, data.Trees.Tint.Foliage);
         Assert.Equal(original.Trees.GeneratedTiles, data.Trees.GeneratedTiles);
         Assert.Equal(original.Trees.ProxyYMin, data.Trees.ProxyYMin);
         Assert.Equal(original.Trees.ProxyYMax, data.Trees.ProxyYMax);
@@ -517,16 +517,17 @@ public sealed class LodPagedEditLoopbackTests
         {
             using (var peek = new PacketReader(bytes))
             {
-                if (peek.Message == NetMessage.LodRegionBegin)
+                var message = peek.Message;
+                if (message == NetMessage.LodRegionBegin)
                 {
                     LastBegin = LodTransfer.ReadBegin(peek);
                     Assert.InRange(LastBegin.Value.Length, 8 * LodTransfer.PageBytes + 1,
                         11 * LodTransfer.PageBytes);
                     Assert.InRange(LastBegin.Value.Pages, 9, 11);
                 }
-                else if (peek.Message == NetMessage.LodRegionPage)
+                else if (message == NetMessage.LodRegionPage)
                     Pages++;
-                else if (peek.Message == NetMessage.LodRegionComplete)
+                else if (message == NetMessage.LodRegionComplete)
                 {
                     _ = peek.ReadInt();
                     _ = peek.ReadInt();
@@ -554,6 +555,7 @@ public sealed class LodPagedEditLoopbackTests
             {
                 if (ack.Status != status) return false;
                 using var reader = new PacketReader(ack.Frame);
+                Assert.Equal(NetMessage.LodRegionAck, reader.Message);
                 var ackNonce = reader.ReadInt();
                 var key = (reader.ReadInt(), reader.ReadInt(), reader.ReadInt());
                 return key == Target && (nonce == null || ackNonce == nonce);
