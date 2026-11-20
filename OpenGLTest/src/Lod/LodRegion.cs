@@ -143,8 +143,9 @@ public class LodRegion : IDisposable
     internal readonly ulong[] TreeSourceTiles;
     internal readonly int[] TreeYMin;
     internal readonly int[] TreeYMax;
+    internal readonly int TreeCount;
     private readonly ulong[] _treeVisibleTiles;
-    internal bool HasTreeInstances => TreeSlice.Count > 0;
+    internal bool HasTreeInstances => TreeCount > 0;
     internal bool HasVisibleTrees
     {
         get
@@ -153,6 +154,13 @@ public class LodRegion : IDisposable
                 if (word != 0) return true;
             return false;
         }
+    }
+    internal bool TreeVisibleAt(int tileX, int tileZ)
+    {
+        var side = SizeBlocks / 16;
+        if ((uint)tileX >= (uint)side || (uint)tileZ >= (uint)side) return false;
+        var i = tileX * side + tileZ;
+        return (_treeVisibleTiles[i >> 6] & (1UL << (i & 63))) != 0;
     }
 
     // The pool both slices came from, so Dispose can hand the space back without an unload
@@ -215,6 +223,7 @@ public class LodRegion : IDisposable
         TreeSourceTiles = data.Trees.GeneratedTiles;
         TreeYMin = data.Trees.ProxyYMin;
         TreeYMax = data.Trees.ProxyYMax;
+        TreeCount = data.Trees.Count;
         _treeVisibleTiles = (ulong[])TreeSourceTiles.Clone();
 
         try
@@ -236,10 +245,11 @@ public class LodRegion : IDisposable
                     System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.WaterVertices),
                     System.Runtime.InteropServices.CollectionsMarshal.AsSpan(data.WaterIndices));
             }
-            if (data.Trees.Count > 0)
+            if (data.Trees.Count > 0 && treePool == null && pool != null)
+                throw new InvalidOperationException("non-empty LOD tree result without a tree pool");
+            if (data.Trees.Count > 0 && treePool != null)
             {
-                _treePool = treePool ?? throw new InvalidOperationException(
-                    "non-empty LOD tree result without a tree pool");
+                _treePool = treePool;
                 TreeSlice = treePool.Upload(data.Trees, X * SizeBlocks, Z * SizeBlocks);
             }
         }

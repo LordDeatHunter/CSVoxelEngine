@@ -362,7 +362,7 @@ position goes through the movement rubberband (both below) — syncs the day clo
 (`NetTimeSyncSeconds`), serves `ChunkRequest`/`ColumnRequest` from the loaded world
 (`ChunkManager.TryCaptureChunk`; a column through `WorldgenColumnSource`, exactly what its own
 mesher reads, encoded by `ChunkNetCodec.EncodeColumn`), queues `LodRegionRequest`s (`StreamRequests`, deduped
-per connection, `ClientConnection.LodQueued`) and holds only one serialized far region
+per connection, `ClientConnection.LodLedger`) and holds only one serialized far region
 server-wide, emitting at most eight pages per `Pump` (`LodRegion.BuildMeshData`, skipping any
 whose client has gone), replays each
 `InventoryRequest` intent (`IntentReplay.OnInventoryRequest`) against **the sender's** inventory only — `InventoryIntentRules.Apply`
@@ -698,6 +698,14 @@ return early in client mode, so a client edit never touches `LodSurface`, `LodCo
 or `TreeCanopy.CanopyDisturbed`. Incoming and predicted cell edits mark nearby streamed regions
 dirty using the same tree reach as the local LOD builder; the old region remains drawable until
 the replacement has uploaded, and a reply whose request predates an edit cannot replace it.
+The server's relevant `LodManager.MarkEditedColumn` event coalesces affected region keys in a
+bounded `LodEditInvalidations` set; overflow sends one global invalidate, which only dirties
+resident or pending client keys. `LodTransferCredit` owns one client transfer identity and
+bounded queued nonces. Begin, each page, Complete and ACK carry the server build generation;
+an edit before completion rejects that build, while an edit after completion dirties the
+resident key for replacement. A timeout or disconnect releases credit and raw bytes. The
+one raw server slot, eight-page Pump and 64-entry queue scan remain separate bounds;
+socket sends retain their finite synchronous timeout. Protocol 69 is unpublished at this stage.
 An unanswered request is retried after `NetLodResendSeconds`. `WorldgenReads` (off in production) is the counter
 `ClientWorldgenIsolationTests` turns on to prove a client world under a poisoned seed streams and
 meshes with no worldgen call and edits without moving the far-LOD tables, and

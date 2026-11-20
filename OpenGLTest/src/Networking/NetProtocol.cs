@@ -58,6 +58,8 @@ public enum NetMessage : byte
     LodRegionBegin = 57,
     LodRegionPage = 58,
     LodRegionComplete = 59,
+    /// <summary>Server to clients: one relevant LOD key, or level -1 for bounded global fallback.</summary>
+    LodRegionInvalidate = 76,
     /// <summary>Client completion, rejection or cancellation of one nonce and region key.</summary>
     LodRegionAck = 69,
     EntityList = 60,

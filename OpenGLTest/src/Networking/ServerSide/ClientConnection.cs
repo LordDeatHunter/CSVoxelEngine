@@ -29,11 +29,9 @@ internal sealed class ClientConnection(TcpClient tcp, int id, ConcurrentQueue<In
     public bool Removed { get; set; }
 
     /// <summary>Far-LOD regions queued for this connection (main thread only).</summary>
-    public HashSet<(int Level, int Rx, int Rz)> LodQueued { get; } = [];
-    internal Dictionary<(int Level, int Rx, int Rz), int> LodRequestNonces { get; } = [];
-    internal bool LodCredit { get; set; } = true;
-    internal int LodActiveNonce { get; set; }
-    internal (int Level, int Rx, int Rz)? LodAwaitingAck { get; set; }
+    internal LodTransferCredit LodLedger { get; } = new();
+    internal (int Level, int Rx, int Rz)? LodFailedKey { get; set; }
+    internal double LodFailedUntil { get; set; }
 
     /// <summary><see cref="Environment.TickCount64"/> of the last inbound frame (or the accept).</summary>
     public long LastInboundAt => Volatile.Read(ref _lastInboundAt);

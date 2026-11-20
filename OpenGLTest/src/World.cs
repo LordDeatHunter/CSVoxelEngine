@@ -1133,7 +1133,7 @@ public class World
     {
         UpdateFocus();
         _chunkManager.Update(Focus.Chunks);
-        _lodManager.Update(_chunkManager);
+        _lodManager.Update(_chunkManager, deltaTime);
         LocalPlayer.ApplyGear(simulatesMana: false);
         // A waystone trip the server landed stays put until this side's chunks there are in
         WaystoneTravel.Update(deltaTime);
@@ -1275,7 +1275,7 @@ public class World
         _chunkManager.Update(Focus.Chunks);
 
         FrameProfiler.Begin(ProfileSection.Lod);
-        _lodManager.Update(_chunkManager);
+        _lodManager.Update(_chunkManager, deltaTime);
         FrameProfiler.End(ProfileSection.Lod);
 
         FrameProfiler.Begin(ProfileSection.Entities);
@@ -1457,7 +1457,7 @@ public class World
         _chunkManager.Update(Focus.Chunks);
 
         FrameProfiler.Begin(ProfileSection.Lod);
-        _lodManager.Update(_chunkManager);
+        _lodManager.Update(_chunkManager, deltaTime);
         FrameProfiler.End(ProfileSection.Lod);
 
         FrameProfiler.Begin(ProfileSection.FluidWake);

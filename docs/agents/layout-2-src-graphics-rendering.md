@@ -127,6 +127,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   when its inputs move, the level-0 cover tests spread over frames (IsCoveredByChunks)
       LodFaceEmitter.cs        # a region build's terrain and water face emission
       LodTreeBuild.cs          # compact tree instances/materials/tint/source mask of one region build
+      LodTreeGpuPayload.cs     # pure std430 payload pack shared by the live tree pool and ABI tests
       LodTreeCoverPass.cs      # main-thread finer/full-detail replacement masks for finite tree tiles
       LodLevelSpec.cs          # one LOD ring's parameters (cell size, region size and radius, sample margin, height bias,
                                #   proxy canopy)
@@ -208,6 +209,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       InventoryNetCodec.cs     # the server-owned inventory on the wire (the save JSON shape)
       QuestStateCodec.cs       # a player's quest progress on the wire (NetMessage.QuestState, the save JSON shape)
       LodNetCodec.cs           # bounded protocol-69 terrain and compact tree logical payload
+      LodEditInvalidations.cs  # bounded relevant-edit region key coalescing and global fallback
       LodTransfer.cs           # nonce, digest and ordered 64 KiB page exchange
       NetAttacks.cs            # what each NetAttackKind stands for: the attack pattern it needs in hand, the
                                #   sword swing it names, the NetPlayerAction it is rebroadcast as
@@ -297,6 +299,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   pending connections, clock, join spawn, the operators and the hosting player
         ServerTransport.cs     # TCP listener, accept thread, per-connection reader threads
         StreamRequests.cs      # chunk, column and far-LOD region requests and the LOD queue
+        LodTransferCredit.cs   # pure per-client queued nonce and active-transfer ownership
         WaystoneSessions.cs    # waystones for each player: discovery on a replayed Use (WaystoneOpened),
                                #   the rows kept current, the rename, the trip judged, held and landed
     Particles/                 # every particle system (debris, bubbles, fire, leaves,

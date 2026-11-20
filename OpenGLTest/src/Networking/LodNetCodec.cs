@@ -20,15 +20,22 @@ public static class LodNetCodec
     private const int HeaderWords = 18;
     private const int HeaderBytes = HeaderWords * sizeof(int);
     public const int MaxLogicalBytes = 12 * 1024 * 1024;
-    private const int MaxTrees = 2048; // 1024 added caps + at most the finite 64-block root neighborhood
+    // A root whose reach is at most half a 64-block tree cell can intersect this
+    // region from the surrounding 32-block band. The conservative integer-site
+    // envelope also includes the 1024 persisted added-canopy records.
+    private static int MaxTreesAt(int level)
+    {
+        var side = checked(LodRegion.Levels[level].RegionBlocks + WorldGenerationConfig.TreeCellBlocks);
+        return checked(side * side + 1024);
+    }
 
     public static byte[] Encode(LodMeshData data)
     {
         if (data.Level < 0 || data.Level >= LodRegion.Levels.Length ||
             !float.IsFinite(data.YMin) || !float.IsFinite(data.YMax) || data.YMin > data.YMax ||
-            data.Vertices.Count > ushort.MaxValue || data.Indices.Count > ushort.MaxValue * 3 ||
+            data.Vertices.Count > ushort.MaxValue + 1 || data.Indices.Count > 98_304 ||
             data.WaterVertices.Count > 4096 || data.WaterIndices.Count > 6144 ||
-            data.Trees.Count > MaxTrees)
+            data.Trees.Count > MaxTreesAt(data.Level))
             throw new InvalidDataException("Unsupported LOD region.");
         var tiles = data.Trees.ProxyYMin.Length;
         var side = data.Trees.Tint?.LatticeSide ?? 0;
@@ -39,12 +46,42 @@ public static class LodNetCodec
         var owned = LodRegion.Levels[data.Level].RegionBlocks / 16;
         if (data.ColumnCyMin.Length != data.ColumnCyMax.Length ||
             data.ColumnCyMin.Length != owned * owned ||
-            (data.Trees.Count == 0 ? tiles != 0 || side != 0 :
-                tiles != owned * owned || side != owned + 1 ||
+            data.Trees.Materials.Length > ushort.MaxValue + 1 ||
+            (data.Trees.Count == 0 ? tiles != 0 || side != 0 ||
+                data.Trees.Materials.Length != 0 || data.Trees.GeneratedTiles.Length != 0 :
+                data.Trees.Materials.Length == 0 || tiles != owned * owned || side != owned + 1 ||
                 data.Trees.GeneratedTiles.Length != (tiles + 63) / 64) ||
             total < 0 ||
             total > MaxLogicalBytes)
             throw new InvalidDataException("LOD region length exceeds its logical bound.");
+        for (var i = 0; i < data.ColumnCyMin.Length; i++)
+            if (data.ColumnCyMin[i] > data.ColumnCyMax[i] ||
+                (long)data.ColumnCyMax[i] - data.ColumnCyMin[i] > 128)
+                throw new InvalidDataException("LOD chunk-Y interval is invalid.");
+        foreach (var index in data.Indices)
+            if (index >= data.Vertices.Count) throw new InvalidDataException("LOD terrain index is invalid.");
+        foreach (var index in data.WaterIndices)
+            if (index >= data.WaterVertices.Count) throw new InvalidDataException("LOD water index is invalid.");
+        var originX = (long)data.X * LodRegion.Levels[data.Level].RegionBlocks;
+        var originZ = (long)data.Z * LodRegion.Levels[data.Level].RegionBlocks;
+        if (originX is < int.MinValue or > int.MaxValue ||
+            originZ is < int.MinValue or > int.MaxValue)
+            throw new InvalidDataException("LOD region origin is invalid.");
+        foreach (var instance in data.Trees.Instances)
+            if (!instance.TryRegionProxy((int)originX, (int)originZ, out _) ||
+                instance.WoodMaterial >= data.Trees.Materials.Length ||
+                instance.LeafMaterial >= data.Trees.Materials.Length)
+                throw new InvalidDataException("LOD tree material or local bound is invalid.");
+        for (var i = 0; i < tiles; i++)
+        {
+            var empty = data.Trees.ProxyYMin[i] == int.MaxValue &&
+                data.Trees.ProxyYMax[i] == int.MinValue;
+            if (!empty && (data.Trees.ProxyYMin[i] >= data.Trees.ProxyYMax[i] ||
+                           data.Trees.ProxyYMin[i] < -LodTreeInstance.MaxWorldY ||
+                           data.Trees.ProxyYMax[i] > LodTreeInstance.MaxWorldY ||
+                           (data.Trees.GeneratedTiles[i >> 6] & (1UL << (i & 63))) == 0))
+                throw new InvalidDataException("LOD tree tile bound or ownership is invalid.");
+        }
         var bytes = new byte[total];
         Span<int> h = stackalloc int[HeaderWords]
         {
@@ -120,9 +157,9 @@ public static class LodNetCodec
         var nc = H(10); var nt = H(11); var nm = H(12); var side = H(13);
         var masks = H(14); var tiles = H(15);
         var owned = LodRegion.Levels[level].RegionBlocks / 16;
-        if (nv < 0 || nv > ushort.MaxValue || ni < 0 || ni > ushort.MaxValue * 3 ||
+        if (nv < 0 || nv > ushort.MaxValue + 1 || ni < 0 || ni > 98_304 ||
             nwv < 0 || nwv > 4096 || nwi < 0 || nwi > 6144 ||
-            nc != owned * owned || nt < 0 || nt > MaxTrees ||
+            nc != owned * owned || nt < 0 || nt > MaxTreesAt(level) ||
             nm < 0 || nm > ushort.MaxValue + 1 ||
             (nt == 0 ? nm != 0 || side != 0 || masks != 0 || tiles != 0 :
                 nm == 0 || side != owned + 1 || tiles != owned * owned ||

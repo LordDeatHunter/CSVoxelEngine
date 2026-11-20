@@ -20,9 +20,10 @@ internal sealed class LodRegionTransferReader(Action<byte[]> send)
             case NetMessage.LodRegionPage:
             {
                 var nonce = reader.ReadInt();
+                var generation = reader.ReadInt();
                 var ordinal = reader.ReadInt();
                 if (_assembly is not { } assembly ||
-                    !assembly.Add(nonce, ordinal, reader.ReadBytes(LodTransfer.PageBytes)))
+                    !assembly.Add(nonce, ordinal, reader.ReadBytes(LodTransfer.PageBytes), generation))
                     throw new InvalidDataException("Invalid test LOD page.");
                 break;
             }
@@ -30,12 +31,15 @@ internal sealed class LodRegionTransferReader(Action<byte[]> send)
             {
                 var nonce = reader.ReadInt();
                 var key = new LodTransfer.Key(reader.ReadInt(), reader.ReadInt(), reader.ReadInt());
+                var generation = reader.ReadInt();
                 if (reader.ReadByte() != LodTransfer.Applied ||
-                    _assembly is not { } assembly || assembly.Header.Region != key)
+                    _assembly is not { } assembly || assembly.Header.Region != key ||
+                    assembly.Header.Generation != generation)
                     throw new InvalidDataException("Invalid test LOD completion.");
                 var result = LodNetCodec.Decode(assembly.Finish(nonce));
                 using var ack = new PacketWriter(NetMessage.LodRegionAck);
-                ack.Write(nonce).Write(key.Level).Write(key.X).Write(key.Z).Write(LodTransfer.Applied);
+                ack.Write(nonce).Write(key.Level).Write(key.X).Write(key.Z)
+                    .Write(generation).Write(LodTransfer.Applied);
                 send(ack.ToArray());
                 _assembly = null;
                 return result;

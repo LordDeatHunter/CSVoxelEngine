@@ -89,12 +89,14 @@ public sealed class ClientLodStreamerTests
         using (var packet = new PacketWriter(NetMessage.LodRegionComplete))
         {
             packet.Write(first.Nonce).Write(first.Level).Write(first.X).Write(first.Z)
+                .Write(begin.Generation)
                 .Write(LodTransfer.Applied);
             using var reader = new PacketReader(packet.ToArray());
             Assert.Equal(NetMessage.LodRegionComplete, reader.Message);
             streamer.Complete(reader);
         }
-        Assert.Contains(LodTransfer.Applied, acks);
+        Assert.Contains(LodTransfer.Canceled, acks);
+        Assert.DoesNotContain(LodTransfer.Applied, acks);
         Assert.False(lod.Regions.ContainsKey((first.Level, first.X, first.Z)));
         streamer.Update(Vector3.Zero, 0.01);
         Assert.Contains(asks, request => request.Level == first.Level &&

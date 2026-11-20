@@ -39,7 +39,7 @@ public sealed class LodTransferTests
     public void BeginRejectsOversizedLogicalRegionBeforeAssemblyAllocation()
     {
         using var writer = new PacketWriter(NetMessage.LodRegionBegin);
-        writer.Write(1).Write(0).Write(0).Write(0)
+        writer.Write(1).Write(0).Write(0).Write(0).Write(0)
             .Write(LodNetCodec.MaxLogicalBytes + 1).Write(LodTransfer.MaxPages + 1)
             .WriteBytes(new byte[32]);
         using var reader = new PacketReader(writer.ToArray());

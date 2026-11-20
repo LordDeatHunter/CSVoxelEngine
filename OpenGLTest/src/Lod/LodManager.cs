@@ -152,7 +152,6 @@ public class LodManager
 
         _regionSet.BumpVersion();
         _coverPass.ResetCover();
-        _treeCoverPass.Reset();
     }
 
     /// <inheritdoc cref="LodRegionClaims.CompletedBuildCount"/>
@@ -160,7 +159,13 @@ public class LodManager
     /// <inheritdoc cref="LodRegionClaims.EnqueueCompletedMesh"/>
     internal void EnqueueCompletedMesh(LodMeshData data) => _claims.EnqueueCompletedMesh(data);
     /// <inheritdoc cref="LodRegionClaims.MarkEditedColumn"/>
-    public void MarkEditedColumn(int x, int z) => _claims.MarkEditedColumn(x, z);
+    public event Action<int, int>? RelevantColumnEdited;
+
+    public void MarkEditedColumn(int x, int z)
+    {
+        _claims.MarkEditedColumn(x, z);
+        RelevantColumnEdited?.Invoke(x, z);
+    }
     /// <inheritdoc cref="LodRegionClaims.TakeDirtyRegion"/>
     internal (int Level, int X, int Z)? TakeDirtyRegion() => _claims.TakeDirtyRegion();
     /// <inheritdoc cref="LodRegionClaims.FindClosestNeededRegion"/>
@@ -191,7 +196,7 @@ public class LodManager
     /// <summary>The camera's horizontal position in blocks (x, z), which the claim scan measures region distance from.</summary>
     internal Vector2 CameraXZ => new(_camera!.Position.X, _camera.Position.Z);
 
-    public void Update(ChunkManager chunkManager)
+    public void Update(ChunkManager chunkManager, double deltaTime = 0)
     {
         if (_camera == null) return;
 
@@ -222,6 +227,12 @@ public class LodManager
         }
 
         ApplyCompletedMeshes(camRegions);
+
+        // Advance once on the world update clock, including off-screen regions. Main,
+        // reflection and shadow consume the same fade and coverage state.
+        var fadeStep = Math.Clamp(deltaTime, 0, LodRegion.MAX_LIFETIME);
+        foreach (var region in RegionList)
+            region.Lifetime = Math.Min(LodRegion.MAX_LIFETIME, region.Lifetime + fadeStep);
 
         // The flags depend only on which chunks are loaded and meshed (MeshVersion), which regions
         // exist (_regionSetVersion) and the camera chunk (the distance early-out in

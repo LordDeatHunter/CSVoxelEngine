@@ -21,7 +21,7 @@ public sealed class ClientLodStreamer
 
     private readonly LodManager _lod;
     private readonly Action<int, int, int, int> _request;
-    private readonly Action<int, LodTransfer.Key, byte> _ack;
+    private readonly Action<int, LodTransfer.Key, int, byte> _ack;
     // Outstanding requests and when each was sent; an answer removes its entry and an entry past
     // the resend age is dropped so the region is asked again.
     private readonly Dictionary<(int Level, int X, int Z), (double At, int Nonce, int Revision)> _asked = new();
@@ -35,7 +35,7 @@ public sealed class ClientLodStreamer
 
     /// <summary><paramref name="wire"/> is the connection's id tables (null keeps the mesh's atlas layers as they came).</summary>
     internal ClientLodStreamer(LodManager lod, Action<int, int, int, int> request,
-        Action<int, LodTransfer.Key, byte> ack, WireIds? wire = null)
+        Action<int, LodTransfer.Key, int, byte> ack, WireIds? wire = null)
     {
         _lod = lod;
         _wire = wire;
@@ -43,15 +43,34 @@ public sealed class ClientLodStreamer
         _ack = ack;
     }
 
+    internal ClientLodStreamer(LodManager lod, Action<int, int, int, int> request,
+        Action<int, LodTransfer.Key, byte> ack, WireIds? wire = null)
+        : this(lod, request, (nonce, key, _, status) => ack(nonce, key, status), wire) { }
+
     // Compatibility for headless request-scanning callers. A live connection supplies both
     // nonce and ACK delegates through the four-argument constructor.
     public ClientLodStreamer(LodManager lod, Action<int, int, int> request, WireIds? wire = null)
-        : this(lod, (l, x, z, _) => request(l, x, z), static (_, _, _) => { }, wire) { }
+        : this(lod, (l, x, z, _) => request(l, x, z), static (_, _, _, _) => { }, wire) { }
 
     private static readonly (int Dx, int Dz)[][] Offsets = BuildOffsets();
 
     /// <summary>Requests outstanding right now (sent, unanswered and not yet expired).</summary>
     public int InFlight => _asked.Count;
+
+    internal int RetainedRevisions => _revisions.Count;
+
+    /// <summary>Cancel pending identities when leaving a usable connection/world.</summary>
+    internal void CancelAll()
+    {
+        foreach (var (key, pending) in _asked)
+            _ack(pending.Nonce, new LodTransfer.Key(key.Level, key.X, key.Z),
+                _assembly?.Header.Nonce == pending.Nonce ? _assembly.Header.Generation : 0,
+                LodTransfer.Canceled);
+        _asked.Clear();
+        _assembly = null;
+        _dirty.Clear();
+        _revisions.Clear();
+    }
 
     /// <summary>Requests the regions around the camera that are not present yet, nearest first.</summary>
     public void Update(Vector3 cameraPos, double deltaTime)
@@ -61,8 +80,12 @@ public sealed class ClientLodStreamer
         // An unloaded region will be rebuilt from the server if asked later; retain no
         // edit generation for keys that no longer have a drawable or pending instance.
         _expired.Clear();
-        foreach (var key in _dirty)
-            if (!_lod.Regions.ContainsKey(key) && !_asked.ContainsKey(key)) _expired.Add(key);
+        foreach (var key in _revisions.Keys)
+            if (!_lod.Regions.ContainsKey(key) && !_asked.ContainsKey(key) &&
+                (_assembly == null ||
+                 (_assembly.Header.Region.Level, _assembly.Header.Region.X,
+                  _assembly.Header.Region.Z) != key))
+                _expired.Add(key);
         foreach (var key in _expired)
         {
             _dirty.Remove(key);
@@ -111,7 +134,7 @@ public sealed class ClientLodStreamer
         if (!_asked.TryGetValue(key, out var pending) || pending.Nonce != begin.Nonce ||
             _assembly != null)
         {
-            _ack(begin.Nonce, begin.Region, LodTransfer.Canceled);
+            _ack(begin.Nonce, begin.Region, begin.Generation, LodTransfer.Canceled);
             return;
         }
         _assembly = new LodTransfer.Assembly(begin);
@@ -122,10 +145,11 @@ public sealed class ClientLodStreamer
     internal void Page(PacketReader reader)
     {
         var nonce = reader.ReadInt();
+        var generation = reader.ReadInt();
         var ordinal = reader.ReadInt();
         var bytes = reader.ReadBytes(LodTransfer.PageBytes);
         if (_assembly is not { } assembly || assembly.Header.Nonce != nonce) return;
-        if (assembly.Add(nonce, ordinal, bytes))
+        if (assembly.Add(nonce, ordinal, bytes, generation))
         {
             var key = assembly.Header.Region;
             var tuple = (key.Level, key.X, key.Z);
@@ -140,6 +164,7 @@ public sealed class ClientLodStreamer
     {
         var nonce = reader.ReadInt();
         var key = new LodTransfer.Key(reader.ReadInt(), reader.ReadInt(), reader.ReadInt());
+        var generation = reader.ReadInt();
         var status = reader.ReadByte();
         var tuple = (key.Level, key.X, key.Z);
         if (status == LodTransfer.Rejected)
@@ -147,16 +172,18 @@ public sealed class ClientLodStreamer
             if (_asked.TryGetValue(tuple, out var pending) && pending.Nonce == nonce)
                 _asked.Remove(tuple);
             if (_assembly?.Header.Nonce == nonce) _assembly = null;
+            _ack(nonce, key, generation, LodTransfer.Rejected);
             return;
         }
         if (status != LodTransfer.Applied) return;
         if (_assembly is not { } assembly ||
-            assembly.Header.Nonce != nonce || assembly.Header.Region != key)
+            assembly.Header.Nonce != nonce || assembly.Header.Region != key ||
+            assembly.Header.Generation != generation)
         {
             if (_asked.TryGetValue(tuple, out var pending) && pending.Nonce == nonce)
             {
                 _asked.Remove(tuple);
-                _ack(nonce, key, LodTransfer.Rejected);
+                _ack(nonce, key, generation, LodTransfer.Rejected);
             }
             return;
         }
@@ -166,13 +193,12 @@ public sealed class ClientLodStreamer
             if ((data.Level, data.X, data.Z) != tuple ||
                 !_asked.TryGetValue(tuple, out var pending) || pending.Nonce != nonce)
                 throw new InvalidDataException("LOD reply no longer matches the requested region.");
-            if (pending.Revision == _revisions.GetValueOrDefault(tuple))
-            {
-                _lod.AddStreamedRegion(data);
-                _dirty.Remove(tuple);
-            }
+            if (pending.Revision != _revisions.GetValueOrDefault(tuple))
+                throw new InvalidDataException("LOD reply was superseded by a newer edit.");
+            _lod.AddStreamedRegion(data);
+            _dirty.Remove(tuple);
             _asked.Remove(tuple);
-            _ack(nonce, key, LodTransfer.Applied);
+            _ack(nonce, key, generation, LodTransfer.Applied);
             _assembly = null;
         }
         catch (Exception e) when (e is InvalidDataException or OverflowException or InvalidOperationException)
@@ -193,14 +219,46 @@ public sealed class ClientLodStreamer
             var (rzMin, rzMax) = LodTreeAnchor.RegionRange(z, spec, reach);
             for (var rx = rxMin; rx <= rxMax; rx++)
             for (var rz = rzMin; rz <= rzMax; rz++)
-            {
-                var key = (level, rx, rz);
-                if (!_lod.Regions.ContainsKey(key) && !_asked.ContainsKey(key)) continue;
-                _dirty.Add(key);
-                _revisions[key] = _revisions.GetValueOrDefault(key) + 1;
-            }
+                MarkKey((level, rx, rz));
         }
     }
+
+    /// <summary>Server-owned relevant edit; absent keys have no client history to retain.</summary>
+    internal void Invalidate(PacketReader reader)
+    {
+        var level = reader.ReadInt();
+        var x = reader.ReadInt();
+        var z = reader.ReadInt();
+        _ = reader.ReadInt(); // server build generation; the nonce/assembly also carries it
+        if (level == -1)
+        {
+            var keys = new HashSet<(int Level, int X, int Z)>(_lod.Regions.Keys);
+            keys.UnionWith(_asked.Keys);
+            foreach (var key in keys) MarkKey(key);
+        }
+        else if ((uint)level < (uint)LodRegion.Levels.Length)
+            MarkKey((level, x, z));
+    }
+
+    private void MarkKey((int Level, int X, int Z) key)
+    {
+        if (!_lod.Regions.ContainsKey(key) && !_asked.ContainsKey(key)) return;
+        _dirty.Add(key);
+        _revisions[key] = unchecked(_revisions.GetValueOrDefault(key) + 1);
+        if (!_asked.Remove(key, out var pending)) return;
+        var wireKey = new LodTransfer.Key(key.Level, key.X, key.Z);
+        var generation = 0;
+        if (_assembly is { } assembly && assembly.Header.Nonce == pending.Nonce &&
+            assembly.Header.Region == wireKey)
+        {
+            generation = assembly.Header.Generation;
+            _assembly = null;
+        }
+        _ack(pending.Nonce, wireKey, generation, LodTransfer.Canceled);
+    }
+
+    // Exact key path used by server invalidations; exposed for content-free state tests.
+    internal void MarkRegionEdited(int level, int x, int z) => MarkKey((level, x, z));
 
     private void Reject(LodTransfer.Begin begin, byte status)
     {
@@ -208,7 +266,7 @@ public sealed class ClientLodStreamer
         var key = (begin.Region.Level, begin.Region.X, begin.Region.Z);
         if (_asked.TryGetValue(key, out var pending) && pending.Nonce == begin.Nonce)
             _asked.Remove(key);
-        _ack(begin.Nonce, begin.Region, status);
+        _ack(begin.Nonce, begin.Region, begin.Generation, status);
     }
 
     // Drops the requests older than the resend age, so they are asked again and stop holding an
@@ -225,7 +283,8 @@ public sealed class ClientLodStreamer
                 (assembly.Header.Region.Level, assembly.Header.Region.X, assembly.Header.Region.Z) == key)
                 Reject(assembly.Header, LodTransfer.Canceled);
             else if (_asked.TryGetValue(key, out var pending))
-                _ack(pending.Nonce, new LodTransfer.Key(key.Level, key.X, key.Z), LodTransfer.Canceled);
+                _ack(pending.Nonce, new LodTransfer.Key(key.Level, key.X, key.Z), 0,
+                    LodTransfer.Canceled);
             _asked.Remove(key);
         }
     }

@@ -413,6 +413,9 @@ internal sealed class ClientSession
             case NetMessage.LodRegionComplete:
                 clientLodStreamer?.Complete(reader);
                 break;
+            case NetMessage.LodRegionInvalidate:
+                clientLodStreamer?.Invalidate(reader);
+                break;
             case NetMessage.EntityList:
             {
                 var count = reader.ReadInt();
@@ -528,11 +531,12 @@ internal sealed class ClientSession
         client.Send(writer.ToArray());
     }
 
-    private void SendLodAck(int nonce, LodTransfer.Key region, byte status)
+    private void SendLodAck(int nonce, LodTransfer.Key region, int generation, byte status)
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client) return;
         using var writer = new PacketWriter(NetMessage.LodRegionAck);
-        writer.Write(nonce).Write(region.Level).Write(region.X).Write(region.Z).Write(status);
+        writer.Write(nonce).Write(region.Level).Write(region.X).Write(region.Z)
+            .Write(generation).Write(status);
         client.Send(writer.ToArray());
     }
 
@@ -704,6 +708,7 @@ internal sealed class ClientSession
 
     internal void DisconnectNetwork()
     {
+        clientLodStreamer?.CancelAll();
         netClient?.Dispose();
         netClient = null;
         clientStreamer = null;

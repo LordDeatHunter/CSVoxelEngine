@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
@@ -15,7 +14,6 @@ public sealed unsafe class LodTreeGpuPool : IDisposable
 {
     internal const uint PayloadBinding = 3;
     private const int UnitBytes = 16;
-    private const int HeaderBytes = 64;
     private readonly GL _gl;
     private readonly GeometryAllocator _allocator = new(4096);
     private readonly ChunkGeometryPool _template;
@@ -58,48 +56,17 @@ public sealed unsafe class LodTreeGpuPool : IDisposable
     internal Slice Upload(LodTreeBuild trees, int originX, int originZ)
     {
         if (trees.Count == 0) return default;
-        var tint = trees.Tint ?? throw new InvalidOperationException("Tree instances need a tint lattice.");
-        var instanceBytes = checked(trees.Count * LodTreeInstance.ByteSize);
-        var materialBytes = checked(trees.Materials.Length * LodTreeMaterial.ByteSize);
-        var tintBytes = tint.ByteSize;
-        var maskBytes = checked(trees.GeneratedTiles.Length * sizeof(ulong));
-        var total = checked(HeaderBytes + instanceBytes + materialBytes + tintBytes + maskBytes);
-        if (total > 12 * 1024 * 1024)
-            throw new InvalidOperationException("One logical tree region exceeds the 12 MiB ceiling.");
-        var bytes = new byte[total];
-        var instanceOffset = HeaderBytes;
-        var materialOffset = checked(instanceOffset + instanceBytes);
-        var tintOffset = checked(materialOffset + materialBytes);
-        var maskOffset = checked(tintOffset + tintBytes);
-        WriteWord(bytes, 0, instanceOffset / 4);
-        WriteWord(bytes, 1, materialOffset / 4);
-        WriteWord(bytes, 2, tintOffset / 4);
-        WriteWord(bytes, 3, maskOffset / 4);
-        WriteWord(bytes, 4, tint.LatticeSide);
-        WriteWord(bytes, 5, trees.Materials.Length);
-        WriteWord(bytes, 6, trees.Count);
-        WriteWord(bytes, 7, trees.ProxyYMin.Length == 0 ? 0 : (int)MathF.Sqrt(trees.ProxyYMin.Length));
-        for (var i = 0; i < trees.Count; i++)
-            trees.Instances[i].WriteRegionLittleEndian(originX, originZ,
-                bytes.AsSpan(instanceOffset + i * LodTreeInstance.ByteSize, LodTreeInstance.ByteSize));
-        for (var i = 0; i < trees.Materials.Length; i++)
-            trees.Materials[i].WriteLittleEndian(
-                bytes.AsSpan(materialOffset + i * LodTreeMaterial.ByteSize, LodTreeMaterial.ByteSize));
-        MemoryMarshal.AsBytes(tint.Grass).CopyTo(bytes.AsSpan(tintOffset));
-        MemoryMarshal.AsBytes(tint.Foliage).CopyTo(bytes.AsSpan(tintOffset + tintBytes / 2));
-        for (var i = 0; i < trees.GeneratedTiles.Length; i++)
-            BinaryPrimitives.WriteUInt64LittleEndian(bytes.AsSpan(maskOffset + i * sizeof(ulong)),
-                trees.GeneratedTiles[i]);
-        var units = checked((total + UnitBytes - 1) / UnitBytes);
+        var payload = LodTreeGpuPayload.Pack(trees, originX, originZ);
+        var units = checked((payload.Bytes.Length + UnitBytes - 1) / UnitBytes);
         if (!_allocator.TryAllocate(units, out var unit))
         {
             Grow(Math.Max(checked(_allocator.Capacity * 2), checked(_allocator.Capacity + units)));
             if (!_allocator.TryAllocate(units, out unit))
                 throw new InvalidOperationException("Tree payload pool failed after growth.");
         }
-        try { _gl.NamedBufferSubData(_buffer, (nint)((long)unit * UnitBytes), bytes.AsSpan()); }
+        try { _gl.NamedBufferSubData(_buffer, (nint)((long)unit * UnitBytes), payload.Bytes.AsSpan()); }
         catch { _allocator.Free(unit, units); throw; }
-        return new Slice(unit, units, trees.Count, maskOffset, maskBytes);
+        return new Slice(unit, units, trees.Count, payload.MaskOffset, payload.MaskBytes);
     }
 
     internal void SetCoverage(in Slice slice, ReadOnlySpan<ulong> mask)
@@ -119,9 +86,6 @@ public sealed unsafe class LodTreeGpuPool : IDisposable
     {
         if (slice.Units > 0) _allocator.Free(slice.Unit, slice.Units);
     }
-
-    private static void WriteWord(Span<byte> bytes, int word, int value) =>
-        BinaryPrimitives.WriteInt32LittleEndian(bytes.Slice(word * 4, 4), value);
 
     private uint NewBuffer(int units)
     {

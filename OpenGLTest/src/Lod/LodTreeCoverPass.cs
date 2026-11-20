@@ -4,38 +4,27 @@ using VoxelEngine.Chunks;
 namespace VoxelEngine.Lod;
 
 /// <summary>
-/// Main-thread source and replacement mask shared by the world, reflection and far shadow.
-/// Ground burial is deliberately independent. A faded-in finer proxy or a valid empty finer
-/// result can replace a coarse tree; a merely uploaded nonempty child cannot open a hole.
+/// One main-thread coverage adapter for all tree draw passes. A finer tile replaces a
+/// coarse tree only when its own result is empty, its fade has finished, or a still
+/// finer/full-detail result completely covers the same tile and Y interval.
 /// </summary>
 internal sealed class LodTreeCoverPass(LodRegionSet regions)
 {
-    private int _meshVersion = -1, _regionVersion = -1, _readyCount = -1;
+    internal void Update(ChunkManager chunks) =>
+        Update((cx, cz, minY, maxY) => FullY(chunks, cx, cz, minY, maxY));
 
-    internal void Reset()
+    // The callback is the exact production full-detail readiness seam. Tests can
+    // supply explicit chunk draw states without initializing a world or renderer.
+    internal void Update(Func<int, int, int, int, bool> fullReady)
     {
-        _meshVersion = _regionVersion = _readyCount = -1;
+        foreach (var region in regions.RegionList)
+            UpdateRegion(region, fullReady);
     }
 
-    internal void Update(ChunkManager chunks)
-    {
-        var ready = 0;
-        foreach (var region in regions.RegionList)
-            if (region.HasTreeInstances && region.Lifetime >= LodRegion.MAX_LIFETIME) ready++;
-        if (_meshVersion == chunks.MeshVersion && _regionVersion == regions.Version &&
-            _readyCount == ready) return;
-        _meshVersion = chunks.MeshVersion;
-        _regionVersion = regions.Version;
-        _readyCount = ready;
-        foreach (var region in regions.RegionList)
-            UpdateRegion(region, chunks);
-    }
-
-    private void UpdateRegion(LodRegion region, ChunkManager chunks)
+    private void UpdateRegion(LodRegion region, Func<int, int, int, int, bool> fullReady)
     {
         if (region.TreeSourceTiles.Length == 0) return;
-        var size = region.SizeBlocks;
-        var side = size / Chunk.Size;
+        var side = region.SizeBlocks / Chunk.Size;
         Span<bool> supplied = stackalloc bool[256];
         Span<bool> child = stackalloc bool[256];
         Span<bool> full = stackalloc bool[256];
@@ -50,22 +39,33 @@ internal sealed class LodTreeCoverPass(LodRegionSet regions)
             var cx = region.X * side + x;
             var cz = region.Z * side + z;
             if (region.Level == 0)
-            {
-                full[i] = FullY(chunks, cx, cz, region.TreeYMin[i], region.TreeYMax[i]);
-            }
+                full[i] = fullReady(cx, cz, region.TreeYMin[i], region.TreeYMax[i]);
             else
-            {
-                var finerSize = LodRegion.Levels[region.Level - 1].RegionBlocks;
-                var childKey = (region.Level - 1,
-                    MathUtils.FloorDiv(cx * Chunk.Size, finerSize),
-                    MathUtils.FloorDiv(cz * Chunk.Size, finerSize));
-                child[i] = regions.Regions.TryGetValue(childKey, out var finer) &&
-                    (!finer.HasTreeInstances || finer.Lifetime >= LodRegion.MAX_LIFETIME);
-            }
+                child[i] = ReadyAt(region.Level - 1, cx, cz,
+                    region.TreeYMin[i], region.TreeYMax[i], fullReady);
         }
-        var coverage = LodTreeCoverage.Build(size, region.Level,
+        var coverage = LodTreeCoverage.Build(region.SizeBlocks, region.Level,
             supplied[..(side * side)], child[..(side * side)], full[..(side * side)]);
         region.SetTreeCoverage(coverage.Words);
+    }
+
+    private bool ReadyAt(int level, int cx, int cz, int minY, int maxY,
+        Func<int, int, int, int, bool> fullReady)
+    {
+        var side = LodRegion.Levels[level].RegionBlocks / Chunk.Size;
+        var key = (level, MathUtils.FloorDiv(cx, side), MathUtils.FloorDiv(cz, side));
+        if (!regions.Regions.TryGetValue(key, out var finer)) return false;
+        if (!finer.HasTreeInstances || finer.TreeSourceTiles.Length == 0) return true;
+        var x = cx - finer.X * side;
+        var z = cz - finer.Z * side;
+        var i = x * side + z;
+        if (finer.TreeYMin[i] >= finer.TreeYMax[i] ||
+            (finer.TreeSourceTiles[i >> 6] & (1UL << (i & 63))) == 0 ||
+            finer.Lifetime >= LodRegion.MAX_LIFETIME)
+            return true;
+        return level == 0
+            ? fullReady(cx, cz, minY, maxY)
+            : ReadyAt(level - 1, cx, cz, minY, maxY, fullReady);
     }
 
     private static bool FullY(ChunkManager chunks, int cx, int cz, int minY, int maxY)
@@ -75,8 +75,13 @@ internal sealed class LodTreeCoverPass(LodRegionSet regions)
         var last = (maxY - 1) >> Chunk.SizeShift;
         if ((long)last - first + 1 > 128) return false;
         for (var cy = first; cy <= last; cy++)
+        {
             if (!chunks.Chunks.TryGetValue(cx, cy, cz, out var chunk) || !chunk.IsMeshed)
                 return false;
+            if ((chunk.HasMesh || chunk.HasTranslucentMesh) &&
+                chunk.lifetime < Chunk.MAX_LIFETIME)
+                return false;
+        }
         return true;
     }
 }

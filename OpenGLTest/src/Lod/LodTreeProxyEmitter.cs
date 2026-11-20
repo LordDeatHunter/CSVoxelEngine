@@ -87,7 +87,7 @@ internal sealed class LodTreeProxyEmitter
                 for (var cz = TreeGenerator.CellOf(_z0 - reach);
                      cz <= TreeGenerator.CellOf(_z0 + _spec.RegionBlocks - 1 + reach); cz++)
                 foreach (var shape in TreeBatches.BatchOf(cx, cz).Trees)
-                    if (!RootSupplied(shape.X, shape.Z))
+                    if (shape.Species.HasLeaves && !RootSupplied(shape.X, shape.Z))
                         TryAddNatural(LodTreeProxy.FromGrown(shape));
             }
         }

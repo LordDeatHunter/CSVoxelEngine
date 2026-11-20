@@ -351,8 +351,6 @@ internal sealed class TerrainPasses
 
         foreach (var (region, _) in _visibleRegions)
         {
-            region.Lifetime += 1.0 / 60.0;
-
             if (region.HasMesh && !region.IsBuried)
                 _owner.ChunkDraws.Add(region.OpaqueSlice!.Value,
                     new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks),
