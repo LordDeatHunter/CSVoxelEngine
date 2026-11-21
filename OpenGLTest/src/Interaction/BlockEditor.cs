@@ -223,7 +223,7 @@ internal sealed class BlockEditor
                 TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z, TreeGenerator.SingleEditPoisonRadius);
                 _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
             }
-            _leaves.Burst(blockPos, ParticleConfig.LeafParticleBurstMined);
+            _leaves.Burst(blockPos, brokenId, ParticleConfig.LeafParticleBurstMined, columns: _chunkManager.ColumnSource);
         }
 
         // Pebbles, torches and their kind need the block holding them up: pop whatever the break
@@ -394,14 +394,14 @@ internal sealed class BlockEditor
                 _lodManager.MarkEditedColumn(lx, lz);
         }
 
-        List<Vector3>? felledLeaves = null;
+        List<(Vector3 Cell, ushort Id)>? felledLeaves = null;
         foreach (var block in collected.Where(block => TreeGenerator.IsLeaf(block.Id)))
         {
             felledLeaves ??= [];
-            felledLeaves.Add(block.Cell);
+            felledLeaves.Add((block.Cell, block.Id));
         }
         if (felledLeaves != null)
-            _leaves.BurstCells(felledLeaves, ParticleConfig.LeafParticleBurstFell);
+            _leaves.BurstCells(felledLeaves, ParticleConfig.LeafParticleBurstFell, columns: _chunkManager.ColumnSource);
 
         // The tree tips away from whoever felled it, pivoting on the mined cell's base
         var away = new Vector3(
@@ -594,7 +594,7 @@ internal sealed class BlockEditor
 
     // Scratch for ThudTree: the landed blocks, split into canopy and trunk
     private readonly List<TopplingTree.FellBlock> _thudLanded = [];
-    private readonly List<Vector3> _thudLeaves = [];
+    private readonly List<(Vector3 Cell, ushort Id)> _thudLeaves = [];
     private readonly List<Vector3> _thudWood = [];
 
     /// <summary>
@@ -614,14 +614,14 @@ internal sealed class BlockEditor
         {
             if (TreeGenerator.IsLeaf(block.Id))
             {
-                _thudLeaves.Add(block.Cell);
+                _thudLeaves.Add((block.Cell, block.Id));
                 continue;
             }
             _thudWood.Add(block.Cell);
             center += block.Cell;
         }
 
-        _leaves.BurstCells(_thudLeaves, ParticleConfig.LeafParticleBurstThud);
+        _leaves.BurstCells(_thudLeaves, ParticleConfig.LeafParticleBurstThud, columns: _chunkManager.ColumnSource);
         GroundDust.TreeThud(_thudWood, _chunkManager, _debris);
         if (_thudWood.Count == 0) return;
         center = center / _thudWood.Count + new Vector3(0.5f);

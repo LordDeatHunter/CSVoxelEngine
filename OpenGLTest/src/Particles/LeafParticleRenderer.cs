@@ -3,14 +3,17 @@ using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using VoxelEngine.Data;
+using VoxelEngine.Effects.Climate;
 using VoxelEngine.Graphics;
 
 namespace VoxelEngine.Particles;
 
 /// <summary>
 /// Draws every live <see cref="LeafParticle"/> as a camera-facing billboard in a single
-/// dynamic draw: one quad per leaf sampling the centered crop of the leaves tile, faded
-/// per vertex through its own shader (the world shader reserves vertex alpha for water).
+/// dynamic draw: one quad per leaf sampling the centered crop of its own leaves tile
+/// (<see cref="LeafParticle.Look"/>), faded per vertex through its own shader (the world shader
+/// reserves vertex alpha for water). A biome-tinted leaf carries its tint as the vertex rgb with
+/// the world's biome-tint bit, which the shader scales by the same gain as the world's.
 /// Back-to-front so the blend reads correctly. Main thread only.
 /// </summary>
 public sealed class LeafParticleRenderer : IDisposable
@@ -27,7 +30,6 @@ public sealed class LeafParticleRenderer : IDisposable
     private readonly float[] _depths;
     private readonly int[] _order;
 
-    private ushort _leavesTile;
     private UvRect _crop;
     private bool _cropResolved;
 
@@ -106,8 +108,8 @@ public sealed class LeafParticleRenderer : IDisposable
 
         if (!_cropResolved)
         {
-            _leavesTile = TextureAtlas.TileOf("oak_leaves");
-            _crop = CenterCrop(_leavesTile, tilePixels, ParticleConfig.LeafParticleCropPixels);
+            // The crop is the same on every tile; each leaf supplies its own layer
+            _crop = CenterCrop(0, tilePixels, ParticleConfig.LeafParticleCropPixels);
             _cropResolved = true;
         }
 
@@ -130,6 +132,8 @@ public sealed class LeafParticleRenderer : IDisposable
             var cos = MathF.Cos(p.Rotation);
             var sin = MathF.Sin(p.Rotation);
             var alpha = (byte)(MathUtils.Clamp01(p.Alpha) * 255f + 0.5f);
+            var look = p.Look;
+            BiomeTint.Shade(255, look.Tint, out var r, out var g, out var b);
 
             for (var c = 0; c < 4; c++)
             {
@@ -137,8 +141,8 @@ public sealed class LeafParticleRenderer : IDisposable
                 var offset = right * ((sx * cos - sy * sin) * half)
                            + up * ((sx * sin + sy * cos) * half);
                 _verts[slot * 4 + c] = new Vertex(p.Position + offset,
-                    255, 255, 255, alpha, uvCorners[c], _leavesTile,
-                    1f, 0f, Vector3.UnitY);
+                    r, g, b, alpha, uvCorners[c], look.Tile,
+                    1f, 0f, Vector3.UnitY, biomeTint: look.Tinted);
             }
         }
 

@@ -381,7 +381,7 @@ public class LeafDecayManager
         // while a crown dissolves and crowd out the boxes real edits schedule.
         if (_speciesByLeaf[id] != null)
         {
-            _leaves?.Burst(cell, ParticleConfig.LeafParticleBurstDecay);
+            _leaves?.Burst(cell, id, ParticleConfig.LeafParticleBurstDecay, columns: _chunks.ColumnSource);
             return;
         }
 

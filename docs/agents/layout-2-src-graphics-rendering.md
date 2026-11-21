@@ -313,9 +313,10 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   (FootfallsBetween) and whether it kicks up a puff (Kicks)
       GroundDust.cs            # the cosmetic ground dust: a landing from a real fall kicks up a puff of chips of the block landed on
       LandingDust.cs           # the landing-dust rule, GL-free: how many chips a landing kicks up and how fast they fly
+      LeafLook.cs              # what a falling leaf wears: its species' tile and, for a biome-tinted leaf, the cell's tint
       LeafParticle.cs          # one falling leaf billboard (sway, tumble, rest, fade); LeafParticleSystem owns them
       LeafParticleRenderer.cs  # the falling leaves as one back-to-front billboard draw
-      LeafParticleSystem.cs    # falling leaves: ambient fall off canopy near the camera + bursts where it was disturbed
+      LeafParticleSystem.cs    # falling leaves: ambient fall off any species' canopy near the camera + bursts where it was disturbed
       ParticleRing.cs          # a fixed-capacity, order-preserving particle store
       PopBoxEmitter.cs         # the mining pop's geometry: each hitbox drawn as a box sampling its crop of the block's face tiles
       SandwormEffectRules.cs   # GL-free numbers of the worm's sand and earthquake: chips and speed by closeness, the quake by distance

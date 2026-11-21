@@ -269,7 +269,10 @@ the plain program's per-draw `uBiomeTint` uniform (`BiomeTint.TryCellTint` at th
 world's `ColumnSource` — the pop reads `RenderManager.LightSource.ColumnSource`, the debris gets
 `BlockDebrisSystem.Burst`'s `columns:` argument — carried by `BlockDebris.Tint` for each cube, and
 untinted white when a streamed column is missing), multiplied into bit-4 vertices in the vertex
-shader. Its white
+shader. The falling leaves (`LeafParticleSystem`) draw in their own program, so each leaf carries its look
+(`LeafLook.TryFor`: a tinted species' `Tinted` top tile with `BlockDebrisSystem.TintAt`'s field as the vertex rgb
+and bit 4, which `leaf-particle-vertex.glsl` scales by the gain; an untinted species, crystal, its own tile in
+white; a log's burst its species' leaves), and the ambient fall drips off any species' canopy. The uniform's white
 default is written in `RenderManager.InitWorldProgram`, which binds the program first;
 `Shader.SetUniform` writes to whatever program is bound, so every per-draw set sits after
 `worldShader.Use()` and is reset to white straight after the pop or debris draw for the plain

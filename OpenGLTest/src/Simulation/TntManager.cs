@@ -175,7 +175,7 @@ public class TntManager
         // Per blasted (x, z): the lowest destroyed y and the highest destroyed surface-solid y
         // (int.MinValue while none), so each column updates the far LOD once
         var blastedColumns = new Dictionary<(int X, int Z), (int Lowest, int HighestSolid)>();
-        List<Vector3>? blastedLeaves = null;
+        List<(Vector3 Cell, ushort Id)>? blastedLeaves = null;
 
         var min = (center - new Vector3(radius)).Floor();
         var max = (center + new Vector3(radius)).Floor();
@@ -214,8 +214,8 @@ public class TntManager
 
             if (leaves != null && TreeGenerator.IsLeaf(removed))
             {
-                blastedLeaves ??= new List<Vector3>();
-                blastedLeaves.Add(new Vector3(x, y, z));
+                blastedLeaves ??= [];
+                blastedLeaves.Add((new Vector3(x, y, z), removed));
             }
 
             if (BlockType.ById[removed]?.OnBreak == BlockBreakAction.PrimeTnt
@@ -299,6 +299,6 @@ public class TntManager
         leafDecay?.ScheduleBox(min, max);
 
         if (blastedLeaves != null)
-            leaves?.BurstCells(blastedLeaves, ParticleConfig.LeafParticleBurstBlast);
+            leaves?.BurstCells(blastedLeaves, ParticleConfig.LeafParticleBurstBlast, columns: chunks.ColumnSource);
     }
 }

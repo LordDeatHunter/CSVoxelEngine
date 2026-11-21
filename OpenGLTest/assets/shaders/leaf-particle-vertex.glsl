@@ -6,6 +6,7 @@ layout (location = 0) in vec3 vPosition;
 layout (location = 1) in vec4 vColor;
 layout (location = 2) in vec2 vTexCoord;
 layout (location = 3) in float vSun;
+layout (location = 5) in uint vNormalBits;
 layout (location = 7) in uint vLayer;
 
 uniform mat4 uVP;
@@ -22,6 +23,9 @@ void main() {
     fUv = vTexCoord;
     fLayer = vLayer;
     fTint = vColor;
+    // Vertex.Normal bit 4: a biome-tinted leaf on its gray tile. Mirrors BiomeTint.Gain (4) and
+    // test-vertex.glsl's fTintGain: the rgb carries tint and the gain lifts it to the canopy's color.
+    if ((vNormalBits & 16u) != 0u) fTint.rgb *= 4.0;
     fSun = vSun;
     fDist = distance(vPosition, uCameraPos);
 }

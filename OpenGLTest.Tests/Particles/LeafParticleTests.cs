@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Effects.Climate;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Particles;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
 namespace VoxelEngine.Tests.Particles;
@@ -183,11 +186,79 @@ public sealed class LeafParticleTests
         Assert.Empty(system.Particles);
     }
 
+    /// <summary>
+    /// A leaf wears the canopy it fell from: a biome-tinted species its gray tinted tile with the climate field at its
+    /// cell (the canopy's own color), an untinted species (crystal) its own tile in white.
+    /// </summary>
+    [Fact]
+    public void ABurstWearsTheLeavesItFellFrom()
+    {
+        var cell = new Vector3(-37f, 70f, -5f);
+        var tinted = ContentRegistry.RequireBlock("oak_leaves");
+        var oak = new LeafParticleSystem();
+        oak.Burst(cell, tinted.Id, 3, new Random(1));
+        Assert.NotEmpty(oak.Particles);
+        var field = BiomeTint.CellTint(tinted.BiomeTint!.Palette, (int)cell.X, (int)cell.Z);
+        Assert.All(oak.Particles, p =>
+        {
+            Assert.True(p.Look.Tinted);
+            Assert.Equal(tinted.BiomeTint!.Tinted[4], p.Look.Tile);
+            Assert.Equal(field, p.Look.Tint);
+        });
+
+        var plain = ContentRegistry.RequireBlock("crystal_leaves");
+        Assert.Null(plain.BiomeTint);
+        var crystal = new LeafParticleSystem();
+        crystal.Burst(cell, plain.Id, 3, new Random(1));
+        Assert.NotEmpty(crystal.Particles);
+        Assert.All(crystal.Particles, p =>
+        {
+            Assert.False(p.Look.Tinted);
+            Assert.Equal(plain.FaceTiles[4], p.Look.Tile);
+            Assert.Equal(Vector3.One, p.Look.Tint);
+        });
+    }
+
+    /// <summary>A hit trunk shakes its own species' crown loose; a block that sheds no leaves bursts nothing.</summary>
+    [Fact]
+    public void AWoodBurstWearsItsSpeciesLeavesAndOtherBlocksShedNone()
+    {
+        var species = TreeSpeciesRegistry.Require("crystal_tree");
+        var system = new LeafParticleSystem();
+        system.Burst(new Vector3(0f, 70f, 0f), species.WoodId, 2, new Random(2));
+        Assert.NotEmpty(system.Particles);
+        Assert.All(system.Particles, p => Assert.Equal(BlockType.ById[species.LeavesId]!.FaceTiles[4], p.Look.Tile));
+
+        var none = new LeafParticleSystem();
+        none.Burst(new Vector3(0f, 70f, 0f), StoneId, 5, new Random(2));
+        Assert.Empty(none.Particles);
+    }
+
+    /// <summary>Ambient fall drips off the bottom shell of any species' canopy, wearing that species.</summary>
+    [Fact]
+    public void AmbientFallDripsOffEverySpeciesCanopy()
+    {
+        var crystal = ContentRegistry.RequireBlock("crystal_leaves");
+        Assert.True(TreeGenerator.IsLeaf(crystal.Id));
+        var (chunks, center) = Setup();
+        for (var x = 4; x < 12; x++)
+        for (var z = 4; z < 12; z++)
+            center.SetBlockRaw(x, 3, z, crystal.Id, 0);
+
+        var system = new LeafParticleSystem();
+        var rng = new Random(42);
+        for (var i = 0; i < 1200 && system.Particles.Count == 0; i++)
+            system.Update(1f / 60f, new Vector3(8f, 3f, 8f), chunks, rng);
+
+        Assert.NotEmpty(system.Particles);
+        Assert.All(system.Particles, p => Assert.Equal(crystal.FaceTiles[4], p.Look.Tile));
+    }
+
     [Fact]
     public void BurstRespectsMaxParticles()
     {
         var system = new LeafParticleSystem();
-        system.Burst(new Vector3(8f, 3f, 3f), ParticleConfig.LeafParticleMax + 50, new Random(5));
+        system.Burst(new Vector3(8f, 3f, 3f), LeavesId, ParticleConfig.LeafParticleMax + 50, new Random(5));
         Assert.Equal(ParticleConfig.LeafParticleMax, system.Particles.Count);
     }
 
@@ -195,9 +266,9 @@ public sealed class LeafParticleTests
     public void BurstCellsSamplesAtMostCount()
     {
         var system = new LeafParticleSystem();
-        var cells = new List<Vector3>();
+        var cells = new List<(Vector3, ushort)>();
         for (var i = 0; i < 100; i++)
-            cells.Add(new Vector3(i, 10, 0));
+            cells.Add((new Vector3(i, 10, 0), LeavesId));
 
         system.BurstCells(cells, 10, new Random(6));
         Assert.Equal(10, system.Particles.Count);
@@ -225,7 +296,7 @@ public sealed class LeafParticleTests
         var rng = new Random(11);
 
         for (var i = 0; i < max + overflow; i++)
-            system.Burst(new Vector3(i, 100f, 0f), 1, rng);
+            system.Burst(new Vector3(i, 100f, 0f), LeavesId, 1, rng);
 
         Assert.Equal(max, system.Particles.Count);
         for (var i = 0; i < max; i++)

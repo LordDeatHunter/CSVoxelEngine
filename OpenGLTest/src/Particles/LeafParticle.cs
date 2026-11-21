@@ -21,6 +21,9 @@ public class LeafParticle
     /// <summary>Edge length of the billboard quad, in blocks.</summary>
     public float Size { get; }
 
+    /// <summary>The tile and color of the canopy the leaf fell from.</summary>
+    public LeafLook Look { get; }
+
     /// <summary>Whether the leaf has come to rest on the terrain and is fading out.</summary>
     public bool IsLanded { get; private set; }
 
@@ -55,10 +58,12 @@ public class LeafParticle
     private readonly float _swayFreq;
     private readonly float _swayAmp;
 
-    public LeafParticle(Vector3 position, Vector3? toss = null, float? size = null, Random? random = null)
+    public LeafParticle(Vector3 position, Vector3? toss = null, float? size = null, Random? random = null,
+        LeafLook look = default)
     {
         var rng = random ?? Random.Shared;
         Position = position;
+        Look = look;
         Size = size ?? ParticleConfig.LeafParticleSize;
         _lifetime = ParticleConfig.LeafParticleLifetime * (0.7f + 0.6f * rng.NextSingle());
 

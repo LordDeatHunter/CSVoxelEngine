@@ -34,6 +34,7 @@ internal sealed class LeftClickAction
     private readonly BlockDebrisSystem _debris;
     private readonly LeafParticleSystem _leaves;
     private readonly List<Vector3> _shudderCells = [];
+    private readonly List<(Vector3 Cell, ushort Id)> _shudderLeaves = [];
     private readonly HitMarker _hitMarker;
     private readonly List<Mob> _mobs;
     private readonly bool _clientMode;
@@ -761,7 +762,11 @@ internal sealed class LeftClickAction
         TreeShudder.Gather(woodCell, (x, y, z) => TreeGenerator.IsLeaf(_chunkManager.GetBlockGlobal(x, y, z)),
             _shudderCells, ParticleConfig.TreeShudderCells, ParticleConfig.TreeShudderReachBlocks,
             ParticleConfig.TreeShudderHeightBlocks);
-        _leaves.BurstCells(_shudderCells, ParticleConfig.TreeShudderCells * ParticleConfig.TreeShudderLeavesPerCell);
+        _shudderLeaves.Clear();
+        foreach (var cell in _shudderCells)
+            _shudderLeaves.Add((cell, _chunkManager.GetBlockGlobal((int)cell.X, (int)cell.Y, (int)cell.Z)));
+        _leaves.BurstCells(_shudderLeaves, ParticleConfig.TreeShudderCells * ParticleConfig.TreeShudderLeavesPerCell,
+            columns: _chunkManager.ColumnSource);
     }
 
     private void StopBreaking()
