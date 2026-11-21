@@ -1,6 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Graphics;
+using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine.Tests.Support;
 
@@ -14,6 +17,7 @@ internal static class TestContent
 {
     private static readonly object Gate = new();
     private static bool _loaded;
+    private static Dictionary<string, (TreeSpecies Owner, string Wood, string? Leaves)>? _realTreeOwners;
 
     internal static void EnsureLoaded()
     {
@@ -32,7 +36,18 @@ internal static class TestContent
     /// </summary>
     internal static void SwapIn(string root)
     {
-        lock (Gate) LoadFrom(root);
+        lock (Gate)
+        {
+            if (!_loaded) throw new InvalidOperationException("Load real test content before swapping it.");
+            if (_realTreeOwners is not null) throw new InvalidOperationException("Nested content swaps are unsupported.");
+
+            var owners = new Dictionary<string, (TreeSpecies, string, string?)>(StringComparer.Ordinal);
+            foreach (var (name, species) in TreeSpeciesRegistry.ByName)
+                owners.Add(name, (species, BlockName(species.WoodId),
+                    species.HasLeaves ? BlockName(species.LeavesId) : null));
+            _realTreeOwners = owners;
+            LoadFrom(root);
+        }
     }
 
     /// <summary>Reloads the real content after a <see cref="SwapIn"/>.</summary>
@@ -40,10 +55,35 @@ internal static class TestContent
     {
         lock (Gate)
         {
+            var owners = _realTreeOwners ?? throw new InvalidOperationException("No content swap to restore.");
+            _loaded = false;
             LoadFrom(FindAssetsRoot());
+
+            // The generator's immutable tables still hold the original species objects. Only
+            // republish them when the restored real content has the same names and block bindings.
+            if (TreeSpeciesRegistry.ByName.Count != owners.Count)
+                throw new InvalidOperationException("Restored tree species membership changed.");
+            var original = new Dictionary<string, TreeSpecies>(StringComparer.Ordinal);
+            foreach (var (name, saved) in owners)
+            {
+                if (!TreeSpeciesRegistry.ByName.TryGetValue(name, out var reloaded)
+                    || reloaded.WoodId != saved.Owner.WoodId
+                    || reloaded.LeavesId != saved.Owner.LeavesId
+                    || BlockName(reloaded.WoodId) != saved.Wood
+                    || (reloaded.HasLeaves ? BlockName(reloaded.LeavesId) : null) != saved.Leaves)
+                    throw new InvalidOperationException($"Restored tree species '{name}' changed its block bindings.");
+                original.Add(name, saved.Owner);
+            }
+            TreeSpeciesRegistry.Publish(original);
+            _realTreeOwners = null;
             _loaded = true;
         }
     }
+
+    private static string BlockName(ushort id) =>
+        id < BlockType.ById.Length && BlockType.ById[id] is { } block
+            ? block.Name
+            : throw new InvalidOperationException($"Tree block {id} is not registered.");
 
     private static void LoadFrom(string root)
     {

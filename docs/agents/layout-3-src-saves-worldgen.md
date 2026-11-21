@@ -618,7 +618,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
           IGrowthLogic.cs, GrowthLogicRegistry.cs  # growth.logic: the direction chooser + its table
         Shape/                 # rasterizing a graph: cells, leaf clusters, trunk shapes and rims, the far-LOD crown proxy
           LeafCluster.cs, LeafClusterShape.cs  # leaves around live tips and their hydration
-          LodCrownProxy.cs, LodCrownProfile.cs  # the far-LOD crown silhouette of a species
+          LodCrownProxy.cs, LodCrownProfile.cs, TreeProxyReach.cs  # far-LOD crown silhouette and eligible-worldgen radius bound
           ShellOffset.cs, TrunkShape.cs, TrunkRim.cs  # wide-trunk shells: offsets, footprint, rim style
           TreeRasterizer.cs, TreeCell.cs  # graph -> wood/shell/leaf cells with their state bytes
   assets/shaders/, assets/textures/   # GLSL shaders; block tiles (loaded into a TEXTURE_2D_ARRAY,

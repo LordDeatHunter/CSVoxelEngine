@@ -253,8 +253,9 @@ base quad first and then the coplanar tinted quad, the overlay winning by draw o
 `Lequal`; the reflection and shadow passes reuse the same lists and inherit the order, and the
 shadow pass's alpha test punches the overlay's holes over the opaque base. The far LOD reads the
 same lattice from the region's own origin (`rx * regionChunkSpan`, never the prefetch origin
-`baseChunkX`) through `LodFaceEmitter.AddBlockFace`, for grass tops and sides and for the canopy bumps, and a
-tinted canopy's transparent texels fall back to the textureless gray (`vec3(0.1221)`, the decoded
+`baseChunkX`) through `LodFaceEmitter.AddBlockFace` for grass tops and sides, and through a
+compact per-tree tint lattice for the independent instanced crowns. A tinted crown's transparent
+texels fall back to the textureless gray (`vec3(0.1221)`, the decoded
 98) instead of `uLodLeafColor`, so the tint still applies there; chunks, LOD and the felled tree
 all bake the tint into their rgb. The felled tree is meshed by the real chunk mesher through
 `CellBatchMesher.Build` (one scratch chunk per chunk its cells span, each at its real position), so
@@ -302,7 +303,8 @@ with `FenceSync`/`ClientWaitSync`, since VSync is off) and issues one
 (`Shader`'s `defines` prefix): the `#define CHUNK_DRAW` variant reads the `ChunkInfo` SSBO at
 binding 0 at `uDrawBase + gl_DrawID` and transforms with `uViewProj`, while the plain variant
 keeps `uModel`/`uMVP`/`uAlpha` for drops, TNT, falling blocks, toppling trees, block pops and debris
-(`SetDrawUniforms`; the far LOD draws through the `CHUNK_DRAW` program too, `TerrainPasses.RenderLod` -> `chunkShader`), and takes its light per draw as `uEntitySun`/`uEntityBlock`, sampled from the
+(`SetDrawUniforms`; the far terrain draws through `chunkShader`, while finite tree proxies use
+the `CHUNK_DRAW`/`TREE_PROXY` variant and a shared SSBO template), and takes its light per draw as `uEntitySun`/`uEntityBlock`, sampled from the
 world at the entity's cell by `EntityLight.Sample` (each chunk keeps its mesh-time light snapshot
 for that) and passed through `SetDrawUniforms`'s required `EntityLightSample` argument. Per-draw fade alpha reaches the fragment stage as the `flat` varying
 `fAlpha`, because a uniform cannot vary between the sub-draws of one multi-draw. The wave and

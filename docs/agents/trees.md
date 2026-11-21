@@ -188,12 +188,41 @@ outside Jungle; this extra work has not been timed. A manual giant felled in a L
 its actual species reach through `FellPoisonRadiusFor`, while ordinary Legacy trees retain the old
 poison bound. `Stamp` writes wood with its state
 into air or leaves, then leaves into air, in a fixed scan order (the root walk extends the trunk
-down through cave air only inside the chunk holding the base). The far LOD's first rings read the
-stamped canopy (`TreeGenerator.TryGetCanopy`), while the coarse rings (`LodLevelSpec.ProxyCanopy`)
-read a proxy rolled from the same placement: the species' `lod` crown height and radius through
-`LodCrownProxy.TopOffset`'s dome/cone/column silhouette, so the far sweep never grows a tree. The
-solo shapes, the batches and both canopy tables are `GenerationalCache` sites (`TreeShapeCache*`,
-`TreeBatchCache*`, `TreeCanopyCache*`, `TreeProxyCanopyCache*` in `WorldGenerationConfig`).
+down through cave air only inside the chunk holding the base).
+The far LOD draws its terrain shell independently of trees (see "Render-only tree LOD" in
+`architecture-and-worldgen.md`). Its live tree path collects finite natural trunk/crown
+instances from batch-grown shapes in level 0 and accepted species proxy bounds in farther
+levels, without growing far roots. Leafless species retain their historical far omission.
+Saved added-canopy tops have no root or wood record, so they become two-block leaf caps.
+Natural proxy suppression tests each half-open footprint against the existing four-word
+per-chunk disturbed-marker buckets, including negative and cross-chunk rectangles, without
+scanning every fine column. A fully supplied region does no generated tree work; mixed
+regions check root and piece source ownership. Root anchors sample the source and edit
+height in a fixed neighborhood, applying shell overrides then caps; edits dirty regions
+through the anchor and tree reach. These are render approximations, not reductions of
+stamped voxels, and the terrain remains a heightmap approximation.
+
+The live tree layer stores bounded 64-byte logical instances, shared six-face log/leaf
+materials, grass and foliage tint lattices, generated 16-block tiles and proxy-Y intervals.
+`LodTreeGpuPayload` packs its region-local signed coordinates and materials for a shared
+GPU buffer; `LodTreeGpuPool` uploads them. Its private GPU header marks a region
+single-layer only when every face of every table material has at most one tile. Such
+regions use a second reusable 72-vertex/108-index trunk/crown/cap template; a dual
+base+tint face anywhere retains the original 144-vertex/216-index template. Both
+modes retain original part/face decoding, per-face tint choice, order and coverage,
+and share one region draw in the opaque world, reflection and far-shadow passes. The terrain and water
+meshes keep their separate geometry. `LodTreeCoverPass` masks a proxy tile only after
+finer proxy or full-detail draw readiness covers its Y interval, while ground burial stays
+independent. The current LOD network format carries the logical tree layer and atlas
+remapping to clients (protocol 69); no baked per-tree opaque-vertex tail is required.
+The shader box approximation and tile-edge clipping still require matched natural visual,
+multiplayer and measured build/draw acceptance; source integration alone does not establish
+those outcomes.
+
+`TreeGenerator.TryGetCanopy` and the two column-top caches remain available for canopy queries/tests; the LOD no longer
+turns those tops into ground-to-crown leaf walls. The solo shapes, batches and canopy query
+tables remain `GenerationalCache` sites (`TreeShapeCache*`, `TreeBatchCache*`,
+`TreeCanopyCache*`, `TreeProxyCanopyCache*` in `WorldGenerationConfig`).
 
 **Leaf decay** (`Simulation/LeafDecay/LeafDecayManager.cs`, owned by `World`, main thread only, never while
 loading, the `leafDecay` profiler row) is a `FluidManager`-style scheduled-cell simulation. An edit
@@ -318,7 +347,11 @@ scans the loaded column for its highest leaf and records it through `TreeGenerat
 (`TreeCanopy.CanopyAdded`: packed top and leaf block per fine column, read before the disturbed
 marker and the generated canopy on every ring, cleared by any later `PoisonCanopy`, saved in
 `lod-edits.bin` (format version 3) with the leaf as a block name, reset by `WorldSeed.Apply`; never
-in a `GenerationalCache`). `CanopyAddedTests`, `AGrownCrownGoesBackToTheFarLod`.
+in a `GenerationalCache`). Since these records have no root, bottom or wood ID, the far LOD
+approximates each occupied coarse cell with a two-block-high leaf cap at its saved top. A mined,
+felled, blasted or decayed column suppresses any natural proxy whose crown footprint contains
+it; edit invalidation reaches two profile tree radii across region seams. The saved format stays
+unchanged. `CanopyAddedTests`, `AGrownCrownGoesBackToTheFarLod`.
 
 Known gap, open: the wide-trunk residue of `M-14` — a wide core cut while its shells stand leaves
 the crown unreachable for reactive growth.

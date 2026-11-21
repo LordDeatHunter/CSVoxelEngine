@@ -62,6 +62,8 @@ public sealed class SpellEffectsTests : IDisposable
         context.Forward = Vector3.Normalize(target - context.Eye);
         context.ViewDirection = context.Forward;
         _now += 10.0;
+        // Exercise delivered effects; the caster/risk tests cover fizzle and backfire.
+        world.World.Caster.FizzleRoll = static () => 1f;
         Assert.Equal(CastVerdict.Cast, world.World.CastFor(context, 0, new CastPacing(), _now, 0));
         return stats;
     }

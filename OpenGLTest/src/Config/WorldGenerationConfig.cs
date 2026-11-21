@@ -935,13 +935,12 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // The SHAPE cache holds one grown, rasterized tree per accepted trunk column, keyed by (x, z):
     // one entry is a whole tree of roughly a thousand TreeCells, so its capacity is far below the
     // old 16384 small-shape entries. It is genuinely shared: TreeGenerator.Stamp asks it on the
-    // four generation workers, and BuildCanopyTops asks it for every leafy trunk in a
-    // (2 * ReachHorizontal + 16)^2 footprint, which the far-LOD canopy sweep drives. Re-price it
+    // four generation workers, and the near LOD reads batch-grown shapes directly. Re-price it
     // only against the tree-perf.json numbers in TREES_PLAN.md.
     //
     // The CANOPY cache holds one CanopyColumns (the 16x16 tops and leaf blocks of a chunk column).
-    // Its single engine caller is LodRegion.BuildMeshData, which asks TryGetCanopy for every FINE
-    // column of a region -- that is what makes the 4096 cap bite at the outer rings.
+    // Retained for canopy-query callers; the LOD now draws finite per-tree prisms instead of
+    // asking TryGetCanopy for every fine column of a region.
     //
     // GENERATIONS is 4 at both sites, matching ColumnCacheGenerations and CellCacheGenerations so
     // all GenerationalCache sites read alike. G is the one-token re-pricing lever, and PERF_TODO's
@@ -970,12 +969,20 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int TreeBatchCacheGenerations = 4;
 
     // TreeCanopy.ProxyCanopyCache: the proxy CanopyColumns of a chunk column that the far LOD
-    // rings read instead of the grown canopy. Cheap to rebuild (no growth, only placement and the
-    // species' lod crown), and sized like the real canopy cache because the same per-fine-column
-    // sweep in LodRegion.BuildMeshData drives it. G = 4 like every site; re-price only against a
+    // rings formerly read instead of the grown canopy. Retained for canopy-query callers; the
+    // LOD now scans accepted roots once per region. G = 4 like every site; re-price only against a
     // capture (PERF_TODO lesson 4).
     public const int TreeProxyCanopyCacheCapacity = 4096;
     public const int TreeProxyCanopyCacheGenerations = 4;
+
+    // Far LOD natural roots only: sparse immutable proxy arrays per generated 16x16 chunk
+    // column. The 4096-entry/4-generation cap retains several repeat region working sets.
+    // Worst case is 256 proxies/column at about 48 bytes each: ~48 MiB payload, plus arrays,
+    // dictionary nodes and transient duplicate pure builds. Typical columns are much sparser.
+    // Every eviction reconstructs from the same seed/profile recipe; source ownership is checked
+    // before any cache read or miss. No edit, anchor, material or supplied-source state is stored.
+    public const int LodFarRootCacheCapacity = 4096;
+    public const int LodFarRootCacheGenerations = 4;
 
     // --- Layers (plans/LAYERS.md): the hell below and the sky above, as vertical bands of the one
     // world. Every Y range of the realms lives here (the visual cloud sea in SkyConfig), nowhere

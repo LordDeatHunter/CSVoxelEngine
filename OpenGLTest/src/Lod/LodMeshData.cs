@@ -15,4 +15,8 @@ namespace VoxelEngine.Lod;
 /// </summary>
 public record LodMeshData(int Level, int X, int Z, List<Vertex> Vertices, List<ushort> Indices,
     List<Vertex> WaterVertices, List<ushort> WaterIndices, float YMin, float YMax,
-    int[] ColumnCyMin, int[] ColumnCyMax);
+    int[] ColumnCyMin, int[] ColumnCyMax)
+{
+    /// <summary>Whole render-only trees; never part of the terrain vertex/index lists.</summary>
+    public LodTreeBuild Trees { get; init; } = LodTreeBuild.Empty;
+}

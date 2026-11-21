@@ -14,9 +14,9 @@ using VoxelEngine.WorldGen.Ocean;
 namespace VoxelEngine.Lod;
 
 /// <summary>
-/// The face and water emission of one far-LOD region build (<see cref="LodMeshBuilder"/>): the block palette, the
-/// biome tint lattice its faces sample, the four output lists (rented from the build's MeshBufferPool and never
-/// returned here) and every terrain face and sea-sheet quad. Stack-only, one per build.
+/// Terrain, water and finite tree-prism emission of one far-LOD region build
+/// (<see cref="LodMeshBuilder"/>). All opaque faces share the existing region vertex/index lists
+/// and biome tint lattice. Stack-only, one per build.
 /// </summary>
 internal ref struct LodFaceEmitter
 {
@@ -28,7 +28,6 @@ internal ref struct LodFaceEmitter
     private readonly BlockType _sand;
     private readonly BlockType _gravel;
     private readonly BlockType _sandstone;
-    private readonly BlockType _fallbackLeaves;
     private readonly BlockType _snow;
     private readonly BlockType _ice;
     private readonly BlockType _permafrost;
@@ -64,7 +63,6 @@ internal ref struct LodFaceEmitter
     private readonly Biome[] _biomeGrid;
     private readonly int[] _waterLevels;
     private readonly byte[] _seaFloor;
-    private readonly ushort[] _canopyLeaf;
     private readonly ushort[] _topBlockGrid;
     private readonly List<Vertex> _vertices;
     private readonly List<ushort> _indices;
@@ -78,7 +76,7 @@ internal ref struct LodFaceEmitter
         ColumnData[] columns, Vector3[] grassTint, Vector3[] foliageTint, bool hasRegionOverrides, int[] topCell,
         int[] groundTop, bool[] beachTop, bool[] gravelTop, bool[] rockTop, bool[] soilStripped, bool[] snowTop,
         bool[] iceTop,
-        Biome[] biomeGrid, int[] waterLevels, byte[] seaFloor, ushort[] canopyLeaf, ushort[] topBlockGrid)
+        Biome[] biomeGrid, int[] waterLevels, byte[] seaFloor, ushort[] topBlockGrid)
     {
         _spec = spec;
         _cellSize = cellSize;
@@ -105,7 +103,6 @@ internal ref struct LodFaceEmitter
         _biomeGrid = biomeGrid;
         _waterLevels = waterLevels;
         _seaFloor = seaFloor;
-        _canopyLeaf = canopyLeaf;
         _topBlockGrid = topBlockGrid;
 
         _grass = BlockType.ById[TerrainGenerator.SurfaceBlock]!;
@@ -114,7 +111,6 @@ internal ref struct LodFaceEmitter
         _sand = BlockType.ById[TerrainGenerator.SandBlock]!;
         _gravel = BlockType.ById[TerrainGenerator.GravelBlock]!;
         _sandstone = BlockType.ById[TerrainGenerator.SandstoneBlock]!;
-        _fallbackLeaves = BlockType.ById[TreeGenerator.LeavesBlock]!;
         _snow = BlockType.ById[TerrainGenerator.SnowBlock]!;
         _ice = BlockType.ById[TerrainGenerator.IceBlock]!;
         _permafrost = BlockType.ById[TerrainGenerator.PermafrostBlock]!;
@@ -163,9 +159,6 @@ internal ref struct LodFaceEmitter
         _yMax = float.MinValue;
     }
 
-    private BlockType CanopyBlock(ushort leafId) =>
-        (leafId != 0 ? BlockType.ById[leafId] : null) ?? _fallbackLeaves;
-
     // Ocean floor block by the depth band the chunk mesher's GenerateColumn would pick for the
     // same height (0 sand, 1 gravel, 2 stone), so far seabed matches near seabed. A land biome's
     // lake or river bed keeps the soil the column wears under water instead (3), which is dirt,
@@ -203,7 +196,7 @@ internal ref struct LodFaceEmitter
 
     private void AddQuad(List<Vertex> targetVertices, List<ushort> targetIndices,
         int faceIndex, Vector3 cellOrigin, ushort tile, scoped Span<byte> shades, scoped ReadOnlySpan<float> suns,
-        bool isWater = false, bool lodLeaves = false, BiomeTintPalette? tinted = null)
+        bool isWater = false, BiomeTintPalette? tinted = null)
     {
         // Meshes are indexed with ushort; a region can't realistically exceed this,
         // but degrade gracefully instead of overflowing if terrain is extreme
@@ -232,10 +225,8 @@ internal ref struct LodFaceEmitter
             var shade = shades[c];
             // Sun is the coarse height-derived sky exposure (LodSkyExposure); no lamp
             // light, real face normal.
-            // ponytail: vertex alpha flags the fragment path (254 = water, 253 = opaque
-            // LOD foliage, 255 = everything else); fColor.a is otherwise unused by the
-            // world shader, so the flags are invisible.
-            var alpha = (byte)(isWater ? 254 : lodLeaves ? 253 : 255);
+            // Terrain is opaque (255); the separate sea sheet is water (254).
+            var alpha = (byte)(isWater ? 254 : 255);
             if (tinted is { } palette)
             {
                 // A biome-tinted face bakes shade * tint into the rgb like the chunk mesher
@@ -263,19 +254,19 @@ internal ref struct LodFaceEmitter
     // the tinted quad coplanar over it, so Lequal lets the overlay win; a `tile` face is the
     // tinted quad alone. Every other block wears its plain face tile.
     private void AddBlockFace(int face, Vector3 origin, BlockType block, scoped Span<byte> faceShades,
-        scoped ReadOnlySpan<float> faceSuns, bool lodLeaves = false)
+        scoped ReadOnlySpan<float> faceSuns)
     {
         if (block.BiomeTint is { } bt)
         {
             if (bt.Base[face] != BiomeTintFaces.NoTile)
-                AddQuad(_vertices, _indices, face, origin, bt.Base[face], faceShades, faceSuns, lodLeaves: lodLeaves);
+                AddQuad(_vertices, _indices, face, origin, bt.Base[face], faceShades, faceSuns);
             if (bt.Tinted[face] != BiomeTintFaces.NoTile)
                 AddQuad(_vertices, _indices, face, origin, bt.Tinted[face], faceShades, faceSuns,
-                    lodLeaves: lodLeaves, tinted: bt.Palette);
+                    tinted: bt.Palette);
             return;
         }
 
-        AddQuad(_vertices, _indices, face, origin, block.FaceTiles[face], faceShades, faceSuns, lodLeaves: lodLeaves);
+        AddQuad(_vertices, _indices, face, origin, block.FaceTiles[face], faceShades, faceSuns);
     }
 
     internal void Emit()
@@ -355,8 +346,7 @@ internal ref struct LodFaceEmitter
             : null;
         var strataColumn = StrataColumn(i, j);
 
-        // The block the cell's drawn surface wears: the canopy bump's leaves above the
-        // ground, else the edited block, else the generated material chain.
+        // Trees have separate finite proxies; the terrain shell always keeps its own material.
         var surface = edited
             ?? (isSeaCell ? FloorBlock(floor)   // seabed wears its depth band, not dirt
             : beach ? cap
@@ -370,8 +360,7 @@ internal ref struct LodFaceEmitter
             : biome == Biome.Charred ? FloorBlock(floor)
             : _grass);
         AddBlockFace(TopFace, new Vector3(i * _cellSize, top * _cellSize, j * _cellSize),
-            top > ground ? CanopyBlock(_canopyLeaf[gi * _heightGrid + gj]) : surface,
-            shades, suns, lodLeaves: top > ground);
+            surface, shades, suns);
 
         // AddQuad places a +Y face one cell above its origin, so the origin sits a
         // cell below the sheet. A frozen cell shows snow-covered ice instead of open
@@ -422,16 +411,9 @@ internal ref struct LodFaceEmitter
                         lateralTop, oppositeDiagonal, neighborTop);
                 }
 
-                // Canopy airspace wears leaves; at and below the eroded surface the
-                // grass/dirt/stone rule applies, measured from the ground (not the bump),
-                // with the biome's own top material and soil band beneath it
+                // Terrain material is measured from the eroded surface alone.
                 var sideOrigin = new Vector3(i * _cellSize, cy * _cellSize, j * _cellSize);
-                if (cy > ground)
-                {
-                    AddBlockFace(f, sideOrigin, CanopyBlock(_canopyLeaf[gi * _heightGrid + gj]),
-                        shades, suns, lodLeaves: true);
-                }
-                else if (cy == top)
+                if (cy == top)
                 {
                     AddBlockFace(f, sideOrigin, surface, shades, suns);
                 }

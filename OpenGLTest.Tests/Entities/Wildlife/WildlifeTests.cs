@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Linq;
 using System.Numerics;
 using VoxelEngine.Entities;
@@ -7,6 +9,7 @@ using VoxelEngine.Networking;
 using VoxelEngine.Simulation;
 using VoxelEngine.WorldGen;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace VoxelEngine.Tests.Entities.Wildlife;
 
@@ -20,7 +23,13 @@ namespace VoxelEngine.Tests.Entities.Wildlife;
 /// </summary>
 public sealed class WildlifeTests
 {
-    public WildlifeTests() => TestContent.EnsureLoaded();
+    private readonly ITestOutputHelper _output;
+
+    public WildlifeTests(ITestOutputHelper output)
+    {
+        _output = output;
+        TestContent.EnsureLoaded();
+    }
 
     private const float Dt = 1f / 60f;
 
@@ -63,21 +72,117 @@ public sealed class WildlifeTests
         return chunks;
     }
 
+    // Proposed crow-only support fixture. A 3x3 chunk halo covers the current ground and
+    // Crow.ChoosePerchSpot's 14-block search before each manager step. A flyer moving at
+    // at most its 14-block/s swoop speed crosses at most one chunk per axis in a 1/60-s step.
+    private sealed class CrowFloorSupport(ChunkManager chunks, FlyingAnimal flyer, float maxSeconds)
+    {
+        private readonly ushort _stone = ContentRegistry.RequireBlock("stone").Id;
+        private readonly int _maxChunks = 9 + 5 * ((int)MathF.Ceiling(maxSeconds / Dt) + 6);
+
+        internal void BeforeStep()
+        {
+            var feet = flyer.Feet;
+            var cx = (int)MathF.Floor(feet.X / Chunk.Size);
+            var cz = (int)MathF.Floor(feet.Z / Chunk.Size);
+            for (var dx = -1; dx <= 1; dx++)
+            for (var dz = -1; dz <= 1; dz++)
+            {
+                var key = new Vector3(cx + dx, 0, cz + dz);
+                if (chunks.Chunks.ContainsKey(key)) continue;
+                Assert.True(chunks.Chunks.Count < _maxChunks, "crow floor support exceeded its finite step bound");
+                var chunk = new Chunk(null!, key, generateBlockData: false) { IsBlockDataReady = true };
+                chunks.Chunks[key] = chunk;
+                for (var x = 0; x < Chunk.Size; x++)
+                for (var z = 0; z < Chunk.Size; z++)
+                    chunk.SetBlockRaw(x, 0, z, _stone, 0);
+            }
+
+            var xCell = (int)MathF.Floor(feet.X);
+            var zCell = (int)MathF.Floor(feet.Z);
+            Assert.NotNull(chunks.ChunkAt(xCell, 0, zCell));
+            Assert.Equal(_stone, chunks.GetBlockGlobal(xCell, 0, zCell));
+        }
+    }
+
     // A flyer of the named species in the air over (x, z), already settled
     private static T Airborne<T>(WildlifeManager manager, string name, float x, float z, float height = 5f) where T : Animal =>
         Assert.IsAssignableFrom<T>(manager.Spawn(name, new Vector3(x, 1f + height, z), spawnIn: false));
 
     // Steps until the condition holds; false when the time runs out first
     private static bool RunUntil(WildlifeManager manager, ChunkManager chunks, IReadOnlyList<IMobTarget> targets,
-        float seconds, System.Func<bool> done)
+        float seconds, System.Func<bool> done, CrowFlightTrace? trace = null,
+        CrowFloorSupport? support = null)
     {
         var drops = new DropManager();
         for (var t = 0f; t < seconds; t += Dt)
         {
+            support?.BeforeStep();
             manager.Update(Dt, chunks, drops, targets);
-            if (done()) return true;
+            trace?.Record(t + Dt);
+            if (!done()) continue;
+            trace?.Finish(t + Dt, true);
+            return true;
         }
+        trace?.Finish(seconds, false);
         return false;
+    }
+
+    // Test-only, bounded transition log. Reads the installed fixture chunks and never queries terrain.
+    private sealed class CrowFlightTrace(ITestOutputHelper output, FlyingAnimal flyer,
+        ChunkManager chunks, WildlifeManager manager)
+    {
+        private static readonly FieldInfo ActionField = typeof(EntityAnimator).GetField("_action",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        private readonly List<string> _pending = [];
+        private string _lastPhase = "";
+        private bool _lastPerched;
+        private bool _lastGrounded;
+        private object? _lastAction;
+        private float _lastTime = -1f;
+        private int _records;
+        internal string Phase { get; set; } = "initial-rest";
+
+        private string Snapshot(float time)
+        {
+            var feet = flyer.Feet;
+            var x = (int)MathF.Floor(feet.X);
+            var z = (int)MathF.Floor(feet.Z);
+            var floor = chunks.ChunkAt(x, 0, z);
+            var floorId = floor == null ? (ushort)0 : chunks.GetBlockGlobal(x, 0, z);
+            var action = (ActionField.GetValue(flyer.Animation) as AnimationClip)?.Name ?? "none";
+            var others = string.Join(";", manager.Mobs.Select(m => $"{m.Kind}@{m.Position}"));
+            return $"phase={Phase} time={time:F3} pos={flyer.Position} feet={feet} " +
+                $"perched={flyer.IsPerched} grounded={flyer.IsGrounded} action={action} " +
+                $"floorLoaded={floor != null} floorId={floorId} floorSolid={BlockType.IsSolid(floorId)} floorChunks={chunks.Chunks.Count} " +
+                $"inside48={x >= -16 && x < 32 && z >= -16 && z < 32} mobs={others}";
+        }
+
+        internal void Record(float time)
+        {
+            if (_records >= 255) return;
+            // This is called at 60 Hz. Check cheap state and heartbeat first; a snapshot reads
+            // fixture blocks, walks the mob list, and formats positions only for emitted rows.
+            var perched = flyer.IsPerched;
+            var grounded = flyer.IsGrounded;
+            var action = ActionField.GetValue(flyer.Animation);
+            if (Phase == _lastPhase && perched == _lastPerched && grounded == _lastGrounded &&
+                ReferenceEquals(action, _lastAction) && time - _lastTime < 1f) return;
+            _lastPhase = Phase;
+            _lastPerched = perched;
+            _lastGrounded = grounded;
+            _lastAction = action;
+            _lastTime = time;
+            _pending.Add(Snapshot(time));
+            _records++;
+        }
+
+        internal void Finish(float time, bool reached)
+        {
+            foreach (var row in _pending) output.WriteLine("CROW_TRACE " + row);
+            _pending.Clear();
+            output.WriteLine($"CROW_TRACE_FINAL reached={reached} capped={_records >= 255} {Snapshot(time)}");
+        }
     }
 
     [Fact]
@@ -308,15 +413,21 @@ public sealed class WildlifeTests
         Assert.False(flyer.IsPerched);
 
         var landBy = WildlifeConfig.FlyerAirMaxSeconds + 30f;
-        Assert.True(RunUntil(manager, chunks, [player], landBy, () => flyer.IsPerched && flyer.IsGrounded),
+        var trace = name == Crow.EntityName ? new CrowFlightTrace(_output, flyer, chunks, manager) : null;
+        var support = name == Crow.EntityName
+            ? new CrowFloorSupport(chunks, flyer, 2f * landBy + WildlifeConfig.FlyerPerchMaxSeconds + 5f)
+            : null;
+        Assert.True(RunUntil(manager, chunks, [player], landBy, () => flyer.IsPerched && flyer.IsGrounded, trace, support),
             $"the {name} never came down to rest");
         Assert.True(flyer.Feet.Y < 1.2f, $"a resting {name} should stand on the floor, not hang at {flyer.Feet.Y}");
 
-        Assert.True(RunUntil(manager, chunks, [player], WildlifeConfig.FlyerPerchMaxSeconds + 5f, () => !flyer.IsPerched),
+        if (trace != null) trace.Phase = "takeoff";
+        Assert.True(RunUntil(manager, chunks, [player], WildlifeConfig.FlyerPerchMaxSeconds + 5f, () => !flyer.IsPerched, trace, support),
             $"the {name} never took off again");
 
         // Resting again, a hit sends it up at once
-        Assert.True(RunUntil(manager, chunks, [player], landBy, () => flyer.IsPerched && flyer.IsGrounded));
+        if (trace != null) trace.Phase = "second-rest";
+        Assert.True(RunUntil(manager, chunks, [player], landBy, () => flyer.IsPerched && flyer.IsGrounded, trace, support));
         flyer.TakeDamage(1);
         Assert.False(flyer.IsPerched);
     }
@@ -330,14 +441,20 @@ public sealed class WildlifeTests
         var manager = NewManager();
         var flyer = Assert.IsAssignableFrom<FlyingAnimal>(Airborne<Animal>(manager, name, 8f, 8f));
         var away = PlayerAt(8f + 60f, 8f);
+        var trace = name == Crow.EntityName ? new CrowFlightTrace(_output, flyer, chunks, manager) : null;
+        var support = name == Crow.EntityName
+            ? new CrowFloorSupport(chunks, flyer, WildlifeConfig.FlyerAirMaxSeconds + 30f + 1.5f + 3f)
+            : null;
         Assert.True(RunUntil(manager, chunks, [away], WildlifeConfig.FlyerAirMaxSeconds + 30f,
-            () => flyer.IsPerched && flyer.IsGrounded && !flyer.Animation.IsActionPlaying));
+            () => flyer.IsPerched && flyer.IsGrounded && !flyer.Animation.IsActionPlaying, trace, support));
 
         // Four blocks off: inside what either species notices, outside a crow's peck
         var near = PlayerAt(flyer.Position.X + 4f, flyer.Position.Z);
         (flyer as Crow)?.TakeDamage(1);
-        Assert.True(RunUntil(manager, chunks, [near], 1.5f, () => !flyer.IsPerched), $"the resting {name} sat still beside a player");
-        Assert.True(RunUntil(manager, chunks, [near], 3f, () => flyer.Feet.Y > 2f), $"the {name} left the ground but did not climb");
+        if (trace != null) trace.Phase = "near-player";
+        Assert.True(RunUntil(manager, chunks, [near], 1.5f, () => !flyer.IsPerched, trace, support), $"the resting {name} sat still beside a player");
+        if (trace != null) trace.Phase = "climb";
+        Assert.True(RunUntil(manager, chunks, [near], 3f, () => flyer.Feet.Y > 2f, trace, support), $"the {name} left the ground but did not climb");
     }
 
     [Theory]

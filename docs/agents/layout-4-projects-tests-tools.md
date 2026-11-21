@@ -123,7 +123,9 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Juice/                       # game-feel rules: blast shake, damage direction and fringe,
                                #   hit-stop, the vignette, pops, FOV and tilt, droplets, tool shatter
   Lod/                         # far-LOD regions, the manager, build pool and buffers, column caps, surface
-                               #   overrides and their save state, sky exposure; the build-cost probe
+                               #   overrides and their save state, sky exposure, source/edit-aware tree anchors;
+                               #   FixedShoreCoverageTests freezes 39 seed-serialized shore regions;
+                               #   compact tree descriptor/material/template/coverage foundation and live integration facts; the build-cost probe
   Magic/                       # the cast rules, pacing and held-staff lookup, the spell effects (bolt flight,
                                #   impact rules, the element impacts on a server world), the sparks, the cast
                                #   feedback and a client's preview bolt; its own helper StaffFixture
@@ -138,7 +140,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   locked, a hosted world serves its host over loopback and releases the world on Stop,
                                #   the LAN address pick (HostingTests)
     ServerSide/                # the server player and its status (the eye's cave biome: ServerPlayerCaveBiomeTests),
-                               #   movement and intent rules, operators, the loopback GameServer and the server-mode World
+                               #   movement and intent rules, operators, the loopback GameServer and the server-mode World;
+                               #   LodPagedEditLoopbackTests drives two framed LOD peers without a World or GL
   Particles/                   # every particle system and the dust, splash and pop emitters
     Collapse/                  # a defeated tower's collapse show: its rule, thrown blocks burst and never write a cell
                                #   (TowerCollapseEffectsTests)
@@ -190,7 +193,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   the screen's buttons, zoom about the pointer, pan-stops-following and CENTER
   VisualTest/                  # scenario parsing and ops, PNG capture
   WorldGen/                    # terrain, biomes, lakes, ravines, clouds, the generational
-                               #   cache, the tree front end and batches, worldgen stats,
+                               #   cache, the tree front end and batches (including sparse disturbed-canopy
+                               #   rectangle checks), worldgen stats,
                                #   the worldgen cost probe and the stage-timer tests; WorldGenProfileIdentityTests
                                #   compare real column/chunk output to frozen EA identity fixture;
                                #   DynamicClimateOceanTests cover bounded spatial scale, basin, shore and ecotones;

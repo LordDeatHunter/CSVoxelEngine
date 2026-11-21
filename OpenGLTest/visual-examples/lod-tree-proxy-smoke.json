@@ -1,0 +1,14 @@
+{
+  // First fixed flying observation of the natural Jungle root neighborhood at seed 1337 Dynamic.
+  // Run storeless with VOXEL_TIME=147; camera composition is unverified until originals are viewed.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [4004.5, 80.5, 1111.5], "yaw": -90, "pitch": -5 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "tree_lod_first_l0", "hideHud": true },
+    { "op": "teleport", "pos": [4004.5, 105.5, 1511.5], "yaw": -90, "pitch": -4.5 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "screenshot", "name": "tree_lod_first_far", "hideHud": true }
+  ]
+}

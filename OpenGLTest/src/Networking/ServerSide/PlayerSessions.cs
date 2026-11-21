@@ -16,6 +16,7 @@ internal sealed class PlayerSessions
     private readonly int _seed;
 
     private readonly List<ClientConnection> _idleScratch = [];
+    internal Action<ClientConnection>? ClientRemoved;
 
     internal PlayerSessions(ServerState state, ServerChat chat, string worldName, int seed)
     {
@@ -331,6 +332,7 @@ internal sealed class PlayerSessions
     {
         client.Close();
         client.Removed = true;
+        ClientRemoved?.Invoke(client);
         _state.Pending.Remove(client);
         if (!_state.Clients.Remove(client.Id))
             return;

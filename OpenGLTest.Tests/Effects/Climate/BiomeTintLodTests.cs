@@ -180,49 +180,42 @@ public sealed class BiomeTintLodTests
             .ToHashSet();
 
         var regionBlocks = LodRegion.Levels[Level].RegionBlocks;
-        var checkedVertices = 0;
+        var checkedTrees = 0;
         var discriminating = 0;
         foreach (var (rx, rz) in RegionsOver(Biome.Forest).Take(64))
         {
             var mesh = LodRegion.BuildMeshData(Level, rx, rz);
-            foreach (var v in mesh.Vertices)
+            foreach (var tree in mesh.Trees.Instances)
             {
-                if (!leafTiles.Contains(v.Layer)) continue;
-                var face = Face(v);
-                Assert.True(v.IsBiomeTinted, $"LOD canopy vertex on tile {v.Layer} is unflagged");
-                Assert.True((v.PackedColor >> 24) == 253, $"LOD canopy vertex on tile {v.Layer} is not drawn as LOD leaves");
-
-                var wx = rx * regionBlocks + v.Position.X;
-                var wz = rz * regionBlocks + v.Position.Z;
+                var x = tree.RootX - rx * regionBlocks + 0.5f;
+                var z = tree.RootZ - rz * regionBlocks + 0.5f;
+                if (!tree.HasCrown || x < 0 || z < 0 || x >= regionBlocks || z >= regionBlocks)
+                    continue;
+                var material = mesh.Trees.Materials[tree.LeafMaterial];
+                if (!Enumerable.Range(0, 6).Any(face => leafTiles.Contains(material.TintedAt(face))))
+                    continue;
+                Assert.Equal(BiomeTintPalette.Foliage, material.Palette);
+                var tint = Assert.IsType<LodTreeTintLattice>(mesh.Trees.Tint);
+                var wx = tree.RootX + 0.5f;
+                var wz = tree.RootZ + 0.5f;
                 var foliage = ChunkMesherTint(BiomeTintPalette.Foliage, wx, wz);
                 var grass = ChunkMesherTint(BiomeTintPalette.Grass, wx, wz);
-                var (vr, vg, vb) = Rgb(v);
-                var matchedAny = false;
-                for (var ao = 0; ao < 4; ao++)
-                {
-                    var shade = ChunkFaceTables.ShadeLut[(face << 2) | ao];
-                    BiomeTint.Shade(shade, foliage, out var fr, out var fg, out var fb);
-                    if (Math.Abs(vr - fr) > 1 || Math.Abs(vg - fg) > 1 || Math.Abs(vb - fb) > 1) continue;
-                    matchedAny = true;
-
-                    // Where the grass palette would give visibly different bytes at the same
-                    // shade, the canopy must not be wearing it
-                    BiomeTint.Shade(shade, grass, out var gr, out var gg, out var gb);
-                    if (Math.Max(Math.Abs(fr - gr), Math.Max(Math.Abs(fg - gg), Math.Abs(fb - gb))) <= 2) continue;
-                    discriminating++;
-                    Assert.False(Math.Abs(vr - gr) <= 1 && Math.Abs(vg - gg) <= 1 && Math.Abs(vb - gb) <= 1,
-                        $"LOD canopy at ({wx}, {wz}) wears the grass palette");
-                }
-
-                Assert.True(matchedAny,
-                    $"LOD canopy at ({wx}, {wz}) face {face} is {Rgb(v)}, not shade * the foliage field {foliage}");
-                checkedVertices++;
+                var actual = tint.Sample(BiomeTintPalette.Foliage, x, z);
+                Assert.True(Vector3.Distance(actual, foliage) <= 0.00001f,
+                    $"LOD tree at ({wx}, {wz}) wears {actual}, not the chunk foliage field {foliage}");
+                checkedTrees++;
+                if (MathF.Max(MathF.Abs(foliage.X - grass.X),
+                        MathF.Max(MathF.Abs(foliage.Y - grass.Y), MathF.Abs(foliage.Z - grass.Z))) <= 2f / 255f)
+                    continue;
+                discriminating++;
+                Assert.True(Vector3.Distance(actual, grass) > 2f / 255f,
+                    $"LOD tree at ({wx}, {wz}) wears the grass palette");
             }
 
-            if (checkedVertices > 0 && discriminating > 0) break;
+            if (checkedTrees > 0 && discriminating > 0) break;
         }
 
-        Assert.True(checkedVertices > 0, "no level-0 forest region drew a tinted canopy");
-        Assert.True(discriminating > 0, "no LOD canopy vertex told the foliage palette apart from the grass one");
+        Assert.True(checkedTrees > 0, "no level-0 forest region carried a foliage-tinted tree");
+        Assert.True(discriminating > 0, "no LOD tree distinguished foliage from grass tint");
     }
 }
