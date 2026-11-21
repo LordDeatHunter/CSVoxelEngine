@@ -39,6 +39,38 @@ public static class PopBoxEmitter
     /// the rest, as <c>TreeWoodEmitter</c> draws a limb's tube.
     /// </summary>
     /// <summary>
+    /// Whether the pop must draw <paramref name="type"/>'s own model rather than its hitboxes: a model block whose
+    /// hitboxes are only a loose aim box around (or inside) what it draws - a crossed plant, a torch - would pop as
+    /// that box wearing its first quad's tile, the picture spread over the whole box. A block whose hitbox union
+    /// matches its model's bounds (a cube, a slab, a stalagmite's per-segment boxes) keeps the box pop, which crops
+    /// each face at full texel density.
+    /// </summary>
+    public static bool PopsAsModel(BlockType type)
+    {
+        if (type is not { Renderer: BlockRenderer.Model, BakedModel.Quads.Length: > 0 }) return false;
+        var modelMin = new Vector3(float.MaxValue);
+        var modelMax = new Vector3(float.MinValue);
+        foreach (var quad in type.BakedModel.Quads)
+            for (var j = 0; j < 4; j++)
+            {
+                modelMin = Vector3.Min(modelMin, quad.Positions[j]);
+                modelMax = Vector3.Max(modelMax, quad.Positions[j]);
+            }
+
+        var boxes = type.Hitboxes is { Length: > 0 } h ? h : [BlockHitbox.FullCube];
+        var boxMin = new Vector3(float.MaxValue);
+        var boxMax = new Vector3(float.MinValue);
+        foreach (var box in boxes)
+        {
+            boxMin = Vector3.Min(boxMin, box.Min);
+            boxMax = Vector3.Max(boxMax, box.Max);
+        }
+
+        const float tolerance = 1e-3f;
+        return Vector3.Distance(modelMin, boxMin) > tolerance || Vector3.Distance(modelMax, boxMax) > tolerance;
+    }
+
+    /// <summary>
     /// Appends a facing block's baked model (already turned to its facing, see
     /// <c>BlockType.RotatedModels</c>) offset by <paramref name="blockPosition"/> and grown about
     /// the model's own center by <paramref name="grow"/>, with the model's own tiles and UVs, so a

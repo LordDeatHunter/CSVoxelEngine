@@ -264,7 +264,7 @@ internal sealed class WorldRenderer
                 if (popGrow > 0f && !LeftClick.ShowsEatenFace)
                     renderManager.Selection.RenderBlockPop(Camera, LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId, popGrow,
                         HitboxesAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId),
-                        FacingModelAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId));
+                        PopModelAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId));
 
                 var selectedId = Edits.BlockIdAt(LeftClick.SelectedBlockPosition);
                 renderManager.Selection.RenderBlockSelection(Camera, LeftClick.SelectedBlockPosition, LeftClick.SelectedFaceNormal, popGrow,
@@ -284,7 +284,7 @@ internal sealed class WorldRenderer
                 && !(LeftClick.IsBreaking && LeftClick.BreakingBlockPosition == Placer.PlacePopPosition))
                 renderManager.Selection.RenderBlockPop(Camera, Placer.PlacePopPosition, Placer.PlacePopId, placePopGrow,
                     HitboxesAt(Placer.PlacePopPosition, Placer.PlacePopId),
-                    FacingModelAt(Placer.PlacePopPosition, Placer.PlacePopId));
+                    PopModelAt(Placer.PlacePopPosition, Placer.PlacePopId));
 
             renderManager.GpuTimer.EndGpuPass(ProfileSection.SelectPass);
             FrameProfiler.End(ProfileSection.SelectPass);
@@ -428,7 +428,12 @@ internal sealed class WorldRenderer
         FrameProfiler.End(ProfileSection.CloudPass);
     }
 
-    private BakedModel? FacingModelAt(Vector3 blockPos, ushort blockId)
+    /// <summary>
+    /// The model the mining and placement pop draws for the block at <paramref name="blockPos"/>, or null to pop
+    /// its hitboxes: a stump, a log on its side and a facing block as their turned models, and a block whose hitbox
+    /// is only a loose aim box (a crossed plant, <see cref="PopBoxEmitter.PopsAsModel"/>) as its own model.
+    /// </summary>
+    private BakedModel? PopModelAt(Vector3 blockPos, ushort blockId)
     {
         var type = BlockType.ById[blockId];
         // A stump's two stacked boxes would pop as one slab wearing its first quad's tile, so it pops as its model too
@@ -440,9 +445,13 @@ internal sealed class WorldRenderer
             return WoodState.LyingAxis(logState) is var axis and >= 0 ? lying[axis] : null;
         }
 
-        if (type is not { HasHorizontalFacing: true, RotatedModels: { } models }) return null;
-        var state = _chunkManager.GetStateGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
-        return models[BlockType.ShapeIndex(state, models.Length)];
+        if (type is { HasHorizontalFacing: true, RotatedModels: { } models })
+        {
+            var state = _chunkManager.GetStateGlobal((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z);
+            return models[BlockType.ShapeIndex(state, models.Length)];
+        }
+
+        return type != null && PopBoxEmitter.PopsAsModel(type) ? type.BakedModel : null;
     }
 
     private BlockHitbox[] HitboxesAt(Vector3 blockPos, ushort blockId) =>

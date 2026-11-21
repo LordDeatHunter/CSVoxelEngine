@@ -280,7 +280,9 @@ overshoot or jiggle.
   (`BlockDebrisSystem` + `DebrisLook.Color`, `LandingDust.SkinColor`), the same pool the slime
   splat uses.
 - **Placement pop.** A placed block pops in a little too big and settles with one small overshoot
-  (`SelectionPasses.RenderBlockPop`, `PopBoxEmitter`).
+  (`SelectionPasses.RenderBlockPop`, `PopBoxEmitter`). A block whose hitbox is only a loose aim box (a flower, a
+  small cactus, tall grass) pops as its own model rather than as that box wearing its picture
+  (`PopBoxEmitter.PopsAsModel` via `WorldRenderer.PopModelAt`); a `modelTint` plant's pop takes its cell's tint.
 - **Mob hit sparks.** A punch, slice or throw that connects throws pale chips from the wound point
   on top of the floating damage number.
   The wound also spurts **gore** (`BlockDebrisSystem.Gore`, `JuiceConfig.Gore*`): droplets of the kind's `blood` (its entity file:

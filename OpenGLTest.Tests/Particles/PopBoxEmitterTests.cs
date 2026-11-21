@@ -199,4 +199,37 @@ public sealed class PopBoxEmitterTests
         Assert.Equal((ushort)24, indices[36]);
         Assert.Equal(verts[0].Position + Vector3.One, verts[24].Position);
     }
+
+    /// <summary>
+    /// A crossed plant's hitbox is only a loose aim box, so its pop must draw its own model (or the flower's picture
+    /// spreads over the whole box when placed); a block whose hitboxes match what it draws keeps the box pop.
+    /// </summary>
+    [Theory]
+    [InlineData("flower", true)]
+    [InlineData("desert_flower", true)]
+    [InlineData("small_cactus", true)]
+    [InlineData("tall_grass", true)]
+    [InlineData("stone", false)]
+    [InlineData("cobblestone_slab", false)]
+    [InlineData("stalagmite", false)]
+    public void OnlyALooseHitboxBlockPopsAsItsModel(string name, bool asModel)
+    {
+        TestContent.EnsureLoaded();
+        Assert.Equal(asModel, PopBoxEmitter.PopsAsModel(ContentRegistry.RequireBlock(name)));
+    }
+
+    /// <summary>A modelTint plant's model pop flags every quad tinted, so the per-draw field colors its gray tile.</summary>
+    [Fact]
+    public void AModelTintedPlantsModelPopIsTintedOnEveryQuad()
+    {
+        TestContent.EnsureLoaded();
+        var plant = ContentRegistry.RequireBlock("tall_grass");
+        Assert.NotNull(plant.ModelBiomeTint);
+        var verts = new List<Vertex>();
+        var indices = new List<ushort>();
+        ushort offset = 0;
+        PopBoxEmitter.EmitModel(verts, indices, ref offset, plant.BakedModel!, 0.1f, Vector3.Zero, tinted: true);
+        Assert.NotEmpty(verts);
+        Assert.All(verts, v => Assert.True(v.IsBiomeTinted));
+    }
 }

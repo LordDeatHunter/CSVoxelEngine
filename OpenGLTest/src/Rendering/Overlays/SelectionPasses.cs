@@ -92,10 +92,11 @@ internal sealed class SelectionPasses : IDisposable
         ushort indexOffset = 0;
         var grownVec = new Vector3(grow);
         var treeWood = BlockType.IsTreeWood(blockId);
-        // A facing block pops as its turned model, not as a cube of its hitboxes
+        // A facing block pops as its turned model and a loose-hitbox block (a crossed plant) as its own, not as a cube of its hitboxes
         if (model != null)
         {
-            PopBoxEmitter.EmitModel(_popVerts, _popIndices, ref indexOffset, model, grow, blockPosition);
+            PopBoxEmitter.EmitModel(_popVerts, _popIndices, ref indexOffset, model, grow, blockPosition,
+                tinted: type.ModelBiomeTint != null);
         }
         else
         {
@@ -125,8 +126,8 @@ internal sealed class SelectionPasses : IDisposable
         // The field comes from the world's column source (a client's is streamed, and a column
         // that has not arrived draws untinted); no world (DevStudio) means worldgen.
         var columns = _owner.LightSource?.ColumnSource ?? WorldgenColumnSource.Instance;
-        _owner.WorldShader.SetUniform(_owner.LocBiomeTint, type.BiomeTint is { } bt
-            && BiomeTint.TryCellTint(columns, bt.Palette, (int)MathF.Floor(blockPosition.X),
+        _owner.WorldShader.SetUniform(_owner.LocBiomeTint, (type.BiomeTint?.Palette ?? type.ModelBiomeTint) is { } palette
+            && BiomeTint.TryCellTint(columns, palette, (int)MathF.Floor(blockPosition.X),
                 (int)MathF.Floor(blockPosition.Z), out var cellTint)
             ? cellTint
             : Vector3.One);
