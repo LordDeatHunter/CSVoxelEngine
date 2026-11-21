@@ -274,6 +274,8 @@ tools/                                # asset generators: models, animation clip
   generate-sea-item-sprites.py        # deterministic placeholder sprites of the sea animals' drops (raw and cooked cod, salmon
                                       #   and tuna, shark tooth, jellyfish gel); --check
   generate-lumber-sprite.py           # deterministic placeholder sprite of the lumber item (a stack of boards); --check
+  generate-plant-textureless.py      # the bush and fern gray _textureless tiles: each colored twin's luminance cut at its quartiles
+                                      #   onto a fixed four-gray ramp (the tinted plants' shading)
   generate-leather-sprites.py         # deterministic placeholder sprites of the leather works (flint knife, salt, salted
                                       #   hide, leather, bark) and the rock salt tile; --check
   generate-wiki-shots.mjs             # the wiki's screenshot scenarios (visual-examples/wiki-*.json) and wiki/data/screenshots.json from one spec of poses and captions

@@ -14,6 +14,7 @@
 - [ ] **Stumps** — `blocks/<species>_stump.json` reuse each log's side and end tiles on `models/block/stump.json`; give them their own cut-wood tile if the ring should differ from a log's end.
 - [ ] **Jungle** — `blocks/jungle_mud.png` is the dirt tile darkened (generated once in PowerShell; no generator to remove), and `jungle_log`, `jungle_leaves`, `jungle_stump` and the distinct `jungle_giant_*` blocks reuse the oak log/leaf tiles; give them their own jungle art (a mossy mud, a darker bark, broad glossy leaves). Keep `jungle_mud.png` 32x32.
 - [ ] **Javelin model** — `models/item/javelin.bbmodel` (the first 3D item, built in Blockbench over MCP: nine cubes, a generated 32x32 skin embedded). Reshape the blocky stone head and repaint the skin; keep it upright (tip +Y), centered on the origin, cubes unrotated.
+- [ ] **Plant tint tiles** — `blocks/bush_textureless.png`, `fern_textureless.png`, `tall_fern_bottom_textureless.png` and `tall_fern_top_textureless.png` are generated from their colored twins (`tools/generate-plant-textureless.py`, four grays). Hand-shade them if the quartile cut reads noisy; keep the twins' alpha masks and a mean gray near 98, then delete the generator.
 - [ ] **Everfuel** — `items/everfuel.json` currently reuses `coal.png`; replace with a distinct endless-fuel icon.
 
 Paths are under `OpenGLTest/assets/textures/items/`. All sprites are 32x32 RGBA unless noted, with
