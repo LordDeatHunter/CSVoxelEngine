@@ -40,6 +40,8 @@ internal sealed class ShadowPass
     private int _locChunkShadowWind;
     private int _locChunkShadowWindOffset;
     private int _locChunkShadowOpaque;
+    private readonly int _locTreeShadowViewProj;
+    private readonly int _locTreeShadowDrawBase;
 
     // The near cascade only: which chunk casters can reach a texel any consumer samples this frame.
     // The far map is cached (FarShadowReuse) and re-rendered from its whole box, never receiver-culled.
@@ -63,6 +65,8 @@ internal sealed class ShadowPass
         _locChunkShadowWind = _owner.ChunkShadowShader.GetUniformLocation("uWind");
         _locChunkShadowWindOffset = _owner.ChunkShadowShader.GetUniformLocation("uWindOffset");
         _locChunkShadowOpaque = _owner.ChunkShadowShader.GetUniformLocation("uOpaqueCasters");
+        _locTreeShadowViewProj = _owner.TreeShadowShader.GetUniformLocation("uViewProj");
+        _locTreeShadowDrawBase = _owner.TreeShadowShader.GetUniformLocation("uDrawBase");
     }
 
     /// <summary>
@@ -304,18 +308,38 @@ internal sealed class ShadowPass
             for (var i = 0; i < lodRegions.Count; i++)
             {
                 var region = lodRegions[i];
-                if (!region.HasMesh || region.IsBuried) continue;
+                if ((!region.HasMesh || region.IsBuried) && !region.HasVisibleTrees) continue;
 
                 var min = new Vector3(region.X * region.SizeBlocks, region.YMin, region.Z * region.SizeBlocks);
                 var max = new Vector3(min.X + region.SizeBlocks, region.YMax, min.Z + region.SizeBlocks);
                 if (!farFrustum.IntersectsAABB(min, max)) continue;
 
-                _owner.ChunkDraws.Add(region.OpaqueSlice!.Value,
-                    new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks), 1f);
+                if (region.HasMesh && !region.IsBuried)
+                    _owner.ChunkDraws.Add(region.OpaqueSlice!.Value,
+                        new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks), 1f);
             }
 
             _owner.ChunkDraws.Draw(_owner.LodGeometry.Vao, _owner.ChunkShadowShader, _locChunkShadowDrawBase);
             _owner.ChunkShadowShader.SetUniform(_locChunkShadowOpaque, 0);
+            _owner.TreeShadowShader.Use();
+            _owner.TreeShadowShader.SetUniform(_locTreeShadowViewProj, _owner.FarShadow.ViewProj);
+            // The shared template includes cutout leaves; keep their alpha holes in the
+            // far shadow instead of treating every tree face as opaque terrain.
+            _owner.TreeShadowShader.SetUniform("uOpaqueCasters", 0);
+            _owner.LodTrees.Bind();
+            _owner.ChunkDraws.BeginPass(lodRegions.Count);
+            for (var i = 0; i < lodRegions.Count; i++)
+            {
+                var region = lodRegions[i];
+                if (!region.HasVisibleTrees) continue;
+                var min = new Vector3(region.X * region.SizeBlocks, region.YMin, region.Z * region.SizeBlocks);
+                var max = new Vector3(min.X + region.SizeBlocks, region.YMax, min.Z + region.SizeBlocks);
+                if (!farFrustum.IntersectsAABB(min, max)) continue;
+                _owner.ChunkDraws.AddInstanced(_owner.LodTrees.Template(region.TreeSlice),
+                    new Vector3(min.X, 0f, min.Z), 1f,
+                    (uint)region.TreeSlice.Count, region.TreeSlice.BaseInstance);
+            }
+            _owner.ChunkDraws.Draw(_owner.LodTrees.Vao, _owner.TreeShadowShader, _locTreeShadowDrawBase);
         }
     }
 

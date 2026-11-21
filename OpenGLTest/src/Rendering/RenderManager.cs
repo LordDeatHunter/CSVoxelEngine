@@ -82,6 +82,8 @@ public class RenderManager : IDisposable
     internal const int HizDepthUnit = 10, HizPyramidUnit = 11;
     private Shader chunkShader;
     private Shader chunkShadowShader;
+    private Shader treeShader;
+    private Shader treeShadowShader;
 
     /// <summary>The shared vertex/index buffers every chunk's opaque mesh lives in.</summary>
     public ChunkGeometryPool OpaqueChunkGeometry { get; private set; }
@@ -98,6 +100,7 @@ public class RenderManager : IDisposable
     /// <see cref="ChunkGeometryPool.LodInitialUnits"/> for the sizing derivation.
     /// </summary>
     public ChunkGeometryPool LodGeometry { get; private set; }
+    public LodTreeGpuPool LodTrees { get; private set; }
 
     // The persistent-mapped indirect-command ring + ChunkInfo SSBO the chunk passes fill and
     // draw with one MultiDrawElementsIndirect each.
@@ -280,6 +283,11 @@ public class RenderManager : IDisposable
     private int[] _locChunkPointPos = [];
     private int[] _locChunkPointColor = [];
     private int[] _locChunkBlockLightPalette = [];
+    private int[] _locTreePointPos = [];
+    private int[] _locTreePointColor = [];
+    private int[] _locTreeBlockLightPalette = [];
+    private int _locTreeViewProj;
+    private int _locTreeDrawBase;
 
     // The pass components this renderer builds and owns; WorldRenderer, Program and the other
     // passes call them directly.
@@ -373,7 +381,8 @@ public class RenderManager : IDisposable
     /// re-uploads its chunk's opaque slice and so moves it, a known over-invalidation; the
     /// translucent pool never casts and is not counted. Main thread only.
     /// </summary>
-    internal int FarCasterVersion => unchecked(OpaqueChunkGeometry.ContentVersion + LodGeometry.ContentVersion);
+    internal int FarCasterVersion => unchecked(OpaqueChunkGeometry.ContentVersion +
+        LodGeometry.ContentVersion + LodTrees.ContentVersion);
     internal SkyRenderer? SkyDome => _skyDome;
     internal Shader SunShader => sunShader;
     internal Shader MoonShader => moonShader;
@@ -405,6 +414,10 @@ public class RenderManager : IDisposable
     internal int LocStatusTint => _locStatusTint;
     internal Shader ShadowShader => shadowShader;
     internal Shader ChunkShadowShader => chunkShadowShader;
+    internal Shader TreeShader => treeShader;
+    internal Shader TreeShadowShader => treeShadowShader;
+    internal int LocTreeViewProj => _locTreeViewProj;
+    internal int LocTreeDrawBase => _locTreeDrawBase;
     internal ChunkDrawBatch ChunkDraws => _chunkDraws;
     /// <summary>The opaque chunk pass's Hi-Z occlusion cull (<see cref="TerrainPasses.RenderWorld"/>).</summary>
     internal ChunkOcclusionCuller Occlusion { get; private set; }
@@ -474,8 +487,10 @@ public class RenderManager : IDisposable
         // The same two sources again, with the chunk-draw variant switched on: everything a
         // chunk pass draws goes through this program (see ChunkDrawDefines).
         chunkShader = new Shader(gl, vs, fs, ChunkDrawDefines);
+        treeShader = new Shader(gl, vs, fs, ChunkDrawDefines + "\n#define TREE_PROXY");
         InitWorldProgram(worldShader);
         InitWorldProgram(chunkShader);
+        InitWorldProgram(treeShader);
         // uFlash is only ever non-zero for a primed-TNT draw, which never goes through the
         // chunk program; the cutout default matches BeginFrame's. Both are set once because
         // nothing else on this program ever writes them.
@@ -483,6 +498,10 @@ public class RenderManager : IDisposable
         chunkShader.SetUniform("uHitFlash", 0f);
         chunkShader.SetUniform("uStatusTint", Vector4.Zero);
         chunkShader.SetUniform("uAlphaCutoff", LightingConfig.AlphaCutoff);
+        treeShader.SetUniform("uFlash", 0f);
+        treeShader.SetUniform("uHitFlash", 0f);
+        treeShader.SetUniform("uStatusTint", Vector4.Zero);
+        treeShader.SetUniform("uAlphaCutoff", LightingConfig.AlphaCutoff);
         // The HDR target first, so every creator after it restores to the scene target it made.
         Targets.CreateHdrTarget();
         Reflection.CreateReflectionTarget();
@@ -515,6 +534,11 @@ public class RenderManager : IDisposable
         _locChunkPointPos = chunkShader.GetUniformArrayLocations("uPointPos", LightingConfig.MaxPointLights);
         _locChunkPointColor = chunkShader.GetUniformArrayLocations("uPointColor", LightingConfig.MaxPointLights);
         _locChunkBlockLightPalette = chunkShader.GetUniformArrayLocations("uBlockLightPalette", BlockLightPalette.MaxSlots);
+        _locTreePointPos = treeShader.GetUniformArrayLocations("uPointPos", LightingConfig.MaxPointLights);
+        _locTreePointColor = treeShader.GetUniformArrayLocations("uPointColor", LightingConfig.MaxPointLights);
+        _locTreeBlockLightPalette = treeShader.GetUniformArrayLocations("uBlockLightPalette", BlockLightPalette.MaxSlots);
+        _locTreeViewProj = treeShader.GetUniformLocation("uViewProj");
+        _locTreeDrawBase = treeShader.GetUniformLocation("uDrawBase");
 
         selectionShader = new Shader(gl, selectionVs, selectionFs);
         breakShader = new Shader(gl, breakVs, breakFs);
@@ -534,6 +558,9 @@ public class RenderManager : IDisposable
         chunkShadowShader = new Shader(gl, shadowVs, shadowFs, ChunkDrawDefines);
         chunkShadowShader.Use();
         chunkShadowShader.SetUniform("uTextureAtlas", 0);
+        treeShadowShader = new Shader(gl, shadowVs, shadowFs, ChunkDrawDefines + "\n#define TREE_PROXY");
+        treeShadowShader.Use();
+        treeShadowShader.SetUniform("uTextureAtlas", 0);
         Shadows = new ShadowPass(gl, this);
         CreateShadowMap();
 
@@ -544,6 +571,7 @@ public class RenderManager : IDisposable
         OpaqueChunkGeometry = new ChunkGeometryPool(gl, ChunkGeometryPool.OpaqueInitialUnits, "opaque");
         TranslucentChunkGeometry = new ChunkGeometryPool(gl, ChunkGeometryPool.TranslucentInitialUnits, "translucent");
         LodGeometry = new ChunkGeometryPool(gl, ChunkGeometryPool.LodInitialUnits, "lod");
+        LodTrees = new LodTreeGpuPool(gl);
         _chunkDraws = new ChunkDrawBatch(gl);
         Occlusion = new ChunkOcclusionCuller(gl, this);
 
@@ -791,6 +819,8 @@ public class RenderManager : IDisposable
     /// </summary>
     internal void SetWorldUniform(string name, float value)
     {
+        treeShader.Use();
+        treeShader.SetUniform(name, value);
         chunkShader.Use();
         chunkShader.SetUniform(name, value);
         worldShader.Use();
@@ -800,6 +830,8 @@ public class RenderManager : IDisposable
     /// <inheritdoc cref="SetWorldUniform(string, float)"/>
     internal void SetWorldUniform(string name, in Matrix4x4 value)
     {
+        treeShader.Use();
+        treeShader.SetUniform(name, value);
         chunkShader.Use();
         chunkShader.SetUniform(name, value);
         worldShader.Use();
@@ -869,6 +901,8 @@ public class RenderManager : IDisposable
         chunkShader.Use();
         // Opaque default: punch the leaf tiles' holes; the translucent pass lowers it.
         chunkShader.SetUniform(_locChunkAlphaCutoff, LightingConfig.AlphaCutoff);
+        treeShader.Use();
+        treeShader.SetUniform("uAlphaCutoff", LightingConfig.AlphaCutoff);
         worldShader.Use();
         worldShader.SetUniform(_locAlphaCutoff, LightingConfig.AlphaCutoff);
         _eyeWaterDepth = camera is { IsEyeInWater: true, IsEyeInLava: false }
@@ -950,6 +984,8 @@ public class RenderManager : IDisposable
     /// </summary>
     internal void ApplyFrameUniforms()
     {
+        treeShader.Use();
+        ApplyFrameUniformsTo(treeShader, _locTreePointPos, _locTreePointColor, _locTreeBlockLightPalette);
         chunkShader.Use();
         ApplyFrameUniformsTo(chunkShader, _locChunkPointPos, _locChunkPointColor, _locChunkBlockLightPalette);
         worldShader.Use();
@@ -1071,10 +1107,12 @@ public class RenderManager : IDisposable
         Mobs.Dispose();
         worldShader.Dispose();
         chunkShader.Dispose();
+        treeShader.Dispose();
         selectionShader.Dispose();
         breakShader.Dispose();
         shadowShader.Dispose();
         chunkShadowShader.Dispose();
+        treeShadowShader.Dispose();
         sunShader.Dispose();
         moonShader.Dispose();
         Occlusion.Dispose();
@@ -1110,6 +1148,7 @@ public class RenderManager : IDisposable
         OpaqueChunkGeometry.Dispose();
         TranslucentChunkGeometry.Dispose();
         LodGeometry.Dispose();
+        LodTrees.Dispose();
         gl.Dispose();
     }
 }

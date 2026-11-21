@@ -94,8 +94,10 @@ public sealed class GameServer : IDisposable
         _transport = new ServerTransport(port);
         _broadcasts = new ServerBroadcasts(_state);
         _streaming = new StreamRequests(_state);
+        _state.World.GetLodManager().RelevantColumnEdited += _streaming.OnEditedColumn;
         _chat = new ServerChat(_state, _broadcasts);
         _sessions = new PlayerSessions(_state, _chat, worldName, seed);
+        _sessions.ClientRemoved = _streaming.RemoveClient;
         _waystones = new WaystoneSessions(_state);
         _intents = new IntentReplay(_state, _waystones);
         _chests = new ChestSessions(_state);
@@ -290,6 +292,10 @@ public sealed class GameServer : IDisposable
                 _streaming.OnLodRegionRequest(client, reader);
                 break;
 
+            case NetMessage.LodRegionAck:
+                _streaming.OnLodAck(client, reader);
+                break;
+
             case NetMessage.InventoryRequest:
                 _intents.OnInventoryRequest(client, reader);
                 break;
@@ -351,6 +357,7 @@ public sealed class GameServer : IDisposable
             client.Close();
         _state.Pending.Clear();
         _streaming.ClearLodQueue();
+        _state.World.GetLodManager().RelevantColumnEdited -= _streaming.OnEditedColumn;
         _state.Clients.Clear();
         _state.Players.Clear();
         _state.PlayerList.Clear();

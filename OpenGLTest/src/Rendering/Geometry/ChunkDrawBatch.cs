@@ -138,6 +138,14 @@ public sealed unsafe class ChunkDrawBatch : IDisposable
     /// vertex stage reads at <c>uDrawBase + gl_DrawID</c>.
     /// </summary>
     public void Add(in GeometrySlice slice, Vector3 origin, float alpha)
+        => AddInstanced(slice, origin, alpha, 1, 0);
+
+    /// <summary>
+    /// One indirect command for a shared template drawn by many compact instances. It is
+    /// submitted only through the uncullled LOD tree pass: chunk Hi-Z zeros InstanceCount.
+    /// </summary>
+    internal void AddInstanced(in GeometrySlice slice, Vector3 origin, float alpha,
+        uint instanceCount, uint baseInstance)
     {
         if (_cursor >= _capacityPerSlot)
             throw new InvalidOperationException(
@@ -148,10 +156,10 @@ public sealed unsafe class ChunkDrawBatch : IDisposable
         _cmds[i] = new DrawElementsIndirectCommand
         {
             Count = (uint)slice.IndexCount,
-            InstanceCount = 1,
+            InstanceCount = instanceCount,
             FirstIndex = (uint)slice.IndexOffset,
             BaseVertex = slice.VertexOffset,
-            BaseInstance = 0
+            BaseInstance = baseInstance
         };
         _draws[i] = new Vector4(origin, alpha);
 

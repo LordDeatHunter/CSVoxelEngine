@@ -24,6 +24,32 @@ public sealed class NetFramingTests
 
     public NetFramingTests(Xunit.Abstractions.ITestOutputHelper output) => _output = output;
 
+    [Theory]
+    [InlineData(66)]
+    [InlineData(67)]
+    [InlineData(68)]
+    public async Task ClientRejectsOlderServerHelloBeforeReadingWorld(int version)
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var address = (IPEndPoint)listener.LocalEndpoint;
+        var peer = Task.Run(() =>
+        {
+            using var socket = listener.AcceptTcpClient();
+            var stream = socket.GetStream();
+            Assert.NotNull(NetFraming.ReadFrame(stream));
+            using var hello = new PacketWriter(NetMessage.ServerHello);
+            hello.Write(version); // The incompatible layout stops before any world fields.
+            NetFraming.WriteFrame(stream, hello.ToArray());
+        });
+        using var client = new NetworkClient(new ServerAddress("127.0.0.1", address.Port),
+            "Tester", 3.0);
+        await Task.Run(client.Connect).WaitAsync(TimeSpan.FromSeconds(5));
+        await peer.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(NetworkStatus.Failed, client.Status);
+        Assert.Null(client.Server);
+    }
+
     [Fact]
     public async Task PartialFrameWriteFailureIsTerminalAndNeverWritesAgain()
     {

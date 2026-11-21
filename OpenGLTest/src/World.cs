@@ -447,7 +447,7 @@ public class World
     public World(GL gl, ChunkGeometryPool opaqueGeometry, ChunkGeometryPool translucentGeometry,
         ChunkGeometryPool lodGeometry, IWindow window, IInputContext input, SfxManager? sfx = null,
         ChunkSaveStore? saveStore = null, bool serverMode = false, bool clientMode = false,
-        Vector3? spawn = null, IWorldSource? worldSource = null)
+        Vector3? spawn = null, IWorldSource? worldSource = null, LodTreeGpuPool? lodTreePool = null)
     {
         ChunkGenerationWorker? generationWorker = null;
         LodManager? lodManager = null;
@@ -523,7 +523,7 @@ public class World
             // scan rather than idling until the first frame publishes a focus
             UpdateFocus();
             generationWorker = _generationWorker = new ChunkGenerationWorker(_chunkManager, Focus);
-            lodManager = _lodManager = new LodManager(lodGeometry);
+            lodManager = _lodManager = new LodManager(lodGeometry, lodTreePool);
             _lodManager.WorldSource = _chunkManager.WorldSource;
             if (EntityRegistry.TryGet("slime") is { } slimeType)
                 _slimes = new SlimeManager(slimeType, _mobCaps);
@@ -1133,7 +1133,7 @@ public class World
     {
         UpdateFocus();
         _chunkManager.Update(Focus.Chunks);
-        _lodManager.Update(_chunkManager);
+        _lodManager.Update(_chunkManager, deltaTime);
         LocalPlayer.ApplyGear(simulatesMana: false);
         // A waystone trip the server landed stays put until this side's chunks there are in
         WaystoneTravel.Update(deltaTime);
@@ -1275,7 +1275,7 @@ public class World
         _chunkManager.Update(Focus.Chunks);
 
         FrameProfiler.Begin(ProfileSection.Lod);
-        _lodManager.Update(_chunkManager);
+        _lodManager.Update(_chunkManager, deltaTime);
         FrameProfiler.End(ProfileSection.Lod);
 
         FrameProfiler.Begin(ProfileSection.Entities);
@@ -1457,7 +1457,7 @@ public class World
         _chunkManager.Update(Focus.Chunks);
 
         FrameProfiler.Begin(ProfileSection.Lod);
-        _lodManager.Update(_chunkManager);
+        _lodManager.Update(_chunkManager, deltaTime);
         FrameProfiler.End(ProfileSection.Lod);
 
         FrameProfiler.Begin(ProfileSection.FluidWake);

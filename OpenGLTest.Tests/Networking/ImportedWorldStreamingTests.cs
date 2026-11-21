@@ -311,6 +311,7 @@ public sealed class ImportedWorldStreamingTests : IDisposable
                 request.Write(LodLevel);
                 request.Write(0);
                 request.Write(0);
+                request.Write(1);
                 client.Send(request.ToArray());
             }
 
@@ -319,6 +320,7 @@ public sealed class ImportedWorldStreamingTests : IDisposable
             var gotChunk = false;
             var gotColumn = false;
             LodMeshData? region = null;
+            var transfer = new LodRegionTransferReader(client.Send);
             var sw = Stopwatch.StartNew();
             while ((!gotChunk || !gotColumn || region == null) && sw.Elapsed.TotalSeconds < 15)
             {
@@ -326,7 +328,8 @@ public sealed class ImportedWorldStreamingTests : IDisposable
                 while (client.Inbound.TryDequeue(out var payload))
                 {
                     using var reader = new PacketReader(payload);
-                    switch (reader.Message)
+                    var message = reader.Message;
+                    switch (message)
                     {
                         case NetMessage.ChunkData:
                         {
@@ -345,11 +348,10 @@ public sealed class ImportedWorldStreamingTests : IDisposable
                             gotColumn = true;
                             break;
                         }
-                        case NetMessage.LodRegionData:
-                            reader.ReadInt();
-                            reader.ReadInt();
-                            reader.ReadInt();
-                            region = LodNetCodec.Decode(reader.ReadBytes());
+                        case NetMessage.LodRegionBegin:
+                        case NetMessage.LodRegionPage:
+                        case NetMessage.LodRegionComplete:
+                            region = transfer.Accept(message, reader) ?? region;
                             break;
                     }
                 }

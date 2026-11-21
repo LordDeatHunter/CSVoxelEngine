@@ -268,7 +268,7 @@ and once when a mode request was refused),
 respawn), `PlayerList` (id, name, eye, yaw, pitch, flags), `WorldIntent` (a client's world action, `WorldIntentCodec`), `IntentResult` (sequence id,
 accepted), `BlockCorrection` (sequence id, then the authoritative cells around the intent's target),
 `ChunkRequest`/`ChunkData` and `ColumnRequest`/`ColumnTerrain` (the streamed world,
-`ChunkNetCodec`; a column answer is the whole `ColumnTerrain`, `EncodeColumn`), `LodRegionRequest`/`LodRegionData` (a streamed far region, `LodNetCodec`),
+`ChunkNetCodec`; a column answer is the whole `ColumnTerrain`, `EncodeColumn`), `LodRegionRequest`/`LodRegionBegin`/`LodRegionPage`/`LodRegionComplete`/`LodRegionAck` (one bounded streamed far region, `LodNetCodec` and `LodTransfer`),
 `EntityList` (the live mobs, drops, primed TNT and falling blocks, `NetEntity`), `StationState` (the campfires, querns, kilns and
 cast molds, `StationNetCodec`, then the smithing stations, the towers and, since version 38, the cells of the chests at
 least one player has open, `ChestLids.WriteNet`, which is what swings a chest's lid for everyone), `BlockChanges` (a batch of server cell changes, `NetCellChange`)
@@ -362,8 +362,15 @@ position goes through the movement rubberband (both below) — syncs the day clo
 (`NetTimeSyncSeconds`), serves `ChunkRequest`/`ColumnRequest` from the loaded world
 (`ChunkManager.TryCaptureChunk`; a column through `WorldgenColumnSource`, exactly what its own
 mesher reads, encoded by `ChunkNetCodec.EncodeColumn`), queues `LodRegionRequest`s (`StreamRequests`, deduped
-per connection, `ClientConnection.LodQueued`) and builds at most `NetLodBuildsPerPump` of them a
-`Pump` (`LodRegion.BuildMeshData`, skipping any whose client has gone), replays each
+per connection, `ClientConnection.LodLedger`) and holds only one serialized far region
+server-wide, emitting at most eight pages per `Pump` (`LodRegion.BuildMeshData`, skipping any
+whose client has gone). `LodTransferCredit` keeps a peer's one logical-region credit blocked
+until its matching ACK, cancellation or disconnect; a stalled send can release the raw server
+serialization slot after its progress timeout without granting that peer another region. Successful
+Begin/page sends refresh that timeout, while stale nonces cannot release credit.
+The component's internal mesh-producer seam defaults to the same source-backed
+`LodRegion.BuildMeshData` call; headless loopback tests supply a bounded mesh without
+constructing a server `World` or starting its generation worker. The server replays each
 `InventoryRequest` intent (`IntentReplay.OnInventoryRequest`) against **the sender's** inventory only — `InventoryIntentRules.Apply`
 (a slot must be on the hotbar; equip only what the player owns, or toggle off what the slot
 already shows; craft through `Inventory.TryCraft` with exactly the fed members, so a refused craft
@@ -684,13 +691,32 @@ heights, water levels and climate (`ColumnTerrain.ContentEquals`). A client chun
 until its nine columns are in (the dirty gate in the threading rules; all-air chunks exempt), and
 the eye's water surface (`ChunkManager.GetFluidColumnTopGlobal`, `Camera.EyeWaterSurfaceY`) reads
 the streamed water level too. The far LOD is the server's: a `ClientLodStreamer` requests far
-regions (`LodRegionData`, at most `NetLodInFlightMax` outstanding, an unanswered one re-sent only
-after `NetLodResendSeconds`), whose `LodNetCodec` payload is the server's finished vertices with
-the tint and the canopy bumps already baked, so the client's `LodManager` never reads `ColumnCache`
-or `TreeGenerator`; for the same reason `BlockEditor.NotifyLodEdit` and the inline
+regions (protocol 69 `LodRegionBegin`/`Page`/`Complete`, at most `NetLodInFlightMax` requests
+outstanding). The server holds at most one 12 MiB logical region serialization at a time and
+sends at most eight 64 KiB pages per Pump. A checked nonce, ordered page count and SHA-256 guard
+the client's one active assembly; its ACK or cancellation returns one client credit. The
+`LodNetCodec` payload carries the server's terrain vertices and compact, bounded tree instances,
+face-material table, tint corners and generated-source mask. Both are remapped to the client's
+atlas before upload; the client never reads `ColumnCache`
+or `TreeGenerator`. A narrowly internal apply callback lets headless component tests inspect
+the decoded terrain and tree payload before storing a geometry-free resident region; live
+connections still call `LodManager.AddStreamedRegion` and upload the full result.
+For the same reason `BlockEditor.NotifyLodEdit` and the inline
 `TreeGenerator.PoisonCanopy`/`LodManager.MarkEditedColumn` sites in `RemoveBlock` and `FellWood`
 return early in client mode, so a client edit never touches `LodSurface`, `LodColumnCaps`
-or `TreeCanopy.CanopyDisturbed`. `WorldgenReads` (off in production) is the counter
+or `TreeCanopy.CanopyDisturbed`. Incoming and predicted cell edits mark nearby streamed regions
+dirty using the same tree reach as the local LOD builder; the old region remains drawable until
+the replacement has uploaded, and a reply whose request predates an edit cannot replace it.
+The server's relevant `LodManager.MarkEditedColumn` event coalesces affected region keys in a
+bounded `LodEditInvalidations` set; overflow sends one global invalidate, which only dirties
+resident or pending client keys. `LodTransferCredit` owns one client transfer identity and
+bounded queued nonces. Begin, each page, Complete and ACK carry the server build generation;
+an edit before completion rejects that build, while an edit after completion dirties the
+resident key for replacement. A timeout releases raw bytes; matching ACK/cancel or
+disconnect releases peer credit. The
+one raw server slot, eight-page Pump and 64-entry queue scan remain separate bounds;
+socket sends retain their finite synchronous timeout. Protocol 69 is unpublished at this stage.
+An unanswered request is retried after `NetLodResendSeconds`. `WorldgenReads` (off in production) is the counter
 `ClientWorldgenIsolationTests` turns on to prove a client world under a poisoned seed streams and
 meshes with no worldgen call and edits without moving the far-LOD tables, and
 `StreamedTerrainMeshTests` that a mesh built from streamed columns is byte-identical to the

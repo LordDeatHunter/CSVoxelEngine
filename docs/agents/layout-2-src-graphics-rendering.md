@@ -126,14 +126,28 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   lod-edits.bin, the per-world reset
       LodCoverPass.cs          # the buried-flag pass: regions covered by loaded finer regions or meshed chunks, re-run only
                                #   when its inputs move, the level-0 cover tests spread over frames (IsCoveredByChunks)
-      LodFaceEmitter.cs        # a region build's face and water emission (ref struct): block palette, tint lattice, the output
-                               #   lists, AddQuad/AddBlockFace
+      LodFaceEmitter.cs        # a region build's terrain and water face emission
+      LodTreeBuild.cs          # compact tree instances/materials/tint/source mask of one region build
+      LodTreeGpuPayload.cs     # pure std430 payload pack shared by the live tree pool and ABI tests
+      LodTreeCoverPass.cs      # main-thread finer/full-detail replacement masks for finite tree tiles
       LodLevelSpec.cs          # one LOD ring's parameters (cell size, region size and radius, sample margin, height bias,
                                #   proxy canopy)
       LodManager.cs            # the far-LOD composition root: builds the components, unloads out-of-range regions, uploads
                                #   finished builds (ApplyCompletedMeshes), streamed regions, the camera; forwards the rest
       LodMeshBuilder.cs        # the body of LodRegion.BuildMeshData, one instance per build: prefetch, fine-height grid, per-cell
-                               #   grids, burial ranges
+                               #   grids, burial ranges and clipped generated-only tree proxies
+      LodProxyBox.cs           # finite inclusive-low/exclusive-high bounds and XZ clipping of one tree proxy prism
+      LodProxyOwnership.cs     # source-first gates and original/cached X-then-Z far-root collection
+      LodFarRootCache.cs       # bounded immutable sparse natural proxy metadata per generated chunk column
+      LodTreeAnchor.cs         # region-independent source/edit-aware height lower bound and edit reach for tree trunks
+      LodTreeProxy.cs          # reusable grown/far species crown and trunk bounds, separate from the terrain shell
+      LodTreeProxyEmitter.cs   # one region's root enumeration, edit/source clipping and compact proxy collection
+      LodTreeInstance.cs       # canonical 64-byte signed tree descriptor and checked region-relative bounds
+      LodTreeMaterial.cs       # complete base/tinted six-face 32-byte material and atlas remap contract
+      LodTreeMaterialTable.cs  # build-local sharing of tree face materials by ushort block identity
+      LodTreeTemplate.cs       # reusable bounded trunk/crown/cap unit topology and part-bound selector
+      LodTreeTintLattice.cs    # explicit source-corner grass/foliage vec4 lattice for compact proxy tint
+      LodTreeCoverage.cs       # pure 16-block source/replacement/full-detail tree visibility tiles
       LodMeshData.cs           # one finished region build (vertex/index lists, Y bounds, chunk-Y ranges) on its way to the main thread
       LodRegion.cs             # an uploaded far-LOD region: the Levels table, its pool slices, burial flags and per-column chunk-Y
                                #   ranges, the draw-order comparers; BuildMeshData forwards to LodMeshBuilder
@@ -196,7 +210,9 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       LanternNetCodec.cs       # held/placed requests and versioned authoritative fuel/storage answers
       InventoryNetCodec.cs     # the server-owned inventory on the wire (the save JSON shape)
       QuestStateCodec.cs       # a player's quest progress on the wire (NetMessage.QuestState, the save JSON shape)
-      LodNetCodec.cs           # a far-LOD region's mesh on the wire
+      LodNetCodec.cs           # bounded protocol-69 terrain and compact tree logical payload
+      LodEditInvalidations.cs  # bounded relevant-edit region key coalescing and global fallback
+      LodTransfer.cs           # nonce, digest and ordered 64 KiB page exchange
       NetAttacks.cs            # what each NetAttackKind stands for: the attack pattern it needs in hand, the
                                #   sword swing it names, the NetPlayerAction it is rebroadcast as
       NetCellChangeCodec.cs    # one BlockChanges/BlockCorrection cell on the wire (the server writes, the client reads)
@@ -285,6 +301,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   pending connections, clock, join spawn, the operators and the hosting player
         ServerTransport.cs     # TCP listener, accept thread, per-connection reader threads
         StreamRequests.cs      # chunk, column and far-LOD region requests and the LOD queue
+        LodTransferCredit.cs   # pure per-client queued nonce and active-transfer ownership
         WaystoneSessions.cs    # waystones for each player: discovery on a replayed Use (WaystoneOpened),
                                #   the rows kept current, the rename, the trip judged, held and landed
     Particles/                 # every particle system (debris, bubbles, fire, leaves,
@@ -558,6 +575,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   BufferStorage VBO+EBO+VAO, NamedBufferSubData uploads, grow by copy;
                                #   ContentVersion (moves on every upload, free and NoteDrawSetChange, a LOD
                                #   burial flip), summed by RenderManager.FarCasterVersion for the far shadow
+        LodTreeGpuPool.cs       # shared compact-tree SSBO and reusable instanced box template
         GeometryAllocator.cs   # GL-free first-fit free list with coalescing, in units of
                                #   64 vertices / 96 indices; hands out the pools' GeometrySlices;
                                #   ContentVersion moves on every successful allocate and free, never on Grow

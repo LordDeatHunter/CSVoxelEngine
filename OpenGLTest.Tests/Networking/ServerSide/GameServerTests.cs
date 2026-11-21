@@ -25,6 +25,7 @@ using VoxelEngine.Magic;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
+using VoxelEngine.Tests.Networking;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
@@ -897,6 +898,7 @@ public sealed class GameServerTests : IDisposable
             writer.Write(0);
             writer.Write(rx);
             writer.Write(0);
+            writer.Write(rx + 1);
             client.Send(writer.ToArray());
         }
 
@@ -909,15 +911,14 @@ public sealed class GameServerTests : IDisposable
         Thread.Sleep(300);
 
         var received = new List<int>();
+        var transfer = new LodRegionTransferReader(client.Send);
         void Drain()
         {
             while (client.Inbound.TryDequeue(out var payload))
             {
                 using var reader = new PacketReader(payload);
-                if (reader.Message != NetMessage.LodRegionData)
-                    continue;
-                reader.ReadInt();
-                received.Add(reader.ReadInt());
+                var answer = transfer.Accept(reader.Message, reader);
+                if (answer != null) received.Add(answer.X);
             }
         }
 

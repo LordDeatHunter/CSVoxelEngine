@@ -1,7 +1,9 @@
-using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
-using VoxelEngine.Data;
+using System.Text.RegularExpressions;
 using VoxelEngine.Lod;
+using VoxelEngine.WorldGen;
 using Xunit;
 
 namespace VoxelEngine.Tests.Lod;
@@ -93,32 +95,27 @@ public sealed class LodSkyExposureTests
     [Fact]
     public void BuiltLodMeshesShadeCanopySidesAndKeepOpenSkyFullyLit()
     {
-        const byte foliage = 253;
-        const byte plain = 255;
-        static byte Alpha(Vertex v) => (byte)(v.PackedColor >> 24);
-        static bool IsTop(Vertex v) => (v.Normal & 7) == 4;
+        // The live TREE_PROXY vertex shader owns crown light now; its top/side relation
+        // cannot be inferred from terrain vertices. Read that production shader expression.
+        var shader = File.ReadAllText(Path.Combine(TestContent.FindAssetsRoot(), "shaders", "test-vertex.glsl"));
+        var crownSun = Regex.Match(shader,
+            @"treeSun\s*=\s*face\s*==\s*4\s*\?\s*([0-9.]+)\s*:\s*face\s*==\s*5\s*\?\s*([0-9.]+)\s*:\s*([0-9.]+)\s*;");
+        Assert.True(crownSun.Success, "TREE_PROXY has no face-dependent sunlight expression");
+        var top = float.Parse(crownSun.Groups[1].Value, CultureInfo.InvariantCulture);
+        var bottom = float.Parse(crownSun.Groups[2].Value, CultureInfo.InvariantCulture);
+        var side = float.Parse(crownSun.Groups[3].Value, CultureInfo.InvariantCulture);
+        Assert.True(top > side && side > bottom && bottom > 0f);
 
-        LodMeshData? found = null;
-        for (var rx = 0; rx <= 40 && found is null; rx++)
-        for (var rz = 0; rz <= 40 && found is null; rz++)
-        {
-            var data = LodRegion.BuildMeshData(0, rx, rz);
-            var hasSides = data.Vertices.Any(v => Alpha(v) == foliage && !IsTop(v));
-            var hasTops = data.Vertices.Any(v => Alpha(v) == foliage && IsTop(v));
-            if (hasSides && hasTops && data.WaterVertices.Count > 0)
-                found = data;
-        }
+        var land = new FlatWorldSource(-1, 4, -1, 4, 10, TerrainGenerator.RockBlock,
+            Biome.Desert, 0.5f, 0.5f);
+        var dry = LodRegion.BuildMeshData(0, 0, 0, source: land);
+        Assert.Contains(dry.Vertices, v => (v.Normal & 7) == 4 && v.Sun == byte.MaxValue);
+        Assert.DoesNotContain(dry.Vertices, v => (v.PackedColor >> 24) == 253u);
 
-        Assert.NotNull(found);
-        var mesh = found!;
-        var foliageSides = mesh.Vertices.Where(v => Alpha(v) == foliage && !IsTop(v)).Select(v => v.Sun);
-        var foliageTops = mesh.Vertices.Where(v => Alpha(v) == foliage && IsTop(v)).Select(v => v.Sun);
-        Assert.True(foliageSides.Min() < foliageTops.Max(), "canopy sides are not darker than canopy tops");
-
-        Assert.All(mesh.WaterVertices, v => Assert.Equal(byte.MaxValue, v.Sun));
-
-        IEnumerable<Vertex> Plain(bool top) => mesh.Vertices.Where(v => Alpha(v) == plain && IsTop(v) == top);
-        Assert.Contains(Plain(true), v => v.Sun == byte.MaxValue);
-        Assert.Contains(Plain(false), v => v.Sun == byte.MaxValue);
+        var sea = new FlatWorldSource(-1, 4, -1, 4, -8, TerrainGenerator.RockBlock,
+            Biome.Ocean, 0.5f, 0.5f, waterLevel: WorldGenerationConfig.SeaLevel);
+        var water = LodRegion.BuildMeshData(0, 0, 0, source: sea).WaterVertices;
+        Assert.NotEmpty(water);
+        Assert.All(water, v => Assert.Equal(byte.MaxValue, v.Sun));
     }
 }

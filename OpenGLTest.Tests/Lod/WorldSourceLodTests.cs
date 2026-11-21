@@ -27,9 +27,7 @@ public sealed class WorldSourceLodTests : IDisposable
     // How far above worldgen's terrain (and anything worldgen draws there) the test plateaus stand.
     private const int PlateauLift = 24;
 
-    // The vertex alpha LodRegion's AddQuad flags opaque LOD foliage (a canopy bump) with; 254 is
-    // water and 255 everything else.
-    private const uint CanopyAlpha = 253;
+    // The old terrain foliage alpha is deliberately absent: trees now own separate instances.
 
     // The interior of a region these tests look at: region-local X and Z from half a chunk into the
     // region's first chunk column to half a chunk into its second. Every cell window, AO and sky
@@ -66,8 +64,6 @@ public sealed class WorldSourceLodTests : IDisposable
         ?? throw new InvalidOperationException("grass declares no biomeTint");
 
     private static int Face(Vertex v) => v.Normal & 7;
-
-    private static bool IsCanopy(Vertex v) => (v.PackedColor >> 24) == CanopyAlpha;
 
     private static (byte R, byte G, byte B) Rgb(Vertex v) =>
         ((byte)(v.PackedColor & 0xFF), (byte)((v.PackedColor >> 8) & 0xFF), (byte)((v.PackedColor >> 16) & 0xFF));
@@ -132,27 +128,6 @@ public sealed class WorldSourceLodTests : IDisposable
     private static List<Vertex> InteriorTops(LodMeshData mesh) =>
         mesh.Vertices.Where(v => InInterior(v) && Face(v) == TopFace).ToList();
 
-    /// <summary>The level-0 region nearest the origin whose worldgen LOD draws a canopy bump in its
-    /// interior, with that build.</summary>
-    private static (int Rx, int Rz, LodMeshData Mesh) RegionWithInteriorCanopy()
-    {
-        for (var ring = 0; ring <= 24; ring++)
-        for (var rx = -ring; rx <= ring; rx++)
-        for (var rz = -ring; rz <= ring; rz++)
-        {
-            if (Math.Max(Math.Abs(rx), Math.Abs(rz)) != ring) continue;
-            var centerX = rx * Spec.RegionBlocks + Chunk.Size;
-            var centerZ = rz * Spec.RegionBlocks + Chunk.Size;
-            if (TerrainGenerator.BiomeAt(centerX, centerZ) is not (Biome.Forest or Biome.Taiga)) continue;
-
-            var mesh = LodRegion.BuildMeshData(Level, rx, rz);
-            if (mesh.Vertices.Any(v => InInterior(v) && IsCanopy(v)))
-                return (rx, rz, mesh);
-        }
-
-        throw new InvalidOperationException("no level-0 region near the origin draws a canopy in its interior");
-    }
-
     private static void AssertSameMesh(LodMeshData expected, LodMeshData actual)
     {
         // SequenceEqual, not Assert.Equal: Vertex is a struct of float-bearing fields
@@ -160,27 +135,35 @@ public sealed class WorldSourceLodTests : IDisposable
         Assert.True(expected.Indices.SequenceEqual(actual.Indices), "the indices differ");
         Assert.True(expected.WaterVertices.SequenceEqual(actual.WaterVertices), "the water vertices differ");
         Assert.True(expected.WaterIndices.SequenceEqual(actual.WaterIndices), "the water indices differ");
+        Assert.True(expected.Trees.Instances.SequenceEqual(actual.Trees.Instances), "the tree instances differ");
     }
 
     [Fact]
     public void ASuppliedColumnsFarLodFollowsItsOwnHeightsAndBiome()
     {
-        // A region whose worldgen LOD has a tree there, so dropping the canopy is a real change
-        var (rx, rz, generated) = RegionWithInteriorCanopy();
+        WorldSeed.Apply(1337, WorldGenProfile.Dynamic);
+        // Frozen natural giant in the second supplied X/Z chunk pair; a real miss fails.
+        const int rx = 62;
+        const int rz = 12;
+        const int rootX = 4004;
+        const int rootZ = 811;
+        var generated = LodRegion.BuildMeshData(Level, rx, rz);
+        Assert.Contains(generated.Trees.Instances, t => t.RootX == rootX && t.RootZ == rootZ);
         var generatedInterior = generated.Vertices.Where(InInterior).ToList();
         var generatedMaxY = generatedInterior.Max(v => v.Position.Y);
 
-        // A dry desert plateau above worldgen's terrain and every canopy it draws there
+        // A dry desert plateau above worldgen's terrain and every compact crown.
         var top = Math.Max(TallestUnder(rx, rz), (int)MathF.Ceiling(generatedMaxY)) + PlateauLift;
         var source = Over(rx, rz, top, Biome.Desert, warmth: 0.95f, wetness: 0.05f);
         var supplied = LodRegion.BuildMeshData(Level, rx, rz, source: source);
         var interior = supplied.Vertices.Where(InInterior).ToList();
         Assert.NotEmpty(interior);
 
-        // The shell rose to the import's terrain and draws no worldgen tree on it
+        // The shell rose to the import's terrain and suppresses the supplied root.
         Assert.True(interior.Max(v => v.Position.Y) > generatedMaxY,
             "the supplied region's far LOD did not rise to the import's terrain");
-        Assert.DoesNotContain(interior, IsCanopy);
+        Assert.DoesNotContain(supplied.Trees.Instances, t => t.RootX == rootX && t.RootZ == rootZ);
+        Assert.DoesNotContain(supplied.Vertices, v => (v.PackedColor >> 24) == 253u);
         Assert.DoesNotContain(supplied.WaterVertices, InInterior);
 
         // Every top face stands within a cell of the plateau's own top face, lowered by the level's
@@ -197,14 +180,13 @@ public sealed class WorldSourceLodTests : IDisposable
 
         Assert.Contains(InteriorTops(generated), v => v.Layer != sandTop);
 
-        // A basin sunk under worldgen's terrain: worldgen's trees there would stand far above it,
-        // and none is drawn - a supplied column's trees are in its own blocks
+        // A basin sunk under worldgen's terrain: a supplied column's trees are in its own blocks.
         var basin = LowestUnder(rx, rz) - PlateauLift;
-        var sunk = LodRegion.BuildMeshData(Level, rx, rz,
-                source: Over(rx, rz, basin, Biome.Desert, warmth: 0.95f, wetness: 0.05f))
-            .Vertices.Where(InInterior).ToList();
+        var sunkMesh = LodRegion.BuildMeshData(Level, rx, rz,
+            source: Over(rx, rz, basin, Biome.Desert, warmth: 0.95f, wetness: 0.05f));
+        var sunk = sunkMesh.Vertices.Where(InInterior).ToList();
         Assert.NotEmpty(sunk);
-        Assert.DoesNotContain(sunk, IsCanopy);
+        Assert.DoesNotContain(sunkMesh.Trees.Instances, t => t.RootX == rootX && t.RootZ == rootZ);
         Assert.All(sunk, v => Assert.True(v.Position.Y <= basin + 1,
             $"a vertex at {v.Position} stands above the import's basin at {basin}"));
     }

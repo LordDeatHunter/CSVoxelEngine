@@ -15,9 +15,9 @@ namespace VoxelEngine.Tests.Lod;
 /// one placement source the grown canopy shares), every crown profile peaks at the trunk and
 /// never climbs with distance, a crown never leaves its species' reach, the crown roll is a pure
 /// function of the column, and the rings that read the proxy never run tree growth. In the
-/// shape-cache collection because one fact resets the tree caches.
+/// worldgen-seed collection because one fact resets the tree caches.
 /// </summary>
-[Collection("Worldgen shape cache")]
+[Collection("Worldgen seed")]
 public sealed class LodCanopyProxyTests
 {
     public LodCanopyProxyTests() => TestContent.EnsureLoaded();
@@ -212,34 +212,38 @@ public sealed class LodCanopyProxyTests
     [Fact]
     public void FarRingsNeverRunGrowth()
     {
-        // Far from every other fact's search area, so no parallel test fills these caches
-        var (cx, cz) = TreeWorldgenFixture.FindForestTreeColumn(origin: (20000, -30000), maxRadius: 96);
-        var x = cx * Chunk.Size + 8;
-        var z = cz * Chunk.Size + 8;
+        // A frozen admitted Dynamic giant, with no placement search during this fact.
+        const int x = 4004;
+        const int z = 811;
         static int DivFloor(int a, int b) => a >= 0 ? a / b : (a - b + 1) / b;
-
-        var leafTiles = new HashSet<ushort>();
-        foreach (var species in ProxySpecies)
-            leafTiles.UnionWith(TestContent.WorldTiles(BlockType.ById[species.LeavesId]!));
-
-        TreeGenerator.ResetCaches();
-        var before = TreeBatches.GrowsOnThisThread;
-        var proxyRings = 0;
-        for (var level = 0; level < LodRegion.Levels.Length; level++)
+        var seed = WorldSeed.Value;
+        var profile = WorldSeed.Profile;
+        try
         {
-            var spec = LodRegion.Levels[level];
-            if (!spec.ProxyCanopy) continue;
-            proxyRings++;
-            var mesh = LodRegion.BuildMeshData(level, DivFloor(x, spec.RegionBlocks), DivFloor(z, spec.RegionBlocks));
-            Assert.True(before == TreeBatches.GrowsOnThisThread, $"LOD ring {level} reads the proxy but grew a tree");
-            Assert.Contains(mesh.Vertices, v => (v.PackedColor >> 24) == 253u && leafTiles.Contains(v.Layer));
-        }
-        Assert.True(proxyRings > 0, "no LOD ring reads the proxy canopy");
+            WorldSeed.Apply(1337, WorldGenProfile.Dynamic);
+            Assert.True(TreeGenerator.TryGetTree(x, z, out var species, out _));
+            Assert.True(species.HasLeaves);
+            TreeGenerator.ResetCaches();
+            var before = TreeBatches.GrowsOnThisThread;
+            var proxyRings = 0;
+            for (var level = 0; level < LodRegion.Levels.Length; level++)
+            {
+                var spec = LodRegion.Levels[level];
+                if (!spec.ProxyCanopy) continue;
+                proxyRings++;
+                var mesh = LodRegion.BuildMeshData(level, DivFloor(x, spec.RegionBlocks), DivFloor(z, spec.RegionBlocks));
+                Assert.Equal(before, TreeBatches.GrowsOnThisThread);
+                Assert.Contains(mesh.Trees.Instances, tree => tree.RootX == x && tree.RootZ == z && tree.HasCrown);
+                Assert.DoesNotContain(mesh.Vertices, v => (v.PackedColor >> 24) == 253u);
+            }
+            Assert.True(proxyRings > 0, "no LOD ring reads a proxy crown");
 
-        // BuildMeshData runs on the calling thread, so the first ring's grown canopy shows here
-        var first = LodRegion.Levels[0];
-        Assert.False(first.ProxyCanopy, "the ring meeting the full-detail chunks must read the grown canopy");
-        LodRegion.BuildMeshData(0, DivFloor(x, first.RegionBlocks), DivFloor(z, first.RegionBlocks));
-        Assert.True(TreeBatches.GrowsOnThisThread > before, "the first ring read the grown canopy without growing a tree");
+            var first = LodRegion.Levels[0];
+            Assert.False(first.ProxyCanopy, "the ring meeting full-detail chunks must read grown trees");
+            var grown = LodRegion.BuildMeshData(0, DivFloor(x, first.RegionBlocks), DivFloor(z, first.RegionBlocks));
+            Assert.Contains(grown.Trees.Instances, tree => tree.RootX == x && tree.RootZ == z && tree.HasCrown);
+            Assert.True(TreeBatches.GrowsOnThisThread > before, "the first ring read a grown crown without growing a tree");
+        }
+        finally { WorldSeed.Apply(seed, profile); }
     }
 }

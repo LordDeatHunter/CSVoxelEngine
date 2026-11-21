@@ -164,7 +164,8 @@ internal sealed class ClientSession
             ActiveWorld = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
                 renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,
                 windowManager.Window, inputManager.InputContext, sfx, null,
-                serverMode: false, clientMode: true, spawn: server.Spawn)
+                serverMode: false, clientMode: true, spawn: server.Spawn,
+                lodTreePool: renderManager.LodTrees)
             {
                 Player =
                 {
@@ -181,7 +182,8 @@ internal sealed class ClientSession
                 ActiveWorld.Camera.SetAspectRatio(fb.X / (float)fb.Y);
 
             clientStreamer = new ClientChunkStreamer(ActiveWorld.GetChunkManager(), SendChunkRequest, SendColumnRequest, client.Wire);
-            clientLodStreamer = new ClientLodStreamer(ActiveWorld.GetLodManager(), SendLodRequest, client.Wire);
+            clientLodStreamer = new ClientLodStreamer(ActiveWorld.GetLodManager(), SendLodRequest,
+                SendLodAck, client.Wire);
         }
         catch (Exception e)
         {
@@ -322,6 +324,8 @@ internal sealed class ClientSession
                 foreach (var change in netCellsScratch.Where(change => prediction.Offer(change, seq)))
                     netApplyScratch.Add(change);
                 w.ClientMirror.ApplyNetworkBlockChanges(netApplyScratch);
+                foreach (var change in netApplyScratch)
+                    clientLodStreamer?.MarkEditedColumn(change.X, change.Z);
                 break;
             }
             case NetMessage.IntentResult:
@@ -333,6 +337,8 @@ internal sealed class ClientSession
                 netApplyScratch.Clear();
                 prediction.Resolve(seq, netApplyScratch);
                 w.ClientMirror.ApplyNetworkBlockChanges(netApplyScratch);
+                foreach (var change in netApplyScratch)
+                    clientLodStreamer?.MarkEditedColumn(change.X, change.Z);
                 if (Waystones.NoteResult(seq, accepted) && !accepted)
                     w.Toast.Show(WaystoneText.TripRefused);
                 if (!accepted && diagnostics.DebugEnabled)
@@ -398,14 +404,18 @@ internal sealed class ClientSession
                 clientStreamer?.ApplyColumn(cx, cz, reader.ReadBytes());
                 break;
             }
-            case NetMessage.LodRegionData:
-            {
-                reader.ReadInt();
-                reader.ReadInt();
-                reader.ReadInt();
-                clientLodStreamer?.Apply(reader.ReadBytes());
+            case NetMessage.LodRegionBegin:
+                clientLodStreamer?.Begin(reader);
                 break;
-            }
+            case NetMessage.LodRegionPage:
+                clientLodStreamer?.Page(reader);
+                break;
+            case NetMessage.LodRegionComplete:
+                clientLodStreamer?.Complete(reader);
+                break;
+            case NetMessage.LodRegionInvalidate:
+                clientLodStreamer?.Invalidate(reader);
+                break;
             case NetMessage.EntityList:
             {
                 var count = reader.ReadInt();
@@ -424,6 +434,8 @@ internal sealed class ClientSession
                 foreach (var change in netCellsScratch.Where(offerServerWrite))
                     netApplyScratch.Add(change);
                 w.ClientMirror.ApplyNetworkBlockChanges(netApplyScratch);
+                foreach (var change in netApplyScratch)
+                    clientLodStreamer?.MarkEditedColumn(change.X, change.Z);
                 break;
             }
             case NetMessage.LanternContents:
@@ -507,7 +519,7 @@ internal sealed class ClientSession
     }
 
     /// <summary>Asks the server to build and send one far-LOD region (a client builds none itself).</summary>
-    private void SendLodRequest(int level, int rx, int rz)
+    private void SendLodRequest(int level, int rx, int rz, int nonce)
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return;
@@ -515,6 +527,16 @@ internal sealed class ClientSession
         writer.Write(level);
         writer.Write(rx);
         writer.Write(rz);
+        writer.Write(nonce);
+        client.Send(writer.ToArray());
+    }
+
+    private void SendLodAck(int nonce, LodTransfer.Key region, int generation, byte status)
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client) return;
+        using var writer = new PacketWriter(NetMessage.LodRegionAck);
+        writer.Write(nonce).Write(region.Level).Write(region.X).Write(region.Z)
+            .Write(generation).Write(status);
         client.Send(writer.ToArray());
     }
 
@@ -635,8 +657,11 @@ internal sealed class ClientSession
     }
 
     /// <summary>A cell the world just changed as part of a predicted action (World.BlockEdited).</summary>
-    private void StagePredictedCell(int x, int y, int z, ushort blockId, byte state) =>
+    private void StagePredictedCell(int x, int y, int z, ushort blockId, byte state)
+    {
         prediction.Stage(x, y, z);
+        clientLodStreamer?.MarkEditedColumn(x, z);
+    }
 
     /// <summary>
     /// Sends one world intent (World.IntentRaised) with the next sequence id, which also tags the
@@ -683,6 +708,7 @@ internal sealed class ClientSession
 
     internal void DisconnectNetwork()
     {
+        clientLodStreamer?.CancelAll();
         netClient?.Dispose();
         netClient = null;
         clientStreamer = null;

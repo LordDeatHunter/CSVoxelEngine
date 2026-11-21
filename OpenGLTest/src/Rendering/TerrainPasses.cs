@@ -328,7 +328,7 @@ internal sealed class TerrainPasses
 
             // Buried regions are fully covered by a finer level (or, for the finest level, by
             // drawn chunks); drawing them too would stack shells visible from inside caves
-            if (!region.HasMesh || region.IsBuried)
+            if ((!region.HasMesh || region.IsBuried) && !region.HasVisibleTrees)
                 continue;
 
             var min = new Vector3(region.X * region.SizeBlocks, region.YMin, region.Z * region.SizeBlocks);
@@ -351,16 +351,28 @@ internal sealed class TerrainPasses
 
         foreach (var (region, _) in _visibleRegions)
         {
-            region.Lifetime += 1.0 / 60.0;
-
-            _owner.ChunkDraws.Add(region.OpaqueSlice!.Value,
-                new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks),
-                MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
+            if (region.HasMesh && !region.IsBuried)
+                _owner.ChunkDraws.Add(region.OpaqueSlice!.Value,
+                    new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks),
+                    MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)));
         }
 
         // chunkShader's uAlphaCutoff is already 0.5 (set once at construction and restored by
         // RenderManager.BeginFrame), which is exactly what worldShader carried here.
         _owner.ChunkDraws.Draw(_owner.LodGeometry.Vao, _owner.ChunkShader, _owner.LocChunkDrawBase);
+        _owner.TreeShader.Use();
+        _owner.TreeShader.SetUniform(_owner.LocTreeViewProj, viewProj);
+        _owner.LodTrees.Bind();
+        _owner.ChunkDraws.BeginPass(_visibleRegions.Count);
+        foreach (var (region, _) in _visibleRegions)
+        {
+            if (!region.HasVisibleTrees) continue;
+            _owner.ChunkDraws.AddInstanced(_owner.LodTrees.Template(region.TreeSlice),
+                new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks),
+                MathF.Min(1f, (float)(region.Lifetime / LodRegion.MAX_LIFETIME)),
+                (uint)region.TreeSlice.Count, region.TreeSlice.BaseInstance);
+        }
+        _owner.ChunkDraws.Draw(_owner.LodTrees.Vao, _owner.TreeShader, _owner.LocTreeDrawBase);
     }
 
     /// <summary>Drops the per-frame chunk and region draw lists, which still point into the

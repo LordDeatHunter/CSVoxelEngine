@@ -446,9 +446,9 @@ public sealed class LodManagerTests
     }
 
     /// <summary>The block column at the center of a region, which is the only column guaranteed to
-    /// mark that region and nothing beside it: MarkEditedColumn widens the edit by
-    /// SampleMargin + CellSize (3 blocks at level 0) and a column at the center of a 64-block
-    /// region is far inside that margin.</summary>
+    /// mark that region and nothing beside it in these unpoisoned claim tests:
+    /// MarkEditedColumn uses SampleMargin + CellSize for ordinary terrain edits. A poisoned
+    /// tree column deliberately reaches farther so an overhanging crown also rebuilds.</summary>
     private static (int X, int Z) CenterColumnOf((int Level, int X, int Z) key)
     {
         var blocks = LodRegion.Levels[key.Level].RegionBlocks;

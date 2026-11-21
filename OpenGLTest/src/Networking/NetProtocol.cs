@@ -52,8 +52,16 @@ public enum NetMessage : byte
     /// chunk column's heights, water levels and corner climate (<see cref="ChunkNetCodec.EncodeColumn"/>).</summary>
     ColumnTerrain = 53,
     LodRegionRequest = 54,
+    /// <summary>Retired single-frame LOD payload; protocol 69 uses the bounded page exchange.</summary>
     LodRegionData = 55,
     BlockChanges = 56,
+    LodRegionBegin = 57,
+    LodRegionPage = 58,
+    LodRegionComplete = 59,
+    /// <summary>Server to clients: one relevant LOD key, or level -1 for bounded global fallback.</summary>
+    LodRegionInvalidate = 76,
+    /// <summary>Client completion, rejection or cancellation of one nonce and region key.</summary>
+    LodRegionAck = 69,
     EntityList = 60,
     /// <summary>Server broadcast: the campfire, quern, kiln and cast-mold block entities the clients
     /// draw (<see cref="StationNetCodec"/>).</summary>
@@ -322,8 +330,11 @@ public static class NetFraming
     /// <see cref="NetMessage.EntityList"/> (their posture byte says darting or beached); an older client would not draw them.
     /// 67: a <see cref="NetEntityKind.Centipede"/> crawls over walls and ceilings: its posture byte is the face it
     /// holds (<c>CrawlDrive.SurfaceIndex</c>, 0 = airborne) and its yaw the heading's angle on that face; an older
-    /// client would draw it lying on a floor.</summary>
-    public const int ProtocolVersion = 67;
+    /// client would draw it lying on a floor.
+    /// 69: complete compact tree instances/material/tint/source masks and bounded multipart LOD
+    /// regions with per-client completion credit (it also carries 67's crawler posture). It skips 68 and
+    /// rejects it: the separate PR15 68 has a different payload meaning and is not part of this branch.</summary>
+    public const int ProtocolVersion = 69;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;
@@ -465,6 +476,17 @@ public sealed class PacketReader : IDisposable
 
     /// <summary>Reads a length-prefixed byte array written by <see cref="PacketWriter.WriteBytes"/>.</summary>
     public byte[] ReadBytes() => _reader.ReadBytes(_reader.ReadInt32());
+
+    /// <summary>Read one length-prefixed section only after checking its advertised bound.</summary>
+    public byte[] ReadBytes(int maximum)
+    {
+        var length = _reader.ReadInt32();
+        if (length < 0 || length > maximum)
+            throw new InvalidDataException("Network section exceeds its declared bound.");
+        var bytes = _reader.ReadBytes(length);
+        if (bytes.Length != length) throw new EndOfStreamException();
+        return bytes;
+    }
 
     public void Dispose()
     {

@@ -750,7 +750,25 @@ float Schlick(float cosT) {
 // daylight bounce and is lit by torch, point and emissive light alone (twin: SkyAmbient.Gate).
 float SkyGate(float sun) { return clamp(sun, 0.0, 1.0); }
 
+#ifdef TREE_PROXY
+layout (std430, binding = 3) readonly buffer TreePayload { uint treeWords[]; };
+flat in uint fTreeBase;
+in vec2 fTreeXZ;
+bool TreeTileVisible() {
+    int side = int(treeWords[fTreeBase + 7u]);
+    ivec2 tile = ivec2(floor(fTreeXZ / 16.0));
+    if (any(lessThan(tile, ivec2(0))) || any(greaterThanEqual(tile, ivec2(side))))
+        return false;
+    int index = tile.x * side + tile.y;
+    uint bits = treeWords[fTreeBase + treeWords[fTreeBase + 3u] + uint(index >> 5)];
+    return (bits & (1u << uint(index & 31))) != 0u;
+}
+#endif
+
 void main() {
+#ifdef TREE_PROXY
+    if (!TreeTileVisible()) discard;
+#endif
     // The reflection pass clips everything below the sea surface out of the mirror.
     if (fWorldPos.y < uClipY) discard;
     // ponytail: the water flag (254) and the opaque-LOD-foliage flag (253) ride in
