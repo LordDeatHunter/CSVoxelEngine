@@ -43,9 +43,12 @@ public static class PopBoxEmitter
     /// <c>BlockType.RotatedModels</c>) offset by <paramref name="blockPosition"/> and grown about
     /// the model's own center by <paramref name="grow"/>, with the model's own tiles and UVs, so a
     /// hollow log pops with the hole and the grain the chunk mesh shows rather than as a plain cube.
+    /// A quad the model marks <c>shade: false</c> (a crossed plant) stays at full brightness, as the
+    /// chunk mesh draws it. <paramref name="tinted"/> flags every quad biome-tinted (a
+    /// <c>modelTint</c> plant's gray tile), so the plain path's <c>uBiomeTint</c> colors it.
     /// </summary>
     public static void EmitModel(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        BakedModel model, float grow, Vector3 blockPosition)
+        BakedModel model, float grow, Vector3 blockPosition, bool tinted = false)
     {
         // Grown about the model's own middle, so a low block (a stump) swells up as well as out instead of its
         // top sinking under the still-drawn chunk mesh while only its sides pop
@@ -61,11 +64,12 @@ public static class PopBoxEmitter
         var center = (min + max) * 0.5f;
         foreach (var quad in model.Quads)
         {
-            var shade = ChunkFaceTables.ShadeLut[(quad.Face << 2) | 3];
+            var shade = quad.Shade ? ChunkFaceTables.ShadeLut[(quad.Face << 2) | 3] : (byte)255;
             for (var j = 0; j < 4; j++)
             {
                 var p = center + (quad.Positions[j] - center) * (1f + grow);
-                vertices.Add(new Vertex(blockPosition + p, shade, shade, shade, 255, quad.Uvs[j], quad.Tile, 1f, 0f, quad.Normal));
+                vertices.Add(new Vertex(blockPosition + p, shade, shade, shade, 255, quad.Uvs[j], quad.Tile, 1f, 0f, quad.Normal,
+                    biomeTint: tinted));
             }
 
             indices.Add((ushort)(indexOffset + 0));

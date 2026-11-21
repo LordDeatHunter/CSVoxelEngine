@@ -160,6 +160,30 @@ public sealed class BiomeTintPopTests
     }
 
     /// <summary>
+    /// A <c>modelTint</c> plant (a fern, the tall grass) wears a gray tile on every quad, so its chips must carry the
+    /// field of its palette at the cell and its debris model must flag every quad tinted, or they fly off gray.
+    /// </summary>
+    [Fact]
+    public void ModelTintedPlantsChipInTheirCellsTint()
+    {
+        var plants = BlockType.ById.Where(t => t is { ModelBiomeTint: not null, BakedModel: not null }).ToList();
+        Assert.NotEmpty(plants);
+        var cell = new Vector3(-37f, 12f, -5f);
+        foreach (var plant in plants)
+        {
+            var system = new BlockDebrisSystem();
+            system.Burst(cell, plant!.Id, ParticleConfig.BlockDebrisPerHit, new Random(1));
+            Assert.NotEmpty(system.Debris);
+            var expected = BiomeTint.CellTint(plant.ModelBiomeTint!.Value, (int)MathF.Floor(cell.X), (int)MathF.Floor(cell.Z));
+            Assert.All(system.Debris, d => Assert.Equal(expected, d.Tint));
+
+            var (verts, _) = BlockCubeCache.BuildTintedModel(plant);
+            Assert.NotEmpty(verts);
+            Assert.All(verts, v => Assert.True(v.IsBiomeTinted, $"{plant.Name}'s debris model has an untinted quad"));
+        }
+    }
+
+    /// <summary>
     /// A column source for the debris tint: answers from <see cref="Answer"/> (null = the column is
     /// missing, as a client's streamed column before it arrived) and records every column asked.
     /// </summary>

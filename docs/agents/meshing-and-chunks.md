@@ -262,7 +262,9 @@ every chunk uses its own `BiomeTint.FieldsFor` and a falling canopy keeps the cl
 The mining pop and the break debris are standalone copies drawn at many
 cells from streamed or cached geometry, so they wear the `BiomeTint` tiles (`PopBoxEmitter.EmitBox`'s
 `biomeTint` argument; `BlockCubeCache.GetTinted`/`BuildTintedCube`, one cached debris mesh per
-block, which only the debris asks for) with gray shade-only rgb, and the cell's color comes from
+block, which only the debris asks for; a `modelTint` plant's debris is its own model with every quad
+flagged, `BuildTintedModel` through `PopBoxEmitter.EmitModel`'s `tinted` argument, and `TintAt` reads
+its `ModelBiomeTint` palette) with gray shade-only rgb, and the cell's color comes from
 the plain program's per-draw `uBiomeTint` uniform (`BiomeTint.TryCellTint` at the mined cell over the
 world's `ColumnSource` — the pop reads `RenderManager.LightSource.ColumnSource`, the debris gets
 `BlockDebrisSystem.Burst`'s `columns:` argument — carried by `BlockDebris.Tint` for each cube, and

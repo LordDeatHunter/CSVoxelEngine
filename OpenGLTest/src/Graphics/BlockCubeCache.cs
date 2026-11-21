@@ -177,17 +177,19 @@ public class BlockCubeCache : IDisposable
     /// The cube a standalone world copy of the block draws (the break debris): the same as
     /// <see cref="Get"/> for an untinted block, and for a biome-tinted one the cube built by
     /// <see cref="BuildTintedCube"/>, whose tinted quads take their color from the plain
-    /// path's per-draw <c>uBiomeTint</c>, so one cached mesh serves every cell.
+    /// path's per-draw <c>uBiomeTint</c>, so one cached mesh serves every cell. A
+    /// <c>modelTint</c> plant is its model with every quad tinted (<see cref="BuildTintedModel"/>).
     /// </summary>
     public Mesh? GetTinted(ushort blockId)
     {
         var type = BlockType.ById[blockId];
-        if (type?.BiomeTint == null) return Get(blockId);
+        var modelTinted = type is { ModelBiomeTint: not null, BakedModel: not null };
+        if (type?.BiomeTint == null && !modelTinted) return Get(blockId);
 
         if (_tintedMeshes.TryGetValue(blockId, out var mesh))
             return mesh;
 
-        var (vertices, indices) = BuildTintedCube(type);
+        var (vertices, indices) = modelTinted ? BuildTintedModel(type!) : BuildTintedCube(type!);
         mesh = new Mesh(_gl, vertices, indices);
         _tintedMeshes[blockId] = mesh;
         return mesh;
@@ -206,6 +208,20 @@ public class BlockCubeCache : IDisposable
         ushort offset = 0;
         PopBoxEmitter.EmitBox(vertices, indices, ref offset, BlockHitbox.FullCube, BlockHitbox.FullCube,
             new Vector3(-0.5f), type.FaceTiles, type.BiomeTint);
+        return (vertices.ToArray(), indices.ToArray());
+    }
+
+    /// <summary>
+    /// A <c>modelTint</c> block's own model centered on the origin like <see cref="Get"/>'s, every
+    /// quad flagged biome-tinted so the per-draw <c>uBiomeTint</c> colors its gray tile. GL-free.
+    /// </summary>
+    public static (Vertex[] Vertices, ushort[] Indices) BuildTintedModel(BlockType type)
+    {
+        var model = type.BakedModel!;
+        var vertices = new List<Vertex>(model.Quads.Length * 4);
+        var indices = new List<ushort>(model.Quads.Length * 6);
+        ushort offset = 0;
+        PopBoxEmitter.EmitModel(vertices, indices, ref offset, model, 0f, new Vector3(-0.5f), tinted: true);
         return (vertices.ToArray(), indices.ToArray());
     }
 

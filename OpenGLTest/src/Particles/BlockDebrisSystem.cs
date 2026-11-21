@@ -173,13 +173,14 @@ public class BlockDebrisSystem
 
     /// <summary>
     /// The plain path's <c>uBiomeTint</c> for chips of <paramref name="blockId"/> from
-    /// <paramref name="cell"/>: a biome-tinted block wears the field there, read from
-    /// <paramref name="columns"/> (null means worldgen), and anything else, or a column that source
-    /// does not have yet (a client's streamed column that has not arrived), is untinted white.
+    /// <paramref name="cell"/>: a biome-tinted block (per face, or a <c>modelTint</c> plant) wears
+    /// the field there, read from <paramref name="columns"/> (null means worldgen), and anything else,
+    /// or a column that source does not have yet (a client's streamed column that has not arrived),
+    /// is untinted white.
     /// </summary>
     internal static Vector3 TintAt(Vector3 cell, ushort blockId, IColumnSource? columns) =>
-        BlockType.ById[blockId]?.BiomeTint is { } bt
-        && BiomeTint.TryCellTint(columns ?? WorldgenColumnSource.Instance, bt.Palette,
+        BlockType.ById[blockId] is { } type && (type.BiomeTint?.Palette ?? type.ModelBiomeTint) is { } palette
+        && BiomeTint.TryCellTint(columns ?? WorldgenColumnSource.Instance, palette,
             (int)MathF.Floor(cell.X), (int)MathF.Floor(cell.Z), out var cellTint)
             ? cellTint
             : Vector3.One;
