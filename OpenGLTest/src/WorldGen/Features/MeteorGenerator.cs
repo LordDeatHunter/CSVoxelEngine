@@ -6,7 +6,7 @@ namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Meteor craters: a rare bowl cut into the land, its floor lined with obsidian — the scar of an
-/// old impact. Decided per 2^<see cref="WorldFeatureConfig.MeteorCellShift"/>-block cell from a
+/// old impact; several times more common in Charred land (<see cref="WorldFeatureConfig.MeteorCharredChanceFactor"/>). Decided per 2^<see cref="WorldFeatureConfig.MeteorCellShift"/>-block cell from a
 /// pure hash of (cell, seed) (the center column and a radius), so every chunk the bowl crosses
 /// stamps the same cells; each column is cut from its own ground down the bowl profile, so a
 /// crater on a slope stays a bowl. Only the surface is cut (never fluids), and the far LOD shows
@@ -30,12 +30,17 @@ public static class MeteorGenerator
         radius = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x3E7E);
         var roll = (SplitMix64.Mix(h) >> 40) * (1f / (1 << 24));
-        if (roll >= WorldFeatureConfig.MeteorChance) return false;
+        if (roll >= WorldFeatureConfig.MeteorChance * WorldFeatureConfig.MeteorCharredChanceFactor) return false;
 
         var span = (ulong)(1 << WorldFeatureConfig.MeteorCellShift);
         x = (cellX << WorldFeatureConfig.MeteorCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
         z = (cellZ << WorldFeatureConfig.MeteorCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
-        if (roll >= WorldFeatureConfig.MeteorChance * TerrainErg.Retention(x, z)) return false;
+        // Charred land keeps the raised roll; everywhere else the roll is the plain chance, so a crater outside the
+        // province is exactly the one it always was (the Charred test runs only for the rolls that need it)
+        var chance = WorldFeatureConfig.MeteorChance;
+        if (roll >= chance && BiomeClassifier.BiomeWeights(x, z, out _, out _) == Biome.Charred)
+            chance *= WorldFeatureConfig.MeteorCharredChanceFactor;
+        if (roll >= chance * TerrainErg.Retention(x, z)) return false;
         var radii = WorldFeatureConfig.MeteorMaxRadius - WorldFeatureConfig.MeteorMinRadius + 1;
         radius = WorldFeatureConfig.MeteorMinRadius + (int)(SplitMix64.Mix(h + 3) % (ulong)radii);
         if (FeatureExclusion.IntersectsDisc(x, z, radius)) return false;

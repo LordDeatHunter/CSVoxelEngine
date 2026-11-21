@@ -389,6 +389,9 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float VolcanicProvinceStart = 0.16f;
     public const float VolcanicProvinceEnd = 0.34f;
     public const float VolcanicClassifyThreshold = 0.5f;
+    // Rivers dry out toward the Charred line (WaterBodies.CharredRiverGate): fully open below this
+    // province value, fully closed at VolcanicClassifyThreshold, so no river water reaches Charred land.
+    public const float CharredRiverFadeStart = 0.38f;
     public const float VolcanoSiteProvinceMin = 0.75f;
     public const int VolcanoCellBlocks = 2048;
     public const float VolcanoChance = 0.35f;
@@ -415,6 +418,11 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int VolcanoChamberLining = 3;
     public const int VolcanoSiteCacheCapacity = 128;
     public const int VolcanoSiteCacheGenerations = 4;
+    // How many Chebyshev rings of volcano cells around the player's own cell a /locate volcano scans (12 * 2048 blocks:
+    // volcanoes need a strong province, so they sit thousands of blocks apart), and how far past the top of the caldera
+    // wall (VolcanoWallWidth outside the crater) its teleport lands, on the cone's rim.
+    public const int VolcanoLocateRings = 12;
+    public const int VolcanoLocateLandingGapBlocks = 2;
 
     // --- Mud ---
     // Dirt with water directly above it and at least this many water cells in its

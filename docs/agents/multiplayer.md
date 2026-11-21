@@ -797,7 +797,7 @@ generated from the trees, filtered to what the source may run. The commands: `/h
 [target]]` (reports the amount accepted; a partial inventory grant reports that smaller amount, and a full pool
 returns a no-room error), `/summon <entity> [x y z]`, `/time dawn|sunrise|morning|noon|day|dusk|sunset|night|midnight | set <s> | add <s>` (dawn and dusk name sunrise
 and sunset, morning sits halfway between sunrise and noon),
-`/gamemode survival|creative [target]`, `/fly [on|off [target]]`, `/kill [target]`, `/locate tower` and `/op <name>`
+`/gamemode survival|creative [target]`, `/fly [on|off [target]]`, `/kill [target]`, `/locate tower|volcano` and `/op <name>`
 / `/deop <name>` (any name, online or not, `Arg.PlayerName`), all but `/help` and `/locate` operator-only. A root marked
 `.MultiplayerOnly()` (`/op`, `/deop`) exists only where the host has an operator list (`ICommandHost.Operators`,
 null on `LocalCommandHost`): singleplayer answers it with `CommandDispatcher.MultiplayerOnlyReply` and never offers or

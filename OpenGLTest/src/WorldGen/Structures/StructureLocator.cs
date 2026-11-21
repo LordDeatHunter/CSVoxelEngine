@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.WorldGen.Volcanoes;
 
 namespace VoxelEngine.WorldGen.Structures;
 
@@ -48,6 +49,26 @@ public static class StructureLocator
             return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// The volcano nearest column (<paramref name="x"/>, <paramref name="z"/>) within <paramref name="maxRings"/> rings of
+    /// volcano cells (<see cref="VolcanoSites.TryFindNearest"/>; only the Dynamic profile raises volcanoes): its center at
+    /// the crater's lava floor, and a landing on the cone's rim west of the crater, just past the top of the caldera wall
+    /// (<see cref="WorldGenerationConfig.VolcanoWallWidth"/>), overlooking the lava from outside the owned caldera.
+    /// </summary>
+    public static bool TryFindVolcano(int x, int z, int maxRings, out StructureLocation location)
+    {
+        location = default;
+        if (!VolcanoSites.TryFindNearest(x, z, maxRings, out var site)) return false;
+        var landX = (int)MathF.Floor(site.X - site.CraterRadius - WorldGenerationConfig.VolcanoWallWidth
+            - WorldGenerationConfig.VolcanoLocateLandingGapBlocks);
+        var landZ = (int)MathF.Floor(site.Z);
+        var dx = (double)site.X - x;
+        var dz = (double)site.Z - z;
+        location = new StructureLocation((int)MathF.Floor(site.X), site.Floor + 1, landZ,
+            landX, RuinPlacement.HeightAt(landX, landZ) + 1, landZ, Math.Sqrt(dx * dx + dz * dz));
+        return true;
     }
 
     private static StructureLocation LocationOf(TowerSite site, int x, int z)

@@ -484,8 +484,11 @@ internal sealed class LodMeshBuilder
         // A cell holds water only where the chunk mesher would actually flood it: an
         // ocean, or a lake/river bed. maxOwn is the uneroded cell max, matching the
         // beach sampling.
-        var cellLevel = TerrainGenerator.WaterLevelAt(centerX, centerZ);
+        var cellLevel = WaterBodies.WaterLevelAt(centerX, centerZ, out var lavaPool);
         if (maxOwn >= cellLevel) cellLevel = TerrainGenerator.NoWater;
+        // A lava lake has no lava sheet in the far LOD: its bowl wears the owned-lava floor instead (below)
+        var lavaBowl = lavaPool && cellLevel != TerrainGenerator.NoWater;
+        if (lavaBowl) cellLevel = TerrainGenerator.NoWater;
 
         // An oasis: the same pure site the chunk fill and Compute read turns the
         // cell's material to grass and its pond to the oasis' own surface
@@ -522,7 +525,7 @@ internal sealed class LodMeshBuilder
         // Only the generated path knows about a real owned lava volume. Supplied columns
         // carry biome and height but no generated-lava ownership field.
         var volcano = VolcanoSites.At(centerX, centerZ);
-        if (VolcanoShape.InLavaDisc(volcano, centerX, centerZ) && maxOwn == volcano.Floor)
+        if (lavaBowl || (VolcanoShape.InLavaDisc(volcano, centerX, centerZ) && maxOwn == volcano.Floor))
             material = 6;
         _seaFloor[(i + 1) * _heightGrid + (j + 1)] = material;
 

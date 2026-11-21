@@ -25,9 +25,11 @@ and the hearts row like the [E] panel does; `HotbarNameFade` shows the selected 
 server session only). F2
 saves the finished frame through `VisualCapture`; F1 toggles `GameplayInput`'s `hudVisible`, the gate the scenario
 screenshot's `hideHud` drives. The chat commands are `/help`, `/tp x y z`, `/give <item> [count]`
-(the last two needing rights), `/time day|night|<seconds>` and `/locate tower`, which any player may use: it finds the
-nearest battle tower from worldgen (`StructureLocator.TryFindTower`, within `TowerLocateRings` tower cells; a tower the `TowerManager` records as defeated is skipped) and answers
-with a line whose coordinates are a link (`ChatLink`), whose click puts a `/tp` to the ground beside the tower into the
+(the last two needing rights), `/time day|night|<seconds>` and `/locate tower|volcano`, which any player may use: it finds the
+nearest battle tower from worldgen (`StructureLocator.TryFindTower`, within `TowerLocateRings` tower cells; a tower the `TowerManager` records as defeated is skipped)
+or the nearest volcano (`StructureLocator.TryFindVolcano` over `VolcanoSites.TryFindNearest`, within `VolcanoLocateRings`
+volcano cells; Dynamic worlds only, landing on the cone's rim past the caldera wall) and answers
+with a line whose coordinates are a link (`ChatLink`), whose click puts a `/tp` to the ground beside the structure into the
 chat input without sending it (`ChatView.Suggest`; the `/tp` itself still needs rights); the death line is
 `DeathMessages.For` over the blow `PlayerHealth` recorded, drained into the chat (`LocalPlayer.TakeDeathMessage`).
 

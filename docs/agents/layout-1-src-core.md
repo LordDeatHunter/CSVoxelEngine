@@ -190,7 +190,7 @@ OpenGLTest/
                                #   (/help's)
       Definitions/             # one class per command with its Register: HelpCommand, TeleportCommand (LineTo, the /tp a link
                                #   suggests), GiveCommand, SummonCommand, TimeCommand, GameModeCommand, FlyCommand, KillCommand,
-                               #   LocateCommand (Tower: the linked /locate answer), OperatorCommands (/op and /deop,
+                               #   LocateCommand (Tower, Volcano: the linked /locate answers), OperatorCommands (/op and /deop,
                                #   multiplayer-only)
     Config/                    # every tuning constant, one static class per domain (all const or static
                                #   readonly, read concurrently by every thread; namespace VoxelEngine.Config)

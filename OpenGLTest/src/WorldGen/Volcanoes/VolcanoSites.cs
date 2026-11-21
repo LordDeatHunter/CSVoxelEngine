@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace VoxelEngine.WorldGen.Volcanoes;
 
@@ -121,6 +122,42 @@ internal static class VolcanoSites
     }
 
     internal static bool InGuard(float x, float z) => VolcanoShape.InGuard(At(x, z), x, z);
+
+    /// <summary>
+    /// The accepted volcano nearest column (<paramref name="x"/>, <paramref name="z"/>) among the volcano cells within
+    /// <paramref name="maxRings"/> Chebyshev rings of that column's own cell, or false when none holds one (always false
+    /// outside the Dynamic profile). Rolling a cell is only a hash; the rolled candidates are judged nearest first, so only
+    /// those nearer than the answer pay their cached site verdict. A site's center is its roll's center, so ascending roll
+    /// distance is ascending site distance and the first accepted site is the nearest.
+    /// </summary>
+    internal static bool TryFindNearest(int x, int z, int maxRings, out VolcanoSite site)
+    {
+        site = default;
+        if (WorldSeed.Profile != WorldGenProfile.Dynamic || maxRings < 0) return false;
+        const int cellBlocks = WorldGenerationConfig.VolcanoCellBlocks;
+        var homeX = (int)MathF.Floor((float)x / cellBlocks);
+        var homeZ = (int)MathF.Floor((float)z / cellBlocks);
+        var candidates = new List<(double DistanceSquared, int CellX, int CellZ)>();
+        for (var gx = homeX - maxRings; gx <= homeX + maxRings; gx++)
+        for (var gz = homeZ - maxRings; gz <= homeZ + maxRings; gz++)
+        {
+            if (!TerrainSites.TryRoll(gx, gz, cellBlocks, Salt, WorldGenerationConfig.VolcanoChance,
+                    WorldGenerationConfig.VolcanoSizeSkew, out _, out var cx, out var cz, out _)) continue;
+            var dx = (double)cx - x;
+            var dz = (double)cz - z;
+            candidates.Add((dx * dx + dz * dz, gx, gz));
+        }
+
+        candidates.Sort();
+        foreach (var (_, gx, gz) in candidates)
+        {
+            var candidate = SiteAt(gx, gz);
+            if (!candidate.Exists) continue;
+            site = candidate;
+            return true;
+        }
+        return false;
+    }
 
     /// <summary>Conservative footprint rejection for surface features. It leaves the cone
     /// flanks available and rejects any writer whose box touches the owned caldera guard.</summary>

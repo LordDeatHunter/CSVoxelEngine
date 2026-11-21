@@ -167,6 +167,8 @@ public static class SnowGenerator
                 if ((uint)groundSnowLy >= Chunk.Size) continue;
                 if (blocks[Chunk.Idx(x, groundSnowLy, z)] != BlockType.Air) continue;
                 if (!HasSnow(worldX, worldZ, ColdWeightAt(worldX, worldZ, height))) continue;
+                // No snow settles on a lava lake's warm obsidian shore
+                if (LavaPoolCrust.IsShore(column, x, z, worldX0, worldZ0)) continue;
             }
 
             var snowLy = surfaceLy + 1;

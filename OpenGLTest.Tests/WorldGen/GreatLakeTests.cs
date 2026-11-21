@@ -130,7 +130,7 @@ public sealed class GreatLakeTests
                 var holds = WaterBodies.CanHoldSurfaceWater(biome);
                 var lake = 0f;
                 var river = 0f;
-                if (holds) WaterBodies.SampleSurfaceWater(x, z, out lake, out _, out _, out river, out _, out _, out _);
+                if (holds) WaterBodies.SampleSurfaceWater(x, z, 0f, out lake, out _, out _, out river, out _, out _, out _, out _);
 
                 var level = column.WaterLevel[i];
                 var bed = column.Bed[i];

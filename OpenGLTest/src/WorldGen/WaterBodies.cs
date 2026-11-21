@@ -29,20 +29,35 @@ internal static class WaterBodies
     /// that merely deepens an otherwise-dry column stays dry instead of flooding as a narrow spike,
     /// while a ravine breaching a lake or river is prevented outright by <see cref="TerrainGenerator.RavineCutFade"/>.
     /// </summary>
-    public static int WaterLevelAt(float x, float z)
+    public static int WaterLevelAt(float x, float z) => WaterLevelAt(x, z, out _);
+
+    /// <summary>
+    /// <see cref="WaterLevelAt(float, float)"/>, plus whether the surface fluid at that level is lava: a lake or pond
+    /// centered in Charred land (<see cref="SampleSurfaceWater"/>'s <c>lavaLake</c>) floods with lava instead of water,
+    /// exactly as <see cref="TerrainGenerator.Compute"/> marks the column (<see cref="ColumnData.LavaPool"/>).
+    /// </summary>
+    public static int WaterLevelAt(float x, float z, out bool lava)
     {
-        var biome = BiomeClassifier.BiomeWeights(x, z, out _, out var desertWeight);
+        var biome = BiomeClassifier.BiomeWeights(x, z, out var oceanWeight, out var desertWeight);
         var gate = SurfaceWaterGate(desertWeight);
         var lakeWeight = 0f;
         var lakeSurface = NoWater;
         var riverWeight = 0f;
         var riverLevel = WorldGenerationConfig.SeaLevel;
+        var lavaLake = false;
         if (CanHoldSurfaceWater(biome))
-            SampleSurfaceWater(x, z, out lakeWeight, out lakeSurface, out _, out riverWeight, out riverLevel, out _,
-                out _);
+            SampleSurfaceWater(x, z, oceanWeight, out lakeWeight, out lakeSurface, out _, out riverWeight,
+                out riverLevel, out _, out _, out lavaLake);
 
-        return WaterLevelFor(biome, gate, riverWeight, riverLevel, lakeWeight, lakeSurface);
+        var level = WaterLevelFor(biome, gate, riverWeight, riverLevel, lakeWeight, lakeSurface);
+        lava = IsLavaLevel(level, lakeSurface, lavaLake);
+        return level;
     }
+
+    /// <summary>Whether a column flooding to <paramref name="level"/> floods with lava: only when the level is the
+    /// lava lake's own surface (a river or the sea standing there stays water).</summary>
+    internal static bool IsLavaLevel(int level, int lakeSurface, bool lavaLake) =>
+        lavaLake && level != NoWater && level == lakeSurface;
 
     /// <summary>
     /// The lake and river fields at (x, z), with both lake tiers composed: the pond bowl of
@@ -61,10 +76,20 @@ internal static class WaterBodies
     /// great-lake footprint every out equals the pond and river values exactly, with the river at
     /// <see cref="WorldGenerationConfig.SeaLevel"/>. The biome is not tested here: callers gate on
     /// <see cref="CanHoldSurfaceWater"/> as before.
+    /// <para>
+    /// Charred land holds no river and no water lake: the river weight (the outflow included) is scaled by
+    /// <see cref="CharredRiverGate"/> at the column, so a channel dries into a wash before the Charred line the way it
+    /// closes before a desert, and <paramref name="lavaLake"/> reports that the lake reaching the column is centered in
+    /// Charred land (<see cref="IsCharredPool"/>, decided once per lake at its center so a lake never splits into water
+    /// and lava), which floods with lava instead of water. <paramref name="oceanWeight"/> is the column's, as the
+    /// province reads it.
+    /// </para>
     /// </summary>
-    internal static void SampleSurfaceWater(float x, float z, out float lakeWeight, out int lakeSurface,
-        out int lakeFloor, out float riverWeight, out int riverLevel, out int riverBank, out float ravineGuard)
+    internal static void SampleSurfaceWater(float x, float z, float oceanWeight, out float lakeWeight,
+        out int lakeSurface, out int lakeFloor, out float riverWeight, out int riverLevel, out int riverBank,
+        out float ravineGuard, out bool lavaLake)
     {
+        lavaLake = false;
         if (VolcanoSites.InGuard(x, z))
         {
             lakeWeight = 0f;
@@ -76,18 +101,39 @@ internal static class WaterBodies
             ravineGuard = 1f;
             return;
         }
-        lakeWeight = LakeSample(x, z, out lakeSurface, out lakeFloor);
+        lakeWeight = LakeSample(x, z, out lakeSurface, out lakeFloor, out var pondCenter);
         riverWeight = RiverWeight(x, z);
         var great = GreatLakes.Sample(x, z, out var greatSurface, out var greatFloor, out ravineGuard,
-            out riverLevel, out riverBank, out var outflow, out _);
+            out riverLevel, out riverBank, out var outflow, out var greatCell);
         if (outflow > riverWeight) riverWeight = outflow;
-        if (great <= 0f) return;
+        if (riverWeight > 0f) riverWeight *= CharredRiverGate(x, z, oceanWeight);
+        if (great <= 0f)
+        {
+            lavaLake = lakeWeight > 0f && IsCharredPool(pondCenter.X, pondCenter.Z);
+            return;
+        }
 
         lakeWeight = great;
         lakeSurface = greatSurface;
         lakeFloor = greatFloor;
         riverWeight *= GreatLakes.RiverShare(great);
+        var lobe = GreatLakes.SiteAt(greatCell.X, greatCell.Z).Lobe0;
+        lavaLake = IsCharredPool(lobe.X, lobe.Z);
     }
+
+    /// <summary>
+    /// 0..1 share of a river that survives at (x, z): 1 away from the volcanic province, easing to 0 by the Charred
+    /// line (<see cref="WorldGenerationConfig.VolcanicClassifyThreshold"/>), so no river water flows in Charred land,
+    /// whose lakes are lava (<see cref="IsCharredPool"/>). Exactly 1 outside the Dynamic profile.
+    /// </summary>
+    internal static float CharredRiverGate(float x, float z, float oceanWeight) =>
+        1f - MathUtils.SmoothStep(WorldGenerationConfig.CharredRiverFadeStart,
+            WorldGenerationConfig.VolcanicClassifyThreshold, BiomeClassifier.VolcanicProvince(x, z, oceanWeight));
+
+    /// <summary>Whether a lake centered at (<paramref name="centerX"/>, <paramref name="centerZ"/>) is a lava lake:
+    /// its center classifies as Charred land.</summary>
+    internal static bool IsCharredPool(float centerX, float centerZ) =>
+        BiomeClassifier.BiomeWeights(centerX, centerZ, out _, out _) == Biome.Charred;
 
     /// <summary>
     /// Whether a biome is one a lake or a river may stand in: every land biome but the desert
@@ -195,8 +241,14 @@ internal static class WaterBodies
     /// floor) comes from the per-cell cache (<see cref="PondSiteAt"/>), asked only for a column inside the
     /// candidate's nominal radius.
     /// </summary>
-    internal static float LakeSample(float x, float z, out int surface, out int floor)
+    internal static float LakeSample(float x, float z, out int surface, out int floor) =>
+        LakeSample(x, z, out surface, out floor, out _);
+
+    /// <summary><see cref="LakeSample(float, float, out int, out int)"/>, plus the center of the pond that reaches the
+    /// column (default where none does).</summary>
+    internal static float LakeSample(float x, float z, out int surface, out int floor, out (float X, float Z) center)
     {
+        center = default;
         const int cell = WorldGenerationConfig.LakeCellBlocks;
         TerrainSites.CellRange(x, cell, WorldGenerationConfig.LakeMaxRadius, out var gxMin, out var gxMax);
         TerrainSites.CellRange(z, cell, WorldGenerationConfig.LakeMaxRadius, out var gzMin, out var gzMax);
@@ -236,6 +288,7 @@ internal static class WaterBodies
                 best = w;
                 surface = site.Surface;
                 floor = site.Floor;
+                center = (centerX, centerZ);
             }
         }
 
@@ -353,8 +406,8 @@ internal static class WaterBodies
     /// </summary>
     public static float SurfaceWaterWeight(float x, float z)
     {
-        BiomeClassifier.BiomeWeights(x, z, out _, out var desertWeight);
-        SampleSurfaceWater(x, z, out var lake, out _, out _, out var river, out _, out _, out _);
+        BiomeClassifier.BiomeWeights(x, z, out var oceanWeight, out var desertWeight);
+        SampleSurfaceWater(x, z, oceanWeight, out var lake, out _, out _, out var river, out _, out _, out _, out _);
         return MathF.Max(lake, river) * SurfaceWaterGate(desertWeight);
     }
 }

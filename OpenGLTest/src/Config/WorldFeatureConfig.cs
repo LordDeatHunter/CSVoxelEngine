@@ -17,8 +17,10 @@ public static class WorldFeatureConfig
     // Edge length of one stone, in whole texels (footprint and height alike)
     public const int PebbleMinSizeTexels = 4;
     public const int PebbleMaxSizeTexels = 8;
-    // Fraction of natural pebble stones that are obsidian instead of flint (~1% per rock)
+    // Fraction of natural pebble stones that are obsidian instead of flint (~1% per rock), and in the
+    // volcanic province's Charred land (PebbleGenerator.IsObsidianAt), where obsidian is common
     public const float PebbleObsidianChance = 0.01f;
+    public const float PebbleObsidianCharredChance = 0.35f;
 
     // --- Flowers (FlowerGenerator over PlantClumps) ---
     // Meadow cross-blocks in clumps on dry grass, only where the forest is open enough
@@ -213,6 +215,14 @@ public static class WorldFeatureConfig
     public const bool MeteorsEnabled = true;
     public const int MeteorCellShift = 8;
     public const float MeteorChance = 0.06f;
+    // A crater centered in Charred land rolls against MeteorChance times this (MeteorGenerator.TryGetCrater),
+    // so obsidian-lined bowls pock the volcanic province; every other crater is unchanged
+    public const float MeteorCharredChanceFactor = 5f;
+
+    // --- Lava lake crust (LavaPoolCrust): a Charred lava lake's bed and banks are obsidian ---
+    // How far above the lava's surface a bank's top may stand and still take the crust (a pond's banks sit at
+    // least LakeBankDepth above its surface); a higher bank is a cliff the lava does not lap
+    public const int LavaCrustBankRise = 3;
     public const int MeteorMinRadius = 4;
     public const int MeteorMaxRadius = 7;
     // Bowl depth per block inside the rim: the center is radius * this deep

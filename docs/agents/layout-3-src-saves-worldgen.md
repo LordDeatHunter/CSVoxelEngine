@@ -514,8 +514,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         RuinPlacement.cs       # the ruins of the four realms on hashed cells, and the realm site rules satellites share
         StructureLocation.cs   # where StructureLocator found a structure: its center and ground floor, the landing beside it,
                                #   the distance
-        StructureLocator.cs    # /locate: the nearest tower from worldgen within TowerLocateRings, exact by roll distance,
-                               #   and the landing beside it; main thread, never on a client
+        StructureLocator.cs    # /locate: the nearest tower (TowerLocateRings) or volcano (VolcanoLocateRings) from worldgen,
+                               #   exact by roll distance, and the landing beside it; main thread, never on a client
         StructureStamper.cs    # writes a template part inside one chunk, clipped at its border and to a y window
         WaystonePlacement.cs   # a waystone satellite a short walk from a placed ruin, by the ruin's realm rule
         TowerPlacement.cs      # the battle towers (plans/BATTLE_TOWER.md): 1536-block hashed cells (salt 0x5E7F), the cached
@@ -552,6 +552,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         JungleMud.cs           # the jungle floor's mud: noise patches (seed offset 188) read by the column fill for jungle columns only
         IceSpikeGenerator.cs   # rare single-column ice spikes on the frozen plains
         LilyPadGenerator.cs    # lily pads floating on ponds (PlantClumps)
+        LavaPoolCrust.cs       # the obsidian bed and shore of a Charred lava lake (ColumnData.LavaPool), and IsShore for snow
         MeteorGenerator.cs     # a blast crater with scattered meteor rock
         OasisGenerator.cs      # a desert oasis: a water disc, a grass ring and palms (worldgen.oasis)
         PebbleGenerator.cs     # ankle-high stones in rare patches: 1-3 small boxes sharing one air cell above the surface

@@ -51,6 +51,11 @@ public sealed class ColumnData
     /// far LOD wear grass on its surface even in the desert (see <see cref="OasisGenerator"/>).</summary>
     public readonly bool[] Oasis;
 
+    /// <summary>Per-column lava mark: the column's surface fluid up to <see cref="WaterLevel"/> is lava, not water, because
+    /// the lake it belongs to is centered in Charred land (<see cref="WaterBodies.SampleSurfaceWater"/>). The chunk fill
+    /// floods it with lava and the mud stamp leaves the dirt beside it alone. All false for a supplied column.</summary>
+    public readonly bool[] LavaPool;
+
     /// <summary>
     /// The highest level in <see cref="WaterLevel"/>, or <see cref="TerrainGenerator.NoWater"/> when
     /// this chunk column holds no water at all. A chunk whose floor is above it has no water to
@@ -79,7 +84,7 @@ public sealed class ColumnData
     /// </remarks>
     public ColumnData(int[] heights, byte[] dirtDepth, float[] entranceWeight, float[] caveIntensity,
         Biome[]? biomes = null, int[]? bed = null, int[]? waterLevel = null,
-        float cornerWarmth = 0.5f, float cornerWetness = 0.5f, bool[]? oasis = null)
+        float cornerWarmth = 0.5f, float cornerWetness = 0.5f, bool[]? oasis = null, bool[]? lavaPool = null)
     {
         Heights = heights;
         DirtDepth = dirtDepth;
@@ -89,6 +94,7 @@ public sealed class ColumnData
         Bed = bed ?? heights;
         WaterLevel = waterLevel ?? NoWaterLevels(heights.Length);
         Oasis = oasis ?? new bool[heights.Length];
+        LavaPool = lavaPool ?? new bool[heights.Length];
         CornerWarmth = cornerWarmth;
         CornerWetness = cornerWetness;
 

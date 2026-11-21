@@ -396,6 +396,7 @@ public static class TerrainGenerator
         var biomes = new Biome[count];
         var waterLevel = new int[count];
         var oasis = new bool[count];
+        var lavaPool = new bool[count];
 
         var baseX = (float)chunkX * Chunk.Size;
         var baseZ = (float)chunkZ * Chunk.Size;
@@ -428,9 +429,10 @@ public static class TerrainGenerator
                 var riverLevel = WorldGenerationConfig.SeaLevel;
                 var riverBank = NoWater;
                 var ravineGuard = 0f;
+                var lavaLake = false;
                 if (WaterBodies.CanHoldSurfaceWater(biome))
-                    WaterBodies.SampleSurfaceWater(worldX, worldZ, out lakeWeight, out lakeSurface, out lakeFloor,
-                        out riverWeight, out riverLevel, out riverBank, out ravineGuard);
+                    WaterBodies.SampleSurfaceWater(worldX, worldZ, oceanWeight, out lakeWeight, out lakeSurface,
+                        out lakeFloor, out riverWeight, out riverLevel, out riverBank, out ravineGuard, out lavaLake);
 
                 if (lakeWeight > 0f)
                 {
@@ -451,6 +453,9 @@ public static class TerrainGenerator
 
                 waterLevel[i] = WaterBodies.WaterLevelFor(biome, gate, riverWeight, riverLevel, lakeWeight,
                     lakeSurface);
+                // A lake centered in Charred land floods with lava (an oasis, a spring or a caldera that
+                // takes the column over below clears the mark with the level it replaces)
+                lavaPool[i] = WaterBodies.IsLavaLevel(waterLevel[i], lakeSurface, lavaLake);
 
                 // A dry column beside a great lake's ramp water must stand at least at the highest
                 // level a neighbor can hold, or the step between two ramp levels would expose a
@@ -470,6 +475,7 @@ public static class TerrainGenerator
                     {
                         heightF = MathF.Min(heightF, oasisSurface - WorldFeatureConfig.OasisDepth);
                         waterLevel[i] = oasisSurface;
+                        lavaPool[i] = false;
                     }
                 }
 
@@ -481,6 +487,7 @@ public static class TerrainGenerator
                 {
                     heightF = MathF.Min(heightF, springLevel - WorldFeatureConfig.SpringDepth);
                     waterLevel[i] = springLevel;
+                    lavaPool[i] = false;
                 }
 
                 // Exact integer-column admission makes every owned caldera column non-ocean,
@@ -491,6 +498,7 @@ public static class TerrainGenerator
                 {
                     heightF = volcano.Floor;
                     waterLevel[i] = NoWater;
+                    lavaPool[i] = false;
                     oasis[i] = false;
                     biome = Biome.Charred;
                 }
@@ -588,7 +596,7 @@ public static class TerrainGenerator
         Climate(chunkX << Chunk.SizeShift, chunkZ << Chunk.SizeShift, out var cornerWarmth, out var cornerWetness);
 
         return new ColumnData(heights, dirtDepth, entrance, intensity, biomes, bed, waterLevel,
-            cornerWarmth, cornerWetness, oasis);
+            cornerWarmth, cornerWetness, oasis, lavaPool);
     }
 
     /// <summary>

@@ -93,9 +93,16 @@ public static class PebbleGenerator
         return count;
     }
 
-    /// <summary>Whether this stone of a natural pile is obsidian (~1% per rock).</summary>
-    public static bool IsObsidianAt(int x, int z, int i) =>
-        UnitHash(x, z, ObsidianSalt, i) < WorldFeatureConfig.PebbleObsidianChance;
+    /// <summary>Whether this stone of a natural pile is obsidian: ~1% per rock, and about a third in Charred land
+    /// (<see cref="WorldFeatureConfig.PebbleObsidianCharredChance"/>; the biome is classified only for the rolls between the
+    /// two chances, so most stones never pay for it).</summary>
+    public static bool IsObsidianAt(int x, int z, int i)
+    {
+        var roll = UnitHash(x, z, ObsidianSalt, i);
+        if (roll < WorldFeatureConfig.PebbleObsidianChance) return true;
+        return roll < WorldFeatureConfig.PebbleObsidianCharredChance
+               && BiomeClassifier.BiomeWeights(x, z, out _, out _) == Biome.Charred;
+    }
 
     /// <summary>Whether the held item builds obsidian-bearing piles.</summary>
     public static bool IsObsidianItem(ushort itemId) => itemId == ObsidianItem;

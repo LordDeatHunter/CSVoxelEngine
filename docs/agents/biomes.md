@@ -63,6 +63,19 @@ ash patches and shallow cinder rather than a grass/beach fallback. The existing 
 `charred_tree` is eligible on Dynamic Charred ground; its hell ownership is unchanged. This
 province alone does not promise a volcano. It has no new mob or cave-biome rule.
 
+Charred land holds no surface water. A pond or great lake whose center classifies as Charred
+(`WaterBodies.IsCharredPool`, one verdict per lake so it never splits into water and lava) floods
+with lava: `SampleSurfaceWater`'s `lavaLake` becomes `ColumnData.LavaPool` in `TerrainGenerator.Compute`,
+`ChunkTerrainFill.FillWater` writes lava there, the mud stamp ignores it, and the far LOD draws the bowl
+in the owned-lava floor (`WaterBodies.WaterLevelAt(x, z, out lava)`, no lava sheet). Its bed and the banks
+it laps (up to `WorldFeatureConfig.LavaCrustBankRise` above the surface) cool to obsidian
+(`Features/LavaPoolCrust`, right after the fluids), and snow skips that shore. Rivers close before the
+Charred line (`WaterBodies.CharredRiverGate`, from `CharredRiverFadeStart` to `VolcanicClassifyThreshold`
+of the province), the way they close before a desert, so no river water touches the lava; oceans are
+never Charred and stay water. Obsidian is commoner too: a meteor crater centered in Charred land rolls
+`MeteorCharredChanceFactor` times the chance (every other crater is unchanged), and a third of its
+pebble stones are obsidian (`PebbleObsidianCharredChance`). `CharredLavaLakeTests`.
+
 `WorldGen/Volcanoes/` adds rare hashed cone sites. The cached verdict reads Q0 relief,
 biome/province and massif sites only; `WorldSeed.Apply` clears it. Center and eight rim samples
 judge setting, while every integer column of the crater plus guard is checked for zero ocean
@@ -453,7 +466,8 @@ How a tree is grown, stamped, felled and decays is in `### Trees`. Mob spawning 
 shared by slimes and goblins) takes a column whose biome spawns mobs (`MobSpawner.SpawnsMobs`:
 every land biome, so only the ocean spawns nothing; a supplied column's stored biome, a generated column's undithered
 `TerrainGenerator.BiomeAt`). Steppe and savanna hold lakes and rivers like the forest
-(`WaterBodies.CanHoldSurfaceWater`: every land biome but the desert).
+(`WaterBodies.CanHoldSurfaceWater`: every land biome but the desert; Charred lakes are lava and its
+rivers dry out, see **Charred**).
 
 **Scenery and landmarks** are pure per-cell functions like the rest of worldgen — each decided
 from a hash of (cell, seed) or a `PlantClumps` clump, stamped per chunk and clipped at its border,
@@ -511,7 +525,8 @@ the gated `StampGround`) is never gated, since its leaves may come from neighbor
   both `needsSupport` and `flowResistant` (rock: a flow leaves them standing). Each takes the variant of its host rock (`sandstone_*`, `frost_stone_*`, else the stone pair), with its own texture and loot.
 - **Geodes** (`GeodeGenerator`) and **meteor craters** (`MeteorGenerator`): a hollow, crystal-lined
   sphere deep in solid stone (its `crystal_block` is the one non-ore block on the reflective
-  material path), and a blast crater with scattered meteor rock.
+  material path), and a blast crater with scattered meteor rock, its bowl lined with obsidian
+  (`MeteorCharredChanceFactor` times as common in Charred land).
 - **Gravel and sand pockets** (`GravelPocketGenerator`): blobs of loose rock buried in stone, both
   `falls` blocks, so mining into one can bring a small collapse down.
 - **Underground pools** (`UndergroundPoolGenerator`): still water on carved cave floors.

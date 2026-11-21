@@ -196,6 +196,9 @@ internal static class ChunkTerrainFill
             FillWater(blocks, column, lowerBoundY);
             timer?.Mark(Stage.Water);
             StampMud(blocks, column, worldX0, lowerBoundY, worldZ0);
+            // A Charred lava lake's bed and banks cool to obsidian
+            if (lowerBoundY <= column.MaxHeight && lowerBoundY + Size > column.MinHeight)
+                LavaPoolCrust.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         }
         timer?.Mark(Stage.Mud);
 
@@ -686,7 +689,8 @@ internal static class ChunkTerrainFill
     /// reaching sea level. Wetness reads the column's <see cref="ColumnData.Bed"/>: a ravine that
     /// merely cut a dry column below its level holds no water, while a ravine under the ocean just
     /// deepens it (the cut is faded out across every other water body, see
-    /// <c>TerrainGenerator.RavineCutFade</c>). Generated water is always a source (state 0), which
+    /// <c>TerrainGenerator.RavineCutFade</c>). A <see cref="ColumnData.LavaPool"/> column (a lake centered in
+    /// Charred land) floods with lava instead. Generated fluid is always a source (state 0), which
     /// is what an untouched
     /// state byte reads as, so nothing is written to <c>_state</c> here. A pure per-column function
     /// of world position like the rest of worldgen: neighbors agree at their borders with no shared
@@ -704,11 +708,12 @@ internal static class ChunkTerrainFill
             var top = Math.Min(level - lowerBoundY, Size - 1);
             if (top < 0) continue;
 
+            var fluid = column.LavaPool[local] ? LavaGenerator.LavaBlock : TerrainGenerator.SeaBlock;
             for (var y = 0; y <= top; y++)
             {
                 var i = Idx(x, y, z);
                 if (blocks[i] != BlockType.Air) continue;
-                blocks[i] = TerrainGenerator.SeaBlock;
+                blocks[i] = fluid;
             }
         }
     }
@@ -769,7 +774,7 @@ internal static class ChunkTerrainFill
             var wz = worldZ0 + z + dz;
             var neighbor = ColumnCache.Get(wx >> SizeShift, wz >> SizeShift);
             var local = ((wx & SizeMask) << SizeShift) | (wz & SizeMask);
-            if (wy > neighbor.Heights[local] && wy <= neighbor.WaterLevel[local])
+            if (wy > neighbor.Heights[local] && wy <= neighbor.WaterLevel[local] && !neighbor.LavaPool[local])
                 return true;
         }
 
