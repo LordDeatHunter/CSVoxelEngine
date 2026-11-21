@@ -13,6 +13,8 @@
   "hasItem": false,
   "needsSupport": true,
   "supportBlock": "block/tall_fern",
+  // Mining the top takes the base (and its loot) with it, so the plant comes down whole from either cell
+  "breaksHolder": true,
   "blocksSight": false,
   "loot": "none",
   "sfx": "hit_grass",

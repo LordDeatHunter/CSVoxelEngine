@@ -196,6 +196,12 @@ internal sealed class BlockEditor
                 _casting.NotifyBlockRemoved(blockPos, stationDrops);
         }
 
+        // A two-cell plant's top takes the base it names down with it (BlockType.BreaksHolder): the base goes through
+        // this same path, so it rolls its own loot and runs every hook
+        if (BlockIdAt(blockPos) == 0 && BlockType.ById[brokenId] is { BreaksHolder: true } dependent
+            && BlockIdAt(blockPos - Vector3.UnitY) == dependent.SupportBlockId)
+            RemoveBlock(blockPos - Vector3.UnitY, player);
+
         // A mined waystone (either half: the pair came down together above) stays in its discoverers' lists, marked
         // lost once under its lower half's cell. A client keeps no registry; the server's answer to the break decides.
         if (!_clientMode && BlockIdAt(blockPos) == 0

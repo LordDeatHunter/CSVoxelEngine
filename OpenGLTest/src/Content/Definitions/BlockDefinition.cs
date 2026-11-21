@@ -163,6 +163,11 @@ public sealed class BlockDefinition
     /// When set it replaces, rather than extends, the ordinary solid-holder rule.</summary>
     public string? SupportBlock { get; set; }
 
+    /// <summary>Whether mining this <see cref="SupportBlock"/> dependent also breaks the holder under it, so a
+    /// two-cell plant comes down whole from either cell (the tall fern's top). Only legal with
+    /// <c>supportBlock</c>.</summary>
+    public bool? BreaksHolder { get; set; }
+
     /// <summary>
     /// Whether a <see cref="NeedsSupport"/> block is only held up by a full block face: a solid block whose model fills
     /// its cell, or tree wood at full thickness. A torch never mounts on a branch, a waystone, stairs or a slab. Only

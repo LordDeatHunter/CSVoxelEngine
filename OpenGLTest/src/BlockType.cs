@@ -495,6 +495,10 @@ public sealed record BlockType
     /// <summary>The exclusive below-holder block, or 0 for the ordinary solid-holder rule.</summary>
     public ushort SupportBlockId { get; internal set; }
 
+    /// <summary>Whether mining the block also breaks its <see cref="SupportBlockId"/> holder right below it, which
+    /// rolls the holder's own loot (the tall fern's top takes its base down with it).</summary>
+    public bool BreaksHolder { get; init; }
+
     /// <summary>Whether a <see cref="NeedsSupport"/> block a flow may not wash away (a cave
     /// formation): water flowing past it leaves it standing, where an ordinary fragile block
     /// (a pebble, a plant) is displaced and drops its loot. It still pops when the block holding

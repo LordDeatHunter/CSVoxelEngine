@@ -108,18 +108,31 @@ public sealed class GroundCoverLifecycleTests : IDisposable
         Assert.Equal(BlockType.Air, _world.IdAt(x, y + 1, z));
     }
 
+    /// <summary>
+    /// A breaksHolder top takes its named base down with it, so the plant comes down whole from either cell; a
+    /// supportBlock dependent without the flag (the cactus flower) leaves its holder standing.
+    /// </summary>
     [Fact]
-    public void MiningTallFernTopLeavesItsRootedBase()
+    public void MiningTallFernTopTakesItsBaseButAFlowerLeavesItsCactus()
     {
+        Assert.True(ContentRegistry.RequireBlock("tall_fern_top").BreaksHolder);
+        Assert.False(ContentRegistry.RequireBlock("cactus_flower").BreaksHolder);
+
         _world = new GroundCoverPlayerWorld(_output);
         const int x = 6, z = 6;
         var y = _world.Top + 1;
-        _world.Load(x, y + 1, z);
+        _world.Load(x + 2, y + 1, z);
         _world.Set(x, y, z, Id("tall_fern"));
         _world.Set(x, y + 1, z, Id("tall_fern_top"));
         Assert.True(_world.Break(x, y + 1, z));
-        Assert.Equal(Id("tall_fern"), _world.IdAt(x, y, z));
+        Assert.Equal(BlockType.Air, _world.IdAt(x, y, z));
         Assert.Equal(BlockType.Air, _world.IdAt(x, y + 1, z));
+
+        _world.Set(x + 2, y, z, Id("small_cactus"));
+        _world.Set(x + 2, y + 1, z, Id("cactus_flower"));
+        Assert.True(_world.Break(x + 2, y + 1, z));
+        Assert.Equal(Id("small_cactus"), _world.IdAt(x + 2, y, z));
+        Assert.Equal(BlockType.Air, _world.IdAt(x + 2, y + 1, z));
     }
 
     [Fact]

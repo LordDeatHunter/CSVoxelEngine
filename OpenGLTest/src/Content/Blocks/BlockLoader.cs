@@ -206,6 +206,7 @@ internal static class BlockLoader
             WoodLootBands = woodLootBands ?? [new WoodLootBand(0, null, true)],
             HasItem = !fluid && (definition.HasItem ?? true),
             NeedsSupport = support.NeedsSupport,
+            BreaksHolder = definition.BreaksHolder ?? false,
             FlowResistant = support.FlowResistant,
             SupportFullFace = support.FullFace,
             SupportAttached = supportAttached,

@@ -42,6 +42,9 @@ internal sealed class BlockLinkResolver
             _stump.Add((id, definition.Wood.Stump, path));
         if (definition.PickAs != null)
             _pick.Add((id, definition.PickAs, path));
+        if ((definition.BreaksHolder ?? false) && definition.SupportBlock == null)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets breaksHolder without a supportBlock; only a named holder is broken with its dependent.");
         if (definition.SupportBlock != null)
         {
             if (definition.WallBlock != null || definition.UpperHalf != null)
