@@ -179,8 +179,42 @@ selection. Generated far LOD uses the same Dynamic surface choice for its materi
 columns keep their supplied biome. Dynamic also lowers the ocean basin and trench profiles and
 adds a seed-owned abyss term only inside a broad-ocean mask. The existing shallow-shelf slope,
 water-level rule, sea-stack shallow-depth admission and depth-based sand/gravel/stone materials
-still apply; deeper water does not yet add underwater habitat content. A generated fallback beside
+still apply; the S1a deeper water by itself added no underwater habitat content. A generated fallback beside
 an imported source still follows the world's profile without changing supplied chunks.
+Dynamic ocean rock now adds jittered submerged pinnacles after shallow sea stacks and before
+the final cut and bed assignment (`WorldGen/Ocean/OceanPinnacles`). Only real sea-water Ocean
+columns with ocean weight above 0.5 and sufficiently deep incoming floor qualify; the lift
+fades from zero at both admission edges, never lowers a column and stays below sea level.
+Ravine fade and canyon support are zero in that admitted range. Its final height is shared by
+near generation and generated LOD; Legacy, land, Charred and supplied columns keep their old
+paths. A late `OceanRockFields` pass, after VolcanoStamp and before underground rooms, uses
+four generated ColumnCache corner-warmth values to classify ocean depth/warmth eligibility.
+The four reads are cache calls, not guaranteed hits under eviction or concurrency; no field
+read returns to Compute. Jittered deep-ocean patches hold sparse stone or charred-stone columns.
+Each entire column must fit the floor's vertical chunk, have its actual ocean floor host and
+exact source-water targets, then it writes bottom-up with zero state. Any failed host/target
+skips the whole site, so near a vertical boundary some candidate columns do not grow. The
+pass runs in normal and cave-lake probe fill; later structures may still overwrite it. It
+never writes below the floor or into the deep volcanic chamber (whose top is -182), and it
+does not assume every volcano flank is non-Ocean. Generated fallback beside imported terrain
+retains the existing seam limitation; supplied chunks and their LOD remain authoritative.
+The S6b source candidate shares those four fill-owned warmth corners after profile,
+sea-column and Y-band admission. Existing rock columns run first; eligible reef, meadow
+and warmer deep floors replace the visible solid top at h only when its expected host and
+overlying source-water:0 cell remain intact. An independent OCOR hash admits a small coral
+mound only when the center floor is the lowest of five actual coral:0 supports: each
+cardinal floor is at the center height or one block above it. The three center targets
+and four targets immediately above their own supports must all be distinct source-water:0
+cells in the own Y chunk before any write. Failed sites leave all cells unchanged;
+seven connected mound cells are written in ascending Y order with zero state.
+The deeper warm glow threshold is `OceanGlowMossMinWarmth`/`OceanGlowMossMinDepth` in
+`WorldFeatureConfig`; cold shelves and other deep floors keep their original material.
+Both normal and generateLakes:false probe fill stamp after volcano/rock and before underground rooms.
+Generated coarse floor codes represent coral, sea moss and glow moss from direct generated
+climate corners; supplied/imported floors and edit overrides retain authority. Small mounds,
+later host changes and propagated light remain absent from coarse LOD. Natural teal glow
+moss uses the existing colored block-light slot. The one-step mound correction and its
+controls are source-prepared but UNRUN; natural mound placement and visuals remain unverified.
 The forest floor is a broad swell plus a positive-only
 hill field gated by a hill-region mask (`Hill*`/`ForestBaseHeight`), so hills rise in patches with
 flats between them. A **relief layer** (`WorldGen/TerrainRelief.cs`, BIOMEGEN §6) rides

@@ -442,6 +442,14 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         VolcanoShape.cs        # pure cone height and integer caldera/shaft/chamber classifier
         VolcanoCell.cs         # none, lining, lava and owned air classifications
         VolcanoStamp.cs        # normal/probe post-strata owned volume writes and state reset
+      Ocean/                   # generated Dynamic ocean rock and water-closed habitat floors; namespace VoxelEngine.WorldGen.Ocean
+        OceanHabitatField.cs   # four-corner generated warmth interpolation, fill admission and explicit-input labels
+        OceanHabitatBlocks.cs  # one-time name resolution for coral and moss stamp IDs
+        OceanFloorMaterial.cs # generated dominant-floor material kind
+        OceanFloorMaterials.cs # pure habitat-to-floor choice and generated-only LOD material code
+        OceanHabitats.cs      # late exact-source-water floor and whole-support coral mound stamp
+        OceanPinnacles.cs      # jittered, faded submerged heightmap pinnacle raise in uncut deep ocean
+        OceanRockFields.cs     # late whole-site exact-source-water rock columns in one vertical chunk
       Caves/                   # the overworld cave biomes (plans/CAVE_BIOMES.md), namespace VoxelEngine.WorldGen.Caves
         CaveBiome.cs           # Plain / FrozenEcho / DesertEcho / Crystal / Fungal / MagmaDeep, apart from the surface Biome
         CaveCellRole.cs        # Interior / Wall / Floor / Ceiling: where a rock cell sits against the open cave

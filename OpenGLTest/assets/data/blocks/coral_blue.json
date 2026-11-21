@@ -1,0 +1,9 @@
+{
+  "name": "Blue Coral",
+  "model": { "parent": "block/cube_all", "textures": { "all": "coral_blue" } },
+  "sfx": "hit_rock",
+  "hardness": 4,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "loot": "coral_blue"
+}

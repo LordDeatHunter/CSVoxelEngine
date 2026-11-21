@@ -237,6 +237,29 @@ public static class WorldFeatureConfig
     public const int SeaStackMinHeight = 3;
     public const int SeaStackMaxHeight = 6;
 
+    // --- Dynamic submerged ocean rock ---
+    // Jittered sites lift the deep floor into tapered, still-submerged pinnacles.
+    public const int OceanPinnacleCellShift = 7;
+    public const int OceanPinnacleRadius = 28;
+    public const float OceanPinnacleChance = 0.4f;
+    public const int OceanPinnacleMinDepth = 20;
+    public const int OceanPinnacleFullDepth = 28;
+    public const float OceanPinnacleFullOceanWeight = 0.58f;
+    public const int OceanPinnacleMinTop = -14;
+    public const int OceanPinnacleMaxTop = -6;
+    // Separate jittered patches hold sparse stone/charred-stone columns.
+    public const int OceanRockFieldCellShift = 6;
+    public const int OceanRockFieldRadius = 18;
+    public const float OceanRockFieldChance = 0.55f;
+    public const float OceanRockColumnChance = 0.22f;
+    public const int OceanRockColumnMinHeight = 2;
+    public const int OceanRockColumnMaxHeight = 8;
+    /// <summary>Independent OCOR-site chance on a supported reef substrate.</summary>
+    public const float OceanCoralMoundChance = 0.12f;
+    // A visible deep-water floor glows only in warm ocean habitat.
+    public const float OceanGlowMossMinWarmth = 0.53f;
+    public const int OceanGlowMossMinDepth = 40;
+
     // --- Oases (OasisGenerator): a green pocket deep in the desert, its own pond and palm ---
     public const bool OasesEnabled = true;
     public const int OasisCellShift = 7;

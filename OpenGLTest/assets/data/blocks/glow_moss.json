@@ -1,0 +1,8 @@
+{
+  "name": "Glow Moss",
+  "model": { "parent": "block/cube_all", "textures": { "all": "glow_moss" } },
+  "sfx": "hit_grass",
+  "hardness": 2,
+  "light": { "emission": 7, "color": [70, 240, 190], "natural": true },
+  "loot": "glow_moss"
+}

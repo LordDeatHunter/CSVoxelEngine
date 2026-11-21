@@ -7,6 +7,7 @@ using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Volcanoes;
 using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Ocean;
 
 namespace VoxelEngine.Lod;
 
@@ -64,6 +65,7 @@ internal sealed class LodMeshBuilder
     private readonly int _latticeSpan;
     private readonly Vector3[] _grassTint;
     private readonly Vector3[] _foliageTint;
+    private float[]? _generatedOceanWarmth;
 
     internal static LodMeshData Build(int level, int rx, int rz, MeshBufferPool? buffers, bool separableMin,
         IWorldSource? source)
@@ -496,6 +498,22 @@ internal sealed class LodMeshBuilder
         _waterLevels[(i + 1) * _heightGrid + (j + 1)] = cellLevel;
         var material = FloorMaterial(maxOwn, cellLevel, cellBiome,
             _soilStripped[(i + 1) * _heightGrid + (j + 1)]);
+        if (WorldSeed.Profile == WorldGenProfile.Dynamic && cellBiome == Biome.Ocean
+            && cellLevel == WorldGenerationConfig.SeaLevel
+            && WorldGenerationConfig.SeaLevel - maxOwn >= 3)
+        {
+            var cx = centerX >> Chunk.SizeShift;
+            var cz = centerZ >> Chunk.SizeShift;
+            var field = new OceanHabitatField(
+                GeneratedOceanWarmth(cx, cz), GeneratedOceanWarmth(cx + 1, cz),
+                GeneratedOceanWarmth(cx, cz + 1), GeneratedOceanWarmth(cx + 1, cz + 1));
+            var localX = (centerX & Chunk.SizeMask) + 0.5f;
+            var localZ = (centerZ & Chunk.SizeMask) + 0.5f;
+            var habitat = field.Classify(true, true, cellLevel, maxOwn, localX, localZ);
+            var floor = OceanFloorMaterials.Select(habitat, field.Sample(localX, localZ),
+                WorldGenerationConfig.SeaLevel - maxOwn);
+            if (floor != OceanFloorMaterial.None) material = OceanFloorMaterials.LodCode(floor);
+        }
         if (cellBiome == Biome.Charred && material == 5
             && TerrainNoise.VolcanicProvinceNoise.GetNoise(
                 centerX * WorldGenerationConfig.CharredMaterialSampleMultiplier,
@@ -647,6 +665,28 @@ internal sealed class LodMeshBuilder
             : height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanGravelDepth ? (byte)1
             : (byte)2
         : (byte)3;
+
+    // Build-local generated climate only. A supplied neighbor's stored corner never colors
+    // generated fallback; the one-cell LOD border needs n+3 corners per side.
+    private float GeneratedOceanWarmth(int chunkX, int chunkZ)
+    {
+        var span = _regionChunkSpan + 3;
+        var warm = _generatedOceanWarmth;
+        if (warm is null)
+        {
+            warm = new float[span * span];
+            Array.Fill(warm, float.NaN);
+            _generatedOceanWarmth = warm;
+        }
+        var x = chunkX - _regionChunkX + 1;
+        var z = chunkZ - _regionChunkZ + 1;
+        var index = x * span + z;
+        if (!float.IsNaN(warm[index])) return warm[index];
+        TerrainGenerator.Climate(chunkX << Chunk.SizeShift, chunkZ << Chunk.SizeShift,
+            out var value, out _);
+        warm[index] = value;
+        return value;
+    }
 
     private LodMeshData EmitMesh(int level, int rx, int rz, MeshBufferPool? buffers, int[] columnCyMin, int[] columnCyMax)
     {

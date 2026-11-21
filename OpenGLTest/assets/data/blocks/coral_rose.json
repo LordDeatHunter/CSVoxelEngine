@@ -1,0 +1,9 @@
+{
+  "name": "Rose Coral",
+  "model": { "parent": "block/cube_all", "textures": { "all": "coral_rose" } },
+  "sfx": "hit_rock",
+  "hardness": 4,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "loot": "coral_rose"
+}

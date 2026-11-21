@@ -88,6 +88,10 @@ internal sealed class WorldgenStageTimer
         CaveBiomes,
         /// <summary>VolcanoStamp restores the owned caldera after strata and before underground structures.</summary>
         Volcano,
+        /// <summary>Dynamic submerged ocean rock columns after volcano ownership.</summary>
+        OceanRockFields,
+        /// <summary>Dynamic source-water-closed coral mounds and dominant ocean floor materials.</summary>
+        OceanHabitats,
         /// <summary>RuinPlacement.StampUnderground.</summary>
         RuinsUnderground,
         /// <summary>WaystonePlacement.StampUnderground.</summary>
