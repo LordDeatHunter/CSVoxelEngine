@@ -98,6 +98,8 @@ internal sealed class WorldgenStageTimer
         Pebbles,
         /// <summary>CottonGenerator.Stamp.</summary>
         Cotton,
+        /// <summary>DesertFloraGenerator.Stamp.</summary>
+        DesertFlora,
         /// <summary>FlowerGenerator.Stamp.</summary>
         Flowers,
         /// <summary>FoliageGenerator.Stamp.</summary>

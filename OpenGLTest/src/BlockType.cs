@@ -492,6 +492,9 @@ public sealed record BlockType
     /// (see <see cref="BlockSupport"/>).</summary>
     public bool NeedsSupport { get; init; }
 
+    /// <summary>The exclusive below-holder block, or 0 for the ordinary solid-holder rule.</summary>
+    public ushort SupportBlockId { get; internal set; }
+
     /// <summary>Whether a <see cref="NeedsSupport"/> block a flow may not wash away (a cave
     /// formation): water flowing past it leaves it standing, where an ordinary fragile block
     /// (a pebble, a plant) is displaced and drops its loot. It still pops when the block holding

@@ -1,0 +1,16 @@
+{
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-7753.5, 31.3, -7787.5], "yaw": -90, "pitch": -25 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-7753.5, 31.3, -7787.5], "yaw": -90, "pitch": -25 },
+    { "op": "screenshot", "name": "flowered_small_cactus", "hideHud": true },
+    { "op": "teleport", "pos": [-7765.5, 29.3, -7787.5], "yaw": 0, "pitch": -35.9 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "natural_desert_flower", "hideHud": true },
+    { "op": "teleport", "pos": [-7758.5, 31.4, -7782.5], "yaw": -81.9, "pitch": -25 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "desert_flora_context", "hideHud": true }
+  ]
+}

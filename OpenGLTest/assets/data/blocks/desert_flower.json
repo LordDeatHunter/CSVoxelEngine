@@ -1,0 +1,16 @@
+{
+  "name": "Desert Flower",
+  "model": { "parent": "block/cross", "textures": { "cross": "desert_flower" } },
+  "hardness": 0,
+  "flammable": true,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "sway": true,
+  "light": { "passes": true },
+  "needsSupport": true,
+  "blocksSight": false,
+  "replaceableByPlacement": true,
+  "hitbox": { "min": [0.25, 0, 0.25], "max": [0.75, 0.8, 0.75] }
+}

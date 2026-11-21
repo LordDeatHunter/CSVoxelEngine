@@ -36,6 +36,19 @@ public static class WorldFeatureConfig
     public const int MeadowFlowerSpacing = 3;
     public const float MeadowFlowerChance = 0.7f;
 
+    // --- Dynamic desert flora (DesertFloraGenerator) ---
+    // Sparse clumps outside the hard sand core; rolls thin continuously through the erg fringe.
+    public const bool DesertFloraEnabled = true;
+    public const int DesertFloraCellShift = 5;
+    public const int DesertFloraRadius = 6;
+    public const int DesertFloraJitter = 4;
+    public const int DesertFloraMinMembers = 4;
+    public const float DesertFloraClumpChance = 0.65f;
+    public const float DesertFloraEdgeDensity = 0.35f;
+    public const float SmallCactusChance = 0.25f;
+    public const float DesertFlowerChance = 0.45f;
+    public const float CactusFlowerChance = 0.35f;
+
     // --- Foliage (FoliageGenerator) ---
     // Ground cover on the biome's own surface: forest grass tufts are common, desert dead shrubs
     // sparse. Each is gated by a low-frequency patch and then a position-hash density roll.

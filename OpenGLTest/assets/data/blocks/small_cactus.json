@@ -1,0 +1,15 @@
+{
+  "name": "Small Cactus",
+  "model": { "parent": "block/cross", "textures": { "cross": "small_cactus" } },
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "light": { "passes": true },
+  "needsSupport": true,
+  "flowResistant": true,
+  "contactDamage": 1,
+  "blocksSight": false,
+  "hitbox": { "min": [0.28, 0, 0.28], "max": [0.72, 0.8, 0.72] }
+}

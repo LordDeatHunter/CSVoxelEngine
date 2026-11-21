@@ -318,6 +318,12 @@ grow in the forest, steppe and savanna, and dead shrubs grow sparsely on desert 
 frozen plains' permafrost (`FoliageGenerator.TryGetDeadShrub`). A tundra shrub replaces the snow cell
 the snow pass already laid over permafrost: the one exception to the into-air stamp rule, confined
 to permafrost ground (snow over any other ground is never replaced).
+Dynamic deserts also grow clumps of small cross-model cacti and short desert flowers outside the
+hard sand-sea core (`DesertFloraGenerator`). The real stored Desert biome, sand ground, dry column
+and empty surface cell must all agree before a plant is written; the S3a erg retention thins the
+fringe. Some small cacti carry a compact flower in the cell above: the base must have been placed
+in the same y chunk, so a cactus at its top cell stays unflowered. Legacy generation has none of
+these plants. Generated far LOD retains the sand/height but draws no plant proxy.
 Wild cotton grows in **clumps** in the savanna (`CottonGenerator`: a savanna center whose desert
 weight stays under `CottonMaxDesertWeight`, where the savanna/sand dither starts, so a clump never
 lands on dithered sand), stamped after the pebbles and before the flowers and foliage. Placement is the reusable
