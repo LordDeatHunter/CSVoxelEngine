@@ -62,6 +62,7 @@ public static class WorldSeed
             ColumnCache.Reset();
             TerrainErg.ResetCache();
             VolcanoSites.ResetCache();
+            CaveLavaLakes.ResetCache();
         }
     }
 
@@ -133,6 +134,7 @@ public static class WorldSeed
         TowerPlacement.ResetCache();
         TerrainPeaks.ResetCaches();
         VolcanoSites.ResetCache();
+        CaveLavaLakes.ResetCache();
         GreatLakes.ResetCaches();
         WaterBodies.ResetCaches();
 

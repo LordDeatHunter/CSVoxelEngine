@@ -18,12 +18,12 @@ phase E's great-lake river ramps and outflows. Each is documented where it lives
 fold), §6 (each mechanism), §7 (constants), §9 (invariants 11-17), §10 (tests), §11 (limits). Their
 perf numbers are in `PERF.md`, their shots in `visual-examples/terrain-shape.json`. Also done: the
 cave biomes, a 3D cave biome field under the surface biomes (§12; tracked in `CAVE_BIOMES.md`).
-Last updated 2026-11-13.
+Last updated 2026-11-19.
 
 ## In progress
 
-- [ ] S5a Dynamic Charred province and owned caldera: source candidate prepared; Release
-  controls, natural site witness and visual acceptance remain open.
+- [ ] S5b Dynamic deep caldera connection: source, proof and unrun controls are being
+  prepared on delivered S5a; runtime and deep visuals await separate review.
 
 Nothing.
 
@@ -768,6 +768,24 @@ cell-center edges remain approximate. Near and generated far material use the sa
 48× sampling multiplier for ash/stone patches, separate from province classification.
 Existing imported-edge mismatch remains. S5b deep conduit/chamber must
 extend the bounded classifier and exclusion, not rely on a full-volume S5a fill.
+
+**S5b source candidate (all controls unrun).** An accepted S5a site carries optional
+`VolcanoDeep` integer-axis data, added after its existing admission. The shaft has a
+radius-4 source core and radius-2 rock ring; the core alone pierces the old bed. A
+radius-48, half-height-24 chamber at Y=-208 has an integer ellipsoid interior, source
+through Y=-214, air above and a 3-block shell. A 45×45×13 inscribed lava box contains
+26,325 source cells, exceeding the ordinary cave lake's 1000×16 maximum. Shell slice
+radii come from the maximum interior radius within three vertical blocks plus three
+horizontal blocks, enclosing all 6-neighbor air and 5-wake-neighbor lava directions.
+`VolcanoStamp` runs in the existing normal/probe stage, writes Air as well as lining/lava,
+and clears state on every owned write. Underground room and waystone box rejection has
+an independent chamber/shaft branch beyond the S5a surface guard. `CaveLavaLakes` clears
+its seed-keyed profile-dependent plans on `Apply` and quiesced final `EndWorld`.
+The final-height lower-bound and whole-flood rejection argument is in `docs/agents/biomes.md`.
+The frozen S5a fill fact now expects the core's two bed levels to be pierced while retaining
+its off-core bed, lake, shore, state and normal/probe assertions. Pure closure and scale
+controls are separate from future real flood/column tests. S5a visuals and receipt sources
+remain historical and are not rerun by this preparation.
 
 Grep `Biome\.` to confirm; at time of writing:
 

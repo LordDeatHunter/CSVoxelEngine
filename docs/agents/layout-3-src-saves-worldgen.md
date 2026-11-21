@@ -435,11 +435,12 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   miss and in TerrainGenerator.Climate (off in production)
       WorldgenStageTimer.cs    # test/probe seam: per-stage wall time of ChunkTerrainFill.GenerateBlockData,
                                #   passed explicitly (null in production)
-      Volcanoes/               # Dynamic cone and bounded owned caldera; namespace VoxelEngine.WorldGen.Volcanoes
-        VolcanoSite.cs         # immutable accepted site center, radii, floor, depth and rise
-        VolcanoSites.cs        # static cached site verdict from Q0, province and massif; exact crater-guard scan
-        VolcanoShape.cs        # pure cone height and final-height lava/lining classifier
-        VolcanoCell.cs         # none, lining and lava classifications
+      Volcanoes/               # Dynamic cone, owned caldera and connected deep chamber; namespace VoxelEngine.WorldGen.Volcanoes
+        VolcanoSite.cs         # immutable accepted site with optional deep integer axis
+        VolcanoDeep.cs         # explicit deep-volume data, default none on synthetic surface-only sites
+        VolcanoSites.cs        # static cached Q0 verdict, exact crater scan and owned-box exclusion
+        VolcanoShape.cs        # pure cone height and integer caldera/shaft/chamber classifier
+        VolcanoCell.cs         # none, lining, lava and owned air classifications
         VolcanoStamp.cs        # normal/probe post-strata owned volume writes and state reset
       Caves/                   # the overworld cave biomes (plans/CAVE_BIOMES.md), namespace VoxelEngine.WorldGen.Caves
         CaveBiome.cs           # Plain / FrozenEcho / DesertEcho / Crystal / Fungal / MagmaDeep, apart from the surface Biome
@@ -660,6 +661,6 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
 
 `WorldGen/Features/Underground/CaveFluidSources.cs`: shared, spaced 3D source-group candidates for cave water and lava.
 
-`WorldGen/Features/Underground/CaveLavaLakes.cs`: seed-owned bounded floods of natural cave depressions, flat contained source surfaces, depth-dependent size budgets, cross-chunk plans and local writes.
+`WorldGen/Features/Underground/CaveLavaLakes.cs`: seed-owned bounded floods of natural cave depressions, flat contained source surfaces, depth-dependent size budgets, cross-chunk plans and local writes; profile-dependent plans reset at seed/profile Apply and quiesced final EndWorld.
 
 `WorldGen/Features/Underground/CaveTerrainProbe.cs`: private pure completed-terrain queries without lakes/cave life, sharing production generation with independent scratch/maps and no generation-statistics side effects.

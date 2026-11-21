@@ -40,6 +40,8 @@ public sealed class VolcanoFrozenCalderaFillDiagnostic(ITestOutputHelper output)
         var airCells = 0;
         var sharedFaceCells = 0;
         var frontierCells = 0;
+        var piercedBedCells = 0;
+        var retainedBedCells = 0;
 
         try
         {
@@ -55,6 +57,7 @@ public sealed class VolcanoFrozenCalderaFillDiagnostic(ITestOutputHelper output)
             Assert.Equal(151, site.Floor);
             Assert.Equal(6, site.LakeDepth);
             Assert.Equal(156.2266f, site.Rise);
+            Assert.True(site.Deep.Exists);
 
             var lavaRadius = site.CraterRadius - WorldGenerationConfig.VolcanoLiningThickness;
             foreach (var x in new[] { ChunkX[0] * Chunk.Size, (ChunkX[1] + 1) * Chunk.Size - 1 })
@@ -114,7 +117,13 @@ public sealed class VolcanoFrozenCalderaFillDiagnostic(ITestOutputHelper output)
                 for (var ly = 0; ly < Chunk.Size; ly++)
                 {
                     var i = Chunk.Idx(lx, ly, lz);
-                    var expected = ly <= 1 ? lining : ly <= 7 ? lava : BlockType.Air;
+                    var dx = (long)cx * Chunk.Size + lx - site.Deep.AxisX;
+                    var dz = (long)ChunkZ * Chunk.Size + lz - site.Deep.AxisZ;
+                    var core = dx * dx + dz * dz <= (long)WorldGenerationConfig.VolcanoConduitRadius
+                        * WorldGenerationConfig.VolcanoConduitRadius;
+                    // S5a's entire off-axis bed/lake stays fixed. Only the new integer shaft
+                    // pierces the two bed levels in this frozen chunk band.
+                    var expected = ly <= 1 && !core ? lining : ly <= 7 ? lava : BlockType.Air;
                     Assert.Equal(expected, normalBlocks[n][i]);
                     Assert.Equal(expected, probeBlocks[n][i]);
                     Assert.Equal((byte)0, normalState[n][i]);
@@ -122,6 +131,11 @@ public sealed class VolcanoFrozenCalderaFillDiagnostic(ITestOutputHelper output)
                     Assert.Equal(normalBlocks[n][i], probeBlocks[n][i]);
                     Assert.Equal(normalState[n][i], probeState[n][i]);
                     ownedCells++;
+                    if (ly <= 1)
+                    {
+                        if (core) piercedBedCells++;
+                        else retainedBedCells++;
+                    }
                     if (expected == lava) lavaCells++;
                     else if (expected == lining) liningCells++;
                     else airCells++;
@@ -141,7 +155,11 @@ public sealed class VolcanoFrozenCalderaFillDiagnostic(ITestOutputHelper output)
                 for (var ly = 0; ly < Chunk.Size; ly++)
                 {
                     var i = Chunk.Idx(lx, ly, lz);
-                    Assert.Equal(ly <= 1 ? lining : ly <= 7 ? lava : BlockType.Air,
+                    var dx = (long)cx * Chunk.Size + lx - site.Deep.AxisX;
+                    var dz = (long)ChunkZ * Chunk.Size + lz - site.Deep.AxisZ;
+                    var core = dx * dx + dz * dz <= (long)WorldGenerationConfig.VolcanoConduitRadius
+                        * WorldGenerationConfig.VolcanoConduitRadius;
+                    Assert.Equal(ly <= 1 && !core ? lining : ly <= 7 ? lava : BlockType.Air,
                         sentinelBlocks[i]);
                     Assert.Equal(ly <= 7 ? (byte)0 : (byte)0x7f, sentinelState[i]);
                 }
@@ -162,6 +180,8 @@ public sealed class VolcanoFrozenCalderaFillDiagnostic(ITestOutputHelper output)
             Assert.Equal(2, normalCompleted);
             Assert.Equal(2, probeCompleted);
             Assert.Equal(2, directCompleted);
+            Assert.True(piercedBedCells > 0);
+            Assert.True(retainedBedCells > 0);
         }
         finally
         {
@@ -172,6 +192,7 @@ public sealed class VolcanoFrozenCalderaFillDiagnostic(ITestOutputHelper output)
                     $"probe={probeCompleted}/{probeEntered} directStamp={directCompleted}/{directEntered} " +
                     $"snapshots={snapshots}/4 checkedCells={ownedCells}/8192 " +
                     $"lava={lavaCells} lining={liningCells} air={airCells} " +
+                    $"piercedBed={piercedBedCells} retainedBed={retainedBedCells} " +
                     $"sharedFaceCells={sharedFaceCells}/256 frontierCells={frontierCells}");
             }
             finally

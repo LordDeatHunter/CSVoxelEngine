@@ -73,10 +73,38 @@ heights inside an accepted disc may change, while classification and sand-only e
 not. Outside its disc the cone is the exact identity. Peaks, knolls, lakes, ponds, oasis and hot
 springs yield to accepted cone discs.
 The crater floor is pinned after final water/bank composition, its guard blocks cuts and
-overlapping writers, and `VolcanoStamp` writes the floor's lava, surrounding side and bottom
-lining after terrain strata on normal and lake-probe fills. The stamp zeroes state bytes.
-The caldera is a bounded S5a volume; a later deep conduit can extend its classifier without
-making the S5a lake depend on deep generation. The soft ceiling bounds the cone below the
+overlapping writers. An accepted Dynamic site also has an integer shaft at the floor of its
+fractional center. Radius 4 source lava pierces only that shaft's old caldera bed; a radius 2
+lining ring continues into a sealed ellipsoidal chamber centered at Y=-208. Its radius 48,
+half-height 24 interior has source lava through Y=-214 and air above, enclosed by a 3-block
+integer shell. Every owned cell, including chamber air, is written and its state reset by
+`VolcanoStamp` after terrain strata on both normal and lake-probe fills. The original caldera
+outside the shaft is unchanged. `VolcanoSites.IntersectsOwnedBox` independently rejects
+underground ruin and waystone boxes reaching the shaft or chamber, even outside a small
+surface crater guard. `CaveLavaLakes` plans are cleared at `WorldSeed.Apply` and quiesced
+final `EndWorld`, because its seed-only cache key does not carry the profile.
+`CaveLavaLakes.PlanCacheMisses` is a read-only, monotone factory-call diagnostic used to
+verify those resets; a miss alone does not say that the hashed plan admitted a pool.
+
+The deep owned box is within the accepted cone's minimum radius. Ponds, great-lake lobes,
+oases and hot springs that could touch it are refused by their cone overlap checks.
+Great-lake ramps and outflows can cross the cone, but their river level is clamped at sea
+level; they and ordinary rivers carve no lower than sea level minus RiverBedDepth (-3).
+Ramp banks only raise ground. The Dynamic ocean profile is at least -180 before cuts; at ocean weight
+at least 0.5, ravine fade is zero. In the [0.35,0.5) shore band, the land profile is
+at least -13 and ocean blending is under one half, so a 26-block ravine cannot reach -182.
+Below ocean weight 0.35 the shore clamp gives land height at least 1; the remaining river
+level is at least sea level and its bed at least -3. Ravines remove at most 26 and canyons
+cannot lower a column below their dry-floor clamp. The final integer column height is
+therefore above the chamber shell top -182 throughout the owned footprint; the above-terrain
+early-out cannot skip any owned deep cell. The shaft stays below the accepted floor. The
+integer shell's slice radius is the maximum interior radius at heights within 3 plus 3;
+every six-neighbor of its air is owned, and the shaft's ring seals its upward air. Chamber
+lava has an owned bottom and four horizontal wake neighbors. A cave-lake flood from outside
+cannot cross the solid shell; one started in connected chamber air reaches a 64-cell boundary
+or its 16-deep/1000-area budget and rejects the whole plan. It never partially paints the
+owned volume. This is a classifier/whole-plan contract, not a new generic ownership registry.
+The soft ceiling bounds the cone below the
 writer clearance at 186, while the nominal summit is not the final apex height.
 
 Generated far LOD uses the selected Charred rock/ash and approximates the actual cone height;
