@@ -1,0 +1,15 @@
+{
+  // Natural S4b giant-only close views at seed 1337 Dynamic; retain both earlier scenarios.
+  // Fixed normal-block diagnostic verified air eyes and clear rays to leaf (4026,73,779).
+  // North bare trunk is foliage-blocked; these views must be judged as crown emergence.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [4026.5, 70.5, 754.5], "yaw": 90, "pitch": 6.842773 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "s4b_giant_north_close", "hideHud": true },
+    { "op": "teleport", "pos": [4026.5, 84.5, 760.5], "yaw": 90, "pitch": -30.06858 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "s4b_giant_top_close", "hideHud": true }
+  ]
+}

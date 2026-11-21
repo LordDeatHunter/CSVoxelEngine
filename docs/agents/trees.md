@@ -9,7 +9,7 @@ One file per species; the file name is the species name (`TreeSpeciesRegistry.By
 the blocks** (`TreeSpeciesLoader.LoadTreeSpecies`; a missing folder is an empty registry), compiles each file through
 the pure `TreeSpeciesCompiler.Compile` (DTO `TreeSpeciesDefinition.cs`) into an immutable
 `TreeSpecies`, and every error starts `Tree species '<path>'`. Block references take an optional
-`block/` prefix and never resolve to an item. Eleven species ship: `oak` (the forest), `spruce` (the
+`block/` prefix and never resolve to an item. Twelve species ship: `oak` (the forest), `spruce` (the
 taiga), the leafless `cactus` (the desert), the leafless `dead_tree` (the desert, the frozen
 plains and the steppe, which borrows the oak's wood — `TreeSpeciesRegistry.ForBlock` resolves a
 shared wood to the leafy owner, so the growth item never turns an oak into a snag) and the sparse
@@ -18,7 +18,9 @@ generates only through its `worldgen.oasis` disc; `baobab` has **no `worldgen` b
 only ever grown (`TreeGrowthWriter`, the `grow` op, DevStudio); and the hell's `fungal_tree`
 and leafless `charred_tree` have no `worldgen` block either: `HellTrees` plants them from the hell
 biome palettes (see "Hell flora"); nor do the sky's broad `sky_oak` and glowing `crystal_tree`, which
-`SkyTrees` plants from the sky biome palettes (see "Sky biomes"). See
+`SkyTrees` plants from the sky biome palettes (see "Sky biomes"). `jungle_giant` grows only under
+Dynamic, with separate wood and leaves ownership from `jungle_tree`; the blocks intentionally
+reuse the existing Jungle-family tiles. See
 `### Trees` for what the fields drive.
 
 | field | default | meaning |
@@ -49,6 +51,9 @@ biome palettes (see "Hell flora"); nor do the sky's broad `sky_oak` and glowing 
 | `lod.profile` | `dome` | `dome`, `cone` or `column` (`LodCrownProfile`, the silhouette `LodCrownProxy.TopOffset` draws) |
 | `worldgen.biomes` | required | non-empty, duplicate-free list of `Biome` names (`forest`, `desert`, `ocean`, `taiga`, `frozen`) the species is planted in |
 | `worldgen.density` | required, 0..1 | chance per candidate column |
+| `worldgen.profiles` | both | optional nonempty `Legacy`/`Dynamic` eligibility; omitted existing files retain both profiles |
+| `worldgen.dynamicDensity` | `density` | Dynamic-only chance per candidate column, 0..1; Legacy still reads `density` |
+| `worldgen.dynamicWeight` | absent | an explicit finite positive share opts a species into its biome's Dynamic weighted row; if no member opts in, Dynamic keeps the first eligible name. The picked species then passes its own density and ground gates, so effective presence depends on both share and density |
 | `worldgen.spacing` | required, >= 0 | minimum gap to another trunk in blocks (the lowest placement hash wins) |
 | `worldgen.maxSlope` | required, >= 0 | largest ground height step across the footprint |
 | `worldgen.minSoil` | 0 | soil depth the column needs, >= 0 (oak and spruce 2, so they never root on bare rock) |
@@ -164,9 +169,24 @@ bands are unchanged. Every tree of a 64x64 XZ cell (`TreeCellShift`/`TreeCellBlo
 in placement-hash order inside one `VirtualTreeSpace`, each grown tree's cells occupied before the
 next grows, so neighboring crowns grow around each other; the trees of the eight neighboring
 cells count as obstacles only as their cached **solo** shapes (`TreeBatches.ShapeOf`), which keeps a batch a
-pure function of (cell, seed) and independent of chunk order. Dynamic ecotone columns use the
-same surface-biome species for a placed tree and its solo neighbor-obstacle shape; Legacy keeps
-the original pure-biome choice. `Stamp` writes wood with its state
+pure function of (cell, seed) and independent of chunk order. The immutable Legacy table still
+uses the first eligible name and its original reach, density, fallback leaves and fallen-log
+membership. Dynamic has a separate immutable table: only explicit positive-weight members of a
+biome enter a weighted row, and an unweighted row keeps its first eligible name. Its separately
+salted root roll picks a weighted member before that species' density, footprint and ground gates;
+the member's share times its density affects its presence. Weighted members of a biome must use
+the same spacing so the shared placement stream remains symmetric. The Dynamic solo obstacle
+shape rechecks the actual chosen species, including oasis
+palms, against the batch species. Legacy keeps its historical first-by-biome solo recipe (including
+the oasis mismatch). The proxy crown follows the chosen species' own `lod` fields and approximates
+the grown canopy rather than copying its voxels. The new emergent tree shares the Jungle-family
+tile art intentionally; its distinct logical log, leaves and stump keep decay, felling and loot
+owned by that species. Its radius-3 leaves keep the registry-wide Legacy leaf-decay schedule
+reach at 4, while its energy gives Dynamic a horizontal/up reach of 30 (chunk radius 2). Dynamic
+stamper, batch-neighbor, column-fill, arrival and canopy sweeps use that broader profile bound even
+outside Jungle; this extra work has not been timed. A manual giant felled in a Legacy world poisons
+its actual species reach through `FellPoisonRadiusFor`, while ordinary Legacy trees retain the old
+poison bound. `Stamp` writes wood with its state
 into air or leaves, then leaves into air, in a fixed scan order (the root walk extends the trunk
 down through cave air only inside the chunk holding the base). The far LOD's first rings read the
 stamped canopy (`TreeGenerator.TryGetCanopy`), while the coarse rings (`LodLevelSpec.ProxyCanopy`)

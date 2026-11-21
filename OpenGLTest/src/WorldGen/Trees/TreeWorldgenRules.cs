@@ -8,6 +8,9 @@ namespace VoxelEngine.WorldGen.Trees;
 /// </summary>
 public sealed class TreeWorldgenRules
 {
+    /// <summary>World profiles in which this species may generate.</summary>
+    public required IReadOnlyList<WorldGenProfile> Profiles { get; init; }
+
     /// <summary>The biomes the species grows in; non-empty, no duplicates.</summary>
     public required IReadOnlyList<Biome> Biomes { get; init; }
 
@@ -17,6 +20,12 @@ public sealed class TreeWorldgenRules
 
     /// <summary>Chance per candidate column, 0..1.</summary>
     public required float Density { get; init; }
+
+    /// <summary>Dynamic-only density, leaving the Legacy density unchanged.</summary>
+    public required float DynamicDensity { get; init; }
+
+    /// <summary>Explicit positive share in a Dynamic weighted row; null keeps the old primary choice.</summary>
+    public float? DynamicWeight { get; init; }
 
     /// <summary>Minimum gap to another trunk in blocks.</summary>
     public required int Spacing { get; init; }
@@ -55,4 +64,16 @@ public sealed class TreeWorldgenRules
             if (Biomes[i] == biome) return true;
         return false;
     }
+
+    /// <summary>Whether this immutable rule admits the selected world profile.</summary>
+    public bool Allows(WorldGenProfile profile)
+    {
+        for (var i = 0; i < Profiles.Count; i++)
+            if (Profiles[i] == profile) return true;
+        return false;
+    }
+
+    /// <summary>The placement density for the selected profile.</summary>
+    public float DensityFor(WorldGenProfile profile) =>
+        profile == WorldGenProfile.Dynamic ? DynamicDensity : Density;
 }

@@ -1,0 +1,19 @@
+{
+  // Natural S4b follow-up at seed 1337 Dynamic; preserve the original four-shot scenario.
+  // Eyes/endpoints were checked through normal generated chunks in the fixed-camera diagnostic.
+  // Side aims at the clear highest leaf; the lower trunk ray remains blocked by ordinary leaves.
+  // Clear block rays establish feasibility, not final framing or visual acceptance.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [4023.5, 51.5, 782.5], "yaw": -150.94539, "pitch": -10.993201 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "s4b_jungle_under_canopy_followup", "hideHud": true },
+    { "op": "teleport", "pos": [3993.5, 78.5, 778.5], "yaw": 1.7357045, "pitch": -8.611753 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "s4b_giant_side_followup", "hideHud": true },
+    { "op": "teleport", "pos": [4026.5, 104.5, 735.5], "yaw": 90, "pitch": -35.16643 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "s4b_giant_above_followup", "hideHud": true }
+  ]
+}

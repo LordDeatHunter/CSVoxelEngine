@@ -1,0 +1,21 @@
+{
+  // Distinct logical wood owner; intentionally shares the existing Jungle-family tile.
+  "name": "Jungle Giant Log",
+  "model": {
+    "parent": "block/cube_column",
+    "textures": { "end": "oak_log_top", "side": "oak_log_side" }
+  },
+  "hardness": 24,
+  "renderer": "tree_wood",
+  "axisFromFace": true,
+  "sfx": "hit_wood",
+  "requiresTool": true,
+  "tools": { "axe": 1 },
+  "wood": {
+    "stump": "block/jungle_giant_stump",
+    "split": "log_split",
+    "tipHardness": 0.25,
+    "handMaxThickness": 4,
+    "loot": [ { "minThickness": 0, "loot": "wood" }, { "minThickness": 7, "loot": "self" } ]
+  }
+}

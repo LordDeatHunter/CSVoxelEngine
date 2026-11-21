@@ -1,0 +1,21 @@
+{
+  // S4b natural witness, storeless VOXEL_SCRIPT startup: Program applies seed 1337 Dynamic.
+  // Source-only poses around verified batch giant (4026,50,778), leaf box X4019..4033/Z771..784,
+  // leaf top 73. Neighbor crowns and camera occlusion require visual review of original captures.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [4012.5, 53.5, 779.5], "yaw": 0, "pitch": -18 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "s4b_jungle_under_canopy", "hideHud": true },
+    { "op": "teleport", "pos": [4011.5, 80.5, 779.5], "yaw": 0, "pitch": -36 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "s4b_jungle_over_canopy", "hideHud": true },
+    { "op": "teleport", "pos": [4007.5, 65.5, 778.5], "yaw": 0, "pitch": -10 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "s4b_giant_side", "hideHud": true },
+    { "op": "teleport", "pos": [4026.5, 89.5, 766.5], "yaw": 90, "pitch": -64 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "s4b_giant_above", "hideHud": true }
+  ]
+}

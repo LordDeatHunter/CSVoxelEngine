@@ -185,6 +185,27 @@ internal static class TreeSpeciesCompiler
     private static TreeWorldgenRules Worldgen(string path, TreeSpeciesDefinition.WorldgenDefinition w,
         Func<string, ushort?> resolveBlock)
     {
+        var profiles = new List<WorldGenProfile>();
+        if (w.Profiles == null)
+        {
+            profiles.Add(WorldGenProfile.Legacy);
+            profiles.Add(WorldGenProfile.Dynamic);
+        }
+        else
+        {
+            if (w.Profiles.Length == 0)
+                throw Fail(path, "worldgen.profiles must name at least one profile.");
+            foreach (var raw in w.Profiles)
+            {
+                if (raw == null || int.TryParse(raw, out _)
+                    || !Enum.TryParse(raw, ignoreCase: true, out WorldGenProfile profile)
+                    || !Enum.IsDefined(profile))
+                    throw Fail(path, $"worldgen.profiles '{raw}' is not Legacy or Dynamic.");
+                if (profiles.Contains(profile))
+                    throw Fail(path, $"worldgen.profiles names '{raw}' more than once.");
+                profiles.Add(profile);
+            }
+        }
         if (w.Biomes == null || w.Biomes.Length == 0)
             throw Fail(path, $"worldgen.biomes must name at least one biome (known: {BiomeNames}).");
         var biomes = new List<Biome>(w.Biomes.Length);
@@ -201,6 +222,12 @@ internal static class TreeSpeciesCompiler
         float density = Require(path, "worldgen.density", w.Density);
         if (!float.IsFinite(density) || density < 0f || density > 1f)
             throw Fail(path, $"worldgen.density must be 0..1, got {density}.");
+        var dynamicDensity = w.DynamicDensity ?? density;
+        if (!float.IsFinite(dynamicDensity) || dynamicDensity < 0f || dynamicDensity > 1f)
+            throw Fail(path, $"worldgen.dynamicDensity must be 0..1, got {dynamicDensity}.");
+        var dynamicWeight = w.DynamicWeight;
+        if (dynamicWeight is { } weight && (!float.IsFinite(weight) || weight <= 0f))
+            throw Fail(path, $"worldgen.dynamicWeight must be finite and above 0, got {dynamicWeight}.");
         int spacing = Require(path, "worldgen.spacing", w.Spacing);
         if (spacing < 0)
             throw Fail(path, $"worldgen.spacing must be at least 0, got {spacing}.");
@@ -228,9 +255,12 @@ internal static class TreeSpeciesCompiler
 
         return new TreeWorldgenRules
         {
+            Profiles = profiles.ToArray(),
             Biomes = biomes.ToArray(),
             Oasis = w.Oasis ?? false,
             Density = density,
+            DynamicDensity = dynamicDensity,
+            DynamicWeight = dynamicWeight,
             Spacing = spacing,
             MaxSlope = maxSlope,
             MinSoil = minSoil,

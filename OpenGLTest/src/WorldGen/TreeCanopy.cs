@@ -210,7 +210,7 @@ internal static class TreeCanopy
     /// <summary>
     /// Marks the canopy columns within Chebyshev <paramref name="radius"/> of (x, z) as disturbed
     /// (see <see cref="CanopyTop"/>). A single mined or blasted wood or leaf cell passes
-    /// <see cref="TreeGenerator.SingleEditPoisonRadius"/>; a felled tree passes <see cref="TreeGenerator.FellPoisonRadius"/>
+    /// <see cref="TreeGenerator.SingleEditPoisonRadius"/>; a felled tree passes <see cref="TreeGenerator.FellPoisonRadiusFor(ushort)"/>
     /// once at the break, which covers its whole canopy. It also clears any grown crown added over
     /// those columns (<see cref="SetCanopyAdded"/>): add after poisoning, never before.
     /// </summary>

@@ -66,6 +66,34 @@ public sealed class TreeSpeciesCompilerTests
         MaxGround = 10,
     };
 
+    [Fact]
+    public void ProfileWorldgenDefaultsRemainCompatibleAndInvalidSharesAreRejected()
+    {
+        var dto = Valid();
+        dto.Worldgen = ValidWorldgen();
+        var baseline = Compile(dto).Worldgen!;
+        Assert.True(baseline.Allows(WorldGenProfile.Legacy));
+        Assert.True(baseline.Allows(WorldGenProfile.Dynamic));
+        Assert.Equal(baseline.DensityFor(WorldGenProfile.Legacy), baseline.DensityFor(WorldGenProfile.Dynamic));
+        Assert.Null(baseline.DynamicWeight);
+
+        dto.Worldgen.Profiles = ["dynamic"];
+        dto.Worldgen.DynamicDensity = 0.75f;
+        dto.Worldgen.DynamicWeight = 2f;
+        var dynamicRules = Compile(dto).Worldgen!;
+        Assert.False(dynamicRules.Allows(WorldGenProfile.Legacy));
+        Assert.True(dynamicRules.Allows(WorldGenProfile.Dynamic));
+        Assert.NotEqual(dynamicRules.DensityFor(WorldGenProfile.Legacy), dynamicRules.DensityFor(WorldGenProfile.Dynamic));
+        Assert.Equal(2f, dynamicRules.DynamicWeight!.Value);
+
+        Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Profiles = []; });
+        Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Profiles = ["Legacy", "legacy"]; });
+        Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.Profiles = ["unknown"]; });
+        Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.DynamicDensity = float.NaN; });
+        Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.DynamicWeight = 0; });
+        Rejects(d => { d.Worldgen = ValidWorldgen(); d.Worldgen.DynamicWeight = float.PositiveInfinity; });
+    }
+
     private TreeSpecies Compile(TreeSpeciesDefinition dto) =>
         TreeSpeciesCompiler.Compile("x", dto, FakePath, Resolve);
 
