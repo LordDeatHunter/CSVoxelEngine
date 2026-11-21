@@ -61,6 +61,7 @@ public static class IceSpikeGenerator
     {
         baseY = 0;
         height = 0;
+        if (TerrainErg.Intersects(x, z, x, z)) return false;
 
         var own = PlacementHash(x, z);
         if (own >= WorldGenerationConfig.IceSpikeChance)

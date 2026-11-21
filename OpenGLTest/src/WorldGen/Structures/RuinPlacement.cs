@@ -70,6 +70,7 @@ public static class RuinPlacement
         if (TerrainGenerator.IsWaterColumn(x, z, ground)) return false;
         if (!SurfaceClearance.Allows(ground, template.Height - template.GroundLayer)) return false;
         var half = template.Half;
+        if (TerrainErg.Intersects(x - half, z - half, x + half, z + half)) return false;
         if (WorldGenerationConfig.TowersEnabled && TowerPlacement.Meets(x - half - 1, z - half - 1, x + half + 1, z + half + 1))
             return false;
         for (var dx = -half; dx <= half; dx++)
@@ -347,10 +348,12 @@ public static class RuinPlacement
         hash = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ salt);
         x = 0;
         z = 0;
-        if (SplitMix64.Unit(hash, 0) >= chance) return false;
+        var roll = SplitMix64.Unit(hash, 0);
+        if (roll >= chance) return false;
         var span = (ulong)CellBlocks;
         x = (cellX << WorldFeatureConfig.RuinCellShift) + (int)(SplitMix64.Mix(hash + 1) % span);
         z = (cellZ << WorldFeatureConfig.RuinCellShift) + (int)(SplitMix64.Mix(hash + 2) % span);
+        if (kind == StructureKind.Surface && roll >= chance * TerrainErg.Retention(x, z)) return false;
         return true;
     }
 

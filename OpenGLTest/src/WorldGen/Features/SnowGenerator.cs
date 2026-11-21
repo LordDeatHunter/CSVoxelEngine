@@ -38,6 +38,8 @@ public static class SnowGenerator
     /// </summary>
     public static int DepthAt(float x, float z, int height)
     {
+        if (TerrainErg.Intersects((int)MathF.Floor(x), (int)MathF.Floor(z),
+                (int)MathF.Floor(x), (int)MathF.Floor(z))) return 0;
         // SnowAndIceEnabled is a compile-time const, so an early return on it would read as
         // unreachable; a multiplier keeps the toggle a real expression (see BiomeWeights).
         var cold = ColdWeightAt(x, z, height)
@@ -136,6 +138,7 @@ public static class SnowGenerator
         {
             var worldX = worldX0 + x;
             var worldZ = worldZ0 + z;
+            if (TerrainErg.Intersects(worldX, worldZ, worldX, worldZ)) continue;
             var local = VoxelCoords.ColumnIndex(x, z);
             var height = column.Heights[local];
             var level = column.WaterLevel[local];

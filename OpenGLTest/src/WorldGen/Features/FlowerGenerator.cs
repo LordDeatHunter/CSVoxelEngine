@@ -53,6 +53,8 @@ public static class FlowerGenerator
 
     /// <summary>Whether the surface column (x, z) grows a flower, before the terrain checks.</summary>
     public static bool TryGetFlower(int x, int z) =>
+        !TerrainErg.Intersects(x, z, x, z)
+        &&
         // The spread hash runs first: it rejects most columns before any clump or oasis lookup
         IsSpreadSpot(x, z)
         // An oasis disc is a full meadow whatever the clump rule says
@@ -70,11 +72,13 @@ public static class FlowerGenerator
         var patchX = MathUtils.FloorDiv(x, spacing);
         var patchZ = MathUtils.FloorDiv(z, spacing);
         var h = SplitMix64.Hash(patchX, patchZ, WorldGenerationConfig.Seed ^ SpreadSalt);
-        if (SplitMix64.Unit(h, 0) >= WorldFeatureConfig.MeadowFlowerChance) return false;
+        var roll = SplitMix64.Unit(h, 0);
+        if (roll >= WorldFeatureConfig.MeadowFlowerChance) return false;
 
         const int span = spacing - 1;
         return x - patchX * spacing == (int)(SplitMix64.Unit(h, 1) * span)
-               && z - patchZ * spacing == (int)(SplitMix64.Unit(h, 2) * span);
+               && z - patchZ * spacing == (int)(SplitMix64.Unit(h, 2) * span)
+               && roll < WorldFeatureConfig.MeadowFlowerChance * TerrainErg.Retention(x, z);
     }
 
     /// <summary>

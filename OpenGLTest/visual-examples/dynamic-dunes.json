@@ -1,0 +1,35 @@
+{
+  // Dynamic seed 1337 storeless visual scenario. From OpenGLTest/:
+  // DOTNET_ROLL_FORWARD=LatestMajor VOXEL_TIME=690 VOXEL_SPAWN=-8016.5,30.5,2437.5 \
+  // VOXEL_LOOK=37.9,-38.3 VOXEL_SCRIPT=visual-examples/dynamic-dunes.json \
+  // dotnet run -c Release --no-build
+  // Face views include natural foreground sand; the lifted view shows player hands.
+  // The final grassy Steppe context has visible desert behind it.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-8016.5, 30.5, 2437.5], "yaw": 37.9, "pitch": -38.3 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-8016.5, 30.5, 2437.5], "yaw": 37.9, "pitch": -38.3 },
+    { "op": "screenshot", "name": "dune_sand_face_framing", "hideHud": true },
+
+    { "op": "teleport", "pos": [-8016.5, 48.5, 2437.5], "yaw": 37.9, "pitch": -60 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "teleport", "pos": [-8016.5, 48.5, 2437.5], "yaw": 37.9, "pitch": -60 },
+    { "op": "screenshot", "name": "dune_sand_face_lifted_overview", "hideHud": true },
+
+    { "op": "teleport", "pos": [-8195.5, 27.5, -7171.5], "yaw": 45, "pitch": -45 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-8195.5, 27.5, -7171.5], "yaw": 45, "pitch": -45 },
+    { "op": "screenshot", "name": "connected_bare_core", "hideHud": true },
+
+    { "op": "teleport", "pos": [-7744.5, 35.5, -7798.5], "yaw": 180, "pitch": -26.6 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-7744.5, 35.5, -7798.5], "yaw": 180, "pitch": -26.6 },
+    { "op": "screenshot", "name": "dry_desert_fringe_dead_shrubs", "hideHud": true },
+
+    { "op": "teleport", "pos": [-7628.5, 40.5, -7702.5], "yaw": 180, "pitch": -22.6 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-7628.5, 40.5, -7702.5], "yaw": 180, "pitch": -22.6 },
+    { "op": "screenshot", "name": "steppe_grass_oak_context", "hideHud": true }
+  ]
+}

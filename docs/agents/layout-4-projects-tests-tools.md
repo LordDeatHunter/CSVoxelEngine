@@ -195,6 +195,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   DynamicClimateOceanTests cover bounded spatial scale, basin, shore and ecotones;
                                #   S2aTerrainTests cover actual Dynamic shelf/canyon columns, water, reset and LOD behavior;
                                #   S2MaterialsTests cover generated bare-arid rock bands and material boundaries
+                               #   S3aTerrainTests cover connected sand cores, generated sand, outside-root feature exclusion and dune faces
     Features/                  # every feature generator (mirrors src/WorldGen/Features)
       Underground/             # coal, malachite, hematite, tin, vulcanite, the barrier, gravel pockets, cave life (mirrors src/WorldGen/Features/Underground)
     Caves/                     # the cave biomes: point query equals stamp, the map, bands, determinism, safe palettes,

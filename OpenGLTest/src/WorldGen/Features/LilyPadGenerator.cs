@@ -22,6 +22,7 @@ public static class LilyPadGenerator
     /// <summary>Whether the lake column (x, z) carries a pad, before the terrain checks.</summary>
     public static bool TryGetPad(int x, int z)
     {
+        if (TerrainErg.Intersects(x, z, x, z)) return false;
         var h = SplitMix64.Hash(x, z, WorldGenerationConfig.Seed ^ 0x71D5);
         return (SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) < WorldFeatureConfig.LilyPadChance;
     }

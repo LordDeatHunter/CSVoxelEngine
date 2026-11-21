@@ -323,6 +323,8 @@ public static class TerrainGenerator
             // takes the highland lift too, so a highland desert does not sit in a basin.
             var dune = WorldGenerationConfig.ForestBaseHeight + swell + lift
                 + TerrainNoise.DuneNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.DuneAmplitude;
+            var erg = TerrainErg.Weight(worldX, worldZ, desertWeight);
+            if (erg > 0f) dune += TerrainErg.DuneDelta(worldX, worldZ, erg);
             heightF = MathUtils.Lerp(heightF, dune, desertWeight);
         }
 
@@ -517,6 +519,8 @@ public static class TerrainGenerator
                 // (heights[i], ravines included) so the far LOD's rock cap agrees.
                 if (BiomeTraits.ShowsBareRock(biome) && heights[i] >= MountainRockHeight)
                     soil = 0;
+                // The entire accepted erg column owns its sand cover, including canyon cuts.
+                if (TerrainErg.IsCore(chunkX, chunkZ)) soil = Math.Max(soil, 1);
 
                 dirtDepth[i] = (byte)soil;
 

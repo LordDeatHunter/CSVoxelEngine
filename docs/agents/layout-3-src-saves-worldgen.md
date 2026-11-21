@@ -404,6 +404,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   ColumnData, Climate, and the column queries (forwarding to BiomeClassifier, WaterBodies, TerrainNoise);
                                #   ReliefLandHeight (no hashed peaks) and PreFeatureLandHeight (massifs, no lone peaks) for the site tests
       TerrainNoise.cs          # every 2D terrain noise channel, built only by Reseed (static ctor, WorldSeed.Apply); MakeNoise
+      TerrainErg.cs            # Dynamic wind dunes and pure cached all-Desert chunk-column core verdict/footprint checks
       TerrainStrata.cs         # seeded Dynamic bare-arid rock bands; near fill and generated far LOD share the selector
       TerrainIslands.cs        # the ocean-gated island term folded into BiomeWeights (LandWeight: large and small
                                #   island noise) and the stateless hashed archipelago footprints

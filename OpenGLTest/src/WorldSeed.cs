@@ -57,7 +57,10 @@ public static class WorldSeed
     internal static void EndWorld()
     {
         if (Interlocked.Decrement(ref _liveWorlds) == 0)
+        {
             ColumnCache.Reset();
+            TerrainErg.ResetCache();
+        }
     }
 
     /// <summary>Whether any world is registered, which makes <see cref="Apply"/> illegal.</summary>
@@ -120,6 +123,7 @@ public static class WorldSeed
 
         // Every cached value is a function of (key, seed, profile), so all of them are wrong now.
         ColumnCache.Reset();
+        TerrainErg.ResetCache();
         WormCarver.ResetCellCache();
         TreeGenerator.ResetCaches();
         HellTrees.ResetCache();

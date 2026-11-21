@@ -49,15 +49,19 @@ public static class BoulderGenerator
         count = 0;
         blockId = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x80D1);
-        if (Unit(SplitMix64.Mix(h + AcceptStream)) >= WorldFeatureConfig.BoulderChance) return false;
+        var roll = Unit(SplitMix64.Mix(h + AcceptStream));
+        if (roll >= WorldFeatureConfig.BoulderChance) return false;
 
         var size = 1 << WorldFeatureConfig.BoulderCellShift;
         var span = (ulong)size;
         centerX = (cellX << WorldFeatureConfig.BoulderCellShift) + (int)(SplitMix64.Mix(h + CenterXStream) % span);
         centerZ = (cellZ << WorldFeatureConfig.BoulderCellShift) + (int)(SplitMix64.Mix(h + CenterZStream) % span);
+        if (roll >= WorldFeatureConfig.BoulderChance * TerrainErg.Retention(centerX, centerZ)) return false;
         var counts = WorldFeatureConfig.BoulderMaxBlocks - WorldFeatureConfig.BoulderMinBlocks + 1;
         count = WorldFeatureConfig.BoulderMinBlocks + (int)(SplitMix64.Mix(h + CountStream) % (ulong)counts);
         blockId = (SplitMix64.Mix(h + MaterialStream) & 1) == 0 ? StoneBlock : CobblestoneBlock;
+        if (TerrainErg.Intersects(centerX - HorizontalReach, centerZ - HorizontalReach,
+                centerX + HorizontalReach, centerZ + HorizontalReach)) return false;
         return true;
     }
 
