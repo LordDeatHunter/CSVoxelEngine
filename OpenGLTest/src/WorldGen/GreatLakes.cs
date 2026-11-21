@@ -1,4 +1,5 @@
 using System;
+using VoxelEngine.WorldGen.Volcanoes;
 
 namespace VoxelEngine.WorldGen;
 
@@ -171,6 +172,11 @@ internal static class GreatLakes
         var probe = new GreatLakeSite(true, 0, 0, 0f, false, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
             lobeCount, reach, lobe0, lobe1, lobe2, default);
         if (MeetsReliefSite(probe)) return default;
+        for (var lobe = 0; lobe < probe.LobeCount; lobe++)
+        {
+            var shape = probe.Lobe(lobe);
+            if (VolcanoSites.IntersectsConeDisc(shape.X, shape.Z, shape.Radius + Guard)) return default;
+        }
 
         // Rim walk: the shore annulus of every lobe, tracking one rim range over all of them.
         var rimMin = float.PositiveInfinity;

@@ -9,6 +9,7 @@ using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
 using VoxelEngine.WorldGen.Sky;
 using VoxelEngine.WorldGen.Structures;
+using VoxelEngine.WorldGen.Volcanoes;
 
 namespace VoxelEngine;
 
@@ -60,6 +61,7 @@ public static class WorldSeed
         {
             ColumnCache.Reset();
             TerrainErg.ResetCache();
+            VolcanoSites.ResetCache();
         }
     }
 
@@ -130,6 +132,7 @@ public static class WorldSeed
         SkyTrees.ResetCache();
         TowerPlacement.ResetCache();
         TerrainPeaks.ResetCaches();
+        VolcanoSites.ResetCache();
         GreatLakes.ResetCaches();
         WaterBodies.ResetCaches();
 

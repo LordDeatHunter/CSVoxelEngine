@@ -8,6 +8,7 @@ using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
 using VoxelEngine.WorldGen.Sky;
 using VoxelEngine.WorldGen.Structures;
+using VoxelEngine.WorldGen.Volcanoes;
 using static VoxelEngine.Chunks.Chunk;
 using Stage = VoxelEngine.WorldGen.WorldgenStageTimer.Stage;
 
@@ -322,6 +323,10 @@ internal static class ChunkTerrainFill
         // cave palettes and the surface features above the ground retain their cells.
         if (WorldSeed.Profile == WorldGenProfile.Dynamic)
             TerrainStrata.Stamp(blocks, column, caves, worldX0, lowerBoundY, worldZ0);
+
+        if (Admits(stampGates, VolcanoStamp.WriteBand(), lowerBoundY))
+            VolcanoStamp.Stamp(blocks, chunk.StateArray, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Volcano);
 
         // Sealed underground rooms and their waystone chambers, after the deep features and the cave life, so no
         // geode, mushroom, formation, gravel pocket or pool is left inside a room. A room's loot chests take their

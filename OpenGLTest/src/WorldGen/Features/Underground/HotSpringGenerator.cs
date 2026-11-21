@@ -54,7 +54,8 @@ public static class HotSpringGenerator
         x = (cellX << WorldFeatureConfig.SpringCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
         z = (cellZ << WorldFeatureConfig.SpringCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
         var radius = WorldFeatureConfig.SpringRadius;
-        if (TerrainErg.Intersects(x - radius, z - radius, x + radius, z + radius)) return false;
+        if (FeatureExclusion.Intersects(x - radius, z - radius, x + radius, z + radius)
+            || VoxelEngine.WorldGen.Volcanoes.VolcanoSites.IntersectsConeDisc(x, z, radius)) return false;
         if (TerrainGenerator.ColdWeight(x, z) < WorldFeatureConfig.SpringMinCold) return false;
         // A spring is a land feature: a cold ocean column would dig the sea floor
         TerrainGenerator.LandHeight(x, z, out var biome, out _, out _, out _);

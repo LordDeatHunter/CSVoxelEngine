@@ -29,7 +29,8 @@ public static class OasisGenerator
         centerX = (cellX << WorldFeatureConfig.OasisCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
         centerZ = (cellZ << WorldFeatureConfig.OasisCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
         var radius = WorldFeatureConfig.OasisRadius;
-        if (TerrainErg.IntersectsDisc(centerX, centerZ, radius))
+        if (FeatureExclusion.IntersectsDisc(centerX, centerZ, radius)
+            || VoxelEngine.WorldGen.Volcanoes.VolcanoSites.IntersectsConeDisc(centerX, centerZ, radius))
             return false;
 
         // The deep desert only: where SurfaceWaterGate keeps ordinary lakes out, so an oasis is

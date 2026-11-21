@@ -373,7 +373,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
     WorldGen/                  # procedural worldgen: terrain, biomes, caves and worms, the
                                #   tree front end and batches, clouds, the generational cache
       WorldGenProfile.cs      # persisted Legacy/Dynamic generation recipe selector
-      Biome.cs                 # the Forest / Desert / Ocean / Taiga / Frozen / Steppe / Savanna enum (appended, never reordered)
+      Biome.cs                 # stored byte enum, Forest through appended Jungle 7 and Charred 8 (never reordered)
       BiomeClassifier.cs       # the biome climate split: SampleClimate (the one temperature/humidity reader, at the
                                #   ClimateWarp-displaced position), BiomeWeights
                                #   over the Classify/ColdOf/WarmOf/DryOf/SemiDryOf seams, WetnessOf, ColdWeight, WarmWeight
@@ -405,6 +405,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   ReliefLandHeight (no hashed peaks) and PreFeatureLandHeight (massifs, no lone peaks) for the site tests
       TerrainNoise.cs          # every 2D terrain noise channel, built only by Reseed (static ctor, WorldSeed.Apply); MakeNoise
       TerrainErg.cs            # Dynamic wind dunes and pure cached all-Desert chunk-column core verdict/footprint checks
+      FeatureExclusion.cs     # shared erg and owned-caldera guard footprint rejection for surface writers
       TerrainStrata.cs         # seeded Dynamic bare-arid rock bands; near fill and generated far LOD share the selector
       TerrainIslands.cs        # the ocean-gated island term folded into BiomeWeights (LandWeight: large and small
                                #   island noise) and the stateless hashed archipelago footprints
@@ -434,6 +435,12 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   miss and in TerrainGenerator.Climate (off in production)
       WorldgenStageTimer.cs    # test/probe seam: per-stage wall time of ChunkTerrainFill.GenerateBlockData,
                                #   passed explicitly (null in production)
+      Volcanoes/               # Dynamic cone and bounded owned caldera; namespace VoxelEngine.WorldGen.Volcanoes
+        VolcanoSite.cs         # immutable accepted site center, radii, floor, depth and rise
+        VolcanoSites.cs        # static cached site verdict from Q0, province and massif; exact crater-guard scan
+        VolcanoShape.cs        # pure cone height and final-height lava/lining classifier
+        VolcanoCell.cs         # none, lining and lava classifications
+        VolcanoStamp.cs        # normal/probe post-strata owned volume writes and state reset
       Caves/                   # the overworld cave biomes (plans/CAVE_BIOMES.md), namespace VoxelEngine.WorldGen.Caves
         CaveBiome.cs           # Plain / FrozenEcho / DesertEcho / Crystal / Fungal / MagmaDeep, apart from the surface Biome
         CaveCellRole.cs        # Interior / Wall / Floor / Ceiling: where a rock cell sits against the open cave

@@ -79,6 +79,12 @@ public sealed class DynamicTreeProfileTests
                 Assert.Contains(giant, row);
                 continue;
             }
+            if (biome == Biome.Charred)
+            {
+                Assert.Null(TreeGenerator.SpeciesByBiome[(int)biome]);
+                Assert.Equal([TreeSpeciesRegistry.Require("charred_tree")], row);
+                continue;
+            }
             var primary = TreeGenerator.SpeciesByBiome[(int)biome];
             if (primary == null) Assert.Empty(row);
             else Assert.Equal([primary], row);

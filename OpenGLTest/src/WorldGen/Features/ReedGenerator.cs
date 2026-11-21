@@ -32,7 +32,7 @@ public static class ReedGenerator
 
     /// <summary>Whether the surface column (x, z) is a reed clump member, before the terrain checks.</summary>
     public static bool TryGetReed(int x, int z) =>
-        !TerrainErg.Intersects(x, z, x, z) &&
+        !FeatureExclusion.Intersects(x, z, x, z) &&
         // An oasis pond edge is reedy whatever the clump rule says
         (OasisGenerator.IsDisc(x, z)
         || PlantClumps.TryGetMember(Clumps, WorldGenerationConfig.Seed, x, z, null, out _, out _));

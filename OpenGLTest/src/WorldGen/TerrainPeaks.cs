@@ -1,4 +1,5 @@
 using System;
+using VoxelEngine.WorldGen.Volcanoes;
 
 namespace VoxelEngine.WorldGen;
 
@@ -258,6 +259,7 @@ internal static class TerrainPeaks
         if (MassifHeight(centerX, centerZ) != 0f) return default;
 
         var nominal = MathUtils.Lerp(WorldGenerationConfig.PeakMinRadius, WorldGenerationConfig.PeakMaxRadius, size);
+        if (VolcanoSites.IntersectsConeDisc(centerX, centerZ, nominal)) return default;
         var continental = BiomeClassifier.PreIslandOceanWeight(centerX, centerZ) == 0f;
         if (!IsForestProfile(centerX, centerZ, continental)) return default;
         for (var k = 0; k < TerrainSites.RimPoints; k++)
@@ -363,6 +365,7 @@ internal static class TerrainPeaks
         if (TerrainRelief.CordilleraSupport(x, z) > WorldGenerationConfig.KnollMaxCordilleraSupport
             || LonePeakHeight(x, z) > 0f) return default;
         var radius = MathUtils.Lerp(WorldGenerationConfig.KnollMinRadius, WorldGenerationConfig.KnollMaxRadius, size);
+        if (VolcanoSites.IntersectsConeDisc(x, z, radius)) return default;
         var continental = BiomeClassifier.PreIslandOceanWeight(x, z) == 0f;
         if (!IsForestProfile(x, z, continental)) return default;
         for (var k = 0; k < TerrainSites.RimPoints; k++)

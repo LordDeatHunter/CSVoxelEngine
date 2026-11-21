@@ -9,6 +9,7 @@ namespace VoxelEngine.WorldGen;
 internal static class TerrainNoise
 {
     private const int DynamicAbyssSeedOffset = 200;
+    private const int VolcanicProvinceSeedOffset = 199;
     private const int DynamicEcotoneSeedOffset = 204;
     private const int CordilleraSeedOffset = 190;
     private const int CordilleraWarpSeedOffset = 191;
@@ -60,6 +61,7 @@ internal static class TerrainNoise
     internal static FastNoiseLite StrataNoise;
     internal static FastNoiseLite ErgNoise;
     internal static FastNoiseLite ErgRidgeNoise;
+    internal static FastNoiseLite VolcanicProvinceNoise;
     internal static FastNoiseLite LakeShapeNoise;
 
     /// <summary>The pack-ice floe field, read only by <see cref="Features.SnowGenerator.IsFrozenWater"/>.</summary>
@@ -177,6 +179,8 @@ internal static class TerrainNoise
         StrataNoise = MakeNoise(StrataSeedOffset, WorldGenerationConfig.StrataFrequency);
         ErgNoise = MakeNoise(ErgSeedOffset, WorldGenerationConfig.ErgFrequency);
         ErgRidgeNoise = MakeNoise(ErgRidgeSeedOffset, WorldGenerationConfig.ErgRidgeFrequency);
+        VolcanicProvinceNoise = MakeNoise(VolcanicProvinceSeedOffset,
+            WorldGenerationConfig.VolcanicProvinceFrequency);
         LakeShapeNoise = MakeNoise(90, WorldGenerationConfig.LakeShapeFrequency);
         // Offset 152 was unused (ClimateWarp took 151, the feature generators stop at 142)
         PackIceNoise = MakeNoise(152, WorldGenerationConfig.PackIceFrequency, octaves: 2);

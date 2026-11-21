@@ -112,6 +112,17 @@ public static class ColumnCache
                 soilDepth = dirtDepth == 0 ? 0 : 2;
                 break;
 
+            case Biome.Charred:
+                // Dark rock dominates the province; ash pockets and shallow cinder give it
+                // variation without replacing deep stone hosts for caves and ores.
+                topBlock = TerrainNoise.VolcanicProvinceNoise.GetNoise(
+                    worldX * WorldGenerationConfig.CharredMaterialSampleMultiplier,
+                    worldZ * WorldGenerationConfig.CharredMaterialSampleMultiplier) > 0f
+                    ? TerrainGenerator.CharredStoneBlock : TerrainGenerator.AshBlock;
+                soilBlock = TerrainGenerator.CinderSoilBlock;
+                soilDepth = dirtDepth == 0 ? 0 : Math.Min(dirtDepth, 2);
+                break;
+
             default:
                 // Every grass biome (forest, taiga, steppe, savanna: the set
                 // BiomeTraits.RimsWaterWithSand names, which the far LOD reads too) keeps the grass
@@ -130,7 +141,7 @@ public static class ColumnCache
         var needTop = soilDepth != 0 && t < Size;
         var needSoil = soilDepth != 0 && Math.Max(1, t - (Size - 1)) <= Math.Min(soilDepth, t);
 
-        if (biome is not Biome.Desert and not Biome.Ocean and not Biome.Frozen)
+        if (biome is not Biome.Desert and not Biome.Ocean and not Biome.Frozen and not Biome.Charred)
         {
             var beach = dirtDepth != 0 && TerrainGenerator.IsBeachHeight(terrainHeight)
                         && (needTop || needSoil)
@@ -161,7 +172,8 @@ public static class ColumnCache
             if (depth < 0) break;
 
             blocks[Idx(x, y, z)] = soilDepth == 0
-                ? depth == 0 && TerrainGenerator.IsScree(worldX, worldZ, terrainHeight)
+                ? biome == Biome.Charred && depth == 0 ? TerrainGenerator.CharredStoneBlock
+                : depth == 0 && TerrainGenerator.IsScree(worldX, worldZ, terrainHeight)
                     ? TerrainGenerator.GravelBlock : TerrainGenerator.RockBlock
                 : depth == 0 ? topBlock
                 : depth <= soilDepth ? soilBlock

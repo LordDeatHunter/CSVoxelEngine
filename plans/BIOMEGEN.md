@@ -22,6 +22,9 @@ Last updated 2026-11-13.
 
 ## In progress
 
+- [ ] S5a Dynamic Charred province and owned caldera: source candidate prepared; Release
+  controls, natural site witness and visual acceptance remain open.
+
 Nothing.
 
 ## Open
@@ -111,6 +114,7 @@ down, which matters for ramp thresholds).
 | `IslandNoise` | 159 | 1/1200 | 2 | large islands (`TerrainIslands.LandWeight` only) |
 | `IslandSmallNoise` | 160 | 1/420 | 2 | small islands, eased in by the archipelago footprints (`TerrainIslands.LandWeight` only) |
 | `GreatLakeShapeNoise` | 161 | 1/120 | 2 | pulls a great-lake lobe's outline inward into bays (`GreatLakes.Sample` only) |
+| `VolcanicProvinceNoise` | 199 | 1/9000 | 1 | Dynamic Charred province, distinct from warped temperature/humidity |
 
 The range ridge itself is the older `MountainNoise` (3 octaves at `MountainFrequency`) under
 `MountainWarp`, gated by `MountainMask` (offset 84); those keep their offsets and frequencies.
@@ -567,7 +571,7 @@ block (`assets/data/blocks/permafrost.json`, `hit_rock`, hand-diggable, drops it
 * Cotton: Savanna centers with `desertWeight < CottonMaxDesertWeight` (= 0.5 - `BiomeBorderDither`, clear
   of the savanna/sand dither).
 * Boulders: Forest, Taiga, Steppe, Savanna floor.
-* Mobs: Forest, Steppe, Savanna (`MobSpawner.SpawnsMobs`).
+* Mobs: every land biome, including Charred, subject to ordinary ground rules (`MobSpawner.SpawnsMobs`).
 
 ---------------------------------------------------------------------------------------------------
 
@@ -727,18 +731,59 @@ rather than weaken a rule, and never loosen a test. The shipped values needed no
 
 ### 8. Everything that branches on biome (the blast radius of adding/changing one)
 
+**S5a Dynamic Charred append audit.** `Biome.Charred = 8` is appended after Jungle;
+`ColumnFileCodec` persists the biome byte (no version or layout bump); `ChunkNetCodec` sends
+heights, water level, warmth and wetness only. Name-registered `charred_stone` uses the existing block/item mapping.
+`BiomeClassifier` adds independent seed-offset-199 province noise after the ocean and old
+Desert verdict, including dither; `SampleClimate` and its tint values are untouched.
+`TerrainGenerator` composes the accepted cone at Q2/Q3 from Q0 relief. Existing desert and
+ocean lerps dilute a flank continuously. Blended dune and ocean heights inside its disc may
+change, while the old Desert/Ocean decisions and erg sand ownership stay unchanged.
+`VolcanoSites` caches a pure static-factory verdict and resets with `WorldSeed.Apply`.
+Center plus eight rim points establish context only. Every integer column inside the
+crater+guard disc is checked for zero ocean/desert weights, province threshold and
+dithered Charred before an owned lake is admitted. The cold acceptance scan is at most
+118² = 13,924 bounding-square integer visits per fractional-center candidate, plus its nested
+biome/relief/massif work. This is the ownership proof for between-sample columns; the
+outer cone may cross another non-ocean, non-desert climate and retains that material.
+
+`ColumnCache` gives Charred exposed stone or ash over shallow cinder and ordinary deep
+stone; it is excluded from generic grass and beach fallback. `charred_tree` has a
+Dynamic-only Charred worldgen row, with its existing leafless hell ownership intact.
+`FeatureExclusion` preserves the erg check and adds the caldera-guard footprint predicate
+at its 24 existing surface-writer consumers. Peaks/knolls, great lakes/ponds, oasis and
+hot springs reject the accepted cone footprint one way; underground ruins and waystones
+reject owned vertical boxes. Water and ravine/canyon cuts yield in the guard; snow uses
+the current fluid-top rule. Charred uses the existing non-Ocean mob gate; no new wildlife,
+sandworm, cave echo or tint row is added. Existing trait lists exclude Charred from
+bare-rock caps and sandy water rims.
+
+`VolcanoStamp` runs after strata and before underground structures on both normal and
+`generateLakes:false` fills. The final crater floor, not nominal summit, owns each lava,
+side and bed lining cell; state bytes are reset. `Stage.Volcano` records that work.
+Generated LOD uses actual cone heights and an owned generated lava tile; supplied LOD
+keeps supplied columns authoritative and never infers lava. The far tile is opaque and
+nonemissive. Generated LOD and the near writer both omit snow inside the guard; coarse
+cell-center edges remain approximate. Near and generated far material use the same named
+48× sampling multiplier for ash/stone patches, separate from province classification.
+Existing imported-edge mismatch remains. S5b deep conduit/chamber must
+extend the bounded classifier and exclusion, not rely on a full-volume S5a fill.
+
 Grep `Biome\.` to confirm; at time of writing:
 
-* **Classifier:** `WorldGen/BiomeClassifier.cs` (`Classify`, `DitherBiome`), `WorldGen/BiomeTraits.cs`
-  (`ShowsBareRock` = Forest/Steppe/Savanna; `RimsWaterWithSand` = Forest/Taiga/Steppe/Savanna).
-* **Fill:** `Chunks/ColumnCache.cs` `GenerateColumn` switch (Desert/Ocean/Frozen/default = every grass
-  biome); `TerrainGenerator.Compute` rock cap (`ShowsBareRock`); `WorldGen/ChunkTerrainFill.cs:65`
-  (oasis columns are forced to Forest fill).
+* **Classifier:** `WorldGen/BiomeClassifier.cs` (`Classify`, `DitherBiome`, Dynamic
+  `VolcanicProvince`), `WorldGen/BiomeTraits.cs` (`ShowsBareRock` and `RimsWaterWithSand`
+  exclude Charred).
+* **Fill:** `Chunks/ColumnCache.cs` `GenerateColumn` switch (Desert/Ocean/Frozen/Charred/default
+  grass biomes); `TerrainGenerator.Compute` rock cap (`ShowsBareRock`);
+  `WorldGen/ChunkTerrainFill.cs` (oasis columns use Forest fill, accepted calderas get an
+  owned stamp after strata on both normal and lake-probe paths).
 * **Water:** `WorldGen/WaterBodies.cs` (`CanHoldSurfaceWater`: not Ocean, not Desert; Ocean level);
   `WorldGen/GreatLakes.cs` refuses a site whose rim or interior holds a biome failing the same test.
 * **Trees:** each `assets/data/trees/<species>.json` `worldgen.biomes` (data-driven; adding a biome to a
   species is JSON). Current: cactus=desert; dead_tree=desert+frozen+steppe; oak=forest; palm=desert
-  (oasis only); spruce=taiga; stone_pine=savanna; baobab has no worldgen. The `Biome` enum names are
+  (oasis only); spruce=taiga; stone_pine=savanna; `charred_tree`=Dynamic Charred;
+  baobab has no worldgen. The `Biome` enum names are
   parsed lowercase. Per-species `openness` scales `ForestOpenness` thinning (stone_pine 0). A new
   worldgen species must not raise the tree reach without checking `TreeGenerator.ReachChunkRadius`,
   `ProxyReach` and `SimulationConfig.MaxLeafDecayBacklogCells`.
@@ -749,9 +794,9 @@ Grep `Biome\.` to confirm; at time of writing:
   Forest oak, Taiga spruce, Savanna stone pine; none where the species declares none),
   `IceSpike` (frozen), `Oasis` (desert, deep), `SeaStack` (ocean), `HotSpring`
   (cold, hashed), `Reed`/`LilyPad`/`Pebble`/`Cairn`/`RuinedPillar`, underground generators.
-* **Mobs:** `Simulation/MobSpawner.cs` `SpawnsMobs` (Forest, Steppe, Savanna); a supplied column reads
-  `Biomes[i]`, a generated one the undithered `BiomeAt`. **A new biome gets no mobs unless it is added
-  there.**
+* **Mobs:** `Simulation/MobSpawner.cs` `SpawnsMobs` admits every non-Ocean biome, including Charred,
+  subject to ordinary ground rules. A supplied column reads `Biomes[i]`, a generated one the
+  undithered `BiomeAt`.
 * **LOD:** `Lod/LodMeshBuilder.cs` `ClassifyGenerated` (snow top above `SnowColdThreshold` of
   `ColdWeightAt`, ice top on a water cell exactly where `SnowGenerator.IsFrozenWater` says so,
   beach via `RimsWaterWithSand` (or Ocean), bare rock via `ShowsBareRock` above `MountainRockHeight`,
@@ -767,10 +812,10 @@ Grep `Biome\.` to confirm; at time of writing:
   source that *supplies* columns the LOD reads the stored `Biomes`; for generated it re-derives from
   worldgen. **Any biome change must be mirrored in the LOD builder or distant terrain disagrees with
   near chunks.**
-* **Net/save:** `ColumnData` biomes ride `ChunkNetCodec.EncodeColumn` and `ColumnFileCodec` (imported
-  maps store a biome byte per column). Adding an enum value changes a persisted byte's meaning space;
+* **Net/save:** imported `ColumnFileCodec` stores a biome byte per column; `ChunkNetCodec` columns
+  send heights, water level, warmth and wetness only. Adding an enum value changes a persisted byte's meaning space;
   append, don't reorder (`Biome` ordinals: Forest 0, Desert 1, Ocean 2, Taiga 3, Frozen 4, Steppe 5,
-  Savanna 6; `TreeGenerator.SpeciesByBiome` sizes itself from the enum).
+  Savanna 6, Jungle 7, Charred 8; `TreeGenerator.SpeciesByBiome` sizes itself from the enum).
 * **Climate-only (not biome):** tint, grade, aurora, snow, ice, grass tuft density. Cold-related visuals
   follow `ColdWeight`.
 * **Cave biomes:** `WorldGen/Caves/CaveBiomes.Classify` reads the column's stored, dithered surface biome:
@@ -1164,7 +1209,7 @@ Grep `Biome\.` to confirm; at time of writing:
 * The origin is Forest only because its raw climate is exactly 0 (§3); spawn is additionally forced to a
   forest valley (relief clear `ReliefSpawnClear*`, which also keeps massifs, lone peaks and islands away, +
   lake spawn-clear radius 72).
-* Desert, Taiga, Frozen and Ocean are mob-free by design (`MobSpawner.SpawnsMobs`).
+* Ocean is mob-free by the biome gate; other biomes use ordinary ground rules (`MobSpawner.SpawnsMobs`).
 * The snow line (0.55), the pack-ice band (0.6..0.72) and the Taiga line (0.70) overlap; see §6.
 * A supplied (imported) column's far LOD decides ice from its stored Frozen biome, so it shows no
   ragged pack-ice band, and its beaches stay Ocean-only; only the generated path has a cold weight and

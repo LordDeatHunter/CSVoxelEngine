@@ -445,7 +445,8 @@ public sealed class BiomeTests
         var required = new HashSet<Biome>();
         foreach (var species in TreeSpeciesRegistry.All)
         {
-            if (species.Worldgen is not { Oasis: false } worldgen) continue;
+            if (species.Worldgen is not { Oasis: false } worldgen
+                || !worldgen.Allows(WorldSeed.Profile)) continue;
             foreach (var biome in Enum.GetValues<Biome>())
                 if (biome != Biome.Ocean && worldgen.GrowsIn(biome))
                     required.Add(biome);

@@ -21,17 +21,17 @@ description: Rules and checklist for changing CSVoxelEngine biome, climate, terr
 
 ## Traps
 
-- **Next free noise seed offset is 189** (188 the jungle mud patches; 187 the cave intermediate pockets) (179-185 the cave biomes, their shape scale and their ores; 186 the vulcanite veins; 153-161 are relief, mountains, peaks, islands, great lakes; 162 the barrier band's patches; 163 the hell caverns; 164 the hell biomes; 165 the hell pools; 166-167 the solid cloud patches; 168-171 the sky islands (zone outline, island outline, top, stalactites); 172-173 the cloud sea; 174 the sky biomes; 175-178 the sky landmasses). Hashed structures use no noise but a `SplitMix64` hash salt instead (ruins 0x5E7A-0x5E7D, waystone satellites 0x5E7E, battle towers 0x5E7F; next free 0x5E80), listed in BIOMEGEN.md under the seed offsets; a new hashed structure takes the next salt and records it there. A new `TerrainNoise` instance needs a new unused offset. `SnowGenerator.DriftNoise` shares offset 89 with `BiomeDitherNoise`; do not "fix" it, it re-lays snow drift.
+- **Check actual source before allocating a noise seed offset.** Charred's province uses 199; the earlier jungle mud patches use 188. Other relief, cave, sky and material fields already occupy many offsets, so a new `TerrainNoise` instance needs an audited unused one. Hashed sites use a separate `SplitMix64` salt (`VolcanoSites` uses `VOLC`). `SnowGenerator.DriftNoise` shares offset 89 with `BiomeDitherNoise`; do not "fix" it, as that would re-lay snow drift.
 - Changing any frequency, octave count, warp amplitude or seed offset re-lays the whole world for existing seeds; existing saves show seams at the edge of edited chunks. Say so in BIOMEGEN §11.
 - The origin's raw temperature and humidity are exactly 0 (OpenSimplex at the lattice origin); the semi-dry ramp midpoint sits just below 0 to keep spawn Forest. A change moving the origin's climate sample breaks `OriginColumnIsForest`; relax the test to its real rule, never tune toward one seed.
 - Widen the temperate band by raising both `TemperatureWarm*` constants together; never move the cold ramp. The climate warp is bounded by stretch <= 2 and by the desert/snow load-radius separation (the tighter limit); if the separation test fails lower the warp or `TemperatureFrequency`, never the rule.
 - `BiomeAt()` is undithered; `ColumnData.Biomes[]` is dithered. Read the latter for "what the world placed".
 - Const toggles are written as multipliers (like `BiomesEnabled`) so the compiler does not flag dead branches.
-- Keep the tallest land under `SkyConfig.CloudHeight` (160) and the far LOD under the AddQuad vertex ceiling over the steepest highland.
+- Use the current finite Dynamic soft ceiling (186) and check every actual writer's vertical clearance, cloud slab and far LOD vertex bounds. Do not use an old cloud-160 rule as a substitute.
 
 ## Checklist: adding a biome
 
-1. Append the `Biome` enum value (never reorder: ordinals ride `ColumnFileCodec`, the network column and `TreeGenerator.SpeciesByBiome`).
+1. Append the `Biome` enum value (never reorder: ordinals ride imported `ColumnFileCodec` and `TreeGenerator.SpeciesByBiome`; network columns send heights, water level and corner climate, not biome bytes).
 2. `BiomeClassifier.Classify` plus any new weight/ramp (read through `SampleClimate`); config in `WorldGenerationConfig`. Keep ramps smooth and exclusive where they share an axis, borders sloped, the desert line at 0.5. Decide whether `DitherBiome` touches it.
 3. `LandHeight` if it has its own profile (blend by a weight, don't switch).
 4. `ColumnCache.GenerateColumn` surface/soil, and `BiomeTraits` (`ShowsBareRock`, `RimsWaterWithSand`) if it shares the grass fill.

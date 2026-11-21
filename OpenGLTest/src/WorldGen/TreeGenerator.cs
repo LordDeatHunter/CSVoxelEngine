@@ -249,7 +249,7 @@ public static class TreeGenerator
         if (found?.Worldgen == null)
             return false;
         var reach = TreeRasterizer.ReachOf(found).Horizontal;
-        if (TerrainErg.Intersects(x - reach, z - reach, x + reach, z + reach))
+        if (FeatureExclusion.Intersects(x - reach, z - reach, x + reach, z + reach))
             return false;
         var rules = found.Worldgen;
 

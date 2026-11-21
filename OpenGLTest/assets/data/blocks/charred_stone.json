@@ -1,0 +1,9 @@
+{
+  "name": "Charred Stone",
+  "model": { "parent": "block/cube_all", "textures": { "all": "charred_stone" } },
+  "sfx": "hit_rock",
+  "hardness": 5,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "loot": "charred_stone"
+}

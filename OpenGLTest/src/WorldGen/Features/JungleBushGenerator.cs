@@ -50,7 +50,7 @@ internal static class JungleBushGenerator
         if (x + 1 >= Chunk.Size || (third && z + 1 >= Chunk.Size)) return false;
         var wx = worldX0 + x;
         var wz = worldZ0 + z;
-        if (TerrainErg.Intersects(wx, wz, wx + 1, wz + (third ? 1 : 0))) return false;
+        if (FeatureExclusion.Intersects(wx, wz, wx + 1, wz + (third ? 1 : 0))) return false;
         var ci = (x << Chunk.SizeShift) | z;
         var height = column.Heights[ci];
         var ly = height + 1 - worldY0;

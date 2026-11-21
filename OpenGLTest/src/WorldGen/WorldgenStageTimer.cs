@@ -86,6 +86,8 @@ internal sealed class WorldgenStageTimer
         UndergroundPools,
         /// <summary>CaveBiomes.Stamp, from the map <see cref="CaveBiomeMap"/> filled.</summary>
         CaveBiomes,
+        /// <summary>VolcanoStamp restores the owned caldera after strata and before underground structures.</summary>
+        Volcano,
         /// <summary>RuinPlacement.StampUnderground.</summary>
         RuinsUnderground,
         /// <summary>WaystonePlacement.StampUnderground.</summary>

@@ -70,7 +70,7 @@ public static class RuinPlacement
         if (TerrainGenerator.IsWaterColumn(x, z, ground)) return false;
         if (!SurfaceClearance.Allows(ground, template.Height - template.GroundLayer)) return false;
         var half = template.Half;
-        if (TerrainErg.Intersects(x - half, z - half, x + half, z + half)) return false;
+        if (FeatureExclusion.Intersects(x - half, z - half, x + half, z + half)) return false;
         if (WorldGenerationConfig.TowersEnabled && TowerPlacement.Meets(x - half - 1, z - half - 1, x + half + 1, z + half + 1))
             return false;
         for (var dx = -half; dx <= half; dx++)
@@ -127,6 +127,10 @@ public static class RuinPlacement
 
         var floor = lowest + (int)(SplitMix64.Unit(hash, 5) * (highest - lowest + 1));
         originY = floor - template.GroundLayer;
+        if (VoxelEngine.WorldGen.Volcanoes.VolcanoSites.IntersectsOwnedBox(
+                x - template.Half, originY, z - template.Half,
+                x + template.Half, originY + template.Height - 1, z + template.Half))
+            return false;
         return true;
     }
 

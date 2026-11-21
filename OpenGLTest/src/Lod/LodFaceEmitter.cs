@@ -31,6 +31,10 @@ internal ref struct LodFaceEmitter
     private readonly BlockType _snow;
     private readonly BlockType _ice;
     private readonly BlockType _permafrost;
+    private readonly BlockType _ash;
+    private readonly BlockType _cinder;
+    private readonly BlockType _charredStone;
+    private readonly BlockType _lava;
     private readonly LodLevelSpec _spec;
     private readonly int _cellSize;
     private readonly int _cells;
@@ -110,6 +114,10 @@ internal ref struct LodFaceEmitter
         _snow = BlockType.ById[TerrainGenerator.SnowBlock]!;
         _ice = BlockType.ById[TerrainGenerator.IceBlock]!;
         _permafrost = BlockType.ById[TerrainGenerator.PermafrostBlock]!;
+        _ash = BlockType.ById[TerrainGenerator.AshBlock]!;
+        _cinder = BlockType.ById[TerrainGenerator.CinderSoilBlock]!;
+        _charredStone = BlockType.ById[TerrainGenerator.CharredStoneBlock]!;
+        _lava = BlockType.ById[VoxelEngine.WorldGen.Volcanoes.VolcanoStamp.LavaBlock]!;
 
         // Fill the tint lattice: one climate evaluation per point gives both palettes. Lattice
         // point (li, lj) is the minimum corner of chunk column (regionChunkX + li, regionChunkZ + lj),
@@ -152,6 +160,9 @@ internal ref struct LodFaceEmitter
         1 => _gravel,
         3 => _dirt,
         4 => _permafrost,
+        5 => _ash,
+        6 => _lava,
+        7 => _charredStone,
         _ => _stone,
     };
 
@@ -333,9 +344,11 @@ internal ref struct LodFaceEmitter
             // Dynamic's snow stamp covers rock and scree too. Legacy keeps its earlier
             // rock-before-snow LOD precedence; supplied rock/snow classifications never overlap.
             : WorldSeed.Profile == WorldGenProfile.Dynamic && rock && snowCell ? _snow
+            : floor == 6 ? _lava
             : rock ? (_gravelTop[gi * _heightGrid + gj] ? _gravel : _stone)
             : snowCell ? _snow
             : biome == Biome.Desert ? _sand
+            : biome == Biome.Charred ? FloorBlock(floor)
             : _grass);
         AddBlockFace(TopFace, new Vector3(i * _cellSize, top * _cellSize, j * _cellSize),
             top > ground ? CanopyBlock(_canopyLeaf[gi * _heightGrid + gj]) : surface,
@@ -422,6 +435,7 @@ internal ref struct LodFaceEmitter
                         ? (biome == Biome.Desert ? _sandstone.FaceTiles[f]
                             : isSeaCell || rock ? _stone.FaceTiles[f]
                             : biome == Biome.Frozen ? (stripped ? _stone : _permafrost).FaceTiles[f]
+                            : biome == Biome.Charred ? (stripped ? _stone : _cinder).FaceTiles[f]
                             : soil.FaceTiles[f])
                         : _stone.FaceTiles[f];
                     AddQuad(_vertices, _indices, f, sideOrigin, tile, shades, suns);

@@ -212,6 +212,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   (StructureLocatorTests: exactly the nearest, the ring cap, the landing) (mirrors
                                #   src/WorldGen/Structures)
     Trees/                     # the tree growth engine, flat over src's Trees/Shape, Logics and Features
+    Volcanoes/                 # pure Charred classifier, cone/owned-volume geometry and content/profile controls
 USER_TODO.md                          # placeholder art list: every stand-in asset an agent added, its generator and
                                       #   what a replacement must keep (see "Placeholder art" under "Content")
 tools/                                # asset generators: models, animation clips, sounds and the wiki scenarios, each

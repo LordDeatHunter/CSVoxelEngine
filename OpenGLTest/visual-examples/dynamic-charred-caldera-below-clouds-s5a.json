@@ -1,0 +1,21 @@
+{
+  // Frozen seed 1337 Dynamic caldera, same site and natural world as the S5a
+  // three-shot source. Previous originals remain unchanged. Eyes at y158 are
+  // below drawn cloud slabs beginning at y160 and inside the owned lava disc;
+  // neither view is an accepted clear ray or material result until inspected.
+  // Start at the first eye with VOXEL_SPAWN/LOOK; VOXEL_TIME=147 is morning.
+  "output": "/tmp/s5a-e79ada7e-caldera-below-clouds-visuals",
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    // Radius 24 from center, looking down to the owned lava near floor y151.
+    { "op": "teleport", "pos": [-15032.5, 158, -7804.5], "yaw": 180, "pitch": -14.3 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "natural_open_caldera_lava_below_clouds", "hideHud": true },
+    // Radius 29 toward radius 33, across the lava edge to the owned shore.
+    // The shore top is magma_block; charred_stone lines its lower cells.
+    { "op": "teleport", "pos": [-15027.5, 158, -7804.5], "yaw": 0, "pitch": -56.7 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "natural_caldera_lava_shore_lining", "hideHud": true }
+  ]
+}
