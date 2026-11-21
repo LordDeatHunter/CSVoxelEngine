@@ -379,6 +379,11 @@ internal static class ChunkTerrainFill
             DesertFloraGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.DesertFlora);
 
+        if (WorldSeed.Profile == WorldGenProfile.Dynamic
+            && Admits(stampGates, JungleBushGenerator.WriteBand(column), lowerBoundY))
+            JungleBushGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.JungleBushes);
+
         if (WorldFeatureConfig.FlowersEnabled && Admits(stampGates, FlowerGenerator.WriteBand(column), lowerBoundY))
             FlowerGenerator.Stamp(blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Flowers);

@@ -1,0 +1,22 @@
+{
+  // Source-only S4a follow-up to dynamic-ground-cover-candidates.json.
+  // Seed 1337 Dynamic is selected by Program's storeless VOXEL_SCRIPT path.
+  // Run later from OpenGLTest/ with VOXEL_TIME=147; visibility is unverified.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    // The camera is in recorded air at (-8793,71,10404), above a bush at y70,
+    // outside the three-cell shrub at (-8800,10401), (-8799,10401),
+    // (-8800,10402). All three shrub cells have air at y71.
+    // The target bears about -156 degrees; yaw -135 keeps it off the ray.
+    { "op": "teleport", "pos": [-8792.5, 71.4, 10404.5], "yaw": -135, "pitch": -12 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "natural_jungle_whole_shrub_off_axis", "hideHud": true },
+    // The recorded tall fern at (-8799,10408) has base y69 and top y70.
+    // Its bearing from the same air cell is about +146 degrees; yaw +125
+    // frames the base, joint and top away from the central selection ray.
+    { "op": "teleport", "pos": [-8792.5, 71.4, 10404.5], "yaw": 125, "pitch": -15 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "screenshot", "name": "natural_jungle_tall_fern_joint_off_axis", "hideHud": true }
+  ]
+}

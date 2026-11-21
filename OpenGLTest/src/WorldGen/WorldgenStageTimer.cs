@@ -100,6 +100,8 @@ internal sealed class WorldgenStageTimer
         Cotton,
         /// <summary>DesertFloraGenerator.Stamp.</summary>
         DesertFlora,
+        /// <summary>JungleBushGenerator.Stamp.</summary>
+        JungleBushes,
         /// <summary>FlowerGenerator.Stamp.</summary>
         Flowers,
         /// <summary>FoliageGenerator.Stamp.</summary>

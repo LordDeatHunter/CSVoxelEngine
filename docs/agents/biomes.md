@@ -324,6 +324,17 @@ and empty surface cell must all agree before a plant is written; the S3a erg ret
 fringe. Some small cacti carry a compact flower in the cell above: the base must have been placed
 in the same y chunk, so a cactus at its top cell stays unflowered. Legacy generation has none of
 these plants. Generated far LOD retains the sand/height but draws no plant proxy.
+Dynamic forest, jungle, savanna, steppe and dry Taiga also use a denser wetness-driven ground-cover
+roll (`DynamicGroundCover`): it chooses weighted grass, fern, tall fern or bush only on actual dry
+grass, with Jungle mud admitted in Jungle only. Snow-covered Taiga remains bare. A tall fern's
+rigid lower half holds a swaying named-supported top in the same y chunk; at the top boundary it
+falls back to a single fern. `JungleBushGenerator` admits sparse horizontal two- or three-cell
+bushes on equally high grounded grass or Jungle mud, all-or-nothing inside one chunk column.
+Bushes are non-solid, slow movement and cannot hold another block or a full-face attachment;
+they are not species leaves, so a fluid washing them away does not schedule tree leaf decay.
+Hard erg-core intersections, occupied cells, water and insufficient cloud clearance reject whole
+plants. Legacy's former tuft and shrub decisions are unchanged; generated far LOD has no
+individual ground-cover proxy.
 Wild cotton grows in **clumps** in the savanna (`CottonGenerator`: a savanna center whose desert
 weight stays under `CottonMaxDesertWeight`, where the savanna/sand dither starts, so a clump never
 lands on dithered sand), stamped after the pebbles and before the flowers and foliage. Placement is the reusable

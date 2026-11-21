@@ -56,7 +56,9 @@ public static class FoliageGenerator
         if (TerrainErg.Intersects(x, z, x, z)) return false;
         // An oasis disc is a dense meadow whatever the patch noise says
         if (OasisGenerator.IsDisc(x, z)) return true;
-        if (TerrainGenerator.FloraBiomeAt(x, z) is not (Biome.Forest or Biome.Steppe or Biome.Savanna or Biome.Jungle)) return false;
+        var biome = TerrainGenerator.FloraBiomeAt(x, z);
+        if (biome is not (Biome.Forest or Biome.Steppe or Biome.Savanna or Biome.Jungle)
+            && (WorldSeed.Profile != WorldGenProfile.Dynamic || biome != Biome.Taiga)) return false;
         if (GrassPatchNoise.GetNoise(x, z) <= WorldFeatureConfig.GrassPatchThreshold) return false;
         // Denser where the climate is wetter (Climate's own wetness, the tint's input)
         TerrainGenerator.Climate(x, z, out _, out var wetness);
@@ -67,7 +69,9 @@ public static class FoliageGenerator
     /// <summary>The tuft density a column of this climate wetness takes: the dry end's share at
     /// 0, the wet end's at 1, linear between.</summary>
     public static float GrassDensityAt(float wetness) =>
-        MathUtils.Lerp(WorldFeatureConfig.GrassDensityDry, WorldFeatureConfig.GrassDensityWet,
+        MathUtils.Lerp(
+            WorldSeed.Profile == WorldGenProfile.Dynamic ? WorldFeatureConfig.DynamicGrassDensityDry : WorldFeatureConfig.GrassDensityDry,
+            WorldSeed.Profile == WorldGenProfile.Dynamic ? WorldFeatureConfig.DynamicGrassDensityWet : WorldFeatureConfig.GrassDensityWet,
             MathUtils.Clamp01(wetness));
 
     /// <summary>Whether the desert or frozen surface column (x, z) grows a dead shrub.</summary>
@@ -79,7 +83,7 @@ public static class FoliageGenerator
     /// Whether a dead shrub grows over <paramref name="ground"/> at (x, z): sand only in a desert
     /// column and permafrost only in a frozen one, so neither ground grows one in the other biome.
     /// </summary>
-    private static bool TryGetDeadShrubOn(ushort ground, int x, int z)
+    internal static bool TryGetDeadShrubOn(ushort ground, int x, int z)
     {
         Biome biome;
         if (ground == SandGroundBlock) biome = Biome.Desert;
@@ -108,6 +112,11 @@ public static class FoliageGenerator
     /// </summary>
     public static void Stamp(ushort[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
+        if (WorldSeed.Profile == WorldGenProfile.Dynamic)
+        {
+            DynamicGroundCover.Stamp(blocks, column, worldX0, worldY0, worldZ0);
+            return;
+        }
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
         {
@@ -145,7 +154,10 @@ public static class FoliageGenerator
     /// <c>ly = height + 1 - worldY0</c>, one above a column height, so the band is
     /// <see cref="StampBand.AboveSurface"/>.
     /// </summary>
-    internal static StampBand WriteBand(ColumnData column) => StampBand.AboveSurface(column);
+    internal static StampBand WriteBand(ColumnData column) =>
+        WorldSeed.Profile == WorldGenProfile.Dynamic
+            ? DynamicGroundCover.WriteBand(column)
+            : StampBand.AboveSurface(column);
 
     private static float UnitHash(int x, int z, int salt)
     {

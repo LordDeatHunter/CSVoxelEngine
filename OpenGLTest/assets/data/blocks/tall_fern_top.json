@@ -1,0 +1,21 @@
+{
+  "name": "Tall Fern Top",
+  "model": { "parent": "block/cross", "textures": { "cross": "tall_fern_top_textureless" } },
+  "modelTint": "grass",
+  "hardness": 0,
+  "flammable": true,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "sway": true,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "supportBlock": "block/tall_fern",
+  "blocksSight": false,
+  "loot": "none",
+  "sfx": "hit_grass",
+  "stepSfx": "step_grass",
+  "hitbox": { "min": [0.18, 0, 0.18], "max": [0.82, 1, 0.82] }
+}
