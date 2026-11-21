@@ -3,8 +3,10 @@
 Each tile is the colored twin's (`<name>.png`) shading carried over to a fixed four-step gray
 ramp: the texel's luminance is ranked within the tile and cut at its quartiles, so the darkest
 quarter of the leaf takes the darkest gray and the brightest quarter the lightest. The alpha
-mask is the twin's exactly. The ramp's mean sits near the old flat 98, so the tinted plant keeps
-its brightness against the grass while gaining the contrast the tall grass and grass top have.
+mask is the twin's exactly. The ramp is then shifted so the tile's mean gray is the flat 98 the
+tint gain is tuned for (SurfaceShadingConfig.BiomeTintTextureGray, held by BiomeTintTextureTests),
+so the tinted plant keeps its brightness against the grass while gaining the contrast the tall
+grass and grass top have.
 
 Run: python -I tools/generate-plant-textureless.py
 """
@@ -14,6 +16,7 @@ from PIL import Image
 
 TILES = ["bush", "fern", "tall_fern_bottom", "tall_fern_top"]
 RAMP = [58, 82, 106, 136]
+MEAN_GRAY = 98
 BLOCKS = Path(__file__).resolve().parent.parent / "OpenGLTest" / "assets" / "textures" / "blocks"
 
 
@@ -26,19 +29,22 @@ def shade(name):
     pixels = list(src.getdata())
     lums = sorted(luminance(p) for p in pixels if p[3] > 0)
     cuts = [lums[len(lums) * q // 4] for q in (1, 2, 3)]
+    steps = [None if p[3] == 0 else sum(1 for c in cuts if luminance(p) >= c) for p in pixels]
+    opaque = [RAMP[s] for s in steps if s is not None]
+    shift = round(MEAN_GRAY - sum(opaque) / len(opaque))
     out = []
-    for p in pixels:
-        if p[3] == 0:
+    for s in steps:
+        if s is None:
             out.append((0, 0, 0, 0))
             continue
-        step = sum(1 for c in cuts if luminance(p) >= c)
-        g = RAMP[step]
+        g = RAMP[s] + shift
         out.append((g, g, g, 255))
     dst = Image.new("RGBA", src.size)
     dst.putdata(out)
     dst.save(BLOCKS / f"{name}_textureless.png")
     colors = {p for p in out if p[3] > 0}
-    print(f"{name}_textureless.png: {len(colors)} colors")
+    mean = sum(p[0] for p in out if p[3] > 0) / sum(1 for p in out if p[3] > 0)
+    print(f"{name}_textureless.png: {len(colors)} colors, mean gray {mean:.1f}")
 
 
 for tile in TILES:
